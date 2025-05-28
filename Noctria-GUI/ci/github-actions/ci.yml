@@ -1,1 +1,37 @@
+name: CI
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies (backend)
+        run: |
+          pip install -r backend/requirements.txt
+      
+      - name: Install dependencies (frontend)
+        run: |
+          pip install -r frontend/requirements.txt
+      
+      - name: Run backend tests
+        run: |
+          cd backend/tests && pytest
+      
+      - name: Build Docker images
+        run: |
+          docker build -t noctria-backend ./backend
+          docker build -t noctria-frontend ./frontend
