@@ -19,19 +19,14 @@ jobs:
         with:
           python-version: '3.9'
       
-      - name: Install dependencies (backend)
+      - name: Install dependencies
         run: |
-          pip install -r backend/requirements.txt
+          pip install -r requirements.txt
       
-      - name: Install dependencies (frontend)
+      - name: Run unit tests
         run: |
-          pip install -r frontend/requirements.txt
+          pytest tests/unit_tests.py
       
-      - name: Run backend tests
+      - name: Run integration tests
         run: |
-          cd backend/tests && pytest
-      
-      - name: Build Docker images
-        run: |
-          docker build -t noctria-backend ./backend
-          docker build -t noctria-frontend ./frontend
+          pytest tests/final_system_tests.py
