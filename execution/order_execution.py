@@ -1,27 +1,21 @@
 import MetaTrader5 as mt5
+import pandas as pd
 
 class OrderExecution:
-    """トレードのエントリー／エグジットを管理するモジュール"""
+    """トレードのエントリー／エグジットを管理"""
 
     def __init__(self, symbol="EURUSD"):
         self.symbol = symbol
 
     def execute_trade(self, order_type, lot_size):
-        """注文の送信"""
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": self.symbol,
-            "volume": lot_size,
-            "type": order_type,
-            "price": mt5.symbol_info_tick(self.symbol).bid,
-            "magic": 123456,
-            "comment": "Noctria Kingdom Trade"
-        }
-        result = mt5.order_send(request)
-        return result.comment if result.retcode == mt5.TRADE_RETCODE_DONE else "Trade failed"
+        """注文シグナルをCSVに保存（MQL5が読み取る）"""
+        trade_data = {"symbol": self.symbol, "order_type": order_type, "lot_size": lot_size}
+        df = pd.DataFrame([trade_data])
+        df.to_csv("trade_signal.csv", index=False)
+        return f"Trade signal saved: {order_type} {lot_size}"
 
-# ✅ 注文執行テスト
+# ✅ 注文シグナルのテスト
 if __name__ == "__main__":
     executor = OrderExecution()
-    trade_result = executor.execute_trade(mt5.ORDER_TYPE_BUY, 0.1)
-    print("Trade Execution Result:", trade_result)
+    result = executor.execute_trade("BUY", 0.1)
+    print(result)
