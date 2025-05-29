@@ -1,39 +1,18 @@
-import numpy as np
+from strategy_optimizer import select_best_strategy, strategies_performance
+from custom_metrics_strategy import custom_metrics_strategy
+from liquidity_based_strategy import liquidity_adjusted_strategy
+from extended_data_strategy import extended_data_strategy
 
-class StrategyRunner:
-    """複数の戦略を統合し、最適なトレード決定を導くモジュール"""
-    
-    def __init__(self, strategies):
-        self.strategies = strategies
-    
-    def execute(self, market_data):
-        """各戦略を適用し、最適な判断を導出"""
-        results = {}
-        for name, strategy in self.strategies.items():
-            results[name] = strategy.process(market_data)
-        
-        optimal_decision = self._aggregate_results(results)
-        return optimal_decision
+def run_optimal_strategy(market_data):
+    """最適な戦略を適用"""
+    best_strategy = select_best_strategy(strategies_performance)
 
-    def _aggregate_results(self, strategy_results):
-        """戦略結果を統合し、最終意思決定を行う"""
-        decision_counts = {decision: list(strategy_results.values()).count(decision) for decision in set(strategy_results.values())}
-        best_choice = max(decision_counts, key=decision_counts.get)
-        return best_choice
-
-# ✅ 戦略適用テスト
-if __name__ == "__main__":
-    from Aurus_Singularis import AurusSingularis
-    from Levia_Tempest import LeviaTempest
-    from Noctus_Sentinella import NoctusSentinella
-
-    strategies = {
-        "trend_analysis": AurusSingularis(),
-        "scalping": LeviaTempest(),
-        "risk_management": NoctusSentinella(),
-    }
-
-    runner = StrategyRunner(strategies)
-    mock_market_data = {"price": 1.2500, "previous_price": 1.2480, "price_history": [1.2450, 1.2475, 1.2500]}
-    final_decision = runner.execute(mock_market_data)
-    print("Final Trading Decision:", final_decision)
+    if best_strategy == "custom_metrics":
+        return custom_metrics_strategy(market_data)
+    elif best_strategy == "liquidity_based":
+        return liquidity_adjusted_strategy(market_data)
+    elif best_strategy == "extended_data":
+        return extended_data_strategy(market_data)
+    else:
+        market_data["strategy_signal"] = "HOLD"
+        return market_data
