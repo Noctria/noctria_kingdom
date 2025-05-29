@@ -1,25 +1,29 @@
 import streamlit as st
-from strategies.strategy_runner import StrategyRunner
+import pandas as pd
+from strategies.strategy_runner import apply_tradingview_strategy
 from execution.risk_control import evaluate_risk
-from data.raw_data_loader import fetch_fintokei_data, optimize_processing
+from data.tradingview_fetcher import fetch_tradingview_data
 
-st.title("Noctria GUI - フィントケイ市場データ統合")
+st.title("Noctria GUI - TradingView市場データ統合")
+
+# TradingViewから市場データ取得
+raw_data = fetch_tradingview_data()
+processed_data = apply_tradingview_strategy(raw_data)
 
 # 市場データの表示
-processed_df = optimize_processing(fetch_fintokei_data())
-st.subheader("市場データ（フィントケイ）")
-st.dataframe(processed_df)
+st.subheader("市場データ（TradingView）")
+st.dataframe(processed_data)
 
 # 戦略シグナルの表示
-strategy_runner = StrategyRunner(processed_df)
 st.subheader("戦略シグナル")
-st.write(strategy_runner.run_strategies())
+st.write(f"現在の戦略: {processed_data['strategy_signal'].iloc[-1]}")
 
 # リスク評価の表示
 st.subheader("リスク評価")
-st.write(evaluate_risk(processed_df))
+st.write(evaluate_risk(processed_data))
 
 # 更新ボタンの追加
 if st.button("市場データを更新"):
-    processed_df = optimize_processing(fetch_fintokei_data())
+    raw_data = fetch_tradingview_data()
+    processed_data = apply_tradingview_strategy(raw_data)
     st.write("データを更新しました！")
