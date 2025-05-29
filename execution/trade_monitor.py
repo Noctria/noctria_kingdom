@@ -1,35 +1,20 @@
-import MetaTrader5 as mt5
-import pandas as pd
+import datetime
 
 class TradeMonitor:
-    """リアルタイムで注文状況をモニタリングするモジュール"""
-
     def __init__(self):
-        pass
+        self.last_trade_date = None
 
-    def get_open_positions(self):
-        """現在のオープンポジションを取得"""
-        positions = mt5.positions_get()
-        if positions:
-            df = pd.DataFrame(list(positions), columns=positions[0]._asdict().keys())
-            return df
-        else:
-            return "No active positions"
+    def update_trade(self, trade_date):
+        self.last_trade_date = trade_date
 
-    def get_trade_history(self, days=1):
-        """過去のトレード履歴を取得"""
-        history = mt5.history_deals_get(days_ago=days)
-        if history:
-            df = pd.DataFrame(list(history), columns=history[0]._asdict().keys())
-            return df
-        else:
-            return "No recent trades"
+    def check_trade_activity(self):
+        """ 30日間無トレードの失格防止 """
+        if self.last_trade_date:
+            days_since_last_trade = (datetime.datetime.now() - self.last_trade_date).days
+            if days_since_last_trade >= 30:
+                return "Warning: No trades in the last 30 days!"
+        return "Trade activity is normal."
 
-# ✅ トレード監視テスト
-if __name__ == "__main__":
-    monitor = TradeMonitor()
-    open_positions = monitor.get_open_positions()
-    trade_history = monitor.get_trade_history()
-
-    print("Open Positions:\n", open_positions)
-    print("Trade History:\n", trade_history)
+trade_monitor = TradeMonitor()
+trade_monitor.update_trade(datetime.datetime.now() - datetime.timedelta(days=29))
+print(trade_monitor.check_trade_activity())
