@@ -15,13 +15,25 @@ class AurusSingularis:
     """市場トレンド分析と適応戦略設計を行うAI（改修版）"""
 
     def __init__(self):
+        self._configure_gpu()  # ✅ GPU の設定をクラス内部でも適用
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
+
+    def _configure_gpu(self):
+        """✅ GPU メモリの使用を動的制限（重複登録を防ぐ）"""
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            try:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as e:
+                print(f"GPU メモリ設定エラー: {e}")
 
     def _build_model(self):
         """強化学習と市場データ統合を考慮した戦略適用モデル"""
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(128, activation='relu', input_shape=(12,)),  # 特徴量を拡張
+            tf.keras.layers.Input(shape=(12,)),  # ✅ 入力層を明示的に定義
+            tf.keras.layers.Dense(128, activation='relu'),  # 特徴量を拡張
             tf.keras.layers.Dense(64, activation='relu'),
             tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dense(1, activation='sigmoid')
