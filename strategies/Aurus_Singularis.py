@@ -2,6 +2,15 @@ import numpy as np
 import tensorflow as tf
 from data_loader import MarketDataFetcher
 
+# ✅ GPU メモリの使用を制限（動的確保）
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        print(f"GPU メモリ設定エラー: {e}")
+
 class AurusSingularis:
     """市場トレンド分析と適応戦略設計を行うAI（改修版）"""
 
@@ -24,7 +33,7 @@ class AurusSingularis:
         """市場データを分析し、Noctria AIとの戦略統合を適用"""
         processed_data = self._preprocess_data(market_data)
         prediction = self.model.predict(processed_data)
-        
+
         if prediction > 0.6:
             return "BUY"
         elif prediction < 0.4:
