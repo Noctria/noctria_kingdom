@@ -1,6 +1,17 @@
 import logging
 import torch
 import numpy as np
+import tensorflow as tf  # TensorFlow を追加
+
+# ✅ GPU メモリの使用を制限（段階的に確保する設定）
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        print(f"GPU メモリ設定エラー: {e}")
+
 from strategies.Aurus_Singularis import AurusSingularis
 from strategies.Levia_Tempest import LeviaTempest
 from strategies.Noctus_Sentinella import NoctusSentinella
