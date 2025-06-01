@@ -1,0 +1,99 @@
+🎯 本日のテーマ：Noctriaプロジェクトの開発およびMT5環境テスト
+✅ 1️⃣ 全体方針・課題
+王（NoctriaMasterAI）のコードの開発・テスト強化
+
+各種Python仮想環境（venv）とLinux（WSL2）・Windows環境をまたいだ開発体制の整理
+
+MetaTrader5（MT5）との接続テストの実行
+
+✅ 2️⃣ 開発環境（WSL2 / Windows）
+WSL2 Ubuntu 24.04 を中心に開発中
+
+venv環境（venv_noctria）で作業
+
+プロジェクトディレクトリ：~/noctria-kingdom-main（実態は /mnt/e/noctria-kingdom-main へのシンボリックリンク）
+
+✅ 3️⃣ 王（NoctriaMasterAI）コード
+strategies/Noctria.py にクラス NoctriaMasterAI を定義
+
+LSTM予測、強化学習（DQN, PPO, DDPG）、SHAP可視化、自己進化（遺伝的アルゴリズム）などを統合
+
+新規に decide_action() メソッド を実装し、エージェントの意思決定ロジックを明確化
+
+✅ 4️⃣ テスト用ファイル test_decide_action.py の作成
+NoctriaMasterAIの初期化および decide_action() の呼び出しテストを実行
+
+✅ 5️⃣ ファイル依存の解決
+evolutionary_algorithm.py を新規作成・配置
+
+配置先：strategies/evolutionary/
+
+内容：GeneticAlgorithmクラスのスタブ実装（進化的戦略のダミー動作）
+
+✅ 6️⃣ MetaTrader5接続テスト（Windows）
+Windows上に venv_mt5 を新規に作成
+
+pip install MetaTrader5 にてライブラリ導入完了
+
+mt5_test.py を作成してテスト：
+
+接続成功
+
+口座情報（login, balance, server など）とシンボル情報（USDJPYなど）の取得成功
+
+デモ口座の接続テストが完了
+
+✅ 7️⃣ その他開発上のポイント
+pydeps による依存関係可視化
+
+Linux上の venv_noctria にて実施
+
+出力SVGは生成されるも、空の依存関係（環境設定や不適切なパス問題）もあった
+
+venv環境の切り替え・確認：
+
+source venv/bin/activate で有効化
+
+deactivate で終了
+
+which python / pip list でインストール状況確認
+
+Windows PowerShellでは .\venv_mt5\Scripts\Activate.ps1 による仮想環境有効化を確認
+
+⚠️ 明日以降の課題・TODO
+✅ 戦略開発の次のステップ：
+
+NoctriaMasterAIの decide_action() や LSTM予測などの詳細なロジックテスト
+
+強化学習（DQN/PPO/DDPG）のパラメータチューニングやバックテスト
+
+✅ 依存関係可視化の改善
+
+pydeps使用時の環境やオプションの見直し
+
+不要ファイル除外パターンを明確化
+
+✅ MT5との接続応用
+
+実際の戦略実装と連動するためのインターフェース（例：注文発注、ポジション管理）を進める
+
+✅ テスト口座での検証
+
+明確な login / server / password セットで、リアルタイムデータ取得の挙動を確認
+
+💡 引き継ぎメモ
+🟩 各仮想環境
+
+Linux: venv_noctria がメイン作業環境
+
+Windows: venv_mt5 はMT5接続専用（テスト用）
+
+🟩 NoctriaMasterAI（王）の拡張計画
+
+戦略アーキテクチャを更に拡充（各家臣との連携も見据える）
+
+モジュール構造のドキュメント化も進める予定
+
+🟩 進捗ファイル
+
+0529progress.md, 20250530.md などの日報ファイルも随時更新していく方針
