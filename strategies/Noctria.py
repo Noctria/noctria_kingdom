@@ -26,6 +26,9 @@ class NoctriaMasterAI(gym.Env):
         # SHAP（Explainable AI）による意思決定の透明化
         self.explainer = shap.Explainer(self._model_predict, self._get_sample_data())
 
+        # ポートフォリオ最適化エージェント
+        self.portfolio_optimizer = PortfolioOptimizer()
+
         # 戦略適応パラメータ（市場環境に応じて動的変更）
         self.strategy_params = {
             "BUY_THRESHOLD": 0.6,
@@ -65,6 +68,14 @@ class NoctriaMasterAI(gym.Env):
         model.compile(optimizer="adam", loss="mse")
         return model
 
+    def optimize_portfolio(self, market_data):
+        """✅ AI主導のポートフォリオ最適化"""
+        return self.portfolio_optimizer.optimize_allocation(market_data)
+
+    def rebalance_portfolio(self, market_data):
+        """✅ 市場変動に応じたポートフォリオの調整"""
+        return self.portfolio_optimizer.rebalance_portfolio(market_data)
+
     def predict_future_market(self, historical_data):
         """✅ LSTM を使って市場の未来予測"""
         processed_data = np.array(historical_data).reshape(1, 30, 6)
@@ -100,32 +111,10 @@ class NoctriaMasterAI(gym.Env):
         shap_values = self.explainer(input_data)
         return shap_values
 
-    def update_strategy(self, trade_history):
-        """✅ 過去のトレード結果を分析し、成功率の高い戦略を強化"""
-        success_rates = [trade["profit"] / max(trade["risk"], 1) for trade in trade_history]
-        avg_success = np.mean(success_rates)
-
-        if avg_success > 1.5:
-            self.learning_rate *= 1.1
-            self.gamma *= 1.05
-        elif avg_success < 0.8:
-            self.learning_rate *= 0.9
-            self.gamma *= 0.95
-
-        self.dqn_agent = DQN("MlpPolicy", self, verbose=1, learning_rate=self.learning_rate, gamma=self.gamma)
-        self.ppo_agent = PPO("MlpPolicy", self, verbose=1, learning_rate=self.learning_rate, gamma=self.gamma)
-        self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1, learning_rate=self.learning_rate, gamma=self.gamma)
-        
-        self.dqn_agent.learn(total_timesteps=self.update_frequency)
-        self.ppo_agent.learn(total_timesteps=self.update_frequency)
-        self.ddpg_agent.learn(total_timesteps=self.update_frequency)
-
-        print(f"🚀 NoctriaMasterAI の強化学習モデルを最新データで再調整！")
-
 # ✅ AIの統合進化テスト
 if __name__ == "__main__":
     env = NoctriaMasterAI()
     env.dqn_agent.learn(total_timesteps=10000)
     env.ppo_agent.learn(total_timesteps=10000)
     env.ddpg_agent.learn(total_timesteps=10000)
-    print("🚀 NoctriaMasterAI の未来予測・進化型AI・XAI統合完了！")
+    print("🚀 NoctriaMasterAI の未来予測・進化型AI・XAI・ポートフォリオ最適化統合完了！")
