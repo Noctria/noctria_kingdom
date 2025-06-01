@@ -1,3 +1,6 @@
+```plaintext
+(ここに、さっき出したコメント付きツリーをそのまま貼り付ける)
+
 noctria-kingdom-main/
 ├── core/
 │ ├── config.yaml # 🌟 全体設定ファイル
