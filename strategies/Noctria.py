@@ -50,6 +50,9 @@ class NoctriaMasterAI(gym.Env):
         self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
         self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)
 
+        # 自己対戦型強化学習の初期化
+        self.self_play_ai = NoctriaSelfPlayAI()
+
         # 状態空間（市場データ）
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
         # 行動空間（BUY / SELL / HOLD）
@@ -75,6 +78,10 @@ class NoctriaMasterAI(gym.Env):
     def rebalance_portfolio(self, market_data):
         """✅ 市場変動に応じたポートフォリオの調整"""
         return self.portfolio_optimizer.rebalance_portfolio(market_data)
+
+    def self_play_training(self, past_trades):
+        """✅ Noctria が自身の過去トレードデータを活用して戦略を強化"""
+        return self.self_play_ai.self_play_training(past_trades)
 
     def predict_future_market(self, historical_data):
         """✅ LSTM を使って市場の未来予測"""
@@ -117,4 +124,4 @@ if __name__ == "__main__":
     env.dqn_agent.learn(total_timesteps=10000)
     env.ppo_agent.learn(total_timesteps=10000)
     env.ddpg_agent.learn(total_timesteps=10000)
-    print("🚀 NoctriaMasterAI の未来予測・進化型AI・XAI・ポートフォリオ最適化統合完了！")
+    print("🚀 NoctriaMasterAI の未来予測・進化型AI・XAI・ポートフォリオ最適化・自己対戦型強化学習 統合完了！")
