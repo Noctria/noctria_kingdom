@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import gym
+import shap
 import requests
 from stable_baselines3 import DQN, PPO, DDPG
 from transformers import pipeline
@@ -21,6 +22,9 @@ class NoctriaMasterAI(gym.Env):
 
         # 高度なリスク管理用 異常値検知モデル
         self.anomaly_detector = IsolationForest(contamination=0.05)
+
+        # SHAP（Explainable AI）による意思決定の透明化
+        self.explainer = shap.Explainer(self._model_predict, self._get_sample_data())
 
         # 戦略適応パラメータ（市場環境に応じて動的変更）
         self.strategy_params = {
@@ -91,6 +95,11 @@ class NoctriaMasterAI(gym.Env):
         best_strategy = self.evolutionary_agent.optimize(market_data)
         return best_strategy
 
+    def explain_strategy_decision(self, input_data):
+        """✅ SHAP を使い、AI の意思決定プロセスを可視化"""
+        shap_values = self.explainer(input_data)
+        return shap_values
+
     def update_strategy(self, trade_history):
         """✅ 過去のトレード結果を分析し、成功率の高い戦略を強化"""
         success_rates = [trade["profit"] / max(trade["risk"], 1) for trade in trade_history]
@@ -113,26 +122,10 @@ class NoctriaMasterAI(gym.Env):
 
         print(f"🚀 NoctriaMasterAI の強化学習モデルを最新データで再調整！")
 
-    def step(self, action):
-        """✅ AIの意思決定にリアルタイム市場データを活用"""
-        market_data = self.fetch_market_data()
-        future_trend = self.predict_future_market(market_data["historical_data"])
-        evolved_strategy = self.evolve_trading_strategy(market_data)
-
-        if future_trend > self.strategy_params["BUY_THRESHOLD"]:
-            adjusted_strategy = "BUY"
-        elif future_trend < self.strategy_params["SELL_THRESHOLD"]:
-            adjusted_strategy = "SELL"
-        else:
-            adjusted_strategy = evolved_strategy
-
-        reward = self.calculate_reward(action, market_data)
-        return self._get_state(market_data), reward, False, {}
-
 # ✅ AIの統合進化テスト
 if __name__ == "__main__":
     env = NoctriaMasterAI()
     env.dqn_agent.learn(total_timesteps=10000)
     env.ppo_agent.learn(total_timesteps=10000)
     env.ddpg_agent.learn(total_timesteps=10000)
-    print("🚀 NoctriaMasterAI の未来予測・進化型AI 統合完了！")
+    print("🚀 NoctriaMasterAI の未来予測・進化型AI・XAI統合完了！")
