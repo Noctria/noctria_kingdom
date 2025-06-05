@@ -5,61 +5,62 @@ import pandas as pd
 
 class MarketDataFetcher:
     """
-    Yahoo Finance経由で市場データを取得し、整形するクラス。
-    通貨ペア・株式・指数の取得に対応（例: USDJPY=X, AAPL, ^GSPC）。
+    Yahoo Finance経由でドル円（USDJPY）データを取得する専用クラス。
     """
 
     def __init__(self):
-        # 初期化設定（必要に応じて拡張可）
+        # 特に初期化パラメータはなし
         pass
 
-    def get_historical_data(self, symbol="USDJPY=X", interval="1h", period="1mo"):
+    def get_usdjpy_historical_data(self, interval="1h", period="1mo"):
         """
-        過去の市場データを取得
-        :param symbol: 例 "USDJPY=X"（ドル円）、"AAPL"（Apple株式）、"^GSPC"（S&P500指数）
-        :param interval: データ間隔（例: "1h", "1d", "1wk"）
-        :param period: データ期間（例: "1mo", "3mo", "1y"）
-        :return: np.ndarray (例: (行数, 列数)) または None
+        ドル円のヒストリカルデータを取得
+        :param interval: データ間隔（例: "1h", "1d"）
+        :param period: 取得期間（例: "1mo", "3mo", "1y"）
+        :return: np.ndarray (行数, 列数) または None
         """
-        print(f"📥 データ取得中: symbol={symbol}, interval={interval}, period={period}")
-        
+        symbol = "USDJPY=X"  # Yahoo Financeシンボル
+        print(f"📥 USDJPYデータ取得: interval={interval}, period={period}")
+
         # データ取得
         df = yf.download(symbol, interval=interval, period=period, progress=False)
 
         if df.empty:
-            print(f"⚠️ データが取得できませんでした: {symbol}")
+            print("⚠️ USDJPYデータが取得できませんでした")
             return None
 
-        # 欠損値を補完
+        # 欠損値補完
         df.fillna(method="ffill", inplace=True)
 
-        # "Open", "High", "Low", "Close", "Volume"列のみ使用
+        # "Open", "High", "Low", "Close", "Volume" 列のみ抽出
         df = df[["Open", "High", "Low", "Close", "Volume"]]
-        print(f"✅ 取得データ形状: {df.shape}")
+        print(f"✅ USDJPYデータ取得完了: {df.shape}")
 
-        # NumPy配列に変換して返す
+        # NumPy配列で返す
         return df.values
 
-    def get_latest_price(self, symbol="USDJPY=X"):
+    def get_usdjpy_latest_price(self):
         """
-        現在価格（最新の終値）を取得
-        :param symbol: 例 "USDJPY=X"
+        ドル円の最新の終値を取得
         :return: float または None
         """
-        data = self.get_historical_data(symbol=symbol, interval="1d", period="1d")
+        data = self.get_usdjpy_historical_data(interval="1d", period="1d")
         if data is not None and len(data) > 0:
-            latest_close = data[-1][3]  # "Close"列を取得
-            print(f"💰 最新の終値: {latest_close}")
+            latest_close = data[-1][3]  # "Close" 列
+            print(f"💰 USDJPYの最新終値: {latest_close}")
             return latest_close
         return None
 
 if __name__ == "__main__":
-    # 簡易テスト
+    # テスト例
     fetcher = MarketDataFetcher()
-    data = fetcher.get_historical_data(symbol="USDJPY=X", interval="1h", period="1mo")
-    if data is not None:
-        print("🔎 データの一部を表示:")
-        print(data[-5:])  # 直近5行
 
-    latest_price = fetcher.get_latest_price(symbol="AAPL")
-    print(f"Apple株式の最新終値: {latest_price}")
+    # ヒストリカルデータ取得テスト
+    data = fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")
+    if data is not None:
+        print("🔎 USDJPY直近データ（最後の5行）:")
+        print(data[-5:])
+
+    # 最新終値取得テスト
+    latest_price = fetcher.get_usdjpy_latest_price()
+    print(f"USDJPY最新終値: {latest_price}")
