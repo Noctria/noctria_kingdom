@@ -1,42 +1,43 @@
+# core/meta_ai.py
+
 import numpy as np
-import gym
 
 class MetaAI:
-    """各戦略AIの出力を統合し、最終的な戦略を決定するMeta AI"""
+    def __init__(self, strategy_agents=None, state_dim=12, action_dim=3):
+        """
+        MetaAI: 各戦略AIの統合管理・最終意思決定を行うクラス
 
-    def __init__(self, agents):
-        self.agents = agents
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
-        self.action_space = gym.spaces.Discrete(3)  # 0: HOLD, 1: BUY, 2: SELL
+        Parameters:
+        -----------
+        strategy_agents : dict
+            例: {
+                "AurusSingularis": AurusSingularisインスタンス,
+                "LeviaTempest": LeviaTempestインスタンス,
+                ...
+            }
+        state_dim : int
+            状態ベクトルの次元数（例: 12）
+        action_dim : int
+            行動空間の次元数（例: 3）
+        """
+        if strategy_agents is None:
+            strategy_agents = {}
+        self.strategy_agents = strategy_agents
+        self.state_dim = state_dim
+        self.action_dim = action_dim
 
     def decide_final_action(self, market_state):
-        """各戦略AIの出力を集約して最終アクションを決定"""
-        strategy_actions = {name: agent.process(market_state) for name, agent in self.agents.items()}
+        """
+        各戦略AIに市場状態を渡し、その結果をまとめる。
+        現状は単純にランダム選択しているが、
+        実際には統合アルゴリズムや多数決などに置き換え可能。
+        """
+        # 各戦略AIの出力を取得
+        strategy_actions = {
+            name: agent.process(market_state)
+            for name, agent in self.strategy_agents.items()
+        }
 
-        if "AVOID_TRADING" in strategy_actions.values() or "REDUCE_RISK" in strategy_actions.values():
-            return "HOLD"
-
-        if list(strategy_actions.values()).count("BUY") > list(strategy_actions.values()).count("SELL"):
-            return "BUY"
-        elif list(strategy_actions.values()).count("SELL") > list(strategy_actions.values()).count("BUY"):
-            return "SELL"
-
-        return "HOLD"
-
-# ✅ テスト用サンプル
-if __name__ == "__main__":
-    class DummyAgent:
-        def process(self, market_state):
-            return np.random.choice(["BUY", "SELL", "HOLD"])
-
-    agents = {
-        "AurusSingularis": DummyAgent(),
-        "LeviaTempest": DummyAgent(),
-        "NoctusSentinella": DummyAgent(),
-        "PrometheusOracle": DummyAgent()
-    }
-
-    meta_ai = MetaAI(agents)
-    mock_state = {"price": 1.25, "volume": 100}
-    decision = meta_ai.decide_final_action(mock_state)
-    print("MetaAI Decision:", decision)
+        # 例としてランダムに最終行動を決定（統合ルールを組み込む想定）
+        final_action = np.random.choice(["BUY", "SELL", "HOLD"])
+        return final_action, strategy_actions
