@@ -14,7 +14,7 @@ class Noctria:
     def __init__(self):
         self.logger = logging.getLogger("Noctria")
         self.market_fetcher = MarketDataFetcher()
-        self.risk_manager = RiskManager()
+        self.risk_manager = RiskManagement()
 
         # EA戦略4人衆
         self.aurus = AurusSingularis()
