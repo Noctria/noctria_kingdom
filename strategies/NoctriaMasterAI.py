@@ -72,7 +72,8 @@ class NoctriaMasterAI(gym.Env):
 
     def predict_future_market(self, historical_data):
         """LSTMモデルで未来市場スコアを予測"""
-        predict_seq = self.lstm_processor.create_predict_sequence(historical_data)
+        # ✅ prepare_single_sequence を使用！
+        predict_seq = self.lstm_processor.prepare_single_sequence(historical_data)
         prediction = self.forecast_model.predict(predict_seq)
         score = (prediction[0][0] + 1) / 2
         return score
