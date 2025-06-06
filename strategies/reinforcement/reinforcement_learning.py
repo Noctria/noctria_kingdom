@@ -1,12 +1,14 @@
 import numpy as np
+import torch
 from core.NoctriaEnv import NoctriaEnv
 from strategies.reinforcement.dqn_agent import DQNAgent
+from strategies.reinforcement.experience_replay import ExperienceReplay
 
 
-def run_dqn_training(episodes=100, epsilon=0.1):
-    # 環境 & エージェント初期化
+def run_dqn_training(episodes=100, epsilon=0.1, batch_size=32, save_path="logs/dqn_model.pth"):
     env = NoctriaEnv()
     agent = DQNAgent(state_dim=env.state_dim, action_dim=len(env.action_space))
+    replay = ExperienceReplay(capacity=10000)
 
     for episode in range(episodes):
         state = env.reset()
@@ -14,31 +16,32 @@ def run_dqn_training(episodes=100, epsilon=0.1):
         total_reward = 0
 
         while not done:
-            # 行動を決定
             action_idx = agent.decide_action(state, epsilon=epsilon)
             action = env.action_space[action_idx]
-
-            # 環境ステップ
             next_state, reward, done, _ = env.step(action)
             total_reward += reward
 
-            # 経験をリプレイなしの簡易版で即座に学習
-            experience = (
-                np.expand_dims(state, axis=0),  # 状態
-                [action_idx],                   # 行動（整数）
-                [reward],                       # 報酬
-                np.expand_dims(next_state, axis=0),  # 次状態
-                [done]                          # エピソード終了フラグ
-            )
-            agent.update(experience)
+            replay.add(state, action_idx, reward, next_state, done)
+
+            if replay.size() > batch_size:
+                batch = replay.sample(batch_size)
+                agent.update(batch)
 
             state = next_state
 
         print(f"[Episode {episode+1}] Total Reward: {total_reward:.4f}")
 
-    print("✅ 強化学習トレーニング完了！")
+    # ✅ 学習済みモデルを保存
+    torch.save(agent.model.state_dict(), save_path)
+    print(f"✅ モデルを保存しました: {save_path}")
 
 
-# ✅ テスト実行例
+def load_trained_model(agent, load_path="logs/dqn_model.pth"):
+    agent.model.load_state_dict(torch.load(load_path))
+    agent.model.eval()
+    print(f"✅ モデルをロードしました: {load_path}")
+
+
+# ✅ テスト実行
 if __name__ == "__main__":
-    run_dqn_training(episodes=10, epsilon=0.1)
+    run_dqn_training(episodes=10, epsilon=0.1, batch_size=32)
