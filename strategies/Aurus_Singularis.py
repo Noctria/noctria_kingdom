@@ -1,6 +1,8 @@
 import numpy as np
+import pandas as pd
 import tensorflow as tf
-from data.market_data_fetcher import MarketDataFetcher  # ✅ 修正: 正しいインポート
+from data.market_data_fetcher import MarketDataFetcher
+from core.risk_management import RiskManagement
 
 # ✅ GPU メモリの使用を制限（動的確保）
 gpus = tf.config.list_physical_devices('GPU')
@@ -12,12 +14,24 @@ if gpus:
         print(f"GPU メモリ設定エラー: {e}")
 
 class AurusSingularis:
-    """市場トレンド分析と適応戦略設計を行うAI（改修版）"""
+    """市場トレンド分析と適応戦略設計を行うAI（ヒストリカルデータ利用版）"""
 
     def __init__(self):
         self._configure_gpu()
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher()
+
+        # ✅ ヒストリカルデータ取得（1時間足・1ヶ月分）
+        data_array = self.market_fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")
+        if data_array is None:
+            print("⚠️ データ取得失敗。ダミーデータで初期化します")
+            data_array = np.random.normal(loc=100, scale=5, size=(100, 5))
+
+        columns = ["Open", "High", "Low", "Close", "Volume"]
+        historical_data = pd.DataFrame(data_array, columns=columns)
+
+        # ✅ RiskManagementに渡す
+        self.risk_manager = RiskManagement(historical_data=historical_data)
 
     def _configure_gpu(self):
         """✅ GPU メモリの使用を動的制限（重複登録を防ぐ）"""
@@ -68,7 +82,7 @@ if __name__ == "__main__":
     mock_market_data = {
         "price": 1.2345, "volume": 1000, "sentiment": 0.8, "trend_strength": 0.7,
         "volatility": 0.15, "order_block": 0.6, "institutional_flow": 0.8,
-        "short_interest": 0.5, "momentum": 0.9, "trend_prediction": "bullish",
+        "short_interest": 0.5, "momentum": 0.9, "trend_prediction": 0.6,  # 数値化済
         "liquidity_ratio": 1.2
     }
     decision = aurus_ai.process(mock_market_data)
