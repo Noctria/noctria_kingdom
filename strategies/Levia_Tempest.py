@@ -1,6 +1,6 @@
 import numpy as np
-from data_loader import MarketDataFetcher
-from risk_management import RiskManager
+from data.market_data_fetcher import MarketDataFetcher  # ✅ 修正: 正しいインポート
+from core.risk_management import RiskManager  # ✅ core内のモジュールとして修正
 
 class LeviaTempest:
     """スキャルピング戦略を適用する高速トレードAI（改修版）"""
