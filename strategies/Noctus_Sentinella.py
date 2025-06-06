@@ -9,7 +9,7 @@ class NoctusSentinella:
         self.risk_threshold = risk_threshold  # 許容リスクレベル
         self.max_spread = max_spread  # 最大許容スプレッド
         self.min_liquidity = min_liquidity  # 最低市場流動性
-        self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
+        self.market_fetcher = MarketDataFetcher()
         self.risk_manager = RiskManagement()  # ✅ クラス名修正済み
 
     def process(self, market_data):
