@@ -66,7 +66,6 @@ class NoctriaMasterAI(gym.Env):
 
     def adjust_risk_strategy(self, market_data):
         """異常値検知結果を返す（例: REDUCE_POSITION or NORMAL）"""
-        # observation などから「1次元の特徴量リスト」に変換
         features = []
 
         obs = market_data.get("observation", [])
@@ -78,7 +77,6 @@ class NoctriaMasterAI(gym.Env):
         if "price_change" in market_data:
             features.append(market_data["price_change"])
 
-        # IsolationForest の fit & predict
         data = np.array(features).reshape(1, -1)
         self.anomaly_detector.fit(data)
         if self.anomaly_detector.predict(data)[0] == -1:
@@ -104,11 +102,21 @@ class NoctriaMasterAI(gym.Env):
         rl_action, _ = self.ppo_agent.predict(observation, deterministic=True)
         risk_level = self.adjust_risk_strategy(market_data)
 
+        # ✅ ここで action 判定を決める
+        action = "hold"
+        if lstm_score > self.strategy_params["BUY_THRESHOLD"]:
+            action = "buy"
+        elif lstm_score < self.strategy_params["SELL_THRESHOLD"]:
+            action = "sell"
+
         return {
             "lstm_score": lstm_score,
             "rl_action": float(rl_action),
             "risk_level": risk_level,
-            "market_sentiment": "bullish"  # ダミーデータ、必要に応じて修正
+            "market_sentiment": "bullish",   # ダミーデータ
+            "action": action,                # ✅ 追加
+            "symbol": "USDJPY",              # 例
+            "lot": 0.1                       # 例
         }
 
 if __name__ == "__main__":
