@@ -17,7 +17,7 @@ class AurusSingularis:
     def __init__(self):
         self._configure_gpu()
         self.model = self._build_model()
-        self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
+        self.market_fetcher = MarketDataFetcher()
 
     def _configure_gpu(self):
         """✅ GPU メモリの使用を動的制限（重複登録を防ぐ）"""
