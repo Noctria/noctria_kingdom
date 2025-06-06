@@ -1,16 +1,16 @@
 import numpy as np
 from data.market_data_fetcher import MarketDataFetcher  # ✅ 修正: 正しいインポート
-from core.risk_management import RiskManager  # ✅ core内のモジュールとして修正
+from core.risk_management import RiskManagement  # ✅ クラス名の修正
 
 class LeviaTempest:
     """スキャルピング戦略を適用する高速トレードAI（改修版）"""
-    
+
     def __init__(self, threshold=0.05, min_liquidity=120, max_spread=0.018):
         self.threshold = threshold  # 価格変動の閾値
         self.min_liquidity = min_liquidity  # 最低市場流動性（調整済み）
         self.max_spread = max_spread  # 最大スプレッド（調整済み）
         self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
-        self.risk_manager = RiskManager()
+        self.risk_manager = RiskManagement()  # ✅ クラス名を修正
 
     def process(self, market_data):
         """市場データを分析し、短期トレード戦略を決定"""
