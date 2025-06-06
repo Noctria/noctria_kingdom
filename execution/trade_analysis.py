@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 
+print("=== Trade Analysis Script Started ===")
+
 def visualize_trade_history():
     # 直近の全週次レポートを集める
     file_list = sorted(glob.glob("logs/trade_history_*.csv"))
