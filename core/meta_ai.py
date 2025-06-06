@@ -1,65 +1,42 @@
 import numpy as np
+import gym
 
 class MetaAI:
-    """
-    各戦略AIを束ねて統合的な意思決定を行うメタAIクラス。
-    """
+    """各戦略AIの出力を統合し、最終的な戦略を決定するMeta AI"""
 
-    def __init__(self, strategy_agents=None):
-        # ✅ 外部から渡されなければデフォルト戦略群を生成
-        if strategy_agents is not None:
-            self.strategy_agents = strategy_agents
-        else:
-            from strategies.Aurus_Singularis import AurusSingularis
-            from strategies.Levia_Tempest import LeviaTempest
-            from strategies.Noctus_Sentinella import NoctusSentinella
-            from strategies.Prometheus_Oracle import PrometheusOracle
-
-            self.strategy_agents = {
-                "AurusSingularis": AurusSingularis(),
-                "LeviaTempest": LeviaTempest(),
-                "NoctusSentinella": NoctusSentinella(),
-                "PrometheusOracle": PrometheusOracle()
-            }
+    def __init__(self, agents):
+        self.agents = agents
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
+        self.action_space = gym.spaces.Discrete(3)  # 0: HOLD, 1: BUY, 2: SELL
 
     def decide_final_action(self, market_state):
-        """
-        各戦略AIの出力を統合して、最終的なアクションを決定する。
-        """
-        strategy_actions = {}
-        for name, agent in self.strategy_agents.items():
-            # 各戦略AIにprocess()を持たせておく（MetaAI用に決め打ち）
-            if hasattr(agent, "process"):
-                action = agent.process(market_state)
-            else:
-                # 万一 process() がない場合は "HOLD"
-                action = "HOLD"
-            strategy_actions[name] = action
+        """各戦略AIの出力を集約して最終アクションを決定"""
+        strategy_actions = {name: agent.process(market_state) for name, agent in self.agents.items()}
 
-        # ✅ ここでは多数決的に BUY/SELL が多い方を返すシンプルな例
-        buy_count = sum(1 for a in strategy_actions.values() if a == "BUY")
-        sell_count = sum(1 for a in strategy_actions.values() if a == "SELL")
+        if "AVOID_TRADING" in strategy_actions.values() or "REDUCE_RISK" in strategy_actions.values():
+            return "HOLD"
 
-        if buy_count > sell_count:
-            final_action = "BUY"
-        elif sell_count > buy_count:
-            final_action = "SELL"
-        else:
-            final_action = "HOLD"
+        if list(strategy_actions.values()).count("BUY") > list(strategy_actions.values()).count("SELL"):
+            return "BUY"
+        elif list(strategy_actions.values()).count("SELL") > list(strategy_actions.values()).count("BUY"):
+            return "SELL"
 
-        return final_action, strategy_actions
+        return "HOLD"
 
-# ✅ テスト実行例
+# ✅ テスト用サンプル
 if __name__ == "__main__":
-    meta_ai = MetaAI()
-    dummy_market_data = {
-        "price": 1.2345,
-        "previous_price": 1.2300,
-        "volume": 130,
-        "spread": 0.012,
-        "order_block": 0.3,
-        "volatility": 0.15
+    class DummyAgent:
+        def process(self, market_state):
+            return np.random.choice(["BUY", "SELL", "HOLD"])
+
+    agents = {
+        "AurusSingularis": DummyAgent(),
+        "LeviaTempest": DummyAgent(),
+        "NoctusSentinella": DummyAgent(),
+        "PrometheusOracle": DummyAgent()
     }
-    final_action, details = meta_ai.decide_final_action(dummy_market_data)
-    print("MetaAI Final Action:", final_action)
-    print("Details by strategy:", details)
+
+    meta_ai = MetaAI(agents)
+    mock_state = {"price": 1.25, "volume": 100}
+    decision = meta_ai.decide_final_action(mock_state)
+    print("MetaAI Decision:", decision)
