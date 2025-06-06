@@ -1,0 +1,10 @@
+numpy
+pandas
+tensorflow
+gym
+shap
+requests
+scikit-learn
+stable-baselines3
+transformers
+yfinance
