@@ -34,7 +34,7 @@ def execute_order():
         "magic": 123456,
         "comment": "Noctria trade",
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": mt5.ORDER_FILLING_FOK,
     }
 
     result = mt5.order_send(order_request)
