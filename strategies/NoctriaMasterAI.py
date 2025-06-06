@@ -21,6 +21,10 @@ class NoctriaMasterAI(gym.Env):
         super(NoctriaMasterAI, self).__init__()
         print("NoctriaMasterAI: super().__init__() 完了")
 
+        # ✅ ここで observation_space / action_space を先に定義する
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
+        self.action_space = gym.spaces.Discrete(3)
+
         self.market_fetcher = MarketDataFetcher()
         self.order_executor = OrderExecution()
         self.sentiment_model = pipeline("sentiment-analysis")
@@ -42,9 +46,6 @@ class NoctriaMasterAI(gym.Env):
         self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
         self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)
         self.self_play_ai = NoctriaSelfPlayAI()
-
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
-        self.action_space = gym.spaces.Discrete(3)
 
     def build_lstm_model(self):
         model = tf.keras.Sequential([
