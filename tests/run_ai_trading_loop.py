@@ -8,8 +8,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
 from order_execution import OrderExecution
 
-# core/ ディレクトリをインポートパスに加える
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'core')))
+# strategies/ ディレクトリをインポートパスに加える
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'strategies')))
 from NoctriaMasterAI import NoctriaMasterAI
 
 # data/ ディレクトリをインポートパスに加える
