@@ -17,7 +17,10 @@ class NoctriaMasterAI(gym.Env):
     """Noctria Kingdom の統括AI：市場データを分析し、戦略を自己進化させる"""
 
     def __init__(self):
+        print("NoctriaMasterAI: __init__ 開始")
         super(NoctriaMasterAI, self).__init__()
+        print("NoctriaMasterAI: super().__init__() 完了")
+
         self.market_fetcher = MarketDataFetcher()
         self.order_executor = OrderExecution()
         self.sentiment_model = pipeline("sentiment-analysis")
@@ -40,7 +43,6 @@ class NoctriaMasterAI(gym.Env):
         self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)
         self.self_play_ai = NoctriaSelfPlayAI()
 
-        # ✅ observation_space / action_space を定義（必須）
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
         self.action_space = gym.spaces.Discrete(3)
 
@@ -80,11 +82,9 @@ class NoctriaMasterAI(gym.Env):
         市場データを受け取り、AIモデル群の結果を統合して返す。
         core/Noctria.py から呼び出されるインターフェース
         """
-        # 例: observation データは EA戦略が渡す
         observation = market_data.get("observation", np.zeros(12))
         historical_data = market_data.get("historical_prices", [])
 
-        # AI戦略群の結果
         lstm_score = self.predict_future_market(historical_data)
         rl_action, _ = self.ppo_agent.predict(observation, deterministic=True)
         risk_level = self.adjust_risk_strategy(market_data)
@@ -98,7 +98,6 @@ class NoctriaMasterAI(gym.Env):
 
 if __name__ == "__main__":
     env = NoctriaMasterAI()
-    # 例: テスト用のダミーデータ
     dummy_data = {
         "observation": np.random.rand(12),
         "historical_prices": np.random.rand(100, 5),
