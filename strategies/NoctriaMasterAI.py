@@ -19,10 +19,9 @@ class NoctriaMasterAI(gym.Env):
     def __init__(self):
         super(NoctriaMasterAI, self).__init__()
         self.market_fetcher = MarketDataFetcher()
-        self.order_executor = OrderExecutor()
+        self.order_executor = OrderExecution()
         self.sentiment_model = pipeline("sentiment-analysis")
         self.evolutionary_agent = GeneticAlgorithm()
-
         self.anomaly_detector = IsolationForest(contamination=0.05)
         self.explainer = shap.Explainer(self._model_predict, self._get_sample_data())
         self.portfolio_optimizer = PortfolioOptimizer()
