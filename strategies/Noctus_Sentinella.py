@@ -1,7 +1,6 @@
 import numpy as np
 from data.market_data_fetcher import MarketDataFetcher
-from core.risk_management import RiskManager
-
+from core.risk_management import RiskManagement  # ✅ 修正済み
 
 class NoctusSentinella:
     """リスク管理と異常検知を行うAI（改修版）"""
@@ -11,7 +10,7 @@ class NoctusSentinella:
         self.max_spread = max_spread  # 最大許容スプレッド
         self.min_liquidity = min_liquidity  # 最低市場流動性
         self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
-        self.risk_manager = RiskManager()
+        self.risk_manager = RiskManagement()  # ✅ クラス名修正済み
 
     def process(self, market_data):
         """市場データを分析し、リスクを評価"""
