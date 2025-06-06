@@ -7,7 +7,7 @@ from stable_baselines3 import DQN, PPO, DDPG
 from transformers import pipeline
 from sklearn.ensemble import IsolationForest
 from evolutionary_algorithm import GeneticAlgorithm
-from execution.order_execution import OrderExecutor
+from execution.order_execution import OrderExecution
 from data.market_data_fetcher import MarketDataFetcher
 from data.lstm_data_processor import LSTMDataProcessor
 from strategies.portfolio_optimizer import PortfolioOptimizer
