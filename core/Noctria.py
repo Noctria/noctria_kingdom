@@ -45,8 +45,7 @@ class Noctria:
                 "Levia": self.levia,
                 "Noctus": self.noctus,
                 "Prometheus": self.prometheus
-            },
-            state_dim=12  # 例: 観測ベクトルの次元数
+            }
         )
 
     def analyze_market(self):
@@ -57,10 +56,9 @@ class Noctria:
         market_state = self._create_observation_vector()
 
         # ✅ MetaAIが最終戦略を決定
-        final_action, strategy_weights = self.meta_ai.decide_final_action(market_state)
+        final_action = self.meta_ai.decide_final_action(market_state)
 
         self.logger.info(f"MetaAI統合の最終戦略: {final_action}")
-        self.logger.debug(f"各戦略の重み: {strategy_weights}")
 
         return final_action
 
