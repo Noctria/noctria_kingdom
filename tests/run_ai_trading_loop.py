@@ -1,9 +1,21 @@
-# run_ai_trading_loop.py
+# tests/run_ai_trading_loop.py
+
 import time
 import requests
-from order_execution import OrderExecution  # Docker/Linux 側クラス
-from ai_strategies.noctria_master_ai import NoctriaMasterAI  # AI戦略層
-from data.market_data_fetcher import MarketDataFetcher  # データ取得層
+import sys
+import os
+
+# execution/ ディレクトリをインポートパスに加える
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
+from order_execution import OrderExecution
+
+# ai_strategies/ ディレクトリをインポートパスに加える
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ai_strategies')))
+from noctria_master_ai import NoctriaMasterAI
+
+# data/ ディレクトリをインポートパスに加える
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data')))
+from market_data_fetcher import MarketDataFetcher
 
 # 各コンポーネント初期化
 fetcher = MarketDataFetcher()
@@ -15,21 +27,21 @@ while True:
     market_data = fetcher.get_usdjpy_latest_price()
     print("最新市場データ:", market_data)
 
-    # 2️⃣ AI戦略の判定
+    # 2️⃣ AI戦略で分析
     ai_output = ai_strategy.analyze_market(market_data)
     print("NoctriaMasterAI 出力:", ai_output)
 
-    # 3️⃣ エントリー条件チェック（"buy" or "sell"）
+    # 3️⃣ 発注条件判定
     action = ai_output.get("action")
     if action in ["buy", "sell"]:
         symbol = ai_output.get("symbol", "USDJPY")
         lot = ai_output.get("lot", 0.1)
 
-        # 4️⃣ Windows側MT5サーバーに注文送信
+        # 4️⃣ Windows側MT5サーバーに発注
         order_result = executor.execute_order(symbol, lot, order_type=action)
         print("注文結果:", order_result)
     else:
         print("取引しない（HOLD判定）")
 
-    # 5️⃣ ループ間隔（例: 10秒ごと）
+    # 5️⃣ ループ間隔（例: 10秒）
     time.sleep(10)
