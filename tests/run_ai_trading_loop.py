@@ -1,7 +1,6 @@
 # tests/run_ai_trading_loop.py
 
 import time
-import requests
 import sys
 import os
 
