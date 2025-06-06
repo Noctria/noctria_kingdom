@@ -1,14 +1,16 @@
+# tests/test_meta_ai_rl.py
+
 import numpy as np
-from core.meta_ai import MetaAI
 from strategies.Aurus_Singularis import AurusSingularis
 from strategies.Levia_Tempest import LeviaTempest
 from strategies.Noctus_Sentinella import NoctusSentinella
 from strategies.Prometheus_Oracle import PrometheusOracle
+from core.meta_ai import MetaAI
 
 def main():
-    print("✅ MetaAI強化学習サイクルテストを開始します")
+    print("✅ MetaAI PPO学習テストを開始します")
 
-    # 各戦略AIインスタンスを生成
+    # 各戦略AIを初期化
     strategy_agents = {
         "Aurus": AurusSingularis(),
         "Levia": LeviaTempest(),
@@ -16,43 +18,13 @@ def main():
         "Prometheus": PrometheusOracle()
     }
 
-    # ✅ MetaAIに戦略AI群を渡して初期化
+    # MetaAIに戦略群を渡す
     meta_ai = MetaAI(strategy_agents=strategy_agents)
 
-    # 簡易テスト：エピソード数
-    num_episodes = 100
+    # PPO学習サイクルを開始
+    meta_ai.learn(total_timesteps=1000)
 
-    for episode in range(num_episodes):
-        # --- ダミー市場データ（例: 価格変動・ボラティリティなど） ---
-        market_data = {
-            "observation": np.random.rand(12),
-            "historical_prices": np.random.rand(100, 5),
-            "price_change": np.random.normal()
-        }
-
-        # ✅ MetaAIで戦略決定
-        decision = meta_ai.decide_final_action(market_data)
-
-        # --- ダミー報酬を生成（例: ±10pips程度の損益相当） ---
-        profit = np.random.uniform(-10, 10)
-        reward = profit  # シンプルに「損益 = 報酬」
-
-        # --- 次状態（仮） ---
-        next_state = np.random.rand(12)
-
-        # --- 強化学習ループに投入 ---
-        meta_ai.learn(
-            state=market_data["observation"],
-            action=decision,  # ✅ decide_final_action() が文字列を返すので直接渡す
-            reward=reward,
-            next_state=next_state,
-            done=False  # 今回は継続扱い
-        )
-
-        # --- ログ出力 ---
-        print(f"Episode {episode + 1}/{num_episodes} | action={decision} | reward={reward:.2f}")
-
-    print("✅ テスト完了！MetaAIの学習サイクルは正常に動作しています")
+    print("✅ テスト完了！MetaAIのPPO強化学習サイクルは正常に動作しています")
 
 if __name__ == "__main__":
     main()
