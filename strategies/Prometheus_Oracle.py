@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from data_loader import MarketDataFetcher
+from data.market_data_fetcher import MarketDataFetcher
 from risk_management import RiskManager
 
 class PrometheusOracle:
