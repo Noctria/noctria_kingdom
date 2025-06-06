@@ -1,9 +1,12 @@
 import logging
+import numpy as np
+import pandas as pd
+
 from strategies.Aurus_Singularis import AurusSingularis
 from strategies.Levia_Tempest import LeviaTempest
 from strategies.Noctus_Sentinella import NoctusSentinella
 from strategies.Prometheus_Oracle import PrometheusOracle
-from strategies.NoctriaMasterAI import NoctriaMasterAI  # ✅ AI戦略層を統合的に呼び出す
+from strategies.NoctriaMasterAI import NoctriaMasterAI
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
@@ -13,8 +16,21 @@ class Noctria:
 
     def __init__(self):
         self.logger = logging.getLogger("Noctria")
+
+        # ✅ MarketDataFetcherでヒストリカルデータ取得
         self.market_fetcher = MarketDataFetcher()
-        self.risk_manager = RiskManagement()
+        data_array = self.market_fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")
+
+        if data_array is None:
+            # データ取得に失敗したらダミーデータで初期化
+            self.logger.warning("⚠️ ヒストリカルデータ取得失敗。ダミーデータで初期化します")
+            data_array = np.random.normal(loc=100, scale=5, size=(100, 5))
+
+        columns = ["Open", "High", "Low", "Close", "Volume"]
+        historical_data = pd.DataFrame(data_array, columns=columns)
+
+        # ✅ RiskManagementにhistorical_dataを渡す
+        self.risk_manager = RiskManagement(historical_data=historical_data)
 
         # EA戦略4人衆
         self.aurus = AurusSingularis()
@@ -27,15 +43,15 @@ class Noctria:
 
     def analyze_market(self):
         """市場データ取得→AI戦略層分析→EA統合戦略決定"""
-        market_data = self.market_fetcher.fetch_data()
-        if not market_data:
-            self.logger.warning("Market data fetch failed.")
-            return None
+        market_data = {
+            "historical_prices": self.risk_manager.data,  # DataFrame形式で渡す
+            "price_change": 0.05  # 例としてダミー値
+        }
 
-        # ✅ AI戦略層にデータを渡し、総合AI結果を取得
+        # ✅ AI戦略層にデータを渡して総合AI結果を取得
         ai_output = self.ai_env.analyze_market({
             "observation": self._create_observation_vector(market_data),
-            "historical_prices": market_data["historical_prices"],
+            "historical_prices": market_data["historical_prices"].values,
             "price_change": market_data["price_change"]
         })
 
@@ -80,7 +96,6 @@ class Noctria:
         EA戦略などの結果から12次元の観測ベクトルを作成する例。
         本格的には、より高度な特徴量も含めて拡張できる。
         """
-        # 例: 市場価格変化などを埋める
         obs = [market_data.get("price_change", 0.0)] * 12
         return obs
 
@@ -93,6 +108,7 @@ class Noctria:
         _, ai_output, optimal_strategy = result
         self.logger.info(f"Executing trade using optimal strategy: {optimal_strategy}")
         return f"Executing trade using: {optimal_strategy}"
+
 
 # ✅ Noctria AIのテスト起動例
 if __name__ == "__main__":
