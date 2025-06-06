@@ -8,7 +8,7 @@ class ExperienceReplay:
         self.buffer = []
         self.position = 0
 
-    def store(self, state, action, reward, next_state, done):
+    def add(self, state, action, reward, next_state, done):
         """ 新しい経験をバッファに追加 """
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
