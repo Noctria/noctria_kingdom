@@ -3,7 +3,7 @@ import tensorflow as tf
 import gym
 import shap
 import requests
-from stable_baselines3 import DQN, PPO, DDPG
+from stable_baselines3 import PPO, DDPG
 from transformers import pipeline
 from sklearn.ensemble import IsolationForest
 from strategies.evolutionary.evolutionary_algorithm import GeneticAlgorithm
@@ -21,9 +21,9 @@ class NoctriaMasterAI(gym.Env):
         super(NoctriaMasterAI, self).__init__()
         print("NoctriaMasterAI: super().__init__() 完了")
 
-        # ✅ ここで observation_space / action_space を先に定義する
+        # ✅ PPO/ DDPG 対応: 連続アクション空間
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
-        self.action_space = gym.spaces.Discrete(3)
+        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
 
         self.market_fetcher = MarketDataFetcher()
         self.order_executor = OrderExecution()
@@ -42,9 +42,8 @@ class NoctriaMasterAI(gym.Env):
         }
 
         self.forecast_model = self.build_lstm_model()
-        self.dqn_agent = DQN("MlpPolicy", self, verbose=1)
         self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
-        self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)
+        self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)  # 将来的に切り替え可能
         self.self_play_ai = NoctriaSelfPlayAI()
 
     def build_lstm_model(self):
@@ -92,7 +91,7 @@ class NoctriaMasterAI(gym.Env):
 
         return {
             "lstm_score": lstm_score,
-            "rl_action": int(rl_action),
+            "rl_action": float(rl_action),
             "risk_level": risk_level,
             "market_sentiment": "bullish"  # ダミーデータ、必要に応じて修正
         }
