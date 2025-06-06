@@ -4,6 +4,9 @@ import time
 import sys
 import os
 
+# プロジェクトルート自体をパスに追加（トップレベルimport対応）
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 # execution/ ディレクトリをインポートパスに加える
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
 from order_execution import OrderExecution
