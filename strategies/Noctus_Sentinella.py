@@ -1,6 +1,7 @@
 import numpy as np
 from data.market_data_fetcher import MarketDataFetcher
-from risk_management import RiskManager
+from core.risk_management import RiskManager
+
 
 class NoctusSentinella:
     """リスク管理と異常検知を行うAI（改修版）"""
