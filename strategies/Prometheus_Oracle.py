@@ -43,12 +43,23 @@ class PrometheusOracle:
         return float(prediction)
 
     def _preprocess_data(self, market_data):
-        """市場データの前処理"""
+        """
+        市場データの前処理（改修版）
+        ➜ キーが無い場合は0.0でデフォルト埋め
+        """
         return np.array([
-            market_data["price"], market_data["volume"], market_data["sentiment"],
-            market_data["trend_strength"], market_data["volatility"], market_data["order_block"],
-            market_data["institutional_flow"], market_data["short_interest"], market_data["momentum"],
-            market_data["trend_prediction"], market_data["liquidity_ratio"], 1
+            market_data.get("price", 0.0),
+            market_data.get("volume", 0.0),
+            market_data.get("sentiment", 0.0),
+            market_data.get("trend_strength", 0.0),
+            market_data.get("volatility", 0.0),
+            market_data.get("order_block", 0.0),
+            market_data.get("institutional_flow", 0.0),
+            market_data.get("short_interest", 0.0),
+            market_data.get("momentum", 0.0),
+            market_data.get("trend_prediction", 0.0),
+            market_data.get("liquidity_ratio", 0.0),
+            1  # バイアス項などの追加特徴量
         ]).reshape(1, -1)
 
 # ✅ 改修後の市場予測テスト
@@ -57,7 +68,7 @@ if __name__ == "__main__":
     mock_market_data = {
         "price": 1.2345, "volume": 1000, "sentiment": 0.8, "trend_strength": 0.7,
         "volatility": 0.15, "order_block": 0.6, "institutional_flow": 0.8,
-        "short_interest": 0.5, "momentum": 0.9, "trend_prediction": 0.6,  # 文字列ではなく数値に変換
+        "short_interest": 0.5, "momentum": 0.9, "trend_prediction": 0.6,
         "liquidity_ratio": 1.2
     }
     forecast = oracle.predict_market(mock_market_data)
