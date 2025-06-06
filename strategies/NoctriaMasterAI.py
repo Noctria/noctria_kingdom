@@ -9,7 +9,7 @@ from sklearn.ensemble import IsolationForest
 from evolutionary_algorithm import GeneticAlgorithm
 from execution.order_execution import OrderExecutor
 from data.market_data_fetcher import MarketDataFetcher
-from data.lstm_data_processor import LSTMDataProcessor  # LSTMデータ整形クラスを追加
+from data.lstm_data_processor import LSTMDataProcessor
 from strategies.portfolio_optimizer import PortfolioOptimizer
 from strategies.self_play import NoctriaSelfPlayAI
 
@@ -23,19 +23,11 @@ class NoctriaMasterAI(gym.Env):
         self.sentiment_model = pipeline("sentiment-analysis")
         self.evolutionary_agent = GeneticAlgorithm()
 
-        # 異常値検知モデル
         self.anomaly_detector = IsolationForest(contamination=0.05)
-
-        # SHAPによる意思決定の透明化
         self.explainer = shap.Explainer(self._model_predict, self._get_sample_data())
-
-        # ポートフォリオ最適化エージェント
         self.portfolio_optimizer = PortfolioOptimizer()
-
-        # LSTMデータ整形クラス
         self.lstm_processor = LSTMDataProcessor(window_size=30)
 
-        # 戦略適応パラメータ
         self.strategy_params = {
             "BUY_THRESHOLD": 0.6,
             "SELL_THRESHOLD": 0.4,
@@ -43,18 +35,12 @@ class NoctriaMasterAI(gym.Env):
             "TREND_SENSITIVITY": 0.5,
         }
 
-        # LSTMモデル
         self.forecast_model = self.build_lstm_model()
-
-        # 強化学習エージェント
         self.dqn_agent = DQN("MlpPolicy", self, verbose=1)
         self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
         self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)
-
-        # 自己対戦型AI
         self.self_play_ai = NoctriaSelfPlayAI()
 
-        # 状態・行動空間
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
         self.action_space = gym.spaces.Discrete(3)
 
@@ -77,49 +63,46 @@ class NoctriaMasterAI(gym.Env):
         return np.random.rand(100, 12)
 
     def adjust_risk_strategy(self, market_data):
+        """異常値検知結果を返す（例: REDUCE_POSITION or NORMAL）"""
         if self.anomaly_detector.predict([list(market_data.values())])[0] == -1:
             return "REDUCE_POSITION"
         return "NORMAL"
 
     def predict_future_market(self, historical_data):
-        """
-        LSTMモデルで未来市場スコアを予測する部分
-        """
-        # LSTM用の最新シーケンスを整形
+        """LSTMモデルで未来市場スコアを予測"""
         predict_seq = self.lstm_processor.create_predict_sequence(historical_data)
-        print(f"🔍 予測用シーケンス形状: {predict_seq.shape}")
-
-        # LSTM予測
         prediction = self.forecast_model.predict(predict_seq)
-        print(f"🧠 LSTM予測値（生出力）: {prediction}")
-
-        # 例: 0-1スケーリング
         score = (prediction[0][0] + 1) / 2
-        print(f"📈 予測スコア（0-1正規化）: {score}")
         return score
 
-    def decide_action(self, observation, market_data):
-        risk_status = self.adjust_risk_strategy(market_data)
-        if risk_status == "REDUCE_POSITION":
-            print("⚠️ 市場異常検知 → HOLDを強制")
-            return 2  # HOLD
+    def analyze_market(self, market_data):
+        """
+        市場データを受け取り、AIモデル群の結果を統合して返す。
+        core/Noctria.py から呼び出されるインターフェース
+        """
+        # 例: observation データは EA戦略が渡す
+        observation = market_data.get("observation", np.zeros(12))
+        historical_data = market_data.get("historical_prices", [])
 
-        action_rl, _states = self.ppo_agent.predict(observation, deterministic=True)
+        # AI戦略群の結果
+        lstm_score = self.predict_future_market(historical_data)
+        rl_action, _ = self.ppo_agent.predict(observation, deterministic=True)
+        risk_level = self.adjust_risk_strategy(market_data)
 
-        # ドル円データ取得＆LSTM予測
-        historical_data = self.market_fetcher.get_usdjpy_historical_data()
-        future_prediction = self.predict_future_market(historical_data)
-
-        if future_prediction > 0.6:
-            return 0  # BUY
-        elif future_prediction < 0.4:
-            return 1  # SELL
-
-        return int(action_rl)
+        return {
+            "lstm_score": lstm_score,
+            "rl_action": int(rl_action),
+            "risk_level": risk_level,
+            "market_sentiment": "bullish"  # ダミーデータ、必要に応じて修正
+        }
 
 if __name__ == "__main__":
     env = NoctriaMasterAI()
-    env.dqn_agent.learn(total_timesteps=10000)
-    env.ppo_agent.learn(total_timesteps=10000)
-    env.ddpg_agent.learn(total_timesteps=10000)
-    print("🚀 NoctriaMasterAI の統合進化完了！")
+    # 例: テスト用のダミーデータ
+    dummy_data = {
+        "observation": np.random.rand(12),
+        "historical_prices": np.random.rand(100, 5),
+        "price_change": 0.05
+    }
+    output = env.analyze_market(dummy_data)
+    print("AI戦略層の出力:", output)
