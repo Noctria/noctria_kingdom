@@ -5,12 +5,10 @@ from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
 class PrometheusOracle:
-    """市場予測を行うAI（MetaAI対応版）"""
+    """市場予測を行うAI（MetaAI改修版）"""
 
     def __init__(self):
         self.model = self._build_model()
-
-        # ✅ MarketDataFetcherにAPIキーは不要
         self.market_fetcher = MarketDataFetcher()
 
         # ✅ ヒストリカルデータ取得（1時間足・1ヶ月分）
@@ -37,21 +35,24 @@ class PrometheusOracle:
         return model
 
     def predict_market(self, market_data):
-        """
-        市場データを解析し、未来の価格を予測
-        ➜ 万一 market_data が list で渡された場合の防御対応
-        """
-        if not isinstance(market_data, dict):
-            print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
-            market_data = {}
-
+        """市場データを解析し、未来の価格を予測"""
         processed_data = self._preprocess_data(market_data)
         prediction = self.model.predict(processed_data, verbose=0)
         return float(prediction)
 
+    def process(self, market_data):
+        """MetaAI呼び出し用: 予測値に基づき戦略的な方向を返す"""
+        forecast = self.predict_market(market_data)
+        if forecast > 0.6:
+            return "BUY"
+        elif forecast < 0.4:
+            return "SELL"
+        else:
+            return "HOLD"
+
     def _preprocess_data(self, market_data):
         """
-        市場データの前処理（改修版）
+        市場データの前処理
         ➜ キーが無い場合は0.0でデフォルト埋め
         """
         return np.array([
@@ -80,3 +81,5 @@ if __name__ == "__main__":
     }
     forecast = oracle.predict_market(mock_market_data)
     print("Market Forecast:", forecast)
+    decision = oracle.process(mock_market_data)
+    print("Strategy Decision:", decision)
