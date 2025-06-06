@@ -1,91 +1,135 @@
 ```plaintext
-(ここに、さっき出したコメント付きツリーをそのまま貼り付ける)
-
 noctria-kingdom-main/
-├── core/
-│   ├── config.yaml                  # 🌟 システム全体の環境設定
-│   ├── config_loader.py             # 🔧 設定ファイルを読み込むユーティリティ
-│   ├── logger.py                    # 📜 ログ管理機能
-│   ├── NoctriaEnv.py                # 🧠 NoctriaMasterAIの環境（Gym互換）
-│   ├── risk_management.py           # 📊 リスク管理アルゴリズム（損失制御など）
-│   ├── task_scheduler.py            # ⏰ 定期実行・バッチ処理管理
-│   ├── utils.py                     # 🛠️ 汎用関数（ヘルパー関数など）
-│   ├── explainable_ai.py            # 💡 SHAPなどで透明性向上（XAI機能）
-│   ├── anomaly_detection.py         # 🚨 異常値検知アルゴリズム（例: Isolation Forest）
-│   ├── NoctriaMasterAI.py           # 👑 NoctriaMasterAIクラス（今日拡張）
-│       - 市場データ取得・LSTM予測・リスク管理などを統括
+├── .gitignore                          # Git除外設定
+├── 0529progress.md                     # 5/29進捗メモ
+├── 20250530.md                         # 5/30進捗・議事録
+├── 20250603.md                         # 6/3進捗・議事録
+├── callmemo_20250602.md                # 6/2 通話メモ
+├── README.md                           # プロジェクト概要
+├── docker use.md                       # Docker運用メモ
+├── docker_tensorflow_gpu_setup.md      # TensorFlow GPUセットアップ手順
+├── how-to-use-git.md                   # Git利用メモ
+├── latest_tree_and_functions.md        # 最新ツリー＆機能一覧
 │
-├── data/
-│   ├── market_data.py               # 📈 市場データAPI取得（例: Binance, Alpha Vantage）
-│   ├── fundamental_analysis.py      # 📰 経済指標やニュースの分析
-│   ├── tradingview_fetcher.py       # 📈 TradingViewからデータ取得
-│   ├── processed_data_handler.py    # 🔄 データの前処理・整形・保存
-│   ├── raw_data_loader.py           # 📂 ローデータ読み込み（CSVなど）
-│   ├── sentiment_analysis.py        # 🗣️ SNS・ニュースのセンチメント分析
-│   ├── ensemble_learning.py         # 🤝 モデルアンサンブル学習
-│   ├── institutional_order_monitor.py # 🏦 機関投資家の大口注文監視
-│   ├── market_regime_detector.py    # 🏷️ 市場局面（ブル/ベア/レンジ）検知
-│   ├── quantum_computing_integration.py # ⚛️ 量子コンピューティング統合
-│   ├── market_data_fetcher.py       # ✅ ドル円専用化など実際のデータ取得機能（今日更新）
-│   ├── lstm_data_processor.py       # 🆕 LSTM用データ整形クラス（今日新規追加）
-│       - 取得データをLSTMの入力形状に加工
+├── core/                               # 🌟 Noctria Kingdomのコア機能
+│   ├── Noctria.py                      # 👑 中枢管理モジュール（意思決定AI統括）
+│   ├── config.yaml                     # ⚙️ 設定ファイル
+│   ├── init.py                         # 🛠️ 初期化スクリプト
+│   ├── logger.py                       # 📜 ロギング機能
+│   ├── risk_management.py              # 🛡️ リスク管理ロジック
+│   ├── task_scheduler.py               # ⏰ タスクスケジューラ
+│   └── utils.py                        # 🛠️ 汎用ユーティリティ
 │
-├── execution/
-│   ├── challenge_monitor.py         # 🏆 各戦略の成績・勝率モニタリング
-│   ├── execution_manager.py         # ⚙️ 注文発注フローの管理
-│   ├── optimized_order_execution.py # 🧠 スリッページ抑制などの最適化発注
-│   ├── order_execution.py           # 💼 実際の注文処理・執行
-│   ├── risk_control.py              # 🛡️ リスク制御アルゴリズム（最大損失管理など）
-│   ├── trade_monitor.py             # 📊 取引履歴や注文状況の監視
+├── data/                               # 📈 データ取得・解析モジュール
+│   ├── anomaly_detection.py            # 🚨 異常検知
+│   ├── data_loader.py                  # 📦 データ読み込み・整形
+│   ├── ensemble_learning.py            # 🤝 アンサンブル学習
+│   ├── explainable_ai.py               # 💡 XAI透明性向上
+│   ├── fundamental_analysis.py         # 📰 ファンダ分析
+│   ├── high_frequency_trading.py       # ⚡ HFTアルゴリズム
+│   ├── institutional_order_monitor.py  # 🏦 機関投資家監視
+│   ├── lstm_data_processor.py          # 🧠 LSTM用データ整形
+│   ├── market_data_fetcher.py          # ✅ 市場データ取得
+│   ├── market_regime_detector.py       # 🏷️ 市場局面検出
+│   ├── multi_objective_optimizer.py    # 🎯 多目的最適化
+│   ├── processed_data_handler.py       # 🔄 加工済データ管理
+│   ├── quantum_computing_integration.py# ⚛️ 量子コンピュータ連携
+│   ├── raw_data_loader.py              # 📂 生データ取得
+│   ├── sentiment_analysis.py           # 🗣️ センチメント分析
+│   └── tradingview_fetcher.py          # 📈 TradingView API連携
 │
-├── strategies/
-│   ├── base/
-│   │   ├── strategy_base.py         # 🏗️ 戦略基盤クラス（共通機能）
-│   ├── reinforcement/
-│   │   ├── reinforcement_learning.py # 🚀 強化学習戦略（DQN/PPO/DDPGなど）
-│   │   ├── dqn_agent.py             # 🤖 DQNエージェント
-│   │   ├── experience_replay.py     # 🔄 経験リプレイバッファ
-│   │   ├── prioritized_experience_replay.py # 🔥 重要度サンプリング
-│   │   ├── exploration_strategy.py  # 🧭 探索戦略（ε-greedyなど）
-│   │   ├── huber_loss.py            # ⚖️ Huber Lossによる損失関数
-│   ├── portfolio_optimizer.py       # 💼 ポートフォリオ最適化（市場適応型）
-│   ├── strategy_runner.py           # 🎛️ 各戦略の切り替えと統合実行管理
-│   ├── Aurus_Singularis.py          # 🦁 戦略Aurus Singularis
-│   ├── Levia_Tempest.py             # 🌊 戦略Levia Tempest
-│   ├── Noctus_Sentinella.py         # 🦉 戦略Noctus Sentinella
-│   ├── Prometheus_Oracle.py         # 🔥 戦略Prometheus Oracle
-│   └── Noctria.py                   # 👑 NoctriaMasterAI 中核管理（または戦略統括）
+├── execution/                          # ⚙️ 実行・取引管理
+│   ├── challenge_monitor.py            # 🏆 戦略パフォーマンス監視
+│   ├── execution_manager.py            # 🎛️ 注文実行全体管理
+│   ├── optimized_order_execution.py    # 🧠 最適化された発注
+│   ├── order_execution.py              # 💼 注文執行
+│   ├── risk_control.py                 # 🛡️ リスク制御
+│   └── trade_monitor.py                # 📊 トレード状況監視
 │
-├── EA_Fintokei/
-│   ├── config/
-│   │   ├── fintokei_config.yaml     # ⚙️ Fintokei設定
-│   │   ├── disqualification_rules.yaml # ❌ 失格条件設定
-│   │   └── prohibited_actions.yaml  # 🚫 禁止行動設定
-│   ├── scripts/
-│   │   └── fintokei_trader.mq5      # 📜 MQL5 EAスクリプト
-│   ├── docs/                        # 📚 Fintokei関連ドキュメント
-│   └── README.md
+├── strategies/                         # 🧩 戦略モジュール群
+│   ├── Aurus_Singularis.py             # 🦁 戦略Aurus Singularis
+│   ├── Levia_Tempest.py                # 🌊 戦略Levia Tempest
+│   ├── NoctriaMasterAI.py              # 👑 戦略統括AI
+│   ├── Noctus_Sentinella.py            # 🦉 戦略Noctus Sentinella
+│   ├── Prometheus_Oracle.py            # 🔥 戦略Prometheus Oracle
+│   ├── adaptive_trading.py             # 🔧 適応型戦略
+│   ├── auto_adjustment.py              # 🔄 自動調整
+│   ├── market_analysis.py              # 📊 市場分析
+│   ├── portfolio/                      # 💼 ポートフォリオ最適化
+│   │   └── portfolio_optimizer.py
+│   ├── portfolio_optimizer.py          # 💼 ポートフォリオ管理
+│   ├── quantum_prediction.py           # ⚛️ 量子予測戦略
+│   ├── reinforcement/                  # 🚀 強化学習モジュール
+│   │   ├── dqn_agent.py                # 🤖 DQNエージェント
+│   │   ├── experience_replay.py        # 🔄 経験リプレイ
+│   │   ├── exploration_strategy.py     # 🧭 探索戦略
+│   │   ├── huber_loss.py               # ⚖️ Huber損失
+│   │   ├── prioritized_experience_replay.py # 🔥 優先度付きリプレイ
+│   │   └── target_network.py           # 🎯 ターゲットネットワーク
+│   ├── reinforcement_learning.py       # 🚀 強化学習アルゴリズム
+│   ├── self_play.py                    # 🤼‍♂️ 自己対戦学習
+│   ├── strategy_optimizer_adjusted.py  # ⚙️ 戦略最適化
+│   └── strategy_runner.py              # 🎛️ 戦略実行管理
 │
-├── tests/
-│   ├── backtesting.py               # 📈 バックテスト（戦略検証）
-│   ├── dqn_backtest.py              # 📈 DQN強化学習効果の可視化
-│   ├── stress_tests.py              # 💥 システム負荷テスト
-│   ├── unit_tests.py                # 🧩 単体テスト
-│   ├── performance_tests.py         # 🚀 性能評価テスト
+├── experts/                            # ⚡ MQL5 EA群
+│   ├── aurus_singularis.mq5
+│   ├── auto_evolution.mq5
+│   ├── core_EA.mq5
+│   ├── levia_tempest.mq5
+│   ├── noctus_sentinella.mq5
+│   ├── prometheus_oracle.mq5
+│   └── quantum_prediction.mq5
 │
-├── docs/
-│   ├── api_reference.md             # 📜 APIリファレンス
-│   ├── architecture.md              # 🏗️ システムアーキテクチャ図
-│   ├── strategy_manual.md           # 📖 戦略マニュアル
+├── EA_Strategies/                      # 🏰 各EA戦略の補助ディレクトリ
+│   ├── Aurus_Singularis
+│   ├── Levia_Tempest
+│   ├── Noctus_Sentinella
+│   └── Prometheus_Oracle
 │
-├── Noctria-GUI/
-│   ├── backend/                     # 🖥️ バックエンド
-│   ├── frontend/                    # 🎨 フロントエンド
-│   ├── shared/                      # 🧩 共通モジュール
+├── Noctria-GUI/                        # 🎨 GUIシステム全体
+│   ├── .gitignore
+│   ├── README.md
+│   ├── backend/                        # 🖥️ APIサーバー
+│   │   ├── Dockerfile
+│   │   ├── app/
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   ├── main.py
+│   │   │   ├── routes/config_router.py # 📡 設定APIルート
+│   │   │   └── utils/util.py
+│   │   ├── requirements.txt
+│   │   └── tests/test_api.py
+│   ├── ci/github-actions/              # 🔧 CI/CD
+│   │   ├── cd.yml
+│   │   └── ci.yml
+│   ├── docker-compose.yml
+│   ├── docs/                           # 📝 GUIドキュメント
+│   │   ├── README.md
+│   │   └── architecture.md
+│   ├── frontend/                       # 🎨 フロントエンド
+│   │   ├── Dockerfile
+│   │   ├── app/
+│   │   │   ├── __init__.py
+│   │   │   ├── components/sample_component.py
+│   │   │   └── dashboard.py
+│   │   ├── requirements.txt
+│   │   └── tests/test_dashboard.py
+│   ├── logs/performance_log.csv        # 📊 GUIパフォーマンスログ
+│   └── shared/configs/default_config.yaml # ⚙️ 共通設定
 │
-├── docker/
-│   ├── Dockerfile                   # 🐳 Dockerイメージビルド
-│   ├── docker-compose.yml           # 🐳 コンテナオーケストレーション
-│   ├── docker_tensorflow_gpu_setup.md # ⚙️ GPUセットアップ手順
+├── order_api.py                        # 📡 注文API機能
+├── optimization/reinforcement_learning.py # 🚀 RL最適化アルゴリズム
 │
-└── README.md                        # プロジェクト概要・使い方
+├── tests/                              # 🧪 テスト群
+│   ├── backtesting.py
+│   ├── backtesting/dqn_backtest.py
+│   ├── execute_order_test.py
+│   ├── integration_test_noctria.py
+│   ├── run_ai_trading_loop.py
+│   ├── stress_tests.py
+│   ├── test_dqn_agent.py
+│   ├── test_mt5_connection.py
+│   ├── test_noctria_master_ai.py
+│   └── unit_tests.py
+│
+└── token                               # 🔑 （APIキー管理など？）
