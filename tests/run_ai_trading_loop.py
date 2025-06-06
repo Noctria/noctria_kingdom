@@ -9,9 +9,9 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
 from order_execution import OrderExecution
 
-# ai_strategies/ ディレクトリをインポートパスに加える
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ai_strategies')))
-from noctria_master_ai import NoctriaMasterAI
+# core/ ディレクトリをインポートパスに加える
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'core')))
+from NoctriaMasterAI import NoctriaMasterAI
 
 # data/ ディレクトリをインポートパスに加える
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data')))
@@ -31,7 +31,7 @@ while True:
     ai_output = ai_strategy.analyze_market(market_data)
     print("NoctriaMasterAI 出力:", ai_output)
 
-    # 3️⃣ 発注条件判定
+    # 3️⃣ エントリー条件判定
     action = ai_output.get("action")
     if action in ["buy", "sell"]:
         symbol = ai_output.get("symbol", "USDJPY")
