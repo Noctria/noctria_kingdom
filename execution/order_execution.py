@@ -1,44 +1,40 @@
-import MetaTrader5 as mt5
+"""
+💼 OrderExecutionクラス
+Docker/Linux側から Windows上のMT5サーバー (order_api.py) に発注リクエストを送る
+"""
+
+import requests
 
 class OrderExecution:
-    """Pythonから直接MT5 APIを呼び、注文を実行"""
+    def __init__(self, api_url="http://host.docker.internal:5001/order"):
+        """
+        ✅ Windows側のMT5サーバーのエンドポイントURLを指定
+        （Docker環境なら host.docker.internal でWindows側に接続可能）
+        """
+        self.api_url = api_url
 
-    def __init__(self, symbol="EURUSD", max_spread=2.0, min_liquidity=100):
-        self.symbol = symbol
-        self.max_spread = max_spread
-        self.min_liquidity = min_liquidity
-
-    def execute_trade(self, order_type, lot_size):
-        """MetaTrader5 APIを使い、直接注文を送信"""
-        if not mt5.initialize():
-            return "MT5接続失敗"
-
-        # 現在のBid価格取得
-        symbol_info = mt5.symbol_info_tick(self.symbol)
-        spread = symbol_info.ask - symbol_info.bid
-        liquidity = mt5.symbol_info(self.symbol).volume
-
-        # 取引回避条件
-        if spread > self.max_spread or liquidity < self.min_liquidity:
-            return f"⚠️ Trade avoided: Spread={spread:.2f}, Liquidity={liquidity}"
-
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": self.symbol,
-            "volume": lot_size,
-            "type": mt5.ORDER_TYPE_BUY if order_type == "BUY" else mt5.ORDER_TYPE_SELL,
-            "price": symbol_info.bid,
-            "magic": 123456,
-            "comment": "Noctria Kingdom Trade"
+    def execute_order(self, symbol, lot, order_type="buy"):
+        """
+        ✅ 注文リクエストを送信
+        :param symbol: 通貨ペア (例: "USDJPY")
+        :param lot: 注文ロット数 (例: 0.1)
+        :param order_type: "buy" or "sell"
+        :return: Windows側APIの応答(JSON)
+        """
+        payload = {
+            "symbol": symbol,
+            "lot": lot,
+            "type": order_type
         }
-        
-        result = mt5.order_send(request)
-        mt5.shutdown()  # 接続を閉じる
+        try:
+            response = requests.post(self.api_url, json=payload, timeout=5)
+            response.raise_for_status()  # HTTPステータスコードでエラー検知
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            # 例外があれば詳細を返す（テスト・開発向け）
+            return {"status": "error", "message": str(e)}
 
-        return result.comment if result.retcode == mt5.TRADE_RETCODE_DONE else f"Trade failed: {result.comment}"
-
-# ✅ 注文テスト
 if __name__ == "__main__":
-    executor = OrderExecution()
-    trade_result = executor.execute_trade("BUY", 0.1)
-    print("Trade Execution Result:", trade_result)
+    executor = OrderExecution(api_url="http://192.168.11.30:5001/order")
+    result = executor.execute_order("USDJPY", 0.1, order_type="buy")
+    print("MT5注文結果:", result)
