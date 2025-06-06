@@ -40,6 +40,7 @@ class NoctriaMasterAI(gym.Env):
         self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)
         self.self_play_ai = NoctriaSelfPlayAI()
 
+        # ✅ observation_space / action_space を定義（必須）
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
         self.action_space = gym.spaces.Discrete(3)
 
