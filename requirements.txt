@@ -7,4 +7,5 @@ requests
 scikit-learn
 stable-baselines3
 transformers
+transformers
 yfinance
