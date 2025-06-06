@@ -5,7 +5,7 @@ from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
 class PrometheusOracle:
-    """市場予測を行うAI（MetaAI改修版）"""
+    """市場予測を行うAI（ヒストリカルデータ利用版・MetaAI改修版）"""
 
     def __init__(self):
         self.model = self._build_model()
@@ -24,7 +24,7 @@ class PrometheusOracle:
         self.risk_manager = RiskManagement(historical_data=historical_data)
 
     def _build_model(self):
-        """強化学習と市場予測を統合したモデル"""
+        """未来予測用のシンプルなMLPモデル"""
         model = tf.keras.Sequential([
             tf.keras.layers.Dense(128, activation='relu', input_shape=(12,)),
             tf.keras.layers.Dense(64, activation='relu'),
@@ -34,14 +34,8 @@ class PrometheusOracle:
         model.compile(optimizer='adam', loss='mse')
         return model
 
-    def predict_market(self, market_data):
-        """市場データを解析し、未来の価格を予測"""
-        processed_data = self._preprocess_data(market_data)
-        prediction = self.model.predict(processed_data, verbose=0)
-        return float(prediction)
-
     def process(self, market_data):
-        """MetaAI呼び出し用: 予測値に基づき戦略的な方向を返す"""
+        """市場データを分析し、未来の市場予測スコアを返す"""
         forecast = self.predict_market(market_data)
         if forecast > 0.6:
             return "BUY"
@@ -50,11 +44,22 @@ class PrometheusOracle:
         else:
             return "HOLD"
 
+    def predict_market(self, market_data):
+        """LSTMモデルなどを用いた未来市場スコアを返す例"""
+        processed_data = self._preprocess_data(market_data)
+        prediction = self.model.predict(processed_data, verbose=0)
+        return float(prediction)
+
     def _preprocess_data(self, market_data):
         """
         市場データの前処理
+        ➜ 万一 market_data が list で渡された場合の防御対応
         ➜ キーが無い場合は0.0でデフォルト埋め
         """
+        if not isinstance(market_data, dict):
+            print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
+            market_data = {}
+
         return np.array([
             market_data.get("price", 0.0),
             market_data.get("volume", 0.0),
@@ -81,5 +86,3 @@ if __name__ == "__main__":
     }
     forecast = oracle.predict_market(mock_market_data)
     print("Market Forecast:", forecast)
-    decision = oracle.process(mock_market_data)
-    print("Strategy Decision:", decision)
