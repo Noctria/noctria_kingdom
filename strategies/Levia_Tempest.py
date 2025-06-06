@@ -27,10 +27,10 @@ class LeviaTempest:
     def process(self, market_data):
         """市場データを分析し、短期トレード戦略を決定"""
         price_change = self._calculate_price_change(market_data)
-        liquidity = market_data["volume"]
-        spread = market_data["spread"]
-        order_block_impact = market_data["order_block"]
-        volatility = market_data["volatility"]
+        liquidity = market_data.get("volume", 0.0)
+        spread = market_data.get("spread", 0.0)
+        order_block_impact = market_data.get("order_block", 0.0)
+        volatility = market_data.get("volatility", 0.0)
 
         # 大口注文の影響を考慮
         adjusted_threshold = self.threshold * (1 + order_block_impact)
@@ -48,8 +48,10 @@ class LeviaTempest:
             return "HOLD"
 
     def _calculate_price_change(self, market_data):
-        """市場データから価格変動を計算"""
-        return market_data["price"] - market_data["previous_price"]
+        """市場データから価格変動を計算（キーが無いときは0.0）"""
+        price = market_data.get("price", 0.0)
+        previous_price = market_data.get("previous_price", 0.0)
+        return price - previous_price
 
 # ✅ 改修後のスキャルピング戦略テスト
 if __name__ == "__main__":
