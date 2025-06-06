@@ -13,7 +13,7 @@ class Noctria:
 
     def __init__(self):
         self.logger = logging.getLogger("Noctria")
-        self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
+        self.market_fetcher = MarketDataFetcher()
         self.risk_manager = RiskManager()
 
         # EA戦略4人衆
