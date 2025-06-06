@@ -3,19 +3,16 @@ import pandas as pd
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
-class NoctusSentinella:
-    """
-    MetaAI対応版:
-    リスク管理と異常検知を担当するAIモジュール
-    """
+class LeviaTempest:
+    """スキャルピング戦略を適用する高速トレードAI（MetaAI改修版）"""
 
-    def __init__(self, risk_threshold=0.02, max_spread=0.018, min_liquidity=120):
-        self.risk_threshold = risk_threshold
-        self.max_spread = max_spread
+    def __init__(self, threshold=0.05, min_liquidity=120, max_spread=0.018):
+        self.threshold = threshold
         self.min_liquidity = min_liquidity
+        self.max_spread = max_spread
         self.market_fetcher = MarketDataFetcher()
 
-        # ✅ ヒストリカルデータ取得
+        # ✅ ヒストリカルデータ取得（1時間足・1ヶ月分）
         data_array = self.market_fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")
         if data_array is None:
             print("⚠️ データ取得失敗。ダミーデータで初期化します")
@@ -24,54 +21,52 @@ class NoctusSentinella:
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
 
-        # ✅ リスク管理インスタンス
+        # ✅ RiskManagementに渡す
         self.risk_manager = RiskManagement(historical_data=historical_data)
 
-    def _calculate_risk(self, market_data):
+    def process(self, market_data):
         """
-        市場データからリスクスコアを計算
-        （例: VaRを適用）
+        市場データを分析し、短期トレード戦略を決定
+        ➜ 万一 market_data が list で渡された場合の防御対応
         """
-        price_history = market_data.get("price_history", [])
-        price = market_data.get("price", 1.0)  # 0除算防止で1.0に
+        if not isinstance(market_data, dict):
+            print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
+            market_data = {}
 
-        if not price_history:
-            return 0.0
-
-        volatility = np.std(price_history)
-        risk_value = self.risk_manager.calculate_var()
-        return risk_value / price if price != 0 else 0.0
-
-    def decide_action(self, market_data):
-        """
-        ✅ MetaAI統合用インターフェース:
-        市場データを受け取り、リスク管理戦略を決定
-        """
-        risk_score = self._calculate_risk(market_data)
-        spread = market_data.get("spread", 0.0)
+        price_change = self._calculate_price_change(market_data)
         liquidity = market_data.get("volume", 0.0)
+        spread = market_data.get("spread", 0.0)
         order_block_impact = market_data.get("order_block", 0.0)
         volatility = market_data.get("volatility", 0.0)
 
-        # 流動性 & スプレッドチェック
+        # 大口注文の影響を考慮
+        adjusted_threshold = self.threshold * (1 + order_block_impact)
+
+        # 流動性とスプレッドのチェック
         if liquidity < self.min_liquidity or spread > self.max_spread:
-            return "AVOID_TRADING"
+            return "HOLD"
 
-        # 大口注文の影響を加味してリスク基準を補正
-        adjusted_risk_threshold = self.risk_threshold * (1 + order_block_impact)
-
-        if risk_score > adjusted_risk_threshold and volatility > 0.2:
-            return "REDUCE_RISK"
+        # スキャルピングロジック適用
+        if price_change > adjusted_threshold and volatility < 0.2:
+            return "BUY"
+        elif price_change < -adjusted_threshold and volatility < 0.2:
+            return "SELL"
         else:
-            return "MAINTAIN_POSITION"
+            return "HOLD"
 
-# ✅ 改修後のテスト実行
+    def _calculate_price_change(self, market_data):
+        """価格変動計算（キーが無いときは0.0）"""
+        price = market_data.get("price", 0.0)
+        previous_price = market_data.get("previous_price", 0.0)
+        return price - previous_price
+
+# ✅ 改修後のスキャルピング戦略テスト
 if __name__ == "__main__":
-    noctus_ai = NoctusSentinella()
+    levia_ai = LeviaTempest()
     mock_market_data = {
-        "price": 1.2530,
-        "price_history": [1.2500, 1.2525, 1.2550, 1.2510, 1.2540],
-        "spread": 0.015, "volume": 120, "order_block": 0.5, "volatility": 0.22
+        "price": 1.2050, "previous_price": 1.2040,
+        "volume": 150, "spread": 0.012, "order_block": 0.4,
+        "volatility": 0.15
     }
-    decision = noctus_ai.decide_action(mock_market_data)
-    print("Risk Management Decision:", decision)
+    decision = levia_ai.process(mock_market_data)
+    print("Scalping Decision:", decision)
