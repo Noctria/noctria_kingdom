@@ -1,5 +1,5 @@
 import numpy as np
-from data_loader import MarketDataFetcher
+from data.market_data_fetcher import MarketDataFetcher
 from risk_management import RiskManager
 
 class NoctusSentinella:
