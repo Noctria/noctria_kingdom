@@ -4,6 +4,7 @@ __pycache__/
 
 # venv
 venv/
+venv_mt5/
 
 # local pip user install
 .local/
