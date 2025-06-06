@@ -9,6 +9,7 @@ from sklearn.ensemble import IsolationForest
 from evolutionary_algorithm import GeneticAlgorithm
 from execution.order_execution import OrderExecutor
 from data.market_data_fetcher import MarketDataFetcher
+from data.lstm_data_processor import LSTMDataProcessor  # LSTMデータ整形クラスを追加
 from strategies.portfolio_optimizer import PortfolioOptimizer
 from strategies.self_play import NoctriaSelfPlayAI
 
@@ -17,7 +18,7 @@ class NoctriaMasterAI(gym.Env):
 
     def __init__(self):
         super(NoctriaMasterAI, self).__init__()
-        self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
+        self.market_fetcher = MarketDataFetcher()
         self.order_executor = OrderExecutor()
         self.sentiment_model = pipeline("sentiment-analysis")
         self.evolutionary_agent = GeneticAlgorithm()
@@ -30,6 +31,9 @@ class NoctriaMasterAI(gym.Env):
 
         # ポートフォリオ最適化エージェント
         self.portfolio_optimizer = PortfolioOptimizer()
+
+        # LSTMデータ整形クラス
+        self.lstm_processor = LSTMDataProcessor(window_size=30)
 
         # 戦略適応パラメータ
         self.strategy_params = {
@@ -56,7 +60,7 @@ class NoctriaMasterAI(gym.Env):
 
     def build_lstm_model(self):
         model = tf.keras.Sequential([
-            tf.keras.layers.LSTM(50, return_sequences=True, input_shape=(30, 6)),
+            tf.keras.layers.LSTM(50, return_sequences=True, input_shape=(30, 5)),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.LSTM(50, return_sequences=False),
             tf.keras.layers.Dropout(0.2),
@@ -78,7 +82,21 @@ class NoctriaMasterAI(gym.Env):
         return "NORMAL"
 
     def predict_future_market(self, historical_data):
-        return np.random.rand()
+        """
+        LSTMモデルで未来市場スコアを予測する部分
+        """
+        # LSTM用の最新シーケンスを整形
+        predict_seq = self.lstm_processor.create_predict_sequence(historical_data)
+        print(f"🔍 予測用シーケンス形状: {predict_seq.shape}")
+
+        # LSTM予測
+        prediction = self.forecast_model.predict(predict_seq)
+        print(f"🧠 LSTM予測値（生出力）: {prediction}")
+
+        # 例: 0-1スケーリング
+        score = (prediction[0][0] + 1) / 2
+        print(f"📈 予測スコア（0-1正規化）: {score}")
+        return score
 
     def decide_action(self, observation, market_data):
         risk_status = self.adjust_risk_strategy(market_data)
@@ -87,8 +105,10 @@ class NoctriaMasterAI(gym.Env):
             return 2  # HOLD
 
         action_rl, _states = self.ppo_agent.predict(observation, deterministic=True)
-        future_prediction = self.predict_future_market(self.market_fetcher.get_historical_data())
-        print(f"🔮 LSTM予測: {future_prediction}")
+
+        # ドル円データ取得＆LSTM予測
+        historical_data = self.market_fetcher.get_usdjpy_historical_data()
+        future_prediction = self.predict_future_market(historical_data)
 
         if future_prediction > 0.6:
             return 0  # BUY
