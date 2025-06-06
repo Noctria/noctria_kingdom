@@ -9,7 +9,7 @@ class LeviaTempest:
         self.threshold = threshold  # 価格変動の閾値
         self.min_liquidity = min_liquidity  # 最低市場流動性（調整済み）
         self.max_spread = max_spread  # 最大スプレッド（調整済み）
-        self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
+        self.market_fetcher = MarketDataFetcher()
         self.risk_manager = RiskManagement()  # ✅ クラス名を修正
 
     def process(self, market_data):
