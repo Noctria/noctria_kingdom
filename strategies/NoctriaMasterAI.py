@@ -66,13 +66,14 @@ class NoctriaMasterAI(gym.Env):
 
     def adjust_risk_strategy(self, market_data):
         """異常値検知結果を返す（例: REDUCE_POSITION or NORMAL）"""
-        if self.anomaly_detector.predict([list(market_data.values())])[0] == -1:
+        data = np.array(list(market_data.values())).reshape(1, -1)
+        self.anomaly_detector.fit(data)
+        if self.anomaly_detector.predict(data)[0] == -1:
             return "REDUCE_POSITION"
         return "NORMAL"
 
     def predict_future_market(self, historical_data):
         """LSTMモデルで未来市場スコアを予測"""
-        # ✅ prepare_single_sequence を使用！
         predict_seq = self.lstm_processor.prepare_single_sequence(historical_data)
         prediction = self.forecast_model.predict(predict_seq)
         score = (prediction[0][0] + 1) / 2
