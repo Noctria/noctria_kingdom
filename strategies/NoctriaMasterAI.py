@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import gym
 import shap
+import requests
 from stable_baselines3 import PPO, DDPG
 from transformers import pipeline
 from sklearn.ensemble import IsolationForest
@@ -13,21 +14,17 @@ from strategies.portfolio_optimizer import PortfolioOptimizer
 from strategies.self_play import NoctriaSelfPlayAI
 
 class NoctriaMasterAI(gym.Env):
-    """
-    MetaAI対応: Noctria Kingdom 統括AI
-    - 市場データ分析
-    - 自己進化型強化学習
-    - ポートフォリオ最適化
-    """
+    """Noctria Kingdom の統括AI：市場データを分析し、戦略を自己進化させる"""
 
     def __init__(self):
+        print("NoctriaMasterAI: __init__ 開始")
         super(NoctriaMasterAI, self).__init__()
+        print("NoctriaMasterAI: super().__init__() 完了")
 
-        # ✅ Observation / Action Space
+        # ✅ PPO/ DDPG 対応: 連続アクション空間
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
 
-        # ✅ 各コンポーネント
         self.market_fetcher = MarketDataFetcher()
         self.order_executor = OrderExecution()
         self.sentiment_model = pipeline("sentiment-analysis")
@@ -38,7 +35,6 @@ class NoctriaMasterAI(gym.Env):
         self.lstm_processor = LSTMDataProcessor(window_size=30)
         self.self_play_ai = NoctriaSelfPlayAI()
 
-        # ✅ 戦略パラメータ
         self.strategy_params = {
             "BUY_THRESHOLD": 0.6,
             "SELL_THRESHOLD": 0.4,
@@ -46,17 +42,15 @@ class NoctriaMasterAI(gym.Env):
             "TREND_SENSITIVITY": 0.5,
         }
 
-        # ✅ モデル群
-        self.forecast_model = self._build_lstm_model()
-        self.ppo_agent = PPO("MlpPolicy", self, verbose=0)
-        self.ddpg_agent = DDPG("MlpPolicy", self, verbose=0)  # 将来的に切り替え可能
+        self.forecast_model = self.build_lstm_model()
+        self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
+        self.ddpg_agent = DDPG("MlpPolicy", self, verbose=1)  # 将来的に切り替え可能
 
-    def _build_lstm_model(self):
-        """未来予測用LSTMモデル"""
+    def build_lstm_model(self):
         model = tf.keras.Sequential([
             tf.keras.layers.LSTM(50, return_sequences=True, input_shape=(30, 5)),
             tf.keras.layers.Dropout(0.2),
-            tf.keras.layers.LSTM(50),
+            tf.keras.layers.LSTM(50, return_sequences=False),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(25, activation="relu"),
             tf.keras.layers.Dense(1, activation="linear")
@@ -65,36 +59,46 @@ class NoctriaMasterAI(gym.Env):
         return model
 
     def _model_predict(self, data):
-        """SHAP用ダミー関数"""
         return np.random.rand(data.shape[0])
 
     def _get_sample_data(self):
-        """SHAP用サンプルデータ"""
         return np.random.rand(100, 12)
 
     def adjust_risk_strategy(self, market_data):
-        """異常検知によるリスク制御判断"""
-        features = list(market_data.get("observation", [0.0]*12))
-        features.append(market_data.get("price_change", 0.0))
-        data = np.array(features).reshape(1, -1)
+        """異常値検知結果を返す（例: REDUCE_POSITION or NORMAL）"""
+        features = []
 
+        obs = market_data.get("observation", [])
+        if isinstance(obs, (list, np.ndarray)):
+            features.extend(list(obs))
+        else:
+            features.append(obs)
+
+        if "price_change" in market_data:
+            features.append(market_data["price_change"])
+
+        data = np.array(features).reshape(1, -1)
         self.anomaly_detector.fit(data)
         if self.anomaly_detector.predict(data)[0] == -1:
             return "REDUCE_POSITION"
         return "NORMAL"
 
     def predict_future_market(self, historical_data):
-        """未来市場動向をLSTMで予測"""
-        seq = self.lstm_processor.prepare_single_sequence(historical_data)
-        prediction = self.forecast_model.predict(seq, verbose=0)
+        """LSTMモデルで未来市場スコアを予測"""
+        predict_seq = self.lstm_processor.prepare_single_sequence(historical_data)
+        prediction = self.forecast_model.predict(predict_seq)
         score = (prediction[0][0] + 1) / 2
         return score
 
     def analyze_market(self, market_data):
         """
-        市場データを受け取り、MetaAIとして総合的に分析し、
-        各層（強化学習 / 予測モデル / リスク評価）から統合的に意思決定する。
+        市場データを受け取り、AIモデル群の結果を統合して返す。
+        core/Noctria.py から呼び出されるインターフェース
         """
+        if not isinstance(market_data, dict):
+            print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
+            market_data = {}
+
         observation = market_data.get("observation", np.zeros(12))
         historical_data = market_data.get("historical_prices", [])
 
@@ -102,7 +106,7 @@ class NoctriaMasterAI(gym.Env):
         rl_action, _ = self.ppo_agent.predict(observation, deterministic=True)
         risk_level = self.adjust_risk_strategy(market_data)
 
-        # ✅ 最終的な戦略アクション
+        # ✅ ここで action 判定を決める
         action = "hold"
         if lstm_score > self.strategy_params["BUY_THRESHOLD"]:
             action = "buy"
@@ -113,18 +117,18 @@ class NoctriaMasterAI(gym.Env):
             "lstm_score": lstm_score,
             "rl_action": float(rl_action),
             "risk_level": risk_level,
-            "market_sentiment": "bullish",   # ダミー
-            "action": action,
-            "symbol": "USDJPY",
-            "lot": 0.1
+            "market_sentiment": "bullish",   # ダミーデータ
+            "action": action,                # ✅ 追加
+            "symbol": "USDJPY",              # 例
+            "lot": 0.1                       # 例
         }
 
 if __name__ == "__main__":
-    ai = NoctriaMasterAI()
+    env = NoctriaMasterAI()
     dummy_data = {
         "observation": np.random.rand(12),
         "historical_prices": np.random.rand(100, 5),
         "price_change": 0.05
     }
-    output = ai.analyze_market(dummy_data)
+    output = env.analyze_market(dummy_data)
     print("AI戦略層の出力:", output)
