@@ -1,11 +1,18 @@
+# core/meta_ai.py
+
 import numpy as np
 
 class MetaAI:
-    """MetaAI: 複数の戦略AIを統合し、最終的なトレードアクションを決定する統括AIクラス"""
+    """
+    MetaAI: 複数の戦略AIを統合し、最終的なトレードアクションを決定する統括AIクラス
+    """
 
     def __init__(self, strategy_agents):
-        self.strategy_agents = strategy_agents  # 例: {'Aurus': AurusSingularis(), ...}
-        # ここに将来的に強化学習（例: Qテーブル、DQNなど）を統合する余地がある
+        """
+        各戦略AIを受け取り、統括管理する
+        - strategy_agents: dict (例: {'Aurus': AurusSingularis(), ...})
+        """
+        self.strategy_agents = strategy_agents
 
     def decide_final_action(self, market_state):
         """
@@ -16,6 +23,9 @@ class MetaAI:
             name: agent.process(market_state)
             for name, agent in self.strategy_agents.items()
         }
+
+        # デバッグ表示
+        print("各戦略の出力:", strategy_actions)
 
         if "SELL" in strategy_actions.values():
             final_action = "SELL"
@@ -29,7 +39,7 @@ class MetaAI:
     def learn(self, state, action, reward, next_state, done):
         """
         テスト用のダミー学習メソッド
-        本番ではDQNやPPOに接続し、経験の蓄積と更新を行う
+        ➜ 将来的にはDQNやPPOに接続して学習更新を実装予定
         """
         print("=== MetaAI Learn Call ===")
         print(f"State: {state}")
