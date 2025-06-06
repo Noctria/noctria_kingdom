@@ -1,63 +1,66 @@
-# core/meta_ai.py
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
+import numpy as np
+from strategies.Aurus_Singularis import AurusSingularis
+from strategies.Levia_Tempest import LeviaTempest
+from strategies.Noctus_Sentinella import NoctusSentinella
+from strategies.Prometheus_Oracle import PrometheusOracle
 
 class MetaAI:
     """
-    王 (Noctria) の役割：複数AI（臣下）の結果を重み付け統合するメタAI層。
+    MetaAI：複数の戦略AIを統括し、最適な戦略を決定する統合AI層。
     """
 
-    def __init__(self, strategy_agents, state_dim, learning_rate=1e-4):
-        """
-        strategy_agents: {'Aurus': agentA, 'Levia': agentB, ...} 各戦略AI
-        state_dim: 市場状態ベクトルの次元数
-        """
-        self.strategy_agents = strategy_agents
-        self.meta_policy = self._init_meta_network(state_dim, len(strategy_agents))
-        self.optimizer = optim.Adam(self.meta_policy.parameters(), lr=learning_rate)
-        self.gamma = 0.99  # 割引率（将来報酬の重み）
-
-    def _init_meta_network(self, input_dim, output_dim):
-        """
-        メタポリシーネット（戦略の重み決定ネットワーク）
-        """
-        return nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, output_dim),
-            nn.Softmax(dim=-1)  # 各戦略への信頼度（重み）に変換
-        )
+    def __init__(self):
+        self.aurus = AurusSingularis()
+        self.levia = LeviaTempest()
+        self.noctus = NoctusSentinella()
+        self.prometheus = PrometheusOracle()
 
     def decide_final_action(self, market_state):
         """
-        各戦略AIの行動を統合し、メタAIが最終戦略を決定
+        それぞれの戦略AIからの提案を集約し、最終アクションを決定する。
         """
-        # 各戦略AIの行動を取得
-        strategy_actions = {name: agent.decide_action(market_state)
-                            for name, agent in self.strategy_agents.items()}
 
-        # メタポリシーの入力（例：市場状態ベクトル）
-        state_tensor = torch.tensor(market_state, dtype=torch.float32).unsqueeze(0)
-        strategy_weights = self.meta_policy(state_tensor).detach().numpy()[0]
+        # それぞれの戦略AIからアクションを取得
+        strategy_actions = {
+            "AurusSingularis": self.aurus.process(market_state),
+            "LeviaTempest": self.levia.process(market_state),
+            "NoctusSentinella": self.noctus.process(market_state),
+            "PrometheusOracle": self.prometheus.predict_market(market_state)
+        }
 
-        # 最も重みが高い戦略の行動を採用
-        selected_strategy = max(zip(strategy_actions.keys(), strategy_weights),
-                                key=lambda x: x[1])[0]
-        final_action = strategy_actions[selected_strategy]
+        print("=== 各戦略AIの出力 ===")
+        for name, action in strategy_actions.items():
+            print(f"{name}: {action}")
 
-        return final_action, strategy_weights
+        # 例として、ここでは最も積極的なBUYシグナルがあればBUYを返す
+        if strategy_actions["AurusSingularis"] == "BUY":
+            return "BUY"
+        elif strategy_actions["LeviaTempest"] == "BUY":
+            return "BUY"
+        elif strategy_actions["NoctusSentinella"] == "REDUCE_RISK":
+            return "HOLD"
+        else:
+            return "HOLD"
 
-    def update_meta_policy(self, state, reward):
-        """
-        メタポリシーの更新ステップ（方策勾配のシンプル版）
-        """
-        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
-        weights = self.meta_policy(state_tensor)
-        log_prob = torch.log(weights.max())  # 採用戦略の重みの最大値を強化
-        loss = -log_prob * reward
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+# ✅ 簡単なテスト
+if __name__ == "__main__":
+    meta_ai = MetaAI()
+    mock_market_data = {
+        "price": 1.2345,
+        "previous_price": 1.2330,
+        "volume": 200,
+        "spread": 0.012,
+        "order_block": 0.4,
+        "volatility": 0.15,
+        "sentiment": 0.8,
+        "trend_strength": 0.7,
+        "price_history": [1.23, 1.235, 1.238, 1.236, 1.234],
+        "institutional_flow": 0.8,
+        "short_interest": 0.5,
+        "momentum": 0.9,
+        "trend_prediction": 0.6,
+        "liquidity_ratio": 1.2
+    }
+    final_decision = meta_ai.decide_final_action(mock_market_data)
+    print("\n=== MetaAIの最終決定 ===")
+    print("Final Decision:", final_decision)
