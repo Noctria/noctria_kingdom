@@ -5,7 +5,8 @@ from strategies.Noctus_Sentinella import NoctusSentinella
 from strategies.Prometheus_Oracle import PrometheusOracle
 from strategies.NoctriaMasterAI import NoctriaMasterAI  # ✅ AI戦略層を統合的に呼び出す
 from data.market_data_fetcher import MarketDataFetcher
-from core.risk_management import RiskManager
+from core.risk_management import RiskManagement
+
 
 class Noctria:
     """市場適応型アンサンブルAIトレーダー（王 + EA４人衆 + AI戦略層）"""
