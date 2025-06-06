@@ -4,7 +4,7 @@ import time
 import sys
 import os
 
-# プロジェクトルート自体をパスに追加（トップレベルimport対応）
+# ✅ プロジェクトルートをパスに追加（strategies.evolutionary など全体を見せるため）
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # execution/ ディレクトリをインポートパスに加える
