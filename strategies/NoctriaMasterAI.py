@@ -66,7 +66,20 @@ class NoctriaMasterAI(gym.Env):
 
     def adjust_risk_strategy(self, market_data):
         """異常値検知結果を返す（例: REDUCE_POSITION or NORMAL）"""
-        data = np.array(list(market_data.values())).reshape(1, -1)
+        # observation などから「1次元の特徴量リスト」に変換
+        features = []
+
+        obs = market_data.get("observation", [])
+        if isinstance(obs, (list, np.ndarray)):
+            features.extend(list(obs))
+        else:
+            features.append(obs)
+
+        if "price_change" in market_data:
+            features.append(market_data["price_change"])
+
+        # IsolationForest の fit & predict
+        data = np.array(features).reshape(1, -1)
         self.anomaly_detector.fit(data)
         if self.anomaly_detector.predict(data)[0] == -1:
             return "REDUCE_POSITION"
