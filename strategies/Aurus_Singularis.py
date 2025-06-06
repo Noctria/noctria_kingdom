@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from data_loader import MarketDataFetcher
+from data.market_data_fetcher import MarketDataFetcher  # ✅ 修正: 正しいインポート
 
 # ✅ GPU メモリの使用を制限（動的確保）
 gpus = tf.config.list_physical_devices('GPU')
@@ -15,7 +15,7 @@ class AurusSingularis:
     """市場トレンド分析と適応戦略設計を行うAI（改修版）"""
 
     def __init__(self):
-        self._configure_gpu()  # ✅ GPU の設定をクラス内部でも適用
+        self._configure_gpu()
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher(api_key="YOUR_API_KEY")
 
@@ -32,8 +32,8 @@ class AurusSingularis:
     def _build_model(self):
         """強化学習と市場データ統合を考慮した戦略適用モデル"""
         model = tf.keras.Sequential([
-            tf.keras.layers.Input(shape=(12,)),  # ✅ 入力層を明示的に定義
-            tf.keras.layers.Dense(128, activation='relu'),  # 特徴量を拡張
+            tf.keras.layers.Input(shape=(12,)),
+            tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(64, activation='relu'),
             tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dense(1, activation='sigmoid')
@@ -44,7 +44,7 @@ class AurusSingularis:
     def process(self, market_data):
         """市場データを分析し、Noctria AIとの戦略統合を適用"""
         processed_data = self._preprocess_data(market_data)
-        prediction = self.model.predict(processed_data)
+        prediction = self.model.predict(processed_data, verbose=0)
 
         if prediction > 0.6:
             return "BUY"
@@ -59,7 +59,7 @@ class AurusSingularis:
             market_data["price"], market_data["volume"], market_data["sentiment"],
             market_data["trend_strength"], market_data["volatility"], market_data["order_block"],
             market_data["institutional_flow"], market_data["short_interest"], market_data["momentum"],
-            market_data["trend_prediction"], market_data["liquidity_ratio"], 1  # 追加特徴量
+            market_data["trend_prediction"], market_data["liquidity_ratio"], 1
         ]).reshape(1, -1)
 
 # ✅ 改修後の市場戦略適用テスト
