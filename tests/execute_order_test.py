@@ -1,6 +1,8 @@
-# execute_order_test.py
-from order_execution import OrderExecution  # 事前にorder_execution.pyにまとめた場合
-# またはクラス部分を直接ここにペーストしてもOK
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
+
+from order_execution import OrderExecution  # execution/order_execution.py
 
 if __name__ == "__main__":
     executor = OrderExecution(api_url="http://192.168.11.30:5001/order")
