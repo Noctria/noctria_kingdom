@@ -1,12 +1,71 @@
+import numpy as np
+import pandas as pd
+from data.market_data_fetcher import MarketDataFetcher
+from core.risk_management import RiskManagement
+
 class LeviaTempest:
-    def __init__(self):
-        pass
+    """
+    MetaAI対応版:
+    スキャルピング戦略に特化した高速トレードAI
+    """
 
-    def process(self, market_state):
-        """
-        短期スキャルピング系戦略ロジック（ダミー例）
-        """
-        return "SELL"  # ダミー出力
+    def __init__(self, threshold=0.05, min_liquidity=120, max_spread=0.018):
+        self.threshold = threshold
+        self.min_liquidity = min_liquidity
+        self.max_spread = max_spread
+        self.market_fetcher = MarketDataFetcher()
 
-    def decide_action(self, market_state):
-        return self.process(market_state)
+        # ✅ ヒストリカルデータ取得
+        data_array = self.market_fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")
+        if data_array is None:
+            print("⚠️ データ取得失敗。ダミーデータで初期化します")
+            data_array = np.random.normal(loc=100, scale=5, size=(100, 5))
+
+        columns = ["Open", "High", "Low", "Close", "Volume"]
+        historical_data = pd.DataFrame(data_array, columns=columns)
+
+        # ✅ リスク管理インスタンス
+        self.risk_manager = RiskManagement(historical_data=historical_data)
+
+    def _calculate_price_change(self, market_data):
+        """価格変動の計算"""
+        price = market_data.get("price", 0.0)
+        previous_price = market_data.get("previous_price", 0.0)
+        return price - previous_price
+
+    def decide_action(self, market_data):
+        """
+        ✅ MetaAI統合用インターフェース:
+        スキャルピング戦略の決定
+        """
+        price_change = self._calculate_price_change(market_data)
+        liquidity = market_data.get("volume", 0.0)
+        spread = market_data.get("spread", 0.0)
+        order_block_impact = market_data.get("order_block", 0.0)
+        volatility = market_data.get("volatility", 0.0)
+
+        # 大口注文の影響を考慮
+        adjusted_threshold = self.threshold * (1 + order_block_impact)
+
+        # 流動性 & スプレッドチェック
+        if liquidity < self.min_liquidity or spread > self.max_spread:
+            return "HOLD"
+
+        # スキャルピングロジック
+        if price_change > adjusted_threshold and volatility < 0.2:
+            return "BUY"
+        elif price_change < -adjusted_threshold and volatility < 0.2:
+            return "SELL"
+        else:
+            return "HOLD"
+
+# ✅ 改修後のテスト実行
+if __name__ == "__main__":
+    levia_ai = LeviaTempest()
+    mock_market_data = {
+        "price": 1.2050, "previous_price": 1.2040,
+        "volume": 150, "spread": 0.012, "order_block": 0.4,
+        "volatility": 0.15
+    }
+    decision = levia_ai.decide_action(mock_market_data)
+    print("Scalping Decision:", decision)
