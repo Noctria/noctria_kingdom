@@ -1,47 +1,41 @@
 import numpy as np
-from core.meta_ai import MetaAI
-from strategies.Aurus_Singularis import AurusSingularis
-from strategies.Levia_Tempest import LeviaTempest
-from strategies.Noctus_Sentinella import NoctusSentinella
-from strategies.Prometheus_Oracle import PrometheusOracle
 
-def main():
-    print("✅ MetaAI強化学習サイクルテストを開始します")
+class MetaAI:
+    """MetaAI: 複数の戦略AIを統合し、最終的なトレードアクションを決定する統括AIクラス"""
 
-    # 各戦略AIインスタンスを生成
-    strategy_agents = {
-        "Aurus": AurusSingularis(),
-        "Levia": LeviaTempest(),
-        "Noctus": NoctusSentinella(),
-        "Prometheus": PrometheusOracle()
-    }
+    def __init__(self, strategy_agents):
+        self.strategy_agents = strategy_agents  # 例: {'Aurus': AurusSingularis(), ...}
+        # ここに将来的に強化学習（例: Qテーブル、DQNなど）を統合する余地がある
 
-    # MetaAIに戦略AI群を渡して初期化
-    meta_ai = MetaAI(strategy_agents=strategy_agents)
+    def decide_final_action(self, market_state):
+        """
+        各戦略AIからアクションを取得し、最終的なトレードアクションを決定する
+        ➜ 今は単純に各戦略AIの出力を見て 'SELL' を優先、次に 'BUY'、なければ 'HOLD'。
+        """
+        strategy_actions = {
+            name: agent.process(market_state)
+            for name, agent in self.strategy_agents.items()
+        }
 
-    # ダミー市場データ
-    mock_market_data = {
-        "price": 1.2345,
-        "volume": 150,
-        "spread": 0.012,
-        "order_block": 0.3,
-        "volatility": 0.1,
-        "price_history": [1.2, 1.22, 1.25, 1.23, 1.24]
-    }
+        if "SELL" in strategy_actions.values():
+            final_action = "SELL"
+        elif "BUY" in strategy_actions.values():
+            final_action = "BUY"
+        else:
+            final_action = "HOLD"
 
-    # 1. 各戦略AIの統合アクションを取得
-    final_action = meta_ai.decide_final_action(mock_market_data)
-    print("MetaAI決定アクション:", final_action)
+        return final_action
 
-    # 2. 学習サイクルのテスト
-    state = np.random.rand(12)
-    next_state = np.random.rand(12)
-    reward = np.random.uniform(-1, 1)
-    done = False
+    def learn(self, state, action, reward, next_state, done):
+        """
+        テスト用のダミー学習メソッド
+        本番ではDQNやPPOに接続し、経験の蓄積と更新を行う
+        """
+        print("=== MetaAI Learn Call ===")
+        print(f"State: {state}")
+        print(f"Action: {action}")
+        print(f"Reward: {reward}")
+        print(f"Next State: {next_state}")
+        print(f"Done: {done}")
+        print("=========================")
 
-    meta_ai.learn(state=state, action="BUY", reward=reward, next_state=next_state, done=done)
-
-    print("✅ テスト完了")
-
-if __name__ == "__main__":
-    main()
