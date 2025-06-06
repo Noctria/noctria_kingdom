@@ -3,13 +3,13 @@ import pandas as pd
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
-class LeviaTempest:
-    """スキャルピング戦略を適用する高速トレードAI（MetaAI改修版）"""
+class NoctusSentinella:
+    """リスク管理と異常検知を行うAI（実際のヒストリカルデータ使用版・MetaAI対応）"""
 
-    def __init__(self, threshold=0.05, min_liquidity=120, max_spread=0.018):
-        self.threshold = threshold
-        self.min_liquidity = min_liquidity
+    def __init__(self, risk_threshold=0.02, max_spread=0.018, min_liquidity=120):
+        self.risk_threshold = risk_threshold
         self.max_spread = max_spread
+        self.min_liquidity = min_liquidity
         self.market_fetcher = MarketDataFetcher()
 
         # ✅ ヒストリカルデータ取得（1時間足・1ヶ月分）
@@ -26,47 +26,53 @@ class LeviaTempest:
 
     def process(self, market_data):
         """
-        市場データを分析し、短期トレード戦略を決定
-        ➜ 万一 market_data が list で渡された場合の防御対応
+        市場データを分析し、リスクを評価する
+        ➜ 万一 market_data が list などで渡された場合の防御対応
         """
         if not isinstance(market_data, dict):
             print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
             market_data = {}
 
-        price_change = self._calculate_price_change(market_data)
-        liquidity = market_data.get("volume", 0.0)
+        risk_score = self._calculate_risk(market_data)
         spread = market_data.get("spread", 0.0)
+        liquidity = market_data.get("volume", 0.0)
         order_block_impact = market_data.get("order_block", 0.0)
         volatility = market_data.get("volatility", 0.0)
 
-        # 大口注文の影響を考慮
-        adjusted_threshold = self.threshold * (1 + order_block_impact)
-
         # 流動性とスプレッドのチェック
         if liquidity < self.min_liquidity or spread > self.max_spread:
-            return "HOLD"
+            return "AVOID_TRADING"
 
-        # スキャルピングロジック適用
-        if price_change > adjusted_threshold and volatility < 0.2:
-            return "BUY"
-        elif price_change < -adjusted_threshold and volatility < 0.2:
-            return "SELL"
+        # ボラティリティと大口注文の影響を考慮し、リスク評価を強化
+        adjusted_risk_threshold = self.risk_threshold * (1 + order_block_impact)
+
+        if risk_score > adjusted_risk_threshold and volatility > 0.2:
+            return "REDUCE_RISK"
         else:
-            return "HOLD"
+            return "MAINTAIN_POSITION"
 
-    def _calculate_price_change(self, market_data):
-        """価格変動計算（キーが無いときは0.0）"""
-        price = market_data.get("price", 0.0)
-        previous_price = market_data.get("previous_price", 0.0)
-        return price - previous_price
+    def _calculate_risk(self, market_data):
+        """
+        市場データからリスクスコアを計算（VaR適用）
+        ➜ market_dataに"price"や"price_history"が無い場合は0.0に。
+        """
+        price_history = market_data.get("price_history", [])
+        price = market_data.get("price", 1.0)  # 0除算防止で1.0に
 
-# ✅ 改修後のスキャルピング戦略テスト
+        if not price_history:  # データがない場合は安全に0.0
+            return 0.0
+
+        volatility = np.std(price_history)
+        risk_value = self.risk_manager.calculate_var()  # historical_dataから算出
+        return risk_value / price if price != 0 else 0.0  # 0除算防止
+
+# ✅ 改修後のリスク管理テスト
 if __name__ == "__main__":
-    levia_ai = LeviaTempest()
+    noctus_ai = NoctusSentinella()
     mock_market_data = {
-        "price": 1.2050, "previous_price": 1.2040,
-        "volume": 150, "spread": 0.012, "order_block": 0.4,
-        "volatility": 0.15
+        "price": 1.2530,
+        "price_history": [1.2500, 1.2525, 1.2550, 1.2510, 1.2540],
+        "spread": 0.015, "volume": 120, "order_block": 0.5, "volatility": 0.22
     }
-    decision = levia_ai.process(mock_market_data)
-    print("Scalping Decision:", decision)
+    risk_decision = noctus_ai.process(mock_market_data)
+    print("Risk Management Decision:", risk_decision)
