@@ -23,12 +23,12 @@ def main():
     # logsディレクトリにTensorBoardログを保存
     tensorboard_logdir = "logs/ppo_tensorboard_logs"
 
-    # PPOエージェントの生成（TensorBoard設定込み）
+    # PPOエージェントの生成（学習率を変更）
     ppo_agent = PPO(
         "MlpPolicy",
         env,
         verbose=1,
-        tensorboard_log=tensorboard_logdir
+        tensorboard_log=tensorboard_logdir,
         learning_rate=0.0001  # 学習率を0.0001に変更
     )
 
