@@ -26,7 +26,7 @@ def fetch_fred_data(api_key, series_id):
 
 def main():
     # FRED APIキーとシリーズID
-    api_key = "YOUR_API_KEY"
+    api_key = "c0cb7c667f94e8ecee6a2fbc71020201"
     series_id = "CPIAUCNS"  # 例: 消費者物価指数
 
     # データ取得
