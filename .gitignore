@@ -8,3 +8,7 @@ venv_mt5/
 
 # local pip user install
 .local/
+
+# CSVなどのヒストリカルデータ（ローカルのみ）
+data/private_data/
+
