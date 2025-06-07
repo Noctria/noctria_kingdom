@@ -5,6 +5,9 @@
 ✅ docker start my_temp_image2
 docker container exec -it my_temp_image2 bash
 
+✅ スクリプト実行コマンド
+root@df47ddd0fb1d:/workspace# PYTHONPATH=/workspace python data/fundamental/ファイル名.py
+
 #環境起動手順
 ✅ TensorBoardサーバーをDockerで起動する例
 
