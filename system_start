@@ -1,0 +1,11 @@
+
+#環境起動手順
+✅ TensorBoardサーバーをDockerで起動する例
+
+docker run -it --rm -p 6006:6006 \
+  -v /mnt/e/noctria-kingdom-main/logs:/logs \
+  tensorflow/tensorflow:2.15.0 \
+  tensorboard --logdir=/logs --host=0.0.0.0
+
+✅ ブラウザで確認
+http://localhost:6006
