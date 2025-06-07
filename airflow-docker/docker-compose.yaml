@@ -11,6 +11,7 @@ services:
 
   airflow-webserver:
     image: apache/airflow:2.8.0
+    command: webserver     # ← 追加
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -26,6 +27,7 @@ services:
 
   airflow-scheduler:
     image: apache/airflow:2.8.0
+    command: scheduler     # ← 追加
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -39,6 +41,7 @@ services:
 
   airflow-worker:
     image: apache/airflow:2.8.0
+    command: celery worker     # ← 追加してもOK（任意）
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
