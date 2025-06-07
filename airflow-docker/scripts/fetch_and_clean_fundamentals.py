@@ -33,7 +33,7 @@ def main():
     df["value"] = df["value"].astype(float)
 
     print("🔮 Prometheus: 整形完了。未来の戦略に役立てます。")
-    df.to_csv("data/fundamental/cleaned_cpi.csv", index=False)
+    df.to_csv("/opt/airflow/data/fundamental/cleaned_cpi.csv", index=False)
 
     print("✅ Aurus: data/fundamental/cleaned_cpi.csv に保存完了！")
     print("👑 王Noctria: 任務完了。次の戦略へ備えよ！")
