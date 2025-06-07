@@ -1,31 +1,38 @@
 """
-integrate_fundamental_data.py
-ファンダメンタルデータ（例: CPI, 金利差, 失業率など）を
-テクニカルデータ（例: 1時間足OHLCV）に統合する前処理スクリプト。
+integrate_multiple_fundamental_data.py
+複数のファンダメンタルデータ（例: CPI, 金利差, 失業率など）を
+テクニカルデータ（例: 1時間足OHLCV）に統合するスクリプト。
 """
 
 import pandas as pd
 
-def integrate_fundamental_data(ohlcv_path, fund_path, output_path):
+def load_fundamental_data(path, col_name):
     """
-    OHLCVデータとファンダメンタルデータを結合して保存する。
+    単一ファンダ指標のCSVを読み込み、指定列名にリネームして返す。
+    """
+    df = pd.read_csv(path, parse_dates=['date'])
+    df.rename(columns={'value': col_name}, inplace=True)
+    df.set_index('date', inplace=True)
+    return df
+
+def integrate_fundamentals(ohlcv_path, fundamental_files, output_path):
+    """
+    複数ファンダ指標をOHLCVに統合する。
 
     Parameters:
     ----------
     ohlcv_path: str
-        OHLCVデータのCSVファイルパス
-    fund_path: str
-        ファンダメンタルデータのCSVファイルパス
+        OHLCVデータのCSVファイル
+    fundamental_files: dict
+        {'cpi': 'path/to/cpi.csv', 'interest_diff': 'path/to/interest.csv', ...}
     output_path: str
-        統合後のCSV出力先パス
+        出力先パス
     """
-    # 1時間足OHLCVデータ（ヘッダ行あり）
+    # OHLCVデータ（ヘッダあり）
     ohlcv_df = pd.read_csv(
         ohlcv_path,
         parse_dates=['Datetime']
     )
-
-    # 列名を小文字に統一
     ohlcv_df.rename(columns={
         'Datetime': 'datetime',
         'Open': 'open',
@@ -33,26 +40,28 @@ def integrate_fundamental_data(ohlcv_path, fund_path, output_path):
         'Low': 'low',
         'Close': 'close'
     }, inplace=True)
-
     ohlcv_df.set_index('datetime', inplace=True)
 
-    # ファンダメンタルデータ（例: 月次データ）
-    fund_df = pd.read_csv(fund_path, parse_dates=['date'])
-    fund_df.set_index('date', inplace=True)
+    # ファンダ指標を順に統合
+    for col_name, file_path in fundamental_files.items():
+        fund_df = load_fundamental_data(file_path, col_name)
+        ohlcv_df[col_name] = fund_df[col_name].reindex(ohlcv_df.index, method='ffill')
 
-    # 直近発表値で埋める（forward fill）
-    ohlcv_df['cpi'] = fund_df['cpi'].reindex(ohlcv_df.index, method='ffill')
-    ohlcv_df['interest_diff'] = fund_df['interest_diff'].reindex(ohlcv_df.index, method='ffill')
-    ohlcv_df['unemployment'] = fund_df['unemployment'].reindex(ohlcv_df.index, method='ffill')
-
-    # 保存
+    # 出力
     ohlcv_df.to_csv(output_path)
     print(f"統合データを {output_path} に保存しました。")
 
 if __name__ == "__main__":
-    # データパス例
+    # OHLCVデータ
     ohlcv_csv = "data/preprocessed_usdjpy_1h.csv"
-    fund_csv = "data/fundamental/cleaned_fred_data.csv"
+
+    # ファンダ指標ファイル群（必要に応じて拡張可）
+    fundamental_files = {
+        'cpi': 'data/fundamental/cleaned_cpi.csv',
+        'interest_diff': 'data/fundamental/cleaned_interest_diff.csv',
+        'unemployment': 'data/fundamental/cleaned_unemployment.csv'
+    }
+
     output_csv = "data/preprocessed_usdjpy_with_fundamental.csv"
 
-    integrate_fundamental_data(ohlcv_csv, fund_csv, output_csv)
+    integrate_fundamentals(ohlcv_csv, fundamental_files, output_csv)
