@@ -30,7 +30,7 @@ def save_cleaned_data(df, output_path):
     print(f"✅ 保存完了: {output_path}")
 
 if __name__ == "__main__":
-    api_key = "YOUR_FRED_API_KEY"
+    api_key = "c0cb7c667f94e8ecee6a2fbc71020201"
 
     fundamentals = {
         "cpi": {
