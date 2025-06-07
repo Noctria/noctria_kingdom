@@ -29,7 +29,7 @@ def main():
         env,
         verbose=1,
         tensorboard_log=tensorboard_logdir,
-        learning_rate=0.0001  # 学習率を0.0001に変更
+        learning_rate=0.00005  # 学習率を0.00005に変更
     )
 
     # PPO学習の実行
