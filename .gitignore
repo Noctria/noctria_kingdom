@@ -12,3 +12,6 @@ venv_mt5/
 # CSVなどのヒストリカルデータ（ローカルのみ）
 data/private_data/
 
+# TensorBoardログはGit管理外
+logs/ppo_tensorboard_logs/
+
