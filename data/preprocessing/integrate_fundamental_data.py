@@ -1,67 +1,71 @@
 """
-integrate_multiple_fundamental_data.py
-複数のファンダメンタルデータ（例: CPI, 金利差, 失業率など）を
-テクニカルデータ（例: 1時間足OHLCV）に統合するスクリプト。
+fetch_and_clean_fundamentals.py
+FRED APIからファンダメンタル指標をダウンロードして、
+「date,value」の形式に整形して保存するスクリプト。
 """
 
+import requests
 import pandas as pd
 
-def load_fundamental_data(path, col_name):
+def fetch_fred_data(api_key, series_id):
     """
-    単一ファンダ指標のCSVを読み込み、指定列名にリネームして返す。
-    """
-    df = pd.read_csv(path, parse_dates=['date'])
-    df.rename(columns={'value': col_name}, inplace=True)
-    df.set_index('date', inplace=True)
-    return df
-
-def integrate_fundamentals(ohlcv_path, fundamental_files, output_path):
-    """
-    複数ファンダ指標をOHLCVに統合する。
+    FRED APIから指定シリーズIDのデータを取得する。
 
     Parameters:
     ----------
-    ohlcv_path: str
-        OHLCVデータのCSVファイル
-    fundamental_files: dict
-        {'cpi': 'path/to/cpi.csv', 'interest_diff': 'path/to/interest.csv', ...}
-    output_path: str
-        出力先パス
+    api_key: str
+        FREDのAPIキー
+    series_id: str
+        取得するFRED指標のID（例: 'CPIAUCSL'）
+
+    Returns:
+    -------
+    pd.DataFrame
+        日付と値のDataFrame
     """
-    # OHLCVデータ（ヘッダあり）
-    ohlcv_df = pd.read_csv(
-        ohlcv_path,
-        parse_dates=['Datetime']
-    )
-    ohlcv_df.rename(columns={
-        'Datetime': 'datetime',
-        'Open': 'open',
-        'High': 'high',
-        'Low': 'low',
-        'Close': 'close'
-    }, inplace=True)
-    ohlcv_df.set_index('datetime', inplace=True)
+    url = f"https://api.stlouisfed.org/fred/series/observations"
+    params = {
+        'series_id': series_id,
+        'api_key': api_key,
+        'file_type': 'json'
+    }
+    response = requests.get(url, params=params)
+    data = response.json()['observations']
 
-    # ファンダ指標を順に統合
-    for col_name, file_path in fundamental_files.items():
-        fund_df = load_fundamental_data(file_path, col_name)
-        ohlcv_df[col_name] = fund_df[col_name].reindex(ohlcv_df.index, method='ffill')
+    df = pd.DataFrame(data)
+    df = df[['date', 'value']]
+    df['value'] = pd.to_numeric(df['value'], errors='coerce')
+    df.dropna(inplace=True)
+    df['date'] = pd.to_datetime(df['date'])
+    return df
 
-    # 出力
-    ohlcv_df.to_csv(output_path)
-    print(f"統合データを {output_path} に保存しました。")
+def save_cleaned_data(df, output_path):
+    """
+    整形データをCSVに保存する。
+    """
+    df.to_csv(output_path, index=False)
+    print(f"{output_path} に保存しました。")
 
 if __name__ == "__main__":
-    # OHLCVデータ
-    ohlcv_csv = "data/preprocessed_usdjpy_1h.csv"
+    # FRED APIキー
+    api_key = "c0cb7c667f94e8ecee6a2fbc71020201"
 
-    # ファンダ指標ファイル群（必要に応じて拡張可）
-    fundamental_files = {
-        'cpi': 'data/fundamental/cleaned_cpi.csv',
-        'interest_diff': 'data/fundamental/cleaned_interest_diff.csv',
-        'unemployment': 'data/fundamental/cleaned_unemployment.csv'
+    # 取得する指標と出力ファイル
+    fundamentals = {
+        'cpi': {
+            'series_id': 'CPIAUCSL',  # 米国CPI
+            'output_path': 'data/fundamental/cleaned_cpi.csv'
+        },
+        'interest_diff': {
+            'series_id': 'IR',  # 例: 政策金利差のシリーズID（仮）
+            'output_path': 'data/fundamental/cleaned_interest_diff.csv'
+        },
+        'unemployment': {
+            'series_id': 'UNRATE',  # 失業率
+            'output_path': 'data/fundamental/cleaned_unemployment.csv'
+        }
     }
 
-    output_csv = "data/preprocessed_usdjpy_with_fundamental.csv"
-
-    integrate_fundamentals(ohlcv_csv, fundamental_files, output_csv)
+    for name, info in fundamentals.items():
+        df = fetch_fred_data(api_key, info['series_id'])
+        save_cleaned_data(df, info['output_path'])
