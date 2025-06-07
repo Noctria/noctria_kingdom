@@ -19,8 +19,21 @@ def integrate_fundamental_data(ohlcv_path, fund_path, output_path):
     output_path: str
         統合後のCSV出力先パス
     """
-    # 1時間足OHLCVデータ
-    ohlcv_df = pd.read_csv(ohlcv_path, parse_dates=['datetime'])
+    # 1時間足OHLCVデータ（ヘッダ行あり）
+    ohlcv_df = pd.read_csv(
+        ohlcv_path,
+        parse_dates=['Datetime']
+    )
+
+    # 列名を小文字に統一
+    ohlcv_df.rename(columns={
+        'Datetime': 'datetime',
+        'Open': 'open',
+        'High': 'high',
+        'Low': 'low',
+        'Close': 'close'
+    }, inplace=True)
+
     ohlcv_df.set_index('datetime', inplace=True)
 
     # ファンダメンタルデータ（例: 月次データ）
