@@ -56,11 +56,13 @@ if __name__ == "__main__":
     # OHLCVデータ
     ohlcv_csv = "data/preprocessed_usdjpy_1h.csv"
 
-    # ファンダ指標ファイル群（必要に応じて拡張可）
+    # ファンダ指標ファイル群（ffr・gdpを含めた完全版）
     fundamental_files = {
         'cpi': 'data/fundamental/cleaned_cpi.csv',
         'interest_diff': 'data/fundamental/cleaned_interest_diff.csv',
-        'unemployment': 'data/fundamental/cleaned_unemployment.csv'
+        'unemployment': 'data/fundamental/cleaned_unemployment.csv',
+        'ffr': 'data/fundamental/cleaned_ffr.csv',
+        'gdp': 'data/fundamental/cleaned_gdp.csv'
     }
 
     output_csv = "data/preprocessed_usdjpy_with_fundamental.csv"
