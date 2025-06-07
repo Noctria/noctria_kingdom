@@ -1,65 +1,69 @@
 # core/meta_ai_env.py
-import numpy as np
+
 import gym
-from gym import spaces
+import numpy as np
 
 class MetaAIEnv(gym.Env):
     """
-    MetaAI用の強化学習環境
-    各戦略AIの出力などを観測としてまとめ、最終的なアクションを強化学習エージェントに決めさせる。
+    MetaAI向けの学習環境（OpenAI Gym形式）
+
+    各戦略AIの出力と行動を統合し、
+    強化学習アルゴリズムが学習できる環境を提供する。
     """
 
     def __init__(self):
         super(MetaAIEnv, self).__init__()
 
-        # 例: 観測ベクトル（例: 12次元の市場状態 + 各戦略の推奨度など）
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32)
+        # ✅ 観測空間（例: 12次元の市場状態）
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
 
-        # 例: 3つのアクション {0: HOLD, 1: BUY, 2: SELL}
-        self.action_space = spaces.Discrete(3)
+        # ✅ 行動空間（例: 0=SELL, 1=HOLD, 2=BUY）
+        self.action_space = gym.spaces.Discrete(3)
 
-        # 初期化: 例としてランダムな市場状態
-        self.state = np.random.rand(12)
+        # ✅ 状態管理
+        self.state = self._get_initial_state()
         self.current_step = 0
-        self.max_steps = 1000  # 例: 1000ステップで1エピソード終了
+        self.max_steps = 1000
+
+    def _get_initial_state(self):
+        """
+        初期状態（ダミー: ランダムベクトル）を生成
+        """
+        return np.random.rand(12)
 
     def reset(self):
         """
         環境のリセット
         """
-        self.state = np.random.rand(12)  # 例としてランダム初期化
+        self.state = self._get_initial_state()
         self.current_step = 0
         return self.state
 
     def step(self, action):
         """
-        環境のステップ
+        行動を受け取り、次状態・報酬・終了判定・追加情報を返す
         """
-        self.current_step += 1
-
-        # 例: ダミーの市場反応（次状態）
+        # ✅ 簡易版: ランダムに次状態を生成
         next_state = np.random.rand(12)
 
-        # 例: アクションに基づくダミー報酬（適宜、実際の損益計算を入れる）
-        if action == 1:  # BUY
-            reward = np.random.uniform(-1, 1)
-        elif action == 2:  # SELL
-            reward = np.random.uniform(-1, 1)
-        else:  # HOLD
-            reward = -0.1  # 例: 機会損失ペナルティ
+        # ✅ 簡易版: 行動に応じた報酬（SELL=-1, HOLD=0, BUY=+1）
+        if action == 0:
+            reward = -1
+        elif action == 2:
+            reward = 1
+        else:
+            reward = 0
 
+        self.current_step += 1
         done = self.current_step >= self.max_steps
 
-        # 追加情報
-        info = {}
-
+        # ✅ 状態更新
         self.state = next_state
 
-        return next_state, reward, done, info
+        return next_state, reward, done, {}
 
     def render(self, mode='human'):
         """
-        環境の可視化（今回は省略）
+        （オプション）環境の状態を可視化
         """
         print(f"Step: {self.current_step}, State: {self.state}")
-
