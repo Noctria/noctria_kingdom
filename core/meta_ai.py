@@ -56,25 +56,48 @@ class MetaAI(gym.Env):
         # ✅ 実際の観測ベクトル
         obs = self.data.iloc[self.current_step].values.astype(np.float32)
 
-        # ✅ ダミー報酬（後で本物に置換）
+        # ✅ ファンダ指標取得
+        cpi = self.data.iloc[self.current_step]["cpi"]
+        interest_diff = self.data.iloc[self.current_step]["interest_diff"]
+        unemployment = self.data.iloc[self.current_step]["unemployment"]
+
+        # ✅ ダミーの利益・コスト（後で本物ロジックに置換）
         trade_profit = np.random.uniform(-5, 5)
         spread_cost = np.random.uniform(0, 0.2)
         commission = 0.1
 
         self.trade_history.append(trade_profit)
 
+        # ✅ 最大ドローダウン計算
         cum_profit = np.cumsum(self.trade_history)
         peak = np.maximum.accumulate(cum_profit)
         drawdowns = peak - cum_profit
         self.max_drawdown = np.max(drawdowns)
 
+        # ✅ ファンダ要素の寄与（例: CPI活性度ボーナス、失業率リスクペナルティ）
+        cpi_factor = 0.05 * (cpi / 100)
+        unemployment_factor = -0.05 * (unemployment / 10)
+
+        # ✅ 連勝/連敗制御
+        recent_trades = self.trade_history[-3:]
+        streak_sum = sum(recent_trades)
+        streak_bonus = 0.1 if streak_sum > 0 else -0.1 if streak_sum < 0 else 0
+
+        # ✅ 複合報酬式
         reward = (
             0.6 * trade_profit
             - 0.3 * self.max_drawdown
             - 0.1 * (spread_cost + commission)
+            + cpi_factor
+            + unemployment_factor
+            + streak_bonus
         )
 
-        print(f"Action: {action}, Reward: {reward:.3f}, Drawdown: {self.max_drawdown:.3f}")
+        print(
+            f"Action: {action}, Reward: {reward:.3f}, Drawdown: {self.max_drawdown:.3f}, "
+            f"CPI: {cpi:.2f}, Unemployment: {unemployment:.2f}, Streak: {streak_sum:.2f}"
+        )
+
         return obs, reward, done, {}
 
     def reset(self):
