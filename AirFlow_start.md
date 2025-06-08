@@ -15,6 +15,10 @@ docker compose up
 これで WebUI（http://localhost:8080） にアクセス可能！
 ブラウザでログインすれば、また王国が動き出すよ👑✨
 
+✅ スケジューラーのdockerに入るためのコマンド
+docker exec -it airflow-docker-airflow-scheduler-1 /bin/bash
+
+
 🟩 補足: バックグラウンドで立ち上げる場合
 bash
 コピーする
