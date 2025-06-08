@@ -16,7 +16,12 @@ docker compose up
 ブラウザでログインすれば、また王国が動き出すよ👑✨
 
 ✅ スケジューラーのdockerに入るためのコマンド
+AireFlowディレクトリに移動して
 docker exec -it airflow-docker-airflow-scheduler-1 /bin/bash
+
+中で以下を実行し、gym と core の存在 を確認
+python3 -c "import gym; print(gym.__file__)"
+ls /opt/airflow/core
 
 
 🟩 補足: バックグラウンドで立ち上げる場合
