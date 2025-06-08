@@ -10,11 +10,16 @@ def analyze_trades(log_csv):
     total_trades = len(df)
     total_profit = df['profit'].sum()
     win_rate = (df['profit'] > 0).mean() * 100
-    max_drawdown = df['drawdown'].max()
+
+    # drawdown列の存在を確認してから計算
+    if 'drawdown' in df.columns:
+        max_drawdown = df['drawdown'].max()
+        print("🛡️ Noctus: 最大ドローダウンは {:.2f}。リスク管理に注視します。".format(max_drawdown))
+    else:
+        print("🛡️ Noctus: 'drawdown' 列が存在しません。リスク管理データなし。")
 
     print("⚔️ Aurus: 勝率は {:.2f}%。全体取引数は {} 件。".format(win_rate, total_trades))
     print("⚡ Levia: 短期戦での総利益は {:.2f}。".format(total_profit))
-    print("🛡️ Noctus: 最大ドローダウンは {:.2f}。リスク管理に注視します。".format(max_drawdown))
     print("🔮 Prometheus: 外部環境に基づく未来の戦略調整を検討します。")
     print("✅ 王Noctria: 本日の戦略成果報告を受理した。次の成長へ備えよ！")
 
