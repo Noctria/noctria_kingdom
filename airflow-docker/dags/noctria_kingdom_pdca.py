@@ -26,7 +26,11 @@ with DAG(
     # 2️⃣ AI学習
     train_ai = BashOperator(
         task_id='train_ai',
-        bash_command='echo "⚔️ Aurus: 戦略AI学習を開始します！" && python3 /opt/airflow/scripts/meta_ai_tensorboard_train.py',
+        bash_command=(
+            'export PYTHONPATH=$PYTHONPATH:/home/airflow/.local/lib/python3.8/site-packages && '
+            'echo "⚔️ Aurus: 戦略AI学習を開始します！" && '
+            'python3 /opt/airflow/scripts/meta_ai_tensorboard_train.py'
+        ),
     )
 
     # 3️⃣ 戦略成果の分析
