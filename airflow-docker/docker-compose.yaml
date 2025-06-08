@@ -21,6 +21,8 @@ services:
       - ./logs:/opt/airflow/logs
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
+      - ./core:/opt/airflow/core
+      
     depends_on:
       - postgres
 
