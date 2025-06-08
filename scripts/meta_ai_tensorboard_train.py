@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+import sys
+# Airflowコンテナ内で core モジュールが見えるようにパスを追加
+sys.path.append('/opt/airflow')
+
 import gym
 import numpy as np
 from stable_baselines3 import PPO
-from core.meta_ai import MetaAI  # 環境に合わせてパスを調整
+from core.meta_ai import MetaAI  # core ディレクトリにある自作環境クラス
 
 def main():
     print("✅ MetaAI PPO学習（TensorBoard対応・logsディレクトリ）開始！")
