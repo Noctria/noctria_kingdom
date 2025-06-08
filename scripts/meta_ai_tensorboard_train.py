@@ -2,18 +2,21 @@
 # coding: utf-8
 
 import sys
-# Airflowコンテナ内で core モジュールが見えるようにパスを追加
-sys.path.append('/opt/airflow')
+sys.path.append('/opt/airflow')  # Airflow内で core モジュールが見えるようにする！
 
 import gym
 import numpy as np
 from stable_baselines3 import PPO
-from core.meta_ai import MetaAI  # core ディレクトリにある自作環境クラス
+from core.meta_ai import MetaAI  # core モジュール
 
 def main():
-    print("✅ MetaAI PPO学習（TensorBoard対応・logsディレクトリ）開始！")
+    print("👑 王Noctria: Aurusよ、戦略学習の任務を開始せよ！")
+    print("⚔️ Aurus: 市場データを元に、戦略を強化学習で磨きます。")
+    print("🔮 Prometheus: 外部データも活用し、未来を予見して反映します。")
+    print("🛡️ Noctus: 学習中のリスクに警戒を怠らぬよう監視します。")
+    print("⚡ Levia: 短期利益の刈り取り準備も進めています！")
 
-    # 各戦略AIのモック（実際は本物の戦略クラスをインポート・インスタンス化）
+    # 各戦略AIのモック（本番では本物クラスをインポートして置き換える）
     strategy_agents = {
         "Aurus": None,
         "Levia": None,
@@ -27,19 +30,17 @@ def main():
     # logsディレクトリにTensorBoardログを保存
     tensorboard_logdir = "logs/ppo_tensorboard_logs"
 
-    # PPOエージェントの生成（学習率を変更）
+    # PPOエージェントの生成（TensorBoard設定込み）
     ppo_agent = PPO(
         "MlpPolicy",
         env,
         verbose=1,
-        tensorboard_log=tensorboard_logdir,
-        learning_rate=0.0002  # 学習率を0.0002に変更
+        tensorboard_log=tensorboard_logdir
     )
 
-    # PPO学習の実行
+    print("⚔️ Aurus: 戦略学習サイクルを始動！王国の勝利を目指します。")
     ppo_agent.learn(total_timesteps=50000)
-
-    print("✅ PPO学習（TensorBoard対応・logsディレクトリ）完了！")
+    print("✅ 王Noctria: Aurus、Prometheus、Noctus、Levia…任務完了！王国の戦略がさらに磨かれた。")
 
 if __name__ == "__main__":
     main()
