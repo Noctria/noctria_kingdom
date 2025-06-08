@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+import sys
+sys.path.append('/opt/airflow')  # 追加で core モジュールを認識させる
+
 import gym
 import numpy as np
 from stable_baselines3 import PPO
-from core.meta_ai import MetaAI  # 環境に合わせてパスを調整
+from core.meta_ai import MetaAI  # core モジュール
 
 def main():
     print("👑 王Noctria: Aurusよ、戦略学習の任務を開始せよ！")
@@ -13,7 +16,6 @@ def main():
     print("🛡️ Noctus: 学習中のリスクに警戒を怠らぬよう監視します。")
     print("⚡ Levia: 短期利益の刈り取り準備も進めています！")
 
-    # 各戦略AIのモック（実際は本物の戦略クラスをインポート・インスタンス化）
     strategy_agents = {
         "Aurus": None,
         "Levia": None,
@@ -21,13 +23,9 @@ def main():
         "Prometheus": None
     }
 
-    # MetaAI環境の生成
     env = MetaAI(strategy_agents=strategy_agents)
 
-    # logsディレクトリにTensorBoardログを保存
     tensorboard_logdir = "logs/ppo_tensorboard_logs"
-
-    # PPOエージェントの生成（TensorBoard設定込み）
     ppo_agent = PPO(
         "MlpPolicy",
         env,
@@ -35,7 +33,6 @@ def main():
         tensorboard_log=tensorboard_logdir
     )
 
-    # PPO学習の実行
     print("⚔️ Aurus: 戦略学習サイクルを始動！王国の勝利を目指します。")
     ppo_agent.learn(total_timesteps=50000)
     print("✅ 王Noctria: Aurus、Prometheus、Noctus、Levia…任務完了！王国の戦略がさらに磨かれた。")
