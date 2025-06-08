@@ -20,5 +20,5 @@ def analyze_trades(log_csv):
 
 if __name__ == "__main__":
     # 例: ログCSVファイル名
-    log_csv = "logs/trade_history_2025-05-31_to_2025-06-07.csv"
+    log_csv = "/opt/airflow/logs/trade_history_2025-05-31_to_2025-06-07.csv"
     analyze_trades(log_csv)
