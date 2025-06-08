@@ -14,7 +14,7 @@ class MetaAI(gym.Env):
         self.strategy_agents = strategy_agents
 
         # ✅ データ読み込み（OHLCV + ファンダ）
-        self.data = pd.read_csv("data/preprocessed_usdjpy_with_fundamental.csv", parse_dates=['datetime'])
+        self.data = pd.read_csv("/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", parse_dates=['datetime'])
         self.data.set_index('datetime', inplace=True)
         self.current_step = 0
 
