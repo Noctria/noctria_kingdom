@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import optuna
+import json
 
 def objective(trial):
     # 試行するパラメータ例（学習率など）
@@ -19,12 +20,22 @@ def main():
     print("🔮 Prometheus: Optunaでパラメータの可能性を探索し、王国の勝利に繋げます。")
     print("🛡️ Noctus: リスクの増加を伴う試行には警戒を怠りません。")
 
+    # 最適化開始
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=10)
 
+    # 最適化結果の表示
+    best_params = study.best_params
     print("✅ Prometheus: 最適化完了！見つけた最適な学習率は {:.6f}、clip_rangeは {:.2f}。".format(
-        study.best_params['learning_rate'], study.best_params['clip_range']
+        best_params['learning_rate'], best_params['clip_range']
     ))
+
+    # 💾 最適化結果を best_params.json に保存
+    output_file = "best_params.json"
+    with open(output_file, "w") as f:
+        json.dump(best_params, f, indent=4)
+    print(f"💾 Prometheus: 最適化成果を {output_file} に封印しました。Leviaよ、次の戦いへ活かせ！")
+
     print("👑 王Noctria: Prometheusの成果を受理した。Levia、これを活かせ！")
 
 if __name__ == "__main__":
