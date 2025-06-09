@@ -4,17 +4,30 @@ import pandas as pd
 from stable_baselines3 import PPO
 
 # 🎯 カスタム報酬関数
-def calculate_reward(profit, drawdown, win_rate):
+def calculate_reward(profit, drawdown, win_rate, recent_profits):
     """
     Noctria Kingdom版報酬関数
-    利益最大化 + ドローダウン抑制 + 勝率ボーナス
+    利益最大化 + ドローダウン抑制 + 勝率ボーナス + 安定性ボーナス
     """
     reward = profit
-    max_drawdown_threshold = -30  # 例: -30pips以上でペナルティ
+
+    max_drawdown_threshold = -30
     if drawdown < max_drawdown_threshold:
         reward += drawdown
+
     if win_rate > 0.6:
         reward += 10
+
+    # 🎯 安定性ボーナス: 直近収益の標準偏差が小さいほどボーナス
+    if len(recent_profits) > 1:
+        std_dev = np.std(recent_profits)
+        stability_bonus = 5 / (1 + std_dev)
+        reward += stability_bonus
+    else:
+        stability_bonus = 0
+
+    print(f"安定性ボーナス: {stability_bonus:.3f}")
+
     return reward
 
 class MetaAI(gym.Env):
@@ -45,7 +58,7 @@ class MetaAI(gym.Env):
 
         self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
 
-        # トレード履歴
+        # トレード履歴など
         self.trade_history = []
         self.max_drawdown = 0.0
         self.wins = 0
@@ -70,7 +83,7 @@ class MetaAI(gym.Env):
 
         obs = self.data.iloc[self.current_step].values.astype(np.float32)
 
-        # ✅ ダミーの取引結果（ここを実戦ロジックに置き換え予定）
+        # ✅ ダミーの取引結果（後で本物ロジックに置換予定）
         profit = np.random.uniform(-5, 5)
         spread_cost = np.random.uniform(0, 0.2)
         commission = 0.1
@@ -83,14 +96,17 @@ class MetaAI(gym.Env):
         drawdowns = peak - cum_profit
         self.max_drawdown = np.max(drawdowns)
 
-        # ✅ 勝率計算（例: 収益がプラスなら勝ち）
+        # ✅ 勝率計算
         self.trades += 1
         if profit > 0:
             self.wins += 1
         win_rate = self.wins / self.trades if self.trades > 0 else 0.0
 
-        # ✅ カスタム報酬関数でreward計算
-        reward = calculate_reward(profit, -self.max_drawdown, win_rate)
+        # ✅ 直近10トレードの収益リスト
+        recent_profits = self.trade_history[-10:]
+
+        # ✅ カスタム報酬関数の呼び出し
+        reward = calculate_reward(profit, -self.max_drawdown, win_rate, recent_profits)
 
         print(
             f"Action: {action}, Reward: {reward:.3f}, Drawdown: {self.max_drawdown:.3f}, "
