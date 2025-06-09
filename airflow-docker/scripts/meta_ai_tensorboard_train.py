@@ -25,7 +25,7 @@ def main():
 
     env = MetaAI(strategy_agents=strategy_agents)
 
-    tensorboard_logdir = "logs/ppo_tensorboard_logs"
+    tensorboard_logdir = "/opt/airflow/logs/ppo_tensorboard_logs"
     ppo_agent = PPO(
         "MlpPolicy",
         env,
