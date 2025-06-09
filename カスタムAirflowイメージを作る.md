@@ -14,11 +14,11 @@ Dockerfile
 編集する
 FROM apache/airflow:2.8.0
  
-# root権限で追加パッケージをインストール
+ # root権限で追加パッケージをインストール
 USER root
  
-# 必要ならシステムツールのインストール
-# RUN apt-get update && apt-get install -y nano vim
+ # 必要ならシステムツールのインストール
+ # RUN apt-get update && apt-get install -y nano vim
 
 # Pythonパッケージのインストール
 RUN pip install --no-cache-dir \
