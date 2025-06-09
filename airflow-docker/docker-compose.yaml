@@ -15,6 +15,7 @@ services:
     command: webserver
     ports:
       - "8080:8080"
+      - "6006:6006"  # TensorBoard用ポートを公開
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -60,3 +61,4 @@ services:
 
 volumes:
   postgres-data:
+
