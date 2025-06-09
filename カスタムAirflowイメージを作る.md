@@ -1,93 +1,29 @@
-🎯 目的：カスタムAirflowイメージを作る   
-✅ ベースイメージ：apache/airflow:2.8.0  
-✅ 追加でインストールするもの：  
+もちろんです！以下に、GitHub向けに見やすく整形したMarkdownファイル内容をまとめました🚀✨
 
-tensorboard
- 
-必要なら他のPythonパッケージも！
- 
-📝 カスタムDockerfile例
-以下は airflow-docker/Dockerfile として保存する例👇
- 
-Dockerfile
+markdown
 コピーする
 編集する
-FROM apache/airflow:2.8.0
- 
- # root権限で追加パッケージをインストール
-USER root
- 
- # 必要ならシステムツールのインストール
- # RUN apt-get update && apt-get install -y nano vim
+# airflow-docker/Dockerfile （カスタムDockerfile完全版）
 
-# Pythonパッケージのインストール
-RUN pip install --no-cache-dir \
-    tensorboard \
-    # 他に必要ならここに追加
-    && pip cache purge
+Noctria Kingdom の Airflow 環境を拡張し、必要なパッケージを自動的にインストールするためのカスタム Dockerfile です。  
+`gym`, `optuna`, `shimmy`, `tensorboard` を追加して、手動インストールの手間を省きます！
 
-# airflowユーザーに戻す
-USER airflow
-🔥 docker-compose.yamlの修正
-✅ ビルドするように指定！
-airflow-webserver, airflow-scheduler, airflow-init の各サービスに👇を追加👇
+---
 
-yaml
-コピーする
-編集する
-build: .
-例:
+## 📁 ファイル構成
 
-yaml
-コピーする
-編集する
-  airflow-webserver:
-    build: .
-    image: custom_airflow:latest
-    ports:
-      - "8080:8080"
-      - "6006:6006"
-    ...
-✅ 他のサービスも同様に build: . を追加しておくと安心！
+以下のファイルを `airflow-docker/` に置きます。
 
-🚀 新しいカスタムイメージをビルド＆起動！
-1️⃣ カレントディレクトリが airflow-docker にいることを確認
-
-bash
-コピーする
-編集する
-cd /mnt/e/noctria-kingdom-main/airflow-docker
-2️⃣ Docker Composeで再ビルド＆起動
-
-bash
-コピーする
-編集する
-docker compose down
-docker compose up --build -d
-🎯 効果：
-✅ もう 手動 pip install tensorboard は不要！
-✅ カスタムイメージに全て入ってるので、初期化後すぐに使える🚀
-✅ さらに「TensorBoardだけじゃなく、他のPythonパッケージ（例: pandas, matplotlib）もまとめて入れられる」！
-
-😊
-このカスタムDockerfile案をベースにしたい・さらに「こんなツールも追加したい！」という要望があれば遠慮なく教えてね🚀✨
-一緒に王国のDockerイメージを最適化しよう！
-
-
-
-
-
-
-
-あなた:
-追加でインストールするものは、gym、optuna、Shimmy、tensorboardです
-
-
-ChatGPT:
-了解です！
-指定してくれた gym, optuna, shimmy, tensorboard をまとめてインストールする カスタムDockerfile完全版 を用意しますね！🚀
-
-📝 airflow-docker/Dockerfile（カスタムDockerfile完全版）
+```plaintext
+airflow-docker/
+├── docker-compose.yaml
+├── Dockerfile
+├── dags/
+├── logs/
+├── scripts/
+├── data/
+├── core/
+📝 Dockerfile 内容
 Dockerfile
 コピーする
 編集する
@@ -96,7 +32,7 @@ FROM apache/airflow:2.8.0
 # rootユーザーに切り替え
 USER root
 
-# 必要ならOSレベルのツールもインストール（例: nanoやvimなど）
+# 必要に応じてOSレベルのツールもインストールできます
 # RUN apt-get update && apt-get install -y nano vim
 
 # Pythonパッケージをまとめてインストール
@@ -109,8 +45,8 @@ RUN pip install --no-cache-dir \
 
 # airflowユーザーに戻す
 USER airflow
-🔥 docker-compose.yamlの修正ポイント
-✅ 各サービスで build: . を追加👇
+🚀 docker-compose.yaml の修正例
+airflow-webserver サービスに以下を追加します。
 
 yaml
 コピーする
@@ -120,21 +56,24 @@ yaml
     image: custom_airflow:latest
     ports:
       - "8080:8080"
-      - "6006:6006"
+      - "6006:6006"  # TensorBoard用
     ...
-他のサービス（airflow-scheduler, airflow-init）にも同様に build: . を追加すると良いです。
+他のサービス（例: airflow-scheduler, airflow-init）にも build: . を追加すると、同じカスタムイメージを使えます。
 
-🚀 ビルド&起動コマンド
+💡 ビルド＆起動手順
+1️⃣ カレントディレクトリを airflow-docker に移動
+
 bash
 コピーする
 編集する
 cd /mnt/e/noctria-kingdom-main/airflow-docker
+2️⃣ カスタムイメージをビルドしながら起動
+
+bash
+コピーする
+編集する
 docker compose down
 docker compose up --build -d
-✅ 効果
-🔹 これで gym, optuna, shimmy, tensorboard がコンテナに自動的に入る
-🔹 手動で pip install する手間ゼロ！
-
-😊
-これで Airflowコンテナは TensorBoard可視化やAI学習環境の完全装備版 になりますね！
-次に進めたい場合（例: Dockerfileにさらにパッケージを追加・別のツールも入れたいなど）も遠慮なく言ってね🚀✨
+🎯 効果
+✅ これで Airflow 環境内に gym, optuna, shimmy, tensorboard が自動的にインストールされます！
+✅ 以後、手動で pip install する必要はありません。
