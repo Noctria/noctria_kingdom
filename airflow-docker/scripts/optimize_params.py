@@ -30,8 +30,8 @@ def main():
         best_params['learning_rate'], best_params['clip_range']
     ))
 
-    # 💾 最適化結果を best_params.json に保存
-    output_file = "best_params.json"
+    # 💾 最適化結果を /opt/airflow/best_params.json に保存
+    output_file = "/opt/airflow/best_params.json"
     with open(output_file, "w") as f:
         json.dump(best_params, f, indent=4)
     print(f"💾 Prometheus: 最適化成果を {output_file} に封印しました。Leviaよ、次の戦いへ活かせ！")
