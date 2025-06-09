@@ -3,27 +3,38 @@
 
 import pandas as pd
 
-def analyze_trades(log_csv):
-    print("👑 王Noctria: Aurus、Noctus、Levia、Prometheusよ、本日の戦略成果を報告せよ！")
+def main():
+    print("👑 王Noctria: 分析の儀式を開始する。臣下たちよ、準備は整ったか？")
 
-    df = pd.read_csv(log_csv)
-    total_trades = len(df)
-    total_profit = df['profit'].sum()
-    win_rate = (df['profit'] > 0).mean() * 100
+    # トレード履歴の書を開く
+    file_path = "logs/trade_history_2025-05-31_to_2025-06-07.csv"
+    try:
+        df = pd.read_csv(file_path)
+        print(f"📜 王Noctria: 履歴の書『{file_path}』を開封した。")
+    except FileNotFoundError:
+        print(f"⚠️ 王Noctria: 書が見つからぬ。{file_path} に探索を命ずる。")
+        return
 
-    # drawdown列の存在を確認してから計算
-    if 'drawdown' in df.columns:
-        max_drawdown = df['drawdown'].max()
-        print("🛡️ Noctus: 最大ドローダウンは {:.2f}。リスク管理に注視します。".format(max_drawdown))
-    else:
-        print("🛡️ Noctus: 'drawdown' 列が存在しません。リスク管理データなし。")
+    # drawdown カラムの有無を確認
+    if "drawdown" not in df.columns:
+        print("🛡️ Noctus: drawdownカラムは見当たりませぬ。王国の安全を期すため、0で補完いたします。")
+        df["drawdown"] = 0
 
-    print("⚔️ Aurus: 勝率は {:.2f}%。全体取引数は {} 件。".format(win_rate, total_trades))
-    print("⚡ Levia: 短期戦での総利益は {:.2f}。".format(total_profit))
-    print("🔮 Prometheus: 外部環境に基づく未来の戦略調整を検討します。")
-    print("✅ 王Noctria: 本日の戦略成果報告を受理した。次の成長へ備えよ！")
+    # 王国の戦果を報告
+    print("📊 Aurus: 王国の戦果をお見せいたします。")
+    print(df.describe())
+
+    # 戦果の詳細を吟味
+    win_rate = (df["profit"] >= 0).mean() * 100
+    max_drawdown = df["drawdown"].max()
+
+    print(f"🏆 Levia: 勝率は {win_rate:.2f}%。瞬間の勝機をものにしております。")
+    print(f"🔻 Noctus: 最大ドローダウンは {max_drawdown}。リスク管理に抜かりはございませぬ。")
+
+    # 必要なら更に深い戦略書を編纂
+    # 例: df.to_csv("logs/analyzed_trade_history.csv", index=False)
+
+    print("✅ 王Noctria: 分析の儀式は滞りなく完了した。次なる戦略の構築に進むとしよう。")
 
 if __name__ == "__main__":
-    # 例: ログCSVファイル名
-    log_csv = "/opt/airflow/logs/trade_history_2025-05-31_to_2025-06-07.csv"
-    analyze_trades(log_csv)
+    main()
