@@ -1,6 +1,6 @@
-🎯 目的：カスタムAirflowイメージを作る
-✅ ベースイメージ：apache/airflow:2.8.0
-✅ 追加でインストールするもの：
+🎯 目的：カスタムAirflowイメージを作る   
+✅ ベースイメージ：apache/airflow:2.8.0  
+✅ 追加でインストールするもの：  
 
 tensorboard
 
