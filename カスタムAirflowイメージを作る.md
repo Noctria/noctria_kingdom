@@ -3,20 +3,20 @@
 ✅ 追加でインストールするもの：  
 
 tensorboard
-
+ 
 必要なら他のPythonパッケージも！
-
+ 
 📝 カスタムDockerfile例
 以下は airflow-docker/Dockerfile として保存する例👇
-
+ 
 Dockerfile
 コピーする
 編集する
 FROM apache/airflow:2.8.0
-
+ 
 # root権限で追加パッケージをインストール
 USER root
-
+ 
 # 必要ならシステムツールのインストール
 # RUN apt-get update && apt-get install -y nano vim
 
