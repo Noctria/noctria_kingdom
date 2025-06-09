@@ -5,7 +5,7 @@ import json
 import os
 
 def apply_best_params():
-    best_params_file = "/opt/airflow/best_params.json"
+    best_params_file = "/opt/airflow/logs/best_params.json"
     if not os.path.exists(best_params_file):
         print(f"❌ ファイルが存在しません: {best_params_file}。最適化タスクがまだ完了していない可能性があります。スキップします。")
         return
