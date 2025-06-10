@@ -1,58 +1,53 @@
+import sys
+sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago
-
+from datetime import datetime, timedelta
 from core.aurus_singularis import AurusSingularis
 
-import logging
-
-def run_aurus_strategy():
-    """⚔️【王国戦略会議】Aurus Singularisの叡智を召喚し、戦略指令を下す"""
-    # 🎩 大賢者Aurusが目覚める
-    aurus = AurusSingularis()
-    
-    # 🏰 市場からの風を読む（テスト用のダミーデータ）
-    dummy_market_data = {
-        "price": 150.25,
-        "volume": 1200,
-        "sentiment": 0.65,
-        "trend_strength": 0.7,
-        "volatility": 0.3,
-        "order_block": 0.0,
-        "institutional_flow": 0.2,
-        "short_interest": 0.1,
-        "momentum": 0.5,
-        "trend_prediction": 0.8,
-        "liquidity_ratio": 0.4
-    }
-
-    # 🪄 Aurusが解析の儀を行う
-    action = aurus.process(dummy_market_data)
-    logging.info(f"👑 王Noctria: Aurusよ、汝の示す未来は『{action}』であるか！")
-
-    # 📜 王国の戦略書に結果を記録（必要であればDB保存処理を追加）
-    # 例:
-    # save_to_db(action)
-
-# 🏰 王国の戦略書（DAG）を編纂
+# ✅ DAG設定
 default_args = {
-    "owner": "noctria_kingdom",
-    "retries": 1,
+    'owner': 'Noctria',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
 }
 
-with DAG(
-    dag_id="aurus_strategy_dag",
+dag = DAG(
+    dag_id='aurus_strategy_dag',
     default_args=default_args,
-    start_date=days_ago(1),
-    schedule_interval="@hourly",
+    description='Noctria Kingdomの臣下Aurusによるトレンド解析DAG',
+    schedule_interval=None,  # 必要に応じてスケジュール設定
+    start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=["noctria", "aurus", "戦略AI"],
-) as dag:
+    tags=['noctria', 'trend-analysis'],
+)
 
-    # 👑 王国の戦略司令塔が発動
-    summon_aurus = PythonOperator(
-        task_id="summon_aurus_singularis",
-        python_callable=run_aurus_strategy,
+def aurus_strategy_task():
+    print("👑 王Noctria: Aurusよ、歴史の潮流を読み解き、我が王国を導け！")
+    aurus = AurusSingularis()
+    mock_market_data = {
+        "price": 1.2345,
+        "volume": 500,
+        "sentiment": 0.7,
+        "trend_strength": 0.5,
+        "volatility": 0.12,
+        "order_block": 0.3,
+        "institutional_flow": 0.6,
+        "short_interest": 0.4,
+        "momentum": 0.8,
+        "trend_prediction": 0.65,
+        "liquidity_ratio": 1.1
+    }
+    decision = aurus.process(mock_market_data)
+    print(f"🔮 Aurusの市場トレンド解析結果: {decision}")
+
+with dag:
+    aurus_task = PythonOperator(
+        task_id='aurus_trend_analysis_task',
+        python_callable=aurus_strategy_task,
+        dag=dag,
     )
-
-    summon_aurus
