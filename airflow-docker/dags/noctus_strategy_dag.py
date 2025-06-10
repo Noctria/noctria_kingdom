@@ -1,43 +1,48 @@
+import sys
+sys.path.append('/opt/airflow')  # ✅ Airflowコンテナのルートパスを追加
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from core.levia_tempest import LeviaTempest
+from core.noctus_sentinella import NoctusSentinella
 
+# ✅ DAG設定
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
     'email_on_failure': False,
+    'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
 
-def execute_levia_strategy():
-    print("👑 Levia_Tempest: 王国の即応部隊、出撃します！")
-    levia_ai = LeviaTempest()
-    mock_market_data = {
-        "price": 1.2050,
-        "previous_price": 1.2040,
-        "volume": 150,
-        "spread": 0.012,
-        "order_block": 0.4,
-        "volatility": 0.15
-    }
-    decision = levia_ai.process(mock_market_data)
-    print("👑 Leviaの決断:", decision)
-
-with DAG(
-    dag_id='levia_strategy_dag',
+dag = DAG(
+    dag_id='noctus_strategy_dag',
     default_args=default_args,
-    description='👑 Leviaによるスキャルピング戦略DAG',
-    schedule_interval='@hourly',  # 任意で調整
-    start_date=datetime(2025, 6, 10),
+    description='Noctria Kingdomの臣下Noctusによるリスク管理戦略DAG',
+    schedule_interval=None,  # 必要に応じてスケジュール設定（例: "@daily"など）
+    start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=['noctria_kingdom', 'levia', 'scalping']
-) as dag:
+    tags=['noctria', 'risk_management'],
+)
 
-    execute_strategy_task = PythonOperator(
-        task_id='execute_levia_strategy',
-        python_callable=execute_levia_strategy
+def noctus_strategy_task():
+    print("👑 王Noctria: Noctus、リスク管理を任せるぞ。")
+    noctus = NoctusSentinella()
+    mock_market_data = {
+        "price": 1.2530,
+        "price_history": [1.2500, 1.2525, 1.2550, 1.2510, 1.2540],
+        "spread": 0.015,
+        "volume": 120,
+        "order_block": 0.5,
+        "volatility": 0.22
+    }
+    decision = noctus.process(mock_market_data)
+    print(f"🛡️ Noctusの決断: {decision}")
+
+with dag:
+    noctus_task = PythonOperator(
+        task_id='noctus_risk_management_task',
+        python_callable=noctus_strategy_task,
+        dag=dag,
     )
-
-    execute_strategy_task
