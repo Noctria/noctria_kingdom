@@ -1,0 +1,27 @@
+# Airflow本体
+apache-airflow==2.8.0
+
+# データ分析・機械学習系
+numpy
+pandas
+scikit-learn
+tensorflow
+torch
+gymnasium
+stable_baselines3
+optuna
+
+# APIやデータ取得系
+requests
+yfinance
+ccxt
+
+# JSON・HTML解析
+beautifulsoup4
+lxml
+
+# 可視化ツール
+tensorboard
+
+# 便利ツール
+tqdm
