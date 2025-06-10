@@ -5,7 +5,7 @@ Airflowのコンテナにアクセスします（例としてwebserverコンテ�
 bash
 コピーする
 編集する
-docker compose exec airflow-webserver bash
+docker compose exec airflow-webserver bash  
 2️⃣ TensorBoardを起動する
 コンテナ内で以下のコマンドを実行します。
 --logdir にはPPO学習時に指定したTensorBoardログのパスを入力します（例: /opt/airflow/logs/ppo_tensorboard_logs）。
@@ -13,7 +13,7 @@ docker compose exec airflow-webserver bash
 bash
 コピーする
 編集する
-tensorboard --logdir /opt/airflow/logs/ppo_tensorboard_logs --host 0.0.0.0 --port 6006
+tensorboard --logdir /opt/airflow/logs/ppo_tensorboard_logs --host 0.0.0.0 --port 6006  
 3️⃣ ブラウザでアクセスする
 ホストPCのブラウザで以下のURLにアクセスしてTensorBoardを開きます:
 
