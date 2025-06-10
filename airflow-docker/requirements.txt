@@ -7,10 +7,10 @@ pandas
 scikit-learn
 shimmy
 gym
+gymnasium
 tensorflow
 tensorboard
 torch
-gymnasium
 stable_baselines3
 optuna
 
@@ -24,7 +24,7 @@ beautifulsoup4
 lxml
 
 # 可視化ツール
-tensorboard
+tensorboard  # ← 1行に統合
 
 # 便利ツール
 tqdm
