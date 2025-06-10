@@ -11,11 +11,11 @@ from stable_baselines3 import PPO
 
 
 def objective(trial):
-    # ✅ ハイパーパラメータのサンプリング
-    learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-3)
+    # ✅ ハイパーパラメータのサンプリング（最新APIに準拠）
+    learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-3, log=True)
     n_steps = trial.suggest_int('n_steps', 64, 2048, step=64)
-    gamma = trial.suggest_uniform('gamma', 0.8, 0.9999)
-    ent_coef = trial.suggest_uniform('ent_coef', 0.0, 0.05)
+    gamma = trial.suggest_float('gamma', 0.8, 0.9999)
+    ent_coef = trial.suggest_float('ent_coef', 0.0, 0.05)
 
     # ✅ 環境の初期化
     env = TradingEnvWithFundamentals('/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv')
