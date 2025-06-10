@@ -21,7 +21,7 @@ class TensorBoardCallback(BaseCallback):
         self.writer = SummaryWriter(log_dir=os.path.join(log_dir, f"trial_{trial_number}"))
 
     def _on_step(self) -> bool:
-        # ログ例：step数に応じて報酬など記録
+        # （例）stepごとに報酬などをダミーで出力
         self.writer.add_scalar("charts/reward", 0.0, self.num_timesteps)
         return True
 
@@ -50,21 +50,27 @@ def objective(trial):
         tensorboard_log="/opt/airflow/logs/ppo_tensorboard_logs/"
     )
 
-    # ✅ コールバック（TensorBoardにログ出力）
+    # ✅ コールバック（TensorBoardに各trialごとのログを記録）
     tb_callback = TensorBoardCallback("/opt/airflow/logs/ppo_tensorboard_logs", trial.number)
 
     # ✅ 学習
-    model.learn(total_timesteps=1000, callback=tb_callback)
+    model.learn(total_timesteps=1000, callback=tb_callback)  # 1000はテスト用
 
-    # ✅ ダミーの評価指標: ここではテストとして固定の値を返す
+    # ✅ ダミーの評価指標: ここでは固定の値を返す（本番では収益率などに置換）
     mean_reward = 0.0
     return mean_reward
 
 if __name__ == "__main__":
-    # ✅ Optunaのスタディ名・ストレージ指定（例: SQLite DB）
+    # ✅ Optunaのスタディ名・ストレージ設定
     study_name = "ppo_hyperparam_optimization"
-    storage = f"sqlite:////opt/airflow/logs/{study_name}.db"
 
+    # SQLiteを使う場合（Airflowコンテナ内ファイルとして保存）
+    # storage = f"sqlite:////opt/airflow/logs/{study_name}.db"
+
+    # Postgresを使う場合（例: airflow内のpostgresを利用）
+    storage = f"postgresql+psycopg2://airflow:airflow@postgres/optuna_db"
+
+    # ✅ studyを作成・既存があればロード
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
@@ -72,6 +78,7 @@ if __name__ == "__main__":
         load_if_exists=True
     )
 
+    # ✅ 最適化実行
     study.optimize(objective, n_trials=10)
 
     print("最適ハイパーパラメータ:", study.best_params)
