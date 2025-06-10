@@ -5,6 +5,7 @@ apache-airflow==2.8.0
 numpy
 pandas
 scikit-learn
+shimmy
 gym
 tensorflow
 tensorboard
