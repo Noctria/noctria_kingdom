@@ -1,39 +1,48 @@
-from datetime import datetime, timedelta
+import sys
+sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-# ✅ Levia_Tempestクラスの呼び出し（王国の高速取引執行者！）
+from datetime import datetime, timedelta
 from core.levia_tempest import LeviaTempest
 
-# ✅ Noctria王国からの通達：Levia_Tempestの作戦実行
-def levia_strategy_task():
-    print("⚡ Levia_Tempest: 王の命により即時スキャルピング任務に入ります ⚔️")
+# ✅ DAG設定
+default_args = {
+    'owner': 'Noctria',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
 
-    # Mock市場データ（通常は実データAPI連携に置換）
+dag = DAG(
+    dag_id='levia_strategy_dag',
+    default_args=default_args,
+    description='Noctria Kingdomの臣下Leviaによるスキャルピング戦略DAG',
+    schedule_interval=None,  # 必要に応じてスケジュール設定
+    start_date=datetime(2025, 6, 1),
+    catchup=False,
+    tags=['noctria', 'scalping'],
+)
+
+def levia_strategy_task():
+    print("👑 王Noctria: Leviaよ、嵐の如く瞬間の機を見極めよ！")
+    levia = LeviaTempest()
     mock_market_data = {
-        "price": 1.2050, "previous_price": 1.2040,
-        "volume": 150, "spread": 0.012, "order_block": 0.4,
+        "price": 1.2050,
+        "previous_price": 1.2040,
+        "volume": 150,
+        "spread": 0.012,
+        "order_block": 0.4,
         "volatility": 0.15
     }
+    decision = levia.process(mock_market_data)
+    print(f"⚔️ Leviaのスキャルピング戦略判断: {decision}")
 
-    levia_ai = LeviaTempest()
-    decision = levia_ai.process(mock_market_data)
-
-    print(f"🌀 Levia_Tempestの決断: {decision}")
-
-# ✅ DAG定義: 王国スケジューラによるLevia_Tempest作戦任務
-with DAG(
-    dag_id="levia_strategy_dag",
-    description="Levia_Tempestのスキャルピング任務（Noctria Kingdom）",
-    schedule_interval=timedelta(hours=1),  # 例: 1時間ごとに任務を遂行
-    start_date=datetime(2025, 6, 10),
-    catchup=False,
-    tags=["noctria_kingdom", "levia_tempest", "scalping"]
-) as dag:
-    execute_levia_strategy = PythonOperator(
-        task_id="execute_levia_strategy",
-        python_callable=levia_strategy_task
+with dag:
+    levia_task = PythonOperator(
+        task_id='levia_scalping_task',
+        python_callable=levia_strategy_task,
+        dag=dag,
     )
-
-    # 他に拡張タスクがあればここに追加
-    # e.g., execute_levia_strategy >> next_task
