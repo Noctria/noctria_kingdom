@@ -15,3 +15,5 @@ data/private_data/
 # TensorBoardログはGit管理外
 logs/ppo_tensorboard_logs/
 
+airflow-docker/.env
+
