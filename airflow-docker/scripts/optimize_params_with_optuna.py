@@ -1,60 +1,40 @@
-#!/usr/bin/env python3
-# /opt/airflow/scripts/optimize_params_with_optuna.py
-
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # 🔥 /opt/airflow をパスに追加
-
 import optuna
-from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 from stable_baselines3 import PPO
+from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 
+def optimize(trial):
+    # 各 Trial 専用の TensorBoard ログディレクトリ
+    log_dir = f"/opt/airflow/logs/ppo_tensorboard_logs/trial_{trial.number}"
+    print(f"TensorBoard ログディレクトリ: {log_dir}")
 
-def objective(trial):
-    # ✅ ハイパーパラメータのサンプリング（最新APIに準拠）
+    # 環境のセットアップ
+    env = TradingEnvWithFundamentals("/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv")
+
+    # Optuna のパラメータ探索
     learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-3, log=True)
-    n_steps = trial.suggest_int('n_steps', 64, 2048, step=64)
+    n_steps = trial.suggest_int('n_steps', 128, 2048, step=128)
     gamma = trial.suggest_float('gamma', 0.8, 0.9999)
     ent_coef = trial.suggest_float('ent_coef', 0.0, 0.05)
 
-    # ✅ 環境の初期化
-    env = TradingEnvWithFundamentals('/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv')
-
-    # ✅ PPOエージェントの初期化
+    # PPO モデルの作成（Trial専用の TensorBoard ログディレクトリ指定）
     model = PPO(
         "MlpPolicy",
         env,
+        verbose=1,
+        tensorboard_log=log_dir,
         learning_rate=learning_rate,
         n_steps=n_steps,
         gamma=gamma,
-        ent_coef=ent_coef,
-        verbose=0
+        ent_coef=ent_coef
     )
 
-    # ✅ 学習実行
-    model.learn(total_timesteps=5000)
+    # 学習
+    model.learn(total_timesteps=1000)
 
-    # ✅ モデル評価（ここでは最終報酬を返す例）
-    obs, _ = env.reset()
-    total_reward = 0.0
-    done = False
-
-    while not done:
-        action, _states = model.predict(obs)
-        obs, reward, done, _, _ = env.step(action)
-        total_reward += reward
-
-    print(f"Trial {trial.number}: total_reward={total_reward}")
-    return total_reward
-
+    # 最終報酬（例として環境のカスタム評価関数を呼ぶ想定）
+    mean_reward = 0.0  # 例: 直近の平均リワードを保存するなら実装する
+    return mean_reward
 
 if __name__ == "__main__":
-    # ✅ Optunaのスタディ定義
-    study = optuna.create_study(direction='maximize', study_name='noctria_hyperopt')
-
-    # ✅ 最適化開始
-    study.optimize(objective, n_trials=20)
-
-    # ✅ 結果出力
-    print("最適パラメータ:", study.best_params)
-    print("最高報酬:", study.best_value)
+    study = optuna.create_study(direction='maximize', study_name='noctria-ppo-study')
+    study.optimize(optimize, n_trials=10, n_jobs=2)  # n_jobs=2 で並列試行
