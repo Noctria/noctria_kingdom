@@ -1,40 +1,60 @@
+#!/usr/bin/env python3
+# /opt/airflow/scripts/optimize_params_with_optuna.py
+
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # 🔥 /opt/airflow をパスに追加
+
 import optuna
-from stable_baselines3 import PPO
 from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
+from stable_baselines3 import PPO
+
 
 def objective(trial):
-    env = TradingEnvWithFundamentals(
-        data_path="/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv"
+    # ✅ ハイパーパラメータのサンプリング
+    learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-3)
+    n_steps = trial.suggest_int('n_steps', 64, 2048, step=64)
+    gamma = trial.suggest_uniform('gamma', 0.8, 0.9999)
+    ent_coef = trial.suggest_uniform('ent_coef', 0.0, 0.05)
+
+    # ✅ 環境の初期化
+    env = TradingEnvWithFundamentals('/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv')
+
+    # ✅ PPOエージェントの初期化
+    model = PPO(
+        "MlpPolicy",
+        env,
+        learning_rate=learning_rate,
+        n_steps=n_steps,
+        gamma=gamma,
+        ent_coef=ent_coef,
+        verbose=0
     )
 
-    learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
-    n_steps = trial.suggest_categorical("n_steps", [2048, 4096, 8192])
-    gamma = trial.suggest_uniform("gamma", 0.9, 0.999)
-    ent_coef = trial.suggest_loguniform("ent_coef", 1e-5, 1e-1)
+    # ✅ 学習実行
+    model.learn(total_timesteps=5000)
 
-    model = PPO("MlpPolicy", env, verbose=0,
-                 learning_rate=learning_rate,
-                 n_steps=n_steps,
-                 gamma=gamma,
-                 ent_coef=ent_coef)
-    model.learn(total_timesteps=20000)
-
-    total_reward = 0.0
+    # ✅ モデル評価（ここでは最終報酬を返す例）
     obs, _ = env.reset()
+    total_reward = 0.0
     done = False
+
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
+        action, _states = model.predict(obs)
         obs, reward, done, _, _ = env.step(action)
         total_reward += reward
 
+    print(f"Trial {trial.number}: total_reward={total_reward}")
     return total_reward
 
+
 if __name__ == "__main__":
-    storage_url = "postgresql+psycopg2://airflow:airflow@postgres/airflow"
-    study = optuna.create_study(
-        study_name="noctria_ppo_distributed",
-        storage=storage_url,
-        direction="maximize",
-        load_if_exists=True
-    )
-    study.optimize(objective, n_trials=10)
+    # ✅ Optunaのスタディ定義
+    study = optuna.create_study(direction='maximize', study_name='noctria_hyperopt')
+
+    # ✅ 最適化開始
+    study.optimize(objective, n_trials=20)
+
+    # ✅ 結果出力
+    print("最適パラメータ:", study.best_params)
+    print("最高報酬:", study.best_value)
