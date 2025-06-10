@@ -11,7 +11,9 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   airflow-webserver:
-    image: apache/airflow:2.8.0
+    build:
+      context: .
+      dockerfile: Dockerfile  # ✅ Dockerfileを指定（requirements.txt でライブラリ管理）
     command: webserver
     ports:
       - "8080:8080"
@@ -19,34 +21,40 @@ services:
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - NEWS_API_KEY=${NEWS_API_KEY}  # ✅ 追加！
+      - NEWS_API_KEY=${NEWS_API_KEY}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./core:/opt/airflow/core
+      - ./airflow-docker/requirements.txt:/requirements.txt  # ✅ 必要なライブラリ共有
     depends_on:
       - postgres
 
   airflow-scheduler:
-    image: apache/airflow:2.8.0
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: scheduler
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - NEWS_API_KEY=${NEWS_API_KEY}  # ✅ 追加！
+      - NEWS_API_KEY=${NEWS_API_KEY}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./core:/opt/airflow/core
+      - ./airflow-docker/requirements.txt:/requirements.txt
     depends_on:
       - postgres
 
   airflow-init:
-    image: apache/airflow:2.8.0
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       - postgres
     environment:
@@ -58,6 +66,7 @@ services:
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./core:/opt/airflow/core
+      - ./airflow-docker/requirements.txt:/requirements.txt
     entrypoint: /bin/bash
     command: -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
 
