@@ -4,7 +4,9 @@ from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
 class NoctusSentinella:
-    """リスク管理と異常検知を行うAI（実際のヒストリカルデータ使用版・MetaAI対応）"""
+    """
+    リスク管理と異常検知を行うAI（実際のヒストリカルデータ使用版・MetaAI対応）
+    """
 
     def __init__(self, risk_threshold=0.02, max_spread=0.018, min_liquidity=120):
         self.risk_threshold = risk_threshold
@@ -26,8 +28,8 @@ class NoctusSentinella:
 
     def process(self, market_data):
         """
-        市場データを分析し、リスクを評価する
-        ➜ 万一 market_data が list などで渡された場合の防御対応
+        市場データを分析し、リスクを評価する。
+        万一 market_data が list などで渡された場合の防御対応。
         """
         if not isinstance(market_data, dict):
             print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
@@ -53,8 +55,8 @@ class NoctusSentinella:
 
     def _calculate_risk(self, market_data):
         """
-        市場データからリスクスコアを計算（VaR適用）
-        ➜ market_dataに"price"や"price_history"が無い場合は0.0に。
+        市場データからリスクスコアを計算（VaR適用）。
+        market_dataに"price"や"price_history"が無い場合は0.0に。
         """
         price_history = market_data.get("price_history", [])
         price = market_data.get("price", 1.0)  # 0除算防止で1.0に
@@ -72,7 +74,10 @@ if __name__ == "__main__":
     mock_market_data = {
         "price": 1.2530,
         "price_history": [1.2500, 1.2525, 1.2550, 1.2510, 1.2540],
-        "spread": 0.015, "volume": 120, "order_block": 0.5, "volatility": 0.22
+        "spread": 0.015,
+        "volume": 120,
+        "order_block": 0.5,
+        "volatility": 0.22
     }
     risk_decision = noctus_ai.process(mock_market_data)
     print("Risk Management Decision:", risk_decision)
