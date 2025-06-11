@@ -13,6 +13,7 @@ tensorboard
 torch
 stable_baselines3
 optuna
+statsmodels   # ← 追加！
 
 # APIやデータ取得系
 requests
