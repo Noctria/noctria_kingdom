@@ -8,14 +8,12 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# airflowユーザーに切り替え
-USER airflow
-
-# 追加のpipライブラリをrequirements.txtからインストール
+# requirements.txtをコピー
 COPY requirements.txt /requirements.txt
 
-# 🟢 追加のpip install (statsmodels, blosc2)
-RUN pip install --no-cache-dir -r /requirements.txt \
-    && pip install --no-cache-dir statsmodels blosc2
+# ✅ rootユーザーでpip install（システム全体にインストールされる！）
+RUN python -m pip install --no-cache-dir -r /requirements.txt \
+    && python -m pip install --no-cache-dir statsmodels blosc2
 
-# airflowユーザーでコンテナ起動（デフォルト）
+# airflowユーザーに切り替え
+USER airflow
