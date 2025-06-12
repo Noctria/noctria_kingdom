@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:13
@@ -16,21 +15,18 @@ services:
     command: webserver
     ports:
       - "8080:8080"
-      - "6006:6006"  # TensorBoard用ポート
+      - "6006:6006"  # TensorBoard用
     env_file:
       - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - NEWS_API_KEY=${NEWS_API_KEY}  # もし使う場合
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./core:/opt/airflow/core
-    depends_on:
-      - postgres
 
   airflow-scheduler:
     build:
@@ -42,27 +38,24 @@ services:
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - NEWS_API_KEY=${NEWS_API_KEY}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./core:/opt/airflow/core
-    depends_on:
-      - postgres
 
   airflow-init:
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      - postgres
     env_file:
       - .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    depends_on:
+      - postgres
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
