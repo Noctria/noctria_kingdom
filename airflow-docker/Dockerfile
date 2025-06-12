@@ -1,13 +1,13 @@
-# ベースイメージに公式の Airflow イメージを使用（バージョンは必要に応じて調整）
-FROM apache/airflow:3.0.2-python3.8
+FROM apache/airflow:3.0.2-python3.9
 
-# 必要なファイルをコピー
+USER root
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      git build-essential cmake python3-dev \
+      zlib1g-dev libbz2-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 
-# airflowユーザーに切り替えてpip installを実行（rootではエラーになるため）
 USER airflow
-
-# Airflow自身と追加ライブラリをインストール
-RUN pip install --no-cache-dir apache-airflow==3.0.2 \
-    && pip install --no-cache-dir -r /requirements.txt
-
