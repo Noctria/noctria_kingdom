@@ -1,31 +1,20 @@
-# Airflow本体
-apache-airflow==2.8.0
-
-# データ分析・機械学習系
-numpy
-pandas
-scikit-learn
-shimmy
-gym
-gymnasium
-tensorflow
-tensorboard
-torch
-stable_baselines3
-optuna
-statsmodels   # ← 追加！
-
-# APIやデータ取得系
-requests
-yfinance
-ccxt
-
-# JSON・HTML解析
-beautifulsoup4
-lxml
-
-# 可視化ツール
-tensorboard  # ← 1行に統合
-
-# 便利ツール
-tqdm
+apache-airflow==3.0.2
+numpy==2.3.0
+pandas==2.3.0
+scikit-learn==1.7.0
+shimmy==2.0.0
+gym==0.26.2
+gymnasium==1.1.1
+tensorflow==2.19.0
+tensorboard==2.19.0
+torch==2.7.1
+stable_baselines3==2.6.0
+optuna==4.3.0
+statsmodels==0.14.4
+requests==2.32.4
+yfinance==0.2.63
+ccxt==4.4.88
+beautifulsoup4==4.13.4
+lxml==5.4.0
+tensorboard==2.19.0
+tqdm==4.67.1
