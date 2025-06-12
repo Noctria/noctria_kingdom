@@ -21,4 +21,3 @@ RUN pip install --no-cache-dir --upgrade pip \
     tensorflow==2.14.0 \
     yfinance \
     statsmodels
-    optuna
