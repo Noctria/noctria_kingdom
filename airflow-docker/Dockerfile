@@ -1,20 +1,19 @@
-FROM apache/airflow:slim-3.0.2-python3.9
+FROM apache/airflow:2.8.2-python3.9
 
-# rootユーザーで一時的に必要なものを入れる
+# rootユーザーで apt パッケージなどをインストール
 USER root
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        git build-essential cmake \
-        python3-dev zlib1g-dev libbz2-dev \
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 必要なPythonパッケージを airflow ユーザーでインストール
+USER airflow
 
 COPY requirements.txt /requirements.txt
 
-# airflowユーザーに切り替えてから pip install するのが公式推奨
-USER airflow
-
-RUN pip install --no-cache-dir "apache-airflow==3.0.2" \
-    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.0.2/constraints-3.9.txt" && \
-    pip install --no-cache-dir -r /requirements.txt && \
-    pip install --no-cache-dir tensorflow==2.19.0 yfinance==0.2.62
+RUN pip install --no-cache-dir --constraint \
+    https://raw.githubusercontent.com/apache/airflow/constraints-2.8.2/constraints-3.9.txt \
+    apache-airflow==2.8.2 && \
+    pip install --no-cache-dir -r /requirements.txt
