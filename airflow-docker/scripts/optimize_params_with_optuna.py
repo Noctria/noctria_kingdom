@@ -85,6 +85,6 @@ if __name__ == "__main__":
         load_if_exists=True
     )
 
-    study.optimize(objective, n_trials=10)
+    study.optimize(objective, n_trials=5)
 
     print("✅ 最適ハイパーパラメータ:", study.best_params)
