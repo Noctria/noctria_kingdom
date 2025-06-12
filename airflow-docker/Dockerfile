@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     git \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip
-RUN pip install tensorflow==2.14.0
-
 USER airflow
+
+# ✅ airflowユーザーとして pip install
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir tensorflow==2.14.0
