@@ -1,4 +1,4 @@
-FROM apache/airflow:2.9.1-python3.10  # ✅ Python 3.10 確保
+FROM apache/airflow:2.9.1-python3.10
 
 USER root
 RUN apt-get update && apt-get install -y \
@@ -10,9 +10,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     curl \
     git \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
-# ✅ pip & TensorFlow（2.14.0）インストール
 RUN pip install --upgrade pip
 RUN pip install tensorflow==2.14.0
 
