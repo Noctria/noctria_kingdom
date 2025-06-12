@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
 
 USER airflow
 
-# ✅ airflowユーザーとして pip install
+# ✅ airflowユーザーでpip install（まとめて）
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir tensorflow==2.14.0
+ && pip install --no-cache-dir \
+    tensorflow==2.14.0 \
+    yfinance
