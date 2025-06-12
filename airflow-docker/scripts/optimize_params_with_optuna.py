@@ -67,7 +67,7 @@ def objective(trial):
     tb_callback = TensorBoardCallback("/opt/airflow/logs/ppo_tensorboard_logs", trial.number)
 
     # モデル学習
-    model.learn(total_timesteps=3000, callback=tb_callback)
+    model.learn(total_timesteps=1000, callback=tb_callback)
 
     # モデル評価（報酬平均）
     mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
