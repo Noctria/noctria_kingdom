@@ -4,17 +4,19 @@ import os
 import optuna
 from datetime import datetime
 
-# ✅ AirflowコンテナのPYTHONPATHを明示
+# ✅ Airflow環境のパスを追加（コンテナ内絶対パス）
 sys.path.append('/opt/airflow')
 
-# ✅ TensorBoardのロガー設定
+# ✅ Optuna + TensorBoard ログ
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.evaluation import evaluate_policy
 from torch.utils.tensorboard import SummaryWriter
-
-from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 from stable_baselines3 import PPO
 
-# ✅ TensorBoardCallbackクラス（報酬取得ロジック追加済み）
+# ✅ 独自のトレード環境
+from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
+
+# ✅ TensorBoard Callback
 class TensorBoardCallback(BaseCallback):
     def __init__(self, log_dir, trial_number, verbose=0):
         super().__init__(verbose)
@@ -22,7 +24,6 @@ class TensorBoardCallback(BaseCallback):
         self.episode_rewards = []
 
     def _on_step(self) -> bool:
-        # ✅ 直近の報酬を取得して記録
         rewards = self.locals.get('rewards', [0])
         if rewards:
             last_reward = rewards[-1]
@@ -31,7 +32,6 @@ class TensorBoardCallback(BaseCallback):
         return True
 
     def _on_rollout_end(self) -> None:
-        # ✅ 1エピソード分の合計報酬を記録
         if self.episode_rewards:
             episode_return = sum(self.episode_rewards)
             self.writer.add_scalar("charts/episode_return", episode_return, self.num_timesteps)
@@ -40,18 +40,18 @@ class TensorBoardCallback(BaseCallback):
     def _on_training_end(self) -> None:
         self.writer.close()
 
-# ✅ Optunaの目的関数
+# ✅ Optuna 目的関数
 def objective(trial):
-    # 🎯 Optunaで試すハイパーパラメータ
+    # ハイパーパラメータの探索空間
     learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-3, log=True)
     n_steps = trial.suggest_int('n_steps', 128, 2048)
     gamma = trial.suggest_float('gamma', 0.8, 0.9999)
     ent_coef = trial.suggest_float('ent_coef', 0.0, 0.05)
 
-    # ✅ 環境の初期化
+    # 環境初期化
     env = TradingEnvWithFundamentals('/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv')
 
-    # ✅ モデルの初期化
+    # モデル初期化
     model = PPO(
         "MlpPolicy",
         env,
@@ -63,20 +63,20 @@ def objective(trial):
         tensorboard_log="/opt/airflow/logs/ppo_tensorboard_logs/"
     )
 
-    # ✅ コールバック（TensorBoardにログ出力）
+    # TensorBoard出力先
     tb_callback = TensorBoardCallback("/opt/airflow/logs/ppo_tensorboard_logs", trial.number)
 
-    # ✅ 学習
-    model.learn(total_timesteps=1000, callback=tb_callback)  # ← ステップ数はお好みで調整可
+    # モデル学習
+    model.learn(total_timesteps=3000, callback=tb_callback)
 
-    # ✅ 評価指標: ここでは固定のダミー値を返す（必要に応じて更新）
-    mean_reward = 0.0
+    # モデル評価（報酬平均）
+    mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
     return mean_reward
 
 if __name__ == "__main__":
-    # ✅ Optunaのスタディ名・PostgreSQLストレージ指定
+    # Study名とPostgreSQLストレージ（.envの値を使用）
     study_name = "ppo_hyperparam_optimization"
-    storage = "postgresql+psycopg2://airflow:airflow@postgres/optuna_db"
+    storage = os.getenv("OPTUNA_DB_URL", "postgresql+psycopg2://airflow:airflow@postgres/optuna_db")
 
     study = optuna.create_study(
         direction="maximize",
@@ -87,4 +87,4 @@ if __name__ == "__main__":
 
     study.optimize(objective, n_trials=10)
 
-    print("最適ハイパーパラメータ:", study.best_params)
+    print("✅ 最適ハイパーパラメータ:", study.best_params)
