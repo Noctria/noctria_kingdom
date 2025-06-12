@@ -13,3 +13,4 @@ tqdm==4.67.1
 beautifulsoup4==4.12.3
 lxml==5.2.1
 requests==2.31.0
+statsmodels==0.14.1
