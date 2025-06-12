@@ -1,19 +1,19 @@
-FROM apache/airflow:2.8.2-python3.9
+FROM apache/airflow:2.9.1-python3.10  # ✅ Python 3.10 確保
 
-# rootユーザーで apt パッケージなどをインストール
 USER root
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    libatlas-base-dev \
+    python3-dev \
+    libhdf5-dev \
+    libffi-dev \
+    libssl-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# 必要なPythonパッケージを airflow ユーザーでインストール
+# ✅ pip & TensorFlow（2.14.0）インストール
+RUN pip install --upgrade pip
+RUN pip install tensorflow==2.14.0
+
 USER airflow
-
-COPY requirements.txt /requirements.txt
-
-RUN pip install --no-cache-dir --constraint \
-    https://raw.githubusercontent.com/apache/airflow/constraints-2.8.2/constraints-3.9.txt \
-    apache-airflow==2.8.2 && \
-    pip install --no-cache-dir -r /requirements.txt
