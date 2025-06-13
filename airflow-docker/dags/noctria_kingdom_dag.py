@@ -1,21 +1,24 @@
+# /opt/airflow/dags/noctria_kingdom_dag.py
+
 import sys
-sys.path.append('/opt/airflow')  # Airflowパス追加
+sys.path.append('/opt/airflow')  # Airflow環境でcore/やstrategies/を認識させる
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 
-from core.noctria import Noctria
 from strategies.Aurus_Singularis import AurusSingularis
 from strategies.Levia_Tempest import LeviaTempest
 from strategies.Noctus_Sentinella import NoctusSentinella
 from strategies.Prometheus_Oracle import PrometheusOracle
+from core.noctria import Noctria
 
-# ✅ DAG共通設定
+# === DAG設定 ===
 default_args = {
-    'owner': 'NoctriaKingdom',
+    'owner': 'Noctria',
     'depends_on_past': False,
     'email_on_failure': False,
+    'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
@@ -23,62 +26,79 @@ default_args = {
 dag = DAG(
     dag_id='noctria_kingdom_dag',
     default_args=default_args,
-    description='🏰 Noctria Kingdom 全AIを統括する戦略連携DAG',
+    description='Noctria王国全体戦略統合DAG（XCom連携）',
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=['noctria', 'kingdom', 'coordinated'],
+    tags=['noctria', 'kingdom'],
 )
 
-# --- 各戦略AIのタスク定義（臣下） ---
-def run_aurus():
+# === 各AIタスク ===
+
+def aurus_task(**context):
     aurus = AurusSingularis()
-    decision = aurus.process({
-        "price": 1.234, "trend_strength": 0.7, "volume": 200,
-        "order_block": 0.4, "volatility": 0.15
-    })
-    print(f"📈 Aurusの判断: {decision}")
+    decision = aurus.process({"trend_strength": 0.6})
+    context['ti'].xcom_push(key='aurus_decision', value=decision)
 
-def run_levia():
+def levia_task(**context):
     levia = LeviaTempest()
-    decision = levia.process({
-        "price": 1.205, "previous_price": 1.203, "volume": 300,
-        "spread": 0.01, "order_block": 0.2, "volatility": 0.1
-    })
-    print(f"⚡ Leviaの判断: {decision}")
+    decision = levia.process({"price": 1.25, "spread": 0.01})
+    context['ti'].xcom_push(key='levia_decision', value=decision)
 
-def run_noctus():
+def noctus_task(**context):
     noctus = NoctusSentinella()
-    decision = noctus.process({
-        "price": 1.222, "volume": 150, "spread": 0.02,
-        "order_block": 0.3, "volatility": 0.2,
-        "price_history": [1.21, 1.22, 1.23]
-    })
-    print(f"🛡️ Noctusの判断: {decision}")
+    decision = noctus.process({"volume": 130, "spread": 0.012, "volatility": 0.2})
+    context['ti'].xcom_push(key='noctus_decision', value=decision)
 
-def run_prometheus():
+def prometheus_task(**context):
     prometheus = PrometheusOracle()
-    decision = prometheus.process({
-        "cpi": 3.1, "gdp_growth": 2.2, "interest_rate": 1.5,
-        "sentiment": 0.6, "geopolitical_risk": 0.3
-    })
-    print(f"🔮 Prometheusの判断: {decision}")
+    decision = prometheus.process({"macro_score": 0.75})
+    context['ti'].xcom_push(key='prometheus_decision', value=decision)
 
-# --- 王の統合判断 ---
-def run_noctria_king():
-    king = Noctria()
-    result = king.execute_trade()
-    print(f"👑 王Noctriaの最終判断: {result}")
+# === 王Noctriaが全てを統合するタスク ===
 
+def noctria_final_decision(**context):
+    ti = context['ti']
+    decisions = {
+        "Aurus": ti.xcom_pull(key='aurus_decision', task_ids='aurus_strategy'),
+        "Levia": ti.xcom_pull(key='levia_decision', task_ids='levia_strategy'),
+        "Noctus": ti.xcom_pull(key='noctus_decision', task_ids='noctus_strategy'),
+        "Prometheus": ti.xcom_pull(key='prometheus_decision', task_ids='prometheus_strategy'),
+    }
 
-# ✅ DAG構築
+    print(f"👑 王Noctriaが受け取った判断: {decisions}")
+    noctria = Noctria()
+    final_action = noctria.meta_ai.decide_final_action(decisions)
+    print(f"🏰 王国全体の最終戦略決定: {final_action}")
+
+# === DAGタスク定義 ===
+
 with dag:
-    aurus_task = PythonOperator(task_id="aurus_task", python_callable=run_aurus)
-    levia_task = PythonOperator(task_id="levia_task", python_callable=run_levia)
-    noctus_task = PythonOperator(task_id="noctus_task", python_callable=run_noctus)
-    prometheus_task = PythonOperator(task_id="prometheus_task", python_callable=run_prometheus)
+    t1 = PythonOperator(
+        task_id='aurus_strategy',
+        python_callable=aurus_task,
+        provide_context=True,
+    )
+    t2 = PythonOperator(
+        task_id='levia_strategy',
+        python_callable=levia_task,
+        provide_context=True,
+    )
+    t3 = PythonOperator(
+        task_id='noctus_strategy',
+        python_callable=noctus_task,
+        provide_context=True,
+    )
+    t4 = PythonOperator(
+        task_id='prometheus_strategy',
+        python_callable=prometheus_task,
+        provide_context=True,
+    )
+    t5 = PythonOperator(
+        task_id='noctria_final_decision',
+        python_callable=noctria_final_decision,
+        provide_context=True,
+    )
 
-    noctria_task = PythonOperator(task_id="noctria_final_decision", python_callable=run_noctria_king)
-
-    # 🏰 王国の臣下タスクを先に実行 → 王の判断
-    [aurus_task, levia_task, noctus_task, prometheus_task] >> noctria_task
+    # 依存関係
+    [t1, t2, t3, t4] >> t5
