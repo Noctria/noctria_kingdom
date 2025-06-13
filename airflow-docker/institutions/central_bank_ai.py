@@ -1,63 +1,135 @@
-# institutions/central_bank_ai.py
+import gym
+import numpy as np
+import pandas as pd
+from stable_baselines3 import PPO
+from institutions.central_bank_ai import CentralBankAI  # ✅ 追加
 
-class CentralBankAI:
+# 🎯 カスタム報酬関数
+def calculate_reward(profit, drawdown, win_rate, recent_profits, cb_score=0.0):
     """
-    Noctria Kingdom 中央銀行AI：CPI・金利差・失業率に基づく政策スタンス評価
+    Noctria Kingdom版報酬関数
+    利益最大化 + ドローダウン抑制 + 勝率ボーナス + 安定性ボーナス + 中央銀行スコア補正
+    """
+    reward = profit
+
+    max_drawdown_threshold = -30
+    if drawdown < max_drawdown_threshold:
+        reward += drawdown
+
+    if win_rate > 0.6:
+        reward += 10
+
+    # 🎯 安定性ボーナス: 直近収益の標準偏差が小さいほどボーナス
+    if len(recent_profits) > 1:
+        std_dev = np.std(recent_profits)
+        stability_bonus = 5 / (1 + std_dev)
+        reward += stability_bonus
+    else:
+        stability_bonus = 0
+
+    # ✅ 中央銀行スコアによる補正（例：緩和なら+1、引き締めなら-1）
+    reward += cb_score * 2
+
+    print(f"安定性ボーナス: {stability_bonus:.3f} / 中央銀行スコア補正: {cb_score:.2f}")
+
+    return reward
+
+class MetaAI(gym.Env):
+    """
+    MetaAI: 各戦略AIを統合し、強化学習による自己進化を行う（PPO統合版・ファンダメンタル拡張版）
     """
 
-    def __init__(self, inflation_target=2.0, unemployment_threshold=5.0, interest_neutral=0.5):
-        self.inflation_target = inflation_target
-        self.unemployment_threshold = unemployment_threshold
-        self.interest_neutral = interest_neutral
+    def __init__(self, strategy_agents):
+        super(MetaAI, self).__init__()
 
-    def determine_policy_mode(self, fundamentals: dict) -> str:
-        """
-        経済指標から中央銀行の政策モードを分類
-        :param fundamentals: dict with keys 'cpi', 'interest_diff', 'unemployment'
-        :return: 'EASING' | 'NEUTRAL' | 'TIGHTENING'
-        """
-        cpi = fundamentals.get("cpi", 0.0)
-        interest_diff = fundamentals.get("interest_diff", 0.0)
-        unemployment = fundamentals.get("unemployment", 5.0)
+        self.strategy_agents = strategy_agents
 
-        if cpi < self.inflation_target - 0.5 or unemployment > self.unemployment_threshold:
-            return "EASING"
-        elif cpi > self.inflation_target + 0.5 and interest_diff > self.interest_neutral:
-            return "TIGHTENING"
-        else:
-            return "NEUTRAL"
+        # ✅ データ読み込み（OHLCV + ファンダ）
+        self.data = pd.read_csv("/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", parse_dates=['datetime'])
+        self.data.set_index('datetime', inplace=True)
+        self.current_step = 0
 
-    def encode_policy_to_score(self, mode: str) -> float:
-        """
-        政策モードを MetaAI で利用可能な数値スコアへ変換
-        :param mode: policy mode string
-        :return: float score: +1 (EASING), 0 (NEUTRAL), -1 (TIGHTENING)
-        """
-        mapping = {
-            "EASING": +1.0,
-            "NEUTRAL": 0.0,
-            "TIGHTENING": -1.0
+        # ✅ 中央銀行AI
+        self.central_bank_ai = CentralBankAI()
+
+        # ✅ 観測空間
+        self.observation_space = gym.spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(self.data.shape[1],),
+            dtype=np.float32
+        )
+
+        # ✅ アクション空間
+        self.action_space = gym.spaces.Discrete(3)
+
+        self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
+
+        self.trade_history = []
+        self.max_drawdown = 0.0
+        self.wins = 0
+        self.trades = 0
+
+    def decide_final_action(self, market_state):
+        strategy_actions = {
+            name: agent.process(market_state)
+            for name, agent in self.strategy_agents.items()
         }
-        return mapping.get(mode.upper(), 0.0)
+        print("各戦略の出力:", strategy_actions)
+        if "SELL" in strategy_actions.values():
+            return 2
+        elif "BUY" in strategy_actions.values():
+            return 1
+        else:
+            return 0
 
-    def evaluate(self, fundamentals: dict) -> float:
-        """
-        外部から呼び出す際の統合関数：スコアを即返す
-        :param fundamentals: dict with cpi, interest_diff, unemployment
-        :return: float score (-1.0〜+1.0)
-        """
-        mode = self.determine_policy_mode(fundamentals)
-        return self.encode_policy_to_score(mode)
+    def step(self, action):
+        self.current_step += 1
+        done = self.current_step >= len(self.data) - 1
 
+        obs = self.data.iloc[self.current_step].values.astype(np.float32)
 
-# ✅ テスト実行例
-if __name__ == "__main__":
-    cb = CentralBankAI()
-    test_data = {
-        "cpi": 3.2,
-        "interest_diff": 0.75,
-        "unemployment": 3.5
-    }
-    mode = cb.determine_policy_mode(test_data)
-    score = cb.evaluate(test_data)
-    print(f"📊 政策モード: {mode} → スコア: {score}")
+        profit = np.random.uniform(-5, 5)
+        spread_cost = np.random.uniform(0, 0.2)
+        commission = 0.1
+
+        self.trade_history.append(profit)
+
+        cum_profit = np.cumsum(self.trade_history)
+        peak = np.maximum.accumulate(cum_profit)
+        drawdowns = peak - cum_profit
+        self.max_drawdown = np.max(drawdowns)
+
+        self.trades += 1
+        if profit > 0:
+            self.wins += 1
+        win_rate = self.wins / self.trades if self.trades > 0 else 0.0
+
+        recent_profits = self.trade_history[-10:]
+
+        # ✅ 中央銀行スコアの算出
+        fundamentals = self.data.iloc[self.current_step][["cpi", "interest_diff", "unemployment"]].to_dict()
+        cb_score = self.central_bank_ai.evaluate(fundamentals)
+
+        reward = calculate_reward(profit, -self.max_drawdown, win_rate, recent_profits, cb_score)
+
+        print(
+            f"Action: {action}, Reward: {reward:.3f}, Drawdown: {self.max_drawdown:.3f}, "
+            f"Win Rate: {win_rate:.2f}"
+        )
+
+        return obs, reward, done, {}
+
+    def reset(self):
+        self.current_step = 0
+        self.trade_history.clear()
+        self.max_drawdown = 0.0
+        self.wins = 0
+        self.trades = 0
+        obs = self.data.iloc[self.current_step].values.astype(np.float32)
+        return obs
+
+    def learn(self, total_timesteps=5000):
+        print("=== MetaAI PPO学習サイクル開始 ===")
+        self.ppo_agent.learn(total_timesteps=total_timesteps)
+        print("=== MetaAI PPO学習サイクル完了 ===")
