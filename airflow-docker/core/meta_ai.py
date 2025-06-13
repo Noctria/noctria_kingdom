@@ -3,49 +3,26 @@ import numpy as np
 import pandas as pd
 from stable_baselines3 import PPO
 
-# 🎯 カスタム報酬関数
-def calculate_reward(profit, drawdown, win_rate, recent_profits):
-    """
-    Noctria Kingdom版報酬関数
-    利益最大化 + ドローダウン抑制 + 勝率ボーナス + 安定性ボーナス
-    """
-    reward = profit
-
-    max_drawdown_threshold = -30
-    if drawdown < max_drawdown_threshold:
-        reward += drawdown
-
-    if win_rate > 0.6:
-        reward += 10
-
-    # 🎯 安定性ボーナス: 直近収益の標準偏差が小さいほどボーナス
-    if len(recent_profits) > 1:
-        std_dev = np.std(recent_profits)
-        stability_bonus = 5 / (1 + std_dev)
-        reward += stability_bonus
-    else:
-        stability_bonus = 0
-
-    print(f"安定性ボーナス: {stability_bonus:.3f}")
-
-    return reward
+from strategies.reward import calculate_reward
+from institutions.central_bank_ai import CentralBankAI
 
 class MetaAI(gym.Env):
     """
-    MetaAI: 各戦略AIを統合し、強化学習による自己進化を行う（PPO統合版・ファンダメンタル拡張版）
+    MetaAI: 各戦略AIを統合し、強化学習による自己進化を行う（PPO統合版・中央銀行AI対応）
     """
 
     def __init__(self, strategy_agents):
         super(MetaAI, self).__init__()
 
         self.strategy_agents = strategy_agents
+        self.central_bank = CentralBankAI()
 
-        # ✅ データ読み込み（OHLCV + ファンダ）
+        # ✅ データ読み込み（OHLCV + ファンダメンタル）
         self.data = pd.read_csv("/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", parse_dates=['datetime'])
         self.data.set_index('datetime', inplace=True)
         self.current_step = 0
 
-        # ✅ 観測空間
+        # ✅ 観測空間（OHLCV + CPI等の拡張指標を含む）
         self.observation_space = gym.spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -53,12 +30,13 @@ class MetaAI(gym.Env):
             dtype=np.float32
         )
 
-        # ✅ アクション空間
+        # ✅ アクション空間（0: HOLD, 1: BUY, 2: SELL）
         self.action_space = gym.spaces.Discrete(3)
 
+        # ✅ PPO学習用エージェント
         self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
 
-        # トレード履歴など
+        # トレード履歴・パフォーマンス統計
         self.trade_history = []
         self.max_drawdown = 0.0
         self.wins = 0
@@ -70,6 +48,7 @@ class MetaAI(gym.Env):
             for name, agent in self.strategy_agents.items()
         }
         print("各戦略の出力:", strategy_actions)
+
         if "SELL" in strategy_actions.values():
             return 2
         elif "BUY" in strategy_actions.values():
@@ -83,11 +62,8 @@ class MetaAI(gym.Env):
 
         obs = self.data.iloc[self.current_step].values.astype(np.float32)
 
-        # ✅ ダミーの取引結果（後で本物ロジックに置換予定）
+        # ✅ 模擬取引結果（後で本番ロジックへ置換）
         profit = np.random.uniform(-5, 5)
-        spread_cost = np.random.uniform(0, 0.2)
-        commission = 0.1
-
         self.trade_history.append(profit)
 
         # ✅ 最大ドローダウン計算
@@ -102,15 +78,30 @@ class MetaAI(gym.Env):
             self.wins += 1
         win_rate = self.wins / self.trades if self.trades > 0 else 0.0
 
-        # ✅ 直近10トレードの収益リスト
         recent_profits = self.trade_history[-10:]
 
-        # ✅ カスタム報酬関数の呼び出し
-        reward = calculate_reward(profit, -self.max_drawdown, win_rate, recent_profits)
+        # ✅ ファンダメンタル情報取得（CPI・金利差・失業率など）
+        current_row = self.data.iloc[self.current_step]
+        fundamental_data = {
+            "cpi": current_row.get("cpi", 0.0),
+            "interest_diff": current_row.get("interest_diff", 0.0),
+            "unemployment": current_row.get("unemployment", 0.0)
+        }
+
+        cb_score = self.central_bank.get_policy_score(fundamental_data)
+
+        # ✅ カスタム報酬関数（中央銀行スコア反映）
+        reward = calculate_reward(
+            profit=profit,
+            drawdown=-self.max_drawdown,
+            win_rate=win_rate,
+            recent_profits=recent_profits,
+            cb_score=cb_score
+        )
 
         print(
             f"Action: {action}, Reward: {reward:.3f}, Drawdown: {self.max_drawdown:.3f}, "
-            f"Win Rate: {win_rate:.2f}"
+            f"Win Rate: {win_rate:.2f}, CB_Score: {cb_score:.2f}"
         )
 
         return obs, reward, done, {}
