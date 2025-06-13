@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# coding: utf-8
+
 import sys
 import os
 import optuna
@@ -74,8 +76,8 @@ def objective(trial):
     return mean_reward
 
 if __name__ == "__main__":
-    # Study名とPostgreSQLストレージ（.envの値を使用）
-    study_name = "ppo_hyperparam_optimization"
+    # ✅ study_nameは短く（PostgreSQLのカラム長制限対応）
+    study_name = "ppo_opt"
     storage = os.getenv("OPTUNA_DB_URL", "postgresql+psycopg2://airflow:airflow@postgres/optuna_db")
 
     study = optuna.create_study(
@@ -88,3 +90,8 @@ if __name__ == "__main__":
     study.optimize(objective, n_trials=5)
 
     print("✅ 最適ハイパーパラメータ:", study.best_params)
+
+    # オプションで保存
+    best_params_file = "/opt/airflow/logs/best_params.json"
+    with open(best_params_file, "w") as f:
+        json.dump(study.best_params, f, indent=2)
