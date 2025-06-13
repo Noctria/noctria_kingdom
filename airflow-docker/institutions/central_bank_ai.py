@@ -1,135 +1,35 @@
-import gym
-import numpy as np
-import pandas as pd
-from stable_baselines3 import PPO
-from institutions.central_bank_ai import CentralBankAI  # ✅ 追加
-
-# 🎯 カスタム報酬関数
-def calculate_reward(profit, drawdown, win_rate, recent_profits, cb_score=0.0):
+class CentralBankAI:
     """
-    Noctria Kingdom版報酬関数
-    利益最大化 + ドローダウン抑制 + 勝率ボーナス + 安定性ボーナス + 中央銀行スコア補正
-    """
-    reward = profit
-
-    max_drawdown_threshold = -30
-    if drawdown < max_drawdown_threshold:
-        reward += drawdown
-
-    if win_rate > 0.6:
-        reward += 10
-
-    # 🎯 安定性ボーナス: 直近収益の標準偏差が小さいほどボーナス
-    if len(recent_profits) > 1:
-        std_dev = np.std(recent_profits)
-        stability_bonus = 5 / (1 + std_dev)
-        reward += stability_bonus
-    else:
-        stability_bonus = 0
-
-    # ✅ 中央銀行スコアによる補正（例：緩和なら+1、引き締めなら-1）
-    reward += cb_score * 2
-
-    print(f"安定性ボーナス: {stability_bonus:.3f} / 中央銀行スコア補正: {cb_score:.2f}")
-
-    return reward
-
-class MetaAI(gym.Env):
-    """
-    MetaAI: 各戦略AIを統合し、強化学習による自己進化を行う（PPO統合版・ファンダメンタル拡張版）
+    中央銀行AI: CPI、金利差、失業率などから市場の金融政策バイアスを判定し、
+    スコア（buy/bullish方向の強さ）を返す。
     """
 
-    def __init__(self, strategy_agents):
-        super(MetaAI, self).__init__()
+    def __init__(self, cpi_weight=0.4, interest_weight=0.4, unemployment_weight=0.2):
+        self.cpi_weight = cpi_weight
+        self.interest_weight = interest_weight
+        self.unemployment_weight = unemployment_weight
 
-        self.strategy_agents = strategy_agents
+    def get_policy_score(self, data):
+        """
+        ファンダメンタルデータに基づいて中央銀行的なスコア（0〜1）を返す。
+        高スコア = 金融引き締め（通貨高）傾向。
+        """
 
-        # ✅ データ読み込み（OHLCV + ファンダ）
-        self.data = pd.read_csv("/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", parse_dates=['datetime'])
-        self.data.set_index('datetime', inplace=True)
-        self.current_step = 0
+        # データ取得（0.0で補完）
+        cpi = data.get("cpi", 0.0)
+        interest_diff = data.get("interest_diff", 0.0)
+        unemployment = data.get("unemployment", 0.0)
 
-        # ✅ 中央銀行AI
-        self.central_bank_ai = CentralBankAI()
+        # 正規化（仮の閾値基準で正規化）
+        norm_cpi = min(max((cpi - 2.0) / 2.0, 0.0), 1.0)  # CPI 2%以上で強気方向へ
+        norm_interest = min(max((interest_diff + 1.0) / 2.0, 0.0), 1.0)  # 金利差 +1%以上が強気
+        norm_unemployment = 1.0 - min(max((unemployment - 3.0) / 3.0, 0.0), 1.0)  # 失業率が低いほど強気
 
-        # ✅ 観測空間
-        self.observation_space = gym.spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(self.data.shape[1],),
-            dtype=np.float32
+        # 重み付き合計スコア
+        score = (
+            norm_cpi * self.cpi_weight +
+            norm_interest * self.interest_weight +
+            norm_unemployment * self.unemployment_weight
         )
 
-        # ✅ アクション空間
-        self.action_space = gym.spaces.Discrete(3)
-
-        self.ppo_agent = PPO("MlpPolicy", self, verbose=1)
-
-        self.trade_history = []
-        self.max_drawdown = 0.0
-        self.wins = 0
-        self.trades = 0
-
-    def decide_final_action(self, market_state):
-        strategy_actions = {
-            name: agent.process(market_state)
-            for name, agent in self.strategy_agents.items()
-        }
-        print("各戦略の出力:", strategy_actions)
-        if "SELL" in strategy_actions.values():
-            return 2
-        elif "BUY" in strategy_actions.values():
-            return 1
-        else:
-            return 0
-
-    def step(self, action):
-        self.current_step += 1
-        done = self.current_step >= len(self.data) - 1
-
-        obs = self.data.iloc[self.current_step].values.astype(np.float32)
-
-        profit = np.random.uniform(-5, 5)
-        spread_cost = np.random.uniform(0, 0.2)
-        commission = 0.1
-
-        self.trade_history.append(profit)
-
-        cum_profit = np.cumsum(self.trade_history)
-        peak = np.maximum.accumulate(cum_profit)
-        drawdowns = peak - cum_profit
-        self.max_drawdown = np.max(drawdowns)
-
-        self.trades += 1
-        if profit > 0:
-            self.wins += 1
-        win_rate = self.wins / self.trades if self.trades > 0 else 0.0
-
-        recent_profits = self.trade_history[-10:]
-
-        # ✅ 中央銀行スコアの算出
-        fundamentals = self.data.iloc[self.current_step][["cpi", "interest_diff", "unemployment"]].to_dict()
-        cb_score = self.central_bank_ai.evaluate(fundamentals)
-
-        reward = calculate_reward(profit, -self.max_drawdown, win_rate, recent_profits, cb_score)
-
-        print(
-            f"Action: {action}, Reward: {reward:.3f}, Drawdown: {self.max_drawdown:.3f}, "
-            f"Win Rate: {win_rate:.2f}"
-        )
-
-        return obs, reward, done, {}
-
-    def reset(self):
-        self.current_step = 0
-        self.trade_history.clear()
-        self.max_drawdown = 0.0
-        self.wins = 0
-        self.trades = 0
-        obs = self.data.iloc[self.current_step].values.astype(np.float32)
-        return obs
-
-    def learn(self, total_timesteps=5000):
-        print("=== MetaAI PPO学習サイクル開始 ===")
-        self.ppo_agent.learn(total_timesteps=total_timesteps)
-        print("=== MetaAI PPO学習サイクル完了 ===")
+        return round(score, 4)
