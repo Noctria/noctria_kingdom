@@ -1,27 +1,27 @@
-!===========
+===========
 /opt/airflow
 ├── dags/
-│   ├── aurus_strategy_dag.py               # トレンド戦略（Aurus）
-│   ├── levia_strategy_dag.py               # スキャルピング戦略（Levia）
-│   ├── noctus_strategy_dag.py              # リスク戦略（Noctus）
-│   ├── prometheus_strategy_dag.py          # 長期予測戦略（Prometheus）
-│   ├── meta_ai_dag.py                      # MetaAI（意思統合 or 強化学習）
-│   ├── noctria_kingdom_dag.py              # Noctria王国全体の戦略統括DAG
-│   └── noctria_royal_dag.py                # 👑 王Noctriaの統合意思決定DAG
+│   ├── aurus_strategy_dag.py         # 📈 Aurus: トレンド戦略
+│   ├── levia_strategy_dag.py         # ⚡ Levia: スキャルピング戦略
+│   ├── noctus_strategy_dag.py        # 🛡️ Noctus: リスク戦略
+│   ├── prometheus_strategy_dag.py    # 🔮 Prometheus: 長期予測戦略
+│   ├── meta_ai_dag.py                # 🤖 MetaAI: 意思統合・学習DAG
+│   ├── noctria_royal_dag.py          # 👑 王Noctriaの統合判断DAG
+│   └── noctria_kingdom_dag.py        # 🏰 王国全体の実行統括DAG
 │
 ├── data/
-│   └── preprocessed_usdjpy_with_fundamental.csv  # 統合済みテクニカル＋ファンダデータ
+│   └── preprocessed_usdjpy_with_fundamental.csv  # テクニカル＋ファンダ融合データ
 │
 ├── core/
-│   ├── meta_ai.py                          # MetaAI（PPOによる進化統合）
-│   ├── noctria.py                          # 👑 Noctria王の戦略判断ロジック
-│   ├── risk_management.py                  # リスク計算や異常検知モジュール
-│   └── central_bank_ai.py                  # 🏛️ 中央銀行AI（地政学・政策評価など）
+│   ├── central_bank_ai.py           # 🏛️ 中央銀行AI（政策判断）
+│   ├── meta_ai.py                   # MetaAI統合（PPO強化学習など）
+│   ├── noctria.py                   # 👑 Noctria王の統合意思ロジック
+│   └── risk_management.py           # リスク管理・異常検出
 │
 ├── strategies/
-│   ├── Aurus_Singularis.py                 # 📈 Aurusのトレンド分析AI
-│   ├── Levia_Tempest.py                    # ⚡ Leviaの短期スキャルピングAI
-│   ├── Noctus_Sentinella.py                # 🛡️ Noctusのリスク監視AI
-│   └── Prometheus_Oracle.py               # 🔮 Prometheusの予測・ファンダAI
+│   ├── Aurus_Singularis.py          # 📈 トレンド検出AI
+│   ├── Levia_Tempest.py             # ⚡ スキャルピングAI
+│   ├── Noctus_Sentinella.py         # 🛡️ リスク監視AI
+│   └── Prometheus_Oracle.py         # 🔮 ファンダ＋予測AI
 │
-└── logs/                                   # Airflowログ用ディレクトリ
+└── logs/                            # Airflowログ出力ディレクトリ
