@@ -4,6 +4,7 @@
 import sys
 import os
 import optuna
+import json  # ✅ ← これが必要
 from datetime import datetime
 
 # ✅ Airflow環境のパスを追加（コンテナ内絶対パス）
