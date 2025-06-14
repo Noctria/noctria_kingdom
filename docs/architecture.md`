@@ -8,3 +8,19 @@
 
 ## 🌐 構成図
 
+---
+
+---
+User
+│
+▼
+GUI (Noctria-GUI)
+│
+▼
+Airflow DAGs ───────────────┐
+│ │
+▼ ▼
+各AI戦略 core/noctria.py (統合判断)
+│ │
+▼ ▼
+学習・分析層 Execution (OrderAPI, experts)
