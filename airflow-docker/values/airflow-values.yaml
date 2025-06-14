@@ -41,7 +41,7 @@ kubernetesPodTemplate:
   enabled: false
 
 workers:
-  replicas: 2
+  replicas: 1
   resources:
     requests:
       memory: "512Mi"
