@@ -10,7 +10,6 @@ dags:
   persistence:
     enabled: true
     existingClaim: airflow-dags-pvc
-    mountPath: /opt/airflow/dags  # ✅ 明示的にマウント先を指定
   gitSync:
     enabled: false
 
@@ -20,7 +19,7 @@ logs:
 
 webserver:
   defaultUser:
-    enabled: false  # ✅ create-user Job を無効化
+    enabled: false
   service:
     type: ClusterIP
 
@@ -53,3 +52,13 @@ workers:
 flower:
   enabled: false
 
+# ✅ 正式なマウント先指定
+extraVolumeMounts:
+  - name: dags
+    mountPath: /opt/airflow/dags
+    readOnly: false
+
+extraVolumes:
+  - name: dags
+    persistentVolumeClaim:
+      claimName: airflow-dags-pvc
