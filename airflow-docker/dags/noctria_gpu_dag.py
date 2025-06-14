@@ -1,12 +1,8 @@
-# /opt/airflow/dags/noctria_gpu_dag.py
-
-import sys
-sys.path.append('/opt/airflow')  # core や strategies をパスに追加
-
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from datetime import datetime, timedelta
 
+# ✅ DAG定義
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -16,25 +12,29 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-with DAG(
+dag = DAG(
     dag_id='noctria_gpu_dag',
     default_args=default_args,
-    description='GPUノード上でCUDAとnvidia-smiを検証するK8s DAG',
+    description='Noctria KingdomによるGPUトレーニングDAG（KubernetesPodOperator使用）',
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=['noctria', 'gpu', 'kubernetes'],
-) as dag:
+    tags=['noctria', 'gpu', 'k8s'],
+)
 
-    gpu_check_task = KubernetesPodOperator(
-        task_id='gpu_check',
-        name='gpu-check-pod',
-        namespace='default',  # 必要に応じて変更
-        image='nvidia/cuda:12.2.0-base-ubuntu22.04',
-        cmds=["nvidia-smi"],
-        get_logs=True,
-        is_delete_operator_pod=True,
-        resources={
-            'request_gpu': '1',  # KubernetesでGPU割当をリクエスト
-        },
-    )
+# ✅ GPUコンテナでTensorFlowのGPU検出を実行
+gpu_task = KubernetesPodOperator(
+    task_id='gpu_training_task',
+    name='noctria-gpu-task',
+    namespace='default',
+    image='tensorflow/tensorflow:latest-gpu',  # ✅ GPU対応イメージ
+    cmds=["python", "-c"],
+    arguments=["import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"],
+    container_resources={
+        'limits': {'nvidia.com/gpu': '1'}  # ✅ GPUリソースを1つ要求
+    },
+    get_logs=True,
+    is_delete_operator_pod=True,  # Pod終了後に削除
+    in_cluster=True,              # AirflowがKubernetes内部から起動されていることが前提
+    dag=dag,
+)
