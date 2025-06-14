@@ -4,7 +4,7 @@ sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from core.levia_tempest import LeviaTempest
+from strategies.levia_tempest import LeviaTempest
 
 # ✅ DAG設定
 default_args = {
