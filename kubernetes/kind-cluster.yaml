@@ -1,26 +1,6 @@
-# KINDクラスタ定義ファイル（ローカル開発用、Airflow対応）
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: noctria-kind
 nodes:
   - role: control-plane
-    extraPortMappings:
-      - containerPort: 30080  # Airflow WebUI
-        hostPort: 8080
-      - containerPort: 30081  # Flower（必要な場合）
-        hostPort: 8081
-      - containerPort: 30082  # Airflow REST API
-        hostPort: 8082
-    kubeadmConfigPatches:
-      - |
-        kind: InitConfiguration
-        nodeRegistration:
-          kubeletExtraArgs:
-            node-labels: "ingress-ready=true"
   - role: worker
   - role: worker
-containerdConfigPatches:
-  - |-
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-      endpoint = ["https://registry-1.docker.io"]
-
