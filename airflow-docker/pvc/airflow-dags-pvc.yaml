@@ -1,4 +1,19 @@
-# airflow-docker/pvc/airflow-dags-pvc.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: airflow-dags-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /mnt/data/airflow/dags  # KINDノード上のローカルパス（自動で作成されないので注意）
+
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -6,7 +21,8 @@ metadata:
   namespace: airflow  # Helmインストール時の namespace に合わせる
 spec:
   accessModes:
-    - ReadWriteMany   # 複数Podから同時アクセスしたいとき
+    - ReadWriteMany
+  storageClassName: manual
   resources:
     requests:
-      storage: 1Gi     # 必要な容量（最初は1GiでOK）
+      storage: 1Gi
