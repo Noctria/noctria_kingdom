@@ -12,7 +12,5 @@ AIによる為替戦略王国「Noctria」のトレーディングシステム�
 - [最適化・強化学習の記録](docs/optimization_notes.md)
 
 ## ✨ クイックスタート
-
 cd airflow-docker
 docker compose up -d
-
