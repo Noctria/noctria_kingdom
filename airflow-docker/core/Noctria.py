@@ -1,13 +1,17 @@
-# core/Noctria.py
+# core/noctria.py
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import logging
 import numpy as np
 import pandas as pd
 
-from strategies.Aurus_Singularis import AurusSingularis
-from strategies.Levia_Tempest import LeviaTempest
-from strategies.Noctus_Sentinella import NoctusSentinella
-from strategies.Prometheus_Oracle import PrometheusOracle
+from strategies.aurus_singularis import AurusSingularis
+from strategies.levia_tempest import LeviaTempest
+from strategies.noctus_sentinella import NoctusSentinella
+from strategies.prometheus_oracle import PrometheusOracle
 from core.meta_ai import MetaAI
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
@@ -52,7 +56,6 @@ class Noctria:
         """
         市場データ取得 → 各戦略の決定を集約 → MetaAIで最終戦略を決定
         """
-        # 例: 市場状態（仮にダミー値でテスト）
         market_state = self._create_observation_vector()
 
         # ✅ MetaAIが最終戦略を決定
