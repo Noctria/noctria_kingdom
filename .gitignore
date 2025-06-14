@@ -1,23 +1,56 @@
-# Python
+# ==========================
+# 🔹 Python & 仮想環境
+# ==========================
 *.pyc
 __pycache__/
+*.pyo
+*.pyd
 
-# venv
 venv/
-venv_mt5/
-
-# local pip user install
+venv_*/
+.env/
 .local/
 
-# CSVなどのヒストリカルデータ（ローカルのみ）
-data/private_data/
+# ==========================
+# 🔹 Jupyter & エディタ系
+# ==========================
+.ipynb_checkpoints/
+.DS_Store
+.vscode/
+.idea/
 
-# TensorBoardログはGit管理外
-logs/ppo_tensorboard_logs/
+# ==========================
+# 🔹 Airflow 関連
+# ==========================
+# DAG/Plugin のキャッシュやログ
+airflow-docker/dags/__pycache__/
+airflow-docker/plugins/__pycache__/
+airflow-docker/logs/
+airflow-docker/tmp/
 
+# dotenv & airflow.cfg（本番では別管理推奨）
 airflow-docker/.env
-
-# Airflow config
 airflow-docker/airflow.cfg
 
+# SQLite DB（Airflow 初期テストで生成されることがある）
+airflow.db
 
+# ==========================
+# 🔹 データ系・学習ログ
+# ==========================
+# プライベートデータ
+data/private_data/
+# TensorBoardログ
+logs/ppo_tensorboard_logs/
+# その他一時ログ
+*.log
+*.tmp
+
+# ==========================
+# 🔹 Kubernetes・機密
+# ==========================
+.secrets/
+kubeconfig_final.yaml
+
+# Helmのテンポラリ（必要に応じて）
+*.tgz
