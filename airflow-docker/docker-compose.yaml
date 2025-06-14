@@ -31,7 +31,8 @@ services:
       - ./core:/opt/airflow/core
       - ./strategies:/opt/airflow/strategies
       - ./institutions:/opt/airflow/institutions
-      - ${HOME}/.kube/config:/home/airflow/.kube/config/config  # ✅ 修正済み：ファイルとしてマウント
+      - ${HOME}/.kube/config:/home/airflow/.kube/config/config
+
 
   airflow-scheduler:
     build:
