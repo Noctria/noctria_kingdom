@@ -4,7 +4,7 @@ sys.path.append('/opt/airflow')  # Airflow コンテナ用パス追加入力
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from core import Noctria
+from core.noctria import Noctria
 
 # ✅ DAG共通設定
 default_args = {
