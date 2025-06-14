@@ -10,7 +10,7 @@ dags:
   persistence:
     enabled: true
     existingClaim: airflow-dags-pvc
-    subPath: ""
+    #subPath: ""
   gitSync:
     enabled: false
 
