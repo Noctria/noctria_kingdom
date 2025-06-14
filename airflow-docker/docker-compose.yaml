@@ -25,12 +25,13 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /opt/airflow  # ✅ ← 追加
+      PYTHONPATH: /opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ~/.kube:/home/airflow/.kube  # ✅ Kube config mount
+      - ~/.kube:/home/airflow/.kube               # ✅ kubeconfigのマウント
+      - ./pod_templates:/opt/airflow/pod_templates  # ✅ gpu_job.yamlのマウント
     ports:
       - "8080:8080"
     command: webserver
@@ -49,12 +50,13 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /opt/airflow  # ✅ ← 追加
+      PYTHONPATH: /opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ~/.kube:/home/airflow/.kube  # ✅ Kube config mount
+      - ~/.kube:/home/airflow/.kube
+      - ./pod_templates:/opt/airflow/pod_templates  # ✅ gpu_job.yamlのマウント
     command: scheduler
     restart: always
 
