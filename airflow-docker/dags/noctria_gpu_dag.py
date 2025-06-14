@@ -2,7 +2,6 @@ from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from datetime import datetime, timedelta
 
-# ✅ DAG設定
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -22,7 +21,6 @@ dag = DAG(
     tags=['noctria', 'gpu', 'k8s'],
 )
 
-# ✅ GPU対応のTensorFlow Podを起動してGPU確認
 gpu_task = KubernetesPodOperator(
     task_id='gpu_training_task',
     name='noctria-gpu-task',
@@ -31,11 +29,11 @@ gpu_task = KubernetesPodOperator(
     cmds=["python", "-c"],
     arguments=["import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"],
     container_resources={
-        'limits': {'nvidia.com/gpu': '1'}  # ✅ GPUを1つ要求
+        'limits': {'nvidia.com/gpu': '1'}
     },
     get_logs=True,
     is_delete_operator_pod=True,
-    in_cluster=False,  # ✅ 外部接続用
-    config_file='/home/airflow/.kube/config',  # ✅ Airflowコンテナ内のパス
+    in_cluster=False,  # ✅ Kubernetes外から接続
+    config_file='/home/airflow/.kube/config/config',  # ✅ 修正された kubeconfig パス
     dag=dag,
 )
