@@ -1,16 +1,16 @@
-tensorflow==2.15.0              # ✅ 安定版（2.19はAirflow環境で非推奨）
-tensorboard==2.15.1
-torch==2.2.2                    # ✅ RL系やPyTorch対応強化のため
-optuna==3.6.1                   # ✅ ハイパーパラメータ最適化
-stable-baselines3==2.2.1        # ✅ gymnasium互換のSB3
-gymnasium==0.29.1               # ✅ RL環境
-shimmy==1.3.0                   # ✅ gym → gymnasiumブリッジ
+tensorflow==2.15.0             # ✅ 安定版（2.19+はglIBC依存に注意）
+tensorboard==2.15.1            # ✅ 学習ログ可視化用
+torch==2.2.2                   # ✅ PyTorch（必要に応じて +cpu 指定）
+optuna==3.6.1                  # ✅ ハイパーパラメータ自動最適化
+stable-baselines3==2.2.1       # ✅ gymnasium互換RLライブラリ
+gymnasium==0.29.1              # ✅ 強化学習用環境（最新API）
+shimmy==1.3.0                  # ✅ gym <-> gymnasium 橋渡し
 pandas==2.3.0
 numpy==1.26.4
 scikit-learn==1.4.2
-yfinance==0.2.62
-tqdm==4.67.1
-beautifulsoup4==4.12.3
-lxml==5.2.1
-requests==2.31.0
-statsmodels==0.14.1
+yfinance==0.2.62               # ✅ Yahoo Financeデータ取得
+tqdm==4.67.1                   # ✅ プログレスバー
+beautifulsoup4==4.12.3         # ✅ HTMLスクレイピング
+lxml==5.2.1                    # ✅ XML/HTML解析（高速）
+requests==2.31.0               # ✅ HTTP通信
+statsmodels==0.14.1            # ✅ 統計モデリング・ARIMAなど
