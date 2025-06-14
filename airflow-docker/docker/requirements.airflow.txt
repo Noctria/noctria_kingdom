@@ -1,3 +1,2 @@
 apache-airflow-providers-redis
 apache-airflow-providers-postgres
-apache-airflow-providers-flask-appbuilder
