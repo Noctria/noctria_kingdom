@@ -10,7 +10,7 @@ dags:
   persistence:
     enabled: true
     existingClaim: airflow-dags-pvc
-    # subPath: "" ← ❌ 削除またはコメントアウト済み
+    mountPath: /opt/airflow/dags  # ✅ 明示的にマウント先を指定
   gitSync:
     enabled: false
 
@@ -20,7 +20,7 @@ logs:
 
 webserver:
   defaultUser:
-    enabled: false  # ✅ create-user job 無効化
+    enabled: false  # ✅ create-user Job を無効化
   service:
     type: ClusterIP
 
@@ -52,3 +52,4 @@ workers:
 
 flower:
   enabled: false
+
