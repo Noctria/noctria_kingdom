@@ -1,6 +1,5 @@
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from kubernetes.client import models as k8s
 from datetime import datetime, timedelta
 
 default_args = {
@@ -15,7 +14,7 @@ default_args = {
 dag = DAG(
     dag_id='noctria_gpu_dag',
     default_args=default_args,
-    description='Noctria KingdomによるGPUトレーニングDAG（KubernetesPodOperator使用）',
+    description='Noctria KingdomによるGPUトレーニングDAG（pod_template_file使用）',
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
@@ -30,21 +29,6 @@ gpu_task = KubernetesPodOperator(
     config_file='/home/airflow/.kube/config',
     get_logs=True,
     is_delete_operator_pod=True,
-    pod_override=k8s.V1Pod(
-        spec=k8s.V1PodSpec(
-            restart_policy="Never",
-            containers=[
-                k8s.V1Container(
-                    name="base",
-                    image="tensorflow/tensorflow:latest-gpu",
-                    command=["python", "-c"],
-                    args=["import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"],
-                    resources=k8s.V1ResourceRequirements(
-                        limits={"nvidia.com/gpu": "1"}
-                    )
-                )
-            ]
-        )
-    ),
+    pod_template_file='/opt/airflow/pod_templates/gpu_job.yaml',  # ここがテンプレート読み込み
     dag=dag,
 )
