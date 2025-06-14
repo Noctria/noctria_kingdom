@@ -31,7 +31,7 @@ services:
       - ./core:/opt/airflow/core
       - ./strategies:/opt/airflow/strategies
       - ./institutions:/opt/airflow/institutions
-      - ${HOME}/.kube/config:/home/airflow/.kube/config  # ✅ Kubernetes接続設定
+      - /mnt/c/Users/masay/.kube/config:/home/airflow/.kube/config  # ✅ Kubernetes config パスを明示
 
   airflow-scheduler:
     build:
@@ -51,7 +51,7 @@ services:
       - ./core:/opt/airflow/core
       - ./strategies:/opt/airflow/strategies
       - ./institutions:/opt/airflow/institutions
-      - ${HOME}/.kube/config:/home/airflow/.kube/config  # ✅ Kubernetes接続設定
+      - /mnt/c/Users/masay/.kube/config:/home/airflow/.kube/config  # ✅ Kubernetes config パスを明示
 
   airflow-init:
     build:
