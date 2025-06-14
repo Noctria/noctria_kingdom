@@ -1,4 +1,3 @@
-# airflow-dags-pv.yaml
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -11,7 +10,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
   hostPath:
-    path: /home/noctria-kingdom/dags  # ✅ ノード上のGit clone先と一致
+    path: /home/noctria-kingdom/dags  # 👈 Dockerノード上と一致
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
