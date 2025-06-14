@@ -11,14 +11,15 @@ spec:
   accessModes:
     - ReadWriteMany
   hostPath:
-    path: /mnt/data/airflow/dags  # KINDノード上のローカルパス（自動で作成されないので注意）
+    path: /mnt/data/airflow/dags  # ✅ KINDノード側にこのパスを mkdir しておくこと！
 
 ---
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: airflow-dags-pvc
-  namespace: airflow  # Helmインストール時の namespace に合わせる
+  namespace: airflow  # ✅ airflow-values.yaml の namespace と一致させる
 spec:
   accessModes:
     - ReadWriteMany
