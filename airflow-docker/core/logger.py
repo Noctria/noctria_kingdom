@@ -1,37 +1,37 @@
-# core/logger.py
-
 import logging
 import os
 
-# ✅ ログ出力先の絶対パス（Airflowコンテナ用）
-LOG_DIR = "/opt/airflow/logs"
-LOG_FILE = os.path.join(LOG_DIR, "system.log")
+def setup_logger(name: str, log_file: str = "/opt/airflow/logs/system.log", level=logging.INFO):
+    """
+    指定した名前のロガーを作成して返す。
+    - name: ロガーの名前（モジュール単位で付与）
+    - log_file: ログ出力先ファイルのパス
+    - level: ログレベル（デフォルトはINFO）
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-# ✅ ログディレクトリの自動作成
-os.makedirs(LOG_DIR, exist_ok=True)
+    # 既にハンドラが追加されていれば再追加しない
+    if not logger.handlers:
+        # ログフォルダが存在しない場合は作成
+        log_dir = os.path.dirname(log_file)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
-# ✅ ログ設定（1度だけ実行）
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+        # ファイルハンドラを設定
+        fh = logging.FileHandler(log_file)
+        fh.setLevel(level)
 
-# ✅ 共通ロガーの取得
-logger = logging.getLogger("NoctriaLogger")
+        # フォーマットを設定
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
 
-def log_info(message):
-    """ 情報ログを出力 """
-    logger.info(message)
+        # ハンドラ追加
+        logger.addHandler(fh)
 
-def log_warning(message):
-    """ 警告ログを出力 """
-    logger.warning(message)
+    return logger
 
 def log_violation(message):
-    """ ルール違反ログ（警告） """
+    """戦略違反・異常系の共通ログ関数"""
+    logger = setup_logger("ViolationLogger")
     logger.warning(f"Violation Detected: {message}")
-
-def log_error(message):
-    """ エラーログ """
-    logger.error(message)
