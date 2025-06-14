@@ -3,8 +3,7 @@
 import sys
 sys.path.append('/opt/airflow')  # Airflow環境でcore/やstrategies/を認識させる
 
-from core.logger import setup_logger  # ✅ 追加
-
+from core.logger import setup_logger  # ✅ ロガー導入
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
@@ -60,6 +59,8 @@ def prometheus_task(**context):
 # === 王Noctriaが全てを統合するタスク ===
 
 def noctria_final_decision(**context):
+    logger = setup_logger("NoctriaDecision")  # ✅ ロガー初期化
+
     ti = context['ti']
     decisions = {
         "Aurus": ti.xcom_pull(key='aurus_decision', task_ids='aurus_strategy'),
@@ -68,10 +69,12 @@ def noctria_final_decision(**context):
         "Prometheus": ti.xcom_pull(key='prometheus_decision', task_ids='prometheus_strategy'),
     }
 
-    print(f"👑 王Noctriaが受け取った判断: {decisions}")
+    logger.info(f"👑 王Noctriaが受け取った判断: {decisions}")  # ✅ ログ出力
+
     noctria = Noctria()
     final_action = noctria.meta_ai.decide_final_action(decisions)
-    print(f"🏰 王国全体の最終戦略決定: {final_action}")
+
+    logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")  # ✅ ログ出力
 
 # === DAGタスク定義 ===
 
