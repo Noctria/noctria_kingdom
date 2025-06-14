@@ -11,7 +11,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
   hostPath:
-    path: /mnt/e/noctria-kingdom-main/airflow/dags  # ✅ 全ノードに存在するパス
+    path: /home/noctria-kingdom/dags  # ✅ ノード上のGit clone先と一致
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
