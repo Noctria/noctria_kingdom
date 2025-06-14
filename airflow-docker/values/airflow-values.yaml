@@ -23,7 +23,7 @@ webserver:
   service:
     type: ClusterIP
 
-webserverSecretKey: UJ7lYMq8DoWzNRuRkQRvpxw3JVgkoDFgRLEK0750xW00vt7DQKF72erikMJfPrDwaQGG9pqkOg1UYn6g-IRi7g
+webserverSecretKey: changeme-key
 
 postgresql:
   enabled: true
@@ -36,29 +36,5 @@ redis:
   enabled: true
   password: ""
 
-kubernetesPodTemplate:
-  enabled: false
-
 workers:
   replicas: 1
-  resources:
-    requests:
-      memory: "1Gi"
-      cpu: "500m"
-    limits:
-      memory: "2Gi"
-      cpu: "1000m"
-
-flower:
-  enabled: false
-
-# ✅ 正式なマウント先指定
-extraVolumeMounts:
-  - name: dags
-    mountPath: /opt/airflow/dags
-    readOnly: false
-
-extraVolumes:
-  - name: dags
-    persistentVolumeClaim:
-      claimName: airflow-dags-pvc
