@@ -1,6 +1,6 @@
 tensorflow==2.15.0             # ✅ 安定版（2.19+はglIBC依存に注意）
 tensorboard==2.15.1            # ✅ 学習ログ可視化用
-torch==2.2.2                   # ✅ PyTorch（必要に応じて +cpu 指定）
+torch==2.2.2+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 optuna==3.6.1                  # ✅ ハイパーパラメータ自動最適化
