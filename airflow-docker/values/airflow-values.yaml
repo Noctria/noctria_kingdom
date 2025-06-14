@@ -1,1 +1,66 @@
+# Airflow Helm Chart values
+# 公式: https://github.com/apache/airflow/tree/main/chart
+
+executor: CeleryExecutor
+
+# Airflow イメージ
+images:
+  airflow:
+    repository: apache/airflow
+    tag: 2.8.1
+    pullPolicy: IfNotPresent
+
+# DAGsマウント設定（persistence経由）
+dags:
+  persistence:
+    enabled: true
+    existingClaim: airflow-dags-pvc  # PVCは別途作成
+    subPath: ""  # サブディレクトリなしで直下マウント
+  gitSync:
+    enabled: false  # Git連携は一旦使わない
+
+# logs（persistenceでPVCマウントも可能）
+logs:
+  persistence:
+    enabled: false  # 必要ならtrueにしてPVC設定追加
+
+# Webサーバー設定
+webserver:
+  defaultUser:
+    enabled: true
+    username: admin
+    password: admin  # セキュリティの都合であとで変更推奨
+  service:
+    type: ClusterIP
+
+# PostgreSQL (内蔵)
+postgresql:
+  enabled: true
+  postgresqlUsername: airflow
+  postgresqlPassword: airflow
+  postgresqlDatabase: airflow
+
+# Redis (CeleryExecutor用)
+redis:
+  enabled: true
+  password: ""
+
+# Kubernetes executor/pod template (KPOなど使う場合)
+kubernetesPodTemplate:
+  enabled: false  # trueにして pod_template.yaml を使うことも可能
+
+# Workerリソース制限（任意で調整）
+workers:
+  replicas: 2
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+# flower UI
+flower:
+  enabled: false
 
