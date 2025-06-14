@@ -7,10 +7,9 @@ spec:
     storage: 1Gi
   accessModes:
     - ReadWriteMany
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: manual
   hostPath:
-    path: /home/noctria-kingdom/dags  # 👈 Dockerノード上と一致
+    path: /mnt/e/home/noctria-kingdom/dags
+    type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -23,5 +22,4 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: manual
   volumeName: airflow-dags-pv
