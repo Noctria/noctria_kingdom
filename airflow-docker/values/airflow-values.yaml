@@ -1,42 +1,33 @@
-# Airflow Helm Chart values
-# 公式: https://github.com/apache/airflow/tree/main/chart
-
 executor: CeleryExecutor
 
-# Airflow イメージ
 images:
   airflow:
-    repository: apache/airflow
-    tag: 2.7.3  # ✅ 安定版に変更
+    repository: noctria/airflow-custom  # ✅ カスタムイメージを指定
+    tag: 2.9.1
     pullPolicy: IfNotPresent
 
-# DAGsマウント設定（persistence経由）
 dags:
   persistence:
     enabled: true
-    existingClaim: airflow-dags-pvc  # PVCは別途作成
-    subPath: ""  # サブディレクトリなしで直下マウント
+    existingClaim: airflow-dags-pvc
+    subPath: ""  # 直下にマウント
   gitSync:
-    enabled: false  # Git連携は一旦使わない
+    enabled: false  # Git連携は一旦無効
 
-# logs（persistenceでPVCマウントも可能）
 logs:
   persistence:
-    enabled: false  # 必要ならtrueにしてPVC設定追加
+    enabled: false  # 任意で true に（PVC作成が必要）
 
-# Webサーバー設定
 webserver:
   defaultUser:
-    enabled: true
+    enabled: true  # 任意（falseでもOKだが、enabledならhook失敗対策が必要）
     username: admin
-    password: admin  # セキュリティの都合であとで変更推奨
+    password: admin
   service:
     type: ClusterIP
 
-# ✅ 静的なWebserver Secret Keyの設定（警告抑制）
 webserverSecretKey: UJ7lYMq8DoWzNRuRkQRvpxw3JVgkoDFgRLEK0750xW00vt7DQKF72erikMJfPrDwaQGG9pqkOg1UYn6g-IRi7g
 
-# PostgreSQL（新方式）
 postgresql:
   enabled: true
   auth:
@@ -44,16 +35,13 @@ postgresql:
     password: airflow
     database: airflow
 
-# Redis (CeleryExecutor用)
 redis:
   enabled: true
   password: ""
 
-# Kubernetes executor/pod template (KPOなど使う場合)
 kubernetesPodTemplate:
-  enabled: false  # trueにして pod_template.yaml を使うことも可能
+  enabled: false
 
-# Workerリソース制限（任意で調整）
 workers:
   replicas: 2
   resources:
@@ -64,6 +52,9 @@ workers:
       memory: "1Gi"
       cpu: "1000m"
 
-# flower UI
 flower:
+  enabled: false
+
+# ✅ create-user ジョブを無効化（fab系モジュールエラー回避）
+createUserJob:
   enabled: false
