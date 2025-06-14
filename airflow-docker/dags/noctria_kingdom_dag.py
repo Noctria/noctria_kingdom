@@ -1,18 +1,18 @@
 # /opt/airflow/dags/noctria_kingdom_dag.py
 
 import sys
-sys.path.append('/opt/airflow')  # Airflow環境でcore/やstrategies/を認識させる
+sys.path.append('/opt/airflow')  # Airflowからcore/やstrategies/を認識させる
 
-from core.logger import setup_logger  # ✅ ログ機能
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 
+from core.logger import setup_logger
+from core.noctria import Noctria
 from strategies.aurus_singularis import AurusSingularis
 from strategies.levia_tempest import LeviaTempest
 from strategies.noctus_sentinella import NoctusSentinella
 from strategies.prometheus_oracle import PrometheusOracle
-from core.noctria import Noctria
 
 # === DAG設定 ===
 default_args = {
@@ -34,19 +34,13 @@ dag = DAG(
     tags=['noctria', 'kingdom'],
 )
 
-# === 各AIタスク ===
+# === 各AIユニットのタスク定義 ===
 
 def aurus_task(**context):
     logger = setup_logger("NoctriaDecision")
     try:
         aurus = AurusSingularis()
         decision = aurus.process({"trend_strength": 0.6})
-
-        if decision is None:
-            logger.warning("[Aurus] decision is None")
-        elif decision not in ["BUY", "SELL", "HOLD"]:
-            logger.warning(f"[Aurus] unexpected decision: {decision}")
-
         logger.info(f"[Aurus] decision: {decision}")
         context['ti'].xcom_push(key='aurus_decision', value=decision)
     except Exception as e:
@@ -57,12 +51,6 @@ def levia_task(**context):
     try:
         levia = LeviaTempest()
         decision = levia.process({"price": 1.25, "spread": 0.01})
-
-        if decision is None:
-            logger.warning("[Levia] decision is None")
-        elif decision not in ["BUY", "SELL", "HOLD"]:
-            logger.warning(f"[Levia] unexpected decision: {decision}")
-
         logger.info(f"[Levia] decision: {decision}")
         context['ti'].xcom_push(key='levia_decision', value=decision)
     except Exception as e:
@@ -73,12 +61,6 @@ def noctus_task(**context):
     try:
         noctus = NoctusSentinella()
         decision = noctus.process({"volume": 130, "spread": 0.012, "volatility": 0.2})
-
-        if decision is None:
-            logger.warning("[Noctus] decision is None")
-        elif decision not in ["RISK_ON", "RISK_OFF", "MAINTAIN_POSITION"]:
-            logger.warning(f"[Noctus] unexpected decision: {decision}")
-
         logger.info(f"[Noctus] decision: {decision}")
         context['ti'].xcom_push(key='noctus_decision', value=decision)
     except Exception as e:
@@ -89,18 +71,12 @@ def prometheus_task(**context):
     try:
         prometheus = PrometheusOracle()
         decision = prometheus.process({"macro_score": 0.75})
-
-        if decision is None:
-            logger.warning("[Prometheus] decision is None")
-        elif decision not in ["BUY", "SELL", "HOLD"]:
-            logger.warning(f"[Prometheus] unexpected decision: {decision}")
-
         logger.info(f"[Prometheus] decision: {decision}")
         context['ti'].xcom_push(key='prometheus_decision', value=decision)
     except Exception as e:
         logger.error(f"[Prometheus] exception occurred: {e}")
 
-# === 王Noctriaが全てを統合するタスク ===
+# === 王Noctriaによる統合判断タスク ===
 
 def noctria_final_decision(**context):
     logger = setup_logger("NoctriaDecision")
@@ -117,7 +93,7 @@ def noctria_final_decision(**context):
     final_action = noctria.meta_ai.decide_final_action(decisions)
     logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")
 
-# === DAGタスク定義 ===
+# === DAGにタスク登録 ===
 
 with dag:
     t1 = PythonOperator(
@@ -146,4 +122,5 @@ with dag:
         provide_context=True,
     )
 
+    # すべての戦略が終わった後に王Noctriaが判断
     [t1, t2, t3, t4] >> t5
