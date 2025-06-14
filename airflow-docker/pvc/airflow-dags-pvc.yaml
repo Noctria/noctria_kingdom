@@ -11,7 +11,7 @@ spec:
   accessModes:
     - ReadWriteMany
   hostPath:
-    path: /mnt/data/airflow/dags  # ✅ KINDノード側にこのパスを mkdir しておくこと！
+    path: /mnt/e/noctria-kingdom-main/airflow-docker/dags
 
 ---
 
