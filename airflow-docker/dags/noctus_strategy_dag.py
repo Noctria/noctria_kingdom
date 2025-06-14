@@ -4,7 +4,7 @@ sys.path.append('/opt/airflow')  # ✅ Airflowコンテナのルートパスを�
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from core.noctus_sentinella import NoctusSentinella
+from strategies.noctus_sentinella import NoctusSentinella
 
 # ✅ DAG設定
 default_args = {
