@@ -15,13 +15,3 @@ graph TD
     D3 --> E
     D4 --> E
     E --> F[📈 Order Execution / Trade System]
-
-| パス                | 内容                       |
-| ----------------- | ------------------------ |
-| `airflow-docker/` | Airflow DAGsとAIモジュール実行基盤 |
-| `core/`           | Noctria統合判断AI、ロガー        |
-| `strategies/`     | 各臣下AIの実装                 |
-| `data/`           | 市場データ、ファンダメンタル、前処理       |
-| `scripts/`        | PPO訓練、Optuna最適化、レポート出力   |
-| `experts/`        | MQL5版EAファイル              |
-| `Noctria-GUI/`    | Webビュー、API連携             |
