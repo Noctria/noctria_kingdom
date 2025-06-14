@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: noctria-gpu-task
+  labels:
+    app: noctria
+spec:
+  restartPolicy: Never
+  containers:
+    - name: base
+      image: tensorflow/tensorflow:latest-gpu
+      imagePullPolicy: IfNotPresent
+      command: ["python", "-c"]
+      args:
+        - import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+          memory: "4Gi"
+          cpu: "2000m"
+        requests:
+          memory: "2Gi"
+          cpu: "1000m"
+      env:
+        - name: TF_FORCE_GPU_ALLOW_GROWTH
+          value: "true"
+      volumeMounts:
+        - name: noctria-volume
+          mountPath: /workspace
+  volumes:
+    - name: noctria-volume
+      emptyDir: {}
+
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+  nodeSelector:
+    kubernetes.io/hostname: gpu-node-name  # 必要に応じて実際のノード名に変更
+
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 3000
+    fsGroup: 2000
