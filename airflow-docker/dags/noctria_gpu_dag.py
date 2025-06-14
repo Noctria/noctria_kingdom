@@ -26,18 +26,19 @@ gpu_task = KubernetesPodOperator(
     task_id='gpu_training_task',
     name='noctria-gpu-task',
     namespace='default',
-    image='tensorflow/tensorflow:latest-gpu',
-    cmds=["python", "-c"],
-    arguments=["import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"],
-    get_logs=True,
-    is_delete_operator_pod=True,
     in_cluster=False,
     config_file='/home/airflow/.kube/config',
+    get_logs=True,
+    is_delete_operator_pod=True,
     pod_override=k8s.V1Pod(
         spec=k8s.V1PodSpec(
+            restart_policy="Never",
             containers=[
                 k8s.V1Container(
                     name="base",
+                    image="tensorflow/tensorflow:latest-gpu",
+                    command=["python", "-c"],
+                    args=["import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"],
                     resources=k8s.V1ResourceRequirements(
                         limits={"nvidia.com/gpu": "1"}
                     )
