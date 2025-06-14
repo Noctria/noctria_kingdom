@@ -1,46 +1,20 @@
-# Noctria Kingdom - データ処理の説明
+# 📈 データ処理・学習パイプライン
 
-## 概要
-Noctria Kingdom は、FX市場における高精度なデータ処理を行うためのモジュールを組み込んでいます。  
-これにより、市場の動向を正しく評価し、戦略モジュールに適切なデータを供給できます。
+## 📊 データソース
 
-## データ処理フロー
+- Yahoo Finance: USDJPY ヒストリカル
+- FRED API: GDP, CPI, FFR, 失業率
+- NewsAPI + OpenAI: センチメント評価
 
-1. **データ取得 (`raw_data_loader.py`)**
-   - 市場データ（リアルタイム・過去データ）を取得。
-   - データソース（API, CSV, Web Scraping など）から収集。
+## 🔄 前処理フロー
 
-2. **データ前処理 (`processed_data_handler.py`)**
-   - 特徴量抽出（価格変動、ボラティリティなど）。
-   - データのノイズ除去・正規化処理。
-   - 欠損値補完および外れ値の除去。
+1. `fetch_and_clean_fundamentals.py`
+2. `preprocess_usdjpy_data.py`
+3. 統合データ出力: `preprocessed_usdjpy_with_fundamental.csv`
 
-3. **市場心理分析 (`sentiment_analysis.py`)**
-   - ニュース・SNSデータからセンチメントスコアを計算。
-   - 強気市場・弱気市場の判定。
+## 🧠 学習・最適化スクリプト
 
-4. **ファンダメンタル分析 (`fundamental_analysis.py`)**
-   - 財務指標（収益、負債比率、キャッシュフロー）を評価。
-   - 市場健全性スコアを計算。
-
-5. **異常検知 (`anomaly_detection.py`)**
-   - 市場データの異常な変動を検出し、リスク評価を実施。
-   - ボラティリティ急変時のシグナル生成。
-
-6. **市場分類 (`market_regime_detector.py`)**
-   - 市場の局面（ブル・ベア・ニュートラル）をリアルタイムで判定。
-   - 予測モデルに市場状態を供給。
-
-7. **量子市場予測 (`quantum_computing_integration.py`)**
-   - 量子コンピューティングを活用し、非線形市場データを解析。
-   - 最適なトレードシグナルを生成。
-
-## データ保存と管理
-- **`data/` フォルダに保存**
-- **パイプライン方式で戦略モジュールと統合**
-- **バックテストとリアルタイムデータ適用**
-
----
-
-📌 **次の Markdown ファイルを表示する際は「次」と指示してください！** 🚀✨  
-準備が整ったら、**順番に出していくよ！** 💡
+- PPO強化学習: `meta_ai_tensorboard_train.py`
+- Optuna最適化:
+  - `optimize_params.py`
+  - `optimize_params_with_optuna.py`
