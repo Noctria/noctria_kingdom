@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from kubernetes.client import models as k8s
 from datetime import datetime, timedelta
 
 default_args = {
@@ -28,12 +29,21 @@ gpu_task = KubernetesPodOperator(
     image='tensorflow/tensorflow:latest-gpu',
     cmds=["python", "-c"],
     arguments=["import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"],
-    container_resources={
-        'limits': {'nvidia.com/gpu': '1'}
-    },
     get_logs=True,
     is_delete_operator_pod=True,
-    in_cluster=False,  # ✅ Kubernetes外から接続
-    config_file='/home/airflow/.kube/config/config',  # ✅ 修正された kubeconfig パス
+    in_cluster=False,
+    config_file='/home/airflow/.kube/config',
+    pod_override=k8s.V1Pod(
+        spec=k8s.V1PodSpec(
+            containers=[
+                k8s.V1Container(
+                    name="base",
+                    resources=k8s.V1ResourceRequirements(
+                        limits={"nvidia.com/gpu": "1"}
+                    )
+                )
+            ]
+        )
+    ),
     dag=dag,
 )
