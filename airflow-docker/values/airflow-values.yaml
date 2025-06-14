@@ -10,6 +10,7 @@ dags:
   persistence:
     enabled: true
     existingClaim: airflow-dags-pvc
+    # subPath: "" ← ❌ 削除またはコメントアウト済み
   gitSync:
     enabled: false
 
@@ -19,7 +20,7 @@ logs:
 
 webserver:
   defaultUser:
-    enabled: false
+    enabled: false  # ✅ create-user job 無効化
   service:
     type: ClusterIP
 
