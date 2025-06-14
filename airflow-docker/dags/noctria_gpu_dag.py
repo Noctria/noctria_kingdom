@@ -26,9 +26,9 @@ gpu_task = KubernetesPodOperator(
     name='noctria-gpu-task',
     namespace='default',
     in_cluster=False,
-    config_file='/home/airflow/.kube/config',
+    config_file='/opt/airflow/kubeconfig_final.yaml',  # ✅ 修正済みパス
     get_logs=True,
     is_delete_operator_pod=True,
-    pod_template_file='/opt/airflow/pod_templates/gpu_job.yaml',  # ここがテンプレート読み込み
+    pod_template_file='/opt/airflow/pod_templates/gpu_job.yaml',
     dag=dag,
 )
