@@ -15,29 +15,26 @@ graph TD
     D3 --> E
     D4 --> E
     E --> F[📈 Order Execution / Trade System]
-
-| パス                | 内容                       |
-| ----------------- | ------------------------ |
-| `airflow-docker/` | Airflow DAGsとAIモジュール実行基盤 |
-| `core/`           | Noctria統合判断AI、ロガー        |
-| `strategies/`     | 各臣下AIの実装                 |
-| `data/`           | 市場データ、ファンダメンタル、前処理       |
-| `scripts/`        | PPO訓練、Optuna最適化、レポート出力   |
-| `experts/`        | MQL5版EAファイル              |
-| `Noctria-GUI/`    | Webビュー、API連携             |
-
-
+```
 
 ---
 
-このまま `docs/architecture.md` に保存してOKです。GitHubでは**構成図が自動描画される**ため、見た目もよくなります。
+## 📦 ディレクトリ構成概要
+
+| パス              | 内容                                |
+|-------------------|-------------------------------------|
+| `airflow-docker/` | Airflow DAGsとAIモジュール実行基盤       |
+| `core/`           | Noctria統合判断AI、ロガー                  |
+| `strategies/`     | 各臣下AIの実装                          |
+| `data/`           | 市場データ、ファンダメンタル、前処理         |
+| `scripts/`        | PPO訓練、Optuna最適化、レポート出力        |
+| `experts/`        | MQL5版EAファイル                        |
+| `Noctria-GUI/`    | Webビュー、API連携                      |
 
 ---
 
-## 💡他にも追加できます：
+## 🧩 解説
 
-- 複数 DAG の連携図（PDCA含む）
-- PPO/Optuna/Loggerのフロー図
-- 各AIモジュールの入出力図（シーケンス図）
-
-「もっと細かく分けたい」「次はPDCA DAGの流れも描いて」など、希望があればどんどん対応します！
+- GUIからAirflow DAGへ命令が送られ、戦略AI群が並列実行されます。
+- 各AIの出力が Noctria に統合され、最終判断が Execution モジュールへ。
+- 全体構造はモジュール分離されており、保守性・拡張性が高い構成です。
