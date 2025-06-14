@@ -1,33 +1,34 @@
-# core/logger.py
+# ✅ core/logger.py
 
 import logging
 import os
 
-def setup_logger(name: str, log_file: str = "/opt/airflow/logs/system.log", level=logging.INFO):
+def setup_logger(name: str, log_file: str, level=logging.INFO):
+    """
+    指定した名前のロガーを作成して返す。
+    - name: ロガーの名前
+    - log_file: 出力ファイルパス（例: /opt/airflow/logs/AurusLogger.log）
+    - level: ログレベル（デフォルト: INFO）
+    """
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
     if not logger.handlers:
-        # ディレクトリ作成
         log_dir = os.path.dirname(log_file)
         os.makedirs(log_dir, exist_ok=True)
 
+        file_handler = logging.FileHandler(log_file)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(level)
 
-        # ファイルハンドラ（Airflowでも有効）
-        fh = logging.FileHandler(log_file, encoding="utf-8")
-        fh.setLevel(level)
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-
-        # コンソール出力（Airflow Web UIにも出る）
-        sh = logging.StreamHandler()
-        sh.setLevel(level)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
+        logger.addHandler(file_handler)
 
     return logger
 
-def log_violation(message):
-    logger = setup_logger("ViolationLogger")
+def log_violation(message: str, log_file: str = "/opt/airflow/logs/ViolationLogger.log"):
+    """
+    ルール違反や異常を共通で記録する関数
+    """
+    logger = setup_logger("ViolationLogger", log_file)
     logger.warning(f"Violation Detected: {message}")
