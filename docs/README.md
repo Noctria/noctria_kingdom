@@ -17,25 +17,4 @@ AIによる為替戦略王国「Noctria」のトレーディングシステム�
 cd airflow-docker
 docker compose up -d
 
-🧠 構成要素
-AurusSingularis: トレンド分析AI
-
-LeviaTempest: 短期スキャルピングAI
-
-NoctusSentinella: リスク監視AI
-
-PrometheusOracle: ファンダメンタル予測AI
-
-Noctria: 統合判断AI（王）
-
-
----
-
-### ✅ 2. `docs/architecture.md`
-
-```markdown
-# 🏠 Noctria Kingdom 全体構成図
-
-## 🌐 構成図
-
 
