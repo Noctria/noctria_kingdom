@@ -1,0 +1,12 @@
+# airflow-docker/pvc/airflow-dags-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airflow-dags-pvc
+  namespace: airflow  # Helmインストール時の namespace に合わせる
+spec:
+  accessModes:
+    - ReadWriteMany   # 複数Podから同時アクセスしたいとき
+  resources:
+    requests:
+      storage: 1Gi     # 必要な容量（最初は1GiでOK）
