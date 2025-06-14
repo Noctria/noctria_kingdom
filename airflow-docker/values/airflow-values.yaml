@@ -33,12 +33,13 @@ webserver:
   service:
     type: ClusterIP
 
-# PostgreSQL (内蔵)
+# PostgreSQL（新方式）
 postgresql:
   enabled: true
-  postgresqlUsername: airflow
-  postgresqlPassword: airflow
-  postgresqlDatabase: airflow
+  auth:
+    username: airflow
+    password: airflow
+    database: airflow
 
 # Redis (CeleryExecutor用)
 redis:
@@ -63,4 +64,3 @@ workers:
 # flower UI
 flower:
   enabled: false
-
