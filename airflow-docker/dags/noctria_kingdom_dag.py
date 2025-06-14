@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 
-from core.aurus_singularis import AurusSingularis
+from strategies.aurus_singularis import AurusSingularis
 from strategies.levia_tempest import LeviaTempest
 from strategies.noctus_sentinella import NoctusSentinella
 from strategies.prometheus_oracle import PrometheusOracle
