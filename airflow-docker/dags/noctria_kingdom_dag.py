@@ -1,9 +1,9 @@
-# /opt/airflow/dags/noctria_kingdom_dag.py
-
 import sys
 sys.path.append('/opt/airflow')  # Airflow環境でcore/やstrategies/を認識させる
 
-from core.logger import setup_logger  # ✅ ロガー導入
+from core.logger import setup_logger  # ✅ ロガーの読み込み
+logger = setup_logger("NoctriaDecision")
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
@@ -39,28 +39,30 @@ dag = DAG(
 def aurus_task(**context):
     aurus = AurusSingularis()
     decision = aurus.process({"trend_strength": 0.6})
+    logger.info(f"[Aurus] decision: {decision}")
     context['ti'].xcom_push(key='aurus_decision', value=decision)
 
 def levia_task(**context):
     levia = LeviaTempest()
     decision = levia.process({"price": 1.25, "spread": 0.01})
+    logger.info(f"[Levia] decision: {decision}")
     context['ti'].xcom_push(key='levia_decision', value=decision)
 
 def noctus_task(**context):
     noctus = NoctusSentinella()
     decision = noctus.process({"volume": 130, "spread": 0.012, "volatility": 0.2})
+    logger.info(f"[Noctus] decision: {decision}")
     context['ti'].xcom_push(key='noctus_decision', value=decision)
 
 def prometheus_task(**context):
     prometheus = PrometheusOracle()
     decision = prometheus.process({"macro_score": 0.75})
+    logger.info(f"[Prometheus] decision: {decision}")
     context['ti'].xcom_push(key='prometheus_decision', value=decision)
 
 # === 王Noctriaが全てを統合するタスク ===
 
 def noctria_final_decision(**context):
-    logger = setup_logger("NoctriaDecision")  # ✅ ロガー初期化
-
     ti = context['ti']
     decisions = {
         "Aurus": ti.xcom_pull(key='aurus_decision', task_ids='aurus_strategy'),
@@ -69,12 +71,10 @@ def noctria_final_decision(**context):
         "Prometheus": ti.xcom_pull(key='prometheus_decision', task_ids='prometheus_strategy'),
     }
 
-    logger.info(f"👑 王Noctriaが受け取った判断: {decisions}")  # ✅ ログ出力
-
+    logger.info(f"👑 王Noctriaが受け取った判断: {decisions}")
     noctria = Noctria()
     final_action = noctria.meta_ai.decide_final_action(decisions)
-
-    logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")  # ✅ ログ出力
+    logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")
 
 # === DAGタスク定義 ===
 
@@ -105,5 +105,4 @@ with dag:
         provide_context=True,
     )
 
-    # 依存関係
     [t1, t2, t3, t4] >> t5
