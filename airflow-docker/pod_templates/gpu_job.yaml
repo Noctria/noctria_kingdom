@@ -25,21 +25,18 @@ spec:
         - name: TF_FORCE_GPU_ALLOW_GROWTH
           value: "true"
       volumeMounts:
-        - name: noctria-volume
+        - name: workspace-volume
           mountPath: /workspace
   volumes:
-    - name: noctria-volume
+    - name: workspace-volume
       emptyDir: {}
 
+  # GPUノードがある場合はGPU用トレラレートを維持（KINDでは通常不要）
   tolerations:
     - key: "nvidia.com/gpu"
       operator: "Exists"
       effect: "NoSchedule"
 
-  nodeSelector:
-    kubernetes.io/hostname: gpu-node-name  # 必要に応じて実際のノード名に変更
-
-  securityContext:
-    runAsUser: 1000
-    runAsGroup: 3000
-    fsGroup: 2000
+  # nodeSelector は初期は無効化して汎用化（必要に応じて追加）
+  # nodeSelector:
+  #   kubernetes.io/hostname: gpu-node-name
