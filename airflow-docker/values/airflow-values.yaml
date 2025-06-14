@@ -7,7 +7,7 @@ executor: CeleryExecutor
 images:
   airflow:
     repository: apache/airflow
-    tag: 2.8.1
+    tag: 2.7.3  # ✅ 安定版に変更
     pullPolicy: IfNotPresent
 
 # DAGsマウント設定（persistence経由）
