@@ -32,4 +32,3 @@ NoctusSentinella: リスク監視AI
 PrometheusOracle: ファンダメンタル予測AI
 
 Noctria: 統合判断AI（王）
-
