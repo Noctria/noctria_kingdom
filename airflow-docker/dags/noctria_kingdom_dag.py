@@ -3,6 +3,8 @@
 import sys
 sys.path.append('/opt/airflow')  # Airflow環境でcore/やstrategies/を認識させる
 
+from core.logger import setup_logger  # ✅ 追加
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
