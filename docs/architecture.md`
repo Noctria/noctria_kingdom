@@ -1,39 +1,27 @@
-
----
-
-### ✅ 2. `docs/architecture.md`
-
-```markdown
 # 🏠 Noctria Kingdom 全体構成図
 
-## 🌐 構成図
+## 🌐 構成図（Mermaid形式）
 
----
+```mermaid
+graph TD
+    A[👤 User] --> B[🌐 GUI (Noctria-GUI)]
+    B --> C[⚙️ Airflow DAGs]
+    C --> D1[🤖 AurusSingularis]
+    C --> D2[⚡ LeviaTempest]
+    C --> D3[🛡️ NoctusSentinella]
+    C --> D4[🔮 PrometheusOracle]
+    D1 --> E[👑 Noctria (統合判断AI)]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+    E --> F[📈 Order Execution / Trade System]
 
----
-User
-│
-▼
-GUI (Noctria-GUI)
-│
-▼
-Airflow DAGs ───────────────┐
-│ │
-▼ ▼
-各AI戦略 core/noctria.py (統合判断)
-│ │
-▼ ▼
-学習・分析層 Execution (OrderAPI, experts)
-
-
-## 📦 ディレクトリ概要
-
-| パス              | 内容                                |
-|-------------------|-------------------------------------|
-| `airflow-docker/` | Airflow DAGsとAIモジュール実行基盤       |
-| `core/`           | Noctria統合判断AI、ロガー                  |
-| `strategies/`     | 各臣下AIの実装                          |
-| `data/`           | 市場データ、ファンダメンタル、前処理         |
-| `scripts/`        | PPO訓練、Optuna最適化、レポート出力        |
-| `experts/`        | MQL5版EAファイル                        |
-| `Noctria-GUI/`    | Webビュー、API連携                      |
+| パス                | 内容                       |
+| ----------------- | ------------------------ |
+| `airflow-docker/` | Airflow DAGsとAIモジュール実行基盤 |
+| `core/`           | Noctria統合判断AI、ロガー        |
+| `strategies/`     | 各臣下AIの実装                 |
+| `data/`           | 市場データ、ファンダメンタル、前処理       |
+| `scripts/`        | PPO訓練、Optuna最適化、レポート出力   |
+| `experts/`        | MQL5版EAファイル              |
+| `Noctria-GUI/`    | Webビュー、API連携             |
