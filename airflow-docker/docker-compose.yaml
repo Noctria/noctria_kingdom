@@ -25,6 +25,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /opt/airflow  # ✅ ← 追加
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -48,6 +49,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /opt/airflow  # ✅ ← 追加
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
