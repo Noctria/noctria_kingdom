@@ -2,7 +2,7 @@ executor: CeleryExecutor
 
 images:
   airflow:
-    repository: noctria/airflow-custom  # ✅ カスタムイメージを指定
+    repository: noctria/airflow-custom
     tag: 2.9.1
     pullPolicy: IfNotPresent
 
@@ -10,19 +10,17 @@ dags:
   persistence:
     enabled: true
     existingClaim: airflow-dags-pvc
-    subPath: ""  # 直下にマウント
+    subPath: ""
   gitSync:
-    enabled: false  # Git連携は一旦無効
+    enabled: false
 
 logs:
   persistence:
-    enabled: false  # 任意で true に（PVC作成が必要）
+    enabled: false
 
 webserver:
   defaultUser:
-    enabled: true  # 任意（falseでもOKだが、enabledならhook失敗対策が必要）
-    username: admin
-    password: admin
+    enabled: false  # ✅ create-user job 無効化
   service:
     type: ClusterIP
 
@@ -53,8 +51,4 @@ workers:
       cpu: "1000m"
 
 flower:
-  enabled: false
-
-# ✅ create-user ジョブを無効化（fab系モジュールエラー回避）
-createUserJob:
   enabled: false
