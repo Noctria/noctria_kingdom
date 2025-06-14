@@ -34,9 +34,7 @@ webserver:
     type: ClusterIP
 
 # ✅ 静的なWebserver Secret Keyの設定（警告抑制）
-webserverSecretKey:
-  secretName: airflow-webserver-secret-key
-  secretKey: UJ7lYMq8DoWzNRuRkQRvpxw3JVgkoDFgRLEK0750xW00vt7DQKF72erikMJfPrDwaQGG9pqkOg1UYn6g-IRi7g
+webserverSecretKey: UJ7lYMq8DoWzNRuRkQRvpxw3JVgkoDFgRLEK0750xW00vt7DQKF72erikMJfPrDwaQGG9pqkOg1UYn6g-IRi7g
 
 # PostgreSQL（新方式）
 postgresql:
