@@ -17,3 +17,7 @@ logs/ppo_tensorboard_logs/
 
 airflow-docker/.env
 
+# Airflow config
+airflow-docker/airflow.cfg
+
+
