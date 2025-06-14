@@ -23,6 +23,30 @@ webserver:
     enabled: false  # ✅ create-user job 無効化
   service:
     type: ClusterIP
+  persistence:
+    dags:
+      enabled: true
+      existingClaim: airflow-dags-pvc
+
+scheduler:
+  persistence:
+    dags:
+      enabled: true
+      existingClaim: airflow-dags-pvc
+
+workers:
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  persistence:
+    dags:
+      enabled: true
+      existingClaim: airflow-dags-pvc
 
 webserverSecretKey: UJ7lYMq8DoWzNRuRkQRvpxw3JVgkoDFgRLEK0750xW00vt7DQKF72erikMJfPrDwaQGG9pqkOg1UYn6g-IRi7g
 
@@ -39,16 +63,6 @@ redis:
 
 kubernetesPodTemplate:
   enabled: false
-
-workers:
-  replicas: 1
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "500m"
-    limits:
-      memory: "1Gi"
-      cpu: "1000m"
 
 flower:
   enabled: false
