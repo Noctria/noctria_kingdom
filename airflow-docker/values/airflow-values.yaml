@@ -32,6 +32,7 @@ webserver:
     password: admin  # セキュリティの都合であとで変更推奨
   service:
     type: ClusterIP
+  secretKeySecretName: UJ7lYMq8DoWzNRuRkQRvpxw3JVgkoDFgRLEK0750xW00vt7DQKF72erikMJfPrDwaQGG9pqkOg1UYn6g-IRi7g  # ✅ 静的シークレットキーの指定を追加
 
 # PostgreSQL（新方式）
 postgresql:
