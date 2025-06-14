@@ -4,7 +4,7 @@ sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from core.prometheus_oracle import PrometheusOracle
+from strategies.prometheus_oracle import PrometheusOracle
 
 # ✅ DAG設定
 default_args = {
