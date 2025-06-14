@@ -2,7 +2,6 @@ from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from datetime import datetime, timedelta
 
-# DAGの基本設定
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -12,7 +11,6 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-# DAG定義
 dag = DAG(
     dag_id='noctria_gpu_dag',
     default_args=default_args,
@@ -23,15 +21,17 @@ dag = DAG(
     tags=['noctria', 'gpu', 'k8s'],
 )
 
-# KubernetesPodOperatorの設定
 gpu_task = KubernetesPodOperator(
     task_id='gpu_training_task',
-    name='noctria-gpu-task',
-    namespace='default',
-    in_cluster=False,  # ホストの kubeconfig を使用
-    config_file='/opt/airflow/kubeconfig_final.yaml',  # ✅ kubeconfigのパスを修正済み
+    name='noctria-gpu-task-{{ ts_nodash }}',  # リトライ対応
+    namespace='airflow',  # namespaceを統一
+    in_cluster=False,
+    config_file='/opt/airflow/kubeconfig_final.yaml',
+    pod_template_file='/opt/airflow/pod_templates/gpu_job.yaml',
     get_logs=True,
+    log_events_on_failure=True,
     is_delete_operator_pod=True,
-    pod_template_file='/opt/airflow/pod_templates/gpu_job.yaml',  # ✅ GPU用テンプレート
+    retries=1,
+    retry_delay=timedelta(minutes=5),
     dag=dag,
 )
