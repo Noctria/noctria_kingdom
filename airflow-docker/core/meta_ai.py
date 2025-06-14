@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym  # または shimmy経由で利用可能な範囲で
 import numpy as np
 import pandas as pd
 from stable_baselines3 import PPO
