@@ -1,3 +1,4 @@
+# airflow-docker/pvc/airflow-dags-pv.yaml
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -5,11 +6,10 @@ metadata:
   labels:
     type: local
 spec:
+  storageClassName: manual
   capacity:
     storage: 1Gi
   accessModes:
     - ReadWriteMany
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: manual
   hostPath:
-    path: /mnt/e/noctria-kingdom-main/airflow-docker/dags
+    path: "/mnt/e/noctria-kingdom-main/airflow-docker/dags"
