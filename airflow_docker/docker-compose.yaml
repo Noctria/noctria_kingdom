@@ -33,6 +33,7 @@ services:
       - /mnt/e/noctria-kingdom-main/airflow_docker/strategies:/noctria_kingdom/airflow_docker/strategies
       - /mnt/e/noctria-kingdom-main/airflow_docker/data:/noctria_kingdom/airflow_docker/data
       - /mnt/e/noctria-kingdom-main/airflow_docker/models:/noctria_kingdom/airflow_docker/models
+      - /mnt/e/noctria-kingdom-main/airflow_docker/institutions:/noctria_kingdom/airflow_docker/institutions
     ports:
       - "8080:8080"
     command: webserver
@@ -61,6 +62,7 @@ services:
       - /mnt/e/noctria-kingdom-main/airflow_docker/strategies:/noctria_kingdom/airflow_docker/strategies
       - /mnt/e/noctria-kingdom-main/airflow_docker/data:/noctria_kingdom/airflow_docker/data
       - /mnt/e/noctria-kingdom-main/airflow_docker/models:/noctria_kingdom/airflow_docker/models
+      - /mnt/e/noctria-kingdom-main/airflow_docker/institutions:/noctria_kingdom/airflow_docker/institutions
     command: scheduler
     restart: always
 
