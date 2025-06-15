@@ -1,19 +1,18 @@
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
+from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
 
-# === DAG定義 ===
+# ✅ DAG定義
 with DAG(
     dag_id="metaai_apply_dag",
-    description="🤖 Noctria Kingdomの知性核MetaAIへの再学習適用DAG",
-    schedule_interval=None,  # 手動 or 他DAG連携による発火
+    schedule_interval=None,  # 人の操作または他DAGによるトリガーを想定
     start_date=days_ago(1),
     catchup=False,
-    tags=["noctria", "metaai", "apply"]
+    tags=["noctria", "metaai", "retrain"]
 ) as dag:
 
-    # 👑 王Noctriaの命により、MetaAIへ最適パラメータを適用し再学習を行う
-    apply_metaai = BashOperator(
+    apply_metaai_task = PythonOperator(
         task_id="apply_best_params_to_metaai",
-        bash_command="python3 /opt/airflow/scripts/apply_best_params_to_metaai.py"
+        python_callable=apply_best_params_to_metaai,
     )
