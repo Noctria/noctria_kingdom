@@ -1,7 +1,6 @@
 from pathlib import Path
 from tabulate import tabulate
 
-# ✅ 各ホスト側ディレクトリと、対応するDocker内パスのマッピング辞書
 VOLUME_MAP = {
     "data": "/opt/airflow/data",
     "core": "/opt/noctria/core",
@@ -10,26 +9,24 @@ VOLUME_MAP = {
     "logs": "/opt/airflow/logs"
 }
 
-# ✅ プロジェクトのルート（このスクリプトを置く場所）
-PROJECT_ROOT = Path(__file__).resolve().parent
-
-# マッピングリスト
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # ← scripts/ から1階層戻る
 mapping = []
 
-for path in PROJECT_ROOT.rglob("*.*"):
-    try:
+for path in PROJECT_ROOT.rglob("*"):
+    if path.is_file():
         rel_path = path.relative_to(PROJECT_ROOT)
-    except ValueError:
-        continue
+        if len(rel_path.parts) == 0:
+            continue
+        top_dir = rel_path.parts[0]
+        if top_dir in VOLUME_MAP:
+            container_path = Path(VOLUME_MAP[top_dir]) / Path(*rel_path.parts[1:])
+            mapping.append([
+                str(rel_path),
+                str(path),
+                str(container_path)
+            ])
 
-    top_dir = rel_path.parts[0]
-    if top_dir in VOLUME_MAP:
-        container_path = Path(VOLUME_MAP[top_dir]) / Path(*rel_path.parts[1:])
-        mapping.append([
-            str(rel_path),     # 📁 Git相対パス
-            str(path),         # 💻 WSL絶対パス
-            str(container_path)  # 📦 Dockerパス
-        ])
-
-# ✅ 表として表示
-print(tabulate(mapping, headers=["📁 Git相対パス", "💻 WSLパス", "📦 Docker内パス"]))
+if mapping:
+    print(tabulate(mapping, headers=["📁 Git相対パス", "💻 WSLパス", "📦 Docker内パス"]))
+else:
+    print("⚠️ 一致するファイルが見つかりませんでした。VOLUME_MAPとファイル構成をご確認ください。")
