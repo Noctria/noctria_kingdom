@@ -2,7 +2,7 @@ FROM apache/airflow:2.9.1-python3.10
 
 USER root
 
-# ✅ システムパッケージのインストール（scikit-learn, lxml, pytorchなどに必要）
+# ✅ システム依存パッケージのインストール
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -17,10 +17,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 USER airflow
 
-# ✅ torch 導入（CPU版）＋ requirements.airflow.txt のインストール
-COPY requirements.airflow.txt /requirements.txt
+# ✅ 依存ライブラリをコピー（Airflow起動時に必要なAIモジュール群）
+COPY requirements.txt /requirements.txt
 
-RUN pip install --no-cache-dir --upgrade pip && \
+# ✅ torch（CPU版）およびその他パッケージをインストール
+RUN pip install --upgrade pip && \
     pip install --no-cache-dir \
         torch==2.2.2+cpu \
         --extra-index-url https://download.pytorch.org/whl/cpu && \
