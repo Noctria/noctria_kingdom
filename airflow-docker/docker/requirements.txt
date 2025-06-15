@@ -1,17 +1,26 @@
+# 🔮 AIライブラリ
 torch==2.2.2+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
 tensorflow==2.15.0
 tensorboard==2.15.1
+
+# 🎯 強化学習＆最適化
 optuna==3.6.1
 stable-baselines3==2.2.1
-gymnasium==0.29.1
-shimmy==1.3.0
+gymnasium==0.28.1         # ✅ 重要：2.2.1での互換性確保
+shimmy==1.2.0             # ✅ gymnasium==0.28.1に適合
+
+# 📊 データ分析
 pandas==2.3.0
 numpy==1.26.4
 scikit-learn==1.4.2
+statsmodels==0.14.1
+
+# 📈 市場・外部データ取得
 yfinance==0.2.62
-tqdm==4.67.1
+requests==2.31.0
 beautifulsoup4==4.12.3
 lxml==5.2.1
-requests==2.31.0
-statsmodels==0.14.1
+
+# 🔄 補助ツール
+tqdm==4.67.1
