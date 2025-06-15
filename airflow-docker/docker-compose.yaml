@@ -19,7 +19,7 @@ services:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__CORE__FERNET_KEY: "6LKqwTHAAeaA56VYt4BNLL236LhGagXYl2YMRzcXv3U="
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
