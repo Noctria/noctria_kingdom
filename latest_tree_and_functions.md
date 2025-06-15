@@ -1,3 +1,4 @@
+```plaintext
 noctria-kingdom/
 ├── airflow-docker/              # Airflow本体（Docker運用環境）
 │   ├── dags/                    # DAG定義ファイル群
@@ -38,3 +39,4 @@ noctria-kingdom/
 │
 ├── .gitignore
 └── README.md
+```
