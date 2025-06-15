@@ -6,7 +6,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from strategies.aurus_singularis import AurusSingularis
 
-# ✅ DAG設定
+# === DAG共通設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -19,15 +19,17 @@ default_args = {
 dag = DAG(
     dag_id='aurus_strategy_dag',
     default_args=default_args,
-    description='Noctria Kingdomの臣下Aurusによるトレンド解析DAG',
-    schedule_interval=None,  # 必要に応じてスケジュール設定
+    description='⚔️ Noctria Kingdomの戦術官Aurusによるトレンド解析DAG',
+    schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'trend-analysis'],
 )
 
+# === Aurusの任務関数 ===
 def aurus_strategy_task():
-    print("👑 王Noctria: Aurusよ、歴史の潮流を読み解き、我が王国を導け！")
+    print("👑 王Noctria: 『Aurusよ、時の波を読み、我らが未来を照らすのだ。』")
+    
     aurus = AurusSingularis()
     mock_market_data = {
         "price": 1.2345,
@@ -42,12 +44,13 @@ def aurus_strategy_task():
         "trend_prediction": 0.65,
         "liquidity_ratio": 1.1
     }
-    decision = aurus.process(mock_market_data)
-    print(f"🔮 Aurusの市場トレンド解析結果: {decision}")
 
+    decision = aurus.process(mock_market_data)
+    print(f"🔮 Aurus: 『王よ、我が洞察によれば…選ぶべき道は【{decision}】にございます。』")
+
+# === タスク登録 ===
 with dag:
     aurus_task = PythonOperator(
         task_id='aurus_trend_analysis_task',
         python_callable=aurus_strategy_task,
-        dag=dag,
     )
