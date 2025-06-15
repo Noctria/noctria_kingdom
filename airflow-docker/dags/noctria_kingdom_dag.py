@@ -1,7 +1,5 @@
-# /opt/airflow/dags/noctria_kingdom_dag.py
-
 import sys
-sys.path.append('/opt/airflow')  # Airflowからcore/やstrategies/を認識させる
+sys.path.append('/opt/airflow')
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -34,93 +32,65 @@ dag = DAG(
     tags=['noctria', 'kingdom'],
 )
 
-# === 各AIユニットのタスク定義 ===
+# 共通ロガー
+logger = setup_logger("NoctriaDecision")
 
-def aurus_task(**context):
-    logger = setup_logger("NoctriaDecision")
+# === 各戦略AI（臣下） ===
+
+def aurus_task(**kwargs):
     try:
-        aurus = AurusSingularis()
-        decision = aurus.process({"trend_strength": 0.6})
+        decision = AurusSingularis().process({"trend_strength": 0.6})
         logger.info(f"[Aurus] decision: {decision}")
-        context['ti'].xcom_push(key='aurus_decision', value=decision)
+        kwargs['ti'].xcom_push(key='aurus_decision', value=decision)
     except Exception as e:
-        logger.error(f"[Aurus] exception occurred: {e}")
+        logger.error(f"[Aurus] exception: {e}")
 
-def levia_task(**context):
-    logger = setup_logger("NoctriaDecision")
+def levia_task(**kwargs):
     try:
-        levia = LeviaTempest()
-        decision = levia.process({"price": 1.25, "spread": 0.01})
+        decision = LeviaTempest().process({"price": 1.25, "spread": 0.01})
         logger.info(f"[Levia] decision: {decision}")
-        context['ti'].xcom_push(key='levia_decision', value=decision)
+        kwargs['ti'].xcom_push(key='levia_decision', value=decision)
     except Exception as e:
-        logger.error(f"[Levia] exception occurred: {e}")
+        logger.error(f"[Levia] exception: {e}")
 
-def noctus_task(**context):
-    logger = setup_logger("NoctriaDecision")
+def noctus_task(**kwargs):
     try:
-        noctus = NoctusSentinella()
-        decision = noctus.process({"volume": 130, "spread": 0.012, "volatility": 0.2})
+        decision = NoctusSentinella().process({"volume": 130, "spread": 0.012, "volatility": 0.2})
         logger.info(f"[Noctus] decision: {decision}")
-        context['ti'].xcom_push(key='noctus_decision', value=decision)
+        kwargs['ti'].xcom_push(key='noctus_decision', value=decision)
     except Exception as e:
-        logger.error(f"[Noctus] exception occurred: {e}")
+        logger.error(f"[Noctus] exception: {e}")
 
-def prometheus_task(**context):
-    logger = setup_logger("NoctriaDecision")
+def prometheus_task(**kwargs):
     try:
-        prometheus = PrometheusOracle()
-        decision = prometheus.process({"macro_score": 0.75})
+        decision = PrometheusOracle().process({"macro_score": 0.75})
         logger.info(f"[Prometheus] decision: {decision}")
-        context['ti'].xcom_push(key='prometheus_decision', value=decision)
+        kwargs['ti'].xcom_push(key='prometheus_decision', value=decision)
     except Exception as e:
-        logger.error(f"[Prometheus] exception occurred: {e}")
+        logger.error(f"[Prometheus] exception: {e}")
 
-# === 王Noctriaによる統合判断タスク ===
+# === 王Noctriaによる統合判断 ===
 
-def noctria_final_decision(**context):
-    logger = setup_logger("NoctriaDecision")
-    ti = context['ti']
+def noctria_final_decision(**kwargs):
+    ti = kwargs['ti']
     decisions = {
         "Aurus": ti.xcom_pull(key='aurus_decision', task_ids='aurus_strategy'),
         "Levia": ti.xcom_pull(key='levia_decision', task_ids='levia_strategy'),
         "Noctus": ti.xcom_pull(key='noctus_decision', task_ids='noctus_strategy'),
         "Prometheus": ti.xcom_pull(key='prometheus_decision', task_ids='prometheus_strategy'),
     }
-
     logger.info(f"👑 王Noctriaが受け取った判断: {decisions}")
     noctria = Noctria()
     final_action = noctria.meta_ai.decide_final_action(decisions)
     logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")
 
-# === DAGにタスク登録 ===
+# === DAGへのタスク登録 ===
 
 with dag:
-    t1 = PythonOperator(
-        task_id='aurus_strategy',
-        python_callable=aurus_task,
-        provide_context=True,
-    )
-    t2 = PythonOperator(
-        task_id='levia_strategy',
-        python_callable=levia_task,
-        provide_context=True,
-    )
-    t3 = PythonOperator(
-        task_id='noctus_strategy',
-        python_callable=noctus_task,
-        provide_context=True,
-    )
-    t4 = PythonOperator(
-        task_id='prometheus_strategy',
-        python_callable=prometheus_task,
-        provide_context=True,
-    )
-    t5 = PythonOperator(
-        task_id='noctria_final_decision',
-        python_callable=noctria_final_decision,
-        provide_context=True,
-    )
+    t1 = PythonOperator(task_id='aurus_strategy', python_callable=aurus_task)
+    t2 = PythonOperator(task_id='levia_strategy', python_callable=levia_task)
+    t3 = PythonOperator(task_id='noctus_strategy', python_callable=noctus_task)
+    t4 = PythonOperator(task_id='prometheus_strategy', python_callable=prometheus_task)
+    t5 = PythonOperator(task_id='noctria_final_decision', python_callable=noctria_final_decision)
 
-    # すべての戦略が終わった後に王Noctriaが判断
     [t1, t2, t3, t4] >> t5
