@@ -1,6 +1,6 @@
 import os
 import logging
-from utils import setup_logger
+from core.utils import setup_logger
 
 def initialize_system():
     """Noctria Kingdomの初期設定を行う"""
