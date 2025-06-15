@@ -1,30 +1,40 @@
-# 📂 Noctria Kingdom - Airflow プロジェクト構成
-
-```
-/opt/airflow
-├── dags/                        # DAGスケジューラ関連
-│   ├── aurus_strategy_dag.py         # 📈 Aurusのトレンド戦略DAG
-│   ├── levia_strategy_dag.py         # ⚡ LeviaのスキャルピングDAG
-│   ├── noctus_strategy_dag.py        # 🛡️ Noctusのリスク管理DAG
-│   ├── prometheus_strategy_dag.py    # 🔮 Prometheusの予測DAG
-│   ├── meta_ai_dag.py                # 🧠 MetaAI (統合強化学習) のDAG
-│   ├── noctria_royal_dag.py          # 👑 王Noctriaの戦略判断DAG
-│   └── noctria_kingdom_dag.py        # 🏰 王国全体の調和・実行DAG
+noctria-kingdom/
+├── airflow-docker/              # Airflow本体（Docker運用環境）
+│   ├── dags/                    # DAG定義ファイル群
+│   ├── core/                    # Airflowから参照する戦略・ユーティリティ
+│   ├── data/                    # airflowが扱うデータ
+│   ├── docker/                  # Dockerfile, requirements
+│   ├── logs/                    # Airflowログ（マウント先）
+│   ├── plugins/                 # 必要ならカスタムプラグイン
+│   ├── scripts/                 # メタAIなど実行スクリプト
+│   ├── strategies/             # 各AI戦略（Airflow用）
+│   └── docker-compose.yaml
 │
-├── data/
-│   └── preprocessed_usdjpy_with_fundamental.csv  # USDJPYの前処理済みデータ
+├── noctria-core/                # Airflow外で動く学習・推論・EA群
+│   ├── core/                    # 共通AIユーティリティ
+│   ├── data/                    # 高頻度データ + ファンダメンタルなど
+│   ├── strategies/             # EAやAI戦略の中核
+│   ├── execution/              # 実行系（トレード、API連携）
+│   ├── optimization/           # Optunaなどの最適化コード
+│   ├── experts/                # MQL5のEAソース群
+│   ├── models/                 # 学習済みモデルの保存
+│   └── tests/                  # unittest + integration test
 │
-├── core/                       # 中核ロジック
-│   ├── meta_ai.py              # 🧠 MetaAI本体（PPO強化学習）
-│   ├── noctria.py              # 👑 Noctria王の統合戦略判断AI
-│   ├── risk_management.py      # リスク管理・異常検知ロジック
-│   └── central_bank_ai.py      # 🏛️ 中央銀行AI（ファンダ政策スコアリング）
+├── docs/                        # 技術ドキュメント・戦略解説
+│   ├── README.md
+│   └── strategy_manual.md
 │
-├── strategies/                 # 各戦略AIユニット
-│   ├── Aurus_Singularis.py     # 📈 トレンドAI（Aurus）
-│   ├── Levia_Tempest.py        # ⚡ スキャルピングAI（Levia）
-│   ├── Noctus_Sentinella.py    # 🛡️ リスクAI（Noctus）
-│   └── Prometheus_Oracle.py    # 🔮 ファンダ・予測AI（Prometheus）
+├── gui/                         # Noctria-GUI（分離して統合）
+│   ├── frontend/
+│   └── backend/
 │
-└── logs/                       # Airflowログ格納ディレクトリ
-```
+├── tools/                       # スクリプトや分析ツールなど
+│   ├── meta_ai_tensorboard_train.py
+│   ├── analyze_results.py
+│   └── ...
+│
+├── .secrets/                    # APIキーやkubeconfigなど（gitignore対象）
+│   └── kubeconfig_final.yaml
+│
+├── .gitignore
+└── README.md
