@@ -1,7 +1,12 @@
-FROM apache/airflow:2.9.1-python3.10
+# 初回ビルド（torch含む）
+cd airflow-docker
+docker compose build
 
-USER airflow
+# DB初期化
+docker compose up airflow-webserver airflow-scheduler postgres -d
+docker compose exec airflow-webserver airflow db init
 
-COPY requirements.airflow.txt /requirements.txt
-
-RUN pip install --no-cache-dir -r /requirements.txt
+# ユーザー作成（初回のみ）
+docker compose exec airflow-webserver airflow users create \
+  --username admin --firstname Noctria --lastname King \
+  --role Admin --email admin@example.com --password yourpassword
