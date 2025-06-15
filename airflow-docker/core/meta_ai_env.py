@@ -1,7 +1,7 @@
-# core/meta_ai_env.py
-
 import gym
 import numpy as np
+from typing import Tuple, Dict
+
 
 class MetaAIEnv(gym.Env):
     """
@@ -12,26 +12,29 @@ class MetaAIEnv(gym.Env):
     """
 
     def __init__(self):
-        super(MetaAIEnv, self).__init__()
+        super().__init__()
 
-        # ✅ 観測空間（例: 12次元の市場状態）
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(12,))
+        # ✅ 状態・行動空間
+        self.state_dim = 12
+        self.observation_space = gym.spaces.Box(
+            low=-np.inf, high=np.inf, shape=(self.state_dim,), dtype=np.float32
+        )
+        self.action_space = gym.spaces.Discrete(3)  # 0=SELL, 1=HOLD, 2=BUY
 
-        # ✅ 行動空間（例: 0=SELL, 1=HOLD, 2=BUY）
-        self.action_space = gym.spaces.Discrete(3)
+        self.reward_map = {0: -1.0, 1: 0.0, 2: 1.0}  # ✅ 行動別報酬マップ
 
         # ✅ 状態管理
         self.state = self._get_initial_state()
         self.current_step = 0
         self.max_steps = 1000
 
-    def _get_initial_state(self):
+    def _get_initial_state(self) -> np.ndarray:
         """
-        初期状態（ダミー: ランダムベクトル）を生成
+        初期状態を生成（ダミー: ランダムベクトル）
         """
-        return np.random.rand(12)
+        return np.random.rand(self.state_dim).astype(np.float32)
 
-    def reset(self):
+    def reset(self) -> np.ndarray:
         """
         環境のリセット
         """
@@ -39,31 +42,22 @@ class MetaAIEnv(gym.Env):
         self.current_step = 0
         return self.state
 
-    def step(self, action):
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         """
         行動を受け取り、次状態・報酬・終了判定・追加情報を返す
         """
-        # ✅ 簡易版: ランダムに次状態を生成
-        next_state = np.random.rand(12)
-
-        # ✅ 簡易版: 行動に応じた報酬（SELL=-1, HOLD=0, BUY=+1）
-        if action == 0:
-            reward = -1
-        elif action == 2:
-            reward = 1
-        else:
-            reward = 0
-
         self.current_step += 1
         done = self.current_step >= self.max_steps
 
-        # ✅ 状態更新
-        self.state = next_state
+        next_state = np.random.rand(self.state_dim).astype(np.float32) if not done else np.zeros(self.state_dim, dtype=np.float32)
 
+        reward = self.reward_map.get(action, 0.0)
+
+        self.state = next_state
         return next_state, reward, done, {}
 
-    def render(self, mode='human'):
+    def render(self, mode: str = 'human'):
         """
-        （オプション）環境の状態を可視化
+        環境の状態を可視化
         """
         print(f"Step: {self.current_step}, State: {self.state}")
