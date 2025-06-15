@@ -6,7 +6,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from strategies.noctus_sentinella import NoctusSentinella
 
-# ✅ DAG設定
+# === DAG設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -26,8 +26,10 @@ dag = DAG(
     tags=['noctria', 'risk_management'],
 )
 
+# === Noctusの戦略タスク ===
 def noctus_strategy_task():
-    print("👑 王Noctria: Noctus、リスク管理を任せるぞ。")
+    print("👑 王Noctria: Noctusよ、王国の資産を守るため、慎重かつ果断に動け。")
+    
     noctus = NoctusSentinella()
     mock_market_data = {
         "price": 1.2530,
@@ -37,9 +39,11 @@ def noctus_strategy_task():
         "order_block": 0.5,
         "volatility": 0.22
     }
+    
     decision = noctus.process(mock_market_data)
     print(f"🛡️ Noctusの決断: {decision}")
 
+# === DAGへのタスク登録 ===
 with dag:
     noctus_task = PythonOperator(
         task_id='noctus_risk_management_task',
