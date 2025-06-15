@@ -25,14 +25,14 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: /noctria_kingdom/airflow_docker/dags
       PYTHONPATH: /noctria_kingdom/airflow_docker
     volumes:
-      - /mnt/e/noctria-kingdom-main/airflow-docker/dags:/noctria_kingdom/airflow_docker/dags
-      - /mnt/e/noctria-kingdom-main/airflow-docker/logs:/noctria_kingdom/airflow_docker/logs
-      - /mnt/e/noctria-kingdom-main/airflow-docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - /mnt/e/noctria-kingdom-main/airflow-docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - /mnt/e/noctria-kingdom-main/airflow-docker/core:/noctria_kingdom/airflow_docker/core
-      - /mnt/e/noctria-kingdom-main/airflow-docker/strategies:/noctria_kingdom/airflow_docker/strategies
-      - /mnt/e/noctria-kingdom-main/airflow-docker/data:/noctria_kingdom/airflow_docker/data
-      - /mnt/e/noctria-kingdom-main/airflow-docker/models:/noctria_kingdom/airflow_docker/models
+      - /mnt/e/noctria-kingdom-main/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - /mnt/e/noctria-kingdom-main/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - /mnt/e/noctria-kingdom-main/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - /mnt/e/noctria-kingdom-main/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - /mnt/e/noctria-kingdom-main/airflow_docker/core:/noctria_kingdom/airflow_docker/core
+      - /mnt/e/noctria-kingdom-main/airflow_docker/strategies:/noctria_kingdom/airflow_docker/strategies
+      - /mnt/e/noctria-kingdom-main/airflow_docker/data:/noctria_kingdom/airflow_docker/data
+      - /mnt/e/noctria-kingdom-main/airflow_docker/models:/noctria_kingdom/airflow_docker/models
     ports:
       - "8080:8080"
     command: webserver
@@ -53,14 +53,14 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: /noctria_kingdom/airflow_docker/dags
       PYTHONPATH: /noctria_kingdom/airflow_docker
     volumes:
-      - /mnt/e/noctria-kingdom-main/airflow-docker/dags:/noctria_kingdom/airflow_docker/dags
-      - /mnt/e/noctria-kingdom-main/airflow-docker/logs:/noctria_kingdom/airflow_docker/logs
-      - /mnt/e/noctria-kingdom-main/airflow-docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - /mnt/e/noctria-kingdom-main/airflow-docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - /mnt/e/noctria-kingdom-main/airflow-docker/core:/noctria_kingdom/airflow_docker/core
-      - /mnt/e/noctria-kingdom-main/airflow-docker/strategies:/noctria_kingdom/airflow_docker/strategies
-      - /mnt/e/noctria-kingdom-main/airflow-docker/data:/noctria_kingdom/airflow_docker/data
-      - /mnt/e/noctria-kingdom-main/airflow-docker/models:/noctria_kingdom/airflow_docker/models
+      - /mnt/e/noctria-kingdom-main/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - /mnt/e/noctria-kingdom-main/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - /mnt/e/noctria-kingdom-main/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - /mnt/e/noctria-kingdom-main/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - /mnt/e/noctria-kingdom-main/airflow_docker/core:/noctria_kingdom/airflow_docker/core
+      - /mnt/e/noctria-kingdom-main/airflow_docker/strategies:/noctria_kingdom/airflow_docker/strategies
+      - /mnt/e/noctria-kingdom-main/airflow_docker/data:/noctria_kingdom/airflow_docker/data
+      - /mnt/e/noctria-kingdom-main/airflow_docker/models:/noctria_kingdom/airflow_docker/models
     command: scheduler
     restart: always
 
