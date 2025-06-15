@@ -6,7 +6,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from strategies.prometheus_oracle import PrometheusOracle
 
-# ✅ DAG設定
+# === DAG設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -26,8 +26,10 @@ dag = DAG(
     tags=['noctria', 'forecasting'],
 )
 
+# === Prometheus戦略タスク定義 ===
 def prometheus_strategy_task():
     print("👑 王Noctria: Prometheus、未来予測を託す！")
+    
     prometheus = PrometheusOracle()
     mock_market_data = {
         "price": 1.2345,
@@ -42,16 +44,20 @@ def prometheus_strategy_task():
         "trend_prediction": 0.6,
         "liquidity_ratio": 1.2
     }
+    
     forecast = prometheus.predict_market(mock_market_data)
     print(f"🔮 Prometheusの予測: {forecast:.4f}")
+    
     if forecast > 0.6:
         decision = "BUY"
     elif forecast < 0.4:
         decision = "SELL"
     else:
         decision = "HOLD"
+    
     print(f"⚔️ Prometheusの戦略判断: {decision}")
 
+# === DAGへ登録 ===
 with dag:
     prometheus_task = PythonOperator(
         task_id='prometheus_forecast_task',
