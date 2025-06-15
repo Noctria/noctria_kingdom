@@ -32,7 +32,7 @@ services:
       - /mnt/e/noctria-kingdom-main/airflow-docker/scripts:/opt/noctria/scripts
       - /mnt/e/noctria-kingdom-main/core:/opt/noctria/core
       - /mnt/e/noctria-kingdom-main/strategies:/opt/noctria/strategies
-      - /mnt/e/noctria-kingdom-main/data:/opt/noctria/data
+      - /mnt/e/noctria-kingdom-main/data:/opt/airflow/data
       - /mnt/e/noctria-kingdom-main/models:/opt/noctria/models
     ports:
       - "8080:8080"
