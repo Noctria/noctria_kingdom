@@ -6,6 +6,7 @@ tensorboard==2.15.1
 
 # 🏹 強化学習・戦略最適化
 optuna==3.6.1
+psycopg2-binary
 stable-baselines3==2.2.1
 gymnasium==0.28.1           # ✅ sb3 2.2.1 と互換性確保
 shimmy==1.2.0               # ✅ gymnasium 0.28.1 用依存
