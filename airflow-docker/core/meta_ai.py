@@ -1,18 +1,19 @@
 import gymnasium as gym
 import numpy as np
 import pandas as pd
+from typing import Tuple, Dict
 
 from strategies.reward import calculate_reward
 from institutions.central_bank_ai import CentralBankAI
+
 
 class MetaAI(gym.Env):
     """
     MetaAI: 各戦略AIを統合し、強化学習による自己進化を行う環境
     """
 
-    def __init__(self, strategy_agents, data_path="/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", verbose=False):
+    def __init__(self, strategy_agents: Dict, data_path: str = "/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", verbose: bool = False):
         super().__init__()
-
         self.strategy_agents = strategy_agents
         self.central_bank = CentralBankAI()
         self.verbose = verbose
@@ -31,24 +32,29 @@ class MetaAI(gym.Env):
         )
         self.action_space = gym.spaces.Discrete(3)  # 0: HOLD, 1: BUY, 2: SELL
 
-        # ✅ トレード統計
+        # ✅ 統計初期化
+        self._reset_stats()
+
+    def _reset_stats(self):
         self.trade_history = []
         self.max_drawdown = 0.0
         self.wins = 0
         self.trades = 0
 
-    def step(self, action):
+    def _simulate_profit(self) -> float:
+        return np.random.uniform(-5, 5)  # TODO: 本番ではシミュレータ or EA結果に置換
+
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         self.current_step += 1
         done = self.current_step >= len(self.data) - 1
 
         if done:
-            obs = np.zeros(self.data.shape[1], dtype=np.float32)
-            return obs, 0.0, done, {}
+            return np.zeros(self.data.shape[1], dtype=np.float32), 0.0, done, {}
 
         obs = self.data.iloc[self.current_step].values.astype(np.float32)
 
-        # ✅ 模擬利益
-        profit = np.random.uniform(-5, 5)
+        # ✅ 利益（シミュレーション）
+        profit = self._simulate_profit()
         self.trade_history.append(profit)
 
         # ✅ 統計更新
@@ -61,7 +67,7 @@ class MetaAI(gym.Env):
         win_rate = self.wins / self.trades if self.trades > 0 else 0.0
         recent_profits = self.trade_history[-10:]
 
-        # ✅ ファンダメンタル情報
+        # ✅ ファンダメンタル取得
         current_row = self.data.iloc[self.current_step]
         fundamentals = {
             "cpi": current_row.get("cpi", 0.0),
@@ -70,7 +76,7 @@ class MetaAI(gym.Env):
         }
         cb_score = self.central_bank.get_policy_score(fundamentals)
 
-        # ✅ カスタム報酬計算
+        # ✅ 報酬計算
         reward = calculate_reward(
             profit=profit,
             drawdown=-self.max_drawdown,
@@ -87,19 +93,14 @@ class MetaAI(gym.Env):
 
         return obs, reward, done, {}
 
-    def reset(self):
+    def reset(self) -> np.ndarray:
         self.current_step = 0
-        self.trade_history.clear()
-        self.max_drawdown = 0.0
-        self.wins = 0
-        self.trades = 0
+        self._reset_stats()
+        return self.data.iloc[self.current_step].values.astype(np.float32)
 
-        obs = self.data.iloc[self.current_step].values.astype(np.float32)
-        return obs
-
-    def decide_final_action(self, market_state):
+    def decide_final_action(self, market_state: pd.Series) -> int:
         """
-        戦略AI群から多数決で最終アクション決定（リアル運用時用）
+        戦略AI群から多数決で最終アクション決定（リアル運用用）
         """
         strategy_actions = {
             name: agent.process(market_state)
