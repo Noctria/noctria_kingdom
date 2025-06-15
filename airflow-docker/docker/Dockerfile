@@ -1,12 +1,18 @@
-# 初回ビルド（torch含む）
-cd airflow-docker
-docker compose build
+FROM apache/airflow:2.9.1-python3.10
 
-# DB初期化
-docker compose up airflow-webserver airflow-scheduler postgres -d
-docker compose exec airflow-webserver airflow db init
+USER root
+# 必要なシステムパッケージ（scikit-learnやlxmlなどに必要）
+RUN apt-get update && apt-get install -y \
+    gcc g++ libpq-dev build-essential \
+    libxml2-dev libxslt1-dev zlib1g-dev
 
-# ユーザー作成（初回のみ）
-docker compose exec airflow-webserver airflow users create \
-  --username admin --firstname Noctria --lastname King \
-  --role Admin --email admin@example.com --password yourpassword
+USER airflow
+
+# torch は pip install に特殊オプションが必要なため Dockerfileで個別に
+COPY requirements.airflow.txt /requirements.txt
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+        torch==2.2.2+cpu \
+        --extra-index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r /requirements.txt
