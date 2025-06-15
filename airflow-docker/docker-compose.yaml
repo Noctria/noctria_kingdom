@@ -26,7 +26,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       PYTHONPATH: /opt/airflow:/opt/noctria
     volumes:
-      - /mnt/e/noctria-kingdom-main/airflow-docker/dags:/opt/airflow/dags
+      - /mnt/e/noctria-kingdom-main/airflow-docker/dags:/noctria-kingdom/airflow-docker/dags
       - /mnt/e/noctria-kingdom-main/airflow-docker/logs:/opt/airflow/logs
       - /mnt/e/noctria-kingdom-main/airflow-docker/plugins:/opt/airflow/plugins
       - /mnt/e/noctria-kingdom-main/airflow-docker/scripts:/opt/noctria/scripts
