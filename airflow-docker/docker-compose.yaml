@@ -12,10 +12,9 @@ services:
     restart: always
 
   airflow-webserver:
-    image: airflow-docker-airflow-webserver
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./docker
+    image: noctria-airflow
     depends_on:
       - postgres
     environment:
@@ -25,23 +24,24 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /opt/airflow
+      PYTHONPATH: /opt/airflow:/opt/noctria
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ~/.kube:/home/airflow/.kube               # ✅ kubeconfigのマウント
-      - ./pod_templates:/opt/airflow/pod_templates  # ✅ gpu_job.yamlのマウント
+      - ../core:/opt/noctria/core
+      - ../strategies:/opt/noctria/strategies
+      - ../data:/opt/noctria/data
+      - ../models:/opt/noctria/models
     ports:
       - "8080:8080"
     command: webserver
     restart: always
 
   airflow-scheduler:
-    image: airflow-docker-airflow-scheduler
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./docker
+    image: noctria-airflow
     depends_on:
       - postgres
     environment:
@@ -50,13 +50,15 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "YOUR_FERNET_KEY"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /opt/airflow
+      PYTHONPATH: /opt/airflow:/opt/noctria
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ~/.kube:/home/airflow/.kube
-      - ./pod_templates:/opt/airflow/pod_templates  # ✅ gpu_job.yamlのマウント
+      - ../core:/opt/noctria/core
+      - ../strategies:/opt/noctria/strategies
+      - ../data:/opt/noctria/data
+      - ../models:/opt/noctria/models
     command: scheduler
     restart: always
 
