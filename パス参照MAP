@@ -1,19 +1,41 @@
-📘 Noctria Kingdom – パス参照マップ（抜粋表示 / Markdown整形版）
-📁 Git相対パス	💻 WSLパス	📦 Docker内パス
-core/config.yaml	/mnt/e/noctria-kingdom-main/core/config.yaml	/opt/noctria/core/config.yaml
-core/logger.py	/mnt/e/noctria-kingdom-main/core/logger.py	/opt/noctria/core/logger.py
-core/meta_ai_env_with_fundamentals.py	/mnt/e/noctria-kingdom-main/core/meta_ai_env_with_fundamentals.py	/opt/noctria/core/meta_ai_env_with_fundamentals.py
-data/preprocessed_usdjpy_with_fundamental.csv	/mnt/e/noctria-kingdom-main/data/preprocessed_usdjpy_with_fundamental.csv	/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv
-scripts/generate_path_mapping.py	/mnt/e/noctria-kingdom-main/scripts/generate_path_mapping.py	/opt/noctria/scripts/generate_path_mapping.py
-logs/ppo_tensorboard_logs/PPO_1/events.out.tfevents...	/mnt/e/noctria-kingdom-main/logs/ppo_tensorboard_logs/PPO_1/events.out...	/opt/airflow/logs/ppo_tensorboard_logs/PPO_1/events.out...
-strategies/NoctriaMasterAI.py	/mnt/e/noctria-kingdom-main/strategies/NoctriaMasterAI.py	/opt/noctria/strategies/NoctriaMasterAI.py
-strategies/reinforcement/reinforcement_learning.py	/mnt/e/noctria-kingdom-main/strategies/reinforcement/reinforcement_learning.py	/opt/noctria/strategies/reinforcement/reinforcement_learning.py
+# 📘 Noctria Kingdom – パス参照マップ（Git / WSL / Docker）
 
-🔎 表は抜粋で表示していますが、全量出力も .md や .csv に保存可能です。
+この表は、`noctria-kingdom-main` プロジェクトに含まれるファイルが、  
+それぞれ Git 管理下の相対パス、WSL環境上の絶対パス、Dockerコンテナ内のマウント先としてどう対応しているかを示したものです。
 
-📦 次なる対応案（必要なら）
-対応案	説明
-path_mapping.md に保存	この表を Markdown ファイルとして保存し、リポジトリに追加可能
-path_mapping.csv に保存	Excel 等でのフィルタリングが容易な形式でも提供可能
-不要ファイルの除外	__pycache__, .pyc, events.out.* をマッピング対象から除外可能
-Airflow用 DAG から出力	DAG実行ログ内にこの一覧を出力して、毎日自動監査も可能
+| 📁 Git相対パス | 💻 WSLパス | 📦 Docker内パス |
+|----------------|------------|-----------------|
+| core/config.yaml | /mnt/e/noctria-kingdom-main/core/config.yaml | /opt/noctria/core/config.yaml |
+| core/logger.py | /mnt/e/noctria-kingdom-main/core/logger.py | /opt/noctria/core/logger.py |
+| core/meta_ai_env_with_fundamentals.py | /mnt/e/noctria-kingdom-main/core/meta_ai_env_with_fundamentals.py | /opt/noctria/core/meta_ai_env_with_fundamentals.py |
+| data/preprocessed_usdjpy_with_fundamental.csv | /mnt/e/noctria-kingdom-main/data/preprocessed_usdjpy_with_fundamental.csv | /opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv |
+| scripts/generate_path_mapping.py | /mnt/e/noctria-kingdom-main/scripts/generate_path_mapping.py | /opt/noctria/scripts/generate_path_mapping.py |
+| logs/ppo_tensorboard_logs/PPO_1/events.out.tfevents... | /mnt/e/noctria-kingdom-main/logs/ppo_tensorboard_logs/PPO_1/events.out.tfevents... | /opt/airflow/logs/ppo_tensorboard_logs/PPO_1/events.out.tfevents... |
+| strategies/NoctriaMasterAI.py | /mnt/e/noctria-kingdom-main/strategies/NoctriaMasterAI.py | /opt/noctria/strategies/NoctriaMasterAI.py |
+| strategies/reinforcement/reinforcement_learning.py | /mnt/e/noctria-kingdom-main/strategies/reinforcement/reinforcement_learning.py | /opt/noctria/strategies/reinforcement/reinforcement_learning.py |
+
+> 🔎 `...` は長いファイル名の省略です。完全な一覧はスクリプト実行結果に含まれています。
+
+---
+
+## 🛡️ マウント構成概要（補足）
+
+| マウント元（WSL） | マウント先（Docker） | 説明 |
+|------------------|---------------------|------|
+| `core/` | `/opt/noctria/core` | AI本体コード |
+| `data/` | `/opt/airflow/data` | 学習用データ・外部指標CSV等 |
+| `strategies/` | `/opt/noctria/strategies` | モジュール別戦略ロジック |
+| `logs/` | `/opt/airflow/logs` | 学習ログ・トレード履歴 |
+| `scripts/` | `/opt/noctria/scripts` | 実行スクリプト・DAG連携処理 |
+
+---
+
+## 🧭 用途
+
+- ✅ デバッグ時のパス照合
+- ✅ Airflowエラー原因の即時特定
+- ✅ DAG開発・Docker再構築時の確認
+- ✅ GitHub READMEへの構成補足情報として添付
+
+---
+
