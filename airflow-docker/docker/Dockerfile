@@ -1,14 +1,23 @@
 FROM apache/airflow:2.9.1-python3.10
 
 USER root
-# 必要なシステムパッケージ（scikit-learnやlxmlなどに必要）
-RUN apt-get update && apt-get install -y \
-    gcc g++ libpq-dev build-essential \
-    libxml2-dev libxslt1-dev zlib1g-dev
+
+# ✅ システムパッケージのインストール（scikit-learn, lxml, pytorchなどに必要）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    build-essential \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 USER airflow
 
-# torch は pip install に特殊オプションが必要なため Dockerfileで個別に
+# ✅ torch 導入（CPU版）＋ requirements.airflow.txt のインストール
 COPY requirements.airflow.txt /requirements.txt
 
 RUN pip install --no-cache-dir --upgrade pip && \
