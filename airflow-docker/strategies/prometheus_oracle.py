@@ -3,24 +3,24 @@ import pandas as pd
 import tensorflow as tf
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
+from core.logger import setup_logger  # 👑 ロガーを導入
 
 class PrometheusOracle:
-    """市場予測を行うAI（ヒストリカルデータ利用版・MetaAI改修版）"""
+    """🔮 市場予測を行うAI（ヒストリカルデータ利用版・MetaAI改修版）"""
 
     def __init__(self):
+        self.logger = setup_logger("PrometheusLogger", "/opt/airflow/logs/PrometheusLogger.log")
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher()
 
-        # ✅ ヒストリカルデータ取得（1時間足・1ヶ月分）
         data_array = self.market_fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")
         if data_array is None:
-            print("⚠️ データ取得失敗。ダミーデータで初期化します")
+            self.logger.warning("⚠️ データ取得失敗。ダミーデータで初期化します")
             data_array = np.random.normal(loc=100, scale=5, size=(100, 5))
 
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
 
-        # ✅ RiskManagementに渡す
         self.risk_manager = RiskManagement(historical_data=historical_data)
 
     def _build_model(self):
@@ -35,32 +35,33 @@ class PrometheusOracle:
         return model
 
     def process(self, market_data):
-        """市場データを分析し、未来の市場予測スコアを返す"""
-        forecast = self.predict_market(market_data)
-        if forecast > 0.6:
-            return "BUY"
-        elif forecast < 0.4:
-            return "SELL"
+        """市場データを分析し、未来の市場予測スコアに基づき判断"""
+        score = self.predict_market(market_data)
+
+        if score > 0.6:
+            decision = "BUY"
+        elif score < 0.4:
+            decision = "SELL"
         else:
-            return "HOLD"
+            decision = "HOLD"
+
+        self.logger.info(f"🔮 Prometheus: 予測スコア = {score:.4f} ➜ 決断: {decision}")
+        return decision
 
     def predict_market(self, market_data):
-        """LSTMモデルなどを用いた未来市場スコアを返す例"""
+        """MLPモデルによる未来市場スコア予測"""
         processed_data = self._preprocess_data(market_data)
         prediction = self.model.predict(processed_data, verbose=0)
+        self.logger.info(f"📈 Prometheus予測: 入力 = {market_data}, 出力 = {prediction[0][0]:.4f}")
         return float(prediction)
 
     def _preprocess_data(self, market_data):
-        """
-        市場データの前処理
-        ➜ 万一 market_data が list で渡された場合の防御対応
-        ➜ キーが無い場合は0.0でデフォルト埋め
-        """
+        """市場データの前処理（防御処理付き）"""
         if not isinstance(market_data, dict):
-            print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
+            self.logger.warning("⚠️ market_dataがlistなどで渡されたため空辞書に置換")
             market_data = {}
 
-        return np.array([
+        return np.array([[
             market_data.get("price", 0.0),
             market_data.get("volume", 0.0),
             market_data.get("sentiment", 0.0),
@@ -72,10 +73,10 @@ class PrometheusOracle:
             market_data.get("momentum", 0.0),
             market_data.get("trend_prediction", 0.0),
             market_data.get("liquidity_ratio", 0.0),
-            1  # バイアス項などの追加特徴量
-        ]).reshape(1, -1)
+            1.0  # バイアス項
+        ]])
 
-# ✅ 改修後の市場予測テスト
+# ✅ テスト用ブロック
 if __name__ == "__main__":
     oracle = PrometheusOracle()
     mock_market_data = {
@@ -85,4 +86,4 @@ if __name__ == "__main__":
         "liquidity_ratio": 1.2
     }
     forecast = oracle.predict_market(mock_market_data)
-    print("Market Forecast:", forecast)
+    print(f"🔮 Prometheusの市場予測スコア: {forecast:.4f}")
