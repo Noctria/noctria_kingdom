@@ -33,7 +33,7 @@ dag = DAG(
 )
 
 # 共通ロガー
-logger = setup_logger(""NoctriaDecision", "/noctria_kingdom/airflow_docker/logs/noctria_decision.log"")
+logger = setup_logger("NoctriaDecision", "/noctria_kingdom/airflow_docker/logs/noctria_decision.log")
 
 # === 各戦略AI（臣下） ===
 
