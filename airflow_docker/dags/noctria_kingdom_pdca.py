@@ -24,23 +24,23 @@ with DAG(
     # 🛡️ 最適化ワーカーたち（王国の戦略軍団）
     optimize_worker_1 = BashOperator(
         task_id="optimize_worker_1",
-        bash_command="python3 /opt/noctria/scripts/optimize_params_with_optuna.py"
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py"
     )
 
     optimize_worker_2 = BashOperator(
         task_id="optimize_worker_2",
-        bash_command="python3 /opt/noctria/scripts/optimize_params_with_optuna.py"
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py"
     )
 
     optimize_worker_3 = BashOperator(
         task_id="optimize_worker_3",
-        bash_command="python3 /opt/noctria/scripts/optimize_params_with_optuna.py"
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py"
     )
 
     # 👑 Leviaが最適戦略を王国に奏上
     apply_best_params = BashOperator(
         task_id="apply_best_params",
-        bash_command="python3 /opt/noctria/scripts/apply_best_params.py"
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py"
     )
 
     # 🧩 流れ：並列最適化 → 集約 → 適用
