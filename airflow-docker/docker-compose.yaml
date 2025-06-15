@@ -26,14 +26,14 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       PYTHONPATH: /opt/airflow:/opt/noctria
     volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./scripts:/opt/noctria/scripts            # ✅ scripts をマウント
-      - ../core:/opt/noctria/core
-      - ../strategies:/opt/noctria/strategies
-      - ../data:/opt/noctria/data
-      - ../models:/opt/noctria/models
+      - /mnt/e/noctria-kingdom-main/airflow-docker/dags:/opt/airflow/dags
+      - /mnt/e/noctria-kingdom-main/airflow-docker/logs:/opt/airflow/logs
+      - /mnt/e/noctria-kingdom-main/airflow-docker/plugins:/opt/airflow/plugins
+      - /mnt/e/noctria-kingdom-main/airflow-docker/scripts:/opt/noctria/scripts
+      - /mnt/e/noctria-kingdom-main/core:/opt/noctria/core
+      - /mnt/e/noctria-kingdom-main/strategies:/opt/noctria/strategies
+      - /mnt/e/noctria-kingdom-main/data:/opt/noctria/data
+      - /mnt/e/noctria-kingdom-main/models:/opt/noctria/models
     ports:
       - "8080:8080"
     command: webserver
@@ -53,14 +53,14 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       PYTHONPATH: /opt/airflow:/opt/noctria
     volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./scripts:/opt/noctria/scripts            # ✅ scripts をマウント
-      - ../core:/opt/noctria/core
-      - ../strategies:/opt/noctria/strategies
-      - ../data:/opt/noctria/data
-      - ../models:/opt/noctria/models
+      - /mnt/e/noctria-kingdom-main/airflow-docker/dags:/opt/airflow/dags
+      - /mnt/e/noctria-kingdom-main/airflow-docker/logs:/opt/airflow/logs
+      - /mnt/e/noctria-kingdom-main/airflow-docker/plugins:/opt/airflow/plugins
+      - /mnt/e/noctria-kingdom-main/airflow-docker/scripts:/opt/noctria/scripts
+      - /mnt/e/noctria-kingdom-main/core:/opt/noctria/core
+      - /mnt/e/noctria-kingdom-main/strategies:/opt/noctria/strategies
+      - /mnt/e/noctria-kingdom-main/data:/opt/noctria/data
+      - /mnt/e/noctria-kingdom-main/models:/opt/noctria/models
     command: scheduler
     restart: always
 
