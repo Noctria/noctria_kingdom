@@ -55,3 +55,4 @@ kubeconfig_final.yaml
 # Helmのテンポラリ（必要に応じて）
 *.tgz
 .cache/
+home/
