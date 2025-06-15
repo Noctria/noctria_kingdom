@@ -1,0 +1,19 @@
+📘 Noctria Kingdom – パス参照マップ（抜粋表示 / Markdown整形版）
+📁 Git相対パス	💻 WSLパス	📦 Docker内パス
+core/config.yaml	/mnt/e/noctria-kingdom-main/core/config.yaml	/opt/noctria/core/config.yaml
+core/logger.py	/mnt/e/noctria-kingdom-main/core/logger.py	/opt/noctria/core/logger.py
+core/meta_ai_env_with_fundamentals.py	/mnt/e/noctria-kingdom-main/core/meta_ai_env_with_fundamentals.py	/opt/noctria/core/meta_ai_env_with_fundamentals.py
+data/preprocessed_usdjpy_with_fundamental.csv	/mnt/e/noctria-kingdom-main/data/preprocessed_usdjpy_with_fundamental.csv	/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv
+scripts/generate_path_mapping.py	/mnt/e/noctria-kingdom-main/scripts/generate_path_mapping.py	/opt/noctria/scripts/generate_path_mapping.py
+logs/ppo_tensorboard_logs/PPO_1/events.out.tfevents...	/mnt/e/noctria-kingdom-main/logs/ppo_tensorboard_logs/PPO_1/events.out...	/opt/airflow/logs/ppo_tensorboard_logs/PPO_1/events.out...
+strategies/NoctriaMasterAI.py	/mnt/e/noctria-kingdom-main/strategies/NoctriaMasterAI.py	/opt/noctria/strategies/NoctriaMasterAI.py
+strategies/reinforcement/reinforcement_learning.py	/mnt/e/noctria-kingdom-main/strategies/reinforcement/reinforcement_learning.py	/opt/noctria/strategies/reinforcement/reinforcement_learning.py
+
+🔎 表は抜粋で表示していますが、全量出力も .md や .csv に保存可能です。
+
+📦 次なる対応案（必要なら）
+対応案	説明
+path_mapping.md に保存	この表を Markdown ファイルとして保存し、リポジトリに追加可能
+path_mapping.csv に保存	Excel 等でのフィルタリングが容易な形式でも提供可能
+不要ファイルの除外	__pycache__, .pyc, events.out.* をマッピング対象から除外可能
+Airflow用 DAG から出力	DAG実行ログ内にこの一覧を出力して、毎日自動監査も可能
