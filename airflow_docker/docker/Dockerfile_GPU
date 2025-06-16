@@ -1,0 +1,49 @@
+# ✅ GPU対応ベースイメージ（TensorFlow + Python 3.10）
+FROM tensorflow/tensorflow:2.14.0-gpu
+
+# root権限でのパッケージ導入
+USER root
+
+# ✅ システム依存パッケージのインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    build-essential \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    curl \
+    git \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ✅ Airflow + その他ライブラリのインストール
+RUN pip install --upgrade pip
+
+# 🎯 Airflowは2.9.1（Python3.10）対応版を制約付きで導入
+RUN pip install apache-airflow==2.9.1 \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.1/constraints-3.10.txt"
+
+# ✅ AI関連ライブラリ（GPU版PyTorch + Optunaなど）
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 && \
+    pip install optuna stable-baselines3 pandas numpy matplotlib
+
+# ✅ requirements.txt があれば一括反映（プロジェクト独自ライブラリ）
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt || echo "requirements.txt は省略可能"
+
+# ✅ DAGやスクリプトなどを配置（必要に応じて調整）
+WORKDIR /opt/airflow
+COPY dags/ dags/
+COPY scripts/ scripts/
+COPY core/ core/
+COPY strategies/ strategies/
+
+# airflowユーザとして実行
+RUN useradd -ms /bin/bash airflow
+USER airflow
+
+# デフォルトCMD（docker-composeでオーバーライドされる前提）
+CMD ["airflow", "version"]
