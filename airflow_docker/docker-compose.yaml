@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   postgres:
     image: postgres:13
@@ -17,23 +19,24 @@ services:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__WEBSERVER__RBAC: "True"
-      AIRFLOW__CORE__FERNET_KEY: "6LKqwTHAAeaA56VYt4BNLL236LhGagXYl2YMRzcXv3U="
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__DAGS_FOLDER: /noctria_kingdom/airflow_docker/dags
-      PYTHONPATH: /noctria_kingdom/airflow_docker
+      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
+      PYTHONPATH: ${PYTHONPATH}
     volumes:
-      - /mnt/e/noctria-kingdom-main/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
-      - /mnt/e/noctria-kingdom-main/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
-      - /mnt/e/noctria-kingdom-main/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - /mnt/e/noctria-kingdom-main/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - /mnt/e/noctria-kingdom-main/airflow_docker/core:/noctria_kingdom/airflow_docker/core
-      - /mnt/e/noctria-kingdom-main/airflow_docker/strategies:/noctria_kingdom/airflow_docker/strategies
-      - /mnt/e/noctria-kingdom-main/airflow_docker/data:/noctria_kingdom/airflow_docker/data
-      - /mnt/e/noctria-kingdom-main/airflow_docker/models:/noctria_kingdom/airflow_docker/models
-      - /mnt/e/noctria-kingdom-main/airflow_docker/institutions:/noctria_kingdom/airflow_docker/institutions
+      - ./dags:/noctria_kingdom/airflow_docker/dags
+      - ./logs:/noctria_kingdom/airflow_docker/logs
+      - ./plugins:/noctria_kingdom/airflow_docker/plugins
+      - ./scripts:/noctria_kingdom/airflow_docker/scripts
+      - ./core:/noctria_kingdom/airflow_docker/core
+      - ./strategies:/noctria_kingdom/airflow_docker/strategies
+      - ./data:/noctria_kingdom/airflow_docker/data
+      - ./models:/noctria_kingdom/airflow_docker/models
+      - ./institutions:/noctria_kingdom/airflow_docker/institutions
     ports:
       - "8080:8080"
     command: webserver
@@ -47,22 +50,22 @@ services:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: "6LKqwTHAAeaA56VYt4BNLL236LhGagXYl2YMRzcXv3U="
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__DAGS_FOLDER: /noctria_kingdom/airflow_docker/dags
-      PYTHONPATH: /noctria_kingdom/airflow_docker
+      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
+      PYTHONPATH: ${PYTHONPATH}
     volumes:
-      - /mnt/e/noctria-kingdom-main/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
-      - /mnt/e/noctria-kingdom-main/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
-      - /mnt/e/noctria-kingdom-main/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - /mnt/e/noctria-kingdom-main/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - /mnt/e/noctria-kingdom-main/airflow_docker/core:/noctria_kingdom/airflow_docker/core
-      - /mnt/e/noctria-kingdom-main/airflow_docker/strategies:/noctria_kingdom/airflow_docker/strategies
-      - /mnt/e/noctria-kingdom-main/airflow_docker/data:/noctria_kingdom/airflow_docker/data
-      - /mnt/e/noctria-kingdom-main/airflow_docker/models:/noctria_kingdom/airflow_docker/models
-      - /mnt/e/noctria-kingdom-main/airflow_docker/institutions:/noctria_kingdom/airflow_docker/institutions
+      - ./dags:/noctria_kingdom/airflow_docker/dags
+      - ./logs:/noctria_kingdom/airflow_docker/logs
+      - ./plugins:/noctria_kingdom/airflow_docker/plugins
+      - ./scripts:/noctria_kingdom/airflow_docker/scripts
+      - ./core:/noctria_kingdom/airflow_docker/core
+      - ./strategies:/noctria_kingdom/airflow_docker/strategies
+      - ./data:/noctria_kingdom/airflow_docker/data
+      - ./models:/noctria_kingdom/airflow_docker/models
+      - ./institutions:/noctria_kingdom/airflow_docker/institutions
     command: scheduler
     restart: always
 
