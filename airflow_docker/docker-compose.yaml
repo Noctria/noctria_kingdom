@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   postgres:
     image: postgres:13
@@ -25,6 +27,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
       PYTHONPATH: ${PYTHONPATH}
+      USDJPY_RAW_CSV_PATH: ${USDJPY_RAW_CSV_PATH}  # ✅ 必要に応じて追記
     volumes:
       - ${HOST_DAGS_PATH}:${AIRFLOW__CORE__DAGS_FOLDER}
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
@@ -54,6 +57,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
       PYTHONPATH: ${PYTHONPATH}
+      USDJPY_RAW_CSV_PATH: ${USDJPY_RAW_CSV_PATH}  # ✅ 必要に応じて追記
     volumes:
       - ${HOST_DAGS_PATH}:${AIRFLOW__CORE__DAGS_FOLDER}
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
