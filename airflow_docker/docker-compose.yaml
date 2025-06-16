@@ -3,6 +3,7 @@ version: "3.8"
 services:
   postgres:
     image: postgres:13
+    env_file: .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -17,17 +18,12 @@ services:
     image: noctria-airflow
     depends_on:
       - postgres
+    env_file: .env  # ✅ ここを追加
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__WEBSERVER__RBAC: "True"
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
-      PYTHONPATH: ${PYTHONPATH}
-      USDJPY_RAW_CSV_PATH: ${USDJPY_RAW_CSV_PATH}  # ✅ 必要に応じて追記
     volumes:
       - ${HOST_DAGS_PATH}:${AIRFLOW__CORE__DAGS_FOLDER}
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
@@ -49,15 +45,11 @@ services:
     image: noctria-airflow
     depends_on:
       - postgres
+    env_file: .env  # ✅ ここを追加
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
-      PYTHONPATH: ${PYTHONPATH}
-      USDJPY_RAW_CSV_PATH: ${USDJPY_RAW_CSV_PATH}  # ✅ 必要に応じて追記
     volumes:
       - ${HOST_DAGS_PATH}:${AIRFLOW__CORE__DAGS_FOLDER}
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
