@@ -1,12 +1,10 @@
-version: "3"
-
 services:
   postgres:
     image: postgres:13
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     restart: always
@@ -28,15 +26,15 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
       PYTHONPATH: ${PYTHONPATH}
     volumes:
-      - ./dags:/noctria_kingdom/airflow_docker/dags
-      - ./logs:/noctria_kingdom/airflow_docker/logs
-      - ./plugins:/noctria_kingdom/airflow_docker/plugins
-      - ./scripts:/noctria_kingdom/airflow_docker/scripts
-      - ./core:/noctria_kingdom/airflow_docker/core
-      - ./strategies:/noctria_kingdom/airflow_docker/strategies
-      - ./data:/noctria_kingdom/airflow_docker/data
-      - ./models:/noctria_kingdom/airflow_docker/models
-      - ./institutions:/noctria_kingdom/airflow_docker/institutions
+      - ${HOST_DAGS_PATH}:${AIRFLOW__CORE__DAGS_FOLDER}
+      - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
+      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
+      - ${HOST_CORE_PATH}:/noctria_kingdom/airflow_docker/core
+      - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/airflow_docker/strategies
+      - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
+      - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
+      - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
     ports:
       - "8080:8080"
     command: webserver
@@ -57,15 +55,15 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
       PYTHONPATH: ${PYTHONPATH}
     volumes:
-      - ./dags:/noctria_kingdom/airflow_docker/dags
-      - ./logs:/noctria_kingdom/airflow_docker/logs
-      - ./plugins:/noctria_kingdom/airflow_docker/plugins
-      - ./scripts:/noctria_kingdom/airflow_docker/scripts
-      - ./core:/noctria_kingdom/airflow_docker/core
-      - ./strategies:/noctria_kingdom/airflow_docker/strategies
-      - ./data:/noctria_kingdom/airflow_docker/data
-      - ./models:/noctria_kingdom/airflow_docker/models
-      - ./institutions:/noctria_kingdom/airflow_docker/institutions
+      - ${HOST_DAGS_PATH}:${AIRFLOW__CORE__DAGS_FOLDER}
+      - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
+      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
+      - ${HOST_CORE_PATH}:/noctria_kingdom/airflow_docker/core
+      - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/airflow_docker/strategies
+      - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
+      - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
+      - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
     command: scheduler
     restart: always
 
