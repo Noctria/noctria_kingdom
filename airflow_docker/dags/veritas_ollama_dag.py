@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import subprocess
+import logging
 
 default_args = {
     'owner': 'Noctria',
@@ -22,17 +23,22 @@ dag = DAG(
 )
 
 def run_veritas_test_script():
-    script_path = '/opt/airflow/scripts/test_ollama_veritas.py'
+    log = logging.getLogger("airflow.task")
+    
+    # ✅ Dockerマウントされている実パス
+    script_path = '/noctria_kingdom/airflow_docker/scripts/test_ollama_veritas.py'
+    
+    log.info(f"📜 Veritas スクリプト実行: {script_path}")
     result = subprocess.run(['python3', script_path], capture_output=True, text=True)
-    print("STDOUT:\n", result.stdout)
-    print("STDERR:\n", result.stderr)
+
+    log.info("📤 STDOUT:\n" + result.stdout)
+    log.info("⚠️ STDERR:\n" + result.stderr)
+
     if result.returncode != 0:
-        raise RuntimeError("Veritas テストスクリプト実行中にエラーが発生しました")
+        raise RuntimeError("❌ Veritas テストスクリプト実行中にエラーが発生しました")
 
 run_veritas = PythonOperator(
     task_id='veritas_ollama_prompt',
     python_callable=run_veritas_test_script,
     dag=dag,
 )
-
-run_veritas
