@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 USER airflow
 
+# ✅ PYTHONPATH を Airflow 全体に適用
+ENV PYTHONPATH=/noctria_kingdom/airflow_docker
+
 # ✅ 依存ライブラリをコピー（Airflow起動時に必要なAIモジュール群）
 COPY requirements.txt /requirements.txt
 
