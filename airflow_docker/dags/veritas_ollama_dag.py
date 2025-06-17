@@ -39,6 +39,7 @@ with DAG(
             payload = {
                 "model": ollama_model,
                 "prompt": ollama_prompt
+                "stream": False  # ← 明示的にstreamを切る
             }
 
             response = requests.post(url, json=payload, timeout=20)
