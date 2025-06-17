@@ -1,31 +1,25 @@
-# gpu_worker.py
 from fastapi import FastAPI
 import subprocess
-from datetime import datetime
 
 app = FastAPI()
 
+@app.get("/")
+def root():
+    return {"message": "FastAPI サーバー動作中 ✅"}
+
 @app.get("/run-gpu-task")
 def run_gpu_task():
-    now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = f"gpu_task_log_{now}.txt"
-
     try:
+        # GPU処理用のスクリプトを呼び出す（ファイル名は必要に応じて変更）
         result = subprocess.run(
-            ["python", "tensorflow_task.py"],
+            ["python", "your_tensorflow_script.py"],  # ← 実際のスクリプト名に置き換えてください
             capture_output=True,
-            text=True
+            text=True,
+            check=True  # エラーがあれば例外を発生
         )
-        with open(log_file, "w", encoding="utf-8") as f:
-            f.write(result.stdout)
-            f.write("\n--- stderr ---\n")
-            f.write(result.stderr)
-
+        return {"output": result.stdout}
+    except subprocess.CalledProcessError as e:
         return {
-            "status": "success" if result.returncode == 0 else "error",
-            "returncode": result.returncode,
-            "log_file": log_file
+            "error": "スクリプト実行中にエラーが発生しました",
+            "stderr": e.stderr
         }
-
-    except Exception as e:
-        return {"status": "exception", "error": str(e)}
