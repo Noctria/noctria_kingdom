@@ -1,44 +1,23 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
-import subprocess
-import logging
+import os
+import requests
 
-default_args = {
-    'owner': 'Noctria',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'retries': 0,
-    'retry_delay': timedelta(minutes=1),
+# 🔧 環境変数から設定を取得
+ollama_host = os.getenv("OLLAMA_HOST", "localhost")
+ollama_port = os.getenv("OLLAMA_PORT", "11434")
+ollama_model = os.getenv("OLLAMA_MODEL", "openhermes")
+ollama_prompt = os.getenv("OLLAMA_PROMPT", "次のUSDJPY戦略を5つ考えてください。")
+
+# 🌐 API URLを組み立て
+url = f"http://{ollama_host}:{ollama_port}/api/generate"
+
+# 📦 リクエスト送信
+payload = {
+    "model": ollama_model,
+    "prompt": ollama_prompt
 }
 
-dag = DAG(
-    dag_id='veritas_ollama_dag',
-    default_args=default_args,
-    description='Veritas_MachinaがOllama(OpenHermes)に戦略プロンプトを送信するDAG',
-    schedule_interval=None,
-    start_date=datetime(2025, 6, 1),
-    catchup=False,
-    tags=['veritas', 'ollama', 'llm'],
-)
+print(f"▶️ リクエスト送信先: {url}")
+response = requests.post(url, json=payload, timeout=20)
 
-def run_veritas_test_script():
-    log = logging.getLogger("airflow.task")
-    
-    # ✅ Dockerマウントされている実パス
-    script_path = '/noctria_kingdom/airflow_docker/scripts/test_ollama_veritas.py'
-    
-    log.info(f"📜 Veritas スクリプト実行: {script_path}")
-    result = subprocess.run(['python3', script_path], capture_output=True, text=True)
-
-    log.info("📤 STDOUT:\n" + result.stdout)
-    log.info("⚠️ STDERR:\n" + result.stderr)
-
-    if result.returncode != 0:
-        raise RuntimeError("❌ Veritas テストスクリプト実行中にエラーが発生しました")
-
-run_veritas = PythonOperator(
-    task_id='veritas_ollama_prompt',
-    python_callable=run_veritas_test_script,
-    dag=dag,
-)
+# ✅ 結果出力
+print("✅ 応答:", response.json())
