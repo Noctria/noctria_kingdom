@@ -1,11 +1,19 @@
 import requests
+import json
 
-response = requests.post(
-    "http://localhost:11434/api/generate",
-    json={
-        "model": "openhermes",
-        "prompt": "Noctria Kingdomの戦略生成AI Veritas_Machinaとして、今週の為替市場における取引戦略を1つ提案してください。"
-    }
-)
+url = "http://host.docker.internal:11434/api/generate"
 
-print(response.json()["response"])
+payload = {
+    "model": "openhermes",
+    "prompt": "あなたはFX戦略の専門家AIです。USDJPYの戦略案を3つ、簡潔に日本語で出力してください。",
+    "stream": False
+}
+
+response = requests.post(url, json=payload)
+
+if response.status_code == 200:
+    data = response.json()
+    print("🧠 Veritas 応答:")
+    print(data.get("response", "（応答なし）"))
+else:
+    print(f"⚠️ エラー {response.status_code}: {response.text}")
