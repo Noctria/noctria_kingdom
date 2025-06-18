@@ -18,7 +18,7 @@ services:
     image: noctria-airflow
     depends_on:
       - postgres
-    env_file: .env  # ✅ ここを追加
+    env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__WEBSERVER__RBAC: "True"
@@ -32,7 +32,7 @@ services:
       - ${HOST_CORE_PATH}:/noctria_kingdom/airflow_docker/core
       - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/airflow_docker/strategies
       - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
-      - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
+      - ${HOST_MODELS_PATH}:/opt/airflow/models                 # ✅ 修正済み
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
     ports:
       - "8080:8080"
@@ -45,9 +45,9 @@ services:
     image: noctria-airflow
     depends_on:
       - postgres
-    env_file: .env  # ✅ ここを追加
+    env_file: .env
     environment:
-      HF_TOKEN: ${HF_TOKEN}   # ✅ ← これを追加
+      HF_TOKEN: ${HF_TOKEN}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
@@ -59,7 +59,7 @@ services:
       - ${HOST_CORE_PATH}:/noctria_kingdom/airflow_docker/core
       - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/airflow_docker/strategies
       - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
-      - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
+      - ${HOST_MODELS_PATH}:/opt/airflow/models                 # ✅ 修正済み
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
     command: scheduler
     restart: always
