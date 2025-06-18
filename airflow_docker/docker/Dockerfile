@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1-dev \
     zlib1g-dev \
     curl \
+    git \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,9 +24,17 @@ ENV PYTHONPATH=/noctria_kingdom/airflow_docker
 # ✅ 依存ライブラリをコピー（Airflow起動時に必要なAIモジュール群）
 COPY requirements.txt /requirements.txt
 
-# ✅ torch（CPU版）およびその他パッケージをインストール
+# ✅ torch（CPU版）および transformers など LLM関連ライブラリをインストール
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir \
         torch==2.2.2+cpu \
         --extra-index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir \
+        transformers \
+        accelerate \
+        sentencepiece \
+        bitsandbytes==0.42.0 \
+        huggingface-hub \
+        einops \
+        peft && \
     pip install --no-cache-dir -r /requirements.txt
