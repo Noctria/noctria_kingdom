@@ -1,7 +1,7 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
-MODEL_DIR = "/noctria_kingdom/airflow_docker/models/openhermes2.5"
+MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
 
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
