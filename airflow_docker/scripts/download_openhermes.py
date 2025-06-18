@@ -1,7 +1,7 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_ID = "openaccess-ai-collective/openhermes-2.5-mistral-7b"
-MODEL_DIR = "/opt/airflow/models/openhermes2.5"
+MODEL_DIR = "/noctria_kingdom/airflow_docker/models/openhermes2.5"
 
 def download():
     print(f"🔽 モデルを {MODEL_ID} から {MODEL_DIR} にダウンロード中...")
