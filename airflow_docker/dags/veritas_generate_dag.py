@@ -10,8 +10,8 @@ import torch
 
 # 🔧 モデルの事前ロード（DAG起動時に一度だけ）
 MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
 
 # 🧠 戦略生成関数
 def generate_fx_strategy(prompt: str) -> str:
