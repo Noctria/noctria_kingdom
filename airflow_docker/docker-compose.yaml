@@ -47,6 +47,7 @@ services:
       - postgres
     env_file: .env  # ✅ ここを追加
     environment:
+      HF_TOKEN: ${HF_TOKEN}   # ✅ ← これを追加
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
