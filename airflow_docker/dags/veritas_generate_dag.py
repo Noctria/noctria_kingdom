@@ -1,5 +1,4 @@
 import os
-import sys
 import logging
 import psycopg2
 from datetime import datetime
@@ -19,16 +18,11 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 MODEL_DIR = os.getenv("MODEL_DIR", "/noctria_kingdom/airflow_docker/models/nous-hermes-2")
 
 # -------------------------------
-# 🔍 モデルパス存在確認
+# 🤖 モデル初期化（DAGロード時に一度だけ）
 # -------------------------------
-if not os.path.isdir(MODEL_DIR):
+if not os.path.exists(MODEL_DIR):
     raise FileNotFoundError(f"❌ モデルディレクトリが存在しません: {MODEL_DIR}")
-else:
-    logging.info(f"✅ モデルディレクトリ確認: {MODEL_DIR}")
 
-# -------------------------------
-# 🤖 モデル初期化
-# -------------------------------
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, local_files_only=True)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
 
@@ -42,7 +36,7 @@ def generate_fx_strategy(prompt: str) -> str:
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 # -------------------------------
-# 💾 DB保存付き実行関数
+# 💾 DB保存付きメイン処理
 # -------------------------------
 def run_veritas_and_save():
     prompt = "USDJPYについて、来週のFX戦略を日本語で5つ提案してください。"
@@ -66,12 +60,10 @@ def run_veritas_and_save():
                 (prompt, response)
             )
             conn.commit()
-        logging.info("✅ 戦略出力をDBに保存しました。")
-
+        print("✅ 戦略出力をDBに保存しました。")
     except Exception as e:
         logging.error("🚨 DB保存に失敗: %s", e)
         raise
-
     finally:
         if conn:
             conn.close()
@@ -92,7 +84,6 @@ with DAG(
     catchup=False,
     tags=["veritas", "llm"]
 ) as dag:
-
     generate_and_save_task = PythonOperator(
         task_id="generate_and_save_fx_strategy",
         python_callable=run_veritas_and_save
