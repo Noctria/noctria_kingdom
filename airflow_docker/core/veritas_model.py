@@ -1,11 +1,15 @@
+import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
-# ✅ 正しいモデルパスに修正
-MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
+MODEL_DIR = os.getenv("MODEL_DIR", "/noctria_kingdom/airflow_docker/models/nous-hermes-2")
 
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+if not os.path.exists(MODEL_DIR):
+    raise FileNotFoundError(f"❌ モデルディレクトリが存在しません: {MODEL_DIR}")
+
+# ✅ ローカルフォルダ指定を明示的に
+model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
 
 def generate_fx_strategy(prompt: str) -> str:
     inputs = tokenizer(prompt, return_tensors="pt")
