@@ -21,10 +21,10 @@ USER airflow
 # ✅ PYTHONPATH を Airflow 全体に適用
 ENV PYTHONPATH=/noctria_kingdom/airflow_docker
 
-# ✅ 依存ライブラリをコピー（Airflow起動時に必要なAIモジュール群）
+# ✅ 依存ライブラリをコピー
 COPY requirements.txt /requirements.txt
 
-# ✅ torch（CPU版）および transformers など LLM関連ライブラリをインストール
+# ✅ torch（CPU版）およびその他パッケージをインストール
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir \
         torch==2.2.2+cpu \
@@ -33,7 +33,6 @@ RUN pip install --upgrade pip && \
         transformers \
         accelerate \
         sentencepiece \
-        bitsandbytes==0.42.0 \
         huggingface-hub \
         einops \
         peft && \
