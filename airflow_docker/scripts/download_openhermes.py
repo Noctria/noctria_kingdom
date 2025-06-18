@@ -1,16 +1,13 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import os
 
-# モデルIDと保存先ディレクトリ
-MODEL_ID = "openaccess-ai-collective/openhermes-2.5-mistral-7b"
-MODEL_DIR = "/noctria_kingdom/airflow_docker/models/openhermes2.5"
-
-# Hugging Face トークン（.env で渡す）
+MODEL_ID = "NousResearch/Nous-Hermes-2-Mistral-7B-DPO"
+MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 def download():
     if not HF_TOKEN:
-        raise ValueError("❌ HF_TOKEN が未設定です。`.env` に追加し、docker-compose.yaml で渡してください。")
+        raise ValueError("❌ HF_TOKEN が未設定です。")
 
     print(f"🔽 モデルを {MODEL_ID} から {MODEL_DIR} にダウンロード中...")
 
