@@ -11,12 +11,15 @@ import torch
 # -------------------------------
 # ⚙️ 環境変数取得
 # -------------------------------
-MODEL_DIR = os.getenv("MODEL_DIR", "/noctria_kingdom/airflow_docker/models/nous-hermes-2")
 DB_NAME = os.getenv("POSTGRES_DB", "airflow")
 DB_USER = os.getenv("POSTGRES_USER", "airflow")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+
+# ⚙️ モデルパス（固定で直書き）
+# -------------------------------
+MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
 
 # -------------------------------
 # 🤖 モデル初期化（DAGロード時に一度だけ）
