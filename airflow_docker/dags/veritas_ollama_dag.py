@@ -4,7 +4,7 @@ import logging
 import json
 import sys
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python import PythonOperator
 from datetime import datetime
 
 # 📜 ログ設定
