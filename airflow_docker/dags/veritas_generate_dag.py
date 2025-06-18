@@ -16,17 +16,19 @@ DB_USER = os.getenv("POSTGRES_USER", "airflow")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
-
-# ⚙️ モデルパス（固定で直書き）
-# -------------------------------
-MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
+MODEL_DIR = os.getenv("MODEL_DIR", "/noctria_kingdom/airflow_docker/models/nous-hermes-2")
 
 # -------------------------------
-# 🤖 モデル初期化（DAGロード時に一度だけ）
+# 🔍 モデルパス存在確認
 # -------------------------------
-if not os.path.exists(MODEL_DIR):
+if not os.path.isdir(MODEL_DIR):
     raise FileNotFoundError(f"❌ モデルディレクトリが存在しません: {MODEL_DIR}")
+else:
+    logging.info(f"✅ モデルディレクトリ確認: {MODEL_DIR}")
 
+# -------------------------------
+# 🤖 モデル初期化
+# -------------------------------
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, local_files_only=True)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
 
@@ -40,7 +42,7 @@ def generate_fx_strategy(prompt: str) -> str:
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 # -------------------------------
-# 💾 DB保存付きメイン処理
+# 💾 DB保存付き実行関数
 # -------------------------------
 def run_veritas_and_save():
     prompt = "USDJPYについて、来週のFX戦略を日本語で5つ提案してください。"
@@ -64,7 +66,7 @@ def run_veritas_and_save():
                 (prompt, response)
             )
             conn.commit()
-        print("✅ 戦略出力をDBに保存しました。")
+        logging.info("✅ 戦略出力をDBに保存しました。")
 
     except Exception as e:
         logging.error("🚨 DB保存に失敗: %s", e)
