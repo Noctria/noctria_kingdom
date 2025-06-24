@@ -1,51 +1,49 @@
-Plaintext
-
 noctria_kingdom/
-├── airflow_docker/
-│   ├── dags/
-│   │   ├── strategies/               # 各AI戦略を呼び出すDAG
-│   │   │   ├── aurus_strategy_dag.py
-│   │   │   ├── levia_strategy_dag.py
-│   │   │   ├── prometheus_strategy_dag.py
-│   │   │   └── noctus_strategy_dag.py
-│   │   ├── integration/             # 複数戦略統合（XCom, Noctria統合など）
-│   │   │   ├── noctria_kingdom_dag.py       # 王Noctriaによる統合判断
-│   │   │   ├── noctria_royal_dag.py         # 王の最終判断のみ
-│   │   │   └── veritas_master_dag.py        # Veritasによる戦略生成統括
-│   │   ├── training/
-│   │   │   ├── metaai_train_dag.py          # MetaAI強化学習用
-│   │   │   └── metaai_evaluate_dag.py       # 学習済みAIの評価用
-│   │   └── pdca/
-│   │       └── noctria_kingdom_pdca_dag.py  # Optuna最適化 → 再学習 → 反映
-│   ├── scripts/
-│   │   ├── optimize_params_with_optuna.py
-│   │   ├── apply_best_params.py
-│   │   ├── apply_best_params_to_metaai.py
-│   │   ├── run_veritas_generate_dag.py       # ✅ GUI経由でveritas起動
-│   │   └── log_utils.py                      # JSONログ出力ユーティリティなど
-│   └── logs/
-│       └── noctria_decision.log
+├── airflow_docker/                   # ⚙️ Airflow + Docker 統合運用環境
+│   ├── dags/                         # DAG定義ファイル群（実行ワークフロー）
+│   │   ├── noctria_kingdom_dag.py          # 王国全体統合DAG
+│   │   ├── noctria_royal_dag.py            # 王単独の意思決定DAG
+│   │   └── noctria_kingdom_pdca_dag.py     # Optuna → MetaAI → 戦略適用PDCA
+│   ├── scripts/                      # DAGから実行される補助スクリプト
+│   │   ├── optimize_params_with_optuna.py  # Optunaで戦略パラメータ最適化
+│   │   ├── apply_best_params_to_metaai.py  # MetaAIへの反映
+│   │   ├── apply_best_params.py            # Kingdom全体戦略への適用
+│   │   └── run_veritas_generate_dag.py     # GUI経由でDAG起動用APIフック
+│   ├── docker/                      # Dockerfile群（必要に応じて拡張）
+│   │   └── Dockerfile
+│   ├── airflow.cfg                 # Airflow設定ファイル
+│   └── .env                        # 環境変数（APIキー等）※機密管理
 │
-├── core/
-│   ├── noctria.py                     # 王Noctriaの統合判断クラス
-│   ├── logger.py                      # ログ設定（XCom含む）
-│   ├── reward.py                      # 強化学習用報酬関数
-│   └── news_sentiment_fetcher.py      # ファンダ or センチメント取得
+├── core/                            # 🧠 中枢ロジック（王と共通処理）
+│   ├── noctria.py                   # 王 Noctria の統合判断ロジック
+│   ├── meta_ai.py                   # MetaAI（戦略統合・RL学習）
+│   ├── logger.py                    # 共通ログユーティリティ
+│   ├── reward.py                    # 独自報酬関数
+│   └── risk_management.py           # リスク管理AI
 │
-├── strategies/
-│   ├── aurus_singularis.py
-│   ├── levia_tempest.py
-│   ├── prometheus_oracle.py
-│   ├── noctus_sentinella.py
-│   └── veritas_generator.py          # Veritasによる戦略生成AI
+├── strategies/                      # 🧠 戦略AI（四臣＋生成）
+│   ├── aurus_singularis.py          # トレンド分析AI（Aurus）
+│   ├── levia_tempest.py             # 短期価格判断AI（Levia）
+│   ├── noctus_sentinella.py         # リスク監視AI（Noctus）
+│   ├── prometheus_oracle.py         # ファンダ予測AI（Prometheus）
+│   └── veritas_generator.py         # 自己進化AI Veritas（戦略生成）
 │
-├── institutions/
-│   └── central_bank_ai.py            # ファンダ分析を担う仮想中央銀行AI
+├── envs/                            # 🧪 学習・検証用強化学習環境
+│   ├── meta_ai_env_with_fundamentals.py    # ファンダ統合型RL環境
+│   ├── meta_ai_env_with_sentiment.py       # センチメント対応型環境
+│   └── meta_ai_env.py                       # MetaAI学習用汎用環境
 │
-├── envs/
-│   ├── meta_ai_env_with_fundamentals.py
-│   ├── metaai_env_sentiment.py
-│   └── metaai.py                     # MetaAI環境本体（統合学習／推論用）
+├── institutions/                    # 🏦 制度的AIユニット（中央銀行など）
+│   └── central_bank_ai.py           # 中央銀行ファンダAI
 │
-└── data/
-    └── preprocessed_usdjpy_with_fundamental.csv
+├── data/                            # 📊 CSV等の事前処理済みデータ
+│   └── preprocessed_usdjpy_with_fundamental.csv
+│
+├── noctria_gui/                     # 🌐 GUI/外部連携
+│   ├── backend/                     # FastAPIサーバ側
+│   │   ├── main.py                  # エンドポイント定義
+│   │   └── config.py                # 設定（ポート/APIキーなど）
+│   └── frontend/                    # フロントエンド（任意）
+│
+├── README.md                        # 📝 プロジェクト概要と構成マップ
+└── requirements.txt                 # Python依存パッケージ一覧
