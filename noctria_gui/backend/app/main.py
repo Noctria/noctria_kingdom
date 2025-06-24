@@ -37,7 +37,7 @@ def trigger_dag(req: DagTriggerRequest):
         response = requests.post(
             trigger_url,
             auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
-            json=payload
+            json=payload,
             timeout=5
         )
 
