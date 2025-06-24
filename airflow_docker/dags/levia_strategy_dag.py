@@ -26,12 +26,12 @@ dag = DAG(
     tags=['noctria', 'scalping'],
 )
 
-# === Leviaの任務関数 ===
-def levia_strategy_task():
+# === Leviaの任務関数（XCom対応）===
+def levia_strategy_task(**kwargs):
     print("👑 王Noctria: 『Leviaよ、風よりも早く、機を断て！』")
-    
+
     levia = LeviaTempest()
-    mock_market_data = {
+    market_data = kwargs.get("market_data") or {
         "price": 1.2050,
         "previous_price": 1.2040,
         "volume": 150,
@@ -40,12 +40,15 @@ def levia_strategy_task():
         "volatility": 0.15
     }
 
-    decision = levia.process(mock_market_data)
+    decision = levia.process(market_data)
+    levia.logger.info(f"⚔️ Levia: スキャル判断 = {decision}")
     print(f"⚔️ Levia: 『王よ、我が刃はこの刻、{decision}に振るうと見定めました。』")
+    return decision
 
 # === DAGにタスク登録 ===
 with dag:
     levia_task = PythonOperator(
         task_id='levia_scalping_task',
         python_callable=levia_strategy_task,
+        provide_context=True,  # ✅ GUIやVeritas連携に必要
     )
