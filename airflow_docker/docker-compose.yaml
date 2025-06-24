@@ -47,6 +47,7 @@ services:
       - postgres
     env_file: .env
     environment:
+      AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
       HF_TOKEN: ${HF_TOKEN}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
