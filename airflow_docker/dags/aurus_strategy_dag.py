@@ -1,11 +1,12 @@
 import sys
-sys.path.append('/opt/airflow')
+sys.path.append('/opt/airflow')  # ✅ Airflowコンテナのルートパスを追加
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from strategies.aurus_singularis import AurusSingularis
 
+# === DAG共通設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -25,13 +26,10 @@ dag = DAG(
     tags=['noctria', 'trend-analysis'],
 )
 
-def aurus_strategy_task(**kwargs):
-    print("👑 王Noctria: 『Aurusよ、時の波を読み、我らが未来を照らすのだ。』")
-
-    aurus = AurusSingularis()
-
-    # Veritas等から渡される入力に対応（なければmock）
-    market_data = kwargs.get("market_data") or {
+# === Veritasなどの外部AIからのmarket_data注入 ===
+def veritas_trigger_task(**kwargs):
+    ti = kwargs['ti']
+    mock_market_data = {
         "price": 1.2345,
         "volume": 500,
         "sentiment": 0.7,
@@ -44,15 +42,41 @@ def aurus_strategy_task(**kwargs):
         "trend_prediction": 0.65,
         "liquidity_ratio": 1.1
     }
+    ti.xcom_push(key='market_data', value=mock_market_data)
 
-    decision = aurus.process(market_data)
-    aurus.logger.info(f"⚔️ Aurusの戦略判断（XCom返却）: {decision}")
-    print(f"🔮 Aurus: 『王よ、我が洞察によれば…選ぶべき道は【{decision}】にございます。』")
-    return decision  # ✅ XCom返却
+# === Aurusによるトレンド解析と判断 ===
+def aurus_strategy_task(**kwargs):
+    ti = kwargs['ti']
+    input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
 
+    if input_data is None:
+        print("⚠️ Veritasからのデータが無かったため、デフォルトで実行します")
+        input_data = {k: 0.0 for k in [
+            "price", "volume", "sentiment", "trend_strength", "volatility",
+            "order_block", "institutional_flow", "short_interest",
+            "momentum", "trend_prediction", "liquidity_ratio"
+        ]}
+        input_data["price"] = 1.0
+
+    aurus = AurusSingularis()
+    decision = aurus.process(input_data)
+
+    ti.xcom_push(key='aurus_decision', value=decision)
+
+    print(f"🔮 Aurusの戦略判断: {decision}")
+
+# === DAG登録 ===
 with dag:
+    veritas_task = PythonOperator(
+        task_id='veritas_trigger_task',
+        python_callable=veritas_trigger_task,
+        provide_context=True
+    )
+
     aurus_task = PythonOperator(
         task_id='aurus_trend_analysis_task',
         python_callable=aurus_strategy_task,
-        provide_context=True,  # ✅ XCom/kwargs対応
+        provide_context=True
     )
+
+    veritas_task >> aurus_task
