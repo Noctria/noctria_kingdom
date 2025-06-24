@@ -5,7 +5,7 @@ import os
 
 app = FastAPI()
 
-AIRFLOW_API_URL = "http://host.docker.internal:8080/api/v1"
+AIRFLOW_API_URL = "AIRFLOW_API_URL = "http://172.20.0.4:8080/api/v1"
 AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
 
