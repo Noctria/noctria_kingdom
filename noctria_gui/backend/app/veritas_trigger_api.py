@@ -1,31 +1,23 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import requests
 import os
-import json
 from datetime import datetime
 import logging
 
+router = APIRouter()
+
 # ✅ ログ設定
-LOG_DIR = os.getenv("VERITAS_LOG_DIR", "./logs")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 log_path = os.path.join(LOG_DIR, "veritas_trigger.log")
+logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-logging.basicConfig(
-    filename=log_path,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
-# ✅ FastAPI起動
-app = FastAPI(title="Veritas Trigger API")
-
-# ✅ リクエストボディ定義
 class VeritasTriggerRequest(BaseModel):
     conf: dict = {}
-    dag_id: str = "veritas_master_dag"  # デフォルト値を指定可能
+    dag_id: str = "veritas_master_dag"
 
-@app.post("/trigger/veritas")
+@router.post("/trigger/veritas")
 def trigger_veritas(request: VeritasTriggerRequest):
     AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
     AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
@@ -47,8 +39,7 @@ def trigger_veritas(request: VeritasTriggerRequest):
         )
 
         if response.status_code in (200, 201):
-            msg = f"✅ DAG '{request.dag_id}' triggered successfully at {execution_date}"
-            logging.info(msg + f" | Payload: {payload}")
+            logging.info(f"[TRIGGERED] DAG={request.dag_id} | Payload={payload}")
             return {
                 "status": "success",
                 "dag_id": request.dag_id,
@@ -56,11 +47,9 @@ def trigger_veritas(request: VeritasTriggerRequest):
                 "response": response.json()
             }
         else:
-            msg = f"❌ DAG trigger failed: {response.status_code} - {response.text}"
-            logging.error(msg)
+            logging.error(f"[FAILED] {response.status_code}: {response.text}")
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
     except Exception as e:
-        msg = f"🚨 Trigger error: {e}"
-        logging.exception(msg)
+        logging.exception("[ERROR] Exception while triggering DAG")
         raise HTTPException(status_code=500, detail=str(e))
