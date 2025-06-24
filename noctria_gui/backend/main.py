@@ -4,7 +4,7 @@ from backend.xcom_fetcher import fetch_xcom_result
 
 app = FastAPI()
 
-@app.post("/run-noctria-dag")
+@app.post("/trigger-dag")
 def run_noctria_kingdom():
     return trigger_dag(dag_id="noctria_kingdom_dag")
 
