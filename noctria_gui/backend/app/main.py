@@ -38,6 +38,7 @@ def trigger_dag(req: DagTriggerRequest):
             trigger_url,
             auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
             json=payload
+            timeout=5
         )
 
         if response.status_code in (200, 201):
