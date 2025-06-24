@@ -60,7 +60,7 @@ class NoctusSentinella:
             self.logger.warning("⚠️ priceまたはprice_history不足 ➜ Risk=0.0")
             return 0.0
 
-        risk_value = self.risk_manager.calculate_var()
+        risk_value = self.risk_manager.value_at_risk
         return risk_value / price
 
 # ✅ テスト用ブロック
