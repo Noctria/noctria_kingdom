@@ -1,21 +1,30 @@
 import requests
 import os
+import json
 from datetime import datetime
 
-# ✅ 設定：Airflow Webserver のエンドポイント
+# ✅ Airflow API 設定（.envなどで外部管理可能）
 AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
-DAG_ID = "veritas_master_dag"
-
-# ✅ 認証情報（必要に応じて変更）
+DAG_ID = os.getenv("DAG_ID", "veritas_master_dag")
 AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
+
+# ✅ 任意のconfパラメータ（JSON文字列で渡す）
+# 例: VERITAS_CONF_JSON='{"run_mode": "full", "user_id": 123}'
+VERITAS_CONF_JSON = os.getenv("VERITAS_CONF_JSON", "{}")
 
 def trigger_veritas_master_dag():
     trigger_url = f"{AIRFLOW_API_URL}/dags/{DAG_ID}/dagRuns"
     execution_date = datetime.utcnow().isoformat()
 
+    try:
+        conf_dict = json.loads(VERITAS_CONF_JSON)
+    except json.JSONDecodeError as e:
+        print(f"⚠️ confのJSONデコードに失敗しました: {e}")
+        conf_dict = {}
+
     payload = {
-        "conf": {},  # 任意の設定パラメータをここで渡せる
+        "conf": conf_dict,
         "execution_date": execution_date
     }
 
@@ -26,7 +35,7 @@ def trigger_veritas_master_dag():
             json=payload
         )
 
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             print(f"✅ DAG '{DAG_ID}' 起動成功！")
             print("📡 実行情報:", response.json())
         else:
@@ -34,7 +43,7 @@ def trigger_veritas_master_dag():
             print(response.text)
 
     except Exception as e:
-        print(f"🚨 エラー発生: {e}")
+        print(f"🚨 通信エラー発生: {e}")
 
 if __name__ == "__main__":
     trigger_veritas_master_dag()
