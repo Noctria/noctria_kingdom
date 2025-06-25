@@ -56,27 +56,27 @@ def aurus_strategy_task(**kwargs):
             "order_block", "institutional_flow", "short_interest",
             "momentum", "trend_prediction", "liquidity_ratio"
         ]}
-        input_data["price"] = 1.0
+        input_data["price"] = 1.0  # 少なくとも価格は必要と仮定
 
-    aurus = AurusSingularis()
-    decision = aurus.process(input_data)
-
-    ti.xcom_push(key='aurus_decision', value=decision)
-
-    print(f"🔮 Aurusの戦略判断: {decision}")
+    try:
+        aurus = AurusSingularis()
+        decision = aurus.process(input_data)
+        ti.xcom_push(key='aurus_decision', value=decision)
+        print(f"🔮 Aurusの戦略判断: {decision}")
+    except Exception as e:
+        print(f"❌ Aurus戦略中にエラー発生: {e}")
+        raise
 
 # === DAG登録 ===
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
         python_callable=veritas_trigger_task,
-        provide_context=True
     )
 
     aurus_task = PythonOperator(
         task_id='aurus_trend_analysis_task',
         python_callable=aurus_strategy_task,
-        provide_context=True
     )
 
     veritas_task >> aurus_task
