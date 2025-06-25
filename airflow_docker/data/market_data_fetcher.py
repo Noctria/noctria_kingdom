@@ -53,6 +53,11 @@ if __name__ == "__main__":
     fetcher = MarketDataFetcher()
     data = fetcher.get_usdjpy_historical_data()
     if data is not None:
+
+        # データを保存
+df.to_csv("USDJPY_M1_recent.csv", index=False)
+print("✅ USDJPYデータをCSVに保存しました: USDJPY_M1_recent.csv")
+
         print("🔎 USDJPY直近データ:")
         print(data[-5:])
     print("USDJPY 最新終値:", fetcher.get_usdjpy_latest_price())
