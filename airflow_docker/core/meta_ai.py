@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 import pandas as pd
+import os
 from typing import Tuple, Dict
 
 from strategies.reward import calculate_reward
@@ -12,11 +13,16 @@ class MetaAI(gym.Env):
     MetaAI: 各戦略AIを統合し、強化学習による自己進化を行う環境
     """
 
-    def __init__(self, strategy_agents: Dict, data_path: str = "/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv", verbose: bool = False):
+    def __init__(self, strategy_agents: Dict, data_path: str = None, verbose: bool = False):
         super().__init__()
         self.strategy_agents = strategy_agents
         self.central_bank = CentralBankAI()
         self.verbose = verbose
+
+        # ✅ 柔軟なデータパス設定
+        if data_path is None:
+            base_dir = os.environ.get("NOCTRIA_DATA_DIR", os.path.expanduser("~/noctria_kingdom/airflow_docker/data"))
+            data_path = os.path.join(base_dir, "preprocessed_usdjpy_with_fundamental.csv")
 
         # ✅ データ読み込み
         self.data = pd.read_csv(data_path, parse_dates=['datetime'])
