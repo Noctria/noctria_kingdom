@@ -8,7 +8,7 @@ class MarketDataFetcher:
     📡 Noctria Kingdomの市場情報通信塔：Yahoo Finance経由でUSDJPYの市場情報を取得。
     """
     def __init__(self, retries=3, wait_sec=2):
-        self.logger = setup_logger("MarketDataFetcher", "/opt/airflow/logs/market_data_fetcher.log")
+        self.logger = setup_logger("MarketDataFetcher", "logs/market_data_fetcher.log")
         self.retries = retries
         self.wait_sec = wait_sec
 
