@@ -1,0 +1,25 @@
+# Pythonキャッシュ類
+__pycache__/
+*.pyc
+*.pyo
+
+# ログや中間ファイル
+*.log
+*.tmp
+
+# 環境ファイル・個人情報
+.env
+*.key
+*.pem
+
+# IDE・エディタ設定
+.vscode/
+.idea/
+
+# Git情報
+.git/
+.gitignore
+
+# モデルや一時生成物
+*.safetensors
+models/
