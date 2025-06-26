@@ -4,20 +4,19 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import os
 
-# ✅ モデルのローカルディレクトリ
 MODEL_DIR = "/home/user/noctria_kingdom/airflow_docker/models/openchat-3.5"
 
 print(f"📦 モデル読み込み中: {MODEL_DIR}")
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     trust_remote_code=True,
-    local_files_only=True,  # ここを追加
-    token=None
+    local_files_only=True,
+    token=None  # ← HuggingFaceにアクセスさせない
 )
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     torch_dtype=torch.float16,
-    local_files_only=True,  # ここも追加
+    local_files_only=True,
     token=None
 )
 model.eval()
