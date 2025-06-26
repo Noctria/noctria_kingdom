@@ -1,43 +1,35 @@
-# veritas_llm_server.py
-
-import os
-import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+import os
 
-# === モデル読み込み（グローバルに一度だけ） ===
-MODEL_DIR = os.getenv("MODEL_DIR", "/noctria_kingdom/airflow_docker/models/nous-hermes-2")
+MODEL_DIR = "/home/user/noctria_kingdom/airflow_docker/models/openchat-3.5"
 
-if not os.path.exists(MODEL_DIR):
-    raise RuntimeError(f"❌ モデルディレクトリが見つかりません: {MODEL_DIR}")
+print(f"📦 モデル読み込み中: {MODEL_DIR}")
+tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.float16)
+model.eval()
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, local_files_only=True)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
 
-# === FastAPI 初期化 ===
-app = FastAPI(title="Veritas LLM Server")
+app = FastAPI(title="Veritas LLM Server (OpenChat 3.5)")
 
 class PromptRequest(BaseModel):
     prompt: str
     max_tokens: int = 300
 
-@app.post("/run_veritas_llm")
-def generate_response(data: PromptRequest):
-    try:
-        inputs = tokenizer(data.prompt, return_tensors="pt")
-        with torch.no_grad():
-            outputs = model.generate(inputs["input_ids"], max_new_tokens=data.max_tokens)
-        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return {"response": result.strip()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"🚨 推論エラー: {str(e)}")
-
-@app.get("/")
-def healthcheck():
-    return {"status": "🧠 Veritas LLMサーバー起動中"}
-
-# === サーバー起動用エントリーポイント ===
-if __name__ == "__main__":
-    uvicorn.run("veritas_llm_server:app", host="0.0.0.0", port=8000)
+@app.post("/predict")
+def predict(request: PromptRequest):
+    inputs = tokenizer(request.prompt, return_tensors="pt").to(device)
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=request.max_tokens,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9
+        )
+    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    return {"response": response}
