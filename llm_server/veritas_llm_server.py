@@ -1,45 +1,49 @@
-from fastapi import FastAPI
+# llm_server/veritas_llm_server.py
+
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-import os
 
+app = FastAPI()
+
+# モデルパス（ローカル）
 MODEL_DIR = "/home/user/noctria_kingdom/airflow_docker/models/openchat-3.5"
-
 print(f"📦 モデル読み込み中: {MODEL_DIR}")
+
+# ローカルからトークナイザーとモデルを読み込む
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
-    trust_remote_code=True,
     local_files_only=True,
-    token=None  # ← HuggingFaceにアクセスさせない
+    use_auth_token=None
 )
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
-    torch_dtype=torch.float16,
     local_files_only=True,
-    token=None
+    use_auth_token=None
 )
 model.eval()
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# CUDAが利用可能なら使用
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
-app = FastAPI(title="Veritas LLM Server (OpenChat 3.5)")
-
+# リクエスト用モデル
 class PromptRequest(BaseModel):
     prompt: str
-    max_tokens: int = 300
+    max_new_tokens: int = 100
+    temperature: float = 0.7
 
-@app.post("/predict")
-def predict(request: PromptRequest):
+@app.post("/generate")
+async def generate_text(request: PromptRequest):
     inputs = tokenizer(request.prompt, return_tensors="pt").to(device)
     with torch.no_grad():
-        output = model.generate(
+        outputs = model.generate(
             **inputs,
-            max_new_tokens=request.max_tokens,
+            max_new_tokens=request.max_new_tokens,
+            temperature=request.temperature,
             do_sample=True,
-            temperature=0.7,
-            top_p=0.9
+            pad_token_id=tokenizer.eos_token_id
         )
-    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return {"response": response}
