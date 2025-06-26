@@ -1,34 +1,30 @@
-# llm_server/veritas_llm_server.py
-
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+import os
 
 app = FastAPI()
 
-# モデルパス（ローカル）
-MODEL_DIR = "/home/user/noctria_kingdom/airflow_docker/models/openchat-3.5"
-print(f"📦 モデル読み込み中: {MODEL_DIR}")
+# モデルのローカルディレクトリ
+MODEL_PATH = "/home/user/noctria_kingdom/airflow_docker/models/openchat-3.5"
+print(f"📦 モデル読み込み中: {MODEL_PATH}")
 
-# ローカルからトークナイザーとモデルを読み込む
+# 明示的に config, tokenizer, model の全パスを指定（完全ローカル）
 tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_DIR,
-    local_files_only=True,
-    use_auth_token=None
+    os.path.abspath(MODEL_PATH),
+    local_files_only=True
 )
+
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_DIR,
-    local_files_only=True,
-    use_auth_token=None
+    os.path.abspath(MODEL_PATH),
+    local_files_only=True
 )
 model.eval()
 
-# CUDAが利用可能なら使用
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
-# リクエスト用モデル
 class PromptRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 100
@@ -45,5 +41,5 @@ async def generate_text(request: PromptRequest):
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id
         )
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return {"response": response}
+    result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return {"response": result}
