@@ -11,12 +11,14 @@ print(f"📦 モデル読み込み中: {MODEL_DIR}")
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     trust_remote_code=True,
-    local_files_only=True  # ここを追加
+    local_files_only=True,  # ここを追加
+    token=None
 )
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
     torch_dtype=torch.float16,
-    local_files_only=True  # ここも追加
+    local_files_only=True,  # ここも追加
+    token=None
 )
 model.eval()
 
