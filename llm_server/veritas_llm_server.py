@@ -4,14 +4,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from pathlib import Path
 
-app = FastAPI()
-
-# 📁 ローカルモデルパス（明示的にPathで指定）
-MODEL_DIR = Path("/home/noctria/noctria-kingdom-main/airflow_docker/models/openchat-3.5")
+# 明示的に Path オブジェクトとして定義
+MODEL_DIR = Path("/home/noctria/noctria-kingdom-main/airflow_docker/models/openchat-3.5").resolve()
 
 print(f"📦 モデル読み込み中: {MODEL_DIR}")
 
-# 🔁 トークナイザとモデルのロード（ローカル専用）
+# ローカルファイルのみでロード
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL_DIR,
     trust_remote_code=True,
@@ -25,6 +23,8 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 model.eval()
+
+app = FastAPI()
 
 class PromptRequest(BaseModel):
     prompt: str
