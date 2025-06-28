@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 ROOT = Path("/mnt/d/noctria-kingdom")
-OLD_PATH = "/mnt/e/"
+OLD_PATH = "/mnt/d/"
 NEW_PATH = "/mnt/d/"
 
 # 対象ファイル拡張子

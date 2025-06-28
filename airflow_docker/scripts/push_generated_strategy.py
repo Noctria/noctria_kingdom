@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 def push_generated_strategies():
-    repo_dir = "/mnt/e/noctria-kingdom-main"
+    repo_dir = "/mnt/d/noctria-kingdom-main"
     strategy_dir = "strategies/veritas_generated"
 
     os.chdir(repo_dir)

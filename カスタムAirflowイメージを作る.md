@@ -66,7 +66,7 @@ yaml
 bash
 コピーする
 編集する
-cd /mnt/e/noctria-kingdom-main/airflow-docker
+cd /mnt/d/noctria-kingdom-main/airflow-docker
 2️⃣ カスタムイメージをビルドしながら起動
 
 bash

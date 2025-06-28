@@ -5,7 +5,7 @@ import os
 HF_TOKEN = os.getenv("HF_TOKEN", "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")
 
 # 保存先ディレクトリ（Airflow/Dockerマウントパスと一致させる）
-TARGET_DIR = "/mnt/e/noctria-kingdom-main/airflow_docker/models/nous-hermes-2"
+TARGET_DIR = "/mnt/d/noctria-kingdom-main/airflow_docker/models/nous-hermes-2"
 
 # モデルダウンロード
 snapshot_download(
