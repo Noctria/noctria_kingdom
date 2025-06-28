@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # .env 読み込み
 load_dotenv()
-model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/airflow_docker/models/openchat-3.5")
+model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/models/elyza-7b-instruct")
 
 # モデル存在チェック
 if not os.path.exists(model_path):
@@ -15,16 +15,15 @@ if not os.path.exists(model_path):
 
 # モデル・トークナイザー読み込み
 print(f"📦 モデル読み込み中: {model_path}")
-tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    local_files_only=True
+    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
 )
 model.eval()
 model.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# FastAPI アプリ
+# FastAPI アプリ定義
 app = FastAPI()
 
 # 入力スキーマ
@@ -33,10 +32,12 @@ class PromptRequest(BaseModel):
     max_new_tokens: int = 128
     temperature: float = 0.7
 
+# 簡易確認用 GET
 @app.get("/")
 def root():
-    return {"message": "🔮 Veritas LLM サーバー稼働中（OpenChat 3.5）"}
+    return {"message": "🔮 Veritas LLM サーバー稼働中（ELYZAモデル）"}
 
+# 推論エンドポイント
 @app.post("/generate")
 def generate(req: PromptRequest):
     inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
