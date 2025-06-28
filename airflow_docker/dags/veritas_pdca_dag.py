@@ -26,16 +26,22 @@ dag = DAG(
 
 with dag:
 
-    # ステップ 1: 戦略生成スクリプト（PythonOperatorのままでも可）
+    # ステップ 1: 戦略生成スクリプト
     generate_task = BashOperator(
         task_id="generate_strategy",
         bash_command="python3 /noctria_kingdom/airflow_docker/scripts/generate_strategy_file.py"
     )
 
-    # ステップ 2: 評価スクリプト（market_data.csv を明示的に渡す）
+    # ステップ 2: 戦略評価・採用判定
     evaluate_task = BashOperator(
         task_id="evaluate_strategies",
         bash_command="python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py market_data.csv"
     )
 
-    generate_task >> evaluate_task
+    # ステップ 3: 採用戦略を GitHub に push
+    push_task = BashOperator(
+        task_id="push_adopted_strategies_to_github",
+        bash_command="python3 /noctria_kingdom/scripts/github_push.py"
+    )
+
+    generate_task >> evaluate_task >> push_task
