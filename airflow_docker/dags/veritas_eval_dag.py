@@ -1,15 +1,15 @@
 import os
+import json
 import importlib.util
 from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# 評価用シミュレータ関数
+# 評価関数の依存モジュール
 from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
-from core.market_loader import load_market_data  # 独立しているなら適宜修正
+from core.market_loader import load_market_data  # 必要に応じて修正
 
-# === DAG設定 ===
 default_args = {
     'owner': 'Veritas',
     'depends_on_past': False,
@@ -29,13 +29,22 @@ dag = DAG(
     tags=['veritas', 'evaluation', 'pdca'],
 )
 
-# === 評価関数 ===
 def evaluate_and_adopt_strategies(**kwargs):
     generated_dir = "/noctria_kingdom/strategies/veritas_generated"
     official_dir = "/noctria_kingdom/strategies/official"
+    log_path = "/noctria_kingdom/airflow_docker/logs/veritas_eval_result.json"
+
     os.makedirs(official_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
     market_data = load_market_data("market_data.csv")
+
+    # ログ読み込み or 初期化
+    if os.path.exists(log_path):
+        with open(log_path, "r") as f:
+            eval_logs = json.load(f)
+    else:
+        eval_logs = []
 
     for filename in os.listdir(generated_dir):
         if filename.endswith(".py"):
@@ -52,6 +61,13 @@ def evaluate_and_adopt_strategies(**kwargs):
                 final_capital = module.simulate(market_data)
                 print(f"📈 評価: {filename} ➜ 資産 {final_capital:,.0f}円")
 
+                log_entry = {
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "filename": filename,
+                    "final_capital": final_capital,
+                    "status": "adopted" if final_capital >= 1050000 else "rejected"
+                }
+
                 if final_capital >= 1050000:
                     save_path = os.path.join(official_dir, filename)
                     with open(path, "r") as src, open(save_path, "w") as dst:
@@ -60,10 +76,21 @@ def evaluate_and_adopt_strategies(**kwargs):
                 else:
                     print(f"❌ 不採用: {filename}")
 
+                eval_logs.append(log_entry)
+
             except Exception as e:
                 print(f"🚫 評価エラー: {filename} ➜ {e}")
+                eval_logs.append({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "filename": filename,
+                    "final_capital": None,
+                    "status": f"error: {str(e)}"
+                })
 
-# === DAGタスク定義 ===
+    # ログ保存
+    with open(log_path, "w") as f:
+        json.dump(eval_logs, f, indent=2)
+
 with dag:
     evaluate_task = PythonOperator(
         task_id='evaluate_and_adopt_generated_strategies',
