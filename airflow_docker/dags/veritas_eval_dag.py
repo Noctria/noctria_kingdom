@@ -5,9 +5,8 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# 評価関数の依存モジュール（← module動的importを外部関数に移譲）
 from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
-from core.market_loader import load_market_data  # 必要に応じて修正
+from core.market_loader import load_market_data
 
 default_args = {
     'owner': 'Veritas',
@@ -22,7 +21,7 @@ default_args = {
 dag = DAG(
     dag_id='veritas_eval_dag',
     default_args=default_args,
-    description='✅ Veritas生成戦略の評価・採用判定DAG',
+    description='✅ Veritas生成戦略の評価・採用判定DAG（dict対応）',
     schedule_interval=None,
     catchup=False,
     tags=['veritas', 'evaluation', 'pdca'],
@@ -36,10 +35,8 @@ def evaluate_and_adopt_strategies(**kwargs):
     os.makedirs(official_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
-    # ✅ 市場データの読み込み
     market_data = load_market_data("market_data.csv")
 
-    # ✅ ログ読み込み or 初期化
     if os.path.exists(log_path):
         with open(log_path, "r") as f:
             eval_logs = json.load(f)
@@ -51,39 +48,36 @@ def evaluate_and_adopt_strategies(**kwargs):
             continue
 
         path = os.path.join(generated_dir, filename)
+        print(f"🔍 評価対象: {filename}")
 
-        try:
-            # ✅ 評価を共通関数で実行
-            final_capital = simulate_strategy_adjusted(path, market_data)
-            print(f"📈 評価: {filename} ➜ 資産 {final_capital:,.0f}円")
+        result = simulate_strategy_adjusted(path, market_data)
 
-            log_entry = {
-                "timestamp": datetime.utcnow().isoformat(),
-                "filename": filename,
-                "final_capital": final_capital,
-                "status": "adopted" if final_capital >= 1050000 else "rejected"
-            }
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "filename": filename,
+            "status": result.get("status", "error"),
+            "final_capital": result.get("final_capital"),
+            "win_rate": result.get("win_rate"),
+            "max_drawdown": result.get("max_drawdown"),
+            "total_trades": result.get("total_trades"),
+            "error_message": result.get("error_message")
+        }
 
-            if final_capital >= 1050000:
-                save_path = os.path.join(official_dir, filename)
-                with open(path, "r") as src, open(save_path, "w") as dst:
-                    dst.write(src.read())
-                print(f"✅ 採用: {filename} を official/ に保存")
-            else:
-                print(f"❌ 不採用: {filename}")
+        if result["status"] == "ok" and result["final_capital"] and result["final_capital"] >= 1_050_000:
+            # 採用
+            save_path = os.path.join(official_dir, filename)
+            with open(path, "r") as src, open(save_path, "w") as dst:
+                dst.write(src.read())
+            print(f"✅ 採用: {filename}（資産 {result['final_capital']:,.0f}円）")
+            log_entry["status"] = "adopted"
+        elif result["status"] == "ok":
+            print(f"❌ 不採用: {filename}（資産 {result['final_capital']:,.0f}円）")
+            log_entry["status"] = "rejected"
+        else:
+            print(f"🚫 エラー: {filename} ➜ {result['error_message']}")
 
-            eval_logs.append(log_entry)
+        eval_logs.append(log_entry)
 
-        except Exception as e:
-            print(f"🚫 評価エラー: {filename} ➜ {e}")
-            eval_logs.append({
-                "timestamp": datetime.utcnow().isoformat(),
-                "filename": filename,
-                "final_capital": None,
-                "status": f"error: {str(e)}"
-            })
-
-    # ✅ ログ保存
     with open(log_path, "w") as f:
         json.dump(eval_logs, f, indent=2)
 
