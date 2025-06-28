@@ -1,8 +1,8 @@
 import os
+import torch  # ✅ transformersより前に記述
 from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
 from dotenv import load_dotenv
 
 # .env 読み込み
