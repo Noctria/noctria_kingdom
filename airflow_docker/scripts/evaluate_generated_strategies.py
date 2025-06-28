@@ -1,12 +1,16 @@
 # airflow_docker/scripts/evaluate_generated_strategies.py
 
 import os
+import sys
 import json
 from datetime import datetime
 from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
 from core.market_loader import load_market_data
 
 def main():
+    # 引数から評価用データCSVを取得（デフォルト: market_data.csv）
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "market_data.csv"
+
     generated_dir = "/noctria_kingdom/strategies/veritas_generated"
     official_dir = "/noctria_kingdom/strategies/official"
     log_path = "/noctria_kingdom/airflow_docker/logs/veritas_eval_result.json"
@@ -14,7 +18,7 @@ def main():
     os.makedirs(official_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
-    market_data = load_market_data("market_data.csv")
+    market_data = load_market_data(csv_path)
 
     if os.path.exists(log_path):
         with open(log_path, "r") as f:
