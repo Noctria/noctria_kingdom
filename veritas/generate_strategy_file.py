@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # 保存先ディレクトリ（戦略出力用）
-OUTPUT_DIR = "/mnt/e/noctria-kingdom-main/strategies/veritas_generated"
+OUTPUT_DIR = "/noctria_kingdom/airflow_docker/strategies/veritas_generated"
 
 # dict形式の simulate 戦略テンプレート
 STRATEGY_TEMPLATE = """\
