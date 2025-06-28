@@ -1,43 +1,43 @@
 import os
-import torch  # ✅ transformersより前に記述
+import torch
 from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
 
-# .env 読み込み
+# ✅ .env 読み込み（MODEL_DIR=/home/user/noctria-kingdom-main/airflow_docker/models/openchat-3.5-0106 など）
 load_dotenv()
-model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/models/elyza-7b-instruct")
+model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/airflow_docker/models/openchat-3.5-0106")
 
-# モデル存在チェック
+# ✅ モデル存在チェック
 if not os.path.exists(model_path):
     raise RuntimeError(f"❌ モデルディレクトリが見つかりません: {model_path}")
 
-# モデル・トークナイザー読み込み
 print(f"📦 モデル読み込み中: {model_path}")
-tokenizer = AutoTokenizer.from_pretrained(model_path)
+torch.cuda.empty_cache()
+
+# ✅ モデルとトークナイザーの読み込み（OpenChatは trust_remote_code 必須）
+tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+    torch_dtype=torch.float16,
+    device_map="auto",
+    trust_remote_code=True
 )
 model.eval()
-model.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# FastAPI アプリ定義
+# ✅ FastAPI サーバー
 app = FastAPI()
 
-# 入力スキーマ
 class PromptRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 128
     temperature: float = 0.7
 
-# 簡易確認用 GET
 @app.get("/")
 def root():
-    return {"message": "🔮 Veritas LLM サーバー稼働中（ELYZAモデル）"}
+    return {"message": "🧠 Veritas LLMサーバー稼働中（OpenChat）"}
 
-# 推論エンドポイント
 @app.post("/generate")
 def generate(req: PromptRequest):
     inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
