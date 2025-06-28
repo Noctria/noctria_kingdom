@@ -31,7 +31,7 @@ with dag:
 
     evaluate_task = BashOperator(
         task_id="evaluate_strategies",
-        bash_command="PYTHONPATH=/noctria_kingdom python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py /noctria_kingdom/airflow_docker/data/market_data.csv"
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py /noctria_kingdom/airflow_docker/data/market_data.csv"
     )
 
     push_task = BashOperator(
