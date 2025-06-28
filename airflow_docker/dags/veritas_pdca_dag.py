@@ -1,5 +1,3 @@
-# airflow_docker/dags/veritas_pdca_dag.py
-
 import os
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -28,17 +26,17 @@ with dag:
 
     generate_task = BashOperator(
         task_id="generate_strategy",
-        bash_command="python3 /noctria_kingdom/scripts/generate_strategy_file.py"
+        bash_command="python3 /noctria_kingdom/veritas/generate_strategy_file.py"
     )
 
     evaluate_task = BashOperator(
         task_id="evaluate_strategies",
-        bash_command="python3 /noctria_kingdom/scripts/evaluate_generated_strategies.py market_data.csv"
+        bash_command="python3 /noctria_kingdom/veritas/evaluate_generated_strategies.py market_data.csv"
     )
 
     push_task = BashOperator(
         task_id="push_adopted_strategies",
-        bash_command="python3 /noctria_kingdom/scripts/github_push.py"
+        bash_command="python3 /noctria_kingdom/veritas/github_push.py"
     )
 
     generate_task >> evaluate_task >> push_task
