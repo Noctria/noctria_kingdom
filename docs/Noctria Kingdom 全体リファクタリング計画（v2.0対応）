@@ -1,0 +1,74 @@
+# 🛠️ Noctria Kingdom 全体リファクタリング計画（v2.0対応）
+
+## 🎯 目的
+
+- ✅ **パスのハードコードを完全撤廃**し、集中管理方式（`core/path_config.py`）に移行
+- ✅ **Airflowは純粋なオーケストレーター**として維持（処理ロジックは持たせない）
+- ✅ **ファイル機能とディレクトリ構造を完全一致**させ、構造的・意味的混乱を排除
+- ✅ **マウントポイント命名の乱立を統一**し、ChatGPT世代間の構成崩壊を防止
+
+---
+
+## 📁 対象範囲
+
+- `/noctria_kingdom-main/` 以下のすべてのPythonスクリプト・Airflow DAG・補助ツール・サーバ構成など
+
+---
+
+## 🔁 ステップ構成
+
+### ① `core/path_config.py` の導入
+- すべてのロジックコードは `path_config` に定義された **グローバルパス定数**を参照
+- `Pathlib` ベースの可搬性・整合性のあるパス設計
+
+### ② Airflowの純粋化（DAGからロジック分離）
+- DAGは `subprocess.run()` で外部スクリプトを起動するだけにする
+- 実処理ロジックは `scripts/` や `veritas/`, `core/`, `execution/` へ移動・集約
+
+### ③ マウントポイントの統一と明文化
+- `/noctria_kingdom/` を基準に、**全Docker/Airflow/venv環境のマウント先を一元化**
+- `docs/mount_mapping.md` に対応表を公式化・更新管理する
+
+### ④ `tools/hardcoded_path_replacer.py` による自動変換
+- ハードコードされた相対/絶対パスをすべて `path_config` 形式に自動置換
+- `from core.path_config import *` を自動追加する
+
+### ⑤ モジュール単位の責務分離・最小化
+| ディレクトリ | リファクタ方針 |
+|-------------|----------------|
+| `veritas/` | `generate/`, `evaluate/`, `template/`, `utils/` などに細分化 |
+| `core/` | `path_config`, `logger`, `market_loader`, `optimizer` などを集約 |
+| `execution/` | `mt5_executor.py`, `backtester.py`, `metrics.py` などへ整理 |
+
+### ⑥ GUI・LLMサーバ連携の明示的分離
+- `llm_server/` → `veritas/` のみ参照可能（逆は不可）
+- `noctria_gui/` → FastAPI経由でAirflow DAGをトリガーする構成を明示
+
+---
+
+## 🧪 追加改善案（段階的導入）
+
+- ✅ `.env` → `core/env_config.py` に安全に移行（読み取り・暗号化管理）
+- ✅ `tools/structure_auditor.py` に v2.0準拠チェック機能を追加
+- ✅ CI/CDパイプラインにリファクタ・パス監査の自動チェックを統合
+
+---
+
+## 📜 成果物一覧（新規作成/変更予定ファイル）
+
+| ファイル/ディレクトリ | 用途・目的 |
+|----------------------|------------|
+| `core/path_config.py` | グローバルパス管理モジュール |
+| `tools/hardcoded_path_replacer.py` | ハードコード自動検出・置換ツール |
+| `docs/refactoring_plan_v2.md` | このドキュメント（リファクタ方針記録） |
+| `docs/mount_mapping.md` | マウントポイント対応表 |
+| 各 `DAG` ファイル | 外部スクリプト呼び出し形式に変更 |
+| 各 `veritas/`, `execution/` モジュール | 構造整理・責務分離 |
+
+---
+
+## 🔚 終わりに
+
+この計画は「AI国家Noctria」の長期運用における**秩序と拡張性の維持**を目的とするものであり、今後のVeritas戦略自律進化、複数通貨対応、サーバー統合を視野に入れたものです。
+
+この設計原則 v2.0 にすべての知性を従わせることで、AI王国は統一された秩序のもとで自律的に進化し続けることができる。
