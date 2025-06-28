@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 
 # === DAGの基本設定 ===
 default_args = {
@@ -28,11 +29,6 @@ def generate_strategy():
     from veritas.generate_strategy_file import generate_strategy_file
     generate_strategy_file("veritas_strategy")
 
-# === ステップ 2: 生成戦略の評価・採用判定 ===
-def evaluate_strategies():
-    from dags.veritas_eval_dag import evaluate_and_adopt_strategies
-    evaluate_and_adopt_strategies()
-
 # === DAGタスク定義 ===
 with dag:
     generate_task = PythonOperator(
@@ -40,9 +36,9 @@ with dag:
         python_callable=generate_strategy
     )
 
-    evaluate_task = PythonOperator(
+    evaluate_task = BashOperator(
         task_id="evaluate_and_adopt",
-        python_callable=evaluate_strategies
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py"
     )
 
     generate_task >> evaluate_task
