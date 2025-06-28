@@ -29,7 +29,7 @@ with dag:
     # ステップ 1: 戦略生成スクリプト
     generate_task = BashOperator(
         task_id="generate_strategy",
-        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/generate_strategy_file.py"
+        bash_command="python3 /noctria_kingdom/scripts/generate_strategy_file.py"
     )
 
     # ステップ 2: 戦略評価・採用判定
