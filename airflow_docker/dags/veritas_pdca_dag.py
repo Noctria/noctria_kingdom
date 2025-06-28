@@ -1,10 +1,10 @@
+# airflow_docker/dags/veritas_pdca_dag.py
+
 import os
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 
-# === DAGの基本設定 ===
 default_args = {
     'owner': 'Veritas',
     'depends_on_past': False,
@@ -24,21 +24,18 @@ dag = DAG(
     tags=["veritas", "pdca", "autoloop"]
 )
 
-# === ステップ 1: 戦略ファイルの自動生成 ===
-def generate_strategy():
-    from veritas.generate_strategy_file import generate_strategy_file
-    generate_strategy_file("veritas_strategy")
-
-# === DAGタスク定義 ===
 with dag:
-    generate_task = PythonOperator(
+
+    # ステップ 1: 戦略生成スクリプト（PythonOperatorのままでも可）
+    generate_task = BashOperator(
         task_id="generate_strategy",
-        python_callable=generate_strategy
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/generate_strategy_file.py"
     )
 
+    # ステップ 2: 評価スクリプト（market_data.csv を明示的に渡す）
     evaluate_task = BashOperator(
-        task_id="evaluate_and_adopt",
-        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py"
+        task_id="evaluate_strategies",
+        bash_command="python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py market_data.csv"
     )
 
     generate_task >> evaluate_task
