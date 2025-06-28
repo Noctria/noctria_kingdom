@@ -13,22 +13,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     curl \
     git \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 USER airflow
 
-# ✅ PYTHONPATH を Airflow 全体に適用
+# ✅ PYTHONPATH を Airflow 全体に適用（ここが肝）
 ENV PYTHONPATH=/noctria_kingdom/airflow_docker
 
 # ✅ 依存ライブラリをコピー
 COPY requirements.txt /requirements.txt
 
-# ✅ torch（CPU版）およびその他パッケージをインストール
+# ✅ Pythonライブラリのインストール（CPU限定のTorch含む）
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir \
-        torch==2.2.2+cpu \
-        --extra-index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir torch==2.2.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir \
         transformers \
         accelerate \
