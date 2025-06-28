@@ -24,6 +24,7 @@ services:
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: ${PYTHONPATH}
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
@@ -53,6 +54,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: ${PYTHONPATH}
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
