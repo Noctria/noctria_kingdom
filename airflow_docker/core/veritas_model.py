@@ -9,22 +9,29 @@ print(f"📦 使用モデルディレクトリ: {MODEL_DIR}")
 if not os.path.isdir(MODEL_DIR):
     raise FileNotFoundError(f"❌ モデルディレクトリが存在しません: {MODEL_DIR}")
 
-# ✅ 実行デバイスを自動判定（CPU / CUDA）
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# ✅ GPU確認ログ
+if torch.cuda.is_available():
+    print(f"🚀 GPU使用可能: {torch.cuda.get_device_name(0)}")
+else:
+    print("⚠️ GPUが使用できません（CPUで実行されます）")
 
-# ✅ モデル・トークナイザー読み込み（低メモリ設定＋ローカルのみ）
+# ✅ モデル・トークナイザー読み込み（device_map="auto" を使用）
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_DIR,
-    torch_dtype=torch.float16 if device.type == "cuda" else torch.float32,
+    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+    device_map="auto",                  # ← ここが重要
     low_cpu_mem_usage=True,
     local_files_only=True
-).to(device)
+)
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
 
 def generate_fx_strategy(prompt: str) -> str:
     """為替戦略を生成"""
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    inputs = tokenizer(prompt, return_tensors="pt")
+    if torch.cuda.is_available():
+        inputs = {k: v.to("cuda") for k, v in inputs.items()}
+
     with torch.no_grad():
         outputs = model.generate(
             inputs["input_ids"],
