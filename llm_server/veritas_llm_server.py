@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # ✅ .env 読み込み（MODEL_DIR=/home/user/noctria-kingdom-main/airflow_docker/models/openchat-3.5-0106 など）
 load_dotenv()
-model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/airflow_docker/models/openchat-3.5-0106")
+model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/airflow_docker/models/elyza-7b-instruct")
 
 # ✅ モデル存在チェック
 if not os.path.exists(model_path):
