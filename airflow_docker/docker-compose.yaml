@@ -34,6 +34,7 @@ services:
       - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
       - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
+      - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
     ports:
       - "8080:8080"
     command: webserver
@@ -62,6 +63,7 @@ services:
       - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
       - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
+      - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
     command: scheduler
     restart: always
 
