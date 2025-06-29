@@ -1,0 +1,8 @@
+# requirements.txt
+pytest
+numpy
+pandas
+scikit-learn
+tensorflow
+torch
+statsmodels
