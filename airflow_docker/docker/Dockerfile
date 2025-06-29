@@ -28,6 +28,7 @@ COPY requirements.txt /requirements.txt
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir torch==2.2.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir \
+        pytest \  # ←★ここを追加
         transformers \
         accelerate \
         sentencepiece \
