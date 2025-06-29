@@ -29,8 +29,8 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: ${REDIS_URL}
+      AIRFLOW__CELERY__RESULT_BACKEND: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
@@ -38,13 +38,14 @@ services:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
       - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
-      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
+      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/scripts
       - ${HOST_CORE_PATH}:/noctria_kingdom/core
       - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/strategies
       - ${HOST_DATA_PATH}:/noctria_kingdom/data
       - ${HOST_MODELS_PATH}:/noctria_kingdom/models
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/institutions
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
+      - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
       - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
     ports:
       - "8080:8080"
@@ -62,17 +63,13 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
-      HF_TOKEN: ${HF_TOKEN}
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CELERY__BROKER_URL: ${REDIS_URL}
+      AIRFLOW__CELERY__RESULT_BACKEND: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
       - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
-      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
+      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/scripts
       - ${HOST_CORE_PATH}:/noctria_kingdom/core
       - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/strategies
       - ${HOST_DATA_PATH}:/noctria_kingdom/data
@@ -95,13 +92,13 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: ${REDIS_URL}
+      AIRFLOW__CELERY__RESULT_BACKEND: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
       - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
-      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
+      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/scripts
       - ${HOST_CORE_PATH}:/noctria_kingdom/core
       - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/strategies
       - ${HOST_DATA_PATH}:/noctria_kingdom/data
