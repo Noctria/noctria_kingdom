@@ -1,52 +1,66 @@
-# tools/apply_refactor_plan.py
-
+import os
 import json
 import shutil
-from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PLAN_PATH = PROJECT_ROOT / "logs" / "refactor_plan.json"
-APPLIED_LOG = PROJECT_ROOT / "logs" / "refactor_applied.json"
+ROOT_DIR = "/noctria_kingdom"
+PLAN_PATH = os.path.join(ROOT_DIR, "logs", "refactor_plan.json")
 
-def load_plan():
-    with open(PLAN_PATH, "r", encoding="utf-8") as f:
+def load_plan(path):
+    with open(path, "r") as f:
         return json.load(f)
 
-def apply_refactor(actions):
-    applied = []
-    for action in actions:
-        file_path = PROJECT_ROOT / action["file"]
-        if not file_path.exists():
-            continue
+def apply_refactor_step(src_path, dst_path):
+    abs_src = os.path.join(ROOT_DIR, src_path)
+    abs_dst = os.path.join(ROOT_DIR, dst_path)
 
-        # ハードコード書き換え
-        if action["type"] == "hardcoded_path":
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            if "from core.path_config" not in content:
-                content = f"from core.path_config import *\n\n{content}"
-            for raw in ["strategies/", "data/", "execution/", "models/"]:
-                if raw in content:
-                    content = content.replace(f'"{raw}', f'{raw.upper().replace("/", "_")}_DIR / "')
+    if not os.path.exists(abs_src):
+        print(f"⚠️ Not found: {src_path}")
+        return
+
+    os.makedirs(os.path.dirname(abs_dst), exist_ok=True)
+    shutil.move(abs_src, abs_dst)
+    print(f"📁 Moved: {src_path} → {dst_path}")
+
+    # パスの参照も書き換え（importやopen等）
+    update_references(src_path, dst_path)
+
+def update_references(old_path, new_path):
+    all_py_files = []
+
+    for dirpath, _, filenames in os.walk(ROOT_DIR):
+        for filename in filenames:
+            if filename.endswith(".py"):
+                all_py_files.append(os.path.join(dirpath, filename))
+
+    old_import = path_to_import(old_path)
+    new_import = path_to_import(new_path)
+
+    for file_path in all_py_files:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if old_import in content or old_path in content:
+            content = content.replace(old_import, new_import)
+            content = content.replace(old_path, new_path)
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            applied.append(action)
+            print(f"✏️ Updated import in: {os.path.relpath(file_path, ROOT_DIR)}")
 
-        # simulate関数を utils/ に移動
-        if action["type"] == "simulate_function_out_of_place":
-            dest_dir = PROJECT_ROOT / "veritas" / "utils"
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(file_path), str(dest_dir / file_path.name))
-            applied.append(action)
-
-    with open(APPLIED_LOG, "w", encoding="utf-8") as f:
-        json.dump(applied, f, indent=2, ensure_ascii=False)
-
-    print(f"✅ リファクタ適用完了（{len(applied)}件）→ {APPLIED_LOG}")
+def path_to_import(path):
+    return path.replace("/", ".").replace(".py", "")
 
 def main():
-    actions = load_plan()
-    apply_refactor(actions)
+    if not os.path.exists(PLAN_PATH):
+        print(f"❌ No refactor plan found at {PLAN_PATH}")
+        return
+
+    plan = load_plan(PLAN_PATH)
+    print(f"🧠 Applying {len(plan)} refactor steps...")
+
+    for step in plan:
+        apply_refactor_step(step["src"], step["dst"])
+
+    print("✅ Refactoring complete!")
 
 if __name__ == "__main__":
     main()
