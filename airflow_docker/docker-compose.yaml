@@ -43,6 +43,7 @@ services:
       - ${HOST_MODELS_PATH}:/noctria_kingdom/models
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/institutions
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
+      - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
     ports:
       - "8080:8080"
     command: webserver
