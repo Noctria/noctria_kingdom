@@ -16,13 +16,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
+# 🔻 USER airflow に切り替えてから pip install を行う（ここが重要）
+USER airflow
+
 # ✅ CeleryExecutor に必要な追加パッケージ
 RUN pip install --no-cache-dir \
     'apache-airflow[celery]==2.9.1' \
     'flower' \
     'redis'
-
-USER airflow
 
 # ✅ PYTHONPATH を Airflow 全体に適用
 ENV PYTHONPATH=/noctria_kingdom/airflow_docker
