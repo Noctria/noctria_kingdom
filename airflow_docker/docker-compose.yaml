@@ -1,11 +1,12 @@
+version: "3.8"
+
 services:
   postgres:
     image: postgres:13
-    env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     restart: always
@@ -23,27 +24,26 @@ services:
     depends_on:
       - postgres
       - redis
-    env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: ${PYTHONPATH}
+      PYTHONPATH: /noctria_kingdom
     volumes:
-      - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
-      - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
-      - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
-      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
-      - ${HOST_CORE_PATH}:/noctria_kingdom/core
-      - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/strategies
-      - ${HOST_DATA_PATH}:/noctria_kingdom/data
-      - ${HOST_MODELS_PATH}:/noctria_kingdom/models
-      - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/institutions
-      - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
-      - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
+      - ./airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - ./airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - ./airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - ./airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - ./core:/noctria_kingdom/core
+      - ./strategies:/noctria_kingdom/strategies
+      - ./data:/noctria_kingdom/data
+      - ./models:/noctria_kingdom/models
+      - ./institutions:/noctria_kingdom/institutions
+      - ./veritas:/noctria_kingdom/veritas
+      - ./tests:/noctria_kingdom/tests
     ports:
       - "8080:8080"
     command: webserver
@@ -56,29 +56,28 @@ services:
     depends_on:
       - postgres
       - redis
-    env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
-      HF_TOKEN: ${HF_TOKEN}
+      HF_TOKEN: your_huggingface_token_here  # 🔒 ここだけ必要に応じて安全に管理
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: ${PYTHONPATH}
+      PYTHONPATH: /noctria_kingdom
     volumes:
-      - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
-      - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
-      - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
-      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
-      - ${HOST_CORE_PATH}:/noctria_kingdom/core
-      - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/strategies
-      - ${HOST_DATA_PATH}:/noctria_kingdom/data
-      - ${HOST_MODELS_PATH}:/noctria_kingdom/models
-      - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/institutions
-      - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
-      - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
-      - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
+      - ./airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - ./airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - ./airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - ./airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - ./core:/noctria_kingdom/core
+      - ./strategies:/noctria_kingdom/strategies
+      - ./data:/noctria_kingdom/data
+      - ./models:/noctria_kingdom/models
+      - ./institutions:/noctria_kingdom/institutions
+      - ./veritas:/noctria_kingdom/veritas
+      - ./tools:/noctria_kingdom/tools
+      - ./tests:/noctria_kingdom/tests
     command: scheduler
     restart: always
 
@@ -89,25 +88,24 @@ services:
     depends_on:
       - postgres
       - redis
-    env_file: .env
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      PYTHONPATH: ${PYTHONPATH}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
+      PYTHONPATH: /noctria_kingdom
     volumes:
-      - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
-      - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
-      - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
-      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
-      - ${HOST_CORE_PATH}:/noctria_kingdom/core
-      - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/strategies
-      - ${HOST_DATA_PATH}:/noctria_kingdom/data
-      - ${HOST_MODELS_PATH}:/noctria_kingdom/models
-      - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/institutions
-      - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
-      - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
-      - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
+      - ./airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - ./airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - ./airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - ./airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - ./core:/noctria_kingdom/core
+      - ./strategies:/noctria_kingdom/strategies
+      - ./data:/noctria_kingdom/data
+      - ./models:/noctria_kingdom/models
+      - ./institutions:/noctria_kingdom/institutions
+      - ./veritas:/noctria_kingdom/veritas
+      - ./tools:/noctria_kingdom/tools
+      - ./tests:/noctria_kingdom/tests
     command: celery worker
     restart: always
 
