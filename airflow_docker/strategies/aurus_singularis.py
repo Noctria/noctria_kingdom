@@ -1,8 +1,5 @@
-# /opt/airflow/strategies/aurus_singularis.py
-
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 from core.logger import setup_logger
@@ -13,7 +10,9 @@ class AurusSingularis:
     def __init__(self):
         self.logger = setup_logger("AurusLogger", "/opt/airflow/logs/AurusLogger.log")
 
+        self.tf = self._lazy_import_tensorflow()
         self._configure_gpu()
+
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher()
 
@@ -26,16 +25,21 @@ class AurusSingularis:
         historical_data = pd.DataFrame(data_array, columns=columns)
         self.risk_manager = RiskManagement(historical_data=historical_data)
 
+    def _lazy_import_tensorflow(self):
+        import tensorflow as tf
+        return tf
+
     def _configure_gpu(self):
-        gpus = tf.config.list_physical_devices('GPU')
+        gpus = self.tf.config.list_physical_devices('GPU')
         if gpus:
             try:
                 for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
+                    self.tf.config.experimental.set_memory_growth(gpu, True)
             except RuntimeError as e:
                 self.logger.error(f"GPU メモリ設定エラー: {e}")
 
     def _build_model(self):
+        tf = self.tf
         model = tf.keras.Sequential([
             tf.keras.layers.Input(shape=(12,)),
             tf.keras.layers.Dense(128, activation='relu'),
