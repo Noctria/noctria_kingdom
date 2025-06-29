@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/opt/airflow')
+sys.path.append('/opt/airflow')  # Docker環境対応（必要に応じて）
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -26,17 +26,16 @@ dag = DAG(
     dag_id='noctria_kingdom_dag',
     default_args=default_args,
     description='Noctria王国全体戦略統合DAG（XCom連携）',
-    schedule_interval=None,
+    schedule_interval=None,  # 必要に応じて '@daily' などに変更
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'kingdom'],
 )
 
-# 共通ロガー
+# === 共通ロガー ===
 logger = setup_logger("NoctriaDecision", "/noctria_kingdom/airflow_docker/logs/noctria_decision.log")
 
-# === 各戦略AI（臣下） ===
-
+# === 各戦略AIタスク定義 ===
 def aurus_task(**kwargs):
     try:
         decision = AurusSingularis().process({"trend_strength": 0.6})
@@ -69,15 +68,14 @@ def prometheus_task(**kwargs):
     except Exception as e:
         logger.error(f"[Prometheus] exception: {e}")
 
-# === 王Noctriaによる統合判断 ===
-
+# === 王Noctriaの統合意思決定 ===
 def noctria_final_decision(**kwargs):
     ti = kwargs['ti']
     decisions = {
-        "Aurus": ti.xcom_pull(key='aurus_decision', task_ids='aurus_strategy'),
-        "Levia": ti.xcom_pull(key='levia_decision', task_ids='levia_strategy'),
-        "Noctus": ti.xcom_pull(key='noctus_decision', task_ids='noctus_strategy'),
-        "Prometheus": ti.xcom_pull(key='prometheus_decision', task_ids='prometheus_strategy'),
+        "Aurus": ti.xcom_pull(task_ids='aurus_strategy', key='aurus_decision'),
+        "Levia": ti.xcom_pull(task_ids='levia_strategy', key='levia_decision'),
+        "Noctus": ti.xcom_pull(task_ids='noctus_strategy', key='noctus_decision'),
+        "Prometheus": ti.xcom_pull(task_ids='prometheus_strategy', key='prometheus_decision'),
     }
     logger.info(f"👑 王Noctriaが受け取った判断: {decisions}")
     noctria = Noctria()
@@ -85,12 +83,12 @@ def noctria_final_decision(**kwargs):
     logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")
 
 # === DAGへのタスク登録 ===
-
 with dag:
-    t1 = PythonOperator(task_id='aurus_strategy', python_callable=aurus_task)
-    t2 = PythonOperator(task_id='levia_strategy', python_callable=levia_task)
-    t3 = PythonOperator(task_id='noctus_strategy', python_callable=noctus_task)
-    t4 = PythonOperator(task_id='prometheus_strategy', python_callable=prometheus_task)
-    t5 = PythonOperator(task_id='noctria_final_decision', python_callable=noctria_final_decision)
+    aurus_op = PythonOperator(task_id='aurus_strategy', python_callable=aurus_task)
+    levia_op = PythonOperator(task_id='levia_strategy', python_callable=levia_task)
+    noctus_op = PythonOperator(task_id='noctus_strategy', python_callable=noctus_task)
+    prometheus_op = PythonOperator(task_id='prometheus_strategy', python_callable=prometheus_task)
 
-    [t1, t2, t3, t4] >> t5
+    final_decision_op = PythonOperator(task_id='noctria_final_decision', python_callable=noctria_final_decision)
+
+    [aurus_op, levia_op, noctus_op, prometheus_op] >> final_decision_op
