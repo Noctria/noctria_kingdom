@@ -1,5 +1,12 @@
 import os
 import subprocess
+from pathlib import Path
+from dotenv import load_dotenv
+
+# ✅ .envファイルの明示的ロード（パス自動解決）
+dotenv_path = Path(__file__).resolve().parents[1] / "airflow_docker" / ".env"
+if not load_dotenv(dotenv_path=dotenv_path):
+    raise FileNotFoundError(f"❌ .envファイルが見つかりません: {dotenv_path}")
 
 def main():
     token = os.getenv("GITHUB_PAT")
@@ -17,10 +24,10 @@ def main():
     ]
 
     for cmd in commands:
-        result = subprocess.run(cmd, capture_output=True, text=True)
         print(f"💻 {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"⚠️ Error: {result.stderr}")
+            print(f"⚠️ Error: {result.stderr.strip()}")
         else:
             print(f"✅ {result.stdout.strip()}")
 
