@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import subprocess
 from datetime import datetime
 from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
 from core.market_loader import load_market_data
@@ -14,6 +15,7 @@ def main():
     generated_dir = "/noctria_kingdom/strategies/veritas_generated"
     official_dir = "/noctria_kingdom/strategies/official"
     log_path = "/noctria_kingdom/airflow_docker/logs/veritas_eval_result.json"
+    project_root = "/noctria_kingdom"
 
     os.makedirs(official_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -52,6 +54,19 @@ def main():
                 dst.write(src.read())
             print(f"✅ 採用: {filename}（資産 {result['final_capital']:,.0f}円）")
             log_entry["status"] = "adopted"
+
+            # --- GitHubへの反映処理 ---
+            try:
+                subprocess.run(["git", "add", save_path], cwd=project_root, check=True)
+                subprocess.run(["git", "commit", "-m", f"✅ Adopt strategy: {filename}"], cwd=project_root, check=True)
+                subprocess.run(["git", "push"], cwd=project_root, check=True)
+                print(f"🚀 GitHubへpush完了: {filename}")
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️ Git操作失敗: {e}")
+                log_entry["git_push"] = "failed"
+            else:
+                log_entry["git_push"] = "success"
+
         elif result["status"] == "ok":
             print(f"❌ 不採用: {filename}（資産 {result['final_capital']:,.0f}円）")
             log_entry["status"] = "rejected"
