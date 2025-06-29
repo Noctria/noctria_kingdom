@@ -66,8 +66,33 @@ services:
       - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
-      - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools  # ←追加
+      - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
     command: scheduler
+    restart: always
+
+  airflow-worker:
+    build:
+      context: ./docker
+    image: noctria-airflow
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      PYTHONPATH: ${PYTHONPATH}
+    volumes:
+      - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
+      - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/noctria_kingdom/airflow_docker/plugins
+      - ${HOST_SCRIPTS_PATH}:/noctria_kingdom/airflow_docker/scripts
+      - ${HOST_CORE_PATH}:/noctria_kingdom/airflow_docker/core
+      - ${HOST_STRATEGIES_PATH}:/noctria_kingdom/airflow_docker/strategies
+      - ${HOST_DATA_PATH}:/noctria_kingdom/airflow_docker/data
+      - ${HOST_MODELS_PATH}:/noctria_kingdom/airflow_docker/models
+      - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
+      - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
+      - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
+    command: worker
     restart: always
 
 volumes:
