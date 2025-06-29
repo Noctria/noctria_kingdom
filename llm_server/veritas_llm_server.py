@@ -1,9 +1,14 @@
+# llm_server/veritas_llm_server.py
+
 import os
 import torch
 from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
+
+# ✅ Veritasテンプレ読み込み
+from veritas.generate.llm_prompt_builder import load_strategy_template
 
 # ✅ .env 読み込み
 load_dotenv()
@@ -29,7 +34,10 @@ model.eval()
 # ✅ FastAPI サーバー
 app = FastAPI()
 
-# ✅ リクエスト定義（top_p, do_sampleを含めて柔軟化）
+# ✅ 戦略テンプレートを起動時に読み込み
+strategy_template = load_strategy_template()
+
+# ✅ リクエスト定義
 class PromptRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 128
@@ -39,14 +47,23 @@ class PromptRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {"message": "🧠 Veritas LLMサーバー稼働中（OpenChat）"}
+    return {"message": "🧠 Veritas LLMサーバー稼働中（テンプレ統合済み）"}
 
 @app.post("/generate")
 def generate(req: PromptRequest):
-    # ✅ 入力をモデルのデバイスに転送
-    inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
+    # ✅ テンプレートを含んだプロンプトを構築
+    full_prompt = f"""あなたはAI戦略生成者Veritasです。
+以下のテンプレートに準拠した形式で、新しい戦略をPythonコードで生成してください。
 
-    # ✅ 生成実行（すべてのパラメータを反映）
+--- 戦略テンプレート ---
+{strategy_template}
+
+--- ユーザー指示 ---
+{req.prompt}
+"""
+
+    # ✅ モデル入力と推論
+    inputs = tokenizer(full_prompt, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
         max_new_tokens=req.max_new_tokens,
