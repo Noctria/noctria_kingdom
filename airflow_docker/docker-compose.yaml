@@ -92,6 +92,7 @@ services:
       - ${HOST_INSTITUTIONS_PATH}:/noctria_kingdom/airflow_docker/institutions
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
       - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
+      - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
     command: worker
     restart: always
 
