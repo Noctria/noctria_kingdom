@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-LOG_PATH = PROJECT_ROOT / "logs" / "refactor_plan.json"
+LOG_PATH = PROJECT_ROOT / "airflow_docker" / "logs" / "refactor_plan.json"
 EXCLUDE_DIRS = {"venv", ".git", "__pycache__", "models", "logs", "tmp"}
 TARGET_EXT = ".py"
 
