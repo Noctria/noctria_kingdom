@@ -32,7 +32,6 @@ services:
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /noctria_kingdom
     volumes:
       - /mnt/d/noctria-kingdom/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
       - /mnt/d/noctria-kingdom/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
@@ -66,7 +65,6 @@ services:
       HF_TOKEN: your_huggingface_token_here
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /noctria_kingdom
     volumes:
       - /mnt/d/noctria-kingdom/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
       - /mnt/d/noctria-kingdom/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
@@ -95,7 +93,6 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
-      PYTHONPATH: /noctria_kingdom
     volumes:
       - /mnt/d/noctria-kingdom/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
       - /mnt/d/noctria-kingdom/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
