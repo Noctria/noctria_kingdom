@@ -16,12 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
+# ✅ CeleryExecutor に必要な追加パッケージ
+RUN pip install --no-cache-dir \
+    'apache-airflow[celery]==2.9.1' \
+    'flower' \
+    'redis'
+
 USER airflow
 
-# ✅ PYTHONPATH を Airflow 全体に適用（ここが肝）
+# ✅ PYTHONPATH を Airflow 全体に適用
 ENV PYTHONPATH=/noctria_kingdom/airflow_docker
 
-# ✅ 依存ライブラリをコピー
+# ✅ requirements.txt をコピー
 COPY requirements.txt /requirements.txt
 
 # ✅ Pythonライブラリのインストール（CPU限定のTorch含む）
