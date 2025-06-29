@@ -94,7 +94,7 @@ services:
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
       - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
       - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
-    command: worker
+    command: celery workerr
     restart: always
 
 volumes:
