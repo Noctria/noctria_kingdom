@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir \
     'redis'
 
 # ✅ PYTHONPATH を Airflow 全体に適用
-ENV PYTHONPATH=/noctria_kingdom/airflow_docker
+ENV PYTHONPATH=/noctria_kingdom
 
 # ✅ requirements.txt をコピー
 COPY requirements.txt /requirements.txt
