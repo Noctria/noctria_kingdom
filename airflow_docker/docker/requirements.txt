@@ -2,7 +2,7 @@
 # 🧠 AI / Deep Learning
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.2+cpu
-tensorflow==2.15.0
+tensorflow-cpu==2.15.0
 tensorboard==2.15.1
 
 # 🏹 強化学習・戦略最適化
