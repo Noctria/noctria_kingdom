@@ -1,116 +1,52 @@
 version: "3.8"
 
 services:
-  postgres:
-    image: postgres:13
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
-    restart: always
-
-  redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
-    restart: always
-
   airflow-webserver:
-    build:
-      context: ./docker
-    image: noctria-airflow
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__WEBSERVER__RBAC: "True"
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /noctria_kingdom
+    ...
     volumes:
-      - ./airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
-      - ./airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
-      - ./airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - ./airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - ./core:/noctria_kingdom/core
-      - ./strategies:/noctria_kingdom/strategies
-      - ./data:/noctria_kingdom/data
-      - ./models:/noctria_kingdom/models
-      - ./institutions:/noctria_kingdom/institutions
-      - ./veritas:/noctria_kingdom/veritas
-      - ./tests:/noctria_kingdom/tests
-    ports:
-      - "8080:8080"
-    command: webserver
-    restart: always
+      - /mnt/d/noctria-kingdom/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - /mnt/d/noctria-kingdom/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - /mnt/d/noctria-kingdom/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - /mnt/d/noctria-kingdom/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - /mnt/d/noctria-kingdom/core:/noctria_kingdom/core
+      - /mnt/d/noctria-kingdom/strategies:/noctria_kingdom/strategies
+      - /mnt/d/noctria-kingdom/data:/noctria_kingdom/data
+      - /mnt/d/noctria-kingdom/models:/noctria_kingdom/models
+      - /mnt/d/noctria-kingdom/institutions:/noctria_kingdom/institutions
+      - /mnt/d/noctria-kingdom/veritas:/noctria_kingdom/veritas
+      - /mnt/d/noctria-kingdom/tests:/noctria_kingdom/tests
 
   airflow-scheduler:
-    build:
-      context: ./docker
-    image: noctria-airflow
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
-      HF_TOKEN: your_huggingface_token_here  # 🔒 適宜.env等に移動推奨
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      PYTHONPATH: /noctria_kingdom
+    ...
     volumes:
-      - ./airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
-      - ./airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
-      - ./airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - ./airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - ./core:/noctria_kingdom/core
-      - ./strategies:/noctria_kingdom/strategies
-      - ./data:/noctria_kingdom/data
-      - ./models:/noctria_kingdom/models
-      - ./institutions:/noctria_kingdom/institutions
-      - ./veritas:/noctria_kingdom/veritas
-      - ./tools:/noctria_kingdom/tools
-      - ./tests:/noctria_kingdom/tests
-    command: scheduler
-    restart: always
+      - /mnt/d/noctria-kingdom/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - /mnt/d/noctria-kingdom/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - /mnt/d/noctria-kingdom/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - /mnt/d/noctria-kingdom/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - /mnt/d/noctria-kingdom/core:/noctria_kingdom/core
+      - /mnt/d/noctria-kingdom/strategies:/noctria_kingdom/strategies
+      - /mnt/d/noctria-kingdom/data:/noctria_kingdom/data
+      - /mnt/d/noctria-kingdom/models:/noctria_kingdom/models
+      - /mnt/d/noctria-kingdom/institutions:/noctria_kingdom/institutions
+      - /mnt/d/noctria-kingdom/veritas:/noctria_kingdom/veritas
+      - /mnt/d/noctria-kingdom/tools:/noctria_kingdom/tools
+      - /mnt/d/noctria-kingdom/tests:/noctria_kingdom/tests
 
   airflow-worker:
-    build:
-      context: ./docker
-    image: noctria-airflow
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
-      PYTHONPATH: /noctria_kingdom
+    ...
     volumes:
-      - ./airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
-      - ./airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
-      - ./airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
-      - ./airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
-      - ./core:/noctria_kingdom/core
-      - ./strategies:/noctria_kingdom/strategies
-      - ./data:/noctria_kingdom/data
-      - ./models:/noctria_kingdom/models
-      - ./institutions:/noctria_kingdom/institutions
-      - ./veritas:/noctria_kingdom/veritas
-      - ./tools:/noctria_kingdom/tools
-      - ./tests:/noctria_kingdom/tests
-    command: celery worker
-    restart: always
+      - /mnt/d/noctria-kingdom/airflow_docker/dags:/noctria_kingdom/airflow_docker/dags
+      - /mnt/d/noctria-kingdom/airflow_docker/logs:/noctria_kingdom/airflow_docker/logs
+      - /mnt/d/noctria-kingdom/airflow_docker/plugins:/noctria_kingdom/airflow_docker/plugins
+      - /mnt/d/noctria-kingdom/airflow_docker/scripts:/noctria_kingdom/airflow_docker/scripts
+      - /mnt/d/noctria-kingdom/core:/noctria_kingdom/core
+      - /mnt/d/noctria-kingdom/strategies:/noctria_kingdom/strategies
+      - /mnt/d/noctria-kingdom/data:/noctria_kingdom/data
+      - /mnt/d/noctria-kingdom/models:/noctria_kingdom/models
+      - /mnt/d/noctria-kingdom/institutions:/noctria_kingdom/institutions
+      - /mnt/d/noctria-kingdom/veritas:/noctria_kingdom/veritas
+      - /mnt/d/noctria-kingdom/tools:/noctria_kingdom/tools
+      - /mnt/d/noctria-kingdom/tests:/noctria_kingdom/tests
 
 volumes:
   postgres-db-volume:
