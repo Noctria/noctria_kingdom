@@ -26,6 +26,7 @@ services:
       - redis
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__WEBSERVER__RBAC: "True"
@@ -58,10 +59,11 @@ services:
       - redis
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
-      HF_TOKEN: your_huggingface_token_here  # 🔒 ここだけ必要に応じて安全に管理
+      HF_TOKEN: your_huggingface_token_here  # 🔒 適宜.env等に移動推奨
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       PYTHONPATH: /noctria_kingdom
@@ -90,6 +92,7 @@ services:
       - redis
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@postgres/airflow
       PYTHONPATH: /noctria_kingdom
