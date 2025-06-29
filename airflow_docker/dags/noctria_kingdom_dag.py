@@ -1,9 +1,13 @@
 import sys
-sys.path.append('/opt/airflow')  # Docker環境対応（必要に応じて）
-
+import os
+import glob
+import importlib.util
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
+
+# sys.path を明示的に追加（Airflow上の /opt/airflow 想定）
+sys.path.append('/opt/airflow')
 
 from core.logger import setup_logger
 from core.noctria import Noctria
@@ -25,17 +29,16 @@ default_args = {
 dag = DAG(
     dag_id='noctria_kingdom_dag',
     default_args=default_args,
-    description='Noctria王国全体戦略統合DAG（XCom連携）',
-    schedule_interval=None,  # 必要に応じて '@daily' などに変更
+    description='Noctria王国全体戦略統合DAG（XCom連携＋Veritas連動）',
+    schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'kingdom'],
 )
 
-# === 共通ロガー ===
 logger = setup_logger("NoctriaDecision", "/noctria_kingdom/airflow_docker/logs/noctria_decision.log")
 
-# === 各戦略AIタスク定義 ===
+# === 各臣下AIタスク ===
 def aurus_task(**kwargs):
     try:
         decision = AurusSingularis().process({"trend_strength": 0.6})
@@ -68,27 +71,72 @@ def prometheus_task(**kwargs):
     except Exception as e:
         logger.error(f"[Prometheus] exception: {e}")
 
-# === 王Noctriaの統合意思決定 ===
+# === Veritas 戦略（official/以下） ===
+OFFICIAL_STRATEGY_DIR = "/noctria_kingdom/strategies/official"
+
+def load_official_strategies():
+    strategies = []
+    for file_path in glob.glob(os.path.join(OFFICIAL_STRATEGY_DIR, "*.py")):
+        module_name = os.path.basename(file_path).replace(".py", "")
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        mod = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(mod)
+            if hasattr(mod, "simulate"):
+                strategies.append((module_name, mod.simulate))
+        except Exception as e:
+            logger.error(f"[Veritas] 読み込み失敗: {module_name}: {e}")
+    return strategies
+
+def dynamic_veritas_task(simulate_func, name):
+    def task(**kwargs):
+        logger.info(f"[Veritas_{name}] 実行開始")
+        try:
+            result = simulate_func()
+            logger.info(f"[Veritas_{name}] 結果: {result}")
+            kwargs["ti"].xcom_push(key=f"veritas_{name}_decision", value=result)
+        except Exception as e:
+            logger.error(f"[Veritas_{name}] 実行エラー: {e}")
+    return task
+
+# === 王による最終決定 ===
 def noctria_final_decision(**kwargs):
     ti = kwargs['ti']
     decisions = {
-        "Aurus": ti.xcom_pull(task_ids='aurus_strategy', key='aurus_decision'),
-        "Levia": ti.xcom_pull(task_ids='levia_strategy', key='levia_decision'),
-        "Noctus": ti.xcom_pull(task_ids='noctus_strategy', key='noctus_decision'),
-        "Prometheus": ti.xcom_pull(task_ids='prometheus_strategy', key='prometheus_decision'),
+        "Aurus": ti.xcom_pull(key='aurus_decision', task_ids='aurus_strategy'),
+        "Levia": ti.xcom_pull(key='levia_decision', task_ids='levia_strategy'),
+        "Noctus": ti.xcom_pull(key='noctus_decision', task_ids='noctus_strategy'),
+        "Prometheus": ti.xcom_pull(key='prometheus_decision', task_ids='prometheus_strategy'),
     }
+
+    # Veritas追加戦略も取り込み
+    for mod_name, _ in load_official_strategies():
+        key = f"veritas_{mod_name}_decision"
+        task_id = f"veritas_strategy_{mod_name}"
+        val = ti.xcom_pull(key=key, task_ids=task_id)
+        decisions[f"Veritas_{mod_name}"] = val
+
     logger.info(f"👑 王Noctriaが受け取った判断: {decisions}")
     noctria = Noctria()
     final_action = noctria.meta_ai.decide_final_action(decisions)
     logger.info(f"🏰 王国全体の最終戦略決定: {final_action}")
 
-# === DAGへのタスク登録 ===
+# === DAG 登録 ===
 with dag:
-    aurus_op = PythonOperator(task_id='aurus_strategy', python_callable=aurus_task)
-    levia_op = PythonOperator(task_id='levia_strategy', python_callable=levia_task)
-    noctus_op = PythonOperator(task_id='noctus_strategy', python_callable=noctus_task)
-    prometheus_op = PythonOperator(task_id='prometheus_strategy', python_callable=prometheus_task)
+    t1 = PythonOperator(task_id='aurus_strategy', python_callable=aurus_task)
+    t2 = PythonOperator(task_id='levia_strategy', python_callable=levia_task)
+    t3 = PythonOperator(task_id='noctus_strategy', python_callable=noctus_task)
+    t4 = PythonOperator(task_id='prometheus_strategy', python_callable=prometheus_task)
 
-    final_decision_op = PythonOperator(task_id='noctria_final_decision', python_callable=noctria_final_decision)
+    veritas_tasks = []
+    for mod_name, simulate_fn in load_official_strategies():
+        task_id = f"veritas_strategy_{mod_name}"
+        op = PythonOperator(
+            task_id=task_id,
+            python_callable=dynamic_veritas_task(simulate_fn, mod_name),
+        )
+        veritas_tasks.append(op)
 
-    [aurus_op, levia_op, noctus_op, prometheus_op] >> final_decision_op
+    t5 = PythonOperator(task_id='noctria_final_decision', python_callable=noctria_final_decision)
+
+    [t1, t2, t3, t4, *veritas_tasks] >> t5
