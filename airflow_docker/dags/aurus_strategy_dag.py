@@ -1,12 +1,10 @@
 import sys
-sys.path.append('/opt/airflow')  # ✅ Airflowコンテナのルートパスを追加
+sys.path.append('/opt/airflow')  # Airflowコンテナルートに対応
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from strategies.aurus_singularis import AurusSingularis
 
-# === DAG共通設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -26,7 +24,6 @@ dag = DAG(
     tags=['noctria', 'trend-analysis'],
 )
 
-# === Veritasなどの外部AIからのmarket_data注入 ===
 def veritas_trigger_task(**kwargs):
     ti = kwargs['ti']
     mock_market_data = {
@@ -44,11 +41,9 @@ def veritas_trigger_task(**kwargs):
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
-# === Aurusによるトレンド解析と判断 ===
 def aurus_strategy_task(**kwargs):
     ti = kwargs['ti']
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
-
     if input_data is None:
         print("⚠️ Veritasからのデータが無かったため、デフォルトで実行します")
         input_data = {k: 0.0 for k in [
@@ -56,9 +51,11 @@ def aurus_strategy_task(**kwargs):
             "order_block", "institutional_flow", "short_interest",
             "momentum", "trend_prediction", "liquidity_ratio"
         ]}
-        input_data["price"] = 1.0  # 少なくとも価格は必要と仮定
+        input_data["price"] = 1.0
 
     try:
+        # ✅ 重い import をここに移動
+        from strategies.aurus_singularis import AurusSingularis
         aurus = AurusSingularis()
         decision = aurus.process(input_data)
         ti.xcom_push(key='aurus_decision', value=decision)
@@ -67,7 +64,6 @@ def aurus_strategy_task(**kwargs):
         print(f"❌ Aurus戦略中にエラー発生: {e}")
         raise
 
-# === DAG登録 ===
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
