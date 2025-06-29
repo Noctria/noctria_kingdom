@@ -1,31 +1,34 @@
 #!/bin/bash
 
-# ===============================
-# 🛠️ Noctria Kingdom Airflow 初期化スクリプト
-# ===============================
-
 set -e
 
-echo "📦 Airflow DB 初期化開始..."
+echo "⚙️ 初期化開始：Airflow Database & ユーザー設定"
+
+# Airflow DB 初期化 & マイグレーション
+airflow db check || true
 airflow db init
 
-echo "👤 ユーザー作成: admin / admin"
+# Admin ユーザー作成（存在しない場合のみ）
+echo "👤 Admin ユーザーを作成..."
 airflow users create \
     --username admin \
     --firstname Noctria \
-    --lastname Administrator \
+    --lastname Admin \
     --role Admin \
-    --email noctria@kingdom.ai \
-    --password admin || echo "⚠️ 既にユーザーが存在します。スキップ"
+    --email admin@noctria.ai \
+    --password admin || true
 
-echo "🔌 PostgreSQL Optuna 接続登録（optuna_db）..."
-if [ -z "$OPTUNA_DB_URL" ]; then
-  echo "❌ .env に OPTUNA_DB_URL が定義されていません。スキップします。"
-else
-  airflow connections add 'optuna_db' \
-    --conn-uri "${OPTUNA_DB_URL}" \
-    --conn-type 'postgres' \
-    --conn-description "Optuna Study DB" || echo "⚠️ optuna_db 接続は既に存在。スキップ"
-fi
+# Optuna DB接続情報を Airflow Connections に登録
+echo "🔗 Optuna DB 接続情報を airflow connections に登録..."
+airflow connections delete optuna_db || true
+airflow connections add optuna_db \
+    --conn-uri "${OPTUNA_DB_URL}"
 
-echo "✅ 初期化完了。Airflow 起動準備OK。"
+# HuggingFace Token の XCom 共有・キャッシュ指定用
+echo "🔐 HuggingFace Token 接続情報を airflow connections に登録..."
+airflow connections delete huggingface_token || true
+airflow connections add huggingface_token \
+    --conn-type generic \
+    --extra "{\"token\": \"${HF_TOKEN}\", \"hf_home\": \"${HF_HOME}\"}"
+
+echo "✅ Airflow 初期化完了"
