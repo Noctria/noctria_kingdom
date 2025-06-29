@@ -1,30 +1,21 @@
-# === Airflow & 基本パッケージ ===
-apache-airflow==2.9.1
-apache-airflow-providers-postgres
-apache-airflow-providers-redis
-psycopg2-binary
-redis
-python-dotenv
+# ================================
+# 🌪 Noctria Kingdom: Airflow Dockerfile
+# ベース: Apache Airflow 2.9.1 + Python 3.10
+# ================================
 
-# === AI・強化学習関連 ===
-gymnasium==0.28.1
-stable-baselines3==2.2.1
-shimmy
+FROM apache/airflow:2.9.1-python3.10
 
-# === データ処理・分析 ===
-pandas
-numpy
-scikit-learn
-optuna
-matplotlib
-seaborn
+# 環境変数（ログ強度やPYTHONPATHの調整など）
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/noctria_kingdom
 
-# === LLM・API関連 ===
-requests
-huggingface_hub
-transformers
-accelerate
-sentencepiece
+# パッケージリストをコンテナにコピー
+COPY requirements.txt /requirements.txt
 
-# === その他ユーティリティ ===
-tqdm
+# pipパッケージをインストール
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir -r /requirements.txt
+
+# DAGsフォルダやその他構成ファイルの初期コピー（任意で追記）
+# COPY dags /opt/airflow/dags
+# COPY plugins /opt/airflow/plugins
