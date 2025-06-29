@@ -12,10 +12,6 @@ ENV PYTHONUNBUFFERED=1 \
 # パッケージリストをコンテナにコピー
 COPY requirements.txt /requirements.txt
 
-# pipパッケージをインストール
+# pipパッケージをインストール（Airflow 2.9.1対応）
 RUN pip install --upgrade pip \
  && pip install --no-cache-dir -r /requirements.txt
-
-# DAGsフォルダやその他構成ファイルの初期コピー（任意で追記）
-# COPY dags /opt/airflow/dags
-# COPY plugins /opt/airflow/plugins
