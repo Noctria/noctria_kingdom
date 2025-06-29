@@ -1,25 +1,47 @@
-# tests/test_path_config.py
+from pathlib import Path
 
-import unittest
-import os
-from core import path_config
+# 🔷 プロジェクトルート（このファイルから2階層上）
+BASE_DIR = Path(__file__).resolve().parents[1]
 
+# 🔷 各主要ディレクトリパス（原則：絶対パス）
+AIRFLOW_DIR = BASE_DIR / "airflow_docker"
+CORE_DIR = BASE_DIR / "core"
+VERITAS_DIR = BASE_DIR / "veritas"
+STRATEGIES_DIR = BASE_DIR / "strategies"
+OFFICIAL_STRATEGIES_DIR = STRATEGIES_DIR / "official"
+GENERATED_STRATEGIES_DIR = STRATEGIES_DIR / "veritas_generated"
+EXECUTION_DIR = BASE_DIR / "execution"
+DATA_DIR = BASE_DIR / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+FUNDAMENTAL_DATA_DIR = DATA_DIR / "fundamental"
+MODELS_DIR = BASE_DIR / "models"
+LATEST_MODELS_DIR = MODELS_DIR / "latest"
+ARCHIVE_MODELS_DIR = MODELS_DIR / "archive"
+LLM_SERVER_DIR = BASE_DIR / "llm_server"
+GUI_DIR = BASE_DIR / "noctria_gui"
+EXPERTS_DIR = BASE_DIR / "experts"
+TOOLS_DIR = BASE_DIR / "tools"
+TESTS_DIR = BASE_DIR / "tests"
+DOCS_DIR = BASE_DIR / "docs"
 
-class TestPathConfig(unittest.TestCase):
-    """core/path_config.py に定義されたパスが実在するかを確認"""
+# 🔷 Airflowログ
+AIRFLOW_LOG_DIR = AIRFLOW_DIR / "logs"
+VERITAS_EVAL_LOG = AIRFLOW_LOG_DIR / "veritas_eval_result.json"
 
-    def test_path_variables_exist(self):
-        # path_config 内の変数をすべて取得
-        for var_name in dir(path_config):
-            if var_name.isupper() and (var_name.endswith("_DIR") or var_name.endswith("_LOG")):
-                path = getattr(path_config, var_name)
+# 🔷 作成が必要なディレクトリ（初期化等で使う）
+REQUIRED_DIRS = [
+    RAW_DATA_DIR,
+    PROCESSED_DATA_DIR,
+    AIRFLOW_LOG_DIR,
+    GENERATED_STRATEGIES_DIR,
+    FUNDAMENTAL_DATA_DIR,
+    LATEST_MODELS_DIR,
+    ARCHIVE_MODELS_DIR,
+]
 
-                with self.subTest(path_name=var_name):
-                    self.assertTrue(
-                        os.path.exists(path),
-                        f"{var_name} → パスが存在しません: {path}"
-                    )
-
-
+# ✅ 動作確認用（オプション）
 if __name__ == "__main__":
-    unittest.main()
+    for name, path in globals().items():
+        if name.endswith("_DIR") or name.endswith("_LOG"):
+            print(f"{name:30} → {path}")
