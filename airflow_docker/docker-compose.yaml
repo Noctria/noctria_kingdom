@@ -12,15 +12,24 @@ services:
       - postgres-db-volume:/var/lib/postgresql/data
     restart: always
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: always
+
   airflow-webserver:
     build:
       context: ./docker
     image: noctria-airflow
     depends_on:
       - postgres
+      - redis
     env_file: .env
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       AIRFLOW__WEBSERVER__RBAC: "True"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
@@ -47,11 +56,14 @@ services:
     image: noctria-airflow
     depends_on:
       - postgres
+      - redis
     env_file: .env
     environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
       HF_TOKEN: ${HF_TOKEN}
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       PYTHONPATH: ${PYTHONPATH}
@@ -77,9 +89,12 @@ services:
     image: noctria-airflow
     depends_on:
       - postgres
+      - redis
     env_file: .env
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       PYTHONPATH: ${PYTHONPATH}
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
@@ -94,7 +109,7 @@ services:
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
       - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
       - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
-    command: celery workerr
+    command: celery worker
     restart: always
 
 volumes:
