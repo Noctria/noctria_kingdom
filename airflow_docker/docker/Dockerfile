@@ -1,45 +1,30 @@
-FROM apache/airflow:2.9.1-python3.10
+# === Airflow & 基本パッケージ ===
+apache-airflow==2.9.1
+apache-airflow-providers-postgres
+apache-airflow-providers-redis
+psycopg2-binary
+redis
+python-dotenv
 
-USER root
+# === AI・強化学習関連 ===
+gymnasium==0.28.1
+stable-baselines3==2.2.1
+shimmy
 
-# ✅ システム依存パッケージのインストール
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
-    libpq-dev \
-    build-essential \
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    curl \
-    git \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+# === データ処理・分析 ===
+pandas
+numpy
+scikit-learn
+optuna
+matplotlib
+seaborn
 
-# 🔻 USER airflow に切り替えてから pip install を行う（ここが重要）
-USER airflow
+# === LLM・API関連 ===
+requests
+huggingface_hub
+transformers
+accelerate
+sentencepiece
 
-# ✅ CeleryExecutor に必要な追加パッケージ
-RUN pip install --no-cache-dir \
-    'apache-airflow[celery]==2.9.1' \
-    'flower' \
-    'redis'
-
-# ✅ PYTHONPATH を Airflow 全体に適用
-ENV PYTHONPATH=/noctria_kingdom
-
-# ✅ requirements.txt をコピー
-COPY requirements.txt /requirements.txt
-
-# ✅ Pythonライブラリのインストール（CPU限定のTorch含む）
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir torch==2.2.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir \
-        pytest \
-        transformers \
-        accelerate \
-        sentencepiece \
-        huggingface-hub \
-        einops \
-        peft && \
-    pip install --no-cache-dir -r /requirements.txt
+# === その他ユーティリティ ===
+tqdm
