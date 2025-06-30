@@ -9,9 +9,9 @@ FROM apache/airflow:2.7.3-python3.10
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/noctria_kingdom
 
-# パッケージリストと制約ファイルをコンテナにコピー
+# パッケージリストだけをコンテナにコピー
 COPY requirements.txt /requirements.txt
-COPY constraints.txt /constraints.txt
+# constraints.txt はマウント運用（COPYしない）
 
 # pipパッケージをインストール（Airflow 2.7.3 + constraints対応）
 RUN pip install --upgrade pip \
