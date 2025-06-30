@@ -1,8 +1,7 @@
 # ===============================
 # 🧠 AI / Deep Learning
 # ===============================
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.3.1+cpu
+torch==2.3.1+cpu                 # https://download.pytorch.org/whl/cpu
 tensorflow-cpu==2.15.0
 tensorboard==2.15.1
 transformers==4.40.2
@@ -10,9 +9,9 @@ transformers==4.40.2
 # ===============================
 # 🏹 強化学習 / 戦略最適化
 # ===============================
-optuna==3.6.1
 stable-baselines3==2.2.1
-gymnasium==0.28.1
+optuna==3.6.1
+gymnasium[classic_control]==0.28.1
 shimmy==1.2.0
 
 # ===============================
