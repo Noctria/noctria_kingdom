@@ -20,7 +20,8 @@ services:
 
   airflow-webserver:
     build:
-      context: ./docker
+      context: ..
+      dockerfile: airflow_docker/docker/Dockerfile
     image: noctria-airflow
     depends_on:
       - postgres
@@ -46,7 +47,6 @@ services:
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
       - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
       - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
-      - ../constraints.txt:/constraints.txt   # ✅ constraints.txt をマウント
     ports:
       - "8080:8080"
     command: webserver
@@ -54,7 +54,8 @@ services:
 
   airflow-scheduler:
     build:
-      context: ./docker
+      context: ..
+      dockerfile: airflow_docker/docker/Dockerfile
     image: noctria-airflow
     depends_on:
       - postgres
@@ -78,13 +79,13 @@ services:
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
       - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
       - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
-      - ../constraints.txt:/constraints.txt   # ✅ constraints.txt をマウント
     command: scheduler
     restart: always
 
   airflow-worker:
     build:
-      context: ./docker
+      context: ..
+      dockerfile: airflow_docker/docker/Dockerfile
     image: noctria-airflow
     depends_on:
       - postgres
@@ -108,7 +109,6 @@ services:
       - ${HOST_VERITAS_PATH}:/noctria_kingdom/veritas
       - ${HOST_TOOLS_PATH}:/noctria_kingdom/tools
       - ${HOST_TESTS_PATH}:/noctria_kingdom/tests
-      - ../constraints.txt:/constraints.txt   # ✅ constraints.txt をマウント
     command: celery worker
     restart: always
 
