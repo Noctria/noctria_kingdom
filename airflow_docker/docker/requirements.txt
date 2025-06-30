@@ -1,33 +1,25 @@
 # ===============================
-# ✈ Airflow Core
-# ===============================
-apache-airflow==2.9.1
-sqlalchemy==1.4.51                  # ✅ Airflow 2.9.xと互換性あり
-psycopg2-binary==2.9.9
-
-# ===============================
 # 🧠 AI / Deep Learning
 # ===============================
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.3.1+cpu
 tensorflow-cpu==2.15.0
 tensorboard==2.15.1
-transformers==4.40.2                # ✅ Veritas対応用
+transformers==4.40.2
 
 # ===============================
 # 🏹 強化学習 / 戦略最適化
 # ===============================
 optuna==3.6.1
 stable-baselines3==2.2.1
-gymnasium==0.28.1                   # ✅ sb3対応
-shimmy==1.2.0                       # ✅ gymnasium依存
-celery[postgresql]==5.3.6          # ✅ CeleryExecutor用
+gymnasium==0.28.1
+shimmy==1.2.0
 
 # ===============================
 # 📊 データ分析 / 統計戦略
 # ===============================
 pandas==2.3.0
-numpy==1.26.4                       # ✅ NumPy 2.x 非互換回避
+numpy==1.26.4
 scikit-learn==1.4.2
 statsmodels==0.14.1
 
