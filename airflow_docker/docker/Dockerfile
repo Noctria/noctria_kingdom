@@ -1,22 +1,18 @@
 # ================================
 # 🌪 Noctria Kingdom: Airflow Dockerfile
-# ベース: Airflow 2.7.3 + Python 3.10
+# ベース: Apache Airflow 2.7.3 + Python 3.10
 # ================================
 
 FROM apache/airflow:2.7.3-python3.10
 
-# 作業ディレクトリ
-WORKDIR /opt/airflow
-
-# 環境変数
+# 環境変数（ログ強度やPYTHONPATHの調整など）
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/noctria_kingdom \
-    AIRFLOW_HOME=/opt/airflow
+    PYTHONPATH=/noctria_kingdom
 
-# requirements + constraints ファイル追加
+# パッケージリストと制約ファイルをコンテナにコピー
 COPY requirements.txt /requirements.txt
-ADD https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-3.10.txt /constraints.txt
+COPY constraints.txt /constraints.txt
 
-# 依存関係インストール
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r /requirements.txt --constraint /constraints.txt
+# pipパッケージをインストール（Airflow 2.7.3 + constraints対応）
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir -r /requirements.txt --constraint /constraints.txt
