@@ -1,22 +1,33 @@
 import os
+from pathlib import Path
 
 # 🔗 環境変数からベースパス取得（Docker対応）
-BASE_DIR = os.getenv("TARGET_PROJECT_ROOT", "/noctria_kingdom")
+BASE_DIR = Path(os.getenv("TARGET_PROJECT_ROOT", "/noctria_kingdom")).resolve()
 
-# 📂 各ディレクトリ定義（共通参照）
-DAGS_DIR = os.path.join(BASE_DIR, "airflow_docker", "dags")
-LOGS_DIR = os.path.join(BASE_DIR, "airflow_docker", "logs")
-PLUGINS_DIR = os.path.join(BASE_DIR, "airflow_docker", "plugins")
-SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
-CORE_DIR = os.path.join(BASE_DIR, "core")
-STRATEGIES_DIR = os.path.join(BASE_DIR, "strategies")
-DATA_DIR = os.path.join(BASE_DIR, "data")
-MODELS_DIR = os.path.join(BASE_DIR, "models")
-INSTITUTIONS_DIR = os.path.join(BASE_DIR, "institutions")
-VERITAS_DIR = os.path.join(BASE_DIR, "veritas")
-TOOLS_DIR = os.path.join(BASE_DIR, "tools")
-TESTS_DIR = os.path.join(BASE_DIR, "tests")
+# 📂 各ディレクトリ定義
+DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
+LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
+PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
 
-# 📝 ファイル単体パス
-VERITAS_EVAL_LOG = os.path.join(LOGS_DIR, "veritas_eval_result.json")
-USDJPY_CSV = os.path.join(LOGS_DIR, "USDJPY_M1_201501020805_202506161647.csv")
+SCRIPTS_DIR = BASE_DIR / "scripts"
+CORE_DIR = BASE_DIR / "core"
+STRATEGIES_DIR = BASE_DIR / "strategies"
+DATA_DIR = BASE_DIR / "data"
+MODELS_DIR = BASE_DIR / "models"
+INSTITUTIONS_DIR = BASE_DIR / "institutions"
+VERITAS_DIR = BASE_DIR / "veritas"
+TOOLS_DIR = BASE_DIR / "tools"
+TESTS_DIR = BASE_DIR / "tests"
+
+# 📝 ファイルパス
+VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
+USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
+
+# 🌐 エクスポート
+__all__ = [
+    "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
+    "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
+    "MODELS_DIR", "INSTITUTIONS_DIR", "VERITAS_DIR",
+    "TOOLS_DIR", "TESTS_DIR",
+    "VERITAS_EVAL_LOG", "USDJPY_CSV"
+]
