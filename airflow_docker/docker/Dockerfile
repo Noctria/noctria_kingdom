@@ -11,8 +11,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 # パッケージリストと制約ファイルをコンテナにコピー
 COPY requirements.txt /requirements.txt
-COPY constraints.txt /constraints.txt
+COPY constraints.txt /tmp/
 
 # pipパッケージをインストール（Airflow 2.7.3 + constraints対応）
 RUN pip install --upgrade pip \
- && pip install --no-cache-dir -r /requirements.txt --constraint /constraints.txt
+ && pip install --no-cache-dir -r /requirements.txt --constraint /tmp/constraints.txt
