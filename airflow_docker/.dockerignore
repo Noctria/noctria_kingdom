@@ -1,0 +1,9 @@
+# .dockerignore
+constraints.txt
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.log
+.env
