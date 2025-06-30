@@ -15,4 +15,4 @@ COPY requirements.txt /requirements.txt
 
 # pipパッケージをインストール（Airflow 2.7.3 + constraints対応）
 RUN pip install --upgrade pip \
- && pip install --no-cache-dir -r /requirements.txt --constraint /constraints.txt
+ && pip install --no-cache-dir -r /requirements.txt --constraint /noctria_kingdom/airflow_docker/docker/constraints.txt
