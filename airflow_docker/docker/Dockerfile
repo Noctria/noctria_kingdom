@@ -10,8 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/noctria_kingdom
 
 # パッケージリストだけをコンテナにコピー
-COPY requirements.txt /requirements.txt
-# constraints.txt はマウント運用（COPYしない）
+COPY airflow_docker/docker/constraints.txt /constraints.txt
 
 # pipパッケージをインストール（Airflow 2.7.3 + constraints対応）
 RUN pip install --upgrade pip \
