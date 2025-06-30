@@ -20,8 +20,8 @@ services:
 
   airflow-webserver:
     build:
-      context: ./docker
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: airflow_docker/docker/Dockerfile
     image: noctria-airflow
     depends_on:
       - postgres
