@@ -1,0 +1,9 @@
+torch==2.3.1
+tensorflow-cpu==2.15.0
+tensorboard==2.15.1
+transformers==4.40.2
+stable-baselines3==2.2.1
+optuna==3.6.1
+gymnasium[classic_control]==0.28.1
+shimmy==1.2.0
+yfinance==0.2.62
