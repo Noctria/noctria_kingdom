@@ -34,6 +34,7 @@ services:
       AIRFLOW__CELERY__RESULT_BACKEND: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
