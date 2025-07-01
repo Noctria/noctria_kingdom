@@ -3,6 +3,16 @@ from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
+from pathlib import Path
+import os
+
+# 🔧 ベースパス（Docker対応）: config.py不要で環境変数から取得
+BASE_DIR = Path(os.getenv("TARGET_PROJECT_ROOT", "/noctria_kingdom")).resolve()
+
+# 📂 統一パス定義
+TOOLS_DIR = BASE_DIR / "tools"
+SCRIPTS_DIR = BASE_DIR / "scripts"
+TESTS_DIR = BASE_DIR / "tests"
 
 default_args = {
     "owner": "noctria",
@@ -21,7 +31,7 @@ with DAG(
 
     scan_structure = BashOperator(
         task_id="scan_structure",
-        bash_command="python3 tools/scan_refactor_plan.py",
+        bash_command=f"python3 {TOOLS_DIR / 'scan_refactor_plan.py'}",
     )
 
     pause_for_review = EmptyOperator(
@@ -35,22 +45,22 @@ with DAG(
 
     dry_run_refactor = BashOperator(
         task_id="dry_run_refactor",
-        bash_command="python3 tools/apply_refactor_plan.py --dry-run",
+        bash_command=f"python3 {TOOLS_DIR / 'apply_refactor_plan.py'} --dry-run",
     )
 
     run_tests = BashOperator(
         task_id="run_tests",
-        bash_command="pytest tests/",
+        bash_command=f"pytest {TESTS_DIR}",
     )
 
     apply_refactor = BashOperator(
         task_id="apply_refactor",
-        bash_command="python3 tools/apply_refactor_plan.py",
+        bash_command=f"python3 {TOOLS_DIR / 'apply_refactor_plan.py'}",
     )
 
     push_to_github = BashOperator(
         task_id="push_to_github",
-        bash_command="python3 scripts/github_push.py",
+        bash_command=f"python3 {SCRIPTS_DIR / 'github_push.py'}",
         trigger_rule=TriggerRule.ALL_SUCCESS,
     )
 
