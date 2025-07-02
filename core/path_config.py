@@ -27,6 +27,20 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 
+# 🧪 構造整合性チェック関数（Airflow DAG用）
+def _lint_path_config():
+    """主要パスの存在チェックを行う"""
+    checks = {
+        "BASE_DIR": BASE_DIR.exists(),
+        "DAGS_DIR": DAGS_DIR.exists(),
+        "LOGS_DIR": LOGS_DIR.exists(),
+        "STRATEGIES_DIR": STRATEGIES_DIR.exists(),
+        "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
+        "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
+        "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
+    }
+    return checks
+
 # 🌐 エクスポート（__all__でIDE補完対応）
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
@@ -34,5 +48,6 @@ __all__ = [
     "MODELS_DIR", "INSTITUTIONS_DIR", "VERITAS_DIR",
     "TOOLS_DIR", "TESTS_DIR",
     "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
-    "VERITAS_EVAL_LOG", "USDJPY_CSV"
+    "VERITAS_EVAL_LOG", "USDJPY_CSV",
+    "_lint_path_config"
 ]
