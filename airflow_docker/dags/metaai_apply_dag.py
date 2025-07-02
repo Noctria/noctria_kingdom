@@ -1,19 +1,21 @@
+import sys
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-import sys
-import os
 
-# 🔧 Airflow内PYTHONPATH（Docker環境でも対応）
-sys.path.append("/opt/airflow")
+# ✅ Noctria Kingdom パス管理（v2.0）
+from core.path_config import SCRIPTS_DIR
 
-# ✅ MetaAI最適パラメータ適用関数（外部スクリプトからの読み込み）
-from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
+# ✅ Docker・Airflow環境対応：スクリプトディレクトリを明示追加
+sys.path.append(str(SCRIPTS_DIR))
 
-# ✅ DAG定義
+# ✅ 外部スクリプト：MetaAIへの最適パラメータ適用ロジック
+from apply_best_params_to_metaai import apply_best_params_to_metaai
+
+# ✅ DAG構成：MetaAIへの単体適用用DAG
 with DAG(
     dag_id="metaai_apply_dag",
-    schedule_interval=None,  # 人の操作または他DAGによるトリガーを想定
+    schedule_interval=None,  # GUI or 他DAGからのトリガー前提
     start_date=days_ago(1),
     catchup=False,
     tags=["noctria", "metaai", "retrain"],
