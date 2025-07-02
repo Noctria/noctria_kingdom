@@ -1,8 +1,7 @@
 # core/__init__.py
 
-import logging
 from core.utils import setup_logger
-from core.path_config import DATA_DIR, LOGS_DIR
+from core.path_config import RAW_DATA_DIR, PROCESSED_DATA_DIR, LOGS_DIR
 
 def initialize_system():
     """Noctria Kingdomの初期設定を行う"""
@@ -11,8 +10,8 @@ def initialize_system():
 
     # 必要なディレクトリの作成（path_configで一元管理）
     required_dirs = [
-        DATA_DIR / "raw",
-        DATA_DIR / "processed",
+        RAW_DATA_DIR,
+        PROCESSED_DATA_DIR,
         LOGS_DIR
     ]
     for dir_path in required_dirs:
