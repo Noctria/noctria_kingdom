@@ -1,65 +1,74 @@
+# tools/apply_refactor_plan.py
+
 import os
 import json
 import shutil
+from pathlib import Path
 
-ROOT_DIR = "/noctria_kingdom"
-PLAN_PATH = os.path.join(ROOT_DIR, "logs", "refactor_plan.json")
+# ✅ パス一元管理
+try:
+    from core.path_config import BASE_DIR, LOGS_DIR
+except ImportError:
+    BASE_DIR = Path(__file__).resolve().parents[1]
+    LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 
-def load_plan(path):
-    with open(path, "r") as f:
+PLAN_PATH = LOGS_DIR / "refactor_plan.json"
+
+def load_plan(path: Path) -> list:
+    if not path.exists():
+        print(f"❌ No refactor plan found at {path}")
+        return []
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def apply_refactor_step(src_path, dst_path):
-    abs_src = os.path.join(ROOT_DIR, src_path)
-    abs_dst = os.path.join(ROOT_DIR, dst_path)
+def apply_refactor_step(src: str, dst: str):
+    abs_src = BASE_DIR / src
+    abs_dst = BASE_DIR / dst
 
-    if not os.path.exists(abs_src):
-        print(f"⚠️ Not found: {src_path}")
+    if not abs_src.exists():
+        print(f"⚠️ Not found: {src}")
         return
 
-    os.makedirs(os.path.dirname(abs_dst), exist_ok=True)
-    shutil.move(abs_src, abs_dst)
-    print(f"📁 Moved: {src_path} → {dst_path}")
+    os.makedirs(abs_dst.parent, exist_ok=True)
+    shutil.move(str(abs_src), str(abs_dst))
+    print(f"📁 Moved: {src} → {dst}")
 
-    # パスの参照も書き換え（importやopen等）
-    update_references(src_path, dst_path)
+    update_references(src, dst)
 
-def update_references(old_path, new_path):
-    all_py_files = []
-
-    for dirpath, _, filenames in os.walk(ROOT_DIR):
-        for filename in filenames:
-            if filename.endswith(".py"):
-                all_py_files.append(os.path.join(dirpath, filename))
-
+def update_references(old_path: str, new_path: str):
+    all_py_files = list(BASE_DIR.rglob("*.py"))
     old_import = path_to_import(old_path)
     new_import = path_to_import(new_path)
 
-    for file_path in all_py_files:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+    for file in all_py_files:
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e:
+            print(f"⚠️ Skipping unreadable file: {file} ({e})")
+            continue
 
         if old_import in content or old_path in content:
-            content = content.replace(old_import, new_import)
-            content = content.replace(old_path, new_path)
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"✏️ Updated import in: {os.path.relpath(file_path, ROOT_DIR)}")
+            new_content = content.replace(old_import, new_import).replace(old_path, new_path)
+            with open(file, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            print(f"✏️ Updated import in: {file.relative_to(BASE_DIR)}")
 
-def path_to_import(path):
+def path_to_import(path: str) -> str:
     return path.replace("/", ".").replace(".py", "")
 
 def main():
-    if not os.path.exists(PLAN_PATH):
-        print(f"❌ No refactor plan found at {PLAN_PATH}")
+    plan = load_plan(PLAN_PATH)
+    if not plan:
         return
 
-    plan = load_plan(PLAN_PATH)
     print(f"🧠 Applying {len(plan)} refactor steps...")
-
     for step in plan:
-        apply_refactor_step(step["src"], step["dst"])
-
+        src = step.get("file")
+        suggested = step.get("suggested_dir")
+        if src and suggested:
+            dst = str(Path(suggested) / Path(src).name)
+            apply_refactor_step(src, dst)
     print("✅ Refactoring complete!")
 
 if __name__ == "__main__":
