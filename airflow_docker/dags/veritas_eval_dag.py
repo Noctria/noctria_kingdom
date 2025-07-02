@@ -5,9 +5,17 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
+# ✅ Noctria Kingdom v2.0 パス一元管理
+from core.path_config import (
+    STRATEGIES_DIR,
+    LOGS_DIR,
+    DATA_DIR
+)
+
 from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
 from core.market_loader import load_market_data
 
+# === DAG基本設定 ===
 default_args = {
     'owner': 'Veritas',
     'depends_on_past': False,
@@ -27,17 +35,19 @@ dag = DAG(
     tags=['veritas', 'evaluation', 'pdca'],
 )
 
-def evaluate_and_adopt_strategies(**kwargs):
-    generated_dir = "/noctria_kingdom/strategies/veritas_generated"
-    official_dir = "/noctria_kingdom/strategies/official"
-    log_path = "/noctria_kingdom/airflow_docker/logs/veritas_eval_result.json"
+# === 評価＆昇格処理 ===
+def evaluate_and_adopt_strategies():
+    generated_dir = STRATEGIES_DIR / "veritas_generated"
+    official_dir = STRATEGIES_DIR / "official"
+    log_path = LOGS_DIR / "veritas_eval_result.json"
+    data_csv_path = DATA_DIR / "market_data.csv"
 
     os.makedirs(official_dir, exist_ok=True)
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    os.makedirs(log_path.parent, exist_ok=True)
 
-    market_data = load_market_data("market_data.csv")
+    market_data = load_market_data(str(data_csv_path))
 
-    if os.path.exists(log_path):
+    if log_path.exists():
         with open(log_path, "r") as f:
             eval_logs = json.load(f)
     else:
@@ -47,10 +57,10 @@ def evaluate_and_adopt_strategies(**kwargs):
         if not filename.endswith(".py"):
             continue
 
-        path = os.path.join(generated_dir, filename)
+        path = generated_dir / filename
         print(f"🔍 評価対象: {filename}")
 
-        result = simulate_strategy_adjusted(path, market_data)
+        result = simulate_strategy_adjusted(str(path), market_data)
 
         log_entry = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -63,9 +73,8 @@ def evaluate_and_adopt_strategies(**kwargs):
             "error_message": result.get("error_message")
         }
 
-        if result["status"] == "ok" and result["final_capital"] and result["final_capital"] >= 1_050_000:
-            # 採用
-            save_path = os.path.join(official_dir, filename)
+        if result["status"] == "ok" and result.get("final_capital", 0) >= 1_050_000:
+            save_path = official_dir / filename
             with open(path, "r") as src, open(save_path, "w") as dst:
                 dst.write(src.read())
             print(f"✅ 採用: {filename}（資産 {result['final_capital']:,.0f}円）")
@@ -81,9 +90,9 @@ def evaluate_and_adopt_strategies(**kwargs):
     with open(log_path, "w") as f:
         json.dump(eval_logs, f, indent=2)
 
+# === DAGへ登録 ===
 with dag:
     evaluate_task = PythonOperator(
         task_id='evaluate_and_adopt_generated_strategies',
         python_callable=evaluate_and_adopt_strategies,
-        provide_context=True,
     )
