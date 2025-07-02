@@ -1,54 +1,39 @@
-import os
+# tools/hardcoded_path_replacer.py
+
 import re
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TARGET_DIRS = ["core", "veritas", "execution", "airflow_docker", "scripts"]
-REPLACEMENTS = {
-    # ハードコードされた文字列 : 置換後の表現（path_configの定義名）
-    '"data/'              : 'str(PROCESSED_DATA_DIR / "',  # e.g., "data/xxx.csv" → str(PROCESSED_DATA_DIR / "xxx.csv")
-    "'data/"              : "str(PROCESSED_DATA_DIR / '",
-    '"/noctria_kingdom/'  : 'str(BASE_DIR / "',
-    "'/noctria_kingdom/"  : "str(BASE_DIR / '",
-    '"./data/'            : 'str(PROCESSED_DATA_DIR / "',
-    "'./data/"            : "str(PROCESSED_DATA_DIR / '"
+# パス変換ルール（文字列 → path_configの定数名）
+REPLACEMENT_RULES = {
+    r'["\']?/noctria_kingdom/airflow_docker/dags["\']?': "DAGS_DIR",
+    r'["\']?/noctria_kingdom/airflow_docker/logs["\']?': "LOGS_DIR",
+    r'["\']?/noctria_kingdom/airflow_docker/plugins["\']?': "PLUGINS_DIR",
+    r'["\']?/noctria_kingdom/scripts["\']?': "SCRIPTS_DIR",
+    r'["\']?/noctria_kingdom/core["\']?': "CORE_DIR",
+    r'["\']?/noctria_kingdom/strategies["\']?': "STRATEGIES_DIR",
+    r'["\']?/noctria_kingdom/data["\']?': "DATA_DIR",
+    r'["\']?/noctria_kingdom/models["\']?': "MODELS_DIR",
+    r'["\']?/noctria_kingdom/institutions["\']?': "INSTITUTIONS_DIR",
+    r'["\']?/noctria_kingdom/veritas["\']?': "VERITAS_DIR",
+    r'["\']?/noctria_kingdom/tools["\']?': "TOOLS_DIR",
+    r'["\']?/noctria_kingdom/tests["\']?': "TESTS_DIR",
 }
 
-IMPORT_LINE = "from core.path_config import *"
-
-def process_file(file_path: Path):
+def replace_paths(file_path: Path):
+    """ファイル内のハードコードされたパスを path_config 定数に置換する"""
     with open(file_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        content = f.read()
 
-    updated_lines = []
-    modified = False
-    import_inserted = False
+    replaced = False
+    for pattern, const in REPLACEMENT_RULES.items():
+        if re.search(pattern, content):
+            content = re.sub(pattern, const, content)
+            replaced = True
 
-    for i, line in enumerate(lines):
-        original_line = line
-        for key, value in REPLACEMENTS.items():
-            if key in line:
-                line = line.replace(key, value)
-                modified = True
+    if replaced:
+        # 既に import 済みか確認
+        if "from core.path_config import" not in content:
+            content = f"from core.path_config import *\n\n{content}"
 
-        updated_lines.append(line)
-
-    # 既に import 済でなければ自動挿入
-    if modified and not any("from core.path_config import" in l for l in lines):
-        updated_lines.insert(0, IMPORT_LINE + "\n")
-        import_inserted = True
-
-    if modified:
         with open(file_path, "w", encoding="utf-8") as f:
-            f.writelines(updated_lines)
-        print(f"✅ Updated: {file_path.relative_to(PROJECT_ROOT)}" + (" (import added)" if import_inserted else ""))
-
-def scan_and_replace():
-    print("🔍 Scanning for hardcoded paths...")
-    for dir_name in TARGET_DIRS:
-        target_path = PROJECT_ROOT / dir_name
-        for py_file in target_path.rglob("*.py"):
-            process_file(py_file)
-
-if __name__ == "__main__":
-    scan_and_replace()
+            f.write(content)
