@@ -1,9 +1,15 @@
 import sys
-sys.path.append('/opt/airflow')  # ✅ Airflow コンテナから core/, strategies/ などを参照可能に
-
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
+
+# ✅ パス一元管理（Noctria Kingdom v2.0 原則）
+from core.path_config import CORE_DIR
+
+# ✅ Airflowコンテナ上で core/, strategies/ などを参照可能にする
+sys.path.append(str(CORE_DIR.parent))
+
+# ✅ 王のAIロジック本体
 from core.noctria import Noctria
 
 # === DAG共通設定 ===
@@ -34,10 +40,9 @@ def royal_decision_task():
     result = king.execute_trade()
     print(f"👑 王の御宣託：{result}")
 
-# === タスク登録 ===
+# === DAGにタスクを登録（司令官としての役目）
 with dag:
     royal_task = PythonOperator(
         task_id='noctria_royal_decision_task',
         python_callable=royal_decision_task,
-        dag=dag,
     )
