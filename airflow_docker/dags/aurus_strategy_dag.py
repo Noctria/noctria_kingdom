@@ -1,9 +1,13 @@
 import sys
-sys.path.append('/opt/airflow')  # ✅ Airflowコンテナ環境対応
-
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
+
+# ✅ パスの統一管理（Noctria Kingdom v2.0 構成）
+from core.path_config import STRATEGIES_DIR
+
+# ✅ Airflowコンテナ環境対応
+sys.path.append(str(STRATEGIES_DIR))
 
 # ✅ DAG共通設定
 default_args = {
@@ -15,7 +19,6 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-# ✅ DAG定義
 dag = DAG(
     dag_id='aurus_strategy_dag',
     default_args=default_args,
@@ -66,7 +69,7 @@ def aurus_strategy_task(**kwargs):
         }
 
     try:
-        from strategies.aurus_singularis import AurusSingularis
+        from aurus_singularis import AurusSingularis  # STRATEGIES_DIR に含まれると仮定
         aurus = AurusSingularis()
         decision = aurus.process(input_data)
         ti.xcom_push(key='aurus_decision', value=decision)
@@ -75,7 +78,7 @@ def aurus_strategy_task(**kwargs):
         print(f"❌ Aurus戦略中にエラー発生: {e}")
         raise
 
-# ✅ DAG定義（タスク構築）
+# ✅ DAG構築（Airflow指揮官）
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
