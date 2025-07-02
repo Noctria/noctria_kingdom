@@ -1,14 +1,15 @@
 import sys
-sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
-
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
 
-# ✅ 重いインポートはタスク関数内で実行する（後述）
-# from strategies.levia_tempest import LeviaTempest ← DAG起動遅延の原因になる
+# ✅ Noctria Kingdom v2.0 パス管理
+from core.path_config import STRATEGIES_DIR
 
-# === DAG共通設定 ===
+# ✅ コンテナ環境用PYTHONPATHに追加（Airflow Worker用）
+sys.path.append(str(STRATEGIES_DIR))
+
+# ✅ DAG共通設定
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -28,7 +29,7 @@ dag = DAG(
     tags=['noctria', 'scalping'],
 )
 
-# === Veritas等からのデータ注入タスク ===
+# === Veritasからのデータ注入（模擬） ===
 def veritas_trigger_task(ti, **kwargs):
     mock_market_data = {
         "price": 1.2050,
@@ -40,7 +41,7 @@ def veritas_trigger_task(ti, **kwargs):
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
-# === Leviaによるスキャルピング判断タスク ===
+# === Leviaによるスキャルピング判断 ===
 def levia_strategy_task(ti, **kwargs):
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
 
@@ -56,7 +57,7 @@ def levia_strategy_task(ti, **kwargs):
         }
 
     try:
-        from strategies.levia_tempest import LeviaTempest
+        from levia_tempest import LeviaTempest  # STRATEGIES_DIR に配置されている前提
         levia = LeviaTempest()
         decision = levia.process(input_data)
 
@@ -67,7 +68,7 @@ def levia_strategy_task(ti, **kwargs):
         print(f"❌ Levia戦略中にエラー発生: {e}")
         raise
 
-# === DAGへ登録 ===
+# === DAGタスク構成（Airflow司令官） ===
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
