@@ -5,12 +5,15 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-sys.path.append('/opt/airflow')
-
+# ✅ Noctria Kingdom v2.0 パス管理構成
+from core.path_config import LOGS_DIR, STRATEGIES_DIR
 from core.logger import setup_logger
 from core.noctria import Noctria
 
-# === DAG設定 ===
+# ✅ PYTHONPATHをAirflow Workerで有効化（戦略読み込み用）
+sys.path.append(str(STRATEGIES_DIR / "official"))
+
+# === DAG共通設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -30,12 +33,14 @@ dag = DAG(
     tags=['noctria', 'kingdom', 'veritas']
 )
 
-# === ロガー初期化 ===
-logger = setup_logger("NoctriaDecision", "/noctria_kingdom/airflow_docker/logs/noctria_decision.log")
+# === ログファイル（v2.0構成に準拠）
+log_file_path = LOGS_DIR / "noctria_decision.log"
+logger = setup_logger("NoctriaDecision", str(log_file_path))
 
-# === 各戦略ファイルを official/ から動的ロード ===
-OFFICIAL_DIR = "/noctria_kingdom/strategies/official"
+# === 戦略ディレクトリの取得（ハードコード撤廃）
+OFFICIAL_DIR = STRATEGIES_DIR / "official"
 
+# === 動的タスク生成関数 ===
 def create_strategy_task(strategy_name, strategy_path):
     def strategy_callable(**kwargs):
         try:
@@ -56,18 +61,20 @@ def create_strategy_task(strategy_name, strategy_path):
 
     return strategy_callable
 
+# === DAGタスク定義 ===
 with dag:
     strategy_tasks = []
     for fname in os.listdir(OFFICIAL_DIR):
         if fname.endswith(".py"):
             strategy_name = os.path.splitext(fname)[0]
-            strategy_path = os.path.join(OFFICIAL_DIR, fname)
+            strategy_path = str(OFFICIAL_DIR / fname)
             task = PythonOperator(
                 task_id=f"{strategy_name}_strategy",
                 python_callable=create_strategy_task(strategy_name, strategy_path)
             )
             strategy_tasks.append((strategy_name, task))
 
+    # === Noctriaによる統合判断 ===
     def noctria_final_decision(**kwargs):
         ti = kwargs['ti']
         decisions = {}
