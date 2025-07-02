@@ -4,7 +4,9 @@ sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from strategies.levia_tempest import LeviaTempest
+
+# ✅ 重いインポートはタスク関数内で実行する（後述）
+# from strategies.levia_tempest import LeviaTempest ← DAG起動遅延の原因になる
 
 # === DAG共通設定 ===
 default_args = {
@@ -27,8 +29,7 @@ dag = DAG(
 )
 
 # === Veritas等からのデータ注入タスク ===
-def veritas_trigger_task(**kwargs):
-    ti = kwargs['ti']
+def veritas_trigger_task(ti, **kwargs):
     mock_market_data = {
         "price": 1.2050,
         "previous_price": 1.2040,
@@ -40,8 +41,7 @@ def veritas_trigger_task(**kwargs):
     ti.xcom_push(key='market_data', value=mock_market_data)
 
 # === Leviaによるスキャルピング判断タスク ===
-def levia_strategy_task(**kwargs):
-    ti = kwargs['ti']
+def levia_strategy_task(ti, **kwargs):
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
 
     if input_data is None:
@@ -55,24 +55,28 @@ def levia_strategy_task(**kwargs):
             "volatility": 0.1
         }
 
-    levia = LeviaTempest()
-    decision = levia.process(input_data)
+    try:
+        from strategies.levia_tempest import LeviaTempest
+        levia = LeviaTempest()
+        decision = levia.process(input_data)
 
-    ti.xcom_push(key='levia_decision', value=decision)
-    print(f"⚔️ Levia: 『王よ、我が刃はこの刻、{decision}に振るうと見定めました。』")
+        ti.xcom_push(key='levia_decision', value=decision)
+        print(f"⚔️ Levia: 『王よ、我が刃はこの刻、{decision}に振るうと見定めました。』")
+
+    except Exception as e:
+        print(f"❌ Levia戦略中にエラー発生: {e}")
+        raise
 
 # === DAGへ登録 ===
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
         python_callable=veritas_trigger_task,
-        provide_context=True,
     )
 
     levia_task = PythonOperator(
         task_id='levia_scalping_task',
         python_callable=levia_strategy_task,
-        provide_context=True,
     )
 
     veritas_task >> levia_task
