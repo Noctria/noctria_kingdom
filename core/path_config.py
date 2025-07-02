@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 
-# 🔗 環境変数からベースパス取得（Docker対応）
-BASE_DIR = Path(os.getenv("TARGET_PROJECT_ROOT", "/noctria_kingdom")).resolve()
+# 🔗 環境変数からベースパス取得（Docker/WSL/ローカル開発を考慮）
+BASE_DIR = Path(os.getenv("TARGET_PROJECT_ROOT", "/mnt/d/noctria-kingdom-main")).resolve()
 
 # 📂 各ディレクトリ定義
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
@@ -23,7 +23,7 @@ TESTS_DIR = BASE_DIR / "tests"
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 
-# 🌐 エクスポート
+# 🌐 エクスポート（__all__でIDE補完対応）
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
     "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
