@@ -1,12 +1,18 @@
 import sys
-sys.path.append('/opt/airflow')  # ✅ AirflowコンテナのPYTHONPATHを明示
-
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
-from strategies.prometheus_oracle import PrometheusOracle
 
-# === DAG設定 ===
+# ✅ パス集中管理（v2.0構成）
+from core.path_config import STRATEGIES_DIR
+
+# ✅ Airflow Worker用のPYTHONPATH追加（strategies読み込み用）
+sys.path.append(str(STRATEGIES_DIR))
+
+# ✅ Prometheus予測AIのインポート
+from prometheus_oracle import PrometheusOracle
+
+# === DAG共通設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -16,20 +22,19 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
+# === DAG定義 ===
 dag = DAG(
     dag_id='prometheus_strategy_dag',
     default_args=default_args,
-    description='Noctria Kingdomの臣下Prometheusによる未来予測戦略DAG',
+    description='🔮 Noctria Kingdomの臣下Prometheusによる未来予測戦略DAG',
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'forecasting'],
 )
 
-# === Veritasから受け取ったデータをXComに注入するタスク ===
-def veritas_trigger_task(**kwargs):
-    ti = kwargs['ti']
-    # Veritasなど外部から受け取ったと仮定した mock データ
+# === Veritas等からのデータ注入（模擬）
+def veritas_trigger_task(ti, **kwargs):
     mock_market_data = {
         "price": 1.2345,
         "volume": 1000,
@@ -45,9 +50,8 @@ def veritas_trigger_task(**kwargs):
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
-# === Prometheus戦略による未来予測タスク ===
-def prometheus_strategy_task(**kwargs):
-    ti = kwargs['ti']
+# === Prometheus戦略による未来予測
+def prometheus_strategy_task(ti, **kwargs):
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
 
     if input_data is None:
@@ -62,7 +66,6 @@ def prometheus_strategy_task(**kwargs):
     prometheus = PrometheusOracle()
     forecast = prometheus.predict_market(input_data)
 
-    # 予測結果をXComに保存（FastAPI側がpullできる）
     ti.xcom_push(key='forecast_result', value=forecast)
 
     # ログ出力
@@ -75,18 +78,16 @@ def prometheus_strategy_task(**kwargs):
 
     print(f"🔮 Prometheus: score = {forecast:.4f} → decision = {decision}")
 
-# === DAGに登録 ===
+# === DAGにタスク登録 ===
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
         python_callable=veritas_trigger_task,
-        provide_context=True
     )
 
     prometheus_task = PythonOperator(
         task_id='prometheus_forecast_task',
         python_callable=prometheus_strategy_task,
-        provide_context=True
     )
 
     veritas_task >> prometheus_task
