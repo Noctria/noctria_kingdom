@@ -1,18 +1,19 @@
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
-from pathlib import Path
+
+# パス定義（path_config.py 経由）
+from core.path_config import TOOLS_DIR, SCRIPTS_DIR, TESTS_DIR
+
+import sys
 import os
 
-# 🔧 ベースパス（Docker対応）: config.py不要で環境変数から取得
-BASE_DIR = Path(os.getenv("TARGET_PROJECT_ROOT", "/noctria_kingdom")).resolve()
-
-# 📂 統一パス定義
-TOOLS_DIR = BASE_DIR / "tools"
-SCRIPTS_DIR = BASE_DIR / "scripts"
-TESTS_DIR = BASE_DIR / "tests"
+# PythonPath に BASE_DIR を追加（Airflow Worker 上でもimport解決）
+BASE_DIR = str(TOOLS_DIR.parent)
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
 
 default_args = {
     "owner": "noctria",
@@ -29,9 +30,13 @@ with DAG(
 
     start = EmptyOperator(task_id="start")
 
-    scan_structure = BashOperator(
+    def run_scan_structure():
+        from tools import scan_refactor_plan
+        scan_refactor_plan.main()
+
+    scan_structure = PythonOperator(
         task_id="scan_structure",
-        bash_command=f"python3 {TOOLS_DIR / 'scan_refactor_plan.py'}",
+        python_callable=run_scan_structure,
     )
 
     pause_for_review = EmptyOperator(
@@ -43,24 +48,40 @@ with DAG(
         """,
     )
 
-    dry_run_refactor = BashOperator(
+    def run_dry_run_refactor():
+        from tools import apply_refactor_plan
+        apply_refactor_plan.main(dry_run=True)
+
+    dry_run_refactor = PythonOperator(
         task_id="dry_run_refactor",
-        bash_command=f"python3 {TOOLS_DIR / 'apply_refactor_plan.py'} --dry-run",
+        python_callable=run_dry_run_refactor,
     )
 
-    run_tests = BashOperator(
+    def run_tests():
+        import pytest
+        return pytest.main([str(TESTS_DIR)])
+
+    run_tests_op = PythonOperator(
         task_id="run_tests",
-        bash_command=f"pytest {TESTS_DIR}",
+        python_callable=run_tests,
     )
 
-    apply_refactor = BashOperator(
+    def run_apply_refactor():
+        from tools import apply_refactor_plan
+        apply_refactor_plan.main(dry_run=False)
+
+    apply_refactor = PythonOperator(
         task_id="apply_refactor",
-        bash_command=f"python3 {TOOLS_DIR / 'apply_refactor_plan.py'}",
+        python_callable=run_apply_refactor,
     )
 
-    push_to_github = BashOperator(
+    def push_to_github():
+        from scripts import github_push
+        github_push.main()
+
+    push_to_github_op = PythonOperator(
         task_id="push_to_github",
-        bash_command=f"python3 {SCRIPTS_DIR / 'github_push.py'}",
+        python_callable=push_to_github,
         trigger_rule=TriggerRule.ALL_SUCCESS,
     )
 
@@ -68,4 +89,4 @@ with DAG(
 
     # DAG依存関係の構築
     start >> scan_structure >> pause_for_review
-    pause_for_review >> dry_run_refactor >> run_tests >> apply_refactor >> push_to_github >> end
+    pause_for_review >> dry_run_refactor >> run_tests_op >> apply_refactor >> push_to_github_op >> end
