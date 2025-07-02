@@ -8,8 +8,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from dotenv import load_dotenv
 import torch
 
-# 📦 .env 読み込み
-load_dotenv("/opt/airflow/.env")
+# ✅ パス集中管理（v2.0対応）
+from core.path_config import MODELS_DIR, STRATEGIES_DIR, CORE_DIR
+
+# ✅ .env 読み込み（Airflow起動時に一度だけ読み込まれる想定）
+load_dotenv(dotenv_path=str(CORE_DIR.parent / ".env"))
 
 # === 環境変数 ===
 DB_NAME = os.getenv("POSTGRES_DB", "airflow")
@@ -17,14 +20,13 @@ DB_USER = os.getenv("POSTGRES_USER", "airflow")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
-MODEL_DIR = os.getenv("MODEL_DIR", "/noctria_kingdom/airflow_docker/models/nous-hermes-2")
+MODEL_DIR = os.getenv("MODEL_DIR", str(MODELS_DIR / "nous-hermes-2"))
 
-# === GitHub用変数（.env経由）===
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_REPO = os.getenv("GITHUB_REPO")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# 📁 モデルロード（グローバルキャッシュ）
+# === モデルロードキャッシュ ===
 model = None
 tokenizer = None
 
@@ -47,8 +49,8 @@ def save_and_push_strategy(code: str, strategy_name: str = None):
     from subprocess import run
     now = datetime.now().strftime("%Y%m%d_%H%M")
     filename = strategy_name or f"strategy_{now}.py"
-    save_dir = "/opt/airflow/strategies/veritas_generated"
-    save_path = os.path.join(save_dir, filename)
+    save_dir = STRATEGIES_DIR / "veritas_generated"
+    save_path = save_dir / filename
 
     os.makedirs(save_dir, exist_ok=True)
     with open(save_path, "w", encoding="utf-8") as f:
@@ -57,7 +59,7 @@ def save_and_push_strategy(code: str, strategy_name: str = None):
     print(f"💾 戦略を保存しました: {save_path}")
 
     try:
-        run(["git", "add", save_path], check=True)
+        run(["git", "add", str(save_path)], check=True)
         run(["git", "commit", "-m", f"🤖 Veritas戦略自動追加: {filename}"], check=True)
         if GITHUB_TOKEN:
             remote = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_USERNAME}/{GITHUB_REPO}.git"
@@ -93,7 +95,6 @@ def run_veritas_and_save():
             )
             conn.commit()
         print("✅ 戦略をDBに保存しました。")
-
     except Exception as e:
         logging.error("🚨 DB保存に失敗: %s", e)
         raise
@@ -101,7 +102,7 @@ def run_veritas_and_save():
         if conn:
             conn.close()
 
-    # ✅ GitHub Push（生成内容を .py で保存）
+    # ✅ GitHubへ戦略反映
     save_and_push_strategy(response)
 
 # === DAG定義 ===
