@@ -1,3 +1,4 @@
+from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -17,7 +18,7 @@ def forward_test():
     print("✅ フォワードテスト開始！")
 
     # 実際の市場データ（MT5からダウンロードしたデータなど）
-    real_time_data_path = "data/preprocessed_usdjpy_with_fundamental.csv"
+    real_time_data_path = str(PROCESSED_DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv")
     real_time_data = load_real_time_data(real_time_data_path)
 
     # 各戦略AI（実際のモデルで置き換え可）

@@ -7,7 +7,6 @@ from airflow.operators.python import PythonOperator
 from core.path_config import STRATEGIES_DIR
 
 # ✅ PythonPath に戦略ディレクトリを追加（Airflow Worker対応）
-sys.path.append(str(STRATEGIES_DIR))
 
 # ✅ Noctus戦略クラスの読み込み
 from noctus_sentinella import NoctusSentinella

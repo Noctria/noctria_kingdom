@@ -8,7 +8,6 @@ from airflow.utils.dates import days_ago
 from core.path_config import SCRIPTS_DIR
 
 # ✅ Python モジュール参照用に scripts ディレクトリを明示追加
-sys.path.append(str(SCRIPTS_DIR))
 
 # ✅ 外部スクリプトの関数をインポート（PDCA構成）
 from optimize_params_with_optuna import optimize_main

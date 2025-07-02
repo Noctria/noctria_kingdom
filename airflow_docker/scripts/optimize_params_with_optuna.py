@@ -1,3 +1,4 @@
+from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -8,7 +9,6 @@ import json
 from datetime import datetime
 
 # ✅ Airflowパス追加（Docker内部用）
-sys.path.append('/noctria_kingdom/airflow_docker')
 
 # ✅ Optuna + TensorBoard
 from stable_baselines3.common.callbacks import BaseCallback

@@ -11,7 +11,6 @@ from core.path_config import TOOLS_DIR, SCRIPTS_DIR, TESTS_DIR
 # ✅ sys.path に BASE_DIR を追加（Airflowコンテナ対応）
 BASE_DIR = str(TOOLS_DIR.parent)
 if BASE_DIR not in sys.path:
-    sys.path.append(BASE_DIR)
 
 # ✅ DAG 共通設定
 default_args = {

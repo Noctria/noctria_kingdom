@@ -4,7 +4,6 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 # ✅ PYTHONPATH を補完（Airflowコンテナ内では /opt/airflow がベース）
-sys.path.append('/opt/airflow')
 
 # ✅ パス集中管理と Lint関数
 from core.path_config import _lint_path_config, VERITAS_EVAL_LOG

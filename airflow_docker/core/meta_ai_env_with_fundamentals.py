@@ -1,3 +1,4 @@
+from core.path_config import *
 """
 meta_ai_env_with_fundamentals.py
 PPO強化学習エージェント用の環境クラス。
@@ -71,6 +72,6 @@ class TradingEnvWithFundamentals(gym.Env):
 
 if __name__ == "__main__":
     # ✅ 単体テスト
-    env = TradingEnvWithFundamentals("data/preprocessed_usdjpy_with_fundamental.csv")
+    env = TradingEnvWithFundamentals(str(PROCESSED_DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"))
     obs, _ = env.reset()
     print("✅ 初期観測ベクトル:", obs)

@@ -1,8 +1,8 @@
+from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8
 
 import sys
-sys.path.append('/opt/airflow')  # Airflow内で core モジュールが見えるようにする！
 
 import gym
 import numpy as np

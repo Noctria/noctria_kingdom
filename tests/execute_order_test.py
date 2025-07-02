@@ -1,6 +1,6 @@
+from core.path_config import *
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
 
 from order_execution import OrderExecution  # execution/order_execution.py
 

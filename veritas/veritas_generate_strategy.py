@@ -1,8 +1,9 @@
+from core.path_config import *
 import os
 from datetime import datetime
 
 # 保存先ディレクトリ
-OUTPUT_DIR = "/mnt/d/noctria-kingdom-main/strategies/veritas_generated"
+OUTPUT_DIR = str(GENERATED_STRATEGIES_DIR)
 
 # Veritasが生成した戦略テンプレート（simulate関数付き・dict対応）
 STRATEGY_TEMPLATE = """\

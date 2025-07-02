@@ -1,3 +1,4 @@
+from core.path_config import *
 # tests/run_ai_trading_loop.py
 
 import time
@@ -6,18 +7,14 @@ import os
 import numpy as np
 
 # ✅ プロジェクトルートをパスに追加
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # execution/ ディレクトリ
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'execution')))
 from order_execution import OrderExecution
 
 # strategies/ ディレクトリ
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'strategies')))
 from NoctriaMasterAI import NoctriaMasterAI
 
 # data/ ディレクトリ
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data')))
 from market_data_fetcher import MarketDataFetcher
 
 # 各コンポーネント初期化

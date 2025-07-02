@@ -1,3 +1,4 @@
+from core.path_config import *
 import os
 import logging
 from core.utils import setup_logger
@@ -8,7 +9,7 @@ def initialize_system():
     logger.info("Noctria Kingdomのシステム初期化を開始")
 
     # 必要なディレクトリの作成
-    required_dirs = ["data/raw_data", "data/processed_data", "logs"]
+    required_dirs = [str(PROCESSED_DATA_DIR / "raw_data"), str(PROCESSED_DATA_DIR / "processed_data"), "logs"]
     for dir in required_dirs:
         if not os.path.exists(dir):
             os.makedirs(dir)

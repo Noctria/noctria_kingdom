@@ -7,7 +7,6 @@ from airflow.operators.python import PythonOperator
 from core.path_config import STRATEGIES_DIR
 
 # ✅ コンテナ環境用PYTHONPATHに追加（Airflow Worker用）
-sys.path.append(str(STRATEGIES_DIR))
 
 # ✅ DAG共通設定
 default_args = {

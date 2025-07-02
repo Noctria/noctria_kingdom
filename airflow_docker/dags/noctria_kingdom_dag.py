@@ -11,7 +11,6 @@ from core.logger import setup_logger
 from core.noctria import Noctria
 
 # ✅ PYTHONPATHをAirflow Workerで有効化（戦略読み込み用）
-sys.path.append(str(STRATEGIES_DIR / "official"))
 
 # === DAG共通設定 ===
 default_args = {

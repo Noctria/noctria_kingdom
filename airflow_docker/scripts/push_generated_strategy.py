@@ -1,10 +1,11 @@
+from core.path_config import *
 # scripts/push_generated_strategy.py
 import subprocess
 import os
 from datetime import datetime
 
 def push_generated_strategies():
-    repo_dir = "/mnt/d/noctria-kingdom-main"
+    repo_dir = str(BASE_DIR)
     strategy_dir = "strategies/veritas_generated"
 
     os.chdir(repo_dir)

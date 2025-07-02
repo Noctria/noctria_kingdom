@@ -7,7 +7,6 @@ from airflow.operators.python import PythonOperator
 from core.path_config import STRATEGIES_DIR
 
 # ✅ Airflow Worker用のPYTHONPATH追加（strategies読み込み用）
-sys.path.append(str(STRATEGIES_DIR))
 
 # ✅ Prometheus予測AIのインポート
 from prometheus_oracle import PrometheusOracle

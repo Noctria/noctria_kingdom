@@ -1,3 +1,4 @@
+from core.path_config import *
 from huggingface_hub import snapshot_download
 import os
 
@@ -5,7 +6,7 @@ import os
 HF_TOKEN = os.getenv("HF_TOKEN", "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")
 
 # 保存先ディレクトリ（Airflow/Dockerマウントパスと一致させる）
-TARGET_DIR = "/mnt/d/noctria-kingdom-main/airflow_docker/models/nous-hermes-2"
+TARGET_DIR = str(MODELS_DIR)
 
 # モデルダウンロード
 snapshot_download(

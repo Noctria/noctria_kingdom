@@ -1,9 +1,9 @@
+from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8
 
 import os
 import sys
-sys.path.append('/opt/airflow')  # Docker/Airflow用のパス
 
 from stable_baselines3 import PPO
 from core.meta_ai import MetaAI  # カスタム環境

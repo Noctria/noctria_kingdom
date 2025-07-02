@@ -7,7 +7,6 @@ from airflow.operators.python import PythonOperator
 from core.path_config import CORE_DIR
 
 # ✅ Airflowコンテナ上で core/, strategies/ などを参照可能にする
-sys.path.append(str(CORE_DIR.parent))
 
 # ✅ 王のAIロジック本体
 from core.noctria import Noctria

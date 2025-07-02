@@ -7,7 +7,6 @@ from airflow.utils.dates import days_ago
 from core.path_config import SCRIPTS_DIR
 
 # ✅ コンテナ用PYTHONPATH
-sys.path.append(str(SCRIPTS_DIR))
 
 # ✅ 外部スクリプト読み込み
 from evaluate_metaai_model import evaluate_metaai_model

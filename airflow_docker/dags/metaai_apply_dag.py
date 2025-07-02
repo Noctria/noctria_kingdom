@@ -7,7 +7,6 @@ from airflow.utils.dates import days_ago
 from core.path_config import SCRIPTS_DIR
 
 # ✅ Docker・Airflow環境対応：スクリプトディレクトリを明示追加
-sys.path.append(str(SCRIPTS_DIR))
 
 # ✅ 外部スクリプト：MetaAIへの最適パラメータ適用ロジック
 from apply_best_params_to_metaai import apply_best_params_to_metaai
