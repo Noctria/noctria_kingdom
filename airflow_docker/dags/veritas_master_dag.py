@@ -1,24 +1,24 @@
-import sys
 import os
 import json
 import random
 from datetime import datetime, timedelta
 
-sys.path.append('/opt/airflow')  # or '/noctria_kingdom/airflow_docker' if needed
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# AIモジュール
+# ✅ Noctria Kingdom パス集中管理
+from core.path_config import LOGS_DIR
+
+# ✅ 各AI戦略
 from strategies.prometheus_oracle import PrometheusOracle
 from strategies.aurus_singularis import AurusSingularis
 from strategies.noctus_sentinella import NoctusSentinella
 from strategies.levia_tempest import LeviaTempest
 
-# GitHub Pushスクリプト（scripts/以下に配置）
+# ✅ GitHub Push用スクリプト
 from scripts.push_generated_strategy import push_generated_strategies
 
-# === DAG設定 ===
+# === DAG共通設定 ===
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -31,14 +31,14 @@ default_args = {
 dag = DAG(
     dag_id='veritas_master_dag',
     default_args=default_args,
-    description='🧠 Veritasから各AI戦略DAGへmarket_dataを連携し、採用戦略をGitHubにpushする',
+    description='🧠 Veritasが生成したmarket_dataを四臣に伝え、戦略をGitHubへpush',
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'veritas', 'hub'],
 )
 
-# === 市場データ生成（Veritas） ===
+# === Veritasによる市場データ生成タスク ===
 def generate_market_data(**kwargs):
     ti = kwargs['ti']
     market_data = {
@@ -57,82 +57,72 @@ def generate_market_data(**kwargs):
         "previous_price": round(random.uniform(1.2, 1.3), 4),
         "price_history": [1.25, 1.255, 1.26, 1.252],
     }
+
     ti.xcom_push(key='market_data', value=market_data)
     print(f"🧠 Veritasが生成した市場データ: {market_data}")
 
-    # ✅ JSONログ保存（GUI参照用）
-    log_dir = "/noctria_kingdom/airflow_docker/logs"
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, "veritas_market_data.json")
+    # ✅ ログファイルに保存（GUI用）
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    log_path = LOGS_DIR / "veritas_market_data.json"
     with open(log_path, "w") as f:
         json.dump(market_data, f, indent=2)
 
-# === 各AIモジュールにデータ伝達し実行 ===
+# === 各AIによる処理タスク ===
 def run_prometheus(**kwargs):
-    ti = kwargs['ti']
-    market_data = ti.xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
+    market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
     result = PrometheusOracle().process(market_data)
     print(f"🔮 Prometheusの戦略判断: {result}")
 
 def run_aurus(**kwargs):
-    ti = kwargs['ti']
-    market_data = ti.xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
+    market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
     result = AurusSingularis().process(market_data)
     print(f"⚔️ Aurusの戦略判断: {result}")
 
 def run_noctus(**kwargs):
-    ti = kwargs['ti']
-    market_data = ti.xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
+    market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
     result = NoctusSentinella().process(market_data)
     print(f"🛡️ Noctusのリスク判断: {result}")
 
 def run_levia(**kwargs):
-    ti = kwargs['ti']
-    market_data = ti.xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
+    market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
     result = LeviaTempest().process(market_data)
     print(f"⚡ Leviaのスキャル判断: {result}")
 
-# === 採用戦略のGitHub push処理 ===
+# === 採用戦略 GitHub Push タスク ===
 def push_to_github(**kwargs):
     push_generated_strategies()
     print("📤 採用された戦略をGitHubにpushしました")
 
-# === DAG定義 ===
+# === DAG登録 ===
 with dag:
     generate_data_task = PythonOperator(
         task_id='veritas_generate_market_data_task',
         python_callable=generate_market_data,
-        provide_context=True,
     )
 
     prometheus_task = PythonOperator(
         task_id='run_prometheus',
         python_callable=run_prometheus,
-        provide_context=True,
     )
 
     aurus_task = PythonOperator(
         task_id='run_aurus',
         python_callable=run_aurus,
-        provide_context=True,
     )
 
     noctus_task = PythonOperator(
         task_id='run_noctus',
         python_callable=run_noctus,
-        provide_context=True,
     )
 
     levia_task = PythonOperator(
         task_id='run_levia',
         python_callable=run_levia,
-        provide_context=True,
     )
 
     push_strategy_task = PythonOperator(
         task_id='push_generated_strategy_to_github',
         python_callable=push_to_github,
-        provide_context=True,
     )
 
     # DAG依存関係構築
