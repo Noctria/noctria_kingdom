@@ -4,13 +4,13 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 
-# ✅ パス集中管理（v2.0設計原則）
+# ✅ パス集中管理（Noctria Kingdom v2.0 構成）
 from core.path_config import SCRIPTS_DIR
 
-# ✅ Python import path に scripts ディレクトリを追加
+# ✅ Python モジュール参照用に scripts ディレクトリを明示追加
 sys.path.append(str(SCRIPTS_DIR))
 
-# ✅ 外部スクリプトの関数をインポート
+# ✅ 外部スクリプトの関数をインポート（PDCA構成）
 from optimize_params_with_optuna import optimize_main
 from apply_best_params_to_metaai import apply_best_params_to_metaai
 from apply_best_params import apply_best_params_to_kingdom
@@ -23,7 +23,7 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
-# ✅ DAG 定義
+# ✅ DAG 定義（Airflowは王の伝令役）
 with DAG(
     dag_id="noctria_kingdom_pdca_dag",
     description="🏰 Noctria KingdomのPDCAサイクル統合DAG（Optuna最適化 → MetaAI再学習 → 戦略適用）",
@@ -34,23 +34,23 @@ with DAG(
     tags=["noctria", "kingdom", "pdca"],
 ) as dag:
 
-    # 🔍 Step 1: Optunaによる戦略最適化
-    optimize_worker_1 = PythonOperator(
+    # 🔍 Step 1: 戦略の試練（Optuna最適化）
+    optimize_task = PythonOperator(
         task_id="optimize_worker_1",
         python_callable=optimize_main,
     )
 
-    # 📘 Step 2: best_params.jsonをMetaAIに適用して再学習
-    apply_to_metaai = PythonOperator(
+    # 📘 Step 2: MetaAIへの叡智の継承（最適パラメータ再学習）
+    apply_metaai_task = PythonOperator(
         task_id="apply_best_params_to_metaai",
         python_callable=apply_best_params_to_metaai,
     )
 
-    # 🏁 Step 3: 王国システムへ最適戦略反映
-    apply_to_kingdom = PythonOperator(
+    # 🏁 Step 3: 王国の未来を定める（戦略反映）
+    apply_kingdom_task = PythonOperator(
         task_id="apply_best_params_to_kingdom",
         python_callable=apply_best_params_to_kingdom,
     )
 
-    # DAGフロー定義: 最適化 → MetaAI再学習 → Kingdom適用
-    optimize_worker_1 >> apply_to_metaai >> apply_to_kingdom
+    # ✅ DAGフロー構築（指令系統）
+    optimize_task >> apply_metaai_task >> apply_kingdom_task
