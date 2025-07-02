@@ -19,6 +19,10 @@ VERITAS_DIR = BASE_DIR / "veritas"
 TOOLS_DIR = BASE_DIR / "tools"
 TESTS_DIR = BASE_DIR / "tests"
 
+# 📁 内部的に使用されるデータディレクトリ（任意）
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+
 # 📝 ファイルパス
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
@@ -29,5 +33,6 @@ __all__ = [
     "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
     "MODELS_DIR", "INSTITUTIONS_DIR", "VERITAS_DIR",
     "TOOLS_DIR", "TESTS_DIR",
+    "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV"
 ]
