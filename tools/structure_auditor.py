@@ -2,14 +2,22 @@
 
 from pathlib import Path
 import os
+import sys
 
+# 🔧 パスを通す（/mnt/d/noctria_kingdom を PYTHONPATH に追加する想定）
+CURRENT_FILE = Path(__file__).resolve()
+ROOT_DIR = CURRENT_FILE.parent.parent
+sys.path.append(str(ROOT_DIR))
+
+# === 各種モジュールインポート ===
 from core.path_config import (
     DAGS_DIR, PLUGINS_DIR, SCRIPTS_DIR, CORE_DIR, STRATEGIES_DIR,
     VERITAS_DIR, TOOLS_DIR
 )
 from tools.hardcoded_path_replacer import replace_paths
+from tools.structure_auditor import audit_structure  # ← 明示的に audit_structure を呼ぶ
 
-# === 対象ディレクトリ（v3.0対応）===
+# === 対象ディレクトリ（v3.0構成）===
 TARGETS = [
     DAGS_DIR,
     PLUGINS_DIR,
@@ -37,7 +45,7 @@ def refactor_all():
             print(f"⚠️ Not found: {target}")
 
     print("✅ Replacements complete. Running structure audit...")
-    audit_main()
+    audit_structure()
 
 if __name__ == "__main__":
     refactor_all()
