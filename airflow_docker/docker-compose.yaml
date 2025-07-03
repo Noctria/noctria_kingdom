@@ -28,6 +28,10 @@ services:
       - redis
     env_file: .env
     environment:
+      AIRFLOW_HOME: ${AIRFLOW_HOME}
+      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
+      AIRFLOW__CORE__PLUGINS_FOLDER: ${AIRFLOW__CORE__PLUGINS_FOLDER}
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: ${AIRFLOW__LOGGING__BASE_LOG_FOLDER}
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__CELERY__BROKER_URL: ${REDIS_URL}
@@ -35,6 +39,8 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      PYTHONPATH: /noctria_kingdom
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
@@ -63,10 +69,15 @@ services:
       - redis
     env_file: .env
     environment:
+      AIRFLOW_HOME: ${AIRFLOW_HOME}
+      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
+      AIRFLOW__CORE__PLUGINS_FOLDER: ${AIRFLOW__CORE__PLUGINS_FOLDER}
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: ${AIRFLOW__LOGGING__BASE_LOG_FOLDER}
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__CELERY__BROKER_URL: ${REDIS_URL}
       AIRFLOW__CELERY__RESULT_BACKEND: ${AIRFLOW__CELERY__RESULT_BACKEND}
+      PYTHONPATH: /noctria_kingdom
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
@@ -93,10 +104,15 @@ services:
       - redis
     env_file: .env
     environment:
+      AIRFLOW_HOME: ${AIRFLOW_HOME}
+      AIRFLOW__CORE__DAGS_FOLDER: ${AIRFLOW__CORE__DAGS_FOLDER}
+      AIRFLOW__CORE__PLUGINS_FOLDER: ${AIRFLOW__CORE__PLUGINS_FOLDER}
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: ${AIRFLOW__LOGGING__BASE_LOG_FOLDER}
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
       AIRFLOW__CELERY__BROKER_URL: ${REDIS_URL}
       AIRFLOW__CELERY__RESULT_BACKEND: ${AIRFLOW__CELERY__RESULT_BACKEND}
+      PYTHONPATH: /noctria_kingdom
     volumes:
       - ${HOST_DAGS_PATH}:/noctria_kingdom/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/noctria_kingdom/airflow_docker/logs
