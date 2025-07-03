@@ -1,51 +1,55 @@
-# tools/structure_refactor.py
+# tools/structure_auditor.py
 
-from pathlib import Path
 import os
-import sys
+import json
+from pathlib import Path
+from collections import defaultdict
 
-# 🔧 パスを通す（/mnt/d/noctria_kingdom を PYTHONPATH に追加する想定）
-CURRENT_FILE = Path(__file__).resolve()
-ROOT_DIR = CURRENT_FILE.parent.parent
-sys.path.append(str(ROOT_DIR))
+from core.path_config import PROJECT_ROOT
 
-# === 各種モジュールインポート ===
-from core.path_config import (
-    DAGS_DIR, PLUGINS_DIR, SCRIPTS_DIR, CORE_DIR, STRATEGIES_DIR,
-    VERITAS_DIR, TOOLS_DIR
-)
-from tools.hardcoded_path_replacer import replace_paths
-from tools.structure_auditor import audit_structure  # ← 明示的に audit_structure を呼ぶ
+AUDIT_LOG_PATH = PROJECT_ROOT / "logs" / "structure_audit.json"
+MAX_DIR_COUNT_THRESHOLD = 25
 
-# === 対象ディレクトリ（v3.0構成）===
-TARGETS = [
-    DAGS_DIR,
-    PLUGINS_DIR,
-    SCRIPTS_DIR,
-    CORE_DIR,
-    STRATEGIES_DIR,
-    VERITAS_DIR,
-    TOOLS_DIR,
-]
+def audit_structure():
+    """Noctria Kingdom ディレクトリ構成を静的に監査"""
+    results = []
+    total_dir_count = 0
 
-def refactor_all():
-    print("🚀 Noctria Kingdom Structure Refactor (v3.0)")
-    for target in TARGETS:
-        if target.exists():
-            print(f"🔧 Replacing paths in: {target}")
-            for root, _, files in os.walk(target):
-                for file in files:
-                    if file.endswith(".py"):
-                        path = Path(root) / file
-                        try:
-                            replace_paths(path)
-                        except Exception as e:
-                            print(f"❌ Error processing {path}: {e}")
-        else:
-            print(f"⚠️ Not found: {target}")
+    for root, dirs, files in os.walk(PROJECT_ROOT):
+        dir_count = len(dirs)
+        total_dir_count += dir_count
 
-    print("✅ Replacements complete. Running structure audit...")
-    audit_structure()
+        # ディレクトリ数が多すぎる階層の警告
+        if dir_count > MAX_DIR_COUNT_THRESHOLD:
+            results.append({
+                "type": "too_many_directories",
+                "path": os.path.relpath(root, PROJECT_ROOT),
+                "count": dir_count
+            })
+
+        # 不要ファイルの検出
+        for file in files:
+            file_path = Path(root) / file
+            if file == "dammy" or file.endswith(".bak") or file.endswith("~"):
+                results.append({
+                    "type": "unnecessary_file",
+                    "path": str(file_path.relative_to(PROJECT_ROOT))
+                })
+
+    # 保存先ディレクトリを確保
+    AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    # 結果を書き出し
+    with open(AUDIT_LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+
+    # 結果を表示
+    if results:
+        print("⚠️ [構造警告] 以下の項目が見つかりました：")
+        for item in results:
+            print(f"  - {item['type']} @ {item['path']} → {item.get('count', '')}")
+    else:
+        print("✅ 構造チェック完了：問題なし")
 
 if __name__ == "__main__":
-    refactor_all()
+    audit_structure()
