@@ -8,7 +8,6 @@ from core.path_config import (
     VERITAS_DIR, TOOLS_DIR
 )
 from tools.hardcoded_path_replacer import replace_paths
-from tools.structure_auditor import main as audit_main
 
 # === 対象ディレクトリ（v3.0対応）===
 TARGETS = [
