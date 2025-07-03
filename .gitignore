@@ -9,6 +9,7 @@ __pycache__/
 venv/
 venv_*/
 .env/
+.env.*
 .local/
 
 # ==========================
@@ -20,39 +21,59 @@ venv_*/
 .idea/
 
 # ==========================
-# 🔹 Airflow 関連
+# 🔹 Airflow 関連（/opt/airflow移行後）
 # ==========================
-# DAG/Plugin のキャッシュやログ
-airflow-docker/dags/__pycache__/
-airflow-docker/plugins/__pycache__/
-airflow-docker/logs/
-airflow-docker/tmp/
+# キャッシュやログ
+logs/
+__pycache__/
+tmp/
+output/
 
-# dotenv & airflow.cfg（本番では別管理推奨）
-airflow-docker/.env
-airflow-docker/airflow.cfg
+# airflow_docker関連（Airflow実体）
+airflow_docker/logs/
+airflow_docker/tmp/
+airflow_docker/airflow.cfg
+airflow_docker/.env
+airflow_docker/.env.*
 
-# SQLite DB（Airflow 初期テストで生成されることがある）
+# airflow sqlite（初期検証用DB）
 airflow.db
 
 # ==========================
-# 🔹 データ系・学習ログ
+# 🔹 データ・学習系ログ
 # ==========================
-# プライベートデータ
-data/private_data/
-# TensorBoardログ
+# TensorBoardログなど
 logs/ppo_tensorboard_logs/
-# その他一時ログ
 *.log
 *.tmp
 
+# プライベートデータや生成物
+data/private_data/
+data/**/*.parquet
+data/**/*.feather
+data/**/*.pkl
+data/**/*.npy
+
 # ==========================
-# 🔹 Kubernetes・機密
+# 🔹 Kubernetes・セキュリティ関連
 # ==========================
 .secrets/
+secrets/
 kubeconfig_final.yaml
+*.key
+*.pem
+*.crt
 
-# Helmのテンポラリ（必要に応じて）
+# Helm, Docker
 *.tgz
 .cache/
-home/
+*.tar
+*.tar.gz
+docker/*.tar
+
+# ==========================
+# 🔹 Veritas戦略生成（自動生成ファイル）
+# ==========================
+strategies/veritas_generated/
+veritas_generated/
+output_generated/
