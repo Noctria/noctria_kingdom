@@ -1,26 +1,26 @@
 # ================================
-# 🌪 Noctria Kingdom: Airflow Dockerfile
-# ベース: Apache Airflow 2.7.3 + Python 3.10
+# 🌪 Noctria Kingdom: Airflow Dockerfile (v2.1)
 # ================================
 
 FROM apache/airflow:2.7.3-python3.10
 
-# 🔹 環境変数の設定（ログ非バッファリング / パス / Airflow構成ルート）
+# 🔹 ログ非バッファ化 / 統一ルート
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/noctria_kingdom \
-    AIRFLOW_HOME=/noctria_kingdom/airflow_docker
+    PYTHONPATH=/opt/airflow \
+    AIRFLOW_HOME=/opt/airflow
 
-# 🔹 作業ディレクトリ（CLI実行の基準ディレクトリ）
+# 🔹 作業ディレクトリ
 WORKDIR ${AIRFLOW_HOME}
 
-# 🔹 パッケージリストと制約ファイルをコンテナにコピー
-COPY airflow_docker/docker/requirements_airflow.txt /requirements_airflow.txt
-COPY airflow_docker/docker/requirements_extra.txt /requirements_extra.txt
-COPY airflow_docker/docker/constraints.txt /tmp/constraints.txt
+# 🔹 パッケージファイルのコピー（build contextが airflow_docker/ の場合）
+COPY docker/requirements_airflow.txt /requirements_airflow.txt
+COPY docker/requirements_extra.txt /requirements_extra.txt
+COPY docker/constraints.txt /tmp/constraints.txt
 
-# 🔹 Airflow本体や周辺ユーティリティを先にインストール
-RUN pip install --upgrade pip \
+# 🔹 Airflow 本体 + 周辺パッケージ
+RUN set -ex \
+ && pip install --upgrade pip \
  && pip install --no-cache-dir -r /requirements_airflow.txt --constraint /tmp/constraints.txt
 
-# 🔹 深層学習・強化学習・外部系など制約外パッケージを後から
+# 🔹 外部・重いパッケージ（制約外）
 RUN pip install --no-cache-dir -r /requirements_extra.txt
