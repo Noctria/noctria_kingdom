@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   postgres:
     image: postgres:13
@@ -25,9 +27,9 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./airflow_docker/dags:/opt/airflow/airflow_docker/dags
-      - ./airflow_docker/logs:/opt/airflow/airflow_docker/logs
-      - ./airflow_docker/plugins:/opt/airflow/airflow_docker/plugins
+      - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
+      - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
       - ../core:/opt/airflow/core
       - ../scripts:/opt/airflow/scripts
       - ../strategies:/opt/airflow/strategies
@@ -46,9 +48,9 @@ services:
       - redis
     env_file: .env
     volumes:
-      - ./airflow_docker/dags:/opt/airflow/airflow_docker/dags
-      - ./airflow_docker/logs:/opt/airflow/airflow_docker/logs
-      - ./airflow_docker/plugins:/opt/airflow/airflow_docker/plugins
+      - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
+      - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
       - ../core:/opt/airflow/core
       - ../scripts:/opt/airflow/scripts
       - ../strategies:/opt/airflow/strategies
