@@ -1,15 +1,9 @@
-import os
 from pathlib import Path
 
-# 🔍 Docker or WSL 環境の自動判定
-IS_DOCKER = Path("/noctria_kingdom").exists()
+# 📌 統一ルートパス（Noctria Kingdom v3.0 構成）
+BASE_DIR = Path("/opt/airflow").resolve()
 
-# 📌 ルートディレクトリ動的切替（Airflowコンテナ or WSLホスト）
-BASE_DIR = Path("/noctria_kingdom") if IS_DOCKER else Path(
-    os.getenv("TARGET_PROJECT_ROOT", "/mnt/d/noctria-kingdom-main")
-).resolve()
-
-# 📂 各ディレクトリ定義（共通ルートに基づく）
+# 📂 各ディレクトリ定義
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
 LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
@@ -32,7 +26,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 
-# ✅ パス整合性チェック関数（任意でDAGなどから呼べる）
+# ✅ パス整合性チェック関数（任意でDAGやテストから呼べる）
 def _lint_path_config():
     return {
         "BASE_DIR": BASE_DIR.exists(),
@@ -44,7 +38,7 @@ def _lint_path_config():
         "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
     }
 
-# 🌐 公開変数一覧（補完用）
+# 🌐 公開変数一覧（補完・明示用）
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
     "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
