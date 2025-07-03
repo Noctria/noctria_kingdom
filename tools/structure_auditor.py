@@ -1,72 +1,64 @@
-# ================================
-# 🏗️ Noctria Kingdom 構造再構成スクリプト
-# - v2.0準拠のリファクタリング自動処理
-# - 不要ファイルの削除 + パス自動置換
-# ================================
+# tools/structure_refactor.py
 
 import os
 import sys
 import shutil
 from pathlib import Path
 
-# ✅ プロジェクトルートを sys.path に追加
+# 📌 現在のスクリプトファイルの絶対パスとプロジェクトルートを取得
 CURRENT_FILE = Path(__file__).resolve()
 ROOT_DIR = CURRENT_FILE.parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+TOOLS_DIR = ROOT_DIR / "tools"
 
-from tools.hardcoded_path_replacer import replace_paths
+# 🔧 tools ディレクトリをインポートパスに追加してモジュール読み込みを可能にする
+sys.path.insert(0, str(TOOLS_DIR))
 
-# 📦 不要ファイル/ディレクトリの削除対象
-REMOVE_TARGETS = [
+from hardcoded_path_replacer import replace_paths
+
+# === 基本構成 ===
+REPLACE_TARGET_DIRS = [
+    "airflow_docker/dags",
+    "scripts",
+    "veritas",
+    "core",
+    "tests",
+]
+
+UNNECESSARY_PATHS = [
     "airflow_docker/config/dammy",
     "airflow_docker/dags/dummyfile",
     "airflow_docker/plugins/dammy",
     "strategies/veritas_generated/dammy",
-    "veritas_dev/dammy"
+    "veritas_dev/dammy",
 ]
 
-# 🎯 パス自動置換対象ディレクトリ
-REPLACE_TARGET_DIRS = [
-    "airflow_docker/dags",
-    "scripts",
-    "core",
-    "veritas",
-]
+def refactor_structure():
+    print("🛠 Noctria Kingdom v2.0 リファクタリング開始\n")
 
-def remove_unnecessary_files():
-    print("🧹 不要ファイル削除中...")
-    for target in REMOVE_TARGETS:
-        path = ROOT_DIR / target
-        if path.exists():
-            if path.is_file():
-                path.unlink()
-                print(f"  ✅ 削除: {path}")
-            elif path.is_dir():
-                shutil.rmtree(path)
-                print(f"  ✅ ディレクトリ削除: {path}")
-        else:
-            print(f"  ⚠️ スキップ（存在しない）: {path}")
-
-def replace_hardcoded_paths():
-    print("🔧 パスの自動置換を開始...")
-    for target_dir in REPLACE_TARGET_DIRS:
-        base = ROOT_DIR / target_dir
-        if not base.exists():
-            print(f"  ⚠️ スキップ（存在しない）: {base}")
+    # === パスの自動置換 ===
+    for rel_path in REPLACE_TARGET_DIRS:
+        abs_path = ROOT_DIR / rel_path
+        if not abs_path.exists():
             continue
+        print(f"🔍 変換中: {abs_path}")
+        for dirpath, _, filenames in os.walk(abs_path):
+            for fname in filenames:
+                if not fname.endswith(".py"):
+                    continue
+                file_path = Path(dirpath) / fname
+                replace_paths(file_path)
 
-        for py_file in base.rglob("*.py"):
-            try:
-                replace_paths(py_file)
-                print(f"  🔄 置換済: {py_file}")
-            except Exception as e:
-                print(f"  ❌ エラー: {py_file} -> {e}")
+    # === 不要ファイルの削除 ===
+    print("\n🧹 不要ファイルの削除:")
+    for rel_path in UNNECESSARY_PATHS:
+        abs_path = ROOT_DIR / rel_path
+        if abs_path.exists():
+            abs_path.unlink()
+            print(f"🗑 削除: {abs_path}")
+        else:
+            print(f"✅ 存在しない: {abs_path}")
 
-def main():
-    print("🚀 Noctria Kingdom v2.0 構造整備 開始")
-    remove_unnecessary_files()
-    replace_hardcoded_paths()
-    print("🎉 全処理完了")
+    print("\n✅ 構造リファクタ完了")
 
 if __name__ == "__main__":
-    main()
+    refactor_structure()
