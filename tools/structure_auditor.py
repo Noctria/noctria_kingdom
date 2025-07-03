@@ -1,30 +1,28 @@
 # tools/structure_refactor.py
 
-import sys
-import os
 from pathlib import Path
+import os
 
-# === パス設定 ===
-CURRENT_FILE = Path(__file__).resolve()
-ROOT_DIR = CURRENT_FILE.parent.parent
-sys.path.append(str(ROOT_DIR))  # ← これが大事！！！
-
+from core.path_config import (
+    DAGS_DIR, PLUGINS_DIR, SCRIPTS_DIR, CORE_DIR, STRATEGIES_DIR,
+    VERITAS_DIR, TOOLS_DIR
+)
 from tools.hardcoded_path_replacer import replace_paths
 from tools.structure_auditor import main as audit_main
 
-# === 各種対象ディレクトリ ===
+# === 対象ディレクトリ（v3.0対応）===
 TARGETS = [
-    ROOT_DIR / "airflow_docker" / "dags",
-    ROOT_DIR / "airflow_docker" / "plugins",
-    ROOT_DIR / "airflow_docker" / "scripts",
-    ROOT_DIR / "core",
-    ROOT_DIR / "strategies",
-    ROOT_DIR / "veritas",
-    ROOT_DIR / "tools",
+    DAGS_DIR,
+    PLUGINS_DIR,
+    SCRIPTS_DIR,
+    CORE_DIR,
+    STRATEGIES_DIR,
+    VERITAS_DIR,
+    TOOLS_DIR,
 ]
 
 def refactor_all():
-    print(f"🚀 Root: {ROOT_DIR}")
+    print("🚀 Noctria Kingdom Structure Refactor (v3.0)")
     for target in TARGETS:
         if target.exists():
             print(f"🔧 Replacing paths in: {target}")
