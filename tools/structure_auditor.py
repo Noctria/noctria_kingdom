@@ -1,64 +1,49 @@
-# tools/structure_refactor.py
-
 import os
 import sys
-import shutil
+import importlib.util
 from pathlib import Path
 
-# 📌 現在のスクリプトファイルの絶対パスとプロジェクトルートを取得
-CURRENT_FILE = Path(__file__).resolve()
-ROOT_DIR = CURRENT_FILE.parent.parent
-TOOLS_DIR = ROOT_DIR / "tools"
-
-# 🔧 tools ディレクトリをインポートパスに追加してモジュール読み込みを可能にする
-sys.path.insert(0, str(TOOLS_DIR))
-
-from hardcoded_path_replacer import replace_paths
-
-# === 基本構成 ===
-REPLACE_TARGET_DIRS = [
-    "airflow_docker/dags",
-    "scripts",
-    "veritas",
-    "core",
-    "tests",
-]
-
-UNNECESSARY_PATHS = [
+# === パス初期化 ===
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+TARGET_DIRS = ["airflow_docker/dags", "scripts", "core"]
+DELETE_LIST = [
     "airflow_docker/config/dammy",
     "airflow_docker/dags/dummyfile",
     "airflow_docker/plugins/dammy",
     "strategies/veritas_generated/dammy",
-    "veritas_dev/dammy",
+    "veritas_dev/dammy"
 ]
 
-def refactor_structure():
-    print("🛠 Noctria Kingdom v2.0 リファクタリング開始\n")
+# === dynamic import for hardcoded_path_replacer.py ===
+replacer_path = PROJECT_ROOT / "tools" / "hardcoded_path_replacer.py"
+spec = importlib.util.spec_from_file_location("hardcoded_path_replacer", replacer_path)
+replacer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(replacer)
 
-    # === パスの自動置換 ===
-    for rel_path in REPLACE_TARGET_DIRS:
-        abs_path = ROOT_DIR / rel_path
-        if not abs_path.exists():
-            continue
-        print(f"🔍 変換中: {abs_path}")
-        for dirpath, _, filenames in os.walk(abs_path):
-            for fname in filenames:
-                if not fname.endswith(".py"):
-                    continue
-                file_path = Path(dirpath) / fname
-                replace_paths(file_path)
+# === 処理開始 ===
+print("🔧 Noctria構造リファクタリング開始...")
 
-    # === 不要ファイルの削除 ===
-    print("\n🧹 不要ファイルの削除:")
-    for rel_path in UNNECESSARY_PATHS:
-        abs_path = ROOT_DIR / rel_path
-        if abs_path.exists():
-            abs_path.unlink()
-            print(f"🗑 削除: {abs_path}")
-        else:
-            print(f"✅ 存在しない: {abs_path}")
+# 不要ファイル削除
+for rel_path in DELETE_LIST:
+    full_path = PROJECT_ROOT / rel_path
+    if full_path.exists() and full_path.is_file():
+        full_path.unlink()
+        print(f"🗑️ Deleted: {rel_path}")
+    else:
+        print(f"⚠️ Skip (not found): {rel_path}")
 
-    print("\n✅ 構造リファクタ完了")
+# パス自動置換
+for rel_dir in TARGET_DIRS:
+    full_dir = PROJECT_ROOT / rel_dir
+    if not full_dir.exists():
+        print(f"⚠️ Directory not found: {rel_dir}")
+        continue
 
-if __name__ == "__main__":
-    refactor_structure()
+    for path in full_dir.rglob("*.py"):
+        try:
+            replacer.replace_paths(path)
+            print(f"✅ Replaced: {path.relative_to(PROJECT_ROOT)}")
+        except Exception as e:
+            print(f"❌ Failed to process {path.relative_to(PROJECT_ROOT)} → {e}")
+
+print("🎉 リファクタリング完了")
