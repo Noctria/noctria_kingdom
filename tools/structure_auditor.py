@@ -1,57 +1,72 @@
+# ================================
+# 🏗️ Noctria Kingdom 構造再構成スクリプト
+# - v2.0準拠のリファクタリング自動処理
+# - 不要ファイルの削除 + パス自動置換
+# ================================
+
 import os
 import sys
-import json
+import shutil
 from pathlib import Path
 
-# 🔧 プロジェクトのルートディレクトリを sys.path に追加
+# ✅ プロジェクトルートを sys.path に追加
 CURRENT_FILE = Path(__file__).resolve()
 ROOT_DIR = CURRENT_FILE.parent.parent
-sys.path.insert(0, str(ROOT_DIR))  # ← これが重要！
+sys.path.insert(0, str(ROOT_DIR))
 
-# ✅ tools モジュールの import
 from tools.hardcoded_path_replacer import replace_paths
 
-# 📁 ログと監査設定
-LOGS_DIR = ROOT_DIR / "logs"
-AUDIT_LOG = LOGS_DIR / "structure_audit.json"
+# 📦 不要ファイル/ディレクトリの削除対象
+REMOVE_TARGETS = [
+    "airflow_docker/config/dammy",
+    "airflow_docker/dags/dummyfile",
+    "airflow_docker/plugins/dammy",
+    "strategies/veritas_generated/dammy",
+    "veritas_dev/dammy"
+]
 
-def remove_path(target: Path):
-    if target.is_file():
-        print(f"🗑️ Removing file: {target}")
-        target.unlink()
-    elif target.is_dir():
-        print(f"🧹 Removing directory: {target}")
-        for sub in target.glob("*"):
-            remove_path(sub)
-        target.rmdir()
+# 🎯 パス自動置換対象ディレクトリ
+REPLACE_TARGET_DIRS = [
+    "airflow_docker/dags",
+    "scripts",
+    "core",
+    "veritas",
+]
 
-def process_audit_log():
-    if not AUDIT_LOG.exists():
-        print("❌ structure_audit.json が見つかりません")
-        return
+def remove_unnecessary_files():
+    print("🧹 不要ファイル削除中...")
+    for target in REMOVE_TARGETS:
+        path = ROOT_DIR / target
+        if path.exists():
+            if path.is_file():
+                path.unlink()
+                print(f"  ✅ 削除: {path}")
+            elif path.is_dir():
+                shutil.rmtree(path)
+                print(f"  ✅ ディレクトリ削除: {path}")
+        else:
+            print(f"  ⚠️ スキップ（存在しない）: {path}")
 
-    with open(AUDIT_LOG, "r", encoding="utf-8") as f:
-        issues = json.load(f)
-
-    for issue in issues:
-        path = ROOT_DIR / issue["path"]
-        if issue["type"] in {"unnecessary_file", "unnecessary_directory"}:
-            remove_path(path)
-        elif issue["type"] in {"too_many_files", "too_many_directories"}:
-            print(f"⚠️ [構造警告] {issue['type']} @ {issue['path']} → count={issue['count']}")
-
-def apply_path_replacements():
-    print("🔄 Import/パス自動変換を適用中...")
-    for py_file in ROOT_DIR.rglob("*.py"):
-        if any(skip in py_file.parts for skip in [".venv", "venv", "__pycache__"]):
+def replace_hardcoded_paths():
+    print("🔧 パスの自動置換を開始...")
+    for target_dir in REPLACE_TARGET_DIRS:
+        base = ROOT_DIR / target_dir
+        if not base.exists():
+            print(f"  ⚠️ スキップ（存在しない）: {base}")
             continue
-        replace_paths(py_file)
+
+        for py_file in base.rglob("*.py"):
+            try:
+                replace_paths(py_file)
+                print(f"  🔄 置換済: {py_file}")
+            except Exception as e:
+                print(f"  ❌ エラー: {py_file} -> {e}")
 
 def main():
-    print("🚀 Noctria Kingdom v2.0構成への再編を開始します")
-    process_audit_log()
-    apply_path_replacements()
-    print("✅ 完了しました。構成はv2.0準拠になりました")
+    print("🚀 Noctria Kingdom v2.0 構造整備 開始")
+    remove_unnecessary_files()
+    replace_hardcoded_paths()
+    print("🎉 全処理完了")
 
 if __name__ == "__main__":
     main()
