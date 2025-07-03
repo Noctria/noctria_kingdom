@@ -12,10 +12,10 @@ ENV PYTHONUNBUFFERED=1 \
 # 🔹 作業ディレクトリ
 WORKDIR ${AIRFLOW_HOME}
 
-# 🔹 要求パッケージのコピー（build context: airflow_docker/）
-COPY docker/requirements_airflow.txt /requirements_airflow.txt
-COPY docker/requirements_extra.txt /requirements_extra.txt
-COPY docker/constraints.txt /tmp/constraints.txt
+# 🔹 要求パッケージのコピー（build context: airflow_docker/docker/）
+COPY requirements_airflow.txt /requirements_airflow.txt
+COPY requirements_extra.txt /requirements_extra.txt
+COPY constraints.txt /tmp/constraints.txt
 
 # 🔹 Airflow本体 + 基本依存パッケージ
 RUN set -ex \
