@@ -3,14 +3,15 @@ import sys
 import json
 from pathlib import Path
 
-# 🔧 モジュールパスを追加（Noctria Kingdom のルートディレクトリを sys.path に含める）
-ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.append(str(ROOT_DIR))
+# 🔧 プロジェクトのルートディレクトリを sys.path に追加
+CURRENT_FILE = Path(__file__).resolve()
+ROOT_DIR = CURRENT_FILE.parent.parent
+sys.path.insert(0, str(ROOT_DIR))  # ← これが重要！
 
-# ✅ 必要な関数をimport（tools以下を読み込めるようになる）
+# ✅ tools モジュールの import
 from tools.hardcoded_path_replacer import replace_paths
 
-# ログと監査設定
+# 📁 ログと監査設定
 LOGS_DIR = ROOT_DIR / "logs"
 AUDIT_LOG = LOGS_DIR / "structure_audit.json"
 
@@ -42,7 +43,7 @@ def process_audit_log():
 def apply_path_replacements():
     print("🔄 Import/パス自動変換を適用中...")
     for py_file in ROOT_DIR.rglob("*.py"):
-        if "venv" in py_file.parts or ".venv" in py_file.parts:
+        if any(skip in py_file.parts for skip in [".venv", "venv", "__pycache__"]):
             continue
         replace_paths(py_file)
 
