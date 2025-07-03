@@ -1,7 +1,17 @@
 from pathlib import Path
 
-# 📌 統一ルートパス（Noctria Kingdom v3.0 構成）
-BASE_DIR = Path("/opt/airflow").resolve()
+# ========================================
+# 📌 Noctria Kingdom Path Config (v3.0)
+#    - 自動で BASE_DIR を切り替える構成
+# ========================================
+
+# ✅ BASE_DIR の自動切り替え
+if Path("/opt/airflow").exists():
+    # Docker / 本番環境
+    BASE_DIR = Path("/opt/airflow").resolve()
+else:
+    # ローカル / 開発環境（WSL等）
+    BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 📂 各ディレクトリ定義
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
