@@ -10,7 +10,7 @@ ROOT_DIR = CURRENT_FILE.parent.parent
 sys.path.append(str(ROOT_DIR))  # v3.0: パスの動的追加（絶対パス対応）
 
 from tools.hardcoded_path_replacer import replace_paths
-from tools.structure_auditor import audit_structure as audit_main  # ← 修正済み
+from tools.structure_auditor import main as audit_main
 
 # === 対象ディレクトリ一覧（v3.0準拠）
 TARGETS = [
