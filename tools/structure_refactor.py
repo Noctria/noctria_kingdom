@@ -1,36 +1,35 @@
 # tools/structure_refactor.py
 
-import sys
-import os
 from pathlib import Path
+import os
+import sys
 
-# === パス設定 ===
+# 🔧 パスを通す（/mnt/d/noctria_kingdom を PYTHONPATH に追加する想定）
 CURRENT_FILE = Path(__file__).resolve()
 ROOT_DIR = CURRENT_FILE.parent.parent
-sys.path.append(str(ROOT_DIR))  # v3.0: パスの動的追加（絶対パス対応）
+sys.path.append(str(ROOT_DIR))
 
+# === 各種モジュールインポート ===
+from core.path_config import (
+    DAGS_DIR, PLUGINS_DIR, SCRIPTS_DIR, CORE_DIR, STRATEGIES_DIR,
+    VERITAS_DIR, TOOLS_DIR
+)
 from tools.hardcoded_path_replacer import replace_paths
-from tools.structure_auditor import main as audit_main
+from tools.structure_auditor import audit_structure  # ← 明示的に audit_structure を呼ぶ
 
-# === 対象ディレクトリ一覧（v3.0準拠）
+# === 対象ディレクトリ（v3.0構成）===
 TARGETS = [
-    ROOT_DIR / "airflow_docker" / "dags",
-    ROOT_DIR / "airflow_docker" / "plugins",
-    ROOT_DIR / "airflow_docker" / "scripts",
-    ROOT_DIR / "core",
-    ROOT_DIR / "strategies",
-    ROOT_DIR / "veritas",
-    ROOT_DIR / "tools",
-    ROOT_DIR / "tests",
-    ROOT_DIR / "llm_server",
-    ROOT_DIR / "execution",
-    ROOT_DIR / "experts",
+    DAGS_DIR,
+    PLUGINS_DIR,
+    SCRIPTS_DIR,
+    CORE_DIR,
+    STRATEGIES_DIR,
+    VERITAS_DIR,
+    TOOLS_DIR,
 ]
 
 def refactor_all():
-    print("🚀 Noctria Kingdom v3.0構成への再編を開始します")
-    print(f"📁 ルート: {ROOT_DIR}")
-
+    print("🚀 Noctria Kingdom Structure Refactor (v3.0)")
     for target in TARGETS:
         if target.exists():
             print(f"🔧 Replacing paths in: {target}")
@@ -45,8 +44,8 @@ def refactor_all():
         else:
             print(f"⚠️ Not found: {target}")
 
-    print("✅ 全ファイルのパス変換が完了しました。構成監査を実行します...")
-    audit_main()
+    print("✅ Replacements complete. Running structure audit...")
+    audit_structure()
 
 if __name__ == "__main__":
     refactor_all()
