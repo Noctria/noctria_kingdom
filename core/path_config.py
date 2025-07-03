@@ -1,10 +1,15 @@
 import os
 from pathlib import Path
 
-# 🔗 環境変数からベースパス取得（Docker/WSL/ローカル開発を考慮）
-BASE_DIR = Path(os.getenv("TARGET_PROJECT_ROOT", "/mnt/d/noctria-kingdom-main")).resolve()
+# 🔍 Docker or WSL 環境の自動判定
+IS_DOCKER = Path("/noctria_kingdom").exists()
 
-# 📂 各ディレクトリ定義
+# 📌 ルートディレクトリ動的切替（Airflowコンテナ or WSLホスト）
+BASE_DIR = Path("/noctria_kingdom") if IS_DOCKER else Path(
+    os.getenv("TARGET_PROJECT_ROOT", "/mnt/d/noctria-kingdom-main")
+).resolve()
+
+# 📂 各ディレクトリ定義（共通ルートに基づく）
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
 LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
@@ -19,7 +24,7 @@ VERITAS_DIR = BASE_DIR / "veritas"
 TOOLS_DIR = BASE_DIR / "tools"
 TESTS_DIR = BASE_DIR / "tests"
 
-# 📁 内部的に使用されるデータディレクトリ（任意）
+# 📁 データサブディレクトリ
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
@@ -27,10 +32,9 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 
-# 🧪 構造整合性チェック関数（Airflow DAG用）
+# ✅ パス整合性チェック関数（任意でDAGなどから呼べる）
 def _lint_path_config():
-    """主要パスの存在チェックを行う"""
-    checks = {
+    return {
         "BASE_DIR": BASE_DIR.exists(),
         "DAGS_DIR": DAGS_DIR.exists(),
         "LOGS_DIR": LOGS_DIR.exists(),
@@ -39,9 +43,8 @@ def _lint_path_config():
         "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
         "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
     }
-    return checks
 
-# 🌐 エクスポート（__all__でIDE補完対応）
+# 🌐 公開変数一覧（補完用）
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
     "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
