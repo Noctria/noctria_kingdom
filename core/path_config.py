@@ -1,3 +1,4 @@
+from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
 from pathlib import Path
 
 # ========================================
@@ -40,21 +41,21 @@ USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 def _lint_path_config():
     return {
         "BASE_DIR": BASE_DIR.exists(),
-        "DAGS_DIR": DAGS_DIR.exists(),
-        "LOGS_DIR": LOGS_DIR.exists(),
-        "STRATEGIES_DIR": STRATEGIES_DIR.exists(),
+        DAGS_DIR: DAGS_DIR.exists(),
+        LOGS_DIR: LOGS_DIR.exists(),
+        STRATEGIES_DIR: STRATEGIES_DIR.exists(),
         "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
-        "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
-        "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
+        "RAW_DATA_DIR: RAW_DATA_DIR.exists(),
+        "PROCESSED_DATA_DIR: PROCESSED_DATA_DIR.exists(),
     }
 
 # 🌐 公開変数一覧（補完・明示用）
 __all__ = [
-    "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
-    "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
-    "MODELS_DIR", "INSTITUTIONS_DIR", "VERITAS_DIR",
-    "TOOLS_DIR", "TESTS_DIR",
-    "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
+    "BASE_DIR", DAGS_DIR, LOGS_DIR, PLUGINS_DIR,
+    SCRIPTS_DIR, CORE_DIR, STRATEGIES_DIR, DATA_DIR,
+    MODELS_DIR, INSTITUTIONS_DIR, VERITAS_DIR,
+    TOOLS_DIR, TESTS_DIR,
+    "RAW_DATA_DIR, "PROCESSED_DATA_DIR,
     "VERITAS_EVAL_LOG", "USDJPY_CSV",
     "_lint_path_config"
 ]

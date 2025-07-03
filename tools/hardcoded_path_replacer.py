@@ -1,3 +1,4 @@
+from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
 import os
 import re
 import difflib
@@ -6,18 +7,18 @@ from pathlib import Path
 
 # 🔁 ハードコードされたパスを path_config 定数へ置換するルール
 REPLACEMENT_RULES = {
-    r'["\']?DAGS_DIR["\']?': "DAGS_DIR",
-    r'["\']?LOGS_DIR["\']?': "LOGS_DIR",
-    r'["\']?PLUGINS_DIR["\']?': "PLUGINS_DIR",
-    r'["\']?SCRIPTS_DIR["\']?': "SCRIPTS_DIR",
-    r'["\']?CORE_DIR["\']?': "CORE_DIR",
-    r'["\']?STRATEGIES_DIR["\']?': "STRATEGIES_DIR",
-    r'["\']?DATA_DIR["\']?': "DATA_DIR",
-    r'["\']?MODELS_DIR["\']?': "MODELS_DIR",
-    r'["\']?INSTITUTIONS_DIR["\']?': "INSTITUTIONS_DIR",
-    r'["\']?VERITAS_DIR["\']?': "VERITAS_DIR",
-    r'["\']?TOOLS_DIR["\']?': "TOOLS_DIR",
-    r'["\']?TESTS_DIR["\']?': "TESTS_DIR",
+    r'["\']?DAGS_DIR["\']?': DAGS_DIR,
+    r'["\']?LOGS_DIR["\']?': LOGS_DIR,
+    r'["\']?PLUGINS_DIR["\']?': PLUGINS_DIR,
+    r'["\']?SCRIPTS_DIR["\']?': SCRIPTS_DIR,
+    r'["\']?CORE_DIR["\']?': CORE_DIR,
+    r'["\']?STRATEGIES_DIR["\']?': STRATEGIES_DIR,
+    r'["\']?DATA_DIR["\']?': DATA_DIR,
+    r'["\']?MODELS_DIR["\']?': MODELS_DIR,
+    r'["\']?INSTITUTIONS_DIR["\']?': INSTITUTIONS_DIR,
+    r'["\']?VERITAS_DIR["\']?': VERITAS_DIR,
+    r'["\']?TOOLS_DIR["\']?': TOOLS_DIR,
+    r'["\']?TESTS_DIR["\']?': TESTS_DIR,
 }
 
 # 🔍 すべての定数を収集（import挿入用）
