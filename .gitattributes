@@ -1,0 +1,59 @@
+# ==========================
+# 🔧 改行コードの自動統一（LF）
+# ==========================
+* text=auto eol=lf
+
+# ==========================
+# 🧠 LLMモデル & 重量ファイル（Git LFS用）
+# ==========================
+*.pt filter=lfs diff=none merge=none
+*.ckpt filter=lfs diff=none merge=none
+*.h5 filter=lfs diff=none merge=none
+*.safetensors filter=lfs diff=none merge=none
+
+# ==========================
+# 📊 データファイルは差分除外
+# ==========================
+*.csv diff=none
+*.tsv diff=none
+*.json diff=none
+*.parquet diff=none
+*.feather diff=none
+*.npy diff=none
+*.pkl diff=none
+*.joblib diff=none
+*.log diff=none
+
+# ==========================
+# 📓 Jupyter Notebook 表示最適化
+# ==========================
+*.ipynb filter=strip-notebook-output
+
+# ==========================
+# 📝 戦略コードの明示（差分ON）
+# ==========================
+strategies/**/*.py text diff=python
+veritas_generated/**/*.py text diff=python
+core/**/*.py text diff=python
+
+# ==========================
+# 🔒 シークレットファイルの差分無効（存在時のみ）
+# ==========================
+.env.secret diff=none
+.env.local diff=none
+
+# ==========================
+# 🧪 テストコードも明示的に差分管理
+# ==========================
+tests/**/*.py text diff=python
+
+# ==========================
+# 🧪 YAML: DAGや設定の差分追跡
+# ==========================
+*.yaml text diff
+*.yml text diff
+
+# ==========================
+# 🧪 Markdown & ドキュメント
+# ==========================
+*.md text
