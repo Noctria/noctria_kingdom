@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 # 設定
-ROOT = Path("/mnt/d/noctria-kingdom")
+ROOT = Path("/opt/airflow")
 OLD_PATH = "/mnt/e/"
 NEW_PATH = "/mnt/d/"
 TARGET_FILES = [

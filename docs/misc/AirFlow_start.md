@@ -4,7 +4,7 @@
 bash
 コピーする
 編集する
-cd /mnt/d/noctria-kingdom-main/airflow-docker
+cd /opt/airflow-main/airflow-docker
 （docker-compose.yaml がある場所）
 
 ✅ 2️⃣ Airflowを起動
@@ -49,7 +49,7 @@ docker compose ps
 bash
 コピーする
 編集する
-cd /mnt/d/noctria-kingdom-main/airflow-docker  
+cd /opt/airflow-main/airflow-docker  
 docker compose up
 ✅ 停止:
 

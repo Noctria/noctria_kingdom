@@ -11,7 +11,7 @@ spec:
   accessModes:
     - ReadWriteMany
   hostPath:
-    path: /mnt/d/noctria-kingdom-main/airflow-docker/dags
+    path: /opt/airflow-main/airflow-docker/dags
 
 ---
 

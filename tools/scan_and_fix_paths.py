@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # 🔁 置換対象のパス（必要に応じて変更）
-OLD_PATH = "/mnt/d/noctria-kingdom"
+OLD_PATH = "/opt/airflow"
 NEW_PATH = "/opt/airflow"
 
 # 📂 対象拡張子
