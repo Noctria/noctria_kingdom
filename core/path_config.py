@@ -35,6 +35,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 # 📝 ファイルパス
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
+MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
 
 # ✅ Veritas戦略生成・評価スクリプトのパス
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
@@ -53,6 +54,7 @@ def _lint_path_config():
         "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
         "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
         "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
+        "MARKET_DATA_CSV": MARKET_DATA_CSV.exists(),
         "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
         "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
         "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
@@ -65,7 +67,7 @@ __all__ = [
     "MODELS_DIR", "INSTITUTIONS_DIR", "VERITAS_DIR",
     "TOOLS_DIR", "TESTS_DIR",
     "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
-    "VERITAS_EVAL_LOG", "USDJPY_CSV",
+    "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
     "GITHUB_PUSH_SCRIPT",
     "_lint_path_config"
