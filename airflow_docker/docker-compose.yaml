@@ -1,6 +1,9 @@
 version: "3.8"
 
 services:
+  # ======================================
+  # 🐘 PostgreSQL データベース
+  # ======================================
   postgres:
     image: postgres:13
     env_file: .env
@@ -12,10 +15,16 @@ services:
       - postgres-db-volume:/var/lib/postgresql/data
     restart: always
 
+  # ======================================
+  # 🔁 Redis（Celery Broker）
+  # ======================================
   redis:
     image: redis:latest
     restart: always
 
+  # ======================================
+  # 🌐 Airflow Web UI
+  # ======================================
   airflow-webserver:
     build:
       context: ./docker
@@ -27,9 +36,12 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      # DAG, logs, plugins（ホスト→コンテナ）
       - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
       - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+
+      # Noctria Kingdom コンポーネント群
       - ../core:/opt/airflow/core
       - ../scripts:/opt/airflow/scripts
       - ../strategies:/opt/airflow/strategies
@@ -39,6 +51,9 @@ services:
     command: webserver
     restart: always
 
+  # ======================================
+  # 🕓 Airflow Scheduler
+  # ======================================
   airflow-scheduler:
     build:
       context: ./docker
@@ -48,9 +63,12 @@ services:
       - redis
     env_file: .env
     volumes:
+      # DAG, logs, plugins（ホスト→コンテナ）
       - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
       - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
       - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+
+      # Noctria Kingdom コンポーネント群
       - ../core:/opt/airflow/core
       - ../scripts:/opt/airflow/scripts
       - ../strategies:/opt/airflow/strategies
@@ -60,5 +78,8 @@ services:
     command: scheduler
     restart: always
 
+# ======================================
+# 🗃 永続ボリューム定義（Postgres用）
+# ======================================
 volumes:
   postgres-db-volume:
