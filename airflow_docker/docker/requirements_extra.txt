@@ -18,3 +18,4 @@ gym==0.26.2
 
 # ファイナンスデータ
 yfinance==0.2.62
+multitasking==0.0.11
