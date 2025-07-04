@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from data.market_data_fetcher import MarketDataFetcher
+from core.data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
 class NoctusSentinella:

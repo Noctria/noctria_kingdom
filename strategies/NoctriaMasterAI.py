@@ -8,8 +8,8 @@ from transformers import pipeline
 from sklearn.ensemble import IsolationForest
 from strategies.evolutionary.evolutionary_algorithm import GeneticAlgorithm
 from execution.order_execution import OrderExecution
-from data.market_data_fetcher import MarketDataFetcher
-from data.lstm_data_processor import LSTMDataProcessor
+from core.data.market_data_fetcher import MarketDataFetcher
+from core.data.lstm_data_processor import LSTMDataProcessor
 from strategies.portfolio_optimizer import PortfolioOptimizer
 from strategies.self_play import NoctriaSelfPlayAI
 

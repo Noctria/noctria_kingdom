@@ -10,7 +10,7 @@ from core.path_config import SCRIPTS_DIR
 # ✅ Docker・Airflow環境対応：スクリプトディレクトリを明示追加
 
 # ✅ 外部スクリプト：MetaAIへの最適パラメータ適用ロジック
-from apply_best_params_to_metaai import apply_best_params_to_metaai
+from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
 
 # ✅ DAG構成：MetaAIへの単体適用用DAG
 with DAG(

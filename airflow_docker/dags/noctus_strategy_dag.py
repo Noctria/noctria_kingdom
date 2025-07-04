@@ -10,7 +10,7 @@ from core.path_config import STRATEGIES_DIR
 # ✅ PythonPath に戦略ディレクトリを追加（Airflow Worker対応）
 
 # ✅ Noctus戦略クラスの読み込み
-from noctus_sentinella import NoctusSentinella
+from strategies.noctus_sentinella import NoctusSentinella
 
 # === DAG共通設定 ===
 default_args = {

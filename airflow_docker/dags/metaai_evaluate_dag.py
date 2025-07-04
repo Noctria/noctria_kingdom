@@ -10,7 +10,7 @@ from core.path_config import SCRIPTS_DIR
 # ✅ コンテナ用PYTHONPATH
 
 # ✅ 外部スクリプト読み込み
-from evaluate_metaai_model import evaluate_metaai_model
+from scripts.evaluate_metaai_model import evaluate_metaai_model
 
 # ✅ DAG定義
 with DAG(

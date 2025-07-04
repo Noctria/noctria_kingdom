@@ -11,8 +11,8 @@ from core.path_config import SCRIPTS_DIR
 # ✅ Python モジュール参照用に scripts ディレクトリを明示追加
 
 # ✅ 外部スクリプトの関数をインポート（PDCA構成）
-from optimize_params_with_optuna import optimize_main
-from apply_best_params_to_metaai import apply_best_params_to_metaai
+from scripts.optimize_params_with_optuna import optimize_main
+from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
 from apply_best_params import apply_best_params_to_kingdom
 
 # ✅ DAG 共通設定

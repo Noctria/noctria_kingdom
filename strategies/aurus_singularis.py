@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from data.market_data_fetcher import MarketDataFetcher  # ✅ 修正済みパス
+from core.data.market_data_fetcher import MarketDataFetcher  # ✅ 修正済みパス
 
 # ✅ GPU メモリの使用を制限（動的確保）
 gpus = tf.config.list_physical_devices('GPU')

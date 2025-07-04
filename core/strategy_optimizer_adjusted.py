@@ -1,7 +1,7 @@
 # strategy_optimizer_adjusted.py
 import numpy as np
 import pandas as pd
-from risk_control import RiskControl
+from core.risk_control import RiskControl
 
 def load_market_data(csv_file='market_data.csv'):
     """

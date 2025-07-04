@@ -5,14 +5,14 @@ from pathlib import Path
 
 BASE_DIR = Path("/opt/airflow")
 REPLACEMENTS = {
-    'from data.': 'from core.data.',
-    'from risk_control import': 'from core.risk_control import',
-    'from noctus_sentinella import': 'from strategies.noctus_sentinella import',
-    'from optimize_params_with_optuna import': 'from scripts.optimize_params_with_optuna import',
-    'from evaluate_metaai_model import': 'from scripts.evaluate_metaai_model import',
-    'from apply_best_params_to_metaai import': 'from scripts.apply_best_params_to_metaai import',
+    'from core.data.': 'from core.data.',
+    'from core.risk_control import': 'from core.risk_control import',
+    'from strategies.noctus_sentinella import': 'from strategies.noctus_sentinella import',
+    'from scripts.optimize_params_with_optuna import': 'from scripts.optimize_params_with_optuna import',
+    'from scripts.evaluate_metaai_model import': 'from scripts.evaluate_metaai_model import',
+    'from scripts.apply_best_params_to_metaai import': 'from scripts.apply_best_params_to_metaai import',
     # 念のため strategies から直接も置換
-    'from Noctus_Sentinella import': 'from strategies.noctus_sentinella import',
+    'from strategies.noctus_sentinella import': 'from strategies.noctus_sentinella import',
 }
 
 def fix_imports():
