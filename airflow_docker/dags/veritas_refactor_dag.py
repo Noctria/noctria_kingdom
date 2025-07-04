@@ -1,7 +1,4 @@
-from core.path_config import (
-    CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR,
-    PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-)
+from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
 import sys
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -12,7 +9,7 @@ from airflow.utils.trigger_rule import TriggerRule
 # ✅ sys.path に BASE_DIR を追加（Airflowコンテナ対応）
 BASE_DIR = str(TOOLS_DIR.parent)
 if BASE_DIR not in sys.path:
-    sys.path.append(BASE_DIR)  # ← ✅ 必須の処理ブロック
+    sys.path.append(BASE_DIR)  # ← ここが必要
 
 # ✅ DAG 共通設定
 default_args = {
