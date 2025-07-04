@@ -106,3 +106,7 @@ strategies/veritas_generated/
 veritas_generated/
 output_generated/
 >>>>>>> 572191d22755722942baf299a92693377c177f7a
+
+# Python bytecode
+*.pyc
+__pycache__/
