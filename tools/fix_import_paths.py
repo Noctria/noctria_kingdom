@@ -1,17 +1,18 @@
+# /mnt/d/noctria_kingdom/tools/fix_import_paths.py
+
 import os
 from pathlib import Path
 
-# 📌 修正対象のベースディレクトリ（Airflow Docker環境内）
 BASE_DIR = Path("/opt/airflow")
-TARGET_EXTENSIONS = [".py"]
-
-# 🔁 修正対象の import 文と修正後の内容（順序重要）
 REPLACEMENTS = {
     'from data.': 'from core.data.',
     'from risk_control import': 'from core.risk_control import',
     'from noctus_sentinella import': 'from strategies.noctus_sentinella import',
-    'from evaluate_metaai_model import': 'from scripts.evaluate_metaai_model import',
     'from optimize_params_with_optuna import': 'from scripts.optimize_params_with_optuna import',
+    'from evaluate_metaai_model import': 'from scripts.evaluate_metaai_model import',
+    'from apply_best_params_to_metaai import': 'from scripts.apply_best_params_to_metaai import',
+    # 念のため strategies から直接も置換
+    'from Noctus_Sentinella import': 'from strategies.noctus_sentinella import',
 }
 
 def fix_imports():
