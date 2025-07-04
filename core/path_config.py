@@ -1,21 +1,5 @@
 from pathlib import Path
 
-<<<<<<< HEAD
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-PATHS = {
-    "airflow_docker": BASE_DIR / "airflow_docker",
-    "execution": BASE_DIR / "execution",
-    "experts": BASE_DIR / "experts",
-    "llm_server": BASE_DIR / "llm_server",
-    "logs": BASE_DIR / "logs",
-    "noctria_gui": BASE_DIR / "noctria_gui",
-    "tests": BASE_DIR / "tests",
-    "tools": BASE_DIR / "tools",
-    "veritas": BASE_DIR / "veritas",
-    "system_start": BASE_DIR / "system_start",
-}
-=======
 # ========================================
 # 📌 Noctria Kingdom Path Config (v3.0)
 #    - 自動で BASE_DIR を切り替える構成
@@ -79,4 +63,3 @@ __all__ = [
     "VERITAS_GENERATE_SCRIPT",
     "_lint_path_config"
 ]
->>>>>>> 572191d22755722942baf299a92693377c177f7a
