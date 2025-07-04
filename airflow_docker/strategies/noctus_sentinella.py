@@ -22,7 +22,7 @@ class NoctusSentinella:
 
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
-        self.risk_manager = RiskManagement(historical_data=historical_data)
+        self.risk_manager = RiskManager(historical_data=historical_data)
 
     def process(self, market_data):
         if not isinstance(market_data, dict):
