@@ -4,7 +4,11 @@ from core.data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManagement
 
 class NoctusSentinella:
-    """リスク管理と異常検知を行うAI（実際のヒストリカルデータ使用版・MetaAI対応）"""
+    """
+    🛡️ Noctria Kingdomの守護者：リスク管理と異常検知を担う戦略AI。
+    - ヒストリカルデータを用いてVaR（Value at Risk）ベースの評価を行い、
+      市場流動性やボラティリティを加味して意思決定を行う。
+    """
 
     def __init__(self, risk_threshold=0.02, max_spread=0.018, min_liquidity=120):
         self.risk_threshold = risk_threshold
@@ -21,13 +25,13 @@ class NoctusSentinella:
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
 
-        # ✅ RiskManagementに渡す
+        # ✅ リスク管理AIにヒストリカルデータを渡す
         self.risk_manager = RiskManagement(historical_data=historical_data)
 
     def process(self, market_data):
         """
-        市場データを分析し、リスクを評価する
-        ➜ 万一 market_data が list などで渡された場合の防御対応
+        市場データを分析し、リスクを評価する。
+        ➜ データ不備時には防御的対応。
         """
         if not isinstance(market_data, dict):
             print("⚠️ market_dataがlistなどで渡されました。空辞書に置換します")
@@ -39,13 +43,14 @@ class NoctusSentinella:
         order_block_impact = market_data.get("order_block", 0.0)
         volatility = market_data.get("volatility", 0.0)
 
-        # 流動性とスプレッドのチェック
+        # 🔍 流動性・スプレッドのチェック
         if liquidity < self.min_liquidity or spread > self.max_spread:
             return "AVOID_TRADING"
 
-        # ボラティリティと大口注文の影響を考慮し、リスク評価を強化
+        # ⚖️ リスク評価閾値の動的補正
         adjusted_risk_threshold = self.risk_threshold * (1 + order_block_impact)
 
+        # 🔺 リスク判定
         if risk_score > adjusted_risk_threshold and volatility > 0.2:
             return "REDUCE_RISK"
         else:
@@ -53,26 +58,29 @@ class NoctusSentinella:
 
     def _calculate_risk(self, market_data):
         """
-        市場データからリスクスコアを計算（VaR適用）
-        ➜ market_dataに"price"や"price_history"が無い場合は0.0に。
+        VaR（Value at Risk）を用いたリスクスコア計算。
+        ➜ price / price_history の存在を確認し、防御的にスコア返却。
         """
         price_history = market_data.get("price_history", [])
-        price = market_data.get("price", 1.0)  # 0除算防止で1.0に
+        price = market_data.get("price", 1.0)  # 0除算防止用
 
-        if not price_history:  # データがない場合は安全に0.0
+        if not price_history:
             return 0.0
 
         volatility = np.std(price_history)
-        risk_value = self.risk_manager.calculate_var()  # historical_dataから算出
-        return risk_value / price if price != 0 else 0.0  # 0除算防止
+        risk_value = self.risk_manager.calculate_var()
+        return risk_value / price if price != 0 else 0.0
 
-# ✅ 改修後のリスク管理テスト
+# ✅ 単体テスト
 if __name__ == "__main__":
     noctus_ai = NoctusSentinella()
     mock_market_data = {
         "price": 1.2530,
         "price_history": [1.2500, 1.2525, 1.2550, 1.2510, 1.2540],
-        "spread": 0.015, "volume": 120, "order_block": 0.5, "volatility": 0.22
+        "spread": 0.015,
+        "volume": 120,
+        "order_block": 0.5,
+        "volatility": 0.22
     }
     risk_decision = noctus_ai.process(mock_market_data)
-    print("Risk Management Decision:", risk_decision)
+    print("🧠 Risk Management Decision:", risk_decision)
