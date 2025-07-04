@@ -1,10 +1,11 @@
 import os
 import re
+import argparse
 from pathlib import Path
 
-ROOT = Path("/mnt/d/noctria-kingdom")
-OLD_PATH = "/mnt/d/"
-NEW_PATH = "/mnt/d/"
+ROOT = Path(__file__).resolve().parent.parent
+OLD_PATH = "/mnt/d/noctria-kingdom"
+NEW_PATH = "/opt/airflow"
 
 # 対象ファイル拡張子
 target_exts = [".py", ".sh", ".yaml", ".yml", ".env", ".txt", ".md"]
@@ -26,17 +27,39 @@ def walk_and_scan(root_dir):
             hits = scan_file(path)
             if hits:
                 report.append({
-                    "file": str(path.relative_to(ROOT)),
+                    "file": path,
                     "matches": hits
                 })
     return report
 
+def apply_fixes(entries):
+    for entry in entries:
+        path = entry["file"]
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+
+        new_content = content.replace(OLD_PATH, NEW_PATH)
+        if new_content != content:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            print(f"✅ 修正: {path.relative_to(ROOT)}")
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--auto-fix", action="store_true", help="対象ファイルを自動修正")
+    args = parser.parse_args()
+
     results = walk_and_scan(ROOT)
+
     for entry in results:
-        print(f"\n📄 {entry['file']}")
+        rel_path = entry["file"].relative_to(ROOT)
+        print(f"\n📄 {rel_path}")
         for lineno, line in entry["matches"]:
             print(f"  L{lineno}: {line}")
             print(f"  👉 修正候補: {line.replace(OLD_PATH, NEW_PATH)}")
 
     print(f"\n✅ 検出完了：{len(results)}ファイルに旧パスが含まれています。")
+
+    if args.auto_fix:
+        apply_fixes(results)
+        print("\n🛠️ すべての対象ファイルを自動修正しました。")
