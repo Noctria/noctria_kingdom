@@ -3,11 +3,18 @@ import re
 import argparse
 from pathlib import Path
 
+# ==========================================
+# 🔧 Noctria Kingdom Path Scanner & Fixer
+# ==========================================
+
+# 自動でプロジェクトルートを取得
 ROOT = Path(__file__).resolve().parent.parent
+
+# 🔁 置換対象のパス（必要に応じて変更）
 OLD_PATH = "/mnt/d/noctria-kingdom"
 NEW_PATH = "/opt/airflow"
 
-# 対象ファイル拡張子
+# 📂 対象拡張子
 target_exts = [".py", ".sh", ".yaml", ".yml", ".env", ".txt", ".md"]
 
 def scan_file(file_path):
