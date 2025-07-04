@@ -10,7 +10,7 @@ from strategies.Noctus_Sentinella import NoctusSentinella
 from strategies.Prometheus_Oracle import PrometheusOracle
 from core.meta_ai import MetaAI
 from data.market_data_fetcher import MarketDataFetcher
-from core.risk_management import RiskManagement
+from core.risk_management import RiskManager
 
 
 class Noctria:
