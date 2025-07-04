@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-class RiskManagement:
+class RiskManager:
     """Noctria Kingdom のリスク管理モジュール"""
 
     def __init__(self, historical_data):
@@ -21,9 +21,10 @@ class RiskManagement:
 
     def calculate_var(self, confidence_level=0.95):
         """VaR (Value at Risk) を計算"""
-        mean_return = np.mean(self.data['Close'].pct_change())
-        std_dev = np.std(self.data['Close'].pct_change())
-        return mean_return - std_dev * np.percentile(self.data['Close'].pct_change(), confidence_level * 100)
+        pct_changes = self.data['Close'].pct_change().dropna()
+        mean_return = np.mean(pct_changes)
+        std_dev = np.std(pct_changes)
+        return mean_return - std_dev * np.percentile(pct_changes, confidence_level * 100)
 
     def adjust_stop_loss(self, current_price):
         """市場のボラティリティに基づいてダイナミックにストップロスを調整"""
@@ -44,7 +45,7 @@ class RiskManagement:
 # テストデータの例
 if __name__ == "__main__":
     sample_data = pd.DataFrame({'Close': np.random.normal(loc=100, scale=5, size=100)})
-    risk_manager = RiskManagement(sample_data)
+    risk_manager = RiskManager(sample_data)
 
     print("市場ボラティリティ:", risk_manager.volatility)
     print("VaR:", risk_manager.value_at_risk)
