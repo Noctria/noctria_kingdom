@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from data.market_data_fetcher import MarketDataFetcher
-from core.risk_management import RiskManagement
+from core.risk_manager import RiskManager
 from core.logger import setup_logger  # 👑 ロガー追加
 
 class LeviaTempest:
