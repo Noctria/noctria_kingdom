@@ -40,6 +40,9 @@ USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 
+# ✅ GitHub自動反映スクリプトのパス
+GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
+
 # ✅ パス整合性チェック関数（任意でDAGやテストから呼べる）
 def _lint_path_config():
     return {
@@ -52,6 +55,7 @@ def _lint_path_config():
         "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
         "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
         "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
+        "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
     }
 
 # 🌐 公開変数一覧（補完・明示用）
@@ -63,5 +67,6 @@ __all__ = [
     "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
+    "GITHUB_PUSH_SCRIPT",
     "_lint_path_config"
 ]
