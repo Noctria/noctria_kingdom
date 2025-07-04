@@ -1,4 +1,7 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+from core.path_config import (
+    CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR,
+    PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+)
 import sys
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -6,12 +9,10 @@ from airflow.operators.empty import EmptyOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
 
-# ✅ Noctria Kingdom パス管理（v2.0構成）
-from core.path_config import TOOLS_DIR, SCRIPTS_DIR, TESTS_DIR
-
 # ✅ sys.path に BASE_DIR を追加（Airflowコンテナ対応）
 BASE_DIR = str(TOOLS_DIR.parent)
 if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)  # ← ✅ 必須の処理ブロック
 
 # ✅ DAG 共通設定
 default_args = {
