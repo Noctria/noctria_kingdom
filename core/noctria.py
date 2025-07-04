@@ -1,13 +1,14 @@
-# core/Noctria.py
+# core/noctria.py
 
 import logging
 import numpy as np
 import pandas as pd
 
-from strategies.Aurus_Singularis import AurusSingularis
-from strategies.Levia_Tempest import LeviaTempest
-from strategies.Noctus_Sentinella import NoctusSentinella
-from strategies.Prometheus_Oracle import PrometheusOracle
+from strategies.aurus_singularis import AurusSingularis
+from strategies.levia_tempest import LeviaTempest
+from strategies.noctus_sentinella import NoctusSentinella
+from strategies.prometheus_oracle import PrometheusOracle
+
 from core.meta_ai import MetaAI
 from data.market_data_fetcher import MarketDataFetcher
 from core.risk_management import RiskManager
@@ -30,7 +31,7 @@ class Noctria:
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
 
-        self.risk_manager = RiskManagement(historical_data=historical_data)
+        self.risk_manager = RiskManager(historical_data=historical_data)
 
         # 各戦略AI（臣下）
         self.aurus = AurusSingularis()
