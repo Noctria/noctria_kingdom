@@ -3,7 +3,7 @@
 import datetime
 import pandas as pd
 
-class RiskManager:
+class RiskControl:
     """
     Noctria Kingdom - 統合型リスク管理クラス
     - 日次損失制限、総損失制限、スキャルピング違反、マーチンゲール違反を検出
