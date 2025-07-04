@@ -42,13 +42,13 @@ class RiskManager:
         """ポジションサイズを最適化 (資本とリスク許容度に基づく)"""
         return capital * risk_per_trade / self.value_at_risk
 
-# テストデータの例
+# ✅ テスト例（直接実行時）
 if __name__ == "__main__":
     sample_data = pd.DataFrame({'Close': np.random.normal(loc=100, scale=5, size=100)})
     risk_manager = RiskManager(sample_data)
 
-    print("市場ボラティリティ:", risk_manager.volatility)
-    print("VaR:", risk_manager.value_at_risk)
-    print("ダイナミック・ストップロス:", risk_manager.adjust_stop_loss(102))
-    print("異常検知:", risk_manager.detect_anomalies())
-    print("推奨ポジションサイズ (資本10000):", risk_manager.optimal_position_size(10000))
+    print("📊 市場ボラティリティ:", risk_manager.volatility)
+    print("📉 VaR:", risk_manager.value_at_risk)
+    print("🛡️ ダイナミック・ストップロス:", risk_manager.adjust_stop_loss(102))
+    print("🚨 異常検知:", risk_manager.detect_anomalies())
+    print("📐 推奨ポジションサイズ（資本10000）:", risk_manager.optimal_position_size(10000))
