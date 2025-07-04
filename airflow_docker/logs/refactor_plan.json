@@ -1,0 +1,758 @@
+[
+  {
+    "file": "tests/execute_order_test.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "from order_execution import OrderExecution  # execution/order_execution.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/forward_test_meta_ai.py",
+    "line": 20,
+    "type": "hardcoded_path",
+    "content": "real_time_data_path = \"data/preprocessed_usdjpy_with_fundamental.csv\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/run_ai_trading_loop.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tests/run_ai_trading_loop.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/run_ai_trading_loop.py",
+    "line": 11,
+    "type": "hardcoded_path",
+    "content": "# execution/ ディレクトリ",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/run_ai_trading_loop.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "# strategies/ ディレクトリ",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/run_ai_trading_loop.py",
+    "line": 19,
+    "type": "hardcoded_path",
+    "content": "# data/ ディレクトリ",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/stress_tests.py",
+    "line": 13,
+    "type": "simulate_function_out_of_place",
+    "content": "def simulate_market_data(self):",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/test_dqn_agent.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tests/test_dqn_agent.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/test_meta_ai_env_rl.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tests/test_meta_ai_env_rl.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/test_meta_ai_rl.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tests/test_meta_ai_rl.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/test_meta_ai_rl_real_data.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tests/test_meta_ai_rl_real_data.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tests/test_noctria_master_ai.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tests/test_noctria_master_ai.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "veritas/generate_strategy_file.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "OUTPUT_DIR = \"/noctria_kingdom/airflow_docker/strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "veritas/generate_strategy_file.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "OUTPUT_DIR = \"/noctria_kingdom/airflow_docker/strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "veritas/generate_strategy_file.py",
+    "line": 12,
+    "type": "simulate_function_out_of_place",
+    "content": "def simulate(data: pd.DataFrame) -> dict:",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "veritas/veritas_generate_strategy.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "OUTPUT_DIR = \"/mnt/d/noctria-kingdom-main/strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "veritas/veritas_generate_strategy.py",
+    "line": 12,
+    "type": "simulate_function_out_of_place",
+    "content": "def simulate(data: pd.DataFrame) -> dict:",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "tools/apply_path_fixes.py",
+    "line": 13,
+    "type": "hardcoded_path",
+    "content": "\"tools/scan_and_fix_paths.py\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/apply_path_fixes.py",
+    "line": 14,
+    "type": "hardcoded_path",
+    "content": "\"veritas/veritas_generate_strategy.py\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/apply_path_fixes.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/pvc/airflow-dags-pv.yaml\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/apply_path_fixes.py",
+    "line": 16,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/pvc/airflow-dags-pvc.yaml\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/apply_path_fixes.py",
+    "line": 17,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/scripts/download_veritas_model.py\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/apply_path_fixes.py",
+    "line": 18,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/scripts/push_generated_strategy.py\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/generate_github_template_summary.py",
+    "line": 12,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/dags\",",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "tools/generate_github_template_summary.py",
+    "line": 13,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/strategies\",",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "tools/generate_github_template_summary.py",
+    "line": 14,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/core\",",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "tools/generate_github_template_summary.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "\"airflow_docker/data\",",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# tools/scan_refactor_plan.py",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 14,
+    "type": "hardcoded_path",
+    "content": "\"generate\": \"veritas/generate\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "\"evaluate\": \"veritas/evaluate\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 16,
+    "type": "hardcoded_path",
+    "content": "\"interface\": \"veritas/interface\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 17,
+    "type": "hardcoded_path",
+    "content": "\"templates\": \"veritas/templates\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 18,
+    "type": "hardcoded_path",
+    "content": "\"utils\": \"veritas/utils\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 25,
+    "type": "hardcoded_path",
+    "content": "\"strategies/\", \"execution/\", \"data/\", \"models/\", \"airflow_docker/\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 25,
+    "type": "hardcoded_path",
+    "content": "\"strategies/\", \"execution/\", \"data/\", \"models/\", \"airflow_docker/\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 25,
+    "type": "hardcoded_path",
+    "content": "\"strategies/\", \"execution/\", \"data/\", \"models/\", \"airflow_docker/\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 25,
+    "type": "hardcoded_path",
+    "content": "\"strategies/\", \"execution/\", \"data/\", \"models/\", \"airflow_docker/\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 25,
+    "type": "hardcoded_path",
+    "content": "\"strategies/\", \"execution/\", \"data/\", \"models/\", \"airflow_docker/\",",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 26,
+    "type": "hardcoded_path",
+    "content": "\"veritas/\", \"llm_server/\", \"noctria_gui/\", \"experts/\", \"tools/\", \"tests/\", \"docs/\"",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 53,
+    "type": "hardcoded_path",
+    "content": "if \"def simulate\" in line and \"strategies/\" not in str(path):",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "tools/scan_refactor_plan.py",
+    "line": 53,
+    "type": "simulate_function_out_of_place",
+    "content": "if \"def simulate\" in line and \"strategies/\" not in str(path):",
+    "suggested_dir": "misc"
+  },
+  {
+    "file": "airflow_docker/scripts/apply_best_params_to_metaai.py",
+    "line": 11,
+    "type": "hardcoded_path",
+    "content": "best_params_path = \"/noctria_kingdom/airflow_docker/logs/best_params.json\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/apply_best_params_to_metaai.py",
+    "line": 23,
+    "type": "hardcoded_path",
+    "content": "data_path = \"/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/apply_best_params_to_metaai.py",
+    "line": 23,
+    "type": "hardcoded_path",
+    "content": "data_path = \"/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/apply_best_params_to_metaai.py",
+    "line": 35,
+    "type": "hardcoded_path",
+    "content": "tensorboard_log=\"/noctria_kingdom/airflow_docker/logs/ppo_tensorboard_logs/\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/apply_best_params_to_metaai.py",
+    "line": 42,
+    "type": "hardcoded_path",
+    "content": "model.save(\"/noctria_kingdom/airflow_docker/logs/metaai_model_latest.zip\")",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/download_openhermes.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/download_openhermes.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/download_veritas_model.py",
+    "line": 8,
+    "type": "hardcoded_path",
+    "content": "TARGET_DIR = \"/mnt/d/noctria-kingdom-main/airflow_docker/models/nous-hermes-2\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/download_veritas_model.py",
+    "line": 8,
+    "type": "hardcoded_path",
+    "content": "TARGET_DIR = \"/mnt/d/noctria-kingdom-main/airflow_docker/models/nous-hermes-2\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/evaluate_generated_strategies.py",
+    "line": 1,
+    "type": "hardcoded_path",
+    "content": "# airflow_docker/scripts/evaluate_generated_strategies.py",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/scripts/evaluate_generated_strategies.py",
+    "line": 14,
+    "type": "hardcoded_path",
+    "content": "generated_dir = \"/noctria_kingdom/strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/scripts/evaluate_generated_strategies.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "official_dir = \"/noctria_kingdom/strategies/official\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/scripts/evaluate_generated_strategies.py",
+    "line": 16,
+    "type": "hardcoded_path",
+    "content": "log_path = \"/noctria_kingdom/airflow_docker/logs/veritas_eval_result.json\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/scripts/fetch_and_clean_fundamentals.py",
+    "line": 36,
+    "type": "hardcoded_path",
+    "content": "df.to_csv(\"/opt/airflow/data/fundamental/cleaned_cpi.csv\", index=False)",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/fetch_and_clean_fundamentals.py",
+    "line": 38,
+    "type": "hardcoded_path",
+    "content": "print(\"✅ Aurus: data/fundamental/cleaned_cpi.csv に保存完了！\")",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/git_push_generated_strategy.py",
+    "line": 32,
+    "type": "hardcoded_path",
+    "content": "save_dir = \"/opt/airflow/strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/scripts/migrate_study_sqlite_to_pg.py",
+    "line": 5,
+    "type": "hardcoded_path",
+    "content": "sqlite_path = \"/opt/airflow/data/optuna_study.db\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/optimize_params_with_optuna.py",
+    "line": 60,
+    "type": "hardcoded_path",
+    "content": "env = TradingEnvWithFundamentals('/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv')",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/optimize_params_with_optuna.py",
+    "line": 60,
+    "type": "hardcoded_path",
+    "content": "env = TradingEnvWithFundamentals('/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv')",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/optimize_params_with_optuna.py",
+    "line": 73,
+    "type": "hardcoded_path",
+    "content": "tensorboard_log=\"/noctria_kingdom/airflow_docker/logs/ppo_tensorboard_logs/\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/optimize_params_with_optuna.py",
+    "line": 76,
+    "type": "hardcoded_path",
+    "content": "tb_callback = TensorBoardCallback(\"/noctria_kingdom/airflow_docker/logs/ppo_tensorboard_logs\", trial.number)",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/optimize_params_with_optuna.py",
+    "line": 113,
+    "type": "hardcoded_path",
+    "content": "best_params_file = \"/noctria_kingdom/airflow_docker/logs/best_params.json\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/prepare_usdjpy_with_fundamental.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "\"/noctria_kingdom/airflow_docker/data/USDJPY_M1_201501020805_202506161647.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/prepare_usdjpy_with_fundamental.py",
+    "line": 15,
+    "type": "hardcoded_path",
+    "content": "\"/noctria_kingdom/airflow_docker/data/USDJPY_M1_201501020805_202506161647.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/prepare_usdjpy_with_fundamental.py",
+    "line": 17,
+    "type": "hardcoded_path",
+    "content": "output_csv_path = \"/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/prepare_usdjpy_with_fundamental.py",
+    "line": 17,
+    "type": "hardcoded_path",
+    "content": "output_csv_path = \"/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/preprocess_usdjpy_data.py",
+    "line": 22,
+    "type": "hardcoded_path",
+    "content": "df.to_csv(\"/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv\", index=False)",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/push_generated_strategy.py",
+    "line": 8,
+    "type": "hardcoded_path",
+    "content": "strategy_dir = \"strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/scripts/veritas_local_test.py",
+    "line": 14,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = os.getenv(\"MODEL_DIR\", \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\")",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/scripts/veritas_local_test.py",
+    "line": 14,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = os.getenv(\"MODEL_DIR\", \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\")",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/noctria_kingdom_dag.py",
+    "line": 36,
+    "type": "hardcoded_path",
+    "content": "logger = setup_logger(\"NoctriaDecision\", \"/noctria_kingdom/airflow_docker/logs/noctria_decision.log\")",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/noctria_kingdom_pdca.py",
+    "line": 27,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/noctria_kingdom_pdca.py",
+    "line": 32,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/noctria_kingdom_pdca.py",
+    "line": 37,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/optimize_params_with_optuna.py\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/noctria_kingdom_pdca.py",
+    "line": 43,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/apply_best_params_to_metaai.py\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/noctria_royal_dag.py",
+    "line": 2,
+    "type": "hardcoded_path",
+    "content": "sys.path.append('/opt/airflow')  # ✅ Airflow コンテナから core/, strategies/ などを参照可能に",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_eval_dag.py",
+    "line": 31,
+    "type": "hardcoded_path",
+    "content": "generated_dir = \"/noctria_kingdom/strategies/veritas_generated\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_eval_dag.py",
+    "line": 32,
+    "type": "hardcoded_path",
+    "content": "official_dir = \"/noctria_kingdom/strategies/official\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_eval_dag.py",
+    "line": 33,
+    "type": "hardcoded_path",
+    "content": "log_path = \"/noctria_kingdom/airflow_docker/logs/veritas_eval_result.json\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_generate_dag.py",
+    "line": 20,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = os.getenv(\"MODEL_DIR\", \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\")",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_generate_dag.py",
+    "line": 20,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = os.getenv(\"MODEL_DIR\", \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\")",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_generate_dag.py",
+    "line": 50,
+    "type": "hardcoded_path",
+    "content": "save_dir = \"/opt/airflow/strategies/veritas_generated\"",
+    "suggested_dir": "veritas/generate"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_master_dag.py",
+    "line": 64,
+    "type": "hardcoded_path",
+    "content": "log_dir = \"/noctria_kingdom/airflow_docker/logs\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_pdca_dag.py",
+    "line": 29,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/veritas/generate_strategy_file.py\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_pdca_dag.py",
+    "line": 34,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py /noctria_kingdom/airflow_docker/data/market_data.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_pdca_dag.py",
+    "line": 34,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/evaluate_generated_strategies.py /noctria_kingdom/airflow_docker/data/market_data.csv\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_pdca_dag.py",
+    "line": 39,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/airflow_docker/scripts/github_push.py\"",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_refactor_dag.py",
+    "line": 23,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/tools/scan_refactor_plan.py\",",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_refactor_dag.py",
+    "line": 33,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/tools/apply_refactor_plan.py --dry-run\",",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_refactor_dag.py",
+    "line": 38,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"pytest /noctria_kingdom/tests/\",",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "airflow_docker/dags/veritas_refactor_dag.py",
+    "line": 43,
+    "type": "hardcoded_path",
+    "content": "bash_command=\"python3 /noctria_kingdom/tools/apply_refactor_plan.py\",",
+    "suggested_dir": "airflow_docker"
+  },
+  {
+    "file": "core/meta_ai.py",
+    "line": 24,
+    "type": "hardcoded_path",
+    "content": "base_dir = os.environ.get(\"NOCTRIA_DATA_DIR\", os.path.expanduser(\"~/noctria_kingdom/airflow_docker/data\"))",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/meta_ai_env_with_fundamentals.py",
+    "line": 74,
+    "type": "hardcoded_path",
+    "content": "env = TradingEnvWithFundamentals(\"data/preprocessed_usdjpy_with_fundamental.csv\")",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/meta_ai_env_with_news_sentiment.py",
+    "line": 96,
+    "type": "hardcoded_path",
+    "content": "data_path=\"/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv\",",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/news_sentiment_fetcher.py",
+    "line": 102,
+    "type": "hardcoded_path",
+    "content": "data_path=\"/opt/airflow/data/preprocessed_usdjpy_with_fundamental.csv\",",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/strategy_optimizer_adjusted.py",
+    "line": 6,
+    "type": "simulate_function_out_of_place",
+    "content": "def simulate_strategy_adjusted(path: str, market_data: pd.DataFrame) -> Dict:",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/veritas_llm.py",
+    "line": 4,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\"",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/veritas_llm.py",
+    "line": 4,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\"",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/veritas_model.py",
+    "line": 6,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = os.getenv(\"MODEL_DIR\", \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\")",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/veritas_model.py",
+    "line": 6,
+    "type": "hardcoded_path",
+    "content": "MODEL_DIR = os.getenv(\"MODEL_DIR\", \"/noctria_kingdom/airflow_docker/models/nous-hermes-2\")",
+    "suggested_dir": "core"
+  },
+  {
+    "file": "core/__init__.py",
+    "line": 11,
+    "type": "hardcoded_path",
+    "content": "required_dirs = [\"data/raw_data\", \"data/processed_data\", \"logs\"]",
+    "suggested_dir": "core"
+  }
+]

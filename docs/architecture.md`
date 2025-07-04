@@ -1,0 +1,40 @@
+# 🏠 Noctria Kingdom 全体構成図
+
+## 🌐 構成図（Mermaid形式）
+
+```mermaid
+graph TD
+    A[👤 User] --> B[🌐 GUI (Noctria-GUI)]
+    B --> C[⚙️ Airflow DAGs]
+    C --> D1[🤖 AurusSingularis]
+    C --> D2[⚡ LeviaTempest]
+    C --> D3[🛡️ NoctusSentinella]
+    C --> D4[🔮 PrometheusOracle]
+    D1 --> E[👑 Noctria (統合判断AI)]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+    E --> F[📈 Order Execution / Trade System]
+```
+
+---
+
+## 📦 ディレクトリ構成概要
+
+| パス              | 内容                                |
+|-------------------|-------------------------------------|
+| `airflow-docker/` | Airflow DAGsとAIモジュール実行基盤       |
+| `core/`           | Noctria統合判断AI、ロガー                  |
+| `strategies/`     | 各臣下AIの実装                          |
+| `data/`           | 市場データ、ファンダメンタル、前処理         |
+| `scripts/`        | PPO訓練、Optuna最適化、レポート出力        |
+| `experts/`        | MQL5版EAファイル                        |
+| `Noctria-GUI/`    | Webビュー、API連携                      |
+
+---
+
+## 🧩 解説
+
+- GUIからAirflow DAGへ命令が送られ、戦略AI群が並列実行されます。
+- 各AIの出力が Noctria に統合され、最終判断が Execution モジュールへ。
+- 全体構造はモジュール分離されており、保守性・拡張性が高い構成です。

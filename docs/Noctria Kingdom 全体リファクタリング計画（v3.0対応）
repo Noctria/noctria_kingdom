@@ -1,0 +1,50 @@
+# 🛠️ Noctria Kingdom 全体リファクタリング計画（v3.0対応 / gpusoroban構成前提）
+
+## 🎯 目的
+
+- ✅ **全システムを `/opt/airflow/` 配下に統一**し、Airflow/Docker/GUI/LLMの混乱を排除
+- ✅ **GPU LLMノードは `gpusoroban` 専用で運用し、FastAPI経由で連携**
+- ✅ **Veritasの自律戦略生成・評価・昇格を堅牢なマルチノード構成で確立**
+- ✅ **CI/CD・GitHub・DAG自動起動を含む未来志向のAI国家基盤の完成**
+
+---
+
+## 🌐 全体構成概要（gpusoroban連携）
+
+| コンポーネント | ノード | 統一パス |
+|----------------|-------|----------|
+| Airflow + GUI + 評価実行 | **WSL + Docker** | `/opt/airflow/` |
+| Veritas LLM推論サーバ | **gpusoroban（venv）** | `/home/user/noctria-kingdom-main/` |
+| GitHubリポジトリ連携 | **origin/main** | ルート = `/opt/airflow/` |
+
+- FastAPIで `localhost:11434` 等を通じて推論
+- `gpusoroban` はモデル保存・推論に特化し、戦略生成結果は GitHub にpushまたはAPIで返却
+
+---
+
+## 📁 新・標準構成（v3.0）
+
+| ディレクトリ | 用途 |
+|-------------|------|
+| `/opt/airflow/` | 全知性・データ・戦略の統一ルート |
+| `/opt/airflow/airflow_docker/` | DAG、Dockerfile、ログ、.env、補助スクリプト |
+| `/opt/airflow/core/` | `path_config.py`, `env_config.py`, 共通ユーティリティ |
+| `/opt/airflow/veritas/` | Veritas生成AI（スクリプトはgpusorobanへAPI呼出） |
+| `/opt/airflow/strategies/` | `official/`（手動）と `veritas_generated/`（自動）に分離管理 |
+| `/opt/airflow/execution/` | MT5連携コード、バックテスト評価、取引記録など |
+| `/opt/airflow/models/` | `latest/`, `archive/` によるモデルバージョン管理 |
+| `/opt/airflow/data/` | `raw/`, `processed/`, `fundamental/` の3階層構造 |
+| `/opt/airflow/llm_server/` | FastAPIクライアント or テスト用ダミー |
+| `/opt/airflow/noctria_gui/` | GUI表示、Airflow DAGトリガー、バックエンドAPI |
+| `/opt/airflow/tools/` | GitHub push、自動パス変換、構成監査など |
+| `/opt/airflow/tests/` | pytest形式の単体/統合テスト群 |
+| `/opt/airflow/docs/` | 設計書、運用手順、マウント一覧など |
+
+---
+
+## 🔁 リファクタリングステップ（v3.0対応）
+
+### ✅ ① パス構成の絶対統一
+- `core/path_config.py`:  
+  ```python
+  TARGET_PROJECT_ROOT = Path("/opt/airflow")

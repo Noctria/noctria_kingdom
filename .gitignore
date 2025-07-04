@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -24,3 +25,84 @@ Thumbs.db
 
 # Airflow/Meta
 airflow_docker/.airflow
+=======
+# ==========================
+# 🔹 Python & 仮想環境
+# ==========================
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+venv/
+venv_*/
+.env/
+.env.*
+.local/
+
+# ==========================
+# 🔹 Jupyter & エディタ系
+# ==========================
+.ipynb_checkpoints/
+.DS_Store
+.vscode/
+.idea/
+
+# ==========================
+# 🔹 Airflow 関連（/opt/airflow移行後）
+# ==========================
+# キャッシュやログ
+logs/
+__pycache__/
+tmp/
+output/
+
+# airflow_docker関連（Airflow実体）
+airflow_docker/logs/
+airflow_docker/tmp/
+airflow_docker/airflow.cfg
+airflow_docker/.env
+airflow_docker/.env.*
+
+# airflow sqlite（初期検証用DB）
+airflow.db
+
+# ==========================
+# 🔹 データ・学習系ログ
+# ==========================
+# TensorBoardログなど
+logs/ppo_tensorboard_logs/
+*.log
+*.tmp
+
+# プライベートデータや生成物
+data/private_data/
+data/**/*.parquet
+data/**/*.feather
+data/**/*.pkl
+data/**/*.npy
+
+# ==========================
+# 🔹 Kubernetes・セキュリティ関連
+# ==========================
+.secrets/
+secrets/
+kubeconfig_final.yaml
+*.key
+*.pem
+*.crt
+
+# Helm, Docker
+*.tgz
+.cache/
+*.tar
+*.tar.gz
+docker/*.tar
+
+# ==========================
+# 🔹 Veritas戦略生成（自動生成ファイル）
+# ==========================
+strategies/veritas_generated/
+veritas_generated/
+output_generated/
+>>>>>>> 572191d22755722942baf299a92693377c177f7a

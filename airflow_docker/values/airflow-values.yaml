@@ -1,0 +1,40 @@
+executor: CeleryExecutor
+
+images:
+  airflow:
+    repository: noctria/airflow-custom
+    tag: 2.9.1
+    pullPolicy: IfNotPresent
+
+dags:
+  persistence:
+    enabled: true
+    existingClaim: airflow-dags-pvc
+  gitSync:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false
+
+webserver:
+  defaultUser:
+    enabled: false
+  service:
+    type: ClusterIP
+
+webserverSecretKey: changeme-key
+
+postgresql:
+  enabled: true
+  auth:
+    username: airflow
+    password: airflow
+    database: airflow
+
+redis:
+  enabled: true
+  password: ""
+
+workers:
+  replicas: 1

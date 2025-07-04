@@ -1,0 +1,50 @@
+[core]
+# Airflow のホームディレクトリ
+airflow_home = /opt/airflow
+
+# DAG ファイルの格納ディレクトリ
+dags_folder = /opt/airflow/dags
+
+# Airflow のログ出力先
+base_log_folder = /opt/airflow/logs
+
+# ログファイルの保存形式
+executor = LocalExecutor
+
+# スケジューラーが DAG をスキャンする間隔（秒）
+dag_dir_list_interval = 30
+
+[database]
+# PostgreSQL コンテナとの接続URL
+sql_alchemy_conn = postgresql+psycopg2://airflow:airflow@postgres/airflow
+
+# DB接続の最大プールサイズ
+sql_alchemy_pool_size = 5
+
+[webserver]
+# Web UI のホスト・ポート
+web_server_host = 0.0.0.0
+web_server_port = 8080
+
+# Web UI のシークレットキー（セキュリティ用）
+secret_key = temporary_key_for_example_only_change_me
+
+# 初期ユーザー名
+default_ui_user = admin
+
+[logging]
+# ログレベル（DEBUG / INFO / WARNING / ERROR）
+logging_level = INFO
+
+# タスクログの出力先
+remote_logging = False
+
+# ログファイル名テンプレート
+log_filename_template = {{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log
+
+[kubernetes]
+# Kubernetes 実行時に使用する config ファイルのパス
+kube_config_path = /home/airflow/.kube/config
+
+# Kubernetes Pod 名のテンプレート
+pod_template_file = /opt/airflow/pod_templates/default_pod.yaml

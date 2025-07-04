@@ -1,0 +1,27 @@
+name: Docker Pytest Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Pytest in Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: 🐳 Build Docker Image (Noctria Airflow)
+        run: docker build -t noctria-ci -f airflow_docker/docker/Dockerfile .
+
+      - name: ✅ Run Pytest Inside Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/noctria_kingdom \
+            -w /noctria_kingdom \
+            noctria-ci \
+            bash -c "PYTHONPATH=. pytest tests/test_path_config.py"
