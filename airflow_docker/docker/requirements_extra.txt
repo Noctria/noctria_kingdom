@@ -14,6 +14,7 @@ optuna==3.6.1
 stable-baselines3==2.2.1
 gymnasium[classic_control]==0.28.1
 shimmy==1.2.0
+gym==0.26.2
 
 # ファイナンスデータ
 yfinance==0.2.62
