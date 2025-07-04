@@ -1,6 +1,7 @@
-from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8
+
+from core.path_config import *
 
 import sys
 import os
@@ -8,15 +9,11 @@ import optuna
 import json
 from datetime import datetime
 
-# ✅ Airflowパス追加（Docker内部用）
-
-# ✅ Optuna + TensorBoard
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from torch.utils.tensorboard import SummaryWriter
 from stable_baselines3 import PPO
+from torch.utils.tensorboard import SummaryWriter
 
-# ✅ Noctria王国の自作環境
 from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 
 # ✅ TensorBoard Callback
@@ -57,7 +54,7 @@ def objective(trial):
 
     # 環境の初期化
     try:
-        env = TradingEnvWithFundamentals('/noctria_kingdom/airflow_docker/data/preprocessed_usdjpy_with_fundamental.csv')
+        env = TradingEnvWithFundamentals(DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv")
     except Exception as e:
         print(f"❌ 環境初期化失敗: {e}")
         raise
@@ -70,10 +67,10 @@ def objective(trial):
             gamma=gamma,
             ent_coef=ent_coef,
             verbose=1,
-            tensorboard_log="/noctria_kingdom/airflow_docker/logs/ppo_tensorboard_logs/"
+            tensorboard_log=str(LOGS_DIR / "ppo_tensorboard_logs")
         )
 
-        tb_callback = TensorBoardCallback("/noctria_kingdom/airflow_docker/logs/ppo_tensorboard_logs", trial.number)
+        tb_callback = TensorBoardCallback(str(LOGS_DIR / "ppo_tensorboard_logs"), trial.number)
         model.learn(total_timesteps=1000, callback=tb_callback)
 
     except Exception as e:
@@ -88,8 +85,8 @@ def objective(trial):
         print(f"❌ 評価エラー: {e}")
         raise
 
-# ✅ メイン処理
-if __name__ == "__main__":
+# ✅ DAGや他スクリプトから呼べるラッパー
+def optimize_main():
     study_name = "ppo_opt"
     storage = os.getenv("OPTUNA_DB_URL", "postgresql+psycopg2://airflow:airflow@postgres:5432/optuna_db")
 
@@ -110,7 +107,7 @@ if __name__ == "__main__":
 
     print("✅ 最適ハイパーパラメータ:", study.best_params)
 
-    best_params_file = "/noctria_kingdom/airflow_docker/logs/best_params.json"
+    best_params_file = LOGS_DIR / "best_params.json"
     try:
         with open(best_params_file, "w") as f:
             json.dump(study.best_params, f, indent=2)
@@ -118,3 +115,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ best_params.json の保存失敗: {e}")
         raise
+
+# ✅ CLI実行時（デバッグ用）
+if __name__ == "__main__":
+    optimize_main()
