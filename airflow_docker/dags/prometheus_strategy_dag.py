@@ -1,16 +1,15 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+from core.path_config import (
+    CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR,
+    MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR,
+    TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+)
 import sys
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# ✅ パス集中管理（v2.0構成）
-from core.path_config import STRATEGIES_DIR
-
-# ✅ Airflow Worker用のPYTHONPATH追加（strategies読み込み用）
-
-# ✅ Prometheus予測AIのインポート
-from prometheus_oracle import PrometheusOracle
+# ✅ Prometheus予測AIの正しいインポート（strategies配下）
+from strategies.prometheus_oracle import PrometheusOracle
 
 # === DAG共通設定 ===
 default_args = {
