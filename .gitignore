@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pkl
+*.log
+
+# Environments
+.venv/
+venv/
+.env
+*.env
+
+# Jupyter/Notebook
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs/Outputs
+/logs/
+/tests/*.deb
+*.bak
+
+# Airflow/Meta
+airflow_docker/.airflow

@@ -1,0 +1,114 @@
+📜 Noctria Kingdom 開発引き継ぎ書
+更新日：2025年7月4日
+担当者：大福雅之
+対象環境：WSL2 + Docker (Airflow, PostgreSQL, Redis)
+プロジェクトルート：/mnt/d/noctria_kingdom
+
+✅ 概要
+Noctria Kingdom プロジェクトを v3.0 構成に準拠して再構築した。
+
+全体のパス管理は core/path_config.py に集約。
+
+tools/structure_refactor.py によりハードコードされたパスの自動置換と構造監査を実施。
+
+AirflowのDockerコンテナ環境にて DB初期化・ユーザ作成・DAG表示の不具合対応を実施。
+
+.env および docker-compose.yaml のパス・マウント整合性を完全統一。
+
+Dockerfile内の COPY 記述ミスによるビルド失敗を修正。
+
+🔧 構成ファイルの主な修正
+1. .env
+env
+コピーする
+# 📁 ホストパス定義
+HOST_DAGS_PATH=/mnt/d/noctria_kingdom/airflow_docker/dags
+HOST_LOGS_PATH=/mnt/d/noctria_kingdom/airflow_docker/logs
+HOST_PLUGINS_PATH=/mnt/d/noctria_kingdom/airflow_docker/plugins
+
+# Airflow用
+PYTHONPATH=/opt/airflow
+AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/airflow_docker/dags
+AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/airflow_docker/logs
+2. docker-compose.yaml（マウント整合済み）
+yaml
+コピーする
+volumes:
+  - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
+  - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
+  - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+3. Dockerfile（パス修正）
+dockerfile
+コピーする
+COPY requirements_airflow.txt /requirements_airflow.txt
+COPY requirements_extra.txt /requirements_extra.txt
+COPY constraints.txt /tmp/constraints.txt
+❌ COPY docker/xxx は削除済み。Docker contextが airflow_docker/docker/ であるため。
+
+🛠 自動パス変換と構造監査
+実行コマンド：
+bash
+コピーする
+PYTHONPATH=/mnt/d/noctria_kingdom python3 tools/structure_refactor.py
+成果：
+20ファイル以上に /opt/airflow/... 構文でのパス更新を適用。
+
+structure_audit.json に以下の監査結果を記録：
+
+json
+コピーする
+[
+  {
+    "type": "too_many_directories",
+    "path": ".",
+    "count": 75
+  },
+  {
+    "type": "unnecessary_file",
+    "path": "/mnt/d/noctria_kingdom/strategies/veritas_generated/dammy"
+  },
+  ...
+]
+🐘 DBとAirflowの初期化ステップ
+bash
+コピーする
+docker compose down -v --remove-orphans
+docker compose build --no-cache
+docker compose up -d
+docker compose exec airflow-webserver airflow db init
+docker compose exec airflow-webserver airflow users create \
+  --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com
+🐞 トラブル対応一覧
+問題内容	対応内容
+Broken DAG エラー（IndentationError）	veritas_refactor_dag.py の if __name__ == '__main__': ブロック内に pass を追記
+Dockerビルド時に COPY docker/... が失敗	Dockerfile の COPY 行を正しい相対パスに修正
+DAGがAirflowに表示されない	.env と docker-compose.yaml のマウント定義を完全一致させ解決
+/opt/airflow/... にPermissionError	.env のマウント構成と structure_auditor.py の出力先を調整し解決
+veritas_refactor_dag.py の構文エラー	if __name__ == '__main__': に対しブロックを正しくインデントし修正
+
+📂 ファイルパス統制とルール（v3.0）
+カテゴリ	パス	備考
+DAGs	/opt/airflow/airflow_docker/dags	.env および docker-compose.yaml 両方で統一
+Logs	/opt/airflow/airflow_docker/logs	Airflowログと共通
+Plugins	/opt/airflow/airflow_docker/plugins	必要に応じて拡張
+Core Modules	/opt/airflow/core	path_config.py, logger.py など
+Strategies	/opt/airflow/strategies	veritas_generated/, official/ など戦略配置
+Scripts	/opt/airflow/scripts	バッチ評価、Git連携など補助ロジック
+Veritas	/opt/airflow/veritas	自動戦略生成AI
+Tools	/opt/airflow/tools	パス変換、構造監査などの管理ユーティリティ
+
+✅ 次の推奨作業
+ Airflow Web UI にログインし DAG が表示されることを確認
+
+ テストDAGを veritas_eval_dag.py 等で動作確認
+
+ GUIまたはFastAPIサーバとの連携チェック
+
+ structure_audit.json の不要ファイルを物理削除
+
+📌 備考
+core/path_config.py はプロジェクト直下・コンテナ内部の実行パスから動的に BASE_DIR を判定する方式に更新済み。
+
+structure_refactor.py は logs/structure_audit.json へのログ出力と同時に、core/path_config.py の存在前提で安全に処理可能。
+
+以上が、Noctria Kingdom プロジェクトの v3.0 対応・Airflow稼働整備の完了記録となります。

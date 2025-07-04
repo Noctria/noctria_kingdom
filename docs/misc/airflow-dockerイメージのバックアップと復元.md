@@ -1,0 +1,101 @@
+以下に、Airflow環境のイメージバックアップ・復元の手順を GitHubで見やすく整形したMarkdown で出力します🚀✨
+
+markdown
+コピーする
+編集する
+# Airflow-docker イメージ & ボリューム バックアップ・復元手順
+
+Noctria Kingdom の Airflow 環境を安全に保管・復元するための手順です。  
+DockerイメージとPostgresボリュームのバックアップ・復元をまとめました。
+
+---
+
+## 📦 1️⃣ Dockerイメージのバックアップ
+
+以下のコマンドを実行し、Airflow環境の各Dockerイメージを `.tar` ファイルとして保存します。
+
+```bash
+docker save -o airflow_webserver_backup.tar custom_airflow:latest
+docker save -o airflow_scheduler_backup.tar apache/airflow:2.8.0
+docker save -o postgres_backup.tar postgres:13
+📦 2️⃣ Postgresデータボリュームのバックアップ
+AirflowのPostgresデータ（postgres-data）を圧縮アーカイブで保存します。
+
+bash
+コピーする
+編集する
+docker run --rm -v postgres-data:/volume -v $(pwd):/backup alpine \
+    tar czf /backup/postgres_data_backup.tar.gz -C /volume ./
+🔄 3️⃣ Dockerイメージの復元
+バックアップ済みのイメージファイルを、以下のコマンドで復元します。
+
+bash
+コピーする
+編集する
+docker load -i airflow_webserver_backup.tar
+docker load -i airflow_scheduler_backup.tar
+docker load -i postgres_backup.tar
+🔄 4️⃣ Postgresデータボリュームの復元
+バックアップ済みのボリュームデータを復元するには、以下を実行します。
+
+bash
+コピーする
+編集する
+docker run --rm -v postgres-data:/volume -v $(pwd):/backup alpine \
+    tar xzf /backup/postgres_data_backup.tar.gz -C /volume
+🎯 5️⃣ 一括実行スクリプト例
+🔹 バックアップ一括スクリプト
+bash
+コピーする
+編集する
+#!/bin/bash
+echo "🔄 Airflowイメージをバックアップ中..."
+docker save -o airflow_webserver_backup.tar custom_airflow:latest
+docker save -o airflow_scheduler_backup.tar apache/airflow:2.8.0
+docker save -o postgres_backup.tar postgres:13
+
+echo "🔄 Postgresボリュームをバックアップ中..."
+docker run --rm -v postgres-data:/volume -v $(pwd):/backup alpine \
+    tar czf /backup/postgres_data_backup.tar.gz -C /volume ./
+
+echo "✅ バックアップ完了！"
+🔹 復元一括スクリプト
+bash
+コピーする
+編集する
+#!/bin/bash
+echo "🔄 Airflowイメージを復元中..."
+docker load -i airflow_webserver_backup.tar
+docker load -i airflow_scheduler_backup.tar
+docker load -i postgres_backup.tar
+
+echo "🔄 Postgresボリュームを復元中..."
+docker run --rm -v postgres-data:/volume -v $(pwd):/backup alpine \
+    tar xzf /backup/postgres_data_backup.tar.gz -C /volume
+
+echo "✅ 復元完了！"
+💡 ポイント
+✅ バックアップファイル（.tar, .tar.gz）は必ず安全な場所に保管してください。
+✅ イメージ名やタグが異なる場合は、実際の環境に合わせて書き換えてください。
+✅ これで Noctria Kingdom の Airflow王国をいつでも復元可能に！
+
+😊
+他に「日付入りファイル名にしてほしい」や「バックアップ先ディレクトリをまとめたい」など、追加カスタマイズがあれば遠慮なく教えてね！🚀✨
+
+yaml
+コピーする
+編集する
+
+---
+
+✅ **このままコピペして `.md` ファイルに保存すれば、GitHubで読みやすい形で表示されます**  
+✅ **もしさらに自動化や補足説明が欲しければ、言ってくれたらすぐ追加しますよ！**
+
+さぁ、これで Noctria Kingdom の資産は完璧に守られますね👑✨
+
+
+
+
+
+
+

@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:13
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:latest
+    restart: always
+
+  airflow-webserver:
+    build:
+      context: ./docker
+    image: noctria-airflow
+    depends_on:
+      - postgres
+      - redis
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
+      - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+      - ../core:/opt/airflow/core
+      - ../scripts:/opt/airflow/scripts
+      - ../strategies:/opt/airflow/strategies
+      - ../veritas:/opt/airflow/veritas
+      - ../data:/opt/airflow/data
+      - ../tools:/opt/airflow/tools
+    command: webserver
+    restart: always
+
+  airflow-scheduler:
+    build:
+      context: ./docker
+    image: noctria-airflow
+    depends_on:
+      - postgres
+      - redis
+    env_file: .env
+    volumes:
+      - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
+      - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
+      - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+      - ../core:/opt/airflow/core
+      - ../scripts:/opt/airflow/scripts
+      - ../strategies:/opt/airflow/strategies
+      - ../veritas:/opt/airflow/veritas
+      - ../data:/opt/airflow/data
+      - ../tools:/opt/airflow/tools
+    command: scheduler
+    restart: always
+
+volumes:
+  postgres-db-volume:

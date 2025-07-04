@@ -1,0 +1,95 @@
+📘 Noctria Kingdom 引き継ぎ書（2025-06-24〜25）
+🗓 実施概要
+項目	内容
+対象機能	veritas_master_dag の API 起動と run_noctus タスクの実行確認
+主な修正点	Airflow REST API 認証調整・DAGトリガー確認・リスク管理AIバグ修正
+成果	NoctusSentinella の DAG 実行と市場リスク評価に成功 🎉
+
+🧰 作業ログ
+1. Airflow Web/API 接続とエラー対応
+curl による localhost:8080/api/v1/dags 実行時に 403 Forbidden 発生
+→ 原因: airflow.cfg の認証設定・ユーザー権限に問題あり
+
+airflow-webserver のログで Login Failed for user: airflow を確認
+
+Airflow 起動ログにて User "airflow" created with role "Admin" を確認（成功）
+
+2. .env ファイル衝突の解消
+git pull 時、.env のローカル変更が原因で pull 失敗
+
+解決策: .env を一時退避 or commit/stash
+
+3. Airflow DAG起動確認（API）
+bash
+コピーする
+編集する
+curl -u airflow:airflow -X POST http://localhost:8080/api/v1/dags/veritas_master_dag/dagRuns \
+  -H "Content-Type: application/json" \
+  -d '{"conf": {"source": "GUI"}}'
+✅ DAGが queued 状態で起動 → ログが /log/dag_id=veritas_master_dag/... に出力されるように
+
+4. run_noctus タスクのエラーと修正
+❌ 初回エラー内容:
+css
+コピーする
+編集する
+TypeError: setup_logger() missing 1 required positional argument: 'log_file'
+該当ファイル: /strategies/noctus_sentinella.py → MarketDataFetcher の setup_logger() 呼び出しに引数漏れ
+
+✅ 修正内容:
+core/utils.py にある setup_logger(name: str, log_file: str) に対して "MarketDataFetcher.log" を明示指定
+
+python
+コピーする
+編集する
+self.logger = setup_logger("MarketDataFetcher", "MarketDataFetcher.log")
+5. RiskManagement の属性エラーと修正
+❌ エラー内容:
+pgsql
+コピーする
+編集する
+AttributeError: 'RiskManagement' object has no attribute 'calculate_var'
+✅ 修正内容:
+calculate_var() は private ではなく public にすべき
+
+対応案1: self.value_at_risk の初期化だけ使用（既存コードでOK）
+
+対応案2: calculate_var() を必要なら public 化（今回は未使用で回避可能）
+
+6. 最終成功ログ
+log
+コピーする
+編集する
+✅ データ取得成功: (517, 5)
+📊 市場ボラティリティ: 0.042
+💥 VaR: 0.035
+🛡️ ストップロス: 97.9
+🚨 異常検知: False
+📈 ポジションサイズ: 571.4
+🗂 関連ファイル構成（抜粋）
+bash
+コピーする
+編集する
+noctria-kingdom-main/
+├── airflow_docker/
+│   ├── dags/
+│   │   └── veritas_master_dag.py      # Veritas Master DAG定義（Noctus実行含む）
+│   ├── strategies/
+│   │   └── noctus_sentinella.py       # リスク管理AI（Noctus）
+│   ├── data/
+│   │   └── market_data_fetcher.py     # 市場データ取得（Yahoo Finance）
+│   ├── core/
+│   │   └── risk_management.py         # VaR・異常検知・ポジション管理
+│   └── .env                           # APIキー・DB接続情報など（秘匿）
+📌 補足メモ
+airflow.cfg の [api] auth_backends 設定は Airflow 2.x から auth_backend → auth_backends へ移行済（注意）
+
+.env 変更時は .gitignore の扱いに注意（共有せずローカル定義）
+
+triggerer, dag_processor の heartbeat が null のまま → コンテナ未起動または接続不良の可能性あり
+
+✅ 次のステップ（推奨）
+優先度	内容
+★★★	run_aurus, run_levia, run_prometheus 各戦略の DAG 実行テスト
+★★☆	FastAPI → DAGトリガーAPI → 結果取得のGUI連携確認
+★☆☆	triggerer・dag_processor の起動確認とログ監視対応
