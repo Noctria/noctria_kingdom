@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from core.data_loader import MarketDataFetcher
-from core.risk_management import RiskManager
+from core.risk_manager import RiskManager
 
 class PrometheusOracle:
     """市場予測を行うAI（改修版）"""
