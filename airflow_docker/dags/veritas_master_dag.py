@@ -1,14 +1,17 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+import sys
 import os
 import json
 import random
 from datetime import datetime, timedelta
 
+# ✅ パス定義の読み込みと sys.path 追加
+from core.path_config import STRATEGIES_DIR, LOGS_DIR
+BASE_DIR = str(STRATEGIES_DIR.parent)
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-# ✅ Noctria Kingdom パス集中管理
-from core.path_config import LOGS_DIR
 
 # ✅ 各AI戦略
 from strategies.prometheus_oracle import PrometheusOracle
