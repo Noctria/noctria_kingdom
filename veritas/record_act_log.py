@@ -4,57 +4,51 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR, DATA_DIR
 
-# ========================================
-# 🧠 Veritas 戦略評価ログ → 採用記録へ
-# ========================================
-
-from core.path_config import VERITAS_EVAL_LOG, DATA_DIR
-
-# 📁 採用履歴ログディレクトリ
+# 📁 保存先ディレクトリ
 ACT_LOG_DIR = DATA_DIR / "act_logs"
 ACT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-def load_latest_eval_result() -> dict:
-    """評価ログファイルから最新戦略の評価結果を取得"""
+# ✅ 評価ログの読み込み
+def load_latest_eval():
     if not VERITAS_EVAL_LOG.exists():
-        print("❌ 評価ログが存在しません:", VERITAS_EVAL_LOG)
-        return {}
+        print(f"❌ 評価ログが存在しません: {VERITAS_EVAL_LOG}")
+        return None
 
     with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        return json.load(f)
 
-    if not isinstance(data, list) or len(data) == 0:
-        print("❌ 評価ログに戦略情報が見つかりません")
-        return {}
+# ✅ 採用戦略ログを保存
+def save_adopted_log(entry: dict):
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    out_path = ACT_LOG_DIR / f"{timestamp}.json"
 
-    latest = data[-1]
-    print(f"✅ 最新の戦略評価を取得: {latest.get('strategy')}")
-    return latest
+    # pushed フラグを明示
+    entry["timestamp"] = timestamp
+    entry["pushed"] = False
 
-def save_act_log(strategy_info: dict, reason: str = "評価基準を満たしたため"):
-    """採用戦略の記録を保存"""
-    log_entry = {
-        "strategy": strategy_info.get("strategy"),
-        "score": strategy_info.get("score"),
-        "reason": reason,
-        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-    }
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(entry, f, indent=2, ensure_ascii=False)
 
-    timestamp = log_entry["timestamp"].replace(":", "-")
-    log_path = ACT_LOG_DIR / f"{timestamp}.json"
+    print(f"📜 採用戦略ログを記録しました: {out_path}")
 
-    with open(log_path, "w", encoding="utf-8") as f:
-        json.dump(log_entry, f, indent=2, ensure_ascii=False)
+def main():
+    print("📝 [Veritas] 採用戦略ログ記録フェーズを開始…")
 
-    print("📜 採用戦略を記録しました:", log_path)
-    print("📦 内容:", log_entry)
+    eval_data = load_latest_eval()
+    if not eval_data:
+        return
 
-def record_latest_act():
-    """最新の戦略評価を Act フェーズとして記録"""
-    latest = load_latest_eval_result()
-    if latest:
-        save_act_log(latest)
+    adopted = eval_data.get("adopted", [])
+    if not adopted:
+        print("📭 採用された戦略がありません")
+        return
+
+    for entry in adopted:
+        save_adopted_log(entry)
+
+    print("👑 採用戦略の記録を完了しました")
 
 if __name__ == "__main__":
-    record_latest_act()
+    main()
