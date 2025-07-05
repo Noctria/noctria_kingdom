@@ -2,86 +2,27 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>📊 統計スコアダッシュボード - Noctria Kingdom</title>
+  <title>📊 統計スコアダッシュボード</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background-color: #f5f5f5;
-      padding: 2rem;
-    }
-
-    h1 {
-      color: #222;
-      margin-bottom: 1rem;
-    }
-
-    form {
-      margin-bottom: 2rem;
-      padding: 1rem;
-      background: #ffffff;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    label {
-      display: inline-block;
-      margin-right: 1rem;
-    }
-
-    input, select {
-      padding: 0.4rem 0.6rem;
-      margin-right: 1rem;
-    }
-
-    button {
-      padding: 0.5rem 1rem;
-      background-color: #007acc;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #005f99;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    th, td {
-      padding: 0.75rem;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
-    }
-
-    th {
-      background-color: #e9f2fb;
-    }
-
-    tr:hover {
-      background-color: #f1f7ff;
-    }
-
-    .export-btn {
-      float: right;
-      margin-top: -3.5rem;
-    }
+    body { font-family: "Segoe UI", sans-serif; background-color: #f5f5f5; padding: 2rem; }
+    h1 { color: #222; margin-bottom: 1rem; }
+    form, table { margin-bottom: 2rem; }
+    table { width: 100%; background: #fff; border-collapse: collapse; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; }
+    th { background-color: #e9f2fb; }
+    tr:hover { background-color: #f1f7ff; }
+    button { padding: 0.5rem 1rem; margin-right: 1rem; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #005f99; }
+    canvas { max-width: 1000px; margin: 2rem 0; }
   </style>
 </head>
 <body>
   <h1>📊 統計スコアダッシュボード</h1>
 
   <form method="get" action="/statistics">
-    <label>
-      戦略名:
+    <label>戦略名:
       <select name="strategy">
         <option value="">-- 全て --</option>
         {% for name in strategies %}
@@ -90,8 +31,7 @@
       </select>
     </label>
 
-    <label>
-      通貨ペア:
+    <label>通貨ペア:
       <select name="symbol">
         <option value="">-- 全て --</option>
         {% for sym in symbols %}
@@ -101,8 +41,14 @@
     </label>
 
     <button type="submit">🔍 絞り込み</button>
-    <a href="/statistics/export" class="export-btn"><button type="button">📤 CSVエクスポート</button></a>
+    <a href="/statistics/export"><button type="button">📤 CSVエクスポート</button></a>
   </form>
+
+  <!-- 📊 勝率グラフ -->
+  <canvas id="winRateChart"></canvas>
+
+  <!-- 🧩 レーダーチャート -->
+  <canvas id="radarChart"></canvas>
 
   <table>
     <thead>
@@ -128,6 +74,78 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <script>
+    const stats = {{ statistics | tojson }};
+    const labels = stats.map(s => s.strategy);
+    const winRates = stats.map(s => s.win_rate || 0);
+    const drawdowns = stats.map(s => s.max_drawdown || 0);
+    const trades = stats.map(s => s.num_trades || 0);
+
+    // 📊 勝率バーグラフ
+    new Chart(document.getElementById("winRateChart"), {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "勝率 (%)",
+          data: winRates,
+          backgroundColor: "rgba(54, 162, 235, 0.6)"
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                const i = ctx.dataIndex;
+                return `勝率: ${winRates[i]}% / 取引数: ${trades[i]} / DD: ${drawdowns[i]}`;
+              }
+            }
+          }
+        },
+        onClick: (e, el) => {
+          if (el.length > 0) {
+            const i = el[0].index;
+            const name = stats[i].strategy;
+            window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
+          }
+        }
+      }
+    });
+
+    // 🧩 レーダーチャート
+    new Chart(document.getElementById("radarChart"), {
+      type: "radar",
+      data: {
+        labels: ["勝率", "最大DD", "取引数"],
+        datasets: stats.map(s => ({
+          label: s.strategy,
+          data: [
+            s.win_rate || 0,
+            s.max_drawdown || 0,
+            s.num_trades || 0
+          ],
+          fill: true
+        }))
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                const i = ctx.datasetIndex;
+                return `${stats[i].strategy} → 勝率: ${stats[i].win_rate}, DD: ${stats[i].max_drawdown}, 取引: ${stats[i].num_trades}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  </script>
 
   <p><a href="/">← ダッシュボードに戻る</a></p>
 </body>
