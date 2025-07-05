@@ -5,7 +5,7 @@ from pathlib import Path
 
 from core.path_config import STRATEGIES_DIR
 
-router = APIRouter()
+router = APIRouter(tags=["strategy"])
 templates = Jinja2Templates(directory="noctria_gui/templates")
 
 @router.get("/strategies", response_class=HTMLResponse)
