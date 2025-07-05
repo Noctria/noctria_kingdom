@@ -1,50 +1,56 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 import requests
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-# ✅ .envの読み込み（/opt/airflow 環境前提）
+# ✅ .env読み込み
 load_dotenv(dotenv_path="/opt/airflow/.env")
 
-# 🔐 Airflow API 認証情報
 AIRFLOW_API_URL = "http://airflow-webserver:8080/api/v1/dags/noctria_kingdom_pdca_dag/dagRuns"
 AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
 
-app = FastAPI(title="Noctria Kingdom PDCA Trigger API")
+app = FastAPI(title="Noctria GUI Trigger")
 
-class TriggerRequest(BaseModel):
-    manual_reason: str = "GUIからの王命"
+templates = Jinja2Templates(directory="noctria_gui/templates")
 
-@app.post("/trigger-pdca/")
-def trigger_pdca(request: TriggerRequest):
-    """👑 GUI からの PDCA サイクル起動API"""
-    dag_run_id = f"manual_trigger__{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+@app.get("/", response_class=HTMLResponse)
+async def render_trigger_form(request: Request):
+    return templates.TemplateResponse("trigger.html", {"request": request, "result": None})
+
+@app.post("/trigger", response_class=HTMLResponse)
+async def trigger_pdca_from_gui(request: Request, manual_reason: str = Form(...)):
+    dag_run_id = f"manual_gui__{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     payload = {
         "dag_run_id": dag_run_id,
-        "conf": {"trigger_source": request.manual_reason},
+        "conf": {"trigger_source": manual_reason},
     }
 
     try:
-        response = requests.post(
+        res = requests.post(
             AIRFLOW_API_URL,
             auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
             json=payload,
             timeout=10,
         )
+        if res.status_code == 200:
+            return templates.TemplateResponse("trigger.html", {
+                "request": request,
+                "result": f"✅ 王命を発令しました: {dag_run_id}"
+            })
+        else:
+            return templates.TemplateResponse("trigger.html", {
+                "request": request,
+                "result": f"❌ 発令失敗: {res.status_code} {res.text}"
+            })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Airflowへの接続失敗: {e}")
-
-    if response.status_code == 200:
-        return {
-            "status": "success",
-            "message": f"✅ 王命を発令しました: {dag_run_id}",
-            "dag_run_id": dag_run_id
-        }
-    else:
-        raise HTTPException(status_code=response.status_code, detail=f"Airflow応答: {response.text}")
+        return templates.TemplateResponse("trigger.html", {
+            "request": request,
+            "result": f"❌ 通信エラー: {e}"
+        })
