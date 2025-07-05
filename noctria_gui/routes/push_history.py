@@ -1,26 +1,26 @@
 from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
-from pathlib import Path
-import json
+
+# 📚 Git Push履歴をロードするサービス
+from noctria_gui.services.push_history_service import load_push_logs
+
+# 📂 テンプレートパス（共通管理）
+from core.path_config import GUI_TEMPLATES_DIR
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
-PUSH_HISTORY_LOG = LOGS_DIR / "github_push_history.json"
-
-@router.get("/push-history")
-async def show_push_history(request: Request):
-    logs = []
-
-    if PUSH_HISTORY_LOG.exists():
-        with open(PUSH_HISTORY_LOG, "r", encoding="utf-8") as f:
-            try:
-                logs = json.load(f)
-            except json.JSONDecodeError:
-                logs = []
-
+# ========================================
+# 📤 Git Push履歴ダッシュボード
+#    - ソート順: asc（昇順）または desc（降順）
+# ========================================
+@router.get("/push-history", response_class=HTMLResponse)
+async def show_push_history(request: Request, sort: str = "desc"):
+    logs = load_push_logs()
+    logs.sort(key=lambda x: x["timestamp"], reverse=(sort == "desc"))
     return templates.TemplateResponse("push_history.html", {
         "request": request,
         "logs": logs,
+        "sort_order": sort,
     })
