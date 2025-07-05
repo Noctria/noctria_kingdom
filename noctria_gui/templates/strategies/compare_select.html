@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 戦略比較 - 選択フォーム</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      padding: 2rem;
+      background-color: #f9f9f9;
+      font-family: "Segoe UI", sans-serif;
+    }
+    form {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    .strategy-list {
+      columns: 3;
+      -webkit-columns: 3;
+      -moz-columns: 3;
+      margin-bottom: 1rem;
+    }
+    .strategy-list label {
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    .form-controls {
+      margin-top: 1rem;
+    }
+    select {
+      padding: 0.4rem;
+      margin-right: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 戦略比較 - 選択フォーム</h1>
+
+  <form method="post" action="/strategies/compare/view">
+    <div class="strategy-list">
+      {% for s in strategies %}
+        <label>
+          <input type="checkbox" name="selected" value="{{ s.strategy }}">
+          {{ s.strategy }}
+        </label>
+      {% endfor %}
+    </div>
+
+    <div class="form-controls">
+      <label for="metric">比較指標:</label>
+      <select name="metric" id="metric">
+        <option value="win_rate">勝率</option>
+        <option value="max_drawdown">最大DD</option>
+        <option value="num_trades">取引数</option>
+      </select>
+      <button type="submit">📈 比較する</button>
+    </div>
+  </form>
+
+  <p style="margin-top: 1rem;"><a href="/">← トップへ戻る</a></p>
+</body>
+</html>
