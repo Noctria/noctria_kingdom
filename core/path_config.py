@@ -24,8 +24,8 @@ TOOLS_DIR = BASE_DIR / "tools"
 # ========================================
 # 🧠 知性領域（AI・戦略・評価）
 # ========================================
-SCRIPTS_DIR = BASE_DIR / "scripts"
 CORE_DIR = BASE_DIR / "core"
+SCRIPTS_DIR = BASE_DIR / "scripts"
 VERITAS_DIR = BASE_DIR / "veritas"
 STRATEGIES_DIR = BASE_DIR / "strategies"
 EXECUTION_DIR = BASE_DIR / "execution"
@@ -44,12 +44,12 @@ INSTITUTIONS_DIR = BASE_DIR / "institutions"
 # 🌐 GUI・推論サーバ・文書など
 # ========================================
 NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
-GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
-GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
+NOCTRIA_GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
+NOCTRIA_GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
+GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # alias
+GUI_STATIC_DIR = NOCTRIA_GUI_STATIC_DIR        # alias
 GUI_ROUTES_DIR = NOCTRIA_GUI_DIR / "routes"
 GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
-NOCTRIA_GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
-NOCTRIA_GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
 
 LLM_SERVER_DIR = BASE_DIR / "llm_server"
 DOCS_DIR = BASE_DIR / "docs"
@@ -61,9 +61,14 @@ TESTS_DIR = BASE_DIR / "tests"
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
-VERITAS_ORDER_JSON = Path(
-    "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files/veritas_signal.json"
-)
+
+# ✅ EA命令JSON保存先（環境によって変更可能）
+if Path("/mnt/c/Users/masay/AppData/Roaming/MetaQuotes").exists():
+    VERITAS_ORDER_JSON = Path(
+        "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files/veritas_signal.json"
+    )
+else:
+    VERITAS_ORDER_JSON = BASE_DIR / "tmp" / "veritas_signal.json"
 
 # ✅ PDCA履歴ログ保存用ディレクトリ
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
