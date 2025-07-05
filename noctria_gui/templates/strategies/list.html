@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📜 Veritas戦略一覧</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>📜 Veritas戦略一覧</h1>
+    {% if strategies %}
+        <ul>
+        {% for name in strategies %}
+            <li>{{ name }}</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>まだ戦略が生成されていません。</p>
+    {% endif %}
+    <a href="/">← トップへ戻る</a>
+</body>
+</html>
