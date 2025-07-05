@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>戦略アップロード</title>
+</head>
+<body>
+    <h1>🆙 戦略アップロード（.py）</h1>
+    <form method="post" action="/upload-strategy" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".py" required>
+        <button type="submit">📤 アップロードして評価</button>
+    </form>
+
+    {% if result %}
+        <h3>評価結果:</h3>
+        <pre>{{ result }}</pre>
+    {% endif %}
+
+    <p><a href="/pdca">← ダッシュボードに戻る</a></p>
+</body>
+</html>
