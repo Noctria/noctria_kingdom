@@ -18,10 +18,7 @@
       padding: 1rem;
       border-radius: 8px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-      margin-bottom: 1.5rem;
-    }
-    .info-box h2 {
-      margin-top: 0;
+      margin-bottom: 2rem;
     }
     .info-table {
       width: 100%;
@@ -65,7 +62,13 @@
     a.button:hover {
       background-color: #005ea6;
     }
+    canvas {
+      max-width: 500px;
+      margin: 1rem auto;
+      display: block;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h1>📄 戦略詳細：{{ strategy.strategy }}</h1>
@@ -97,6 +100,11 @@
   </div>
 
   <div class="info-box">
+    <h2>📈 評価グラフ</h2>
+    <canvas id="evaluationChart"></canvas>
+  </div>
+
+  <div class="info-box">
     <h2>🧠 戦略ロジックの説明</h2>
     <div class="description-box">
       {{ strategy.description or "説明がありません。" }}
@@ -105,5 +113,42 @@
 
   <a class="button" href="/strategies/view?name={{ strategy.strategy }}.py">📜 コードを見る</a>
   <a class="button" href="/strategies">← 戦略一覧に戻る</a>
+
+  <script>
+    const ctx = document.getElementById('evaluationChart');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['勝率', '取引数', '最大DD'],
+        datasets: [{
+          label: '{{ strategy.strategy }}',
+          data: [
+            {{ strategy.win_rate or 0 }},
+            {{ strategy.num_trades or 0 }},
+            {{ strategy.max_drawdown or 0 }}
+          ],
+          backgroundColor: [
+            'rgba(75, 192, 192, 0.6)',
+            'rgba(255, 206, 86, 0.6)',
+            'rgba(255, 99, 132, 0.6)'
+          ],
+          borderColor: [
+            'rgba(75, 192, 192, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(255, 99, 132, 1)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 10 }
+          }
+        }
+      }
+    });
+  </script>
 </body>
 </html>
