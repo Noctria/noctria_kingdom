@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi import status
+from starlette.middleware.sessions import SessionMiddleware
 from pathlib import Path
 import json
 from datetime import datetime
@@ -35,26 +37,29 @@ def show_act_history(request: Request, pushed: str = None):
     else:
         logs = load_act_logs()
 
+    message = request.session.pop("flash_message", None)
+
     return templates.TemplateResponse("act_history.html", {
         "request": request,
-        "logs": logs
+        "logs": logs,
+        "flash_message": message
     })
 
 @router.post("/act-history/push")
-def push_strategy_to_github(log_path: str = Form(...)):
+def push_strategy_to_github(request: Request, log_path: str = Form(...)):
     log_path = Path(log_path)
 
     if not log_path.exists():
-        print(f"❌ 指定されたログファイルが存在しません: {log_path}")
-        return RedirectResponse(url="/act-history", status_code=302)
+        request.session["flash_message"] = "❌ 指定されたログファイルが存在しません"
+        return RedirectResponse(url="/act-history", status_code=status.HTTP_302_FOUND)
 
     # ログ読み込み
     try:
         with open(log_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
-        print(f"❌ ログ読み込み失敗: {e}")
-        return RedirectResponse(url="/act-history", status_code=302)
+        request.session["flash_message"] = f"❌ ログ読み込み失敗: {e}"
+        return RedirectResponse(url="/act-history", status_code=status.HTTP_302_FOUND)
 
     # GitHub push 実行
     try:
@@ -62,8 +67,8 @@ def push_strategy_to_github(log_path: str = Form(...)):
         data["pushed"] = True
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        print(f"🚀 GitHubに戦略をPushし、記録を更新しました: {log_path}")
+        request.session["flash_message"] = f"🚀 GitHubに戦略をPushしました: {data['strategy']}"
     except Exception as e:
-        print(f"❌ GitHub Push失敗: {e}")
+        request.session["flash_message"] = f"❌ GitHub Push失敗: {e}"
 
-    return RedirectResponse(url="/act-history", status_code=302)
+    return RedirectResponse(url="/act-history", status_code=status.HTTP_302_FOUND)
