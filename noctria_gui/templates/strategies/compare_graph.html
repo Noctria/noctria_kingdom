@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 戦略比較グラフ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>📊 複数戦略の評価比較</h1>
+  <canvas id="comparisonChart" width="800" height="400"></canvas>
+  <script>
+    const strategies = {{ strategies | tojson }};
+    
+    const labels = strategies.map(s => s.strategy || s.json_name);
+    const winRates = strategies.map(s => s.win_rate || 0);
+    const drawdowns = strategies.map(s => s.max_drawdown || 0);
+    const trades = strategies.map(s => s.num_trades || 0);
+
+    const data = {
+      labels: labels,
+      datasets: [
+        {
+          label: '勝率（%）',
+          data: winRates,
+          borderColor: 'blue',
+          backgroundColor: 'lightblue',
+          yAxisID: 'y',
+        },
+        {
+          label: '最大DD（%）',
+          data: drawdowns,
+          borderColor: 'red',
+          backgroundColor: 'salmon',
+          yAxisID: 'y1',
+        },
+        {
+          label: '取引回数',
+          data: trades,
+          borderColor: 'green',
+          backgroundColor: 'lightgreen',
+          yAxisID: 'y2',
+        }
+      ]
+    };
+
+    const config = {
+      type: 'bar',
+      data: data,
+      options: {
+        responsive: true,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        stacked: false,
+        plugins: {
+          title: {
+            display: true,
+            text: '戦略別パフォーマンス比較'
+          }
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: { display: true, text: '勝率（%）' }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: '最大DD（%）' }
+          },
+          y2: {
+            type: 'linear',
+            display: false,
+            position: 'right',
+            title: { display: true, text: '取引回数' }
+          }
+        }
+      },
+    };
+
+    new Chart(document.getElementById('comparisonChart'), config);
+  </script>
+  <a href="/strategies/overview">← 戦略一覧に戻る</a>
+</body>
+</html>
