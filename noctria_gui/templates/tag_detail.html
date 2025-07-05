@@ -9,6 +9,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from typing import List, Dict
 
 from noctria_gui.services import tag_summary_service
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
@@ -21,11 +22,13 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 async def show_tag_detail(request: Request, tag: str):
     """
     📂 指定タグに紐づく戦略一覧を表示
-    - GET /tag-summary/detail?tag=xxx
+    - URL例: /tag-summary/detail?tag=momentum
     """
     try:
-        all_logs = tag_summary_service.load_all_statistics()
-        filtered = [s for s in all_logs if tag in s.get("tags", [])]
+        all_logs: List[Dict] = tag_summary_service.load_all_statistics()
+        filtered: List[Dict] = [
+            s for s in all_logs if isinstance(s.get("tags"), list) and tag in s["tags"]
+        ]
     except Exception as e:
         return HTMLResponse(
             content=f"<h2>⚠️ データの読み込みに失敗しました: {e}</h2>",
