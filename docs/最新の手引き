@@ -1,0 +1,93 @@
+# 📘 Noctria Kingdom ディレクトリ構成設計原則（v2.1・確定稿）
+
+---
+
+## 🧭 基本思想
+
+> **「すべての知性は王の意志のもとに動き、Airflowはその意志を伝える伝令である」**
+
+Noctria Kingdom は「自律戦略AI国家」であるという思想に基づき、  
+**生成・評価・実行・記録・統治・可視化**すべての機構を責務単位で分離し、王国の秩序を保つ。  
+Airflowは指揮官、GUIは司令本部、Veritasは戦略生成AI、GitHubは公文書館である。
+
+---
+
+## 🏛 設計原則
+
+| 原則 | 内容 |
+|------|------|
+| 📦 **責務単位での物理分離** | 生成・評価・戦略・実行・記録・可視化を明確に分離。混在を禁止。 |
+| 🔁 **Airflowはオーケストレーターに徹する** | `airflow_docker/` に完全隔離し、ロジックは外部スクリプトに委任。 |
+| 🧠 **Veritasは生成と昇格を担当し、手動改変を許さぬ** | `veritas_generated/` にて隔離し、評価経由で `official/` に昇格。 |
+| 📈 **記録ログは統治史として保存・表示・出力可能にする** | `act_logs/`, `push_logs/`, `pdca_logs/` に分離保存。 |
+| 🌐 **GUIとLLMはそれぞれ独立しつつ連携可能な構成に** | `noctria_gui/`, `llm_server/` にて補助知性を構築。 |
+| 🧪 **すべてのモジュールはtestsで個別評価可能とする** | 疎結合を維持し、CI/CD対応可能に設計。 |
+
+---
+
+## 🗂 構成・命名ルール（最新版）
+
+| ディレクトリ | 説明 |
+|-------------|------|
+| `airflow_docker/` | Airflow DAGs・構成・Dockerfile群を統括（オーケストレータ中枢） |
+| `core/` | 共通ユーティリティ、環境定義、path管理、リスク統制 |
+| `veritas/` | Veritas戦略生成・昇格・記録機構（PDCA起点） |
+| `strategies/` |  
+　├── `official/`：昇格済戦略（手動も含む）  
+　└── `veritas_generated/`：Veritas生成コード（編集禁止） |
+| `execution/` | EA命令生成、発注、シミュレーション、実行統制 |
+| `data/` |  
+　├── `act_logs/`：戦略昇格ログ  
+　├── `push_logs/`：GitHub Pushログ  
+　├── `pdca_logs/`：命令出力記録  
+　├── `raw/`, `processed/`, `fundamental/`：データ分類保管  
+　├── `preprocessing/`：整形前後スクリプト群  
+　└── `external/`：外部APIなどとの連携データ |
+| `models/` |  
+　├── `latest/`：現行モデル  
+　└── `archive/`：旧モデル |
+| `llm_server/` | FastAPIベースの推論サーバ（OpenChat/Tsunagi等） |
+| `noctria_gui/` |  
+　├── `routes/`：画面遷移／命令処理  
+　├── `services/`：ログ読込・統計処理・Push実行など  
+　├── `templates/`：HTMLテンプレート群（ダッシュボード等）  
+　├── `static/`：CSS等  
+　└── `main.py`：FastAPIサーバ起動点 |
+| `experts/` | EAコード（.mq5）群。Veritasまたは人手で生成されたもの |
+| `tools/` |  
+　├── GitHub連携（`push_official_strategy_to_github.py`など）  
+　├── パス変換・構成監査（`structure_auditor.py`など）  
+　├── PDCA記録（`log_pdca_result.py`）等補助スクリプト群 |
+| `scripts/` | モデル評価／強化学習／最適化など各種実験用コード |
+| `tests/` | 単体・統合・GPU検証・MT5接続テスト等を格納 |
+| `docs/` |  
+　├── `README.md`, `architecture.md`：公式記録  
+　├── `misc/`：旧ログ・進捗・鍵情報等  
+　└── `diagnostics/`：構成確認・snapshot用 |
+
+---
+
+## 🔁 Push統治記録システム（反映済）
+
+| 要素 | 説明 |
+|------|------|
+| `veritas/record_act_log.py` | 昇格戦略ログ生成（`pushed: false`） |
+| `tools/push_official_strategy_to_github.py` | GitHubへ昇格戦略を反映 |
+| `data/act_logs/` | 昇格記録ログをJSONで格納 |
+| `data/push_logs/` | Push履歴を記録（timestamp, strategy名, message 等） |
+| `noctria_gui/routes/push_history.py` | GUI上でログを表示 |
+| `templates/push_history*.html` | GUIテンプレート（一覧・詳細） |
+
+---
+
+## ✅ 今後の拡張方針
+
+- ✅ コミットハッシュ・Push担当の記録強化（`pushed_by`, `commit`）
+- ✅ `/pdca-history` や `/act-history` の検索・統計機能のGUI化
+- ✅ GitHubリンク生成・Actions連携（将来的に）
+- ✅ 各 `/data` ログの自動バックアップ・アーカイブ（`veritas_archive/` 等）
+
+---
+
+## 🚫 `.gitignore` 推奨対象
+
