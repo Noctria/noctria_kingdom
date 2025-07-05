@@ -21,6 +21,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 1rem;
+      align-items: center;
     }
     form.filter-form input,
     form.filter-form select,
@@ -88,7 +89,20 @@
     </select>
     <input type="date" name="date_from" value="{{ filters.date_from }}">
     <input type="date" name="date_to" value="{{ filters.date_to }}">
-    <button type="submit">フィルター</button>
+
+    <select name="sort">
+      <option value="">ソートなし</option>
+      <option value="win_rate" {% if sort == 'win_rate' %}selected{% endif %}>📈 勝率 昇順</option>
+      <option value="-win_rate" {% if sort == '-win_rate' %}selected{% endif %}>📈 勝率 降順</option>
+      <option value="max_dd" {% if sort == 'max_dd' %}selected{% endif %}>📉 DD 昇順</option>
+      <option value="-max_dd" {% if sort == '-max_dd' %}selected{% endif %}>📉 DD 降順</option>
+      <option value="trades" {% if sort == 'trades' %}selected{% endif %}>🔁 回数 昇順</option>
+      <option value="-trades" {% if sort == '-trades' %}selected{% endif %}>🔁 回数 降順</option>
+      <option value="timestamp_dt" {% if sort == 'timestamp_dt' %}selected{% endif %}>📅 時刻 昇順</option>
+      <option value="-timestamp_dt" {% if sort == '-timestamp_dt' %}selected{% endif %}>📅 時刻 降順</option>
+    </select>
+
+    <button type="submit">検索</button>
   </form>
 
   <table>
