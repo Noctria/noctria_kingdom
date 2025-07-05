@@ -21,7 +21,7 @@
     label {
       font-weight: bold;
     }
-    input, select {
+    input, select, button {
       padding: 0.3rem;
       font-size: 0.9rem;
     }
@@ -52,6 +52,17 @@
       font-style: italic;
       color: #7f8c8d;
     }
+    .replay-button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .replay-button:hover {
+      background-color: #2980b9;
+    }
   </style>
 </head>
 <body>
@@ -79,6 +90,7 @@
           <th onclick="sortTable(3)">最大DD</th>
           <th onclick="sortTable(4)">スコア</th>
           <th>昇格理由</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody>
@@ -90,6 +102,12 @@
             <td>{{ '{:.2%}'.format(log.dd) if log.dd is not none else '―' }}</td>
             <td>{{ '{:.3f}'.format(log.score) if log.score is not none else '―' }}</td>
             <td class="reason">{{ log.reason or '―' }}</td>
+            <td>
+              <form method="post" action="/pdca/replay">
+                <input type="hidden" name="log_path" value="{{ log._file_path }}">
+                <button type="submit" class="replay-button">🔁 再送</button>
+              </form>
+            </td>
           </tr>
         {% endfor %}
       </tbody>
