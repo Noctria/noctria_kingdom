@@ -1,0 +1,28 @@
+<!-- noctria_gui/templates/pdca/history.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDCA実行履歴</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>🕰 PDCA実行履歴</h1>
+    <table border="1">
+        <tr>
+            <th>時刻</th>
+            <th>フェーズ</th>
+            <th>ステータス</th>
+            <th>詳細</th>
+        </tr>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log.timestamp }}</td>
+            <td>{{ log.phase }}</td>
+            <td>{{ log.status }}</td>
+            <td>{{ log.detail }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <p><a href="/">← 戻る</a></p>
+</body>
+</html>
