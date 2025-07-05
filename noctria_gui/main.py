@@ -12,24 +12,24 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json  # ✅ for from_json filter
 
-# ✅ Noctria Kingdom の統治下にある正式パス管理
+# ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ✅ ルート定義（各画面モジュール）
+# ✅ 各ルートモジュールの導入
 from noctria_gui.routes import (
     home_routes,
     strategy_routes,
-    pdca,
-    upload,
-    upload_history,
+    strategy_detail,
+    strategy_compare,         # ✅ 戦略比較ルート
+    tag_summary,
+    tag_summary_detail,
     statistics,
     act_history,
     push_history,
     logs_routes,
-    tag_summary,
-    tag_summary_detail,
-    strategy_detail,
-    strategy_compare,  # ✅ 戦略比較グラフページ（/strategies/compare）
+    upload,
+    upload_history,
+    pdca,
 )
 
 # ========================================
@@ -42,11 +42,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ✅ 静的ファイル & テンプレートの登録
+# ✅ 静的ファイル＆テンプレート設定
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ Jinja2 カスタムフィルタ（dict → JSON文字列）
+# ✅ Jinja2 カスタムフィルタ（dict → JSON）
 def from_json(value):
     try:
         return json.loads(value)
@@ -55,14 +55,14 @@ def from_json(value):
 
 templates.env.filters["from_json"] = from_json
 
-# ✅ 状態として templates を保持（他モジュールでも利用可能）
+# ✅ templates を状態に保持（グローバル参照用）
 app.state.templates = templates
 
-# ✅ 全ルートモジュール登録
+# ✅ 全ルートを統治パネルへ結集
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
-app.include_router(strategy_compare.router)  # ✅ 比較ページルート追加
 app.include_router(strategy_detail.router)
+app.include_router(strategy_compare.router)       # ✅ 比較系ルート
 app.include_router(tag_summary.router)
 app.include_router(tag_summary_detail.router)
 app.include_router(statistics.router)
