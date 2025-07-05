@@ -15,7 +15,7 @@
       margin-bottom: 1rem;
     }
     .nav-buttons {
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
     }
     .nav-buttons button {
       padding: 0.5rem 1rem;
@@ -31,7 +31,7 @@
     }
     canvas {
       max-width: 800px;
-      margin: auto;
+      margin: 2rem auto;
       display: block;
     }
     .back-link {
@@ -47,46 +47,48 @@
     <button onclick="renderChart('win_rate')">勝率</button>
     <button onclick="renderChart('max_drawdown')">最大DD</button>
     <button onclick="renderChart('num_trades')">取引数</button>
+    <button onclick="toggleSort()">🔁 勝率ソート: <span id="sortLabel">降順</span></button>
   </div>
 
   <canvas id="strategyChart" height="120"></canvas>
 
   <script>
-    const strategies = {{ strategies | tojson }};
-    const labels = strategies.map(s => s.strategy);
+    let originalStrategies = {{ strategies | tojson }};
+    let currentMetric = 'win_rate';
+    let sortAscending = false;
 
-    const metrics = {
-      win_rate: {
-        label: "勝率 (%)",
-        data: strategies.map(s => s.win_rate),
-        backgroundColor: "rgba(54, 162, 235, 0.6)"
-      },
-      max_drawdown: {
-        label: "最大DD",
-        data: strategies.map(s => s.max_drawdown),
-        backgroundColor: "rgba(255, 99, 132, 0.6)"
-      },
-      num_trades: {
-        label: "取引数",
-        data: strategies.map(s => s.num_trades),
-        backgroundColor: "rgba(75, 192, 192, 0.6)"
-      }
-    };
+    const labelsFrom = (arr) => arr.map(s => s.strategy);
+    const dataFrom = (arr, key) => arr.map(s => s[key]);
 
     let chart;
-    function renderChart(type) {
-      if (chart) chart.destroy();
+
+    function renderChart(metric) {
+      currentMetric = metric;
+      const sorted = [...originalStrategies].sort((a, b) => {
+        const aVal = a[metric] || 0;
+        const bVal = b[metric] || 0;
+        return sortAscending ? aVal - bVal : bVal - aVal;
+      });
 
       const ctx = document.getElementById("strategyChart").getContext("2d");
+      if (chart) chart.destroy();
 
       chart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: labels,
+          labels: labelsFrom(sorted),
           datasets: [{
-            label: metrics[type].label,
-            data: metrics[type].data,
-            backgroundColor: metrics[type].backgroundColor
+            label: {
+              win_rate: "勝率 (%)",
+              max_drawdown: "最大DD",
+              num_trades: "取引数"
+            }[metric],
+            data: dataFrom(sorted, metric),
+            backgroundColor: {
+              win_rate: "rgba(54, 162, 235, 0.6)",
+              max_drawdown: "rgba(255, 99, 132, 0.6)",
+              num_trades: "rgba(75, 192, 192, 0.6)"
+            }[metric]
           }]
         },
         options: {
@@ -94,8 +96,8 @@
           onClick: (e, elements) => {
             if (elements.length > 0) {
               const index = elements[0].index;
-              const strategyName = labels[index];
-              window.location.href = `/strategy/detail?name=${encodeURIComponent(strategyName)}`;
+              const name = sorted[index].strategy;
+              window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
             }
           },
           scales: {
@@ -105,7 +107,14 @@
       });
     }
 
-    renderChart("{{ metric if metric else 'win_rate' }}");
+    function toggleSort() {
+      sortAscending = !sortAscending;
+      document.getElementById("sortLabel").textContent = sortAscending ? "昇順" : "降順";
+      renderChart(currentMetric);
+    }
+
+    // 初期表示
+    renderChart(currentMetric);
   </script>
 
   <a class="back-link" href="/strategies/compare">← 戦略選択に戻る</a>
