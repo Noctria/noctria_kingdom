@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 戦略比較の選択</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    h1 { margin-bottom: 1rem; }
+    .strategy-list { margin: 1rem 0; }
+    label { display: block; margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>📊 比較する戦略を選択</h1>
+
+  <form method="post" action="/strategies/compare/render">
+    <div class="strategy-list">
+      {% for s in strategies %}
+        <label>
+          <input type="checkbox" name="selected" value="{{ s.strategy }}">
+          {{ s.strategy }}（勝率: {{ s.win_rate }}%, DD: {{ s.max_drawdown }}）
+        </label>
+      {% endfor %}
+    </div>
+    <button type="submit">📈 比較する</button>
+  </form>
+
+  <p><a href="/">← トップへ戻る</a></p>
+</body>
+</html>
