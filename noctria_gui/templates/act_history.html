@@ -1,76 +1,70 @@
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from datetime import datetime
-from pathlib import Path
-import json
-import os
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>採用戦略履歴 - Noctria Kingdom</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f9f9f9;
+      padding: 2rem;
+    }
+    h1 {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background-color: #eee;
+    }
+    .pushed-true {
+      color: green;
+      font-weight: bold;
+    }
+    .pushed-false {
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>📜 採用戦略履歴</h1>
 
-from core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-from execution.generate_order_json import generate_order_from_log
-
-router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
-
-# ========================================
-# 📜 /act-history - 昇格ログ履歴ページ
-# ========================================
-@router.get("/act-history", response_class=HTMLResponse)
-async def show_act_history(
-    request: Request,
-    strategy: str = "",
-    start_date: str = "",
-    end_date: str = "",
-    sort_by: str = "timestamp",
-    order: str = "desc"
-):
-    logs = []
-
-    for path in sorted(ACT_LOG_DIR.glob("*.json"), reverse=True):
-        with open(path, "r", encoding="utf-8") as f:
-            log = json.load(f)
-
-        # 再送用パスを記録
-        log["_file_path"] = str(path)
-
-        logs.append(log)
-
-    # 🔍 フィルター処理
-    if strategy:
-        logs = [log for log in logs if log.get("strategy") == strategy]
-
-    if start_date:
-        logs = [log for log in logs if log.get("timestamp", "") >= start_date]
-
-    if end_date:
-        logs = [log for log in logs if log.get("timestamp", "") <= end_date]
-
-    # 🔁 ソート処理
-    reverse = order == "desc"
-    logs.sort(key=lambda x: x.get(sort_by, ""), reverse=reverse)
-
-    return templates.TemplateResponse("act_history.html", {
-        "request": request,
-        "logs": logs,
-        "strategy": strategy,
-        "start_date": start_date,
-        "end_date": end_date,
-        "sort_by": sort_by,
-        "order": order,
-    })
-
-# ========================================
-# 🔁 /act-history/replay - 再送処理
-# ========================================
-@router.post("/act-history/replay")
-async def replay_from_act_log(log_path: str = Form(...)):
-    try:
-        path = Path(log_path)
-        if not path.exists():
-            return JSONResponse(status_code=404, content={"detail": "ログファイルが見つかりません"})
-
-        generate_order_from_log(path)
-        return RedirectResponse(url="/act-history", status_code=303)
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+  <table>
+    <thead>
+      <tr>
+        <th>日時</th>
+        <th>戦略名</th>
+        <th>スコア</th>
+        <th>理由</th>
+        <th>Push状態</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in logs %}
+      <tr>
+        <td>{{ entry.timestamp }}</td>
+        <td>{{ entry.strategy }}</td>
+        <td>{{ entry.score }}</td>
+        <td>{{ entry.reason }}</td>
+        <td>
+          {% if entry.pushed %}
+            <span class="pushed-true">✅ Pushed</span>
+          {% else %}
+            <span class="pushed-false">❌ 未Push</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
