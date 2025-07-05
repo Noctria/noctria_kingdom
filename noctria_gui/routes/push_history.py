@@ -8,6 +8,10 @@ router = APIRouter()
 
 @router.get("/push-history", response_class=HTMLResponse)
 async def show_push_history(request: Request, sort: str = "desc"):
+    """
+    📜 GitHub Push履歴一覧ページ
+    - ソート: asc（昇順）/desc（降順）
+    """
     logs = load_push_logs(sort=sort)
     return request.app.state.templates.TemplateResponse("push_history.html", {
         "request": request,
