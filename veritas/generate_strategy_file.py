@@ -1,10 +1,15 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from core.path_config import STRATEGIES_DIR
 
-# 保存先ディレクトリ（戦略出力用）
-OUTPUT_DIR = "/noctria_kingdom/airflow_docker/strategies/veritas_generated"
+# ========================================
+# 🛠 保存先ディレクトリ（Veritas戦略の出力）
+# ========================================
+OUTPUT_DIR = STRATEGIES_DIR / "veritas_generated"
 
-# dict形式の simulate 戦略テンプレート
+# ========================================
+# 📜 Veritas戦略テンプレート（simulate関数）
+# ========================================
 STRATEGY_TEMPLATE = """\
 import pandas as pd
 import numpy as np
@@ -65,17 +70,23 @@ def simulate(data: pd.DataFrame) -> dict:
     }
 """
 
+# ========================================
+# ⚙️ 戦略ファイルの生成
+# ========================================
 def generate_strategy_file(strategy_name: str):
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"{strategy_name}_{timestamp}.py"
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    filepath = OUTPUT_DIR / filename
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     with open(filepath, "w") as f:
         f.write(STRATEGY_TEMPLATE)
 
-    print(f"✅ 戦略ファイルを生成しました: {filepath}")
+    print(f"👑 戦略ファイルを王国に記録しました：{filepath}")
     return filepath
 
+# ========================================
+# 🔁 実行トリガー（直接実行時）
+# ========================================
 if __name__ == "__main__":
     generate_strategy_file("veritas_strategy")
