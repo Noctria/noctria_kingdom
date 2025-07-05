@@ -12,6 +12,29 @@
     h1 {
       color: #222;
     }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .controls {
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+    }
+    .controls input, .controls select {
+      padding: 0.4rem;
+      margin-right: 1rem;
+    }
+    .export-button {
+      padding: 0.5rem 1rem;
+      background-color: #007acc;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .export-button:hover {
+      background-color: #005fa3;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -25,6 +48,7 @@
     }
     th {
       background-color: #e0e0e0;
+      cursor: pointer;
     }
     .tag-link {
       font-weight: bold;
@@ -35,7 +59,7 @@
       text-decoration: underline;
     }
     .strategy-link {
-      color: #007acc;
+      color: #444;
       text-decoration: none;
     }
     .strategy-link:hover {
@@ -44,9 +68,23 @@
   </style>
 </head>
 <body>
-  <h1>🧠 タグ別戦略統計</h1>
+  <div class="header">
+    <h1>🧠 タグ別戦略統計</h1>
+    <a href="/tag-summary/export" class="export-button">CSVエクスポート</a>
+  </div>
 
-  <table>
+  <div class="controls">
+    <input type="text" id="tagSearch" placeholder="🔍 タグ名を検索">
+    <label for="sortBy">ソート:</label>
+    <select id="sortBy">
+      <option value="strategy_count">戦略数</option>
+      <option value="average_win_rate">平均勝率</option>
+      <option value="average_trade_count">平均取引数</option>
+      <option value="average_max_drawdown">平均最大DD</option>
+    </select>
+  </div>
+
+  <table id="tagTable">
     <thead>
       <tr>
         <th>タグ</th>
@@ -60,13 +98,11 @@
     <tbody>
       {% for item in summary_data %}
       <tr>
-        <td>
-          <a class="tag-link" href="/tag-summary/detail?tag={{ item.tag }}">{{ item.tag }}</a>
-        </td>
+        <td><a class="tag-link" href="/tag-summary/detail?tag={{ item.tag }}">{{ item.tag }}</a></td>
         <td>{{ item.strategy_count }}</td>
-        <td>{{ "%.2f"|format(item.average_win_rate) }}%</td>
+        <td>{{ item.average_win_rate }}%</td>
         <td>{{ item.average_trade_count }}</td>
-        <td>{{ "%.2f"|format(item.average_max_drawdown) }}%</td>
+        <td>{{ item.average_max_drawdown }}</td>
         <td>
           {% for strategy in item.sample_strategies %}
             <a class="strategy-link" href="/strategy/detail?name={{ strategy }}">{{ strategy }}</a>{% if not loop.last %}, {% endif %}
@@ -76,5 +112,37 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <script>
+    const searchInput = document.getElementById('tagSearch');
+    const sortBy = document.getElementById('sortBy');
+    const table = document.getElementById('tagTable');
+    const rows = Array.from(table.tBodies[0].rows);
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase();
+      rows.forEach(row => {
+        const tag = row.cells[0].innerText.toLowerCase();
+        row.style.display = tag.includes(query) ? '' : 'none';
+      });
+    });
+
+    sortBy.addEventListener('change', () => {
+      const keyIndex = {
+        'strategy_count': 1,
+        'average_win_rate': 2,
+        'average_trade_count': 3,
+        'average_max_drawdown': 4
+      }[sortBy.value];
+
+      const sorted = [...rows].sort((a, b) => {
+        const valA = parseFloat(a.cells[keyIndex].innerText) || 0;
+        const valB = parseFloat(b.cells[keyIndex].innerText) || 0;
+        return valB - valA;
+      });
+
+      sorted.forEach(row => table.tBodies[0].appendChild(row));
+    });
+  </script>
 </body>
 </html>
