@@ -2,78 +2,71 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>採用戦略履歴 - Noctria Kingdom</title>
+  <title>Noctria Kingdom - 昇格戦略一覧</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f9f9f9;
+      background-color: #f4f4f4;
       padding: 2rem;
     }
     h1 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
+      color: #222;
     }
     table {
-      border-collapse: collapse;
       width: 100%;
+      border-collapse: collapse;
       margin-top: 1rem;
     }
     th, td {
-      border: 1px solid #ddd;
-      padding: 0.6rem;
-      text-align: left;
+      border: 1px solid #aaa;
+      padding: 0.5rem;
+      text-align: center;
     }
     th {
-      background-color: #34495e;
-      color: white;
+      background-color: #ddd;
     }
     tr:nth-child(even) {
-      background-color: #f2f2f2;
+      background-color: #f9f9f9;
     }
-    .filter-bar {
-      margin-bottom: 1rem;
+    .filter-links {
+      margin-top: 1rem;
     }
-    .filter-bar a {
+    .filter-links a {
       margin-right: 1rem;
-      text-decoration: none;
-      color: #2980b9;
     }
-    .tag {
-      display: inline-block;
-      padding: 0.2em 0.6em;
-      font-size: 0.85em;
-      border-radius: 0.25em;
-    }
-    .tag-true {
-      background-color: #2ecc71;
+    .btn {
+      padding: 0.4rem 0.8rem;
+      background-color: #4CAF50;
       color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
     }
-    .tag-false {
-      background-color: #e74c3c;
-      color: white;
+    .btn:disabled {
+      background-color: #aaa;
     }
   </style>
 </head>
 <body>
-  <h1>📜 採用戦略履歴</h1>
+  <h1>📜 昇格戦略ログ（Act フェーズ記録）</h1>
 
-  <div class="filter-bar">
-    <strong>🔍 Push状態フィルタ:</strong>
-    <a href="/act-history">すべて表示</a>
-    <a href="/act-history?pushed=true">✅ Push済のみ</a>
-    <a href="/act-history?pushed=false">❌ 未Pushのみ</a>
+  <div class="filter-links">
+    <a href="/act-history">全て表示</a>
+    <a href="/act-history?pushed=false">未Pushのみ</a>
+    <a href="/act-history?pushed=true">Push済みのみ</a>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>日時</th>
-        <th>戦略ファイル</th>
-        <th>勝率</th>
-        <th>最大DD</th>
-        <th>取引数</th>
-        <th>昇格理由</th>
-        <th>Push状態</th>
+        <th>📆 日時</th>
+        <th>📛 戦略名</th>
+        <th>📈 勝率</th>
+        <th>💥 最大DD</th>
+        <th>🔢 取引数</th>
+        <th>🚩 理由</th>
+        <th>📤 Push状態</th>
+        <th>🔁 操作</th>
       </tr>
     </thead>
     <tbody>
@@ -81,15 +74,19 @@
       <tr>
         <td>{{ log.timestamp }}</td>
         <td>{{ log.strategy }}</td>
-        <td>{{ log.metrics.win_rate }}</td>
-        <td>{{ log.metrics.max_drawdown }}</td>
-        <td>{{ log.metrics.trades }}</td>
+        <td>{{ log.metrics.win_rate }}%</td>
+        <td>{{ log.metrics.max_drawdown }}%</td>
+        <td>{{ log.metrics.num_trades }}</td>
         <td>{{ log.reason }}</td>
+        <td>{{ "✅" if log.pushed else "❌" }}</td>
         <td>
-          {% if log.pushed %}
-            <span class="tag tag-true">✅ Pushed</span>
+          {% if not log.pushed %}
+          <form action="/act-history/push" method="post">
+            <input type="hidden" name="log_path" value="{{ log.path }}">
+            <button type="submit" class="btn">GitHubへPush</button>
+          </form>
           {% else %}
-            <span class="tag tag-false">❌ 未Push</span>
+          <button class="btn" disabled>済</button>
           {% endif %}
         </td>
       </tr>
