@@ -18,6 +18,9 @@ from core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 router = APIRouter(tags=["strategy"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+# 共通の戦略ディレクトリパス
+veritas_dir = STRATEGIES_DIR / "veritas_generated"
+
 
 @router.get("/strategies", response_class=HTMLResponse)
 async def list_strategies(request: Request):
@@ -25,7 +28,6 @@ async def list_strategies(request: Request):
     📋 戦略ファイル一覧表示
     - veritas_generated 内の .py 戦略ファイル一覧を表示
     """
-    veritas_dir = STRATEGIES_DIR / "veritas_generated"
     if not veritas_dir.exists():
         raise HTTPException(status_code=500, detail="戦略ディレクトリが存在しません")
 
@@ -44,7 +46,6 @@ async def view_strategy(request: Request, name: str):
     🔍 指定戦略ファイルの内容を表示
     - /strategies/view?name=example.py
     """
-    veritas_dir = STRATEGIES_DIR / "veritas_generated"
     target_file = veritas_dir / name
 
     if not target_file.exists() or target_file.suffix != ".py":
@@ -67,10 +68,9 @@ async def strategy_overview(request: Request):
     """
     📊 メタ情報付きの戦略一覧表示
     """
-    meta_dir = STRATEGIES_DIR / "veritas_generated"
     data = []
 
-    for file in meta_dir.glob("*.json"):
+    for file in veritas_dir.glob("*.json"):
         try:
             with open(file, encoding="utf-8") as f:
                 j = json.load(f)
@@ -90,10 +90,9 @@ async def strategy_search(request: Request, keyword: str = Query(default="")):
     """
     🔍 戦略のキーワード検索（戦略名 or タグ名にマッチ）
     """
-    meta_dir = STRATEGIES_DIR / "veritas_generated"
     matched = []
 
-    for file in meta_dir.glob("*.json"):
+    for file in veritas_dir.glob("*.json"):
         try:
             with open(file, encoding="utf-8") as f:
                 j = json.load(f)
@@ -116,12 +115,14 @@ async def export_strategy(name: str):
     """
     📤 Python戦略ファイルをダウンロード（保存）
     """
-    target = STRATEGIES_DIR / "veritas_generated" / name
+    target = veritas_dir / name
     if not target.exists():
         raise HTTPException(status_code=404, detail="ファイルが存在しません")
+
+    media_type = "text/x-python" if target.suffix == ".py" else "application/json"
 
     return FileResponse(
         path=target,
         filename=target.name,
-        media_type="text/x-python"
+        media_type=media_type
     )
