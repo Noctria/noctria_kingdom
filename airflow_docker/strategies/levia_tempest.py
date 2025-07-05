@@ -23,8 +23,8 @@ class LeviaTempest:
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
 
-        # ✅ RiskManagementに渡す
-        self.risk_manager = RiskManagement(historical_data=historical_data)
+        # ✅ RiskManagerに渡す
+        self.risk_manager = RiskManager(historical_data=historical_data)
 
     def process(self, market_data):
         """
