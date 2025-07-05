@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========================================
-# 📌 Noctria Kingdom Path Config (v3.4)
+# 📌 Noctria Kingdom Path Config (v3.4+)
 #    - 全構成要素を王の地図に記録
 #    - Docker/WSL/Local対応（自動切り替え）
 # ========================================
@@ -48,8 +48,6 @@ GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
 GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
 GUI_ROUTES_DIR = NOCTRIA_GUI_DIR / "routes"
 GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
-
-# ✅ FastAPI GUI 起動用（main.py で使用される専用パス）
 NOCTRIA_GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
 NOCTRIA_GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
 
@@ -63,6 +61,12 @@ TESTS_DIR = BASE_DIR / "tests"
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
+VERITAS_ORDER_JSON = Path(
+    "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files/veritas_signal.json"
+)
+
+# ✅ PDCA履歴ログ保存用ディレクトリ
+PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 
 # ========================================
 # 🧠 Veritas関連スクリプト
@@ -93,42 +97,7 @@ CATEGORY_MAP = {
 # 🔍 パス整合性チェック関数（審査用）
 # ========================================
 def _lint_path_config():
-    return {
-        "BASE_DIR": BASE_DIR.exists(),
-        "DAGS_DIR": DAGS_DIR.exists(),
-        "LOGS_DIR": LOGS_DIR.exists(),
-        "PLUGINS_DIR": PLUGINS_DIR.exists(),
-        "AIRFLOW_SCRIPTS_DIR": AIRFLOW_SCRIPTS_DIR.exists(),
-        "TOOLS_DIR": TOOLS_DIR.exists(),
-        "SCRIPTS_DIR": SCRIPTS_DIR.exists(),
-        "CORE_DIR": CORE_DIR.exists(),
-        "VERITAS_DIR": VERITAS_DIR.exists(),
-        "STRATEGIES_DIR": STRATEGIES_DIR.exists(),
-        "EXECUTION_DIR": EXECUTION_DIR.exists(),
-        "EXPERTS_DIR": EXPERTS_DIR.exists(),
-        "MODELS_DIR": MODELS_DIR.exists(),
-        "DATA_DIR": DATA_DIR.exists(),
-        "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
-        "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
-        "INSTITUTIONS_DIR": INSTITUTIONS_DIR.exists(),
-        "NOCTRIA_GUI_DIR": NOCTRIA_GUI_DIR.exists(),
-        "GUI_TEMPLATES_DIR": GUI_TEMPLATES_DIR.exists(),
-        "GUI_STATIC_DIR": GUI_STATIC_DIR.exists(),
-        "GUI_ROUTES_DIR": GUI_ROUTES_DIR.exists(),
-        "GUI_SERVICES_DIR": GUI_SERVICES_DIR.exists(),
-        "NOCTRIA_GUI_STATIC_DIR": NOCTRIA_GUI_STATIC_DIR.exists(),
-        "NOCTRIA_GUI_TEMPLATES_DIR": NOCTRIA_GUI_TEMPLATES_DIR.exists(),
-        "LLM_SERVER_DIR": LLM_SERVER_DIR.exists(),
-        "DOCS_DIR": DOCS_DIR.exists(),
-        "TESTS_DIR": TESTS_DIR.exists(),
-        "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
-        "USDJPY_CSV": USDJPY_CSV.exists(),
-        "MARKET_DATA_CSV": MARKET_DATA_CSV.exists(),
-        "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
-        "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
-        "GENERATE_ORDER_SCRIPT": GENERATE_ORDER_SCRIPT.exists(),
-        "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
-    }
+    return {k: v.exists() for k, v in globals().items() if isinstance(v, Path)}
 
 # ========================================
 # 🌐 公開変数一覧（王の地図）
@@ -143,5 +112,6 @@ __all__ = [
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
-    "GITHUB_PUSH_SCRIPT", "CATEGORY_MAP", "_lint_path_config"
+    "VERITAS_ORDER_JSON", "PDCA_LOG_DIR", "GITHUB_PUSH_SCRIPT",
+    "CATEGORY_MAP", "_lint_path_config"
 ]
