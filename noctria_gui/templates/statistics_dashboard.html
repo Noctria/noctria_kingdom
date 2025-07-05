@@ -1,121 +1,22 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>📊 統計スコアダッシュボード - Noctria Kingdom</title>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background-color: #f9f9f9;
-      padding: 2rem;
-    }
-    h1 {
-      color: #333;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-    }
-    .export-button {
-      padding: 0.5rem 1rem;
-      background-color: #007acc;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
-    }
-    .export-button:hover {
-      background-color: #005fa3;
-    }
-    form.filter-form {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-    select, input[type="date"], button {
-      padding: 0.4rem 0.8rem;
-      font-size: 1rem;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: white;
-    }
-    th, td {
-      padding: 0.6rem;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    th {
-      background-color: #eaeaea;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>📊 Veritas戦略 統計スコアボード</h1>
-    <a href="/statistics/export" class="export-button">CSVエクスポート</a>
-  </div>
+@router.get("/statistics", response_class=HTMLResponse)
+async def show_statistics(
+    request: Request,
+    strategy: Optional[str] = None,
+    symbol: Optional[str] = None
+):
+    all_stats = statistics_service.load_all_statistics()
+    filtered_stats = statistics_service.filter_statistics(
+        sort_by="win_rate",
+        descending=True,
+        strategy=strategy,
+        symbol=symbol
+    )
 
-  <form method="get" action="/statistics" class="filter-form">
-    <label>
-      戦略名:
-      <select name="strategy">
-        <option value="">全て</option>
-        {% for s in strategies %}
-        <option value="{{ s }}">{{ s }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <label>
-      通貨ペア:
-      <select name="symbol">
-        <option value="">全て</option>
-        {% for sym in symbols %}
-        <option value="{{ sym }}">{{ sym }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <label>
-      開始日:
-      <input type="date" name="start_date">
-    </label>
-
-    <label>
-      終了日:
-      <input type="date" name="end_date">
-    </label>
-
-    <button type="submit">絞り込み</button>
-  </form>
-
-  <table>
-    <thead>
-      <tr>
-        <th>戦略名</th>
-        <th>通貨ペア</th>
-        <th>勝率</th>
-        <th>最大DD</th>
-        <th>取引回数</th>
-        <th>評価日時</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for stat in statistics %}
-      <tr>
-        <td>{{ stat.strategy }}</td>
-        <td>{{ stat.symbol }}</td>
-        <td>{{ "%.2f"|format(stat.win_rate * 100) }}%</td>
-        <td>{{ "%.2f"|format(stat.max_drawdown * 100) }}%</td>
-        <td>{{ stat.trade_count }}</td>
-        <td>{{ stat.timestamp }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</body>
-</html>
+    return templates.TemplateResponse("statistics_dashboard.html", {
+        "request": request,
+        "statistics": filtered_stats,
+        "strategies": statistics_service.get_available_strategies(all_stats),
+        "symbols": statistics_service.get_available_symbols(all_stats),
+        "strategy": strategy,
+        "symbol": symbol,
+    })
