@@ -1,0 +1,10 @@
+{
+  "strategy": "veritas_strategy_20250706_110439.py",
+  "win_rate": 0.68,
+  "max_drawdown": 0.12,
+  "trade_count": 45,
+  "profit_factor": 1.98,
+  "asset": "USDJPY",
+  "type": "scalping",
+  "evaluated_at": "2025-07-06T15:32:00"
+}
