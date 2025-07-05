@@ -15,16 +15,15 @@ else:
 # ========================================
 # 🏛 中枢構成（Airflow/DAG/Pluginsなど）
 # ========================================
-
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
 LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
 AIRFLOW_SCRIPTS_DIR = BASE_DIR / "airflow_docker" / "scripts"
+TOOLS_DIR = BASE_DIR / "tools"  # ✅ 追加済み
 
 # ========================================
 # 🧠 知性領域（AI・戦略・評価）
 # ========================================
-
 SCRIPTS_DIR = BASE_DIR / "scripts"
 CORE_DIR = BASE_DIR / "core"
 VERITAS_DIR = BASE_DIR / "veritas"
@@ -35,7 +34,6 @@ EXPERTS_DIR = BASE_DIR / "experts"
 # ========================================
 # 📦 データ・モデル領域
 # ========================================
-
 DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
@@ -45,7 +43,6 @@ INSTITUTIONS_DIR = BASE_DIR / "institutions"
 # ========================================
 # 🌐 GUI・推論サーバ・文書など
 # ========================================
-
 NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
 GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
 GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
@@ -59,7 +56,6 @@ TESTS_DIR = BASE_DIR / "tests"
 # ========================================
 # 📄 ファイルパス（王国の記録物）
 # ========================================
-
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
@@ -67,20 +63,17 @@ MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
 # ========================================
 # 🧠 Veritas関連スクリプト
 # ========================================
-
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 
 # ========================================
 # 🔁 GitHub操作スクリプト
 # ========================================
-
 GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
 
 # ========================================
 # 🔍 パス整合性チェック関数（審査用）
 # ========================================
-
 def _lint_path_config():
     return {
         "BASE_DIR": BASE_DIR.exists(),
@@ -88,6 +81,7 @@ def _lint_path_config():
         "LOGS_DIR": LOGS_DIR.exists(),
         "PLUGINS_DIR": PLUGINS_DIR.exists(),
         "AIRFLOW_SCRIPTS_DIR": AIRFLOW_SCRIPTS_DIR.exists(),
+        "TOOLS_DIR": TOOLS_DIR.exists(),  # ✅ 追加済み
         "SCRIPTS_DIR": SCRIPTS_DIR.exists(),
         "CORE_DIR": CORE_DIR.exists(),
         "VERITAS_DIR": VERITAS_DIR.exists(),
@@ -118,9 +112,9 @@ def _lint_path_config():
 # ========================================
 # 🌐 公開変数一覧（王の地図）
 # ========================================
-
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
+    "TOOLS_DIR",  # ✅ 追加済み
     "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
     "EXECUTION_DIR", "EXPERTS_DIR",
     "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "MODELS_DIR", "INSTITUTIONS_DIR",
