@@ -11,7 +11,7 @@ from strategies.prometheus_oracle import PrometheusOracle
 
 from core.meta_ai import MetaAI
 from core.data.market_data_fetcher import MarketDataFetcher
-from core.risk_management import RiskManager
+from core.risk_manager import RiskManager
 
 
 class Noctria:
