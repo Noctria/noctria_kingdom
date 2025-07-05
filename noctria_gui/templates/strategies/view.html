@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📄 {{ filename }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        pre {
+            background: #f8f8f8;
+            padding: 1em;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>📄 {{ filename }}</h1>
+    <pre>{{ content }}</pre>
+    <a href="/strategies">← 戦略一覧に戻る</a>
+</body>
+</html>
