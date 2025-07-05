@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Noctria Kingdom - 王命発令</title>
+</head>
+<body>
+    <h1>👑 Noctria Kingdom - 王命発令システム</h1>
+    <form method="post" action="/trigger">
+        <label for="manual_reason">📜 王命の理由:</label><br>
+        <input type="text" id="manual_reason" name="manual_reason" value="GUIからの命令" required>
+        <br><br>
+        <button type="submit">📯 発令する（PDCA起動）</button>
+    </form>
+
+    {% if result %}
+        <hr>
+        <h3>{{ result }}</h3>
+    {% endif %}
+</body>
+</html>
