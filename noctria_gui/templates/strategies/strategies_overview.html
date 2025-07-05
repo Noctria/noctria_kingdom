@@ -24,9 +24,17 @@
       padding: 0.6rem;
       border: 1px solid #ccc;
       text-align: center;
+      cursor: default;
     }
-    th {
-      background-color: #e8e8e8;
+    th.sortable:hover {
+      background-color: #d0e0f0;
+      cursor: pointer;
+    }
+    th.sorted-asc::after {
+      content: " 🔼";
+    }
+    th.sorted-desc::after {
+      content: " 🔽";
     }
     .tag {
       background-color: #def;
@@ -78,14 +86,14 @@
 
   {% if strategies %}
   <form id="strategy-form">
-  <table>
+  <table id="strategy-table">
     <thead>
       <tr>
         <th>📌</th>
         <th>戦略名</th>
-        <th>勝率</th>
+        <th class="sortable">勝率</th>
         <th>取引数</th>
-        <th>最大DD</th>
+        <th class="sortable">最大DD</th>
         <th>タグ</th>
         <th>操作</th>
       </tr>
@@ -97,7 +105,7 @@
               data-winrate="{{ s.win_rate }}"
               data-drawdown="{{ s.max_drawdown }}"></td>
         <td>{{ s.strategy }}</td>
-        <td>{{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}%</td>
+        <td>{{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}</td>
         <td>{{ s.trade_count if s.trade_count is not none else '―' }}</td>
         <td>{{ s.max_drawdown if s.max_drawdown is not none else '―' }}</td>
         <td>
@@ -163,6 +171,46 @@
         }
       });
     }
+
+    // ソート機能の実装
+    document.addEventListener("DOMContentLoaded", () => {
+      const table = document.getElementById("strategy-table");
+      let sortState = {};
+
+      function sortTable(colIndex, isNumeric) {
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.rows);
+
+        const dir = sortState[colIndex] === "asc" ? "desc" : "asc";
+        sortState = {};  // Reset
+        sortState[colIndex] = dir;
+
+        rows.sort((a, b) => {
+          const aText = a.cells[colIndex].innerText.trim();
+          const bText = b.cells[colIndex].innerText.trim();
+
+          const aVal = isNumeric ? parseFloat(aText) || 0 : aText;
+          const bVal = isNumeric ? parseFloat(bText) || 0 : bText;
+
+          return dir === "asc" ? aVal - bVal : bVal - aVal;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+
+        // 見た目更新
+        table.querySelectorAll("th").forEach(th => th.classList.remove("sorted-asc", "sorted-desc"));
+        const th = table.querySelectorAll("th")[colIndex];
+        th.classList.add(dir === "asc" ? "sorted-asc" : "sorted-desc");
+      }
+
+      // 勝率: colIndex = 2, 最大DD: colIndex = 4
+      table.querySelectorAll("th.sortable").forEach((th, idx) => {
+        th.addEventListener("click", () => {
+          const isNumeric = (idx === 2 || idx === 4);
+          sortTable(idx, isNumeric);
+        });
+      });
+    });
   </script>
 </body>
 </html>
