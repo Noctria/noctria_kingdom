@@ -15,6 +15,9 @@
     }
     .filters {
       margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     .filters form {
       display: flex;
@@ -25,7 +28,7 @@
       padding: 0.4rem;
       width: 200px;
     }
-    .filters button {
+    .filters select, .filters button {
       padding: 0.4rem 0.8rem;
     }
     table {
@@ -45,6 +48,12 @@
       font-size: 0.9rem;
       color: #666;
     }
+    .actions {
+      margin-top: 1rem;
+    }
+    .actions form {
+      display: inline;
+    }
   </style>
 </head>
 <body>
@@ -61,6 +70,10 @@
       </select>
       <button type="submit">適用</button>
     </form>
+
+    <form method="get" action="/push-history/export">
+      <button type="submit">📥 CSVエクスポート</button>
+    </form>
   </div>
 
   {% if logs %}
@@ -71,6 +84,7 @@
           <th>🧠 戦略名</th>
           <th>💬 メッセージ</th>
           <th>👑 署名</th>
+          <th>🔎 詳細</th>
         </tr>
       </thead>
       <tbody>
@@ -80,6 +94,9 @@
           <td>{{ log.strategy }}</td>
           <td>{{ log.message }}</td>
           <td class="small">{{ log.signature or '（署名なし）' }}</td>
+          <td>
+            <a href="/push-history/detail?timestamp={{ log.timestamp | urlencode }}&strategy={{ log.strategy | urlencode }}">🧾 詳細</a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -87,5 +104,6 @@
   {% else %}
     <p>🚫 ログが見つかりませんでした。</p>
   {% endif %}
+
 </body>
 </html>
