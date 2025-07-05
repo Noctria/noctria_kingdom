@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📈 戦略比較グラフ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { padding: 2rem; background: #f9f9f9; }
+    canvas { max-width: 800px; margin-bottom: 2rem; }
+    .nav { margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>📈 選択戦略の比較</h1>
+
+  <div class="nav">
+    <button onclick="showChart('win')">勝率</button>
+    <button onclick="showChart('dd')">最大DD</button>
+    <button onclick="showChart('trades')">取引数</button>
+  </div>
+
+  <canvas id="chart"></canvas>
+
+  <script>
+    const strategies = {{ strategies | tojson }};
+    const labels = strategies.map(s => s.strategy);
+
+    const datasets = {
+      win: {
+        label: "勝率 (%)",
+        data: strategies.map(s => s.win_rate),
+        backgroundColor: "rgba(54, 162, 235, 0.6)"
+      },
+      dd: {
+        label: "最大DD",
+        data: strategies.map(s => s.max_drawdown),
+        backgroundColor: "rgba(255, 99, 132, 0.6)"
+      },
+      trades: {
+        label: "取引数",
+        data: strategies.map(s => s.num_trades),
+        backgroundColor: "rgba(75, 192, 192, 0.6)"
+      }
+    };
+
+    let chart;
+    function showChart(type) {
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById("chart"), {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [datasets[type]]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    // 初期表示
+    showChart('win');
+  </script>
+
+  <p><a href="/strategies/compare">← 戦略選択に戻る</a></p>
+</body>
+</html>
