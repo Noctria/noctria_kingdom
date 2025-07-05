@@ -8,6 +8,7 @@
 """
 
 import json
+import csv
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -69,7 +70,7 @@ def filter_logs(
 
 def sort_logs(logs: List[Dict], sort_key: str, descending: bool = True) -> List[Dict]:
     """
-    ↕️ 指定キーでソート（例：win_rate, max_drawdown）
+    ↕️ 指定キーでソート（例：win_rate, max_drawdown, trades）
     """
     return sorted(
         logs,
@@ -94,3 +95,21 @@ def get_available_symbols(logs: List[Dict]) -> List[str]:
     return sorted(set(
         log["symbol"] for log in logs if "symbol" in log and log["symbol"]
     ))
+
+
+def export_logs_to_csv(logs: List[Dict], output_path: Path):
+    """
+    📤 ログ一覧をCSVファイルに出力する（統治スコアの記録用）
+    """
+    if not logs:
+        print("⚠️ 書き出し対象のログが存在しません")
+        return
+
+    # フィールド名を先頭ログから取得（キーが揃っている前提）
+    fieldnames = list(logs[0].keys())
+
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(logs)
+        print(f"✅ 統計CSVを書き出しました: {output_path}")
