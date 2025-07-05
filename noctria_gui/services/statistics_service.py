@@ -70,7 +70,7 @@ def filter_logs(
 
 def sort_logs(logs: List[Dict], sort_key: str, descending: bool = True) -> List[Dict]:
     """
-    ↕️ 指定キーでソート（例：win_rate, max_drawdown, trades）
+    ↕️ 指定キーでソート（例：win_rate, max_drawdown）
     """
     return sorted(
         logs,
@@ -97,19 +97,57 @@ def get_available_symbols(logs: List[Dict]) -> List[str]:
     ))
 
 
-def export_logs_to_csv(logs: List[Dict], output_path: Path):
+def load_all_statistics() -> List[Dict]:
     """
-    📤 ログ一覧をCSVファイルに出力する（統治スコアの記録用）
+    📊 統計対象として有効なPDCAログを抽出する
+    - 必須項目: strategy, symbol, win_rate, max_drawdown, trade_count, timestamp
+    """
+    logs = load_all_logs()
+    return [
+        log for log in logs
+        if all(k in log for k in ("strategy", "symbol", "win_rate", "max_drawdown", "trade_count", "timestamp"))
+    ]
+
+
+def filter_statistics(
+    sort_by: str = "win_rate",
+    descending: bool = True,
+    strategy: Optional[str] = None,
+    symbol: Optional[str] = None
+) -> List[Dict]:
+    """
+    🔍 統計データにフィルタ・ソートを適用
+    """
+    logs = load_all_statistics()
+    filtered = filter_logs(logs, strategy=strategy, symbol=symbol)
+    return sort_logs(filtered, sort_key=sort_by, descending=descending)
+
+
+def export_statistics_to_csv(logs: List[Dict], output_path: Path):
+    """
+    📤 Veritas戦略の統計ログをCSV形式で出力する
+    - 勝率 / 最大ドローダウン / 取引回数 など主要項目を抽出
     """
     if not logs:
-        print("⚠️ 書き出し対象のログが存在しません")
+        print("⚠️ 書き出すログが存在しません")
         return
 
-    # フィールド名を先頭ログから取得（キーが揃っている前提）
-    fieldnames = list(logs[0].keys())
+    fieldnames = [
+        "strategy",        # 戦略名
+        "symbol",          # 通貨ペア
+        "win_rate",        # 勝率（float）
+        "max_drawdown",    # 最大DD（float）
+        "trade_count",     # 取引回数
+        "timestamp",       # 評価タイムスタンプ
+        "__log_path__",    # 元ログファイルのパス
+    ]
 
-    with open(output_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+    with open(output_path, "w", encoding="utf-8", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(logs)
-        print(f"✅ 統計CSVを書き出しました: {output_path}")
+
+        for log in logs:
+            row = {key: log.get(key, "") for key in fieldnames}
+            writer.writerow(row)
+
+    print(f"✅ 統計スコアCSVを出力しました: {output_path}")
