@@ -14,8 +14,11 @@ from datetime import datetime
 
 from core.path_config import PDCA_LOG_DIR
 
+
 def load_all_logs() -> List[Dict]:
-    """📁 PDCAログディレクトリから全ログを読み込む"""
+    """
+    📁 PDCAログディレクトリから全ログを読み込む
+    """
     logs = []
     for file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
@@ -27,6 +30,7 @@ def load_all_logs() -> List[Dict]:
             print(f"⚠️ ログ読み込み失敗: {file.name} - {e}")
     return logs
 
+
 def filter_logs(
     logs: List[Dict],
     strategy: Optional[str] = None,
@@ -34,7 +38,12 @@ def filter_logs(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ) -> List[Dict]:
-    """🔍 ログにフィルタを適用"""
+    """
+    🔍 ログにフィルタを適用する
+    - strategy: 戦略名で絞り込み
+    - symbol: 通貨ペアで絞り込み
+    - start_date/end_date: ISO形式文字列（例: '2025-07-01'）
+    """
     filtered = []
 
     for log in logs:
@@ -50,24 +59,38 @@ def filter_logs(
                     continue
                 if end_date and dt > datetime.fromisoformat(end_date):
                     continue
-            except:
+            except Exception as e:
+                print(f"⚠️ 日付解析失敗: {log_ts} - {e}")
                 continue
         filtered.append(log)
 
     return filtered
 
+
 def sort_logs(logs: List[Dict], sort_key: str, descending: bool = True) -> List[Dict]:
-    """↕️ 指定キーでソート（例：win_rate, max_drawdown）"""
+    """
+    ↕️ 指定キーでソート（例：win_rate, max_drawdown）
+    """
     return sorted(
         logs,
         key=lambda x: x.get(sort_key, 0.0),
         reverse=descending
     )
 
+
 def get_available_strategies(logs: List[Dict]) -> List[str]:
-    """🗂 使用された戦略名一覧を返す"""
-    return sorted(set(log.get("strategy") for log in logs if "strategy" in log))
+    """
+    🗂 使用された戦略名一覧を返す（重複排除）
+    """
+    return sorted(set(
+        log["strategy"] for log in logs if "strategy" in log and log["strategy"]
+    ))
+
 
 def get_available_symbols(logs: List[Dict]) -> List[str]:
-    """💱 使用された通貨ペア一覧を返す"""
-    return sorted(set(log.get("symbol") for log in logs if "symbol" in log))
+    """
+    💱 使用された通貨ペア一覧を返す（重複排除）
+    """
+    return sorted(set(
+        log["symbol"] for log in logs if "symbol" in log and log["symbol"]
+    ))
