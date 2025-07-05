@@ -13,19 +13,18 @@
     h1 {
       color: #333;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    form {
       margin-top: 1rem;
     }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 0.6rem;
-      text-align: left;
+    input[type="text"] {
+      padding: 0.5rem;
+      font-size: 1rem;
+      width: 250px;
+      margin-right: 1rem;
     }
-    th {
-      background-color: #e9ecef;
-      cursor: pointer;
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
     }
     .filter-links {
       margin-top: 1rem;
@@ -38,22 +37,38 @@
     .filter-links a:hover {
       text-decoration: underline;
     }
-    .sort-indicator {
-      font-size: 0.8em;
-      color: #666;
-      margin-left: 0.25rem;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.6rem;
+      text-align: left;
+    }
+    th {
+      background-color: #e9ecef;
     }
   </style>
 </head>
 <body>
   <h1>📤 Push操作履歴（GitHub記録）</h1>
 
+  <!-- 🔍 キーワード検索フォーム -->
+  <form method="get" action="/push-history">
+    <input type="text" name="q" placeholder="戦略名やメッセージで検索" value="{{ query or '' }}" />
+    <button type="submit">検索</button>
+  </form>
+
+  <!-- 📅 ソート切り替え -->
   <div class="filter-links">
     <a href="/push-history">すべて表示</a>
-    <a href="/push-history?sort=desc">📅 日時: 新→古</a>
-    <a href="/push-history?sort=asc">📅 日時: 古→新</a>
+    <a href="/push-history?sort=desc{% if query %}&q={{ query }}{% endif %}">📅 日時: 新→古</a>
+    <a href="/push-history?sort=asc{% if query %}&q={{ query }}{% endif %}">📅 日時: 古→新</a>
   </div>
 
+  <!-- 📋 Pushログテーブル -->
   <table>
     <thead>
       <tr>
@@ -75,7 +90,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="5">Push履歴が存在しません。</td>
+        <td colspan="5">Push履歴が見つかりません。</td>
       </tr>
       {% endfor %}
     </tbody>
