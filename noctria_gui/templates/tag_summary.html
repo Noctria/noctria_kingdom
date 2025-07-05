@@ -11,7 +11,6 @@
     }
     h1 {
       color: #222;
-      margin-bottom: 1rem;
     }
     table {
       width: 100%;
@@ -20,7 +19,7 @@
       margin-top: 1rem;
     }
     th, td {
-      padding: 0.6rem;
+      padding: 0.5rem;
       border: 1px solid #ccc;
       text-align: center;
     }
@@ -31,24 +30,17 @@
       font-weight: bold;
       color: #333;
     }
-    .export-button {
-      display: inline-block;
-      margin-bottom: 1rem;
-      padding: 0.5rem 1rem;
-      background-color: #007acc;
-      color: white;
+    .strategy-link {
+      color: #007acc;
       text-decoration: none;
-      border-radius: 4px;
     }
-    .export-button:hover {
-      background-color: #005fa3;
+    .strategy-link:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
   <h1>🧠 タグ別戦略統計</h1>
-
-  <a href="/tag-summary/export" class="export-button">CSVエクスポート</a>
 
   <table>
     <thead>
@@ -66,10 +58,14 @@
       <tr>
         <td class="tag-label">{{ item.tag }}</td>
         <td>{{ item.strategy_count }}</td>
-        <td>{{ "%.2f"|format(item.average_win_rate * 100) }}%</td>
-        <td>{{ "%.1f"|format(item.average_trade_count) }}</td>
-        <td>{{ "%.2f"|format(item.average_max_drawdown * 100) }}%</td>
-        <td>{{ item.sample_strategies | join(", ") }}</td>
+        <td>{{ item.average_win_rate }}%</td>
+        <td>{{ item.average_trade_count }}</td>
+        <td>{{ item.average_max_drawdown }}</td>
+        <td>
+          {% for strategy in item.sample_strategies %}
+            <a class="strategy-link" href="/strategy/detail?name={{ strategy }}">{{ strategy }}</a>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
