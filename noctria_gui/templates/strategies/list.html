@@ -9,7 +9,7 @@
     {% if strategies %}
         <ul>
         {% for name in strategies %}
-            <li>{{ name }}</li>
+            <li><a href="/strategies/view?name={{ name }}">{{ name }}</a></li>
         {% endfor %}
         </ul>
     {% else %}
