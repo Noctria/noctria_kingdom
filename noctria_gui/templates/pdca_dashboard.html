@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Noctria PDCA ダッシュボード</title>
+  <style>
+    body { font-family: sans-serif; }
+    .tabs { margin-bottom: 20px; }
+    .tab-button {
+      padding: 10px 20px;
+      background-color: #eee;
+      border: none;
+      cursor: pointer;
+    }
+    .tab-button.active {
+      background-color: #ccc;
+      font-weight: bold;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .block {
+      border: 1px solid #ccc;
+      margin: 10px;
+      padding: 10px;
+      background: #f9f9f9;
+    }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td {
+      border: 1px solid #aaa;
+      padding: 6px;
+      text-align: left;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🤖 Noctria PDCA ダッシュボード</h1>
+
+  <div class="tabs">
+    <button class="tab-button active" onclick="switchTab('run')">▶️ PDCA実行</button>
+    <button class="tab-button" onclick="switchTab('history')">🕰 実行履歴</button>
+  </div>
+
+  <!-- PDCA実行タブ -->
+  <div id="run" class="tab-content active">
+    <form method="post" action="/pdca">
+      <button type="submit">🔁 PDCAループを実行</button>
+    </form>
+    {% if message %}
+      <h3>実行結果:</h3>
+      <pre>{{ message }}</pre>
+    {% endif %}
+  </div>
+
+  <!-- 実行履歴タブ -->
+  <div id="history" class="tab-content">
+    {% for record in histories %}
+      <div class="block">
+        <h2>📂 {{ record.id }}</h2>
+        {% for f in record.files %}
+          <p><strong>📄 {{ f.name }}</strong></p>
+          {% if f.name == "plan_output.json" %}
+            {% set strategies = f.content | from_json %}
+            <ul>
+              {% for s in strategies %}
+                <li><strong>{{ s.name }}</strong>: {{ s.description }}</li>
+              {% endfor %}
+            </ul>
+          {% elif f.name == "evaluation_report.json" %}
+            {% set results = f.content | from_json %}
+            <table>
+              <tr>
+                <th>戦略</th><th>勝率</th><th>DD</th><th>取引数</th><th>採用</th>
+              </tr>
+              {% for r in results %}
+              <tr>
+                <td>{{ r.name }}</td>
+                <td>{{ r.win_rate }}%</td>
+                <td>{{ r.max_drawdown }}%</td>
+                <td>{{ r.trades }}</td>
+                <td>{{ "✅" if r.adopted else "❌" }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          {% else %}
+            <pre>{{ f.content }}</pre>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelector(`.tab-button[onclick="switchTab('${tabId}')"]`).classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>
