@@ -67,6 +67,7 @@ async def view_strategy(request: Request, name: str):
 async def strategy_overview(request: Request):
     """
     📊 メタ情報付きの戦略一覧表示
+    - 勝率、最大DD、取引数などをまとめて表示
     """
     data = []
 
@@ -113,7 +114,7 @@ async def strategy_search(request: Request, keyword: str = Query(default="")):
 @router.get("/strategies/export", response_class=FileResponse)
 async def export_strategy(name: str):
     """
-    📤 Python戦略ファイルをダウンロード（保存）
+    📤 戦略ファイル（.py or .json）をダウンロード
     """
     target = veritas_dir / name
     if not target.exists():
