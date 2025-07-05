@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>GitHub Push履歴 - Noctria Kingdom</title>
+  <title>Noctria Kingdom - Git Push 履歴</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
@@ -10,42 +10,67 @@
       padding: 2rem;
     }
     h1 {
-      color: #333;
+      color: #2c3e50;
+      margin-bottom: 1rem;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 1rem;
+      background-color: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     th, td {
-      padding: 0.5rem;
-      border-bottom: 1px solid #ccc;
+      padding: 0.75rem;
       text-align: left;
+      border-bottom: 1px solid #ddd;
     }
     th {
-      background-color: #eee;
+      background-color: #f0f0f0;
+    }
+    tr:hover {
+      background-color: #f9f9f9;
+    }
+    .filter-bar {
+      margin-bottom: 1rem;
+    }
+    .timestamp {
+      font-family: monospace;
+      color: #555;
+    }
+    .commit-message {
+      color: #333;
     }
   </style>
 </head>
 <body>
-  <h1>📜 GitHub Push履歴</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>日付</th>
-        <th>戦略ファイル</th>
-        <th>メッセージ</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in logs %}
+  <h1>📤 Git Push 履歴</h1>
+
+  <div class="filter-bar">
+    <!-- 今後クエリによるフィルターなどを実装する際の拡張スペース -->
+    <p>王国に記された Git 操作の記録がここに示されます。</p>
+  </div>
+
+  {% if logs %}
+    <table>
+      <thead>
         <tr>
-          <td>{{ entry.date }}</td>
-          <td>{{ entry.files | join(', ') }}</td>
-          <td>{{ entry.message }}</td>
+          <th>📅 日時</th>
+          <th>📦 対象ファイル</th>
+          <th>📝 コミットメッセージ</th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+          <tr>
+            <td class="timestamp">{{ log.timestamp }}</td>
+            <td><code>{{ log.file }}</code></td>
+            <td class="commit-message">{{ log.message }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>⚠️ Git Push 履歴はまだ記録されていません。</p>
+  {% endif %}
 </body>
 </html>
