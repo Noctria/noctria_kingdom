@@ -6,40 +6,64 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="/static/style.css">
   <style>
-    body { padding: 2rem; background: #f9f9f9; }
-    canvas { max-width: 800px; margin-bottom: 2rem; }
-    .nav { margin-bottom: 1rem; }
+    body {
+      padding: 2rem;
+      background: #f9f9f9;
+      font-family: "Segoe UI", sans-serif;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    .nav {
+      margin-bottom: 1rem;
+    }
+    .nav button {
+      padding: 6px 12px;
+      margin-right: 8px;
+      background: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .nav button:hover {
+      background: #005f99;
+    }
+    canvas {
+      max-width: 900px;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
   <h1>📈 選択戦略の比較</h1>
 
   <div class="nav">
-    <button onclick="showChart('win')">勝率</button>
-    <button onclick="showChart('dd')">最大DD</button>
-    <button onclick="showChart('trades')">取引数</button>
+    <button onclick="showChart('win')">🏆 勝率</button>
+    <button onclick="showChart('dd')">📉 最大DD</button>
+    <button onclick="showChart('trades')">📊 取引数</button>
   </div>
 
   <canvas id="chart"></canvas>
 
   <script>
-    const strategies = {{ strategies | tojson }};
+    const strategies = {{ strategies | tojson | safe }};
     const labels = strategies.map(s => s.strategy);
 
     const datasets = {
       win: {
         label: "勝率 (%)",
-        data: strategies.map(s => s.win_rate),
+        data: strategies.map(s => s.win_rate || 0),
         backgroundColor: "rgba(54, 162, 235, 0.6)"
       },
       dd: {
-        label: "最大DD",
-        data: strategies.map(s => s.max_drawdown),
+        label: "最大ドローダウン",
+        data: strategies.map(s => s.max_drawdown || 0),
         backgroundColor: "rgba(255, 99, 132, 0.6)"
       },
       trades: {
         label: "取引数",
-        data: strategies.map(s => s.num_trades),
+        data: strategies.map(s => s.num_trades || 0),
         backgroundColor: "rgba(75, 192, 192, 0.6)"
       }
     };
@@ -55,7 +79,13 @@
         },
         options: {
           responsive: true,
-          scales: { y: { beginAtZero: true } }
+          plugins: {
+            legend: { display: true },
+            title: { display: true, text: datasets[type].label }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
         }
       });
     }
@@ -64,6 +94,8 @@
     showChart('win');
   </script>
 
-  <p><a href="/strategies/compare">← 戦略選択に戻る</a></p>
+  <p style="margin-top: 1.5rem;">
+    <a href="/strategies/compare">← 戦略選択に戻る</a>
+  </p>
 </body>
 </html>
