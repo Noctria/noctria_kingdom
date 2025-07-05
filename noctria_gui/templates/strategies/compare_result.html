@@ -30,7 +30,7 @@
       background-color: #005fa3;
     }
     canvas {
-      max-width: 800px;
+      max-width: 900px;
       margin: 2rem auto;
       display: block;
     }
@@ -98,6 +98,22 @@
               const index = elements[0].index;
               const name = sorted[index].strategy;
               window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: (context) => {
+                  const index = context.dataIndex;
+                  const s = sorted[index];
+                  return [
+                    `📄 戦略名: ${s.strategy}`,
+                    `🎯 勝率: ${s.win_rate ?? '―'}%`,
+                    `📊 取引数: ${s.num_trades ?? '―'}`,
+                    `📉 最大DD: ${s.max_drawdown ?? '―'}`
+                  ];
+                }
+              }
             }
           },
           scales: {
