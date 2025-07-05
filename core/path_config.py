@@ -3,9 +3,10 @@ from pathlib import Path
 # ========================================
 # 📌 Noctria Kingdom Path Config (v3.0)
 #    - 自動で BASE_DIR を切り替える構成
+#    - すべての構成要素を王の地図に記録
 # ========================================
 
-# ✅ BASE_DIR の自動切り替え
+# ✅ BASE_DIR の自動切り替え（Docker vs ローカル）
 if Path("/opt/airflow").exists():
     # Docker / 本番環境
     BASE_DIR = Path("/opt/airflow").resolve()
@@ -13,7 +14,10 @@ else:
     # ローカル / 開発環境（WSL等）
     BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 📂 各ディレクトリ定義
+# ========================================
+# 🏛 ディレクトリ定義（王国の各領土）
+# ========================================
+
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
 LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
@@ -28,23 +32,42 @@ VERITAS_DIR = BASE_DIR / "veritas"
 TOOLS_DIR = BASE_DIR / "tools"
 TESTS_DIR = BASE_DIR / "tests"
 
-# 📁 データサブディレクトリ
+# ✅ GUI構成（前線本部）
+NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
+GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
+
+# ========================================
+# 📂 サブディレクトリ（補佐官領域）
+# ========================================
+
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
-# 📝 ファイルパス
+# ========================================
+# 📄 ファイルパス（王国の記録物）
+# ========================================
+
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 USDJPY_CSV = LOGS_DIR / "USDJPY_M1_201501020805_202506161647.csv"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
 
-# ✅ Veritas戦略生成・評価スクリプトのパス
+# ========================================
+# 🧠 Veritas関連スクリプト
+# ========================================
+
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 
-# ✅ GitHub自動反映スクリプトのパス
+# ========================================
+# 🛠 GitHub連携スクリプト
+# ========================================
+
 GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
 
-# ✅ パス整合性チェック関数（任意でDAGやテストから呼べる）
+# ========================================
+# 🔍 パス整合性チェック（審査用）
+# ========================================
+
 def _lint_path_config():
     return {
         "BASE_DIR": BASE_DIR.exists(),
@@ -58,9 +81,14 @@ def _lint_path_config():
         "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
         "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
         "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
+        "NOCTRIA_GUI_DIR": NOCTRIA_GUI_DIR.exists(),
+        "GUI_TEMPLATES_DIR": GUI_TEMPLATES_DIR.exists(),
     }
 
-# 🌐 公開変数一覧（補完・明示用）
+# ========================================
+# 🌐 公開変数（王国全体地図）
+# ========================================
+
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
     "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
@@ -70,5 +98,6 @@ __all__ = [
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
     "GITHUB_PUSH_SCRIPT",
+    "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR",
     "_lint_path_config"
 ]
