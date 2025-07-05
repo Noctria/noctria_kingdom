@@ -1,20 +1,68 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>📜 Veritas戦略一覧</title>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8" />
+  <title>📜 Veritas戦略一覧 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f9f9f9;
+      padding: 2rem;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      margin: 0.4rem 0;
+    }
+    a.strategy-link {
+      color: #007acc;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    a.strategy-link:hover {
+      text-decoration: underline;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 2rem;
+      color: #555;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .empty-message {
+      color: #666;
+      font-style: italic;
+      margin-top: 1rem;
+    }
+  </style>
 </head>
 <body>
-    <h1>📜 Veritas戦略一覧</h1>
-    {% if strategies %}
-        <ul>
-        {% for name in strategies %}
-            <li><a href="/strategies/view?name={{ name }}">{{ name }}</a></li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>まだ戦略が生成されていません。</p>
-    {% endif %}
-    <a href="/">← トップへ戻る</a>
+
+  <h1>📜 Veritas戦略一覧</h1>
+
+  {% if strategies %}
+    <ul>
+      {% for name in strategies %}
+        <li>
+          <a class="strategy-link" href="/strategies/view?name={{ name }}">{{ name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty-message">まだ戦略が生成されていません。</p>
+  {% endif %}
+
+  <a href="/" class="back-link">← トップへ戻る</a>
+
 </body>
 </html>
