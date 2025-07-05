@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+"""
+🌐 Noctria Kingdom GUI 起動スクリプト
+- DAG起動、戦略管理、PDCA評価、ログ可視化の中枢UI
+"""
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -20,6 +25,7 @@ from noctria_gui.routes import (
     statistics,
     act_history,
     push_history,
+    tag_summary,  # ✅ 作戦Ⅴ：タグ別統計GUI表示
 )
 
 # ========================================
@@ -57,3 +63,4 @@ app.include_router(upload_history.router)
 app.include_router(statistics.router)
 app.include_router(act_history.router)
 app.include_router(push_history.router)
+app.include_router(tag_summary.router)  # ✅ 新規追加ルート
