@@ -1,6 +1,6 @@
 import numpy as np
 from core.data.market_data_fetcher import MarketDataFetcher  # ✅ パス修正済み
-from core.risk_management import RiskManager  # ✅ リスク管理モジュール
+from core.risk_manager import RiskManager  # ✅ リスク管理モジュール
 
 class LeviaTempest:
     """
