@@ -12,23 +12,11 @@
     h1 {
       color: #333;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1.5rem;
-    }
-    th, td {
-      padding: 0.6rem;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    th {
-      background-color: #eaeaea;
-    }
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 1.5rem;
     }
     .export-button {
       padding: 0.5rem 1rem;
@@ -40,6 +28,29 @@
     .export-button:hover {
       background-color: #005fa3;
     }
+    form.filter-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    select, input[type="date"], button {
+      padding: 0.4rem 0.8rem;
+      font-size: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+    }
+    th, td {
+      padding: 0.6rem;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #eaeaea;
+    }
   </style>
 </head>
 <body>
@@ -47,6 +58,40 @@
     <h1>📊 Veritas戦略 統計スコアボード</h1>
     <a href="/statistics/export" class="export-button">CSVエクスポート</a>
   </div>
+
+  <form method="get" action="/statistics" class="filter-form">
+    <label>
+      戦略名:
+      <select name="strategy">
+        <option value="">全て</option>
+        {% for s in strategies %}
+        <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      通貨ペア:
+      <select name="symbol">
+        <option value="">全て</option>
+        {% for sym in symbols %}
+        <option value="{{ sym }}">{{ sym }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      開始日:
+      <input type="date" name="start_date">
+    </label>
+
+    <label>
+      終了日:
+      <input type="date" name="end_date">
+    </label>
+
+    <button type="submit">絞り込み</button>
+  </form>
 
   <table>
     <thead>
