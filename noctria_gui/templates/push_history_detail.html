@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Push履歴の詳細 - Noctria Kingdom</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f9f9f9;
+      padding: 2rem;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.75rem;
+      text-align: left;
+    }
+    th {
+      background-color: #eee;
+    }
+    .back-link {
+      margin-top: 1.5rem;
+      display: inline-block;
+      text-decoration: none;
+      color: #007acc;
+    }
+  </style>
+</head>
+<body>
+  <h1>📄 Push履歴の詳細</h1>
+  <table>
+    <tr><th>タイムスタンプ</th><td>{{ log.timestamp }}</td></tr>
+    <tr><th>戦略ファイル</th><td>{{ log.strategy }}</td></tr>
+    <tr><th>メッセージ</th><td>{{ log.message }}</td></tr>
+    <tr><th>署名</th><td>{{ log.signature }}</td></tr>
+  </table>
+  <a href="/push-history" class="back-link">← 一覧に戻る</a>
+</body>
+</html>
