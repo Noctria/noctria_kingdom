@@ -1,31 +1,44 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-import json
-from pathlib import Path
-
-from core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-
-router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+import sys
 
 # ========================================
-# 📜 /act-history - 採用戦略の記録閲覧ページ
+# 🔁 DAG構成：Actフェーズ記録ログを保存
 # ========================================
-@router.get("/act-history", response_class=HTMLResponse)
-async def show_act_history(request: Request):
-    log_files = sorted(ACT_LOG_DIR.glob("*.json"), reverse=True)
-    logs = []
 
-    for log_file in log_files:
-        try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                logs.append(data)
-        except Exception as e:
-            print(f"⚠️ ログ読み込み失敗: {log_file} - {e}")
+# ✅ パス管理モジュールの追加（Noctria Kingdom標準構成）
+from core.path_config import VERITAS_DIR
+import os
+sys.path.append(str(VERITAS_DIR))
 
-    return templates.TemplateResponse("act_history.html", {
-        "request": request,
-        "logs": logs,
-    })
+# ✅ 実行対象スクリプト
+SCRIPT_PATH = VERITAS_DIR / "record_act_log.py"
+
+default_args = {
+    "owner": "Noctria",
+    "depends_on_past": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=1),
+}
+
+with DAG(
+    dag_id="veritas_act_record_dag",
+    default_args=default_args,
+    description="Veritas: 採用戦略をActログに記録",
+    schedule_interval=None,
+    start_date=datetime(2025, 1, 1),
+    catchup=False,
+    tags=["veritas", "act", "pdca"],
+) as dag:
+
+    def run_record_act_log():
+        print(f"⚙️ 実行中: {SCRIPT_PATH}")
+        os.system(f"python {SCRIPT_PATH}")
+
+    record_act = PythonOperator(
+        task_id="record_act_log",
+        python_callable=run_record_act_log,
+    )
+
+    record_act
