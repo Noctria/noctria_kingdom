@@ -1,13 +1,26 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
 import os
 import subprocess
 from datetime import datetime
+from pathlib import Path
+import json
 
-# プロジェクトルートを自動検出
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OFFICIAL_DIR = os.path.join(REPO_ROOT, "strategies", "official")
+# ========================================
+# 📌 Noctria Kingdom - GitHub Push Script
+#   - Veritas戦略を official に移送し、署名付きでGitHubへ反映
+# ========================================
 
+# ✅ プロジェクトルート
+REPO_ROOT = Path(__file__).resolve().parent.parent
+OFFICIAL_DIR = REPO_ROOT / "strategies" / "official"
+SOURCE_DIR = REPO_ROOT / "strategies" / "veritas_generated"
+PUSH_LOG_DIR = REPO_ROOT / "data" / "push_logs"
+PUSH_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# ✅ Gitコマンド実行ユーティリティ
 def run(cmd):
-    """コマンド実行ユーティリティ"""
     print(f"💻 {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True)
@@ -15,45 +28,86 @@ def run(cmd):
     except subprocess.CalledProcessError as e:
         print(f"❌ Command failed: {e}")
 
+# ✅ コミットハッシュ取得
+def get_current_commit_hash():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
+
+# ✅ 署名コメントを挿入（既にある場合はスキップ）
+def insert_signature_comment(filepath: Path, source_path: Path, commit_hash: str):
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    if "# 📝 Veritas Push Info:" in content:
+        print(f"🔹 既に署名済み: {filepath.name}")
+        return
+
+    signature = f'''# 📝 Veritas Push Info:
+# - Date: {datetime.utcnow().date()}
+# - Commit: {commit_hash}
+# - Source: {source_path.relative_to(REPO_ROOT)}'''
+
+    new_content = signature + "\n\n" + content
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
+    print(f"✍️ 署名を追加しました: {filepath.name}")
+
+# ✅ Pushログを保存
+def record_push_log(strategy_name: str, source_path: Path, commit_hash: str):
+    log_data = {
+        "strategy": strategy_name,
+        "pushed_at": datetime.utcnow().isoformat(),
+        "commit": commit_hash,
+        "source": str(source_path.relative_to(REPO_ROOT))
+    }
+    filename = f"{strategy_name.replace('.py', '')}_{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.json"
+    with open(PUSH_LOG_DIR / filename, "w", encoding="utf-8") as f:
+        json.dump(log_data, f, indent=2, ensure_ascii=False)
+    print(f"📜 Pushログを保存しました: {filename}")
+
+# ✅ メイン処理
 def git_push_official_strategies():
     os.chdir(REPO_ROOT)
 
-    # git branch 判定
-    try:
-        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
-    except subprocess.CalledProcessError:
-        print("❌ Gitブランチを取得できませんでした")
-        return
+    commit_hash = get_current_commit_hash()
 
-    # 対象ディレクトリがなければ作成
-    if not os.path.exists(OFFICIAL_DIR):
-        print(f"📁 strategies/official/ が存在しないため作成します")
-        os.makedirs(OFFICIAL_DIR, exist_ok=True)
-        with open(os.path.join(OFFICIAL_DIR, ".gitkeep"), "w") as f:
-            f.write("")
-
-    # .py ファイルの一覧
+    # コピー対象の戦略一覧
     new_files = []
-    for file in os.listdir(OFFICIAL_DIR):
+    for file in os.listdir(SOURCE_DIR):
         if file.endswith(".py"):
-            rel_path = os.path.join("strategies", "official", file)
-            result = subprocess.run(["git", "ls-files", "--error-unmatch", rel_path],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if result.returncode != 0:
-                new_files.append(rel_path)
+            src_path = SOURCE_DIR / file
+            dst_path = OFFICIAL_DIR / file
+
+            # コピー
+            content = src_path.read_text(encoding="utf-8")
+            dst_path.write_text(content, encoding="utf-8")
+
+            # 署名挿入
+            insert_signature_comment(dst_path, src_path, commit_hash)
+
+            new_files.append(dst_path)
+
+            # Pushログ
+            record_push_log(file, src_path, commit_hash)
 
     if not new_files:
         print("✅ 新たにpushすべき戦略ファイルはありません")
         return
 
-    print(f"📦 新規push対象: {new_files}")
+    # Git add/commit/push
     for path in new_files:
-        run(["git", "add", path])
+        rel_path = str(path.relative_to(REPO_ROOT))
+        run(["git", "add", rel_path])
 
-    commit_message = f"🤖 Veritas戦略をofficialに自動反映（{datetime.utcnow().date()}）"
-    run(["git", "commit", "-m", commit_message])
-    run(["git", "push", "origin", branch])
-    print("🚀 GitHubにpush完了")
+    commit_msg = f"🤖 Veritas戦略をofficialに署名付きで反映（{datetime.utcnow().date()}）"
+    run(["git", "commit", "-m", commit_msg])
+    run(["git", "push"])
+
+    print("🚀 GitHubへのPush完了")
 
 if __name__ == "__main__":
     git_push_official_strategies()
