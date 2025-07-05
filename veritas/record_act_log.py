@@ -1,54 +1,85 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+"""
+🧠 Veritas 評価結果を Act ログ（昇格戦略ログ）として記録
+- 対象: veritas_eval_result.json
+- 出力先: /data/act_logs/{戦略名}_{timestamp}.json
+- pushed 状態も push_logs から照合し記録
+"""
+
 import json
 from datetime import datetime
 from pathlib import Path
-from core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR, DATA_DIR
 
-# 📁 保存先ディレクトリ
+# ✅ 王国の地図
+from core.path_config import VERITAS_EVAL_LOG, DATA_DIR
+
 ACT_LOG_DIR = DATA_DIR / "act_logs"
-ACT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+PUSH_LOG_PATH = DATA_DIR / "push_logs" / "push_history.json"
 
-# ✅ 評価ログの読み込み
-def load_latest_eval():
+# ========================================
+# 🔍 push履歴から該当戦略がPushされたか確認
+# ========================================
+def is_pushed(strategy_name: str, timestamp: str) -> bool:
+    if not PUSH_LOG_PATH.exists():
+        return False
+
+    with open(PUSH_LOG_PATH, "r", encoding="utf-8") as f:
+        push_logs = json.load(f)
+
+    for entry in push_logs:
+        if entry.get("strategy") == strategy_name:
+            # 時刻が近ければOK（数秒のズレ容認）
+            pushed_time = datetime.fromisoformat(entry["timestamp"])
+            act_time = datetime.fromisoformat(timestamp)
+            if abs((pushed_time - act_time).total_seconds()) < 30:
+                return True
+    return False
+
+# ========================================
+# 🧠 Actログ生成
+# ========================================
+def record_act_log():
     if not VERITAS_EVAL_LOG.exists():
-        print(f"❌ 評価ログが存在しません: {VERITAS_EVAL_LOG}")
-        return None
+        print(f"❌ 評価ログが見つかりません: {VERITAS_EVAL_LOG}")
+        return
 
     with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as f:
-        return json.load(f)
+        results = json.load(f)
 
-# ✅ 採用戦略ログを保存
-def save_adopted_log(entry: dict):
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    out_path = ACT_LOG_DIR / f"{timestamp}.json"
+    ACT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    count = 0
 
-    # pushed フラグを明示
-    entry["timestamp"] = timestamp
-    entry["pushed"] = False
+    for entry in results:
+        if not entry.get("adopted", False):
+            continue
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(entry, f, indent=2, ensure_ascii=False)
+        timestamp = datetime.utcnow().replace(microsecond=0).isoformat()
+        strategy_name = entry.get("strategy_name", "unknown_strategy.py")
+        act_log = {
+            "timestamp": timestamp,
+            "strategy": strategy_name,
+            "score": entry.get("score", {}),
+            "reason": entry.get("reason", "評価基準を満たしたため"),
+            "pushed": is_pushed(strategy_name, timestamp)
+        }
 
-    print(f"📜 採用戦略ログを記録しました: {out_path}")
+        filename = f"{strategy_name.replace('.py','')}_{timestamp.replace(':','-')}.json"
+        out_path = ACT_LOG_DIR / filename
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(act_log, f, indent=2, ensure_ascii=False)
 
-def main():
-    print("📝 [Veritas] 採用戦略ログ記録フェーズを開始…")
+        count += 1
+        print(f"✅ Actログを記録しました: {out_path}")
 
-    eval_data = load_latest_eval()
-    if not eval_data:
-        return
+    if count == 0:
+        print("ℹ️ 採用された戦略はありませんでした。")
+    else:
+        print(f"📜 王国の記録: {count} 件の昇格ログを記録しました。")
 
-    adopted = eval_data.get("adopted", [])
-    if not adopted:
-        print("📭 採用された戦略がありません")
-        return
-
-    for entry in adopted:
-        save_adopted_log(entry)
-
-    print("👑 採用戦略の記録を完了しました")
-
+# ========================================
+# 🏁 実行
+# ========================================
 if __name__ == "__main__":
-    main()
+    record_act_log()
