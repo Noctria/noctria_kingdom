@@ -10,10 +10,18 @@
     h1 { color: #222; margin-bottom: 1rem; }
     form, table { margin-bottom: 2rem; }
     table { width: 100%; background: #fff; border-collapse: collapse; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; }
+    th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; text-align: left; }
     th { background-color: #e9f2fb; }
     tr:hover { background-color: #f1f7ff; }
-    button { padding: 0.5rem 1rem; margin-right: 1rem; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button {
+      padding: 0.5rem 1rem;
+      margin-right: 1rem;
+      background: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
     button:hover { background: #005f99; }
     canvas { max-width: 1000px; margin: 2rem 0; }
   </style>
@@ -41,10 +49,10 @@
     </label>
 
     <button type="submit">🔍 絞り込み</button>
-    <a href="/statistics/export"><button type="button">📤 CSVエクスポート</button></a>
+    <button type="button" onclick="location.href='/statistics/export'">📤 CSVエクスポート</button>
   </form>
 
-  <!-- 📊 勝率グラフ -->
+  <!-- 📊 勝率バーグラフ -->
   <canvas id="winRateChart"></canvas>
 
   <!-- 🧩 レーダーチャート -->
@@ -63,10 +71,14 @@
     </thead>
     <tbody>
       {% for stat in statistics %}
+        {% set win = stat.win_rate or 0 %}
+        {% set hue = 120 * (win / 100) %}
         <tr>
           <td>{{ stat.strategy }}</td>
           <td>{{ stat.symbol }}</td>
-          <td>{{ "%.2f"|format(stat.win_rate or 0) }}%</td>
+          <td style="background-color: hsl({{ hue }}, 70%, 80%);">
+            {{ "%.2f"|format(win) }}%
+          </td>
           <td>{{ "%.2f"|format(stat.max_drawdown or 0) }}</td>
           <td>{{ stat.num_trades or "―" }}</td>
           <td>{{ stat.date or "―" }}</td>
