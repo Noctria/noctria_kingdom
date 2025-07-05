@@ -1,22 +1,134 @@
-@router.get("/statistics", response_class=HTMLResponse)
-async def show_statistics(
-    request: Request,
-    strategy: Optional[str] = None,
-    symbol: Optional[str] = None
-):
-    all_stats = statistics_service.load_all_statistics()
-    filtered_stats = statistics_service.filter_statistics(
-        sort_by="win_rate",
-        descending=True,
-        strategy=strategy,
-        symbol=symbol
-    )
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>📊 統計スコアダッシュボード - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f5f5f5;
+      padding: 2rem;
+    }
 
-    return templates.TemplateResponse("statistics_dashboard.html", {
-        "request": request,
-        "statistics": filtered_stats,
-        "strategies": statistics_service.get_available_strategies(all_stats),
-        "symbols": statistics_service.get_available_symbols(all_stats),
-        "strategy": strategy,
-        "symbol": symbol,
-    })
+    h1 {
+      color: #222;
+      margin-bottom: 1rem;
+    }
+
+    form {
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: inline-block;
+      margin-right: 1rem;
+    }
+
+    input, select {
+      padding: 0.4rem 0.6rem;
+      margin-right: 1rem;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      background-color: #007acc;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #005f99;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #e9f2fb;
+    }
+
+    tr:hover {
+      background-color: #f1f7ff;
+    }
+
+    .export-btn {
+      float: right;
+      margin-top: -3.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 統計スコアダッシュボード</h1>
+
+  <form method="get" action="/statistics">
+    <label>
+      戦略名:
+      <select name="strategy">
+        <option value="">-- 全て --</option>
+        {% for name in strategies %}
+          <option value="{{ name }}" {% if name == strategy %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      通貨ペア:
+      <select name="symbol">
+        <option value="">-- 全て --</option>
+        {% for sym in symbols %}
+          <option value="{{ sym }}" {% if sym == symbol %}selected{% endif %}>{{ sym }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <button type="submit">🔍 絞り込み</button>
+    <a href="/statistics/export" class="export-btn"><button type="button">📤 CSVエクスポート</button></a>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>戦略名</th>
+        <th>通貨ペア</th>
+        <th>勝率</th>
+        <th>最大DD</th>
+        <th>取引数</th>
+        <th>日付</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for stat in statistics %}
+        <tr>
+          <td>{{ stat.strategy }}</td>
+          <td>{{ stat.symbol }}</td>
+          <td>{{ "%.2f"|format(stat.win_rate or 0) }}%</td>
+          <td>{{ "%.2f"|format(stat.max_drawdown or 0) }}</td>
+          <td>{{ stat.num_trades or "―" }}</td>
+          <td>{{ stat.date or "―" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p><a href="/">← ダッシュボードに戻る</a></p>
+</body>
+</html>
