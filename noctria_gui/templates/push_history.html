@@ -13,6 +13,17 @@
       color: #2c3e50;
       margin-bottom: 1rem;
     }
+    .sort-links {
+      margin-bottom: 1rem;
+    }
+    .sort-links a {
+      margin-right: 1rem;
+      text-decoration: none;
+      color: #007bff;
+    }
+    .sort-links a:hover {
+      text-decoration: underline;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -30,9 +41,6 @@
     tr:hover {
       background-color: #f9f9f9;
     }
-    .filter-bar {
-      margin-bottom: 1rem;
-    }
     .timestamp {
       font-family: monospace;
       color: #555;
@@ -45,9 +53,13 @@
 <body>
   <h1>📤 Git Push 履歴</h1>
 
-  <div class="filter-bar">
-    <!-- 今後クエリによるフィルターなどを実装する際の拡張スペース -->
-    <p>王国に記された Git 操作の記録がここに示されます。</p>
+  <div class="sort-links">
+    並び順:
+    {% if sort_order == 'asc' %}
+      🔼 昇順 | <a href="?sort=desc">🔽 降順に切替</a>
+    {% else %}
+      🔽 降順 | <a href="?sort=asc">🔼 昇順に切替</a>
+    {% endif %}
   </div>
 
   {% if logs %}
