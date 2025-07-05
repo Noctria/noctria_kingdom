@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from noctria_gui.services.airflow_trigger import trigger_dag
-from core.path_config import PDCA_LOG_DIR, VERITAS_ORDER_JSON
 from pathlib import Path
 import json
 
@@ -10,31 +9,33 @@ router = APIRouter()
 templates = Jinja2Templates(directory="noctria_gui/templates")
 templates.env.filters["from_json"] = lambda x: json.loads(x)
 
+# 📁 PDCAログ格納ディレクトリ
+PDCA_LOG_DIR = Path("logs/pdca")
+
+# =============================
+# 🧩 ログ読み込み（履歴取得）
+# =============================
 def load_pdca_logs():
     histories = []
-    if not PDCA_LOG_DIR.exists():
-        return histories
-
-    for file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
-        try:
-            content = json.loads(file.read_text(encoding="utf-8"))
-            histories.append({
-                "id": file.stem,
-                "filename": file.name,
-                "content": content,
-            })
-        except Exception as e:
-            histories.append({
-                "id": file.stem,
-                "filename": file.name,
-                "content": {
-                    "error": f"読み込み失敗: {e}"
-                },
-            })
+    for subdir in sorted(PDCA_LOG_DIR.iterdir(), reverse=True):
+        if subdir.is_dir():
+            for file in subdir.glob("*.json"):
+                try:
+                    content = json.loads(file.read_text(encoding="utf-8"))
+                except Exception as e:
+                    content = {"error": f"読み込み失敗: {e}"}
+                histories.append({
+                    "id": subdir.name,
+                    "filename": file.name,
+                    "content": content
+                })
     return histories
 
+# =============================
+# 📺 GET: ダッシュボード表示
+# =============================
 @router.get("/pdca", response_class=HTMLResponse)
-async def pdca_dashboard(request: Request):
+def dashboard(request: Request):
     histories = load_pdca_logs()
     return templates.TemplateResponse("pdca_dashboard.html", {
         "request": request,
@@ -42,31 +43,46 @@ async def pdca_dashboard(request: Request):
         "message": None
     })
 
+# =============================
+# ⚙️ POST: 全体PDCA実行（通常）
+# =============================
 @router.post("/pdca", response_class=HTMLResponse)
-async def trigger_pdca(request: Request):
+def trigger_pdca(request: Request):
     result = trigger_dag("veritas_pdca_dag")
     histories = load_pdca_logs()
     return templates.TemplateResponse("pdca_dashboard.html", {
         "request": request,
         "histories": histories,
-        "message": result
+        "message": f"通常実行: {result}"
     })
 
-# ✅ 再実行API：指定されたログファイルで EA命令JSON を上書き
+# =============================
+# 📤 POST: 特定命令の再実行
+# =============================
 @router.post("/pdca/replay", response_class=HTMLResponse)
-async def replay_pdca(filename: str = Form(...)):
-    log_path = PDCA_LOG_DIR / filename
-    if not log_path.exists():
-        return HTMLResponse(content=f"ログが見つかりません: {filename}", status_code=404)
+def replay_pdca(request: Request, filename: str = Form(...)):
+    # 🔍 ファイル検索
+    found = None
+    for subdir in PDCA_LOG_DIR.iterdir():
+        file_path = subdir / filename
+        if file_path.exists():
+            found = file_path
+            break
 
-    try:
-        with open(log_path, "r", encoding="utf-8") as f:
-            content = json.load(f)
+    if not found:
+        histories = load_pdca_logs()
+        return templates.TemplateResponse("pdca_dashboard.html", {
+            "request": request,
+            "histories": histories,
+            "message": f"❌ 再実行失敗: {filename} が見つかりませんでした"
+        })
 
-        VERITAS_ORDER_JSON.parent.mkdir(parents=True, exist_ok=True)
-        with open(VERITAS_ORDER_JSON, "w", encoding="utf-8") as out:
-            json.dump(content, out, indent=2, ensure_ascii=False)
+    # ✅ DAGにXCom/変数として渡す処理（将来的に拡張）
+    result = trigger_dag("veritas_pdca_dag")  # TODO: 内容を反映させる場合は Airflow Variable or XCom の活用が必要
 
-        return RedirectResponse(url="/pdca", status_code=303)
-    except Exception as e:
-        return HTMLResponse(content=f"再実行失敗: {e}", status_code=500)
+    histories = load_pdca_logs()
+    return templates.TemplateResponse("pdca_dashboard.html", {
+        "request": request,
+        "histories": histories,
+        "message": f"📤 {filename} を再実行しました → {result}"
+    })
