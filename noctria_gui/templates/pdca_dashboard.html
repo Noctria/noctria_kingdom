@@ -46,13 +46,29 @@
     tr:hover {
       background-color: #eef;
     }
-    .error {
-      color: red;
-      font-style: italic;
-    }
     .message {
       margin-bottom: 1rem;
       color: green;
+    }
+
+    /* モーダル */
+    #modal {
+      display: none;
+      position: fixed;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      background: white;
+      padding: 1rem;
+      border: 2px solid #444;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      z-index: 999;
+    }
+    #modal-content {
+      background: #eee;
+      padding: 1rem;
+      white-space: pre-wrap;
+      font-family: monospace;
     }
   </style>
 </head>
@@ -61,14 +77,15 @@
   <h1>📜 Noctria Kingdom - Veritas PDCA履歴</h1>
 
   {% if message %}
-    <div class="message">🟢 DAG実行結果: {{ message }}</div>
+    <div class="message">🟢 {{ message }}</div>
   {% endif %}
 
-  <!-- DAGトリガー -->
+  <!-- DAG実行ボタン -->
   <form method="post">
     <button type="submit">⚙️ Veritas PDCA を実行</button>
   </form>
 
+  <!-- PDCA履歴テーブル -->
   <table>
     <thead>
       <tr>
@@ -79,7 +96,8 @@
         <th>⚖️ ロット</th>
         <th>🎯 TP</th>
         <th>🛡 SL</th>
-        <th>🔁 再実行</th>
+        <th>🔍 詳細</th>
+        <th>📤 再実行</th>
       </tr>
     </thead>
     <tbody>
@@ -92,6 +110,13 @@
           <td>{{ log.content.lot or "-" }}</td>
           <td>{{ log.content.tp or "-" }}</td>
           <td>{{ log.content.sl or "-" }}</td>
+
+          <!-- 🔍 モーダル表示ボタン -->
+          <td>
+            <button onclick='showDetail({{ log.content | tojson | safe }})'>🔍 詳細</button>
+          </td>
+
+          <!-- 📤 再実行ボタン -->
           <td>
             <form method="post" action="/pdca/replay" style="margin: 0;">
               <input type="hidden" name="filename" value="{{ log.filename }}">
@@ -102,6 +127,22 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <!-- モーダル -->
+  <div id="modal">
+    <h3>📦 EA命令の詳細</h3>
+    <pre id="modal-content"></pre>
+    <button onclick="document.getElementById('modal').style.display='none'">❌ 閉じる</button>
+  </div>
+
+  <script>
+    function showDetail(data) {
+      const pre = document.getElementById("modal-content");
+      const modal = document.getElementById("modal");
+      pre.textContent = JSON.stringify(data, null, 2);
+      modal.style.display = "block";
+    }
+  </script>
 
 </body>
 </html>
