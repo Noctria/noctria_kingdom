@@ -1,9 +1,15 @@
-# scripts/apply_best_params_to_kingdom.py
+#!/usr/bin/env python3
+# coding: utf-8
 
 import shutil
 from pathlib import Path
 import json
+
 from core.path_config import LOGS_DIR, MODELS_DIR, STRATEGIES_DIR
+from core.logger import setup_logger  # 🏰 王国記録係の導入
+
+# ✅ 王国記録の保存先を定義
+logger = setup_logger("kingdom_logger", LOGS_DIR / "pdca" / "kingdom_apply.log")
 
 def apply_best_params_to_kingdom():
     """
@@ -22,24 +28,36 @@ def apply_best_params_to_kingdom():
     params_src = LOGS_DIR / "best_params.json"
     params_dst = STRATEGIES_DIR / "official" / "best_params.json"
 
+    logger.info("👑 王命: 最適戦略の王国昇格処理を開始する")
+
     # モデル反映
     if model_src.exists():
-        model_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(model_src, model_dst)
-        print(f"📦 モデルを {model_dst} に反映しました。")
+        try:
+            model_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(model_src, model_dst)
+            logger.info(f"📦 モデルを正式戦略として反映: {model_dst}")
+        except Exception as e:
+            logger.error(f"❌ モデル反映失敗: {e}")
+            raise
     else:
-        print(f"❌ モデルが存在しません: {model_src}")
+        logger.error(f"❌ モデルが存在しません: {model_src}")
 
     # パラメータ反映
     if params_src.exists():
-        params_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(params_src, params_dst)
-        print(f"📘 パラメータを {params_dst} に反映しました。")
+        try:
+            params_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(params_src, params_dst)
+            logger.info(f"📘 パラメータを正式戦略として反映: {params_dst}")
+        except Exception as e:
+            logger.error(f"❌ パラメータ反映失敗: {e}")
+            raise
     else:
-        print(f"❌ パラメータが存在しません: {params_src}")
+        logger.error(f"❌ パラメータが存在しません: {params_src}")
 
-    print("🏁 王国への反映処理が完了しました。")
+    logger.info("🎉 王国への反映処理が完了しました")
 
 # ✅ テスト用実行
 if __name__ == "__main__":
+    logger.info("⚔️ CLI起動: 王国への戦略昇格を実行中")
     apply_best_params_to_kingdom()
+    logger.info("🌟 王国戦略の昇格処理が正常に終了しました")
