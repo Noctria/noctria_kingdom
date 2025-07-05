@@ -1,131 +1,81 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>Noctria Kingdom - 採用戦略ログ</title>
+  <meta charset="UTF-8">
+  <title>📜 採用戦略ログ - Noctria Kingdom</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f0f0f5;
       padding: 2rem;
+      background-color: #f4f4f4;
     }
     h1 {
-      color: #333;
+      color: #222;
+    }
+    form.filter {
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 1rem;
-      background-color: #fff;
+      background-color: white;
     }
     th, td {
-      padding: 0.6rem;
+      padding: 0.5rem;
       border: 1px solid #ccc;
-      text-align: left;
+      text-align: center;
     }
     th {
       background-color: #e0e0e0;
     }
-    .btn {
-      padding: 0.3rem 0.6rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+    button {
+      padding: 0.4rem 0.8rem;
     }
-    .btn:disabled {
-      background-color: #aaa;
-      cursor: not-allowed;
-    }
-    .filters {
-      margin-bottom: 1rem;
-    }
-    .filters form, .filters .links {
-      display: inline-block;
-      margin-right: 2rem;
-    }
-    .filters input[type="text"] {
-      padding: 0.3rem;
-    }
-    .pushed-true {
-      color: green;
-      font-weight: bold;
-    }
-    .pushed-false {
-      color: red;
-      font-weight: bold;
-    }
-    .forced-true {
-      background-color: #fff3cd;
+    .action-form {
+      display: inline;
     }
   </style>
 </head>
 <body>
-  <h1>📜 採用戦略ログ - Act履歴</h1>
+  <h1>📜 Veritas 採用戦略ログ</h1>
 
-  <div class="filters">
-    <form method="get" action="/act-history">
-      <input type="text" name="strategy" placeholder="戦略名でフィルター" value="{{ strategy or '' }}">
-      <select name="pushed">
-        <option value="">Push状態を選択</option>
-        <option value="true" {% if pushed == 'true' %}selected{% endif %}>✅ Pushed</option>
-        <option value="false" {% if pushed == 'false' %}selected{% endif %}>❌ Not Pushed</option>
-      </select>
-      <select name="sort_by">
-        <option value="timestamp" {% if sort_by == 'timestamp' %}selected{% endif %}>日時</option>
-        <option value="strategy" {% if sort_by == 'strategy' %}selected{% endif %}>戦略名</option>
-      </select>
-      <select name="order">
-        <option value="desc" {% if order == 'desc' %}selected{% endif %}>降順</option>
-        <option value="asc" {% if order == 'asc' %}selected{% endif %}>昇順</option>
-      </select>
-      <button class="btn" type="submit">適用</button>
-    </form>
-
-    <div class="links">
-      <a href="/act-history">🔄 全表示</a> |
-      <a href="/act-history?pushed=false">🕳️ 未Pushのみ</a>
-    </div>
-  </div>
+  <form method="get" action="/act-history" class="filter">
+    <label>
+      <input type="checkbox" name="only_unpushed" value="true" {% if only_unpushed %}checked{% endif %}>
+      未Pushのみ表示
+    </label>
+    <button type="submit">絞り込み</button>
+    <a href="/act-history/export">CSV出力</a>
+  </form>
 
   <table>
     <thead>
       <tr>
-        <th>日時</th>
         <th>戦略名</th>
-        <th>評価スコア</th>
-        <th>昇格理由</th>
-        <th>Push状態</th>
+        <th>通貨ペア</th>
+        <th>昇格日時</th>
+        <th>Push済</th>
         <th>操作</th>
       </tr>
     </thead>
     <tbody>
       {% for log in logs %}
-      <tr class="{% if log.forced %}forced-true{% endif %}">
-        <td>{{ log.timestamp }}</td>
+      <tr>
         <td>{{ log.strategy }}</td>
+        <td>{{ log.symbol }}</td>
+        <td>{{ log.timestamp }}</td>
+        <td>{{ "✅" if log.pushed else "❌" }}</td>
         <td>
-          {% for key, val in log.score.items() %}
-            {{ key }}: {{ val }}<br>
-          {% endfor %}
-        </td>
-        <td>{{ log.reason }}</td>
-        <td class="pushed-{{ log.pushed }}">
-          {% if log.pushed %}✅ Pushed{% else %}❌ Not Pushed{% endif %}
-        </td>
-        <td>
-          {% if not log.pushed %}
-          <form method="post" action="/act-history/push" style="display:inline;">
-            <input type="hidden" name="filename" value="{{ log.__filename }}">
-            <button class="btn" type="submit">📤 Push</button>
+          <form method="post" action="/act-history/repush" class="action-form">
+            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+            <button type="submit">再Push可に</button>
           </form>
-          {% endif %}
-          <form method="post" action="/act-history/force-record" style="display:inline;">
-            <input type="hidden" name="strategy" value="{{ log.strategy }}">
-            <input type="hidden" name="score" value='{{ log.score | tojson }}'>
-            <input type="hidden" name="reason" value="再評価により強制昇格">
-            <button class="btn" type="submit">⚠️ 再記録</button>
+          <form method="post" action="/act-history/reevaluate" class="action-form">
+            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+            <button type="submit">再評価</button>
           </form>
         </td>
       </tr>
