@@ -6,6 +6,7 @@
 - 対象: veritas_eval_result.json
 - 出力先: /data/act_logs/{戦略名}_{timestamp}.json
 - pushed 状態も push_logs から照合し記録
+- 重複記録の防止機構付き
 """
 
 import json
@@ -17,6 +18,16 @@ from core.path_config import VERITAS_EVAL_LOG, DATA_DIR
 
 ACT_LOG_DIR = DATA_DIR / "act_logs"
 PUSH_LOG_PATH = DATA_DIR / "push_logs" / "push_history.json"
+
+# ========================================
+# 🔍 すでに記録済みかをチェック
+# ========================================
+def is_already_recorded(strategy_name: str) -> bool:
+    if not ACT_LOG_DIR.exists():
+        return False
+    for file in ACT_LOG_DIR.glob(f"{strategy_name.replace('.py','')}_*.json"):
+        return True
+    return False
 
 # ========================================
 # 🔍 push履歴から該当戦略がPushされたか確認
@@ -33,7 +44,7 @@ def is_pushed(strategy_name: str, timestamp: str) -> bool:
             # 時刻が近ければOK（数秒のズレ容認）
             pushed_time = datetime.fromisoformat(entry["timestamp"])
             act_time = datetime.fromisoformat(timestamp)
-            if abs((pushed_time - act_time).total_seconds()) < 30:
+            if abs((pushed_time - act_time).total_seconds()) < 60:
                 return True
     return False
 
@@ -55,8 +66,14 @@ def record_act_log():
         if not entry.get("adopted", False):
             continue
 
-        timestamp = datetime.utcnow().replace(microsecond=0).isoformat()
         strategy_name = entry.get("strategy_name", "unknown_strategy.py")
+
+        if is_already_recorded(strategy_name):
+            print(f"⚠️ すでに記録済のためスキップ: {strategy_name}")
+            continue
+
+        timestamp = datetime.utcnow().replace(microsecond=0).isoformat()
+
         act_log = {
             "timestamp": timestamp,
             "strategy": strategy_name,
@@ -74,7 +91,7 @@ def record_act_log():
         print(f"✅ Actログを記録しました: {out_path}")
 
     if count == 0:
-        print("ℹ️ 採用された戦略はありませんでした。")
+        print("ℹ️ 採用された新規戦略はありませんでした。")
     else:
         print(f"📜 王国の記録: {count} 件の昇格ログを記録しました。")
 
