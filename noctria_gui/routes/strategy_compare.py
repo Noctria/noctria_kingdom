@@ -9,20 +9,22 @@
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from typing import List
 from pathlib import Path
 import json
 
 from core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-router = APIRouter(tags=["strategy-compare"])
+# ✅ FastAPIルーター初期化
+router = APIRouter(tags=["strategy_compare"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# 共通パス
+# ✅ 戦略ファイルディレクトリ
 veritas_dir = STRATEGIES_DIR / "veritas_generated"
 
 
 @router.get("/strategies/compare", response_class=HTMLResponse)
-async def compare_form(request: Request):
+async def compare_select(request: Request):
     """
     📑 戦略選択フォーム
     - 複数戦略から比較対象を選択
@@ -32,20 +34,22 @@ async def compare_form(request: Request):
         try:
             with open(file, encoding="utf-8") as f:
                 j = json.load(f)
-                options.append(j.get("strategy"))
-        except Exception:
-            continue
+                strategy_name = j.get("strategy")
+                if strategy_name:
+                    options.append(j)
+        except Exception as e:
+            print(f"⚠️ 読み込み失敗: {file.name} - {e}")
 
     return templates.TemplateResponse("strategies/compare_form.html", {
         "request": request,
-        "options": sorted(options)
+        "strategies": sorted(options, key=lambda x: x.get("strategy", ""))
     })
 
 
 @router.post("/strategies/compare/result", response_class=HTMLResponse)
-async def compare_result(request: Request, strategies: list[str] = Form(...)):
+async def compare_result(request: Request, strategies: List[str] = Form(...)):
     """
-    📈 選択戦略の比較グラフ結果を表示（棒グラフ＋レーダー）
+    📈 選択戦略の比較グラフを表示（棒グラフ＋レーダー）
     """
     selected = []
     for name in strategies:
@@ -55,11 +59,12 @@ async def compare_result(request: Request, strategies: list[str] = Form(...)):
                 with open(file, encoding="utf-8") as f:
                     data = json.load(f)
                     selected.append(data)
-            except Exception:
+            except Exception as e:
+                print(f"⚠️ ロード失敗: {file.name} - {e}")
                 continue
 
     if not selected:
-        raise HTTPException(status_code=404, detail="有効な戦略が選択されていません")
+        raise HTTPException(status_code=404, detail="⚠️ 有効な戦略が選択されていません")
 
     return templates.TemplateResponse("strategies/compare_result.html", {
         "request": request,
@@ -70,15 +75,16 @@ async def compare_result(request: Request, strategies: list[str] = Form(...)):
 @router.get("/strategies/compare/radar", response_class=HTMLResponse)
 async def compare_radar_sample(request: Request):
     """
-    🧩 レーダーチャートのサンプル表示（全戦略から一部を自動選出）
+    🧩 レーダーチャートのサンプル表示（全戦略から上位5件を抽出）
     """
     selected = []
-    for file in list(veritas_dir.glob("*.json"))[:5]:  # 上位5件サンプル
+    for file in list(veritas_dir.glob("*.json"))[:5]:
         try:
             with open(file, encoding="utf-8") as f:
                 data = json.load(f)
                 selected.append(data)
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ レーダー用読み込み失敗: {file.name} - {e}")
             continue
 
     return templates.TemplateResponse("strategies/compare_result.html", {
