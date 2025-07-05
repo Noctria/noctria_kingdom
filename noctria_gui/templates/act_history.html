@@ -6,30 +6,43 @@
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f8f8f8;
+      background-color: #f4f4f4;
       padding: 2rem;
     }
     h1 {
       color: #2c3e50;
-      margin-bottom: 1rem;
+    }
+    .filters {
+      margin: 1rem 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    label {
+      font-weight: bold;
+    }
+    input, select {
+      padding: 0.3rem;
+      font-size: 0.9rem;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      background-color: #fff;
+      background-color: white;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     th, td {
       padding: 0.75rem;
-      border-bottom: 1px solid #ddd;
+      border-bottom: 1px solid #ccc;
       text-align: left;
     }
     th {
-      background-color: #34495e;
+      background-color: #2c3e50;
       color: white;
+      cursor: pointer;
     }
     tr:hover {
-      background-color: #f1f1f1;
+      background-color: #f0f0f0;
     }
     .timestamp {
       font-size: 0.9em;
@@ -45,15 +58,26 @@
 
   <h1>📜 昇格戦略の記録</h1>
 
+  <div class="filters">
+    <label for="strategyFilter">戦略名:</label>
+    <input type="text" id="strategyFilter" placeholder="例: sample_">
+
+    <label for="fromDate">昇格日（開始）:</label>
+    <input type="date" id="fromDate">
+
+    <label for="toDate">昇格日（終了）:</label>
+    <input type="date" id="toDate">
+  </div>
+
   {% if act_logs %}
-    <table>
+    <table id="actTable">
       <thead>
         <tr>
-          <th>昇格日時</th>
-          <th>戦略名</th>
-          <th>勝率</th>
-          <th>最大DD</th>
-          <th>スコア</th>
+          <th onclick="sortTable(0)">昇格日時</th>
+          <th onclick="sortTable(1)">戦略名</th>
+          <th onclick="sortTable(2)">勝率</th>
+          <th onclick="sortTable(3)">最大DD</th>
+          <th onclick="sortTable(4)">スコア</th>
           <th>昇格理由</th>
         </tr>
       </thead>
@@ -73,6 +97,48 @@
   {% else %}
     <p>現在、昇格された戦略は記録されていません。</p>
   {% endif %}
+
+  <script>
+    function sortTable(colIndex) {
+      const table = document.getElementById("actTable");
+      const tbody = table.tBodies[0];
+      const rows = Array.from(tbody.rows);
+      const asc = table.getAttribute("data-sort-dir") !== "asc";
+
+      rows.sort((a, b) => {
+        let aText = a.cells[colIndex].innerText;
+        let bText = b.cells[colIndex].innerText;
+        let aVal = parseFloat(aText) || Date.parse(aText) || aText;
+        let bVal = parseFloat(bText) || Date.parse(bText) || bText;
+        return asc ? aVal - bVal : bVal - aVal;
+      });
+
+      rows.forEach(row => tbody.appendChild(row));
+      table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
+    }
+
+    function filterTable() {
+      const strategy = document.getElementById("strategyFilter").value.toLowerCase();
+      const from = document.getElementById("fromDate").value;
+      const to = document.getElementById("toDate").value;
+      const rows = document.querySelectorAll("#actTable tbody tr");
+
+      rows.forEach(row => {
+        const date = row.cells[0].innerText.slice(0, 10);
+        const strategyName = row.cells[1].innerText.toLowerCase();
+
+        const matchStrategy = strategyName.includes(strategy);
+        const matchFrom = !from || date >= from;
+        const matchTo = !to || date <= to;
+
+        row.style.display = (matchStrategy && matchFrom && matchTo) ? "" : "none";
+      });
+    }
+
+    document.getElementById("strategyFilter").addEventListener("input", filterTable);
+    document.getElementById("fromDate").addEventListener("change", filterTable);
+    document.getElementById("toDate").addEventListener("change", filterTable);
+  </script>
 
 </body>
 </html>
