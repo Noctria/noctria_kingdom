@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📘 戦略詳細 - {{ strategy.strategy }}</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #222;
+    }
+    .summary {
+      margin-bottom: 1.5rem;
+    }
+    .summary dt {
+      font-weight: bold;
+    }
+    .summary dd {
+      margin: 0 0 1rem 0.5rem;
+    }
+    .tag {
+      display: inline-block;
+      background-color: #007acc;
+      color: white;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+    }
+    .back-link {
+      margin-top: 2rem;
+      display: inline-block;
+      color: #007acc;
+      text-decoration: none;
+    }
+    pre.json-view {
+      background-color: #eee;
+      padding: 1rem;
+      overflow-x: auto;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📘 戦略詳細：{{ strategy.strategy }}</h1>
+
+  <dl class="summary">
+    <dt>通貨ペア:</dt>
+    <dd>{{ strategy.symbol }}</dd>
+
+    <dt>勝率:</dt>
+    <dd>{{ "%.2f"|format(strategy.win_rate * 100) }}%</dd>
+
+    <dt>取引回数:</dt>
+    <dd>{{ strategy.trade_count }}</dd>
+
+    <dt>最大ドローダウン:</dt>
+    <dd>{{ "%.2f"|format(strategy.max_drawdown * 100) }}%</dd>
+
+    <dt>評価日時:</dt>
+    <dd>{{ strategy.timestamp }}</dd>
+
+    <dt>タグ:</dt>
+    <dd>
+      {% for tag in strategy.tags %}
+        <span class="tag">{{ tag }}</span>
+      {% endfor %}
+    </dd>
+  </dl>
+
+  <h2>📄 JSON 表示</h2>
+  <pre class="json-view">{{ strategy | tojson(indent=2) }}</pre>
+
+  <a class="back-link" href="/statistics">← 統計一覧に戻る</a>
+</body>
+</html>
