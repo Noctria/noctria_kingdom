@@ -1,44 +1,44 @@
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-import sys
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
+import json
+from datetime import datetime
 
-# ========================================
-# 🔁 DAG構成：Actフェーズ記録ログを保存
-# ========================================
+from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, DATA_DIR
 
-# ✅ パス管理モジュールの追加（Noctria Kingdom標準構成）
-from core.path_config import VERITAS_DIR
-import os
-sys.path.append(str(VERITAS_DIR))
+router = APIRouter()
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ 実行対象スクリプト
-SCRIPT_PATH = VERITAS_DIR / "record_act_log.py"
+# 🗂️ Actログディレクトリ
+ACT_LOG_DIR = DATA_DIR / "act_logs"
 
-default_args = {
-    "owner": "Noctria",
-    "depends_on_past": False,
-    "retries": 1,
-    "retry_delay": timedelta(minutes=1),
-}
+@router.get("/act-history", response_class=HTMLResponse)
+async def show_act_history(request: Request):
+    act_files = sorted(ACT_LOG_DIR.glob("*.json"), reverse=True)
+    act_logs = []
 
-with DAG(
-    dag_id="veritas_act_record_dag",
-    default_args=default_args,
-    description="Veritas: 採用戦略をActログに記録",
-    schedule_interval=None,
-    start_date=datetime(2025, 1, 1),
-    catchup=False,
-    tags=["veritas", "act", "pdca"],
-) as dag:
+    for file in act_files:
+        with open(file, "r", encoding="utf-8") as f:
+            try:
+                content = json.load(f)
+                content["filename"] = file.name
+                content["timestamp"] = extract_timestamp_from_filename(file.name)
+                act_logs.append(content)
+            except Exception as e:
+                print(f"❌ JSON読み込み失敗: {file.name} - {e}")
 
-    def run_record_act_log():
-        print(f"⚙️ 実行中: {SCRIPT_PATH}")
-        os.system(f"python {SCRIPT_PATH}")
+    return templates.TemplateResponse("act_history.html", {
+        "request": request,
+        "act_logs": act_logs,
+    })
 
-    record_act = PythonOperator(
-        task_id="record_act_log",
-        python_callable=run_record_act_log,
-    )
 
-    record_act
+def extract_timestamp_from_filename(name: str) -> str:
+    """ファイル名から日時部分を抽出"""
+    try:
+        base = name.replace(".json", "")
+        dt = datetime.strptime(base, "%Y-%m-%dT%H-%M-%S")
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        return "Unknown"
