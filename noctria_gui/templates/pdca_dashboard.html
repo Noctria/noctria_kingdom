@@ -51,24 +51,21 @@
       color: green;
     }
 
-    /* モーダル */
-    #modal {
-      display: none;
-      position: fixed;
-      top: 10%;
-      left: 10%;
-      width: 80%;
-      background: white;
-      padding: 1rem;
-      border: 2px solid #444;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
-      z-index: 999;
-    }
-    #modal-content {
-      background: #eee;
-      padding: 1rem;
-      white-space: pre-wrap;
+    dialog {
+      width: 60%;
+      border: none;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 0 15px rgba(0,0,0,0.4);
       font-family: monospace;
+    }
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.3);
+    }
+    .modal-actions {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: space-between;
     }
   </style>
 </head>
@@ -80,7 +77,6 @@
     <div class="message">🟢 {{ message }}</div>
   {% endif %}
 
-  <!-- DAGトリガー -->
   <form method="post">
     <button type="submit">⚙️ Veritas PDCA を実行</button>
   </form>
@@ -110,14 +106,16 @@
           <td>{{ log.content.tp or "-" }}</td>
           <td>{{ log.content.sl or "-" }}</td>
 
-          <!-- 🔍 モーダルボタン -->
+          <!-- 🔍 詳細表示ボタン -->
           <td>
-            <button onclick='showDetail({{ log.content | tojson | safe }}, "{{ log.filename }}")'>🔍 詳細</button>
+            <button type="button" onclick='openModal({{ log.content | tojson | safe }}, "{{ log.filename }}")'>
+              🔍 詳細
+            </button>
           </td>
 
-          <!-- 📤 再実行ボタン -->
+          <!-- 📤 直接再実行 -->
           <td>
-            <form method="post" action="/pdca/replay" style="margin: 0;">
+            <form method="post" action="/pdca/replay" style="margin:0;">
               <input type="hidden" name="filename" value="{{ log.filename }}">
               <button type="submit">📤 再実行</button>
             </form>
@@ -127,23 +125,24 @@
     </tbody>
   </table>
 
-  <!-- 🪟 モーダルウィンドウ -->
-  <div id="modal">
+  <!-- 🪟 モーダル（dialog） -->
+  <dialog id="pdca-dialog">
     <h3>📦 EA命令の詳細</h3>
-    <pre id="modal-content"></pre>
-    <form method="post" action="/pdca/replay">
-      <input type="hidden" name="filename" id="modal-filename" value="">
+    <pre id="modal-content" style="background:#eee; padding:1rem;"></pre>
+
+    <form method="post" action="/pdca/replay" class="modal-actions">
+      <input type="hidden" name="filename" id="modal-filename" />
       <button type="submit">📤 この内容で再実行</button>
+      <button type="button" onclick="document.getElementById('pdca-dialog').close()">❌ 閉じる</button>
     </form>
-    <br />
-    <button onclick="document.getElementById('modal').style.display='none'">❌ 閉じる</button>
-  </div>
+  </dialog>
 
   <script>
-    function showDetail(data, filename) {
+    function openModal(data, filename) {
+      const dialog = document.getElementById("pdca-dialog");
       document.getElementById("modal-content").textContent = JSON.stringify(data, null, 2);
       document.getElementById("modal-filename").value = filename;
-      document.getElementById("modal").style.display = "block";
+      dialog.showModal();
     }
   </script>
 
