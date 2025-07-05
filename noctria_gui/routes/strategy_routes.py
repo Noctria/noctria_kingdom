@@ -25,8 +25,7 @@ veritas_dir = STRATEGIES_DIR / "veritas_generated"
 @router.get("/strategies", response_class=HTMLResponse)
 async def list_strategies(request: Request):
     """
-    📋 戦略ファイル一覧表示
-    - veritas_generated 内の .py 戦略ファイル一覧を表示
+    📋 戦略ファイル一覧表示（.pyファイルのみ）
     """
     if not veritas_dir.exists():
         raise HTTPException(status_code=500, detail="戦略ディレクトリが存在しません")
@@ -43,9 +42,11 @@ async def list_strategies(request: Request):
 @router.get("/strategies/view", response_class=HTMLResponse)
 async def view_strategy(request: Request, name: str):
     """
-    🔍 指定戦略ファイルの内容を表示
-    - /strategies/view?name=example.py
+    🔍 指定戦略ファイルの内容を表示（.py）
     """
+    if ".." in name or "/" in name or "\\" in name:
+        raise HTTPException(status_code=400, detail="不正なファイル名です")
+
     target_file = veritas_dir / name
 
     if not target_file.exists() or target_file.suffix != ".py":
@@ -67,7 +68,6 @@ async def view_strategy(request: Request, name: str):
 async def strategy_overview(request: Request):
     """
     📊 メタ情報付きの戦略一覧表示
-    - 勝率、最大DD、取引数などをまとめて表示
     """
     data = []
 
@@ -76,6 +76,11 @@ async def strategy_overview(request: Request):
             with open(file, encoding="utf-8") as f:
                 j = json.load(f)
                 j["json_name"] = file.name
+                j["strategy"] = j.get("strategy", file.stem)
+                j["tags"] = j.get("tags", [])
+                j["win_rate"] = j.get("win_rate", None)
+                j["num_trades"] = j.get("num_trades", None)
+                j["max_drawdown"] = j.get("max_drawdown", None)
                 data.append(j)
         except Exception as e:
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
@@ -97,12 +102,18 @@ async def strategy_search(request: Request, keyword: str = Query(default="")):
         try:
             with open(file, encoding="utf-8") as f:
                 j = json.load(f)
-                strategy_name = j.get("strategy", "")
+                name = j.get("strategy", file.stem)
                 tags = j.get("tags", [])
-                if keyword.lower() in strategy_name.lower() or any(keyword.lower() in t.lower() for t in tags):
+                if keyword.lower() in name.lower() or any(keyword.lower() in t.lower() for t in tags):
+                    j["strategy"] = name
+                    j["tags"] = tags
+                    j["json_name"] = file.name
+                    j["win_rate"] = j.get("win_rate", None)
+                    j["num_trades"] = j.get("num_trades", None)
+                    j["max_drawdown"] = j.get("max_drawdown", None)
                     matched.append(j)
         except Exception as e:
-            print(f"⚠️ 検索中に読み込み失敗: {file.name} - {e}")
+            print(f"⚠️ 検索読み込み失敗: {file.name} - {e}")
 
     return templates.TemplateResponse("strategies/strategies_overview.html", {
         "request": request,
@@ -114,8 +125,11 @@ async def strategy_search(request: Request, keyword: str = Query(default="")):
 @router.get("/strategies/export", response_class=FileResponse)
 async def export_strategy(name: str):
     """
-    📤 戦略ファイル（.py or .json）をダウンロード
+    📤 Python または JSON 戦略ファイルのダウンロード
     """
+    if ".." in name or "/" in name or "\\" in name:
+        raise HTTPException(status_code=400, detail="不正なファイル名です")
+
     target = veritas_dir / name
     if not target.exists():
         raise HTTPException(status_code=404, detail="ファイルが存在しません")
