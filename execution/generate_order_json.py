@@ -9,12 +9,14 @@ import pandas as pd
 # ⚔️ Veritas戦略 → EA命令JSON生成スクリプト
 # ========================================
 
-# 📌 設定（Windows側共有ディレクトリに出力）
-SIGNAL_OUTPUT_PATH = Path("/mnt/d/MT5_shared/veritas_signal.json")
-STRATEGY_PATH = Path("strategies/official/")  # 昇格戦略の格納場所
-TARGET_STRATEGY = "strategy_001.py"           # 実行対象戦略（ファイル名）
+# ✅ 正しいMT5の "Files" ディレクトリに出力
+SIGNAL_OUTPUT_PATH = Path(
+    "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files/veritas_signal.json"
+)
+STRATEGY_PATH = Path("strategies/official/")
+TARGET_STRATEGY = "strategy_001.py"  # 実行対象戦略（任意に変更可）
 
-# 🗃 市場データ（簡易ダミーで可）
+# 🗃 ダミー市場データ
 def load_dummy_market_data():
     dates = pd.date_range(start="2025-01-01", periods=100, freq="H")
     data = pd.DataFrame({
@@ -25,17 +27,17 @@ def load_dummy_market_data():
     }, index=dates)
     return data
 
-# 🔄 動的インポート（simulate関数を取得）
+# 🔄 simulate関数のロード
 def load_simulate_function(filepath):
     spec = importlib.util.spec_from_file_location("strategy_module", filepath)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.simulate
 
-# 🧠 戦略実行＆シグナル抽出（ここはカスタム可能）
+# 🧠 シグナル抽出
 def extract_signal(result_dict):
     return {
-        "signal": result_dict.get("signal", "BUY"),   # 仮に"BUY"を返す戦略とする
+        "signal": result_dict.get("signal", "BUY"),
         "symbol": result_dict.get("symbol", "USDJPY"),
         "lot": result_dict.get("lot", 0.1),
         "tp": result_dict.get("tp", 10),
