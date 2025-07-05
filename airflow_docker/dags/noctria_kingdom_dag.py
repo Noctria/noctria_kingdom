@@ -29,8 +29,7 @@ dag = DAG(
     tags=['noctria', 'kingdom', 'veritas']
 )
 
-log_file_path = LOGS_DIR / "noctria_decision.log"
-logger = setup_logger("NoctriaDecision", str(log_file_path))
+logger = setup_logger("NoctriaDecision")
 
 OFFICIAL_DIR = STRATEGIES_DIR / "official"
 
