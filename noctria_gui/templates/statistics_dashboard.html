@@ -9,8 +9,18 @@
     body { font-family: "Segoe UI", sans-serif; background-color: #f5f5f5; padding: 2rem; }
     h1 { color: #222; margin-bottom: 1rem; }
     form, table { margin-bottom: 2rem; }
-    table { width: 100%; background: #fff; border-collapse: collapse; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    th, td { padding: 0.75rem; border-bottom: 1px solid #ddd; text-align: left; }
+    table {
+      width: 100%;
+      background: #fff;
+      border-collapse: collapse;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 0.75rem;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
     th { background-color: #e9f2fb; }
     tr:hover { background-color: #f1f7ff; }
     button {
@@ -24,6 +34,7 @@
     }
     button:hover { background: #005f99; }
     canvas { max-width: 1000px; margin: 2rem 0; }
+    .chart-toggle { margin-bottom: 1rem; }
   </style>
 </head>
 <body>
@@ -52,11 +63,13 @@
     <button type="button" onclick="location.href='/statistics/export'">📤 CSVエクスポート</button>
   </form>
 
-  <!-- 📊 勝率バーグラフ -->
-  <canvas id="winRateChart"></canvas>
+  <div class="chart-toggle">
+    <button onclick="switchChart('bar')">📊 バー</button>
+    <button onclick="switchChart('radar')">🧩 レーダー</button>
+    <button onclick="switchChart('line')">📈 ライン</button>
+  </div>
 
-  <!-- 🧩 レーダーチャート -->
-  <canvas id="radarChart"></canvas>
+  <canvas id="statChart"></canvas>
 
   <table>
     <thead>
@@ -93,70 +106,70 @@
     const winRates = stats.map(s => s.win_rate || 0);
     const drawdowns = stats.map(s => s.max_drawdown || 0);
     const trades = stats.map(s => s.num_trades || 0);
+    let chart = null;
 
-    // 📊 勝率バーグラフ
-    new Chart(document.getElementById("winRateChart"), {
-      type: "bar",
-      data: {
+    function renderChart(type) {
+      const ctx = document.getElementById("statChart").getContext("2d");
+      if (chart) chart.destroy();
+
+      let chartData = {
         labels: labels,
         datasets: [{
           label: "勝率 (%)",
           data: winRates,
-          backgroundColor: "rgba(54, 162, 235, 0.6)"
+          backgroundColor: "rgba(54, 162, 235, 0.6)",
+          borderColor: "rgba(54, 162, 235, 1)",
+          fill: type !== "line"
         }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(ctx) {
-                const i = ctx.dataIndex;
-                return `勝率: ${winRates[i]}% / 取引数: ${trades[i]} / DD: ${drawdowns[i]}`;
-              }
-            }
-          }
-        },
-        onClick: (e, el) => {
-          if (el.length > 0) {
-            const i = el[0].index;
-            const name = stats[i].strategy;
-            window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
-          }
-        }
-      }
-    });
+      };
 
-    // 🧩 レーダーチャート
-    new Chart(document.getElementById("radarChart"), {
-      type: "radar",
-      data: {
-        labels: ["勝率", "最大DD", "取引数"],
-        datasets: stats.map(s => ({
-          label: s.strategy,
-          data: [
-            s.win_rate || 0,
-            s.max_drawdown || 0,
-            s.num_trades || 0
-          ],
-          fill: true
-        }))
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: function(ctx) {
-                const i = ctx.datasetIndex;
-                return `${stats[i].strategy} → 勝率: ${stats[i].win_rate}, DD: ${stats[i].max_drawdown}, 取引: ${stats[i].num_trades}`;
+      if (type === "radar") {
+        chartData = {
+          labels: ["勝率", "最大DD", "取引数"],
+          datasets: stats.map(s => ({
+            label: s.strategy,
+            data: [
+              s.win_rate || 0,
+              s.max_drawdown || 0,
+              s.num_trades || 0
+            ],
+            fill: true
+          }))
+        };
+      }
+
+      chart = new Chart(ctx, {
+        type: type,
+        data: chartData,
+        options: {
+          responsive: true,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const i = ctx.dataIndex;
+                  const s = stats[i] || ctx.dataset;
+                  return `${s.strategy || ctx.dataset.label} → 勝率: ${s.win_rate || "?"}, DD: ${s.max_drawdown || "?"}, 取引: ${s.num_trades || "?"}`;
+                }
               }
+            }
+          },
+          onClick: (e, el) => {
+            if (el.length > 0) {
+              const i = el[0].index;
+              const name = stats[i].strategy;
+              window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
             }
           }
         }
-      }
-    });
+      });
+    }
+
+    function switchChart(type) {
+      renderChart(type);
+    }
+
+    renderChart("bar");
   </script>
 
   <p><a href="/">← ダッシュボードに戻る</a></p>
