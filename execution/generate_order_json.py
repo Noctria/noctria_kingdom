@@ -1,24 +1,19 @@
-import os
-import sys
 import json
 import importlib.util
 from pathlib import Path
 import pandas as pd
+from core.path_config import VERITAS_ORDER_JSON, STRATEGIES_DIR
 
 # ========================================
-# ⚔️ Veritas戦略 → EA命令JSON生成スクリプト
+# ⚔️ Veritas戦略 → EA命令JSON生成スクリプト（Doフェーズ）
 # ========================================
 
-# ✅ 正しいMT5の "Files" ディレクトリに出力
-SIGNAL_OUTPUT_PATH = Path(
-    "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files/veritas_signal.json"
-)
-STRATEGY_PATH = Path("strategies/official/")
-TARGET_STRATEGY = "sample_strategy.py"  # 実行対象戦略（任意に変更可）
+# 📌 対象戦略ファイル（固定: sample_strategy.py）
+STRATEGY_PATH = STRATEGIES_DIR / "official" / "sample_strategy.py"
 
-# 🗃 ダミー市場データ
+# 🗃 ダミー市場データを生成
 def load_dummy_market_data():
-    dates = pd.date_range(start="2025-01-01", periods=100, freq="H")
+    dates = pd.date_range(start="2025-01-01", periods=100, freq="h")  # ✅ 'H' → 'h'
     data = pd.DataFrame({
         "Open": 1.0,
         "High": 1.1,
@@ -27,15 +22,15 @@ def load_dummy_market_data():
     }, index=dates)
     return data
 
-# 🔄 simulate関数のロード
-def load_simulate_function(filepath):
-    spec = importlib.util.spec_from_file_location("strategy_module", filepath)
+# 🔄 simulate関数を動的ロード
+def load_simulate_function(filepath: Path):
+    spec = importlib.util.spec_from_file_location("strategy_module", str(filepath))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.simulate
 
-# 🧠 シグナル抽出
-def extract_signal(result_dict):
+# 🧠 シグナル情報を抽出
+def extract_signal(result_dict: dict) -> dict:
     return {
         "signal": result_dict.get("signal", "BUY"),
         "symbol": result_dict.get("symbol", "USDJPY"),
@@ -44,26 +39,28 @@ def extract_signal(result_dict):
         "sl": result_dict.get("sl", 8),
     }
 
-# ✅ メイン処理
-def main():
-    strategy_file = STRATEGY_PATH / TARGET_STRATEGY
-    if not strategy_file.exists():
-        print("❌ 戦略ファイルが見つかりません:", strategy_file)
+# ✅ Airflow対応 callable 関数
+def generate_order_json():
+    print("⚔️ [Veritas] EA命令生成フェーズを開始します…")
+
+    if not STRATEGY_PATH.exists():
+        print(f"❌ 戦略ファイルが存在しません: {STRATEGY_PATH}")
         return
 
-    simulate = load_simulate_function(strategy_file)
+    simulate = load_simulate_function(STRATEGY_PATH)
     market_data = load_dummy_market_data()
     result = simulate(market_data)
-
     signal = extract_signal(result)
 
     # 💾 JSON出力
-    SIGNAL_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(SIGNAL_OUTPUT_PATH, "w") as f:
+    VERITAS_ORDER_JSON.parent.mkdir(parents=True, exist_ok=True)
+    with open(VERITAS_ORDER_JSON, "w", encoding="utf-8") as f:
         json.dump(signal, f, indent=2)
 
-    print("✅ EA命令ファイルを出力しました:", SIGNAL_OUTPUT_PATH)
+    print("✅ EA命令ファイルを出力しました:", VERITAS_ORDER_JSON)
     print("📦 内容:", signal)
+    print("📜 王国訓示:『この命、為すべき時に放たれよ。』")
 
+# ✅ スクリプト直接実行対応
 if __name__ == "__main__":
-    main()
+    generate_order_json()
