@@ -1,121 +1,74 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>📊 Veritas スコアボード</title>
+  <meta charset="UTF-8" />
+  <title>📊 統計スコアダッシュボード - Noctria Kingdom</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f8f9fa;
+      background-color: #f9f9f9;
       padding: 2rem;
+    }
+    h1 {
       color: #333;
     }
-
-    h1 {
-      color: #2c3e50;
-    }
-
-    form {
-      margin-bottom: 1.5rem;
-      padding: 1rem;
-      background-color: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-    }
-
-    input, select {
-      padding: 0.5rem;
-      margin-right: 0.8rem;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      padding: 0.5rem 1rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-
     table {
       width: 100%;
       border-collapse: collapse;
-      background-color: white;
+      margin-top: 1.5rem;
     }
-
     th, td {
-      padding: 0.8rem;
-      border: 1px solid #ddd;
+      padding: 0.6rem;
+      border: 1px solid #ccc;
       text-align: center;
     }
-
     th {
-      background-color: #f0f0f0;
+      background-color: #eaeaea;
     }
-
-    .nowrap {
-      white-space: nowrap;
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-
-    .small {
-      font-size: 0.9em;
+    .export-button {
+      padding: 0.5rem 1rem;
+      background-color: #007acc;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .export-button:hover {
+      background-color: #005fa3;
     }
   </style>
 </head>
 <body>
-  <h1>📊 Veritas スコアボード</h1>
+  <div class="header">
+    <h1>📊 Veritas戦略 統計スコアボード</h1>
+    <a href="/statistics/export" class="export-button">CSVエクスポート</a>
+  </div>
 
-  <!-- 🔍 フィルター・ソートフォーム -->
-  <form method="get">
-    <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy or '' }}">
-    <input type="text" name="symbol" placeholder="通貨ペア" value="{{ filters.symbol or '' }}">
-    <input type="number" step="0.01" name="min_winrate" placeholder="最低勝率" value="{{ filters.min_winrate or '' }}">
-    <input type="number" step="0.01" name="max_dd" placeholder="最大DD" value="{{ filters.max_dd or '' }}">
-
-    <select name="sort_by">
-      <option value="winrate" {% if filters.sort_by == "winrate" %}selected{% endif %}>勝率</option>
-      <option value="max_dd" {% if filters.sort_by == "max_dd" %}selected{% endif %}>最大DD</option>
-      <option value="trades" {% if filters.sort_by == "trades" %}selected{% endif %}>取引数</option>
-    </select>
-
-    <select name="order">
-      <option value="desc" {% if filters.order == "desc" %}selected{% endif %}>降順</option>
-      <option value="asc" {% if filters.order == "asc" %}selected{% endif %}>昇順</option>
-    </select>
-
-    <button type="submit">適用</button>
-  </form>
-
-  <!-- 📈 統計表示テーブル -->
   <table>
     <thead>
       <tr>
         <th>戦略名</th>
         <th>通貨ペア</th>
-        <th>勝率 (%)</th>
+        <th>勝率</th>
         <th>最大DD</th>
-        <th>取引数</th>
-        <th>信号</th>
+        <th>取引回数</th>
         <th>評価日時</th>
       </tr>
     </thead>
     <tbody>
-      {% for entry in stats %}
-        <tr>
-          <td class="nowrap">{{ entry.strategy }}</td>
-          <td>{{ entry.symbol }}</td>
-          <td>{{ '%.2f' | format(entry.winrate or 0) }}</td>
-          <td>{{ entry.max_dd }}</td>
-          <td>{{ entry.trades }}</td>
-          <td>{{ entry.signal }}</td>
-          <td class="small">{{ entry.timestamp }}</td>
-        </tr>
+      {% for stat in statistics %}
+      <tr>
+        <td>{{ stat.strategy }}</td>
+        <td>{{ stat.symbol }}</td>
+        <td>{{ "%.2f"|format(stat.win_rate * 100) }}%</td>
+        <td>{{ "%.2f"|format(stat.max_drawdown * 100) }}%</td>
+        <td>{{ stat.trade_count }}</td>
+        <td>{{ stat.timestamp }}</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
