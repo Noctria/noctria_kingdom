@@ -1,88 +1,70 @@
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from noctria_gui.services.airflow_trigger import trigger_dag
-from pathlib import Path
-import json
+import os
+import requests
+
+from core.path_config import (
+    PDCA_LOG_DIR,
+    VERITAS_ORDER_JSON,
+    NOCTRIA_GUI_TEMPLATES_DIR,
+)
 
 router = APIRouter()
-templates = Jinja2Templates(directory="noctria_gui/templates")
-templates.env.filters["from_json"] = lambda x: json.loads(x)
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# 📁 PDCAログ格納ディレクトリ
-PDCA_LOG_DIR = Path("logs/pdca")
 
-# =============================
-# 🧩 ログ読み込み（履歴取得）
-# =============================
-def load_pdca_logs():
-    histories = []
-    for subdir in sorted(PDCA_LOG_DIR.iterdir(), reverse=True):
-        if subdir.is_dir():
-            for file in subdir.glob("*.json"):
-                try:
-                    content = json.loads(file.read_text(encoding="utf-8"))
-                except Exception as e:
-                    content = {"error": f"読み込み失敗: {e}"}
-                histories.append({
-                    "id": subdir.name,
-                    "filename": file.name,
-                    "content": content
-                })
-    return histories
-
-# =============================
-# 📺 GET: ダッシュボード表示
-# =============================
+# ========================================
+# 📜 /pdca - 履歴表示ページ
+# ========================================
 @router.get("/pdca", response_class=HTMLResponse)
-def dashboard(request: Request):
-    histories = load_pdca_logs()
-    return templates.TemplateResponse("pdca_dashboard.html", {
-        "request": request,
-        "histories": histories,
-        "message": None
-    })
+async def show_pdca_dashboard(request: Request):
+    log_files = sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True)
+    logs = []
 
-# =============================
-# ⚙️ POST: 全体PDCA実行（通常）
-# =============================
-@router.post("/pdca", response_class=HTMLResponse)
-def trigger_pdca(request: Request):
-    result = trigger_dag("veritas_pdca_dag")
-    histories = load_pdca_logs()
-    return templates.TemplateResponse("pdca_dashboard.html", {
-        "request": request,
-        "histories": histories,
-        "message": f"通常実行: {result}"
-    })
-
-# =============================
-# 📤 POST: 特定命令の再実行
-# =============================
-@router.post("/pdca/replay", response_class=HTMLResponse)
-def replay_pdca(request: Request, filename: str = Form(...)):
-    # 🔍 ファイル検索
-    found = None
-    for subdir in PDCA_LOG_DIR.iterdir():
-        file_path = subdir / filename
-        if file_path.exists():
-            found = file_path
-            break
-
-    if not found:
-        histories = load_pdca_logs()
-        return templates.TemplateResponse("pdca_dashboard.html", {
-            "request": request,
-            "histories": histories,
-            "message": f"❌ 再実行失敗: {filename} が見つかりませんでした"
+    for log_file in log_files:
+        with open(log_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        logs.append({
+            "filename": log_file.name,
+            "path": str(log_file),
+            "json_text": content,
         })
 
-    # ✅ DAGにXCom/変数として渡す処理（将来的に拡張）
-    result = trigger_dag("veritas_pdca_dag")  # TODO: 内容を反映させる場合は Airflow Variable or XCom の活用が必要
-
-    histories = load_pdca_logs()
     return templates.TemplateResponse("pdca_dashboard.html", {
         "request": request,
-        "histories": histories,
-        "message": f"📤 {filename} を再実行しました → {result}"
+        "logs": logs,
     })
+
+
+# ========================================
+# 🔁 /pdca/replay - 再送命令 & DAGトリガー
+# ========================================
+@router.post("/pdca/replay")
+async def replay_order_from_log(log_path: str = Form(...)):
+    airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
+    dag_id = "veritas_replay_dag"
+
+    payload = {
+        "conf": {"log_path": log_path}
+    }
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(
+            f"{airflow_url}/dags/{dag_id}/dagRuns",
+            json=payload,
+            headers=headers,
+            auth=("airflow", "airflow")  # Airflow basic auth
+        )
+
+        if response.status_code in [200, 201]:
+            print(f"✅ 再送DAG起動成功: {log_path}")
+            return RedirectResponse(url="/pdca", status_code=303)
+        else:
+            print("❌ DAGトリガー失敗:", response.text)
+            return JSONResponse(status_code=500, content={"detail": "DAG起動に失敗しました"})
+
+    except Exception as e:
+        print("❌ DAG通信エラー:", str(e))
+        return JSONResponse(status_code=500, content={"detail": str(e)})
