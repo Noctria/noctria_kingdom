@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Noctria Kingdom - 昇格戦略一覧</title>
+  <title>昇格戦略ログ一覧 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
@@ -16,80 +17,102 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 1rem;
+      background-color: #fff;
     }
     th, td {
-      border: 1px solid #aaa;
       padding: 0.5rem;
+      border: 1px solid #ccc;
       text-align: center;
     }
     th {
-      background-color: #ddd;
+      background-color: #eee;
     }
-    tr:nth-child(even) {
-      background-color: #f9f9f9;
+    .filters {
+      margin-bottom: 1rem;
     }
-    .filter-links {
-      margin-top: 1rem;
-    }
-    .filter-links a {
+    .filters a {
       margin-right: 1rem;
+      text-decoration: none;
+      color: #007bff;
     }
-    .btn {
-      padding: 0.4rem 0.8rem;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
+    .tag {
+      padding: 2px 6px;
       border-radius: 4px;
+      font-size: 0.8em;
     }
-    .btn:disabled {
-      background-color: #aaa;
+    .pushed {
+      background-color: #cce5ff;
+      color: #004085;
+    }
+    .unpushed {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .flash {
+      color: green;
+      margin-bottom: 1rem;
+    }
+    form {
+      display: inline;
+    }
+    button {
+      padding: 0.3rem 0.7rem;
     }
   </style>
 </head>
 <body>
-  <h1>📜 昇格戦略ログ（Act フェーズ記録）</h1>
+  <h1>📜 昇格戦略ログ（Actフェーズ）</h1>
 
-  <div class="filter-links">
-    <a href="/act-history">全て表示</a>
-    <a href="/act-history?pushed=false">未Pushのみ</a>
-    <a href="/act-history?pushed=true">Push済みのみ</a>
+  {% if request.session.get("flash") %}
+    <div class="flash">{{ request.session.pop("flash") }}</div>
+  {% endif %}
+
+  <div class="filters">
+    <strong>📌 フィルター:</strong>
+    <a href="/act-history">全て</a>
+    <a href="/act-history?filter=unpushed">未Pushのみ</a>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>📆 日時</th>
-        <th>📛 戦略名</th>
-        <th>📈 勝率</th>
-        <th>💥 最大DD</th>
-        <th>🔢 取引数</th>
-        <th>🚩 理由</th>
-        <th>📤 Push状態</th>
-        <th>🔁 操作</th>
+        <th>日時</th>
+        <th>戦略名</th>
+        <th>勝率</th>
+        <th>最大DD</th>
+        <th>取引回数</th>
+        <th>Push状態</th>
+        <th>操作</th>
       </tr>
     </thead>
     <tbody>
       {% for log in logs %}
-      <tr>
-        <td>{{ log.timestamp }}</td>
-        <td>{{ log.strategy }}</td>
-        <td>{{ log.metrics.win_rate }}%</td>
-        <td>{{ log.metrics.max_drawdown }}%</td>
-        <td>{{ log.metrics.num_trades }}</td>
-        <td>{{ log.reason }}</td>
-        <td>{{ "✅" if log.pushed else "❌" }}</td>
-        <td>
-          {% if not log.pushed %}
-          <form action="/act-history/push" method="post">
-            <input type="hidden" name="log_path" value="{{ log.path }}">
-            <button type="submit" class="btn">GitHubへPush</button>
-          </form>
-          {% else %}
-          <button class="btn" disabled>済</button>
-          {% endif %}
-        </td>
-      </tr>
+        <tr>
+          <td>{{ log.timestamp }}</td>
+          <td>{{ log.strategy }}</td>
+          <td>{{ log.metrics.win_rate }}%</td>
+          <td>{{ log.metrics.max_drawdown }}</td>
+          <td>{{ log.metrics.trade_count }}</td>
+          <td>
+            {% if log.pushed %}
+              <span class="tag pushed">Pushed</span>
+            {% else %}
+              <span class="tag unpushed">未Push</span>
+            {% endif %}
+          </td>
+          <td>
+            <form action="/act-history/replay" method="post">
+              <input type="hidden" name="log_path" value="{{ log.path }}">
+              <button type="submit">再送</button>
+            </form>
+            {% if not log.pushed %}
+              <form action="/act-history/push" method="post">
+                <input type="hidden" name="log_path" value="{{ log.path }}">
+                <button type="submit">Push</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
