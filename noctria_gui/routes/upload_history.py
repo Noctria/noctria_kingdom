@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Request, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from noctria_gui.services.upload_actions import re_evaluate_strategy, delete_strategy_log
 from pathlib import Path
 
 router = APIRouter()
@@ -23,3 +24,13 @@ def show_upload_history(request: Request):
         "request": request,
         "histories": histories
     })
+
+@router.post("/upload-history/re-evaluate", response_class=RedirectResponse)
+def post_re_evaluate(strategy_id: str = Form(...)):
+    re_evaluate_strategy(strategy_id)
+    return RedirectResponse(url="/upload-history", status_code=303)
+
+@router.post("/upload-history/delete", response_class=RedirectResponse)
+def post_delete(strategy_id: str = Form(...)):
+    delete_strategy_log(strategy_id)
+    return RedirectResponse(url="/upload-history", status_code=303)
