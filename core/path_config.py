@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========================================
-# 📌 Noctria Kingdom Path Config (v3.4+)
+# 📌 Noctria Kingdom Path Config (v3.5)
 #    - 全構成要素を王の地図に記録
 #    - Docker/WSL/Local対応（自動切り替え）
 # ========================================
@@ -73,6 +73,9 @@ else:
 # ✅ PDCA履歴ログ保存用ディレクトリ
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 
+# ✅ Actフェーズログ保存用ディレクトリ（採用記録）
+ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
+
 # ========================================
 # 🧠 Veritas関連スクリプト
 # ========================================
@@ -117,6 +120,6 @@ __all__ = [
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
-    "VERITAS_ORDER_JSON", "PDCA_LOG_DIR", "GITHUB_PUSH_SCRIPT",
+    "VERITAS_ORDER_JSON", "PDCA_LOG_DIR", "ACT_LOG_DIR", "GITHUB_PUSH_SCRIPT",
     "CATEGORY_MAP", "_lint_path_config"
 ]
