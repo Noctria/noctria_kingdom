@@ -14,7 +14,7 @@ from strategies.noctus_sentinella import NoctusSentinella
 from strategies.prometheus_oracle import PrometheusOracle
 
 from core.meta_ai import MetaAI
-from core.risk_management import RiskManagement
+from core.risk_manager import RiskManager
 from core.logger import setup_logger
 from data.market_data_fetcher import MarketDataFetcher
 
