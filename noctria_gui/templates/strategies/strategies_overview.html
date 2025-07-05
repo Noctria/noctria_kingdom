@@ -54,7 +54,11 @@
       padding: 6px 12px;
       margin-left: 6px;
     }
+    .compare-box {
+      margin: 1rem 0;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h1>📊 Veritas戦略の統計ビュー</h1>
@@ -66,10 +70,18 @@
     </form>
   </div>
 
+  <div class="compare-box">
+    <button onclick="plotComparison()">📈 選択戦略を比較グラフで表示</button>
+  </div>
+
+  <canvas id="comparisonChart" width="900" height="400" style="margin-top: 2rem;"></canvas>
+
   {% if strategies %}
+  <form id="strategy-form">
   <table>
     <thead>
       <tr>
+        <th>📌</th>
         <th>戦略名</th>
         <th>勝率</th>
         <th>取引数</th>
@@ -81,10 +93,11 @@
     <tbody>
       {% for s in strategies %}
       <tr>
+        <td><input type="checkbox" name="compare" value="{{ s.strategy }}"
+              data-winrate="{{ s.win_rate }}"
+              data-drawdown="{{ s.max_drawdown }}"></td>
         <td>{{ s.strategy }}</td>
-        <td>
-          {{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}%
-        </td>
+        <td>{{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}%</td>
         <td>{{ s.trade_count if s.trade_count is not none else '―' }}</td>
         <td>{{ s.max_drawdown if s.max_drawdown is not none else '―' }}</td>
         <td>
@@ -100,10 +113,56 @@
       {% endfor %}
     </tbody>
   </table>
+  </form>
   {% else %}
     <p>⚠️ 表示できる戦略が見つかりませんでした。</p>
   {% endif %}
 
   <p style="margin-top: 1rem;"><a href="/">← トップへ戻る</a></p>
+
+  <script>
+    function plotComparison() {
+      const checkboxes = document.querySelectorAll('input[name="compare"]:checked');
+      const labels = [];
+      const winrates = [];
+      const drawdowns = [];
+
+      checkboxes.forEach(cb => {
+        labels.push(cb.value);
+        winrates.push(parseFloat(cb.dataset.winrate) || 0);
+        drawdowns.push(parseFloat(cb.dataset.drawdown) || 0);
+      });
+
+      const ctx = document.getElementById('comparisonChart').getContext('2d');
+      if (window.strategyChart) window.strategyChart.destroy();
+
+      window.strategyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '勝率（%）',
+              data: winrates,
+              backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            },
+            {
+              label: '最大ドローダウン',
+              data: drawdowns,
+              backgroundColor: 'rgba(255, 99, 132, 0.6)',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  </script>
 </body>
 </html>
