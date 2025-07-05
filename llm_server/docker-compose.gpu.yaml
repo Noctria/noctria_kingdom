@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  veritas-llm:
+    build:
+      context: .
+      dockerfile: Dockerfile_GPU
+    volumes:
+      - .:/opt/airflow
+    environment:
+      - PYTHONPATH=/opt/airflow
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
