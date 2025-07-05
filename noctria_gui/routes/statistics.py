@@ -1,57 +1,54 @@
-from fastapi import APIRouter, Request, Query
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📊 統計ダッシュボード用ルート
+- Veritas戦略の統計スコア一覧表示
+- フィルタ／ソート／CSVエクスポートに対応
+"""
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
-from typing import Optional
+from datetime import datetime
 from pathlib import Path
 
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
-from noctria_gui.services.statistics_service import load_statistics_data
+from core.path_config import TOOLS_DIR, GUI_TEMPLATES_DIR
+from noctria_gui.services import statistics_service
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
-# ========================================
-# 📊 /statistics - 戦略スコアボード
-# ========================================
-@router.get("/statistics")
-async def show_statistics_dashboard(
-    request: Request,
-    strategy: Optional[str] = Query(None),
-    symbol: Optional[str] = Query(None),
-    min_winrate: Optional[float] = Query(None),
-    max_dd: Optional[float] = Query(None),
-    sort_by: Optional[str] = Query("winrate"),
-    order: Optional[str] = Query("desc"),
-):
-    # 統計データ読み込み
-    stats = load_statistics_data()
 
-    # フィルター処理
-    def matches(entry):
-        if strategy and strategy not in entry["strategy"]:
-            return False
-        if symbol and symbol != entry["symbol"]:
-            return False
-        if min_winrate and entry.get("winrate", 0) < min_winrate:
-            return False
-        if max_dd and entry.get("max_dd", float("inf")) > max_dd:
-            return False
-        return True
-
-    filtered = list(filter(matches, stats))
-
-    # ソート処理
-    reverse = order == "desc"
-    filtered.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
+@router.get("/statistics", response_class=HTMLResponse)
+async def show_statistics(request: Request):
+    """
+    📈 統計スコアダッシュボードを表示
+    """
+    all_stats = statistics_service.load_all_statistics()
+    sorted_stats = statistics_service.filter_statistics(sort_by="win_rate", descending=True)
 
     return templates.TemplateResponse("statistics_dashboard.html", {
         "request": request,
-        "stats": filtered,
-        "filters": {
-            "strategy": strategy,
-            "symbol": symbol,
-            "min_winrate": min_winrate,
-            "max_dd": max_dd,
-            "sort_by": sort_by,
-            "order": order,
-        }
+        "statistics": sorted_stats,
+        "strategies": statistics_service.get_available_strategies(all_stats),
+        "symbols": statistics_service.get_available_symbols(all_stats),
     })
+
+
+@router.get("/statistics/export")
+async def export_statistics_csv():
+    """
+    📤 統計スコア一覧をCSVでエクスポート
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = TOOLS_DIR / f"strategy_statistics_{timestamp}.csv"
+
+    stats = statistics_service.load_all_statistics()
+    statistics_service.export_statistics_to_csv(stats, output_path)
+
+    return FileResponse(
+        output_path,
+        filename=output_path.name,
+        media_type="text/csv"
+    )
