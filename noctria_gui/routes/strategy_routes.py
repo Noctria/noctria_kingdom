@@ -5,9 +5,10 @@
 📚 Veritas戦略ファイル一覧＆閲覧ルート
 - 自動生成されたPython戦略ファイル（.py）の一覧と閲覧機能を提供
 - 個別戦略のエクスポート（.py / .json→.csv）機能も提供
+- 🔍 検索・フィルタ付き一覧機能
 """
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -25,7 +26,6 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 async def list_strategies(request: Request):
     """
     📋 戦略ファイル一覧表示
-    - veritas_generated 内の .py 戦略ファイル一覧を表示
     """
     veritas_dir = STRATEGIES_DIR / "veritas_generated"
     if not veritas_dir.exists():
@@ -44,7 +44,6 @@ async def list_strategies(request: Request):
 async def view_strategy(request: Request, name: str):
     """
     🔍 指定戦略ファイルの内容を表示
-    - /strategies/view?name=example.py
     """
     veritas_dir = STRATEGIES_DIR / "veritas_generated"
     target_file = veritas_dir / name
@@ -68,8 +67,6 @@ async def view_strategy(request: Request, name: str):
 async def export_strategy(name: str, format: str = "py"):
     """
     📥 戦略ファイルをエクスポート（.py または .json → .csv）
-    - name: ファイル名（.py or .json）
-    - format: py / csv
     """
     veritas_dir = STRATEGIES_DIR / "veritas_generated"
     target_file = veritas_dir / name
@@ -109,3 +106,22 @@ async def export_strategy(name: str, format: str = "py"):
 
     else:
         raise HTTPException(status_code=400, detail="format は 'py' または 'csv' を指定してください")
+
+
+@router.get("/strategies/search", response_class=HTMLResponse)
+async def search_strategies(request: Request, keyword: str = Query(None)):
+    """
+    🔍 戦略ファイル検索（ファイル名に含まれるキーワードでフィルタ）
+    """
+    veritas_dir = STRATEGIES_DIR / "veritas_generated"
+    if not veritas_dir.exists():
+        raise HTTPException(status_code=500, detail="戦略ディレクトリが存在しません")
+
+    strategy_files = sorted(veritas_dir.glob("*.py"))
+    strategy_names = [f.name for f in strategy_files if not keyword or keyword.lower() in f.name.lower()]
+
+    return templates.TemplateResponse("strategies/search.html", {
+        "request": request,
+        "keyword": keyword or "",
+        "strategies": strategy_names
+    })
