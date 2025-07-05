@@ -17,9 +17,9 @@ from noctria_gui.routes import (
     pdca,
     upload,
     upload_history,
-    act_history,
     statistics,
-    push_history  # ✅ 新たに追加
+    act_history,
+    push_history,
 )
 
 # ========================================
@@ -36,7 +36,7 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ フィルター追加（Jinja2向けカスタム）
+# ✅ Jinja2 カスタムフィルタ（dict → JSON文字列）
 def from_json(value):
     try:
         return json.loads(value)
@@ -45,7 +45,10 @@ def from_json(value):
 
 templates.env.filters["from_json"] = from_json
 
-# ✅ 各画面ルートを登録
+# ✅ 状態として templates を保持（他モジュールでも利用）
+app.state.templates = templates
+
+# ✅ ルーター登録
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
 app.include_router(pdca.router)
@@ -53,4 +56,4 @@ app.include_router(upload.router)
 app.include_router(upload_history.router)
 app.include_router(statistics.router)
 app.include_router(act_history.router)
-app.include_router(push_history.router)  # ✅ 新ルートの登録
+app.include_router(push_history.router)
