@@ -23,7 +23,7 @@ class AurusSingularis:
 
         columns = ["Open", "High", "Low", "Close", "Volume"]
         historical_data = pd.DataFrame(data_array, columns=columns)
-        self.risk_manager = RiskManagement(historical_data=historical_data)
+        self.risk_manager = RiskManager(historical_data=historical_data)
 
     def _lazy_import_tensorflow(self):
         import tensorflow as tf
