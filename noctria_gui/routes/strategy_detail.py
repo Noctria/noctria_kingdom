@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core.path_config import GUI_TEMPLATES_DIR
-from noctria_gui.services import statistics_service
+from noctria_gui.services import statistics_service, tag_summary_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
@@ -24,18 +24,24 @@ async def show_strategy_detail(request: Request, name: str):
     """
     logs = statistics_service.load_all_statistics()
 
-    # 戦略名でフィルタ
+    # 指定戦略の取得
     matched = [log for log in logs if log.get("strategy") == name]
-
     if not matched:
         raise HTTPException(status_code=404, detail="該当戦略が見つかりません")
-
     strategy = matched[0]
 
-    # タグがない場合でも空リストを補完
+    # タグの補完（None → []）
     strategy["tags"] = strategy.get("tags", [])
+
+    # 比較用：同じタグを持つ別戦略（最大4件）
+    related_strategies = [
+        s for s in logs
+        if s.get("strategy") != name and
+           any(tag in s.get("tags", []) for tag in strategy["tags"])
+    ][:4]
 
     return templates.TemplateResponse("strategy_detail.html", {
         "request": request,
-        "strategy": strategy
+        "strategy": strategy,
+        "related_strategies": related_strategies
     })
