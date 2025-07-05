@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========================================
-# 📌 Noctria Kingdom Path Config (v3.2)
+# 📌 Noctria Kingdom Path Config (v3.3)
 #    - 全構成要素を王の地図に記録
 #    - Docker/WSL/Local対応（自動切り替え）
 # ========================================
@@ -76,6 +76,19 @@ VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
 
 # ========================================
+# 🗂 カテゴリ分類マップ（戦略ジャンル）
+# ========================================
+CATEGORY_MAP = {
+    "technical": "📈 テクニカル分析",
+    "fundamental": "📰 ファンダメンタル分析",
+    "sentiment": "📊 センチメント分析",
+    "reinforcement": "🤖 強化学習",
+    "hybrid": "⚔️ ハイブリッド戦略",
+    "experimental": "🧪 実験戦略",
+    "legacy": "📜 旧版戦略"
+}
+
+# ========================================
 # 🔍 パス整合性チェック関数（審査用）
 # ========================================
 def _lint_path_config():
@@ -120,16 +133,13 @@ def _lint_path_config():
 # ========================================
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
-    "TOOLS_DIR",
-    "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
-    "EXECUTION_DIR", "EXPERTS_DIR",
-    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "MODELS_DIR", "INSTITUTIONS_DIR",
-    "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR", "GUI_STATIC_DIR",
-    "GUI_ROUTES_DIR", "GUI_SERVICES_DIR",
+    "TOOLS_DIR", "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
+    "EXECUTION_DIR", "EXPERTS_DIR", "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
+    "MODELS_DIR", "INSTITUTIONS_DIR", "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR",
+    "GUI_STATIC_DIR", "GUI_ROUTES_DIR", "GUI_SERVICES_DIR",
     "NOCTRIA_GUI_STATIC_DIR", "NOCTRIA_GUI_TEMPLATES_DIR",
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
-    "GITHUB_PUSH_SCRIPT",
-    "_lint_path_config"
+    "GITHUB_PUSH_SCRIPT", "CATEGORY_MAP", "_lint_path_config"
 ]
