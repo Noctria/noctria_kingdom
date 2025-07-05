@@ -1,6 +1,7 @@
 import importlib.util
 import pandas as pd
 from pathlib import Path
+import json
 from core.path_config import STRATEGIES_DIR, DATA_DIR, VERITAS_EVAL_LOG
 
 # 📌 評価対象データ
@@ -52,13 +53,21 @@ def evaluate_all_strategies():
 
     return results
 
-if __name__ == "__main__":
+# ✅ Airflow対応版 callable（引数なし）
+def evaluate_strategies():
+    print("⚖️ [Veritas] 戦略評価を開始します…")
+
     results = evaluate_all_strategies()
 
-    import json
-    with open(EVAL_LOG_PATH, "w") as f:
+    with open(EVAL_LOG_PATH, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
-    print(f"🧠 評価完了: {len(results)} 件の戦略を審査しました。")
+    total = len(results)
     passed = [r for r in results if r.get("passed")]
+    print(f"🧠 評価完了: {total} 件の戦略を審査しました。")
     print(f"✅ 採用基準を満たした戦略数: {len(passed)}")
+    print("📜 王国訓示:『知を吟味し、未来を選び取る者こそ、王国の盾なり』")
+
+# ✅ スクリプト直接実行時（開発・手動検証用）
+if __name__ == "__main__":
+    evaluate_strategies()
