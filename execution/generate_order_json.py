@@ -41,7 +41,7 @@ def load_simulate_function(filepath: Path):
     spec.loader.exec_module(module)
     return module.simulate
 
-# 🧠 シグナル抽出
+# 🧠 シグナル抽出＋評価指標も付加
 def extract_signal(result_dict: dict) -> dict:
     return {
         "strategy": TARGET_STRATEGY,
@@ -51,6 +51,9 @@ def extract_signal(result_dict: dict) -> dict:
         "lot": result_dict.get("lot", 0.1),
         "tp": result_dict.get("tp", 10),
         "sl": result_dict.get("sl", 8),
+        "win_rate": result_dict.get("win_rate"),
+        "max_drawdown": result_dict.get("max_drawdown"),
+        "num_trades": result_dict.get("num_trades"),
     }
 
 # 💾 PDCA履歴ログ保存
