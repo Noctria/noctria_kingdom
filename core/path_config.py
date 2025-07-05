@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========================================
-# 📌 Noctria Kingdom Path Config (v3.1)
+# 📌 Noctria Kingdom Path Config (v3.2)
 #    - 全構成要素を王の地図に記録
 #    - Docker/WSL/Local対応（自動切り替え）
 # ========================================
@@ -19,7 +19,7 @@ DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
 LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
 AIRFLOW_SCRIPTS_DIR = BASE_DIR / "airflow_docker" / "scripts"
-TOOLS_DIR = BASE_DIR / "tools"  # ✅ 追加済み
+TOOLS_DIR = BASE_DIR / "tools"
 
 # ========================================
 # 🧠 知性領域（AI・戦略・評価）
@@ -85,7 +85,7 @@ def _lint_path_config():
         "LOGS_DIR": LOGS_DIR.exists(),
         "PLUGINS_DIR": PLUGINS_DIR.exists(),
         "AIRFLOW_SCRIPTS_DIR": AIRFLOW_SCRIPTS_DIR.exists(),
-        "TOOLS_DIR": TOOLS_DIR.exists(),  # ✅ 追加済み
+        "TOOLS_DIR": TOOLS_DIR.exists(),
         "SCRIPTS_DIR": SCRIPTS_DIR.exists(),
         "CORE_DIR": CORE_DIR.exists(),
         "VERITAS_DIR": VERITAS_DIR.exists(),
@@ -102,6 +102,8 @@ def _lint_path_config():
         "GUI_STATIC_DIR": GUI_STATIC_DIR.exists(),
         "GUI_ROUTES_DIR": GUI_ROUTES_DIR.exists(),
         "GUI_SERVICES_DIR": GUI_SERVICES_DIR.exists(),
+        "NOCTRIA_GUI_STATIC_DIR": NOCTRIA_GUI_STATIC_DIR.exists(),
+        "NOCTRIA_GUI_TEMPLATES_DIR": NOCTRIA_GUI_TEMPLATES_DIR.exists(),
         "LLM_SERVER_DIR": LLM_SERVER_DIR.exists(),
         "DOCS_DIR": DOCS_DIR.exists(),
         "TESTS_DIR": TESTS_DIR.exists(),
@@ -118,12 +120,13 @@ def _lint_path_config():
 # ========================================
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
-    "TOOLS_DIR",  # ✅ 追加済み
+    "TOOLS_DIR",
     "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
     "EXECUTION_DIR", "EXPERTS_DIR",
     "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "MODELS_DIR", "INSTITUTIONS_DIR",
     "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR", "GUI_STATIC_DIR",
     "GUI_ROUTES_DIR", "GUI_SERVICES_DIR",
+    "NOCTRIA_GUI_STATIC_DIR", "NOCTRIA_GUI_TEMPLATES_DIR",
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
