@@ -2,86 +2,98 @@
 # coding: utf-8
 
 """
-🧠 Veritas戦略の昇格戦略を GitHub に公式Pushするスクリプト
-- 対象戦略は strategies/official/ 内のファイル
-- commit & push 成功時に push_logs に記録を残す
+🤖 Veritas昇格戦略をGitHubへPushし、統治記録を残す
+- 未Push戦略ファイルを `strategies/official/` から選定
+- Git add → commit → push 実行
+- Pushログは data/push_logs/ に JSON形式で保存
 """
 
-import os
 import subprocess
-import json
+import shutil
 from datetime import datetime
+import json
 from pathlib import Path
 
-# ✅ 王国の地図（標準パス管理）
-from core.path_config import STRATEGIES_DIR, DATA_DIR
+from core.path_config import (
+    STRATEGY_OFFICIAL_DIR,
+    ACT_LOG_DIR,
+    PUSH_LOG_DIR,
+    GITHUB_REPO_URL  # "https://github.com/Noctria/noctria_kingdom"
+)
 
-# ========================================
-# 📌 設定
-# ========================================
-OFFICIAL_DIR = STRATEGIES_DIR / "official"
-PUSH_LOG_PATH = DATA_DIR / "push_logs" / "push_history.json"
-
-# ========================================
-# 🔧 シェルコマンド実行
-# ========================================
-def run(cmd: list[str]):
+def get_latest_commit_hash() -> str:
     try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Command failed: {e}")
-        raise
+        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
 
-# ========================================
-# 💾 Pushログ保存（追記）
-# ========================================
-def save_push_log(strategy_name: str, commit_message: str):
-    PUSH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "strategy": strategy_name,
-        "commit_message": commit_message,
-        "author": os.getenv("GIT_AUTHOR_NAME", "Veritas Bot"),
-        "pushed": True
-    }
-    if PUSH_LOG_PATH.exists():
-        with open(PUSH_LOG_PATH, "r", encoding="utf-8") as f:
-            logs = json.load(f)
-    else:
-        logs = []
+def get_github_url(strategy_path: Path) -> str:
+    rel_path = strategy_path.relative_to(Path.cwd())
+    return f"{GITHUB_REPO_URL}/blob/main/{rel_path.as_posix()}"
 
-    logs.append(log_entry)
-    with open(PUSH_LOG_PATH, "w", encoding="utf-8") as f:
-        json.dump(logs, f, indent=2, ensure_ascii=False)
+def load_act_logs() -> list:
+    logs = []
+    for file in Path(ACT_LOG_DIR).glob("*.json"):
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    logs.append((file, data))
+        except:
+            continue
+    return logs
 
-    print(f"📜 Pushログを記録しました: {PUSH_LOG_PATH}")
+def push_to_github():
+    pushed = 0
+    act_logs = load_act_logs()
 
-# ========================================
-# 🚀 Push実行（add → commit → push）
-# ========================================
-def push_strategy(strategy_filename: str):
-    os.chdir(STRATEGIES_DIR.parent)  # プロジェクトルートへ移動
-    branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
-    rel_path = f"strategies/official/{strategy_filename}"
+    for file_path, log in act_logs:
+        if log.get("pushed", False):
+            continue
 
-    # Git add → commit → push
-    run(["git", "add", rel_path])
-    commit_msg = f"🧠 Veritas戦略 '{strategy_filename}' を昇格しPush"
-    run(["git", "commit", "-m", commit_msg])
-    run(["git", "push", "origin", branch])
+        strategy_name = log.get("strategy")
+        strategy_path = STRATEGY_OFFICIAL_DIR / strategy_name
 
-    # ✅ Pushログに記録
-    save_push_log(strategy_filename, commit_msg)
+        if not strategy_path.exists():
+            print(f"⚠️ 戦略ファイルが見つかりません: {strategy_path}")
+            continue
 
-    print(f"✅ 戦略 '{strategy_filename}' をGitHubへ昇格Pushしました")
+        # Git add, commit, push
+        subprocess.run(["git", "add", str(strategy_path)])
+        commit_message = f"🤖 Veritas戦略をofficialに自動反映（{datetime.now().date()}）"
+        subprocess.run(["git", "commit", "-m", commit_message])
+        subprocess.run(["git", "push"])
 
-# ========================================
-# 🏁 CLI実行
-# ========================================
+        # コミットハッシュとGitHub URLを取得
+        commit_hash = get_latest_commit_hash()
+        github_url = get_github_url(strategy_path)
+
+        # Pushログ記録
+        push_log = {
+            "timestamp": datetime.now().isoformat(),
+            "strategy": strategy_name,
+            "message": "Veritas戦略をGitHubへPush",
+            "pushed_by": "veritas_auto",
+            "commit": commit_hash,
+            "github_url": github_url,
+            "pushed": True
+        }
+
+        log_file_name = f"{datetime.now().isoformat().replace(':', '-')}_{strategy_name}.json"
+        with open(PUSH_LOG_DIR / log_file_name, "w", encoding="utf-8") as f:
+            json.dump(push_log, f, indent=2, ensure_ascii=False)
+
+        # act_log 側も更新（pushed: true）
+        log["pushed"] = True
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(log, f, indent=2, ensure_ascii=False)
+
+        print(f"✅ {strategy_name} を GitHub にPushし、ログを記録しました")
+        pushed += 1
+
+    if pushed == 0:
+        print("🔍 Push対象はありませんでした。")
+
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("strategy", help="Push対象の戦略ファイル名（例: sample_strategy.py）")
-    args = parser.parse_args()
-
-    push_strategy(args.strategy)
+    print("👑 Noctria Kingdom: GitHub Push スクリプト起動")
+    push_to_github()
