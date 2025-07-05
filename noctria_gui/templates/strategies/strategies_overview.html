@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📋 Veritas戦略一覧（メタ情報付き）</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #222;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      margin-top: 1.5rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.6rem;
+      text-align: center;
+    }
+    th {
+      background-color: #eaeaea;
+    }
+    .strategy-link {
+      color: #007acc;
+      text-decoration: none;
+    }
+    .strategy-link:hover {
+      text-decoration: underline;
+    }
+    .tag {
+      background-color: #d0ebff;
+      color: #004085;
+      padding: 2px 6px;
+      margin: 2px;
+      border-radius: 4px;
+      display: inline-block;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h1>📋 Veritas戦略一覧（メタ情報付き）</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>戦略名</th>
+        <th>勝率</th>
+        <th>最大DD</th>
+        <th>取引回数</th>
+        <th>評価日時</th>
+        <th>タグ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for strat in strategies %}
+      <tr>
+        <td><a class="strategy-link" href="/strategies/view?name={{ strat.name }}">{{ strat.name }}</a></td>
+        <td>{{ "%.2f"|format(strat.win_rate * 100) }}%</td>
+        <td>{{ "%.2f"|format(strat.max_drawdown * 100) }}%</td>
+        <td>{{ strat.trade_count }}</td>
+        <td>{{ strat.timestamp }}</td>
+        <td>
+          {% for tag in strat.tags %}
+            <span class="tag">{{ tag }}</span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <a href="/">← トップへ戻る</a>
+</body>
+</html>
