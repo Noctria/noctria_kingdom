@@ -71,6 +71,11 @@
 
   <canvas id="statChart"></canvas>
 
+  <section>
+    <h2>📛 タグ別戦略数</h2>
+    <canvas id="tagChart"></canvas>
+  </section>
+
   <table>
     <thead>
       <tr>
@@ -102,6 +107,7 @@
 
   <script>
     const stats = {{ statistics | tojson }};
+    const tagsCount = {{ tags_count | tojson }};
     const labels = stats.map(s => s.strategy);
     const winRates = stats.map(s => s.win_rate || 0);
     const drawdowns = stats.map(s => s.max_drawdown || 0);
@@ -169,7 +175,37 @@
       renderChart(type);
     }
 
+    function renderTagChart() {
+      const ctx = document.getElementById("tagChart").getContext("2d");
+      new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: Object.keys(tagsCount),
+          datasets: [{
+            label: "戦略数",
+            data: Object.values(tagsCount),
+            backgroundColor: Object.keys(tagsCount).map((_, i) =>
+              `hsl(${(i * 360 / Object.keys(tagsCount).length)}, 70%, 70%)`)
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  return `${ctx.label}: ${ctx.raw} 戦略`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
     renderChart("bar");
+    renderTagChart();
   </script>
 
   <p><a href="/">← ダッシュボードに戻る</a></p>
