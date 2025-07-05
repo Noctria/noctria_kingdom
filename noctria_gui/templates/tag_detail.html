@@ -1,0 +1,13 @@
+@router.get("/tag-summary/detail", response_class=HTMLResponse)
+async def show_tag_detail(request: Request, tag: str):
+    """
+    📂 指定タグに紐づく戦略一覧を表示
+    """
+    all_logs = tag_summary_service.load_all_statistics()
+    filtered = [s for s in all_logs if tag in s.get("tags", [])]
+
+    return templates.TemplateResponse("tag_detail.html", {
+        "request": request,
+        "tag": tag,
+        "strategies": filtered,
+    })
