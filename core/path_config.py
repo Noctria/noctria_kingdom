@@ -48,8 +48,13 @@ INSTITUTIONS_DIR = BASE_DIR / "institutions"
 
 NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
 GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
+GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
+GUI_ROUTES_DIR = NOCTRIA_GUI_DIR / "routes"
+GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
+
 LLM_SERVER_DIR = BASE_DIR / "llm_server"
 DOCS_DIR = BASE_DIR / "docs"
+TESTS_DIR = BASE_DIR / "tests"
 
 # ========================================
 # 📄 ファイルパス（王国の記録物）
@@ -81,6 +86,11 @@ def _lint_path_config():
         "BASE_DIR": BASE_DIR.exists(),
         "DAGS_DIR": DAGS_DIR.exists(),
         "LOGS_DIR": LOGS_DIR.exists(),
+        "PLUGINS_DIR": PLUGINS_DIR.exists(),
+        "AIRFLOW_SCRIPTS_DIR": AIRFLOW_SCRIPTS_DIR.exists(),
+        "SCRIPTS_DIR": SCRIPTS_DIR.exists(),
+        "CORE_DIR": CORE_DIR.exists(),
+        "VERITAS_DIR": VERITAS_DIR.exists(),
         "STRATEGIES_DIR": STRATEGIES_DIR.exists(),
         "EXECUTION_DIR": EXECUTION_DIR.exists(),
         "EXPERTS_DIR": EXPERTS_DIR.exists(),
@@ -88,16 +98,21 @@ def _lint_path_config():
         "DATA_DIR": DATA_DIR.exists(),
         "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
         "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
-        "MARKET_DATA_CSV": MARKET_DATA_CSV.exists(),
+        "INSTITUTIONS_DIR": INSTITUTIONS_DIR.exists(),
+        "NOCTRIA_GUI_DIR": NOCTRIA_GUI_DIR.exists(),
+        "GUI_TEMPLATES_DIR": GUI_TEMPLATES_DIR.exists(),
+        "GUI_STATIC_DIR": GUI_STATIC_DIR.exists(),
+        "GUI_ROUTES_DIR": GUI_ROUTES_DIR.exists(),
+        "GUI_SERVICES_DIR": GUI_SERVICES_DIR.exists(),
+        "LLM_SERVER_DIR": LLM_SERVER_DIR.exists(),
+        "DOCS_DIR": DOCS_DIR.exists(),
+        "TESTS_DIR": TESTS_DIR.exists(),
         "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
+        "USDJPY_CSV": USDJPY_CSV.exists(),
+        "MARKET_DATA_CSV": MARKET_DATA_CSV.exists(),
         "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
         "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
         "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
-        "NOCTRIA_GUI_DIR": NOCTRIA_GUI_DIR.exists(),
-        "GUI_TEMPLATES_DIR": GUI_TEMPLATES_DIR.exists(),
-        "LLM_SERVER_DIR": LLM_SERVER_DIR.exists(),
-        "DOCS_DIR": DOCS_DIR.exists(),
-        "AIRFLOW_SCRIPTS_DIR": AIRFLOW_SCRIPTS_DIR.exists(),
     }
 
 # ========================================
@@ -106,10 +121,12 @@ def _lint_path_config():
 
 __all__ = [
     "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
-    "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR", "MODELS_DIR",
-    "INSTITUTIONS_DIR", "VERITAS_DIR", "EXECUTION_DIR", "EXPERTS_DIR",
-    "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR", "LLM_SERVER_DIR", "DOCS_DIR",
-    "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
+    "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
+    "EXECUTION_DIR", "EXPERTS_DIR",
+    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "MODELS_DIR", "INSTITUTIONS_DIR",
+    "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR", "GUI_STATIC_DIR",
+    "GUI_ROUTES_DIR", "GUI_SERVICES_DIR",
+    "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
     "GITHUB_PUSH_SCRIPT",
