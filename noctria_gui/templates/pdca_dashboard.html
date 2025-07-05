@@ -64,6 +64,7 @@
     <div class="message">🟢 DAG実行結果: {{ message }}</div>
   {% endif %}
 
+  <!-- DAGトリガー -->
   <form method="post">
     <button type="submit">⚙️ Veritas PDCA を実行</button>
   </form>
@@ -78,6 +79,7 @@
         <th>⚖️ ロット</th>
         <th>🎯 TP</th>
         <th>🛡 SL</th>
+        <th>🔁 再実行</th>
       </tr>
     </thead>
     <tbody>
@@ -90,6 +92,12 @@
           <td>{{ log.content.lot or "-" }}</td>
           <td>{{ log.content.tp or "-" }}</td>
           <td>{{ log.content.sl or "-" }}</td>
+          <td>
+            <form method="post" action="/pdca/replay" style="margin: 0;">
+              <input type="hidden" name="filename" value="{{ log.filename }}">
+              <button type="submit">📤 再実行</button>
+            </form>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
