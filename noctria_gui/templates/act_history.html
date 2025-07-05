@@ -33,9 +33,33 @@
     }
     button {
       padding: 0.4rem 0.8rem;
+      cursor: pointer;
     }
     .action-form {
-      display: inline;
+      display: inline-block;
+      margin: 0 0.25rem;
+    }
+    .action-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .csv-link {
+      text-decoration: none;
+      color: #0066cc;
+      border: 1px solid #0066cc;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      background-color: white;
+    }
+    .csv-link:hover {
+      background-color: #eef;
     }
   </style>
 </head>
@@ -43,12 +67,14 @@
   <h1>📜 Veritas 採用戦略ログ</h1>
 
   <form method="get" action="/act-history" class="filter">
-    <label>
-      <input type="checkbox" name="only_unpushed" value="true" {% if only_unpushed %}checked{% endif %}>
-      未Pushのみ表示
-    </label>
-    <button type="submit">絞り込み</button>
-    <a href="/act-history/export">CSV出力</a>
+    <div class="top-actions">
+      <label>
+        <input type="checkbox" name="only_unpushed" value="true" {% if only_unpushed %}checked{% endif %}>
+        未Pushのみ表示
+      </label>
+      <button type="submit">絞り込み</button>
+      <a class="csv-link" href="/act-history/export">📤 CSV出力</a>
+    </div>
   </form>
 
   <table>
@@ -68,7 +94,7 @@
         <td>{{ log.symbol }}</td>
         <td>{{ log.timestamp }}</td>
         <td>{{ "✅" if log.pushed else "❌" }}</td>
-        <td>
+        <td class="action-buttons">
           <form method="post" action="/act-history/repush" class="action-form">
             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
             <button type="submit">再Push可に</button>
