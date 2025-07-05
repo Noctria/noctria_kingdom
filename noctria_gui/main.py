@@ -10,30 +10,30 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-import json  # ✅ for from_json filter
+import json
 
 # ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ✅ 各ルートモジュールの導入
+# ✅ 統治ルートの招集
 from noctria_gui.routes import (
     home_routes,
     strategy_routes,
     strategy_detail,
-    strategy_compare,         # ✅ 戦略比較ルート
+    strategy_compare,         # 📊 戦略比較
     tag_summary,
     tag_summary_detail,
-    statistics,
+    statistics,               # 📈 統計スコアボード
     act_history,
     push_history,
     logs_routes,
     upload,
     upload_history,
-    pdca,
+    pdca
 )
 
 # ========================================
-# 🚀 FastAPI GUI 構成（Noctria Kingdom）
+# 🚀 FastAPI GUI アプリケーション構成
 # ========================================
 
 app = FastAPI(
@@ -42,12 +42,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ✅ 静的ファイル＆テンプレート設定
+# ✅ 静的ファイルとテンプレートの登録
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ Jinja2 カスタムフィルタ（dict → JSON）
-def from_json(value):
+# ✅ Jinja2 カスタムフィルタ：from_json（文字列 → dict）
+def from_json(value: str):
     try:
         return json.loads(value)
     except Exception:
@@ -55,17 +55,17 @@ def from_json(value):
 
 templates.env.filters["from_json"] = from_json
 
-# ✅ templates を状態に保持（グローバル参照用）
+# ✅ テンプレート環境を app.state に格納（共通アクセス用）
 app.state.templates = templates
 
-# ✅ 全ルートを統治パネルへ結集
+# ✅ 各ルートを FastAPI アプリに結合
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
 app.include_router(strategy_detail.router)
-app.include_router(strategy_compare.router)       # ✅ 比較系ルート
+app.include_router(strategy_compare.router)     # ✅ /strategies/compare
 app.include_router(tag_summary.router)
 app.include_router(tag_summary_detail.router)
-app.include_router(statistics.router)
+app.include_router(statistics.router)           # ✅ /statistics
 app.include_router(act_history.router)
 app.include_router(push_history.router)
 app.include_router(logs_routes.router)
