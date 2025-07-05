@@ -4,17 +4,14 @@
 """
 📚 Veritas戦略ファイル一覧＆閲覧ルート
 - 自動生成されたPython戦略ファイル（.py）の一覧と閲覧機能を提供
-- 個別戦略のエクスポート（.py / .json→.csv）機能も提供
-- 🔍 検索・フィルタ付き一覧機能
+- メタ情報（勝率・DDなど）付きの表示や検索機能も対応
 """
 
 from fastapi import APIRouter, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json
-import csv
-from io import StringIO
 
 from core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
@@ -26,6 +23,7 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 async def list_strategies(request: Request):
     """
     📋 戦略ファイル一覧表示
+    - veritas_generated 内の .py 戦略ファイル一覧を表示
     """
     veritas_dir = STRATEGIES_DIR / "veritas_generated"
     if not veritas_dir.exists():
@@ -44,6 +42,7 @@ async def list_strategies(request: Request):
 async def view_strategy(request: Request, name: str):
     """
     🔍 指定戦略ファイルの内容を表示
+    - /strategies/view?name=example.py
     """
     veritas_dir = STRATEGIES_DIR / "veritas_generated"
     target_file = veritas_dir / name
@@ -63,65 +62,66 @@ async def view_strategy(request: Request, name: str):
     })
 
 
-@router.get("/strategies/export")
-async def export_strategy(name: str, format: str = "py"):
+@router.get("/strategies/overview", response_class=HTMLResponse)
+async def strategy_overview(request: Request):
     """
-    📥 戦略ファイルをエクスポート（.py または .json → .csv）
+    📊 メタ情報付きの戦略一覧表示
     """
-    veritas_dir = STRATEGIES_DIR / "veritas_generated"
-    target_file = veritas_dir / name
+    meta_dir = STRATEGIES_DIR / "veritas_generated"
+    data = []
 
-    if format == "py":
-        if not target_file.exists() or target_file.suffix != ".py":
-            raise HTTPException(status_code=404, detail="Python戦略ファイルが存在しません")
-        return FileResponse(
-            target_file,
-            media_type="text/x-python",
-            filename=target_file.name
-        )
-
-    elif format == "csv":
-        if not target_file.exists() or target_file.suffix != ".json":
-            raise HTTPException(status_code=404, detail="JSONファイルが存在しません")
-
+    for file in meta_dir.glob("*.json"):
         try:
-            with open(target_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            with open(file, encoding="utf-8") as f:
+                j = json.load(f)
+                j["json_name"] = file.name
+                data.append(j)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"JSON読み込み失敗: {e}")
+            print(f"⚠️ 読み込み失敗: {file.name} - {e}")
 
-        csv_io = StringIO()
-        writer = csv.writer(csv_io)
-        writer.writerow(["key", "value"])
-        for k, v in data.items():
-            writer.writerow([k, v])
-
-        return Response(
-            content=csv_io.getvalue(),
-            media_type="text/csv",
-            headers={
-                "Content-Disposition": f"attachment; filename={target_file.stem}.csv"
-            }
-        )
-
-    else:
-        raise HTTPException(status_code=400, detail="format は 'py' または 'csv' を指定してください")
+    return templates.TemplateResponse("strategies/strategies_overview.html", {
+        "request": request,
+        "strategies": data
+    })
 
 
 @router.get("/strategies/search", response_class=HTMLResponse)
-async def search_strategies(request: Request, keyword: str = Query(None)):
+async def strategy_search(request: Request, keyword: str = Query(default="")):
     """
-    🔍 戦略ファイル検索（ファイル名に含まれるキーワードでフィルタ）
+    🔍 戦略のキーワード検索（戦略名 or タグ名にマッチ）
     """
-    veritas_dir = STRATEGIES_DIR / "veritas_generated"
-    if not veritas_dir.exists():
-        raise HTTPException(status_code=500, detail="戦略ディレクトリが存在しません")
+    meta_dir = STRATEGIES_DIR / "veritas_generated"
+    matched = []
 
-    strategy_files = sorted(veritas_dir.glob("*.py"))
-    strategy_names = [f.name for f in strategy_files if not keyword or keyword.lower() in f.name.lower()]
+    for file in meta_dir.glob("*.json"):
+        try:
+            with open(file, encoding="utf-8") as f:
+                j = json.load(f)
+                strategy_name = j.get("strategy", "")
+                tags = j.get("tags", [])
+                if keyword.lower() in strategy_name.lower() or any(keyword.lower() in t.lower() for t in tags):
+                    matched.append(j)
+        except Exception as e:
+            print(f"⚠️ 検索中に読み込み失敗: {file.name} - {e}")
 
-    return templates.TemplateResponse("strategies/search.html", {
+    return templates.TemplateResponse("strategies/strategies_overview.html", {
         "request": request,
-        "keyword": keyword or "",
-        "strategies": strategy_names
+        "strategies": matched,
+        "keyword": keyword
     })
+
+
+@router.get("/strategies/export", response_class=FileResponse)
+async def export_strategy(name: str):
+    """
+    📤 Python戦略ファイルをダウンロード（保存）
+    """
+    target = STRATEGIES_DIR / "veritas_generated" / name
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="ファイルが存在しません")
+
+    return FileResponse(
+        path=target,
+        filename=target.name,
+        media_type="text/x-python"
+    )
