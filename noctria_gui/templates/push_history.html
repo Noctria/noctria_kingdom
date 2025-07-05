@@ -1,75 +1,82 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>GitHub Push履歴 - Noctria Kingdom</title>
+  <meta charset="UTF-8" />
+  <title>Push履歴 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f4f4f4;
+      background-color: #f8f9fa;
       padding: 2rem;
     }
     h1 {
-      color: #222;
+      color: #333;
     }
     table {
-      border-collapse: collapse;
       width: 100%;
-      margin-top: 1.5rem;
-      background-color: #fff;
+      border-collapse: collapse;
+      margin-top: 1rem;
     }
     th, td {
       border: 1px solid #ccc;
-      padding: 0.75rem;
+      padding: 0.6rem;
       text-align: left;
     }
     th {
-      background-color: #eee;
+      background-color: #e9ecef;
+      cursor: pointer;
     }
-    a {
-      text-decoration: none;
-      color: #0066cc;
-    }
-    .sort-links {
+    .filter-links {
       margin-top: 1rem;
+    }
+    .filter-links a {
+      margin-right: 1rem;
+      text-decoration: none;
+      color: #007bff;
+    }
+    .filter-links a:hover {
+      text-decoration: underline;
+    }
+    .sort-indicator {
+      font-size: 0.8em;
+      color: #666;
+      margin-left: 0.25rem;
     }
   </style>
 </head>
 <body>
-  <h1>📜 GitHub Push履歴</h1>
+  <h1>📤 Push操作履歴（GitHub記録）</h1>
 
-  <div class="sort-links">
-    並び替え:
-    {% if sort == 'asc' %}
-      🔼 昇順 | <a href="/push-history?sort=desc">🔽 降順</a>
-    {% else %}
-      <a href="/push-history?sort=asc">🔼 昇順</a> | 🔽 降順
-    {% endif %}
+  <div class="filter-links">
+    <a href="/push-history">すべて表示</a>
+    <a href="/push-history?sort=desc">📅 日時: 新→古</a>
+    <a href="/push-history?sort=asc">📅 日時: 古→新</a>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>📌 戦略</th>
-        <th>📅 Push日時</th>
-        <th>🔗 Commit</th>
-        <th>📂 ソースパス</th>
-        <th>📄 ログファイル</th>
+        <th>日時</th>
+        <th>戦略名</th>
+        <th>コミットメッセージ</th>
+        <th>操作種別</th>
+        <th>署名</th>
       </tr>
     </thead>
     <tbody>
-      {% for log in logs %}
-        <tr>
-          <td>{{ log.strategy }}</td>
-          <td>{{ log.pushed_at[:19].replace('T', ' ') }}</td>
-          <td><code>{{ log.commit[:7] }}</code></td>
-          <td>{{ log.source }}</td>
-          <td><code>{{ log.filename }}</code></td>
-        </tr>
+      {% for entry in push_logs %}
+      <tr>
+        <td>{{ entry.timestamp }}</td>
+        <td>{{ entry.strategy }}</td>
+        <td>{{ entry.commit_message }}</td>
+        <td>{{ entry.action }}</td>
+        <td>{{ entry.signature }}</td>
+      </tr>
       {% else %}
-        <tr>
-          <td colspan="5">ログが存在しません。</td>
-        </tr>
+      <tr>
+        <td colspan="5">Push履歴が存在しません。</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
