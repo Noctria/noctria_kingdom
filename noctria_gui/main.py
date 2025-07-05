@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-
 from pathlib import Path
+
+# ✅ Noctria Kingdom の統治下にある正式パス管理
+from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+
+# ✅ ルート定義（各画面モジュール）
+from noctria_gui.routes import home_routes, strategy_routes
 
 # ========================================
 # 🌐 FastAPI GUI 起動構成（Noctria Kingdom）
@@ -18,16 +22,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ✅ パス設定
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATE_DIR = BASE_DIR / "templates"
-STATIC_DIR = BASE_DIR / "static"
+# ✅ 静的ファイル & テンプレートの登録
+app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ テンプレート & 静的ファイル登録
-templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-# ✅ トップページ（仮）
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# ✅ ルータ登録（責務ごとに登録）
+app.include_router(home_routes.router)
+app.include_router(strategy_routes.router)
