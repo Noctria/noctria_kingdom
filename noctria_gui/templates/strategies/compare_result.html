@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 戦略比較ビュー</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      padding: 2rem;
+      background-color: #f4f4f4;
+      font-family: "Segoe UI", sans-serif;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    .nav-buttons {
+      margin-bottom: 1.5rem;
+    }
+    .nav-buttons button {
+      padding: 0.5rem 1rem;
+      margin-right: 1rem;
+      border: none;
+      background-color: #007acc;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .nav-buttons button:hover {
+      background-color: #005fa3;
+    }
+    canvas {
+      max-width: 800px;
+      margin: auto;
+      display: block;
+    }
+    .back-link {
+      margin-top: 2rem;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 選択戦略の比較グラフ</h1>
+
+  <div class="nav-buttons">
+    <button onclick="renderChart('win_rate')">勝率</button>
+    <button onclick="renderChart('max_drawdown')">最大DD</button>
+    <button onclick="renderChart('num_trades')">取引数</button>
+  </div>
+
+  <canvas id="strategyChart" height="120"></canvas>
+
+  <script>
+    const strategies = {{ strategies | tojson }};
+    const labels = strategies.map(s => s.strategy);
+
+    const metrics = {
+      win_rate: {
+        label: "勝率 (%)",
+        data: strategies.map(s => s.win_rate),
+        backgroundColor: "rgba(54, 162, 235, 0.6)"
+      },
+      max_drawdown: {
+        label: "最大DD",
+        data: strategies.map(s => s.max_drawdown),
+        backgroundColor: "rgba(255, 99, 132, 0.6)"
+      },
+      num_trades: {
+        label: "取引数",
+        data: strategies.map(s => s.num_trades),
+        backgroundColor: "rgba(75, 192, 192, 0.6)"
+      }
+    };
+
+    let chart;
+    function renderChart(type) {
+      if (chart) chart.destroy();
+
+      const ctx = document.getElementById("strategyChart").getContext("2d");
+
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: metrics[type].label,
+            data: metrics[type].data,
+            backgroundColor: metrics[type].backgroundColor
+          }]
+        },
+        options: {
+          responsive: true,
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              const strategyName = labels[index];
+              window.location.href = `/strategy/detail?name=${encodeURIComponent(strategyName)}`;
+            }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    renderChart("{{ metric if metric else 'win_rate' }}");
+  </script>
+
+  <a class="back-link" href="/strategies/compare">← 戦略選択に戻る</a>
+</body>
+</html>
