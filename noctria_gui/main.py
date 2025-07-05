@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+"""
+🌐 Noctria Kingdom GUI 起動スクリプト
+- FastAPIにより王国の統治パネルを展開
+"""
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -20,11 +25,14 @@ from noctria_gui.routes import (
     statistics,
     act_history,
     push_history,
-    logs_routes,  # ✅ 統治ログルートを追加
+    logs_routes,
+    tag_summary,           # ✅ タグ別統計ルート
+    tag_summary_detail,    # ✅ タグ別詳細ルート
+    strategy_detail,       # ✅ 戦略詳細ビュー
 )
 
 # ========================================
-# 🌐 FastAPI GUI 起動構成（Noctria Kingdom）
+# 🚀 FastAPI GUI 構成（Noctria Kingdom）
 # ========================================
 
 app = FastAPI(
@@ -46,10 +54,10 @@ def from_json(value):
 
 templates.env.filters["from_json"] = from_json
 
-# ✅ 状態として templates を保持（他モジュールでも利用）
+# ✅ 状態として templates を保持（他モジュールでも利用可能）
 app.state.templates = templates
 
-# ✅ ルーター登録
+# ✅ 全ルートモジュール登録
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
 app.include_router(pdca.router)
@@ -58,4 +66,7 @@ app.include_router(upload_history.router)
 app.include_router(statistics.router)
 app.include_router(act_history.router)
 app.include_router(push_history.router)
-app.include_router(logs_routes.router)  # ✅ 統治ログ操作ルート
+app.include_router(logs_routes.router)
+app.include_router(tag_summary.router)
+app.include_router(tag_summary_detail.router)
+app.include_router(strategy_detail.router)
