@@ -14,7 +14,7 @@ SIGNAL_OUTPUT_PATH = Path(
     "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files/veritas_signal.json"
 )
 STRATEGY_PATH = Path("strategies/official/")
-TARGET_STRATEGY = "strategy_001.py"  # 実行対象戦略（任意に変更可）
+TARGET_STRATEGY = "sample_strategy.py"  # 実行対象戦略（任意に変更可）
 
 # 🗃 ダミー市場データ
 def load_dummy_market_data():
