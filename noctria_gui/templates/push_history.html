@@ -16,9 +16,28 @@
       margin-bottom: 1.5rem;
       display: flex;
       gap: 1rem;
+      align-items: center;
     }
-    input, button {
+    input[type="text"] {
+      flex: 1;
       padding: 0.4rem 0.8rem;
+      font-size: 1rem;
+    }
+    button {
+      padding: 0.4rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .csv-link {
+      text-decoration: none;
+      color: #0066cc;
+      border: 1px solid #0066cc;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      background-color: white;
+    }
+    .csv-link:hover {
+      background-color: #eef;
     }
     table {
       width: 100%;
@@ -37,15 +56,18 @@
       color: #007acc;
       text-decoration: none;
     }
+    a.detail-link:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <h1>📦 Veritas Push履歴</h1>
 
   <form method="get" action="/push-history" class="search">
-    <input type="text" name="keyword" placeholder="戦略名や通貨ペアで検索" />
-    <button type="submit">検索</button>
-    <a href="/push-history/export">CSV出力</a>
+    <input type="text" name="keyword" placeholder="戦略名や通貨ペアで検索" value="{{ keyword | default('') }}" />
+    <button type="submit">🔍 検索</button>
+    <a class="csv-link" href="/push-history/export">📤 CSV出力</a>
   </form>
 
   <table>
@@ -65,7 +87,9 @@
         <td>{{ log.timestamp }}</td>
         <td>{{ log.message }}</td>
         <td>{{ log.pushed_by }}</td>
-        <td><a class="detail-link" href="/push-history/detail?strategy={{ log.strategy }}&timestamp={{ log.timestamp }}">詳細</a></td>
+        <td>
+          <a class="detail-link" href="/push-history/detail?strategy={{ log.strategy }}&timestamp={{ log.timestamp }}">🔎 詳細</a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
