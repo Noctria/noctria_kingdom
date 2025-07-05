@@ -26,9 +26,10 @@ from noctria_gui.routes import (
     act_history,
     push_history,
     logs_routes,
-    tag_summary,           # ✅ タグ別統計ルート
-    tag_summary_detail,    # ✅ タグ別詳細ルート
-    strategy_detail,       # ✅ 戦略詳細ビュー
+    tag_summary,
+    tag_summary_detail,
+    strategy_detail,
+    strategy_compare,  # ✅ 戦略比較グラフページ（/strategies/compare）
 )
 
 # ========================================
@@ -60,13 +61,14 @@ app.state.templates = templates
 # ✅ 全ルートモジュール登録
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
-app.include_router(pdca.router)
-app.include_router(upload.router)
-app.include_router(upload_history.router)
+app.include_router(strategy_compare.router)  # ✅ 比較ページルート追加
+app.include_router(strategy_detail.router)
+app.include_router(tag_summary.router)
+app.include_router(tag_summary_detail.router)
 app.include_router(statistics.router)
 app.include_router(act_history.router)
 app.include_router(push_history.router)
 app.include_router(logs_routes.router)
-app.include_router(tag_summary.router)
-app.include_router(tag_summary_detail.router)
-app.include_router(strategy_detail.router)
+app.include_router(upload.router)
+app.include_router(upload_history.router)
+app.include_router(pdca.router)
