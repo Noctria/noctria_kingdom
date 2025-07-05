@@ -2,81 +2,106 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>📋 Veritas戦略一覧（メタ情報付き）</title>
+  <title>📊 Veritas戦略の統計ビュー</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
       padding: 2rem;
-      background-color: #f4f4f4;
+      background-color: #f9f9f9;
     }
     h1 {
-      color: #222;
+      margin-bottom: 1rem;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      background-color: white;
-      margin-top: 1.5rem;
+      background-color: #fff;
+      margin-top: 1rem;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     }
     th, td {
-      border: 1px solid #ccc;
       padding: 0.6rem;
+      border: 1px solid #ccc;
       text-align: center;
     }
     th {
-      background-color: #eaeaea;
+      background-color: #e8e8e8;
     }
-    .strategy-link {
+    .tag {
+      background-color: #def;
+      color: #046;
+      padding: 2px 6px;
+      margin: 0 2px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .detail-link {
       color: #007acc;
       text-decoration: none;
     }
-    .strategy-link:hover {
+    .detail-link:hover {
       text-decoration: underline;
     }
-    .tag {
-      background-color: #d0ebff;
-      color: #004085;
-      padding: 2px 6px;
-      margin: 2px;
-      border-radius: 4px;
-      display: inline-block;
-      font-size: 0.9em;
+    .search-box {
+      margin-top: 1rem;
+    }
+    .search-box input[type="text"] {
+      padding: 6px;
+      width: 250px;
+    }
+    .search-box button {
+      padding: 6px 12px;
+      margin-left: 6px;
     }
   </style>
 </head>
 <body>
-  <h1>📋 Veritas戦略一覧（メタ情報付き）</h1>
+  <h1>📊 Veritas戦略の統計ビュー</h1>
 
+  <div class="search-box">
+    <form method="get" action="/strategies/search">
+      <input type="text" name="keyword" placeholder="戦略名やタグを検索" value="{{ keyword if keyword else '' }}">
+      <button type="submit">🔍 検索</button>
+    </form>
+  </div>
+
+  {% if strategies %}
   <table>
     <thead>
       <tr>
         <th>戦略名</th>
         <th>勝率</th>
+        <th>取引数</th>
         <th>最大DD</th>
-        <th>取引回数</th>
-        <th>評価日時</th>
         <th>タグ</th>
+        <th>操作</th>
       </tr>
     </thead>
     <tbody>
-      {% for strat in strategies %}
+      {% for s in strategies %}
       <tr>
-        <td><a class="strategy-link" href="/strategies/view?name={{ strat.name }}">{{ strat.name }}</a></td>
-        <td>{{ "%.2f"|format(strat.win_rate * 100) }}%</td>
-        <td>{{ "%.2f"|format(strat.max_drawdown * 100) }}%</td>
-        <td>{{ strat.trade_count }}</td>
-        <td>{{ strat.timestamp }}</td>
+        <td>{{ s.strategy }}</td>
+        <td>{{ s.win_rate or '―' }}%</td>
+        <td>{{ s.num_trades or '―' }}</td>
+        <td>{{ s.max_drawdown or '―' }}</td>
         <td>
-          {% for tag in strat.tags %}
+          {% for tag in s.tags %}
             <span class="tag">{{ tag }}</span>
           {% endfor %}
+        </td>
+        <td>
+          <a class="detail-link" href="/strategy/detail?name={{ s.strategy }}">📄 詳細</a> |
+          <a class="detail-link" href="/strategies/view?name={{ s.strategy }}.py">📜 コード</a>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+    <p>⚠️ 表示できる戦略が見つかりませんでした。</p>
+  {% endif %}
 
-  <a href="/">← トップへ戻る</a>
+  <p style="margin-top: 1rem;"><a href="/">← トップへ戻る</a></p>
 </body>
 </html>
