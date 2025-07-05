@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import os
 import json
 import requests
+from datetime import datetime
 
 from core.path_config import (
     PDCA_LOG_DIR,
@@ -16,10 +17,17 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
 # ========================================
-# 📜 /pdca - 履歴表示ページ
+# 📜 /pdca - 履歴表示ページ（フィルター対応）
 # ========================================
 @router.get("/pdca", response_class=HTMLResponse)
-async def show_pdca_dashboard(request: Request):
+async def show_pdca_dashboard(
+    request: Request,
+    strategy: str = Query(None),
+    symbol: str = Query(None),
+    signal: str = Query(None),
+    date_from: str = Query(None),
+    date_to: str = Query(None),
+):
     log_files = sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True)
     logs = []
 
@@ -31,11 +39,18 @@ async def show_pdca_dashboard(request: Request):
             print(f"⚠️ ログ読み込み失敗: {log_file} -> {e}")
             continue
 
-        logs.append({
+        ts = data.get("timestamp", "")
+        try:
+            ts_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
+        except Exception:
+            ts_dt = None
+
+        log_entry = {
             "filename": log_file.name,
             "path": str(log_file),
             "strategy": data.get("strategy", "N/A"),
-            "timestamp": data.get("timestamp", "N/A"),
+            "timestamp": ts,
+            "timestamp_dt": ts_dt,
             "signal": data.get("signal", "N/A"),
             "symbol": data.get("symbol", "N/A"),
             "lot": data.get("lot", "N/A"),
@@ -45,11 +60,46 @@ async def show_pdca_dashboard(request: Request):
             "max_dd": data.get("max_dd", None),
             "trades": data.get("trades", None),
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
-        })
+        }
+
+        logs.append(log_entry)
+
+    # 🔍 フィルター処理
+    def matches(log):
+        if strategy and strategy.lower() not in log["strategy"].lower():
+            return False
+        if symbol and log["symbol"] != symbol:
+            return False
+        if signal and log["signal"] != signal:
+            return False
+        if date_from:
+            try:
+                from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+                if log["timestamp_dt"] and log["timestamp_dt"] < from_dt:
+                    return False
+            except:
+                pass
+        if date_to:
+            try:
+                to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+                if log["timestamp_dt"] and log["timestamp_dt"] > to_dt:
+                    return False
+            except:
+                pass
+        return True
+
+    filtered_logs = [log for log in logs if matches(log)]
 
     return templates.TemplateResponse("pdca_dashboard.html", {
         "request": request,
-        "logs": logs,
+        "logs": filtered_logs,
+        "filters": {
+            "strategy": strategy or "",
+            "symbol": symbol or "",
+            "signal": signal or "",
+            "date_from": date_from or "",
+            "date_to": date_to or "",
+        }
     })
 
 
