@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
 import json
 import importlib.util
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
+import argparse
 
 # ========================================
 # ⚔️ Veritas戦略 → EA命令JSON生成スクリプト（Doフェーズ）
@@ -58,6 +62,25 @@ def save_pdca_log(signal_dict: dict):
         json.dump(signal_dict, f, indent=2, ensure_ascii=False)
     print(f"🗂️ PDCA履歴ログを保存しました: {out_path}")
 
+# ✅ ログファイルから命令を復元して再送
+def generate_order_from_log(log_path: Path):
+    print(f"♻️ 過去ログからEA命令を再生成します: {log_path}")
+    if not log_path.exists():
+        print(f"❌ 指定されたログファイルが存在しません: {log_path}")
+        return
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        signal = json.load(f)
+
+    # 📤 EA命令ファイルとして再出力
+    VERITAS_ORDER_JSON.parent.mkdir(parents=True, exist_ok=True)
+    with open(VERITAS_ORDER_JSON, "w", encoding="utf-8") as f:
+        json.dump(signal, f, indent=2, ensure_ascii=False)
+
+    print("✅ EA命令ファイルを再出力しました:", VERITAS_ORDER_JSON)
+    print("📦 内容:", signal)
+    print("📜 王国記録:『過去の命を今に蘇らせた…歴史は繰り返す。』")
+
 # ✅ メイン関数（Airflow & CLI 両対応）
 def generate_order_json():
     print("⚔️ [Veritas] EA命令生成フェーズを開始します…")
@@ -84,6 +107,13 @@ def generate_order_json():
 
     print("📜 王国訓示:『この命、記されし記録として未来に残らん。』")
 
-# ✅ 手動実行対応
+# ✅ CLI対応：--from-log 引数で再送可能
 if __name__ == "__main__":
-    generate_order_json()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--from-log", type=str, help="再送用のPDCAログファイルパス")
+    args = parser.parse_args()
+
+    if args.from_log:
+        generate_order_from_log(Path(args.from_log))
+    else:
+        generate_order_json()
