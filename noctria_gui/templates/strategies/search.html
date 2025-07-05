@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔍 Veritas戦略検索 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      padding: 2rem;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      color: #333;
+    }
+    form {
+      margin-bottom: 1rem;
+    }
+    input[type="text"] {
+      padding: 0.5rem;
+      width: 250px;
+      font-size: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      padding: 0.3rem 0;
+    }
+    a {
+      color: #007acc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Veritas戦略検索</h1>
+
+  <form method="get" action="/strategies/search">
+    <input type="text" name="keyword" placeholder="戦略名で検索" value="{{ keyword }}">
+    <button type="submit">検索</button>
+  </form>
+
+  {% if strategies %}
+    <ul>
+      {% for name in strategies %}
+        <li><a href="/strategies/view?name={{ name }}">{{ name }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>一致する戦略は見つかりませんでした。</p>
+  {% endif %}
+
+  <a href="/strategies">← 戦略一覧に戻る</a>
+</body>
+</html>
