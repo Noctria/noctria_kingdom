@@ -2,87 +2,92 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>📈 戦略比較グラフ</title>
+  <title>📊 戦略比較ビュー</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="/static/style.css">
   <style>
     body {
       padding: 2rem;
-      background: #f9f9f9;
+      background-color: #f4f4f4;
       font-family: "Segoe UI", sans-serif;
     }
     h1 {
       margin-bottom: 1rem;
     }
-    .nav {
-      margin-bottom: 1rem;
+    .nav-buttons {
+      margin-bottom: 1.5rem;
     }
-    .nav button {
-      padding: 6px 12px;
-      margin-right: 8px;
-      background: #007acc;
-      color: white;
+    .nav-buttons button {
+      padding: 0.5rem 1rem;
+      margin-right: 1rem;
       border: none;
+      background-color: #007acc;
+      color: white;
       border-radius: 4px;
       cursor: pointer;
     }
-    .nav button:hover {
-      background: #005f99;
+    .nav-buttons button:hover {
+      background-color: #005fa3;
     }
     canvas {
-      max-width: 900px;
-      margin-top: 1rem;
+      max-width: 800px;
+      margin: auto;
+    }
+    .back-link {
+      margin-top: 2rem;
+      display: block;
     }
   </style>
 </head>
 <body>
-  <h1>📈 選択戦略の比較</h1>
+  <h1>📊 選択戦略の比較グラフ</h1>
 
-  <div class="nav">
-    <button onclick="showChart('win')">🏆 勝率</button>
-    <button onclick="showChart('dd')">📉 最大DD</button>
-    <button onclick="showChart('trades')">📊 取引数</button>
+  <div class="nav-buttons">
+    <button onclick="renderChart('win_rate')">勝率</button>
+    <button onclick="renderChart('max_drawdown')">最大DD</button>
+    <button onclick="renderChart('num_trades')">取引数</button>
   </div>
 
-  <canvas id="chart"></canvas>
+  <canvas id="strategyChart" height="120"></canvas>
 
   <script>
-    const strategies = {{ strategies | tojson | safe }};
+    const strategies = {{ strategies | tojson }};
     const labels = strategies.map(s => s.strategy);
 
-    const datasets = {
-      win: {
+    const metrics = {
+      win_rate: {
         label: "勝率 (%)",
-        data: strategies.map(s => s.win_rate || 0),
+        data: strategies.map(s => s.win_rate),
         backgroundColor: "rgba(54, 162, 235, 0.6)"
       },
-      dd: {
-        label: "最大ドローダウン",
-        data: strategies.map(s => s.max_drawdown || 0),
+      max_drawdown: {
+        label: "最大DD",
+        data: strategies.map(s => s.max_drawdown),
         backgroundColor: "rgba(255, 99, 132, 0.6)"
       },
-      trades: {
+      num_trades: {
         label: "取引数",
-        data: strategies.map(s => s.num_trades || 0),
+        data: strategies.map(s => s.num_trades),
         backgroundColor: "rgba(75, 192, 192, 0.6)"
       }
     };
 
     let chart;
-    function showChart(type) {
+    function renderChart(type) {
       if (chart) chart.destroy();
-      chart = new Chart(document.getElementById("chart"), {
-        type: "bar",
+
+      chart = new Chart(document.getElementById("strategyChart"), {
+        type: 'bar',
         data: {
           labels: labels,
-          datasets: [datasets[type]]
+          datasets: [{
+            label: metrics[type].label,
+            data: metrics[type].data,
+            backgroundColor: metrics[type].backgroundColor
+          }]
         },
         options: {
           responsive: true,
-          plugins: {
-            legend: { display: true },
-            title: { display: true, text: datasets[type].label }
-          },
           scales: {
             y: { beginAtZero: true }
           }
@@ -90,12 +95,10 @@
       });
     }
 
-    // 初期表示
-    showChart('win');
+    // 初期表示（選択メトリクスが指定されていればそれ、なければ勝率）
+    renderChart("{{ metric if metric else 'win_rate' }}");
   </script>
 
-  <p style="margin-top: 1.5rem;">
-    <a href="/strategies/compare">← 戦略選択に戻る</a>
-  </p>
+  <a class="back-link" href="/strategies/compare">← 戦略選択に戻る</a>
 </body>
 </html>
