@@ -39,19 +39,18 @@ async def show_act_history(request: Request, only_unpushed: bool = False):
 @router.post("/act-history/repush")
 async def repush_strategy(strategy_name: str = Form(...)):
     """
-    🔁 指定戦略のPushフラグを強制的に false に戻す
-    （再Push可能にする）
+    🔁 指定戦略のPushフラグを false にリセット（再Push可能に）
     """
-    act_log_service.force_unpush_flag(strategy_name)
+    act_log_service.reset_push_flag(strategy_name)
     return RedirectResponse(url="/act-history", status_code=303)
 
 
 @router.post("/act-history/reevaluate")
 async def reevaluate_strategy(strategy_name: str = Form(...)):
     """
-    🔄 指定戦略を再評価フェーズに回す（評価結果へ戻す）
+    🔄 指定戦略を再評価対象として記録
     """
-    act_log_service.move_to_evaluation(strategy_name)
+    act_log_service.mark_for_reevaluation(strategy_name)
     return RedirectResponse(url="/act-history", status_code=303)
 
 
@@ -64,7 +63,7 @@ async def export_act_log_csv():
     output_path = TOOLS_DIR / f"veritas_adoptions_{timestamp}.csv"
 
     logs = act_log_service.load_all_act_logs()
-    act_log_service.export_act_logs_to_csv(logs, output_path)
+    act_log_service.export_logs_to_csv(logs, output_path)
 
     return FileResponse(
         output_path,
