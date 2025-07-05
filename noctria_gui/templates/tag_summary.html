@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>🧠 タグ別戦略統計 - Noctria Kingdom</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #222;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #e0e0e0;
+    }
+    .tag-label {
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 タグ別戦略統計</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>タグ</th>
+        <th>戦略数</th>
+        <th>平均勝率</th>
+        <th>平均取引数</th>
+        <th>平均最大DD</th>
+        <th>戦略例</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in summary_data %}
+      <tr>
+        <td class="tag-label">{{ item.tag }}</td>
+        <td>{{ item.strategy_count }}</td>
+        <td>{{ item.average_win_rate }}%</td>
+        <td>{{ item.average_trade_count }}</td>
+        <td>{{ item.average_max_drawdown }}</td>
+        <td>{{ ", ".join(item.sample_strategies) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
