@@ -49,6 +49,10 @@ GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
 GUI_ROUTES_DIR = NOCTRIA_GUI_DIR / "routes"
 GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
 
+# ✅ FastAPI GUI 起動用（main.py で使用される専用パス）
+NOCTRIA_GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
+NOCTRIA_GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
+
 LLM_SERVER_DIR = BASE_DIR / "llm_server"
 DOCS_DIR = BASE_DIR / "docs"
 TESTS_DIR = BASE_DIR / "tests"
