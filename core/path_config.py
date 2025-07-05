@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ========================================
-# 📌 Noctria Kingdom Path Config (v3.3)
+# 📌 Noctria Kingdom Path Config (v3.4)
 #    - 全構成要素を王の地図に記録
 #    - Docker/WSL/Local対応（自動切り替え）
 # ========================================
@@ -69,6 +69,7 @@ MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
 # ========================================
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
+GENERATE_ORDER_SCRIPT = EXECUTION_DIR / "generate_order_json.py"
 
 # ========================================
 # 🔁 GitHub操作スクリプト
@@ -125,6 +126,7 @@ def _lint_path_config():
         "MARKET_DATA_CSV": MARKET_DATA_CSV.exists(),
         "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
         "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
+        "GENERATE_ORDER_SCRIPT": GENERATE_ORDER_SCRIPT.exists(),
         "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
     }
 
@@ -140,6 +142,6 @@ __all__ = [
     "NOCTRIA_GUI_STATIC_DIR", "NOCTRIA_GUI_TEMPLATES_DIR",
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
-    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
+    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
     "GITHUB_PUSH_SCRIPT", "CATEGORY_MAP", "_lint_path_config"
 ]
