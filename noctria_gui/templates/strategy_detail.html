@@ -5,68 +5,17 @@
   <title>📄 戦略詳細 - {{ strategy.strategy }}</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      padding: 2rem;
-      background-color: #f9f9f9;
-    }
-    h1 {
-      margin-bottom: 1rem;
-    }
-    .info-box {
-      background: #fff;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-      margin-bottom: 2rem;
-    }
-    .info-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .info-table th, .info-table td {
-      padding: 0.6rem;
-      text-align: left;
-    }
-    .info-table th {
-      width: 25%;
-      background-color: #f0f0f0;
-    }
-    .tag {
-      background-color: #def;
-      color: #046;
-      padding: 2px 6px;
-      margin-right: 5px;
-      border-radius: 4px;
-      font-size: 0.9em;
-      display: inline-block;
-    }
-    .description-box {
-      background: #fefefe;
-      border: 1px solid #ccc;
-      padding: 1rem;
-      border-radius: 6px;
-      font-size: 1rem;
-      line-height: 1.5;
-      white-space: pre-wrap;
-    }
-    a.button {
-      display: inline-block;
-      padding: 0.5rem 1rem;
-      margin-top: 1rem;
-      background-color: #007acc;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-    }
-    a.button:hover {
-      background-color: #005ea6;
-    }
-    canvas {
-      max-width: 500px;
-      margin: 1rem auto;
-      display: block;
-    }
+    body { font-family: "Segoe UI", sans-serif; padding: 2rem; background-color: #f9f9f9; }
+    h1 { margin-bottom: 1rem; }
+    .info-box { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+    .info-table { width: 100%; border-collapse: collapse; }
+    .info-table th, .info-table td { padding: 0.6rem; text-align: left; }
+    .info-table th { width: 25%; background-color: #f0f0f0; }
+    .tag { background-color: #def; color: #046; padding: 2px 6px; margin-right: 5px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
+    .description-box { background: #fefefe; border: 1px solid #ccc; padding: 1rem; border-radius: 6px; font-size: 1rem; line-height: 1.5; white-space: pre-wrap; }
+    a.button { display: inline-block; padding: 0.5rem 1rem; margin-top: 1rem; background-color: #007acc; color: white; text-decoration: none; border-radius: 6px; }
+    a.button:hover { background-color: #005ea6; }
+    canvas { max-width: 800px; margin: 2rem auto; display: block; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -76,76 +25,59 @@
   <div class="info-box">
     <h2>📊 概要</h2>
     <table class="info-table">
-      <tr>
-        <th>勝率</th>
-        <td>{{ strategy.win_rate or "―" }}%</td>
-      </tr>
-      <tr>
-        <th>取引数</th>
-        <td>{{ strategy.num_trades or "―" }}</td>
-      </tr>
-      <tr>
-        <th>最大ドローダウン</th>
-        <td>{{ strategy.max_drawdown or "―" }}</td>
-      </tr>
-      <tr>
-        <th>タグ</th>
-        <td>
-          {% for tag in strategy.tags %}
-            <span class="tag">{{ tag }}</span>
-          {% endfor %}
-        </td>
-      </tr>
+      <tr><th>勝率</th><td>{{ strategy.win_rate or "―" }}%</td></tr>
+      <tr><th>取引数</th><td>{{ strategy.num_trades or "―" }}</td></tr>
+      <tr><th>最大ドローダウン</th><td>{{ strategy.max_drawdown or "―" }}</td></tr>
+      <tr><th>タグ</th><td>{% for tag in strategy.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</td></tr>
     </table>
   </div>
 
   <div class="info-box">
-    <h2>📈 評価グラフ</h2>
-    <canvas id="evaluationChart"></canvas>
+    <h2>📈 評価グラフ（他戦略と比較）</h2>
+    <canvas id="comparisonChart"></canvas>
   </div>
 
   <div class="info-box">
-    <h2>🧠 戦略ロジックの説明</h2>
-    <div class="description-box">
-      {{ strategy.description or "説明がありません。" }}
-    </div>
+    <h2>🧠 ロジック説明</h2>
+    <div class="description-box">{{ strategy.description or "説明がありません。" }}</div>
   </div>
 
   <a class="button" href="/strategies/view?name={{ strategy.strategy }}.py">📜 コードを見る</a>
   <a class="button" href="/strategies">← 戦略一覧に戻る</a>
 
   <script>
-    const ctx = document.getElementById('evaluationChart');
-    const chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['勝率', '取引数', '最大DD'],
-        datasets: [{
-          label: '{{ strategy.strategy }}',
-          data: [
-            {{ strategy.win_rate or 0 }},
-            {{ strategy.num_trades or 0 }},
-            {{ strategy.max_drawdown or 0 }}
-          ],
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.6)',
-            'rgba(255, 206, 86, 0.6)',
-            'rgba(255, 99, 132, 0.6)'
-          ],
-          borderColor: [
-            'rgba(75, 192, 192, 1)',
-            'rgba(255, 206, 86, 1)',
-            'rgba(255, 99, 132, 1)'
-          ],
-          borderWidth: 1
-        }]
+    const labels = ["勝率", "取引数", "最大DD"];
+    const datasets = [
+      {
+        label: "{{ strategy.strategy }}",
+        data: [
+          {{ strategy.win_rate or 0 }},
+          {{ strategy.num_trades or 0 }},
+          {{ strategy.max_drawdown or 0 }}
+        ],
+        backgroundColor: "rgba(54, 162, 235, 0.6)"
       },
+      {% for s in related_strategies %}
+      {
+        label: "{{ s.strategy }}",
+        data: [
+          {{ s.win_rate or 0 }},
+          {{ s.num_trades or 0 }},
+          {{ s.max_drawdown or 0 }}
+        ],
+        backgroundColor: "rgba({{ 100 + loop.index0 * 30 }}, 200, 100, 0.4)"
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    const ctx = document.getElementById('comparisonChart');
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
       options: {
+        responsive: true,
         scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 10 }
-          }
+          y: { beginAtZero: true }
         }
       }
     });
