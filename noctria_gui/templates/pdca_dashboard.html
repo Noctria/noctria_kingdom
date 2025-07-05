@@ -13,6 +13,21 @@
       color: #222;
       margin-bottom: 1rem;
     }
+    form.filter-form {
+      background-color: #fff;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    form.filter-form input,
+    form.filter-form select,
+    form.filter-form button {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -62,6 +77,20 @@
 <body>
   <h1>📜 PDCA 実行履歴（Veritas Kingdom）</h1>
 
+  <!-- 🔍 フィルターUI -->
+  <form class="filter-form" method="get" action="/pdca">
+    <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy }}">
+    <input type="text" name="symbol" placeholder="通貨 (例: USDJPY)" value="{{ filters.symbol }}">
+    <select name="signal">
+      <option value="">シグナル</option>
+      <option value="BUY" {% if filters.signal == 'BUY' %}selected{% endif %}>BUY</option>
+      <option value="SELL" {% if filters.signal == 'SELL' %}selected{% endif %}>SELL</option>
+    </select>
+    <input type="date" name="date_from" value="{{ filters.date_from }}">
+    <input type="date" name="date_to" value="{{ filters.date_to }}">
+    <button type="submit">フィルター</button>
+  </form>
+
   <table>
     <thead>
       <tr>
@@ -102,7 +131,6 @@
         </td>
         <td>{{ log.trades or "-" }}</td>
         <td>
-          <!-- 🔍 モーダル起動ボタン -->
           <button onclick="showModal('modal_{{ loop.index }}')">詳細</button>
         </td>
       </tr>
