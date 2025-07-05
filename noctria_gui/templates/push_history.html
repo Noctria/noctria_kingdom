@@ -1,88 +1,77 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>Noctria Kingdom - Git Push 履歴</title>
+  <meta charset="UTF-8">
+  <title>GitHub Push履歴 - Noctria Kingdom</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f9f9f9;
+      background-color: #f4f4f4;
       padding: 2rem;
     }
     h1 {
-      color: #2c3e50;
-      margin-bottom: 1rem;
-    }
-    .sort-links {
-      margin-bottom: 1rem;
-    }
-    .sort-links a {
-      margin-right: 1rem;
-      text-decoration: none;
-      color: #007bff;
-    }
-    .sort-links a:hover {
-      text-decoration: underline;
+      color: #222;
     }
     table {
-      width: 100%;
       border-collapse: collapse;
-      background-color: white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      width: 100%;
+      margin-top: 1.5rem;
+      background-color: #fff;
     }
     th, td {
+      border: 1px solid #ccc;
       padding: 0.75rem;
       text-align: left;
-      border-bottom: 1px solid #ddd;
     }
     th {
-      background-color: #f0f0f0;
+      background-color: #eee;
     }
-    tr:hover {
-      background-color: #f9f9f9;
+    a {
+      text-decoration: none;
+      color: #0066cc;
     }
-    .timestamp {
-      font-family: monospace;
-      color: #555;
-    }
-    .commit-message {
-      color: #333;
+    .sort-links {
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
-  <h1>📤 Git Push 履歴</h1>
+  <h1>📜 GitHub Push履歴</h1>
 
   <div class="sort-links">
-    並び順:
-    {% if sort_order == 'asc' %}
-      🔼 昇順 | <a href="?sort=desc">🔽 降順に切替</a>
+    並び替え:
+    {% if sort == 'asc' %}
+      🔼 昇順 | <a href="/push-history?sort=desc">🔽 降順</a>
     {% else %}
-      🔽 降順 | <a href="?sort=asc">🔼 昇順に切替</a>
+      <a href="/push-history?sort=asc">🔼 昇順</a> | 🔽 降順
     {% endif %}
   </div>
 
-  {% if logs %}
-    <table>
-      <thead>
+  <table>
+    <thead>
+      <tr>
+        <th>📌 戦略</th>
+        <th>📅 Push日時</th>
+        <th>🔗 Commit</th>
+        <th>📂 ソースパス</th>
+        <th>📄 ログファイル</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
         <tr>
-          <th>📅 日時</th>
-          <th>📦 対象ファイル</th>
-          <th>📝 コミットメッセージ</th>
+          <td>{{ log.strategy }}</td>
+          <td>{{ log.pushed_at[:19].replace('T', ' ') }}</td>
+          <td><code>{{ log.commit[:7] }}</code></td>
+          <td>{{ log.source }}</td>
+          <td><code>{{ log.filename }}</code></td>
         </tr>
-      </thead>
-      <tbody>
-        {% for log in logs %}
-          <tr>
-            <td class="timestamp">{{ log.timestamp }}</td>
-            <td><code>{{ log.file }}</code></td>
-            <td class="commit-message">{{ log.message }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>⚠️ Git Push 履歴はまだ記録されていません。</p>
-  {% endif %}
+      {% else %}
+        <tr>
+          <td colspan="5">ログが存在しません。</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </body>
 </html>
