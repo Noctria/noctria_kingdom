@@ -1,50 +1,80 @@
-#!/usr/bin/env python3
-# coding: utf-8
-
-"""
-🛡️ Noctria Kingdom 路構図（path_config）の整合性検査スクリプト v2
-- `--strict`: 存在しない項目があると終了コード 1 を返す
-- `--show-paths`: 各キーのフルパスも表示
-"""
-
 import argparse
+import json
 from core import path_config
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="🔍 Noctria Kingdom 路構図の整合性を検査します。"
-    )
-    parser.add_argument("--strict", action="store_true", help="❗ エラー時に終了コード 1 を返す")
-    parser.add_argument("--show-paths", action="store_true", help="📂 各パスのフルパスを表示する")
+def verify_paths(strict=False, show_paths=False, category=None, output_json=False):
+    paths = []
+    results = []
 
-    args = parser.parse_args()
-    result = path_config._lint_path_config()
-    passed = True
-
-    print("🛡️ Noctria Kingdom 路構図の整合性検査を開始します...\n")
-
-    for key, exists in result.items():
-        path_obj = getattr(path_config, key, None)
-        if exists:
-            status = f"✅ {key}"
-        else:
-            status = f"❌ {key} が存在しません"
-            passed = False
-
-        if args.show_paths and isinstance(path_obj, object):
-            status += f" → {path_obj}"
-        print(status)
-
-    print("\n📜 検査完了。")
-    if passed:
-        print("🎉 全ての構成パスが整っています。王国の秩序は保たれています。")
-        exit(0)
+    if category:
+        if category not in path_config.CATEGORY_MAP:
+            err_msg = f"❌ カテゴリ '{category}' は存在しません。利用可能カテゴリ一覧は --list-categories で確認できます。"
+            if output_json:
+                print(json.dumps({"success": False, "error": err_msg}, indent=2, ensure_ascii=False))
+            else:
+                print(err_msg)
+            return
+        paths = path_config.CATEGORY_MAP[category]
     else:
-        print("⚠️ 一部の構成に問題があります。地図（path_config.py）と実構造を確認してください。")
-        if args.strict:
-            exit(1)
+        for group in path_config.CATEGORY_MAP.values():
+            paths.extend(group)
+
+    all_ok = True
+    for p in paths:
+        entry = {"path": str(p), "exists": p.exists()}
+        if strict:
+            if p.is_dir():
+                entry["type"] = "dir"
+            elif p.is_file():
+                entry["type"] = "file"
+            else:
+                entry["type"] = "unknown"
+        results.append(entry)
+
+        if not p.exists():
+            all_ok = False
+            if not output_json:
+                print(f"❌ 不在: {p}")
         else:
-            exit(0)
+            if strict and entry.get("type") == "unknown":
+                all_ok = False
+                if not output_json:
+                    print(f"⚠️ 不明な型: {p}")
+            elif not output_json and show_paths:
+                print(f"✅ OK: {p}")
+
+    if output_json:
+        print(json.dumps({
+            "success": all_ok,
+            "category": category or "all",
+            "result": results
+        }, indent=2, ensure_ascii=False))
+    else:
+        print("🎉 すべてのパスが正常に存在しています。" if all_ok else "🚨 一部のパスに問題があります。")
+
+def list_categories():
+    print("📚 利用可能なカテゴリ一覧:")
+    for name, paths in path_config.CATEGORY_MAP.items():
+        print(f"  ▶ {name}（{len(paths)}個）:")
+        for p in paths:
+            print(f"     - {p}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="🔍 Noctria Kingdom パス構成検査ツール")
+    parser.add_argument("--strict", action="store_true", help="ディレクトリ種別まで厳密に検査")
+    parser.add_argument("--show-paths", action="store_true", help="全パスを表示（--json 無効時のみ）")
+    parser.add_argument("--category", type=str, help="検査対象カテゴリを指定（例: core, ai, gui）")
+    parser.add_argument("--list-categories", action="store_true", help="利用可能カテゴリ一覧を表示")
+    parser.add_argument("--json", action="store_true", help="結果を JSON 形式で出力")
+
+    args = parser.parse_args()
+
+    if args.list_categories:
+        list_categories()
+    else:
+        verify_paths(
+            strict=args.strict,
+            show_paths=args.show_paths,
+            category=args.category,
+            output_json=args.json
+        )
