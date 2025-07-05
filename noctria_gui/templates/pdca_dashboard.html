@@ -80,12 +80,11 @@
     <div class="message">🟢 {{ message }}</div>
   {% endif %}
 
-  <!-- DAG実行ボタン -->
+  <!-- DAGトリガー -->
   <form method="post">
     <button type="submit">⚙️ Veritas PDCA を実行</button>
   </form>
 
-  <!-- PDCA履歴テーブル -->
   <table>
     <thead>
       <tr>
@@ -111,9 +110,9 @@
           <td>{{ log.content.tp or "-" }}</td>
           <td>{{ log.content.sl or "-" }}</td>
 
-          <!-- 🔍 モーダル表示ボタン -->
+          <!-- 🔍 モーダルボタン -->
           <td>
-            <button onclick='showDetail({{ log.content | tojson | safe }})'>🔍 詳細</button>
+            <button onclick='showDetail({{ log.content | tojson | safe }}, "{{ log.filename }}")'>🔍 詳細</button>
           </td>
 
           <!-- 📤 再実行ボタン -->
@@ -128,19 +127,23 @@
     </tbody>
   </table>
 
-  <!-- モーダル -->
+  <!-- 🪟 モーダルウィンドウ -->
   <div id="modal">
     <h3>📦 EA命令の詳細</h3>
     <pre id="modal-content"></pre>
+    <form method="post" action="/pdca/replay">
+      <input type="hidden" name="filename" id="modal-filename" value="">
+      <button type="submit">📤 この内容で再実行</button>
+    </form>
+    <br />
     <button onclick="document.getElementById('modal').style.display='none'">❌ 閉じる</button>
   </div>
 
   <script>
-    function showDetail(data) {
-      const pre = document.getElementById("modal-content");
-      const modal = document.getElementById("modal");
-      pre.textContent = JSON.stringify(data, null, 2);
-      modal.style.display = "block";
+    function showDetail(data, filename) {
+      document.getElementById("modal-content").textContent = JSON.stringify(data, null, 2);
+      document.getElementById("modal-filename").value = filename;
+      document.getElementById("modal").style.display = "block";
     }
   </script>
 
