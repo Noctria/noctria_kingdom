@@ -2,77 +2,94 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>📘 戦略詳細 - {{ strategy.strategy }}</title>
+  <title>📘 戦略詳細: {{ strategy.strategy }} - Noctria Kingdom</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      padding: 2rem;
       background-color: #f4f4f4;
+      padding: 2rem;
+      color: #333;
     }
+
     h1 {
       color: #222;
     }
-    .summary {
-      margin-bottom: 1.5rem;
+
+    .detail-box {
+      background-color: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 800px;
+      margin-top: 1.5rem;
     }
-    .summary dt {
+
+    .field {
+      margin-bottom: 1rem;
+    }
+
+    .field label {
       font-weight: bold;
+      display: inline-block;
+      width: 180px;
     }
-    .summary dd {
-      margin: 0 0 1rem 0.5rem;
-    }
+
     .tag {
       display: inline-block;
-      background-color: #007acc;
-      color: white;
-      padding: 0.2rem 0.6rem;
+      background-color: #d0e9ff;
+      color: #003f6b;
+      padding: 0.3rem 0.6rem;
       border-radius: 4px;
-      margin-right: 0.5rem;
+      margin-right: 0.3rem;
+      font-size: 0.9rem;
     }
+
     .back-link {
-      margin-top: 2rem;
       display: inline-block;
+      margin-top: 1.5rem;
       color: #007acc;
       text-decoration: none;
     }
-    pre.json-view {
-      background-color: #eee;
-      padding: 1rem;
-      overflow-x: auto;
-      border-radius: 4px;
+
+    .back-link:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
   <h1>📘 戦略詳細：{{ strategy.strategy }}</h1>
 
-  <dl class="summary">
-    <dt>通貨ペア:</dt>
-    <dd>{{ strategy.symbol }}</dd>
+  <div class="detail-box">
+    <div class="field">
+      <label>戦略名:</label> {{ strategy.strategy }}
+    </div>
+    <div class="field">
+      <label>通貨ペア:</label> {{ strategy.symbol }}
+    </div>
+    <div class="field">
+      <label>勝率:</label> {{ "%.2f"|format(strategy.win_rate * 100) }}%
+    </div>
+    <div class="field">
+      <label>最大ドローダウン:</label> {{ "%.2f"|format(strategy.max_drawdown * 100) }}%
+    </div>
+    <div class="field">
+      <label>取引回数:</label> {{ strategy.num_trades }}
+    </div>
+    <div class="field">
+      <label>評価日時:</label> {{ strategy.timestamp }}
+    </div>
+    <div class="field">
+      <label>タグ:</label>
+      {% if strategy.tags %}
+        {% for tag in strategy.tags %}
+          <span class="tag">{{ tag }}</span>
+        {% endfor %}
+      {% else %}
+        （なし）
+      {% endif %}
+    </div>
+  </div>
 
-    <dt>勝率:</dt>
-    <dd>{{ "%.2f"|format(strategy.win_rate * 100) }}%</dd>
-
-    <dt>取引回数:</dt>
-    <dd>{{ strategy.trade_count }}</dd>
-
-    <dt>最大ドローダウン:</dt>
-    <dd>{{ "%.2f"|format(strategy.max_drawdown * 100) }}%</dd>
-
-    <dt>評価日時:</dt>
-    <dd>{{ strategy.timestamp }}</dd>
-
-    <dt>タグ:</dt>
-    <dd>
-      {% for tag in strategy.tags %}
-        <span class="tag">{{ tag }}</span>
-      {% endfor %}
-    </dd>
-  </dl>
-
-  <h2>📄 JSON 表示</h2>
-  <pre class="json-view">{{ strategy | tojson(indent=2) }}</pre>
-
-  <a class="back-link" href="/statistics">← 統計一覧に戻る</a>
+  <a class="back-link" href="/tag-summary">← タグ統計へ戻る</a>
 </body>
 </html>
