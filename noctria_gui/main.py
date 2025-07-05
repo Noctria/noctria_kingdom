@@ -2,8 +2,8 @@
 # coding: utf-8
 
 """
-🌐 Noctria Kingdom GUI 起動スクリプト
-- DAG起動、戦略管理、PDCA評価、ログ可視化の中枢UI
+🌐 Noctria Kingdom GUI 起動構成
+- 統治パネル（戦略・評価・PDCA・ログなど）を統括
 """
 
 from fastapi import FastAPI
@@ -12,10 +12,10 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json  # ✅ for from_json filter
 
-# ✅ Noctria Kingdom の統治下にある正式パス管理
+# ✅ 統一パス定義（Noctria Kingdom 標準）
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ✅ ルート定義（各画面モジュール）
+# ✅ 各画面ルートのインポート
 from noctria_gui.routes import (
     home_routes,
     strategy_routes,
@@ -25,12 +25,12 @@ from noctria_gui.routes import (
     statistics,
     act_history,
     push_history,
-    tag_summary,  # ✅ 作戦Ⅴ：タグ別統計GUI表示
+    logs_routes,  # ✅ 統治ログ出力ルートを追加
 )
 
-# ========================================
-# 🌐 FastAPI GUI 起動構成（Noctria Kingdom）
-# ========================================
+# ===============================
+# 🌐 GUI アプリケーション定義
+# ===============================
 
 app = FastAPI(
     title="Noctria Kingdom GUI",
@@ -38,11 +38,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ✅ 静的ファイル & テンプレートの登録
+# ✅ 静的ファイルとテンプレートの登録
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ Jinja2 カスタムフィルタ（dict → JSON文字列）
+# ✅ カスタムフィルター定義（Jinja2用）
 def from_json(value):
     try:
         return json.loads(value)
@@ -50,11 +50,11 @@ def from_json(value):
         return {}
 
 templates.env.filters["from_json"] = from_json
+app.state.templates = templates  # ✅ 他モジュールでも参照可
 
-# ✅ 状態として templates を保持（他モジュールでも利用）
-app.state.templates = templates
-
-# ✅ ルーター登録
+# ===============================
+# ✅ 各画面ルーターの登録
+# ===============================
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
 app.include_router(pdca.router)
@@ -63,4 +63,4 @@ app.include_router(upload_history.router)
 app.include_router(statistics.router)
 app.include_router(act_history.router)
 app.include_router(push_history.router)
-app.include_router(tag_summary.router)  # ✅ 新規追加ルート
+app.include_router(logs_routes.router)  # ✅ 統治ログ出力ボタン用
