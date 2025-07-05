@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>GitHub Push履歴 - Noctria Kingdom</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f9f9f9;
+      padding: 2rem;
+    }
+    h1 {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 0.5rem;
+      border-bottom: 1px solid #ccc;
+      text-align: left;
+    }
+    th {
+      background-color: #eee;
+    }
+  </style>
+</head>
+<body>
+  <h1>📜 GitHub Push履歴</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>日付</th>
+        <th>戦略ファイル</th>
+        <th>メッセージ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in logs %}
+        <tr>
+          <td>{{ entry.date }}</td>
+          <td>{{ entry.files | join(', ') }}</td>
+          <td>{{ entry.message }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
