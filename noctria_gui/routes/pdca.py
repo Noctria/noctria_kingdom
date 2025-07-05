@@ -17,7 +17,7 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
 # ========================================
-# 📜 /pdca - 履歴表示ページ（フィルター対応）
+# 📜 /pdca - 履歴表示ページ（フィルター＋ソート対応）
 # ========================================
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
@@ -27,6 +27,7 @@ async def show_pdca_dashboard(
     signal: str = Query(None),
     date_from: str = Query(None),
     date_to: str = Query(None),
+    sort: str = Query(None),  # 🔑 ソート指定（例: win_rate, -max_dd）
 ):
     log_files = sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True)
     logs = []
@@ -90,6 +91,20 @@ async def show_pdca_dashboard(
 
     filtered_logs = [log for log in logs if matches(log)]
 
+    # 🔃 ソート処理
+    def get_sort_key_func(key):
+        return lambda log: log.get(key) or 0
+
+    if sort:
+        reverse = False
+        sort_key = sort
+        if sort.startswith("-"):
+            sort_key = sort[1:]
+            reverse = True
+
+        if sort_key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
+            filtered_logs.sort(key=get_sort_key_func(sort_key), reverse=reverse)
+
     return templates.TemplateResponse("pdca_dashboard.html", {
         "request": request,
         "logs": filtered_logs,
@@ -99,7 +114,8 @@ async def show_pdca_dashboard(
             "signal": signal or "",
             "date_from": date_from or "",
             "date_to": date_to or "",
-        }
+        },
+        "sort": sort or ""
     })
 
 
