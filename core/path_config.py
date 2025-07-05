@@ -1,47 +1,55 @@
 from pathlib import Path
 
 # ========================================
-# 📌 Noctria Kingdom Path Config (v3.0)
-#    - 自動で BASE_DIR を切り替える構成
-#    - すべての構成要素を王の地図に記録
+# 📌 Noctria Kingdom Path Config (v3.1)
+#    - 全構成要素を王の地図に記録
+#    - Docker/WSL/Local対応（自動切り替え）
 # ========================================
 
 # ✅ BASE_DIR の自動切り替え（Docker vs ローカル）
 if Path("/opt/airflow").exists():
-    # Docker / 本番環境
     BASE_DIR = Path("/opt/airflow").resolve()
 else:
-    # ローカル / 開発環境（WSL等）
     BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ========================================
-# 🏛 ディレクトリ定義（王国の各領土）
+# 🏛 中枢構成（Airflow/DAG/Pluginsなど）
 # ========================================
 
 DAGS_DIR = BASE_DIR / "airflow_docker" / "dags"
 LOGS_DIR = BASE_DIR / "airflow_docker" / "logs"
 PLUGINS_DIR = BASE_DIR / "airflow_docker" / "plugins"
+AIRFLOW_SCRIPTS_DIR = BASE_DIR / "airflow_docker" / "scripts"
+
+# ========================================
+# 🧠 知性領域（AI・戦略・評価）
+# ========================================
 
 SCRIPTS_DIR = BASE_DIR / "scripts"
 CORE_DIR = BASE_DIR / "core"
-STRATEGIES_DIR = BASE_DIR / "strategies"
-DATA_DIR = BASE_DIR / "data"
-MODELS_DIR = BASE_DIR / "models"
-INSTITUTIONS_DIR = BASE_DIR / "institutions"
 VERITAS_DIR = BASE_DIR / "veritas"
-TOOLS_DIR = BASE_DIR / "tools"
-TESTS_DIR = BASE_DIR / "tests"
-
-# ✅ GUI構成（前線本部）
-NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
-GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
+STRATEGIES_DIR = BASE_DIR / "strategies"
+EXECUTION_DIR = BASE_DIR / "execution"
+EXPERTS_DIR = BASE_DIR / "experts"
 
 # ========================================
-# 📂 サブディレクトリ（補佐官領域）
+# 📦 データ・モデル領域
 # ========================================
 
+DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+MODELS_DIR = BASE_DIR / "models"
+INSTITUTIONS_DIR = BASE_DIR / "institutions"
+
+# ========================================
+# 🌐 GUI・推論サーバ・文書など
+# ========================================
+
+NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
+GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
+LLM_SERVER_DIR = BASE_DIR / "llm_server"
+DOCS_DIR = BASE_DIR / "docs"
 
 # ========================================
 # 📄 ファイルパス（王国の記録物）
@@ -59,13 +67,13 @@ VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 
 # ========================================
-# 🛠 GitHub連携スクリプト
+# 🔁 GitHub操作スクリプト
 # ========================================
 
 GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
 
 # ========================================
-# 🔍 パス整合性チェック（審査用）
+# 🔍 パス整合性チェック関数（審査用）
 # ========================================
 
 def _lint_path_config():
@@ -74,30 +82,36 @@ def _lint_path_config():
         "DAGS_DIR": DAGS_DIR.exists(),
         "LOGS_DIR": LOGS_DIR.exists(),
         "STRATEGIES_DIR": STRATEGIES_DIR.exists(),
-        "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
+        "EXECUTION_DIR": EXECUTION_DIR.exists(),
+        "EXPERTS_DIR": EXPERTS_DIR.exists(),
+        "MODELS_DIR": MODELS_DIR.exists(),
+        "DATA_DIR": DATA_DIR.exists(),
         "RAW_DATA_DIR": RAW_DATA_DIR.exists(),
         "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR.exists(),
         "MARKET_DATA_CSV": MARKET_DATA_CSV.exists(),
+        "VERITAS_EVAL_LOG": VERITAS_EVAL_LOG.exists(),
         "VERITAS_GENERATE_SCRIPT": VERITAS_GENERATE_SCRIPT.exists(),
         "VERITAS_EVALUATE_SCRIPT": VERITAS_EVALUATE_SCRIPT.exists(),
         "GITHUB_PUSH_SCRIPT": GITHUB_PUSH_SCRIPT.exists(),
         "NOCTRIA_GUI_DIR": NOCTRIA_GUI_DIR.exists(),
         "GUI_TEMPLATES_DIR": GUI_TEMPLATES_DIR.exists(),
+        "LLM_SERVER_DIR": LLM_SERVER_DIR.exists(),
+        "DOCS_DIR": DOCS_DIR.exists(),
+        "AIRFLOW_SCRIPTS_DIR": AIRFLOW_SCRIPTS_DIR.exists(),
     }
 
 # ========================================
-# 🌐 公開変数（王国全体地図）
+# 🌐 公開変数一覧（王の地図）
 # ========================================
 
 __all__ = [
-    "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR",
-    "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR",
-    "MODELS_DIR", "INSTITUTIONS_DIR", "VERITAS_DIR",
-    "TOOLS_DIR", "TESTS_DIR",
+    "BASE_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
+    "SCRIPTS_DIR", "CORE_DIR", "STRATEGIES_DIR", "DATA_DIR", "MODELS_DIR",
+    "INSTITUTIONS_DIR", "VERITAS_DIR", "EXECUTION_DIR", "EXPERTS_DIR",
+    "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR", "LLM_SERVER_DIR", "DOCS_DIR",
     "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT",
     "GITHUB_PUSH_SCRIPT",
-    "NOCTRIA_GUI_DIR", "GUI_TEMPLATES_DIR",
     "_lint_path_config"
 ]
