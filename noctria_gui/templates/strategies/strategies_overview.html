@@ -82,11 +82,13 @@
       {% for s in strategies %}
       <tr>
         <td>{{ s.strategy }}</td>
-        <td>{{ s.win_rate or '―' }}%</td>
-        <td>{{ s.num_trades or '―' }}</td>
-        <td>{{ s.max_drawdown or '―' }}</td>
         <td>
-          {% for tag in s.tags %}
+          {{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}%
+        </td>
+        <td>{{ s.trade_count if s.trade_count is not none else '―' }}</td>
+        <td>{{ s.max_drawdown if s.max_drawdown is not none else '―' }}</td>
+        <td>
+          {% for tag in s.tags or [] %}
             <span class="tag">{{ tag }}</span>
           {% endfor %}
         </td>
