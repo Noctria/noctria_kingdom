@@ -1,109 +1,74 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>Noctria Kingdom - Push履歴</title>
+  <meta charset="UTF-8">
+  <title>📦 Push履歴 - Noctria Kingdom</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f8f8f8;
       padding: 2rem;
+      background-color: #f4f4f4;
     }
     h1 {
-      color: #333;
-      margin-bottom: 1rem;
+      color: #222;
     }
-    .filters {
+    form.search {
       margin-bottom: 1.5rem;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .filters form {
-      display: flex;
       gap: 1rem;
-      align-items: center;
     }
-    .filters input[type="text"] {
-      padding: 0.4rem;
-      width: 200px;
-    }
-    .filters select, .filters button {
+    input, button {
       padding: 0.4rem 0.8rem;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      background-color: #fff;
+      background-color: white;
     }
     th, td {
-      padding: 0.6rem;
+      padding: 0.5rem;
       border: 1px solid #ccc;
-      text-align: left;
+      text-align: center;
     }
     th {
-      background-color: #e8e8e8;
+      background-color: #e0e0e0;
     }
-    .small {
-      font-size: 0.9rem;
-      color: #666;
-    }
-    .actions {
-      margin-top: 1rem;
-    }
-    .actions form {
-      display: inline;
+    a.detail-link {
+      color: #007acc;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
-  <h1>📜 Git Push履歴一覧（王国記録）</h1>
+  <h1>📦 Veritas Push履歴</h1>
 
-  <div class="filters">
-    <form method="get" action="/push-history">
-      <label>🔍 キーワード検索:</label>
-      <input type="text" name="keyword" value="{{ keyword | default('') }}" placeholder="strategy名やメッセージ">
-      <label>🗂 ソート:</label>
-      <select name="sort">
-        <option value="desc" {% if sort == 'desc' %}selected{% endif %}>📉 日時（降順）</option>
-        <option value="asc" {% if sort == 'asc' %}selected{% endif %}>📈 日時（昇順）</option>
-      </select>
-      <button type="submit">適用</button>
-    </form>
+  <form method="get" action="/push-history" class="search">
+    <input type="text" name="keyword" placeholder="戦略名や通貨ペアで検索" />
+    <button type="submit">検索</button>
+    <a href="/push-history/export">CSV出力</a>
+  </form>
 
-    <form method="get" action="/push-history/export">
-      <button type="submit">📥 CSVエクスポート</button>
-    </form>
-  </div>
-
-  {% if logs %}
-    <table>
-      <thead>
-        <tr>
-          <th>🕒 日時</th>
-          <th>🧠 戦略名</th>
-          <th>💬 メッセージ</th>
-          <th>👑 署名</th>
-          <th>🔎 詳細</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for log in logs %}
-        <tr>
-          <td>{{ log.timestamp }}</td>
-          <td>{{ log.strategy }}</td>
-          <td>{{ log.message }}</td>
-          <td class="small">{{ log.signature or '（署名なし）' }}</td>
-          <td>
-            <a href="/push-history/detail?timestamp={{ log.timestamp | urlencode }}&strategy={{ log.strategy | urlencode }}">🧾 詳細</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>🚫 ログが見つかりませんでした。</p>
-  {% endif %}
-
+  <table>
+    <thead>
+      <tr>
+        <th>戦略名</th>
+        <th>Push日時</th>
+        <th>メッセージ</th>
+        <th>担当</th>
+        <th>詳細</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.strategy }}</td>
+        <td>{{ log.timestamp }}</td>
+        <td>{{ log.message }}</td>
+        <td>{{ log.pushed_by }}</td>
+        <td><a class="detail-link" href="/push-history/detail?strategy={{ log.strategy }}&timestamp={{ log.timestamp }}">詳細</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </body>
 </html>
