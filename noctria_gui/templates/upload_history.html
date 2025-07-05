@@ -15,6 +15,13 @@
             padding: 10px;
             overflow-x: auto;
         }
+        .actions {
+            margin-top: 10px;
+        }
+        .actions form {
+            display: inline-block;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -25,6 +32,17 @@
     {% for record in histories %}
         <div class="block">
             <h2>📁 {{ record.id }}</h2>
+            <div class="actions">
+                <form method="post" action="/upload-history/re-evaluate">
+                    <input type="hidden" name="strategy_id" value="{{ record.id }}">
+                    <button type="submit">🔁 再評価</button>
+                </form>
+                <form method="post" action="/upload-history/delete" onsubmit="return confirm('本当に削除しますか？');">
+                    <input type="hidden" name="strategy_id" value="{{ record.id }}">
+                    <button type="submit">🗑 削除</button>
+                </form>
+            </div>
+
             {% for f in record.files %}
                 <p><strong>📄 {{ f.name }}</strong></p>
                 <pre>{{ f.content }}</pre>
