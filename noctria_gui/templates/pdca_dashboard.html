@@ -13,138 +13,123 @@
       color: #222;
       margin-bottom: 1rem;
     }
-    form {
-      margin-bottom: 2rem;
-    }
-    button {
-      background-color: #333;
-      color: white;
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 4px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #555;
-    }
     table {
       width: 100%;
       border-collapse: collapse;
-      background-color: white;
-      box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+      background-color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     th, td {
-      padding: 0.8rem;
-      text-align: center;
+      padding: 0.6rem;
       border-bottom: 1px solid #ddd;
+      text-align: center;
     }
     th {
-      background-color: #2d3e50;
+      background-color: #333;
       color: white;
     }
     tr:hover {
-      background-color: #eef;
+      background-color: #f1f1f1;
     }
-    .message {
-      margin-bottom: 1rem;
-      color: green;
+    button {
+      padding: 0.4rem 0.8rem;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
-
+    button:hover {
+      background-color: #004999;
+    }
+    pre {
+      text-align: left;
+      background-color: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
     dialog {
-      width: 60%;
       border: none;
       border-radius: 8px;
-      padding: 1.5rem;
-      box-shadow: 0 0 15px rgba(0,0,0,0.4);
-      font-family: monospace;
-    }
-    dialog::backdrop {
-      background: rgba(0, 0, 0, 0.3);
-    }
-    .modal-actions {
-      margin-top: 1rem;
-      display: flex;
-      justify-content: space-between;
+      padding: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      max-width: 700px;
     }
   </style>
 </head>
 <body>
-
-  <h1>📜 Noctria Kingdom - Veritas PDCA履歴</h1>
-
-  {% if message %}
-    <div class="message">🟢 {{ message }}</div>
-  {% endif %}
-
-  <form method="post">
-    <button type="submit">⚙️ Veritas PDCA を実行</button>
-  </form>
+  <h1>📜 PDCA 実行履歴（Veritas Kingdom）</h1>
 
   <table>
     <thead>
       <tr>
-        <th>🕒 タイムスタンプ</th>
-        <th>📄 戦略ファイル</th>
-        <th>📈 シグナル</th>
+        <th>📅 時刻</th>
+        <th>🧠 戦略</th>
+        <th>💡 シグナル</th>
         <th>💱 通貨</th>
-        <th>⚖️ ロット</th>
-        <th>🎯 TP</th>
-        <th>🛡 SL</th>
-        <th>🔍 詳細</th>
-        <th>📤 再実行</th>
+        <th>🎯 ロット</th>
+        <th>🎯 TP/SL</th>
+        <th>📈 勝率</th>
+        <th>📉 DD</th>
+        <th>🔁 回数</th>
+        <th>操作</th>
       </tr>
     </thead>
     <tbody>
-      {% for log in histories %}
-        <tr>
-          <td>{{ log.content.timestamp or log.id }}</td>
-          <td>{{ log.content.strategy or log.filename }}</td>
-          <td>{{ log.content.signal or "-" }}</td>
-          <td>{{ log.content.symbol or "-" }}</td>
-          <td>{{ log.content.lot or "-" }}</td>
-          <td>{{ log.content.tp or "-" }}</td>
-          <td>{{ log.content.sl or "-" }}</td>
-
-          <!-- 🔍 詳細表示ボタン -->
-          <td>
-            <button type="button" onclick='openModal({{ log.content | tojson | safe }}, "{{ log.filename }}")'>
-              🔍 詳細
-            </button>
-          </td>
-
-          <!-- 📤 直接再実行 -->
-          <td>
-            <form method="post" action="/pdca/replay" style="margin:0;">
-              <input type="hidden" name="filename" value="{{ log.filename }}">
-              <button type="submit">📤 再実行</button>
-            </form>
-          </td>
-        </tr>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.timestamp }}</td>
+        <td>{{ log.strategy }}</td>
+        <td>{{ log.signal }}</td>
+        <td>{{ log.symbol }}</td>
+        <td>{{ log.lot }}</td>
+        <td>{{ log.tp }}/{{ log.sl }}</td>
+        <td>
+          {% if log.win_rate is not none %}
+            {{ '%.1f' | format(log.win_rate * 100) }}%
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>
+          {% if log.max_dd is not none %}
+            {{ '%.1f' | format(log.max_dd * 100) }}%
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ log.trades or "-" }}</td>
+        <td>
+          <!-- 🔍 モーダル起動ボタン -->
+          <button onclick="showModal('modal_{{ loop.index }}')">詳細</button>
+        </td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <!-- 🪟 モーダル（dialog） -->
-  <dialog id="pdca-dialog">
-    <h3>📦 EA命令の詳細</h3>
-    <pre id="modal-content" style="background:#eee; padding:1rem;"></pre>
-
-    <form method="post" action="/pdca/replay" class="modal-actions">
-      <input type="hidden" name="filename" id="modal-filename" />
-      <button type="submit">📤 この内容で再実行</button>
-      <button type="button" onclick="document.getElementById('pdca-dialog').close()">❌ 閉じる</button>
+  <!-- 🔎 モーダル群 -->
+  {% for log in logs %}
+  <dialog id="modal_{{ loop.index }}">
+    <h3>📄 詳細ログ（{{ log.filename }}）</h3>
+    <pre>{{ log.json_text }}</pre>
+    <form method="post" action="/pdca/replay">
+      <input type="hidden" name="log_path" value="{{ log.path }}">
+      <button type="submit">この命令で再実行</button>
     </form>
+    <button onclick="closeModal('modal_{{ loop.index }}')">閉じる</button>
   </dialog>
+  {% endfor %}
 
   <script>
-    function openModal(data, filename) {
-      const dialog = document.getElementById("pdca-dialog");
-      document.getElementById("modal-content").textContent = JSON.stringify(data, null, 2);
-      document.getElementById("modal-filename").value = filename;
-      dialog.showModal();
+    function showModal(id) {
+      document.getElementById(id).showModal();
+    }
+    function closeModal(id) {
+      document.getElementById(id).close();
     }
   </script>
-
 </body>
 </html>
