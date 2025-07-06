@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔁 PDCA履歴 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>🔁 Veritas PDCA実行履歴</h1>
+
+  <!-- 🔍 フィルターUI（将来的に拡張可） -->
+  <!-- <form method="get" action="/pdca" class="filter card"> ... </form> -->
+
+  <!-- 📋 履歴一覧 -->
+  <table class="table">
+    <thead>
+      <tr>
+        <th>🕒 実行日時</th>
+        <th>📘 戦略名</th>
+        <th>⚙ フェーズ</th>
+        <th>📈 ステータス</th>
+        <th>🧪 詳細</th>
+        <th>🔁 再実行</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.timestamp }}</td>
+        <td>{{ log.strategy_name }}</td>
+        <td>{{ log.phase }}</td>
+        <td>{{ log.status }}</td>
+        <td>
+          <button class="btn" onclick="showDetails({{ log | tojson | safe }})">詳細</button>
+        </td>
+        <td>
+          <form method="post" action="/pdca/replay" class="action-form">
+            <input type="hidden" name="strategy_name" value="{{ log.strategy_name }}">
+            <input type="hidden" name="phase" value="{{ log.phase }}">
+            <button type="submit" class="btn">再実行</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- 🪞 モーダル表示 -->
+  <dialog id="detailModal">
+    <h2>🧾 PDCA実行詳細</h2>
+    <pre id="detailContent" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto; background: #f4f4f4; padding: 1rem; border-radius: 8px;"></pre>
+    <button onclick="document.getElementById('detailModal').close()" class="btn">閉じる</button>
+  </dialog>
+
+  <script>
+    function showDetails(log) {
+      const modal = document.getElementById("detailModal");
+      const content = document.getElementById("detailContent");
+      content.textContent = JSON.stringify(log, null, 2);
+      modal.showModal();
+    }
+  </script>
+</body>
+</html>
