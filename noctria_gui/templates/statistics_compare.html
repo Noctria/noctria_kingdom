@@ -73,7 +73,11 @@
     <tbody>
       {% for row in results %}
         <tr>
-          <td>{{ row.key }}</td>
+          <td>
+            <a href="/statistics/detail?mode={{ mode }}&key={{ row.key | urlencode }}">
+              🔍 {{ row.key }}
+            </a>
+          </td>
           <td>{{ row.avg_win }}</td>
           <td>{{ row.avg_dd }}</td>
           <td>{{ row.count }}</td>
