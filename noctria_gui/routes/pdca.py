@@ -1,10 +1,19 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📜 PDCA履歴管理ルート
+- 実行ログの表示・フィルタリング・再送命令（DAGトリガー）を統括
+"""
+
 from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from datetime import datetime
+from pathlib import Path
 import os
 import json
 import requests
-from datetime import datetime
 
 from core.path_config import (
     PDCA_LOG_DIR,
@@ -22,12 +31,12 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
     request: Request,
-    strategy: str = Query(None),
-    symbol: str = Query(None),
-    signal: str = Query(None),
-    date_from: str = Query(None),
-    date_to: str = Query(None),
-    sort: str = Query(None),  # 🔑 ソート指定（例: win_rate, -max_dd）
+    strategy: str = Query(default=None),
+    symbol: str = Query(default=None),
+    signal: str = Query(default=None),
+    date_from: str = Query(default=None),
+    date_to: str = Query(default=None),
+    sort: str = Query(default=None),
 ):
     log_files = sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True)
     logs = []
@@ -57,9 +66,9 @@ async def show_pdca_dashboard(
             "lot": data.get("lot", "N/A"),
             "tp": data.get("tp", "N/A"),
             "sl": data.get("sl", "N/A"),
-            "win_rate": data.get("win_rate", None),
-            "max_dd": data.get("max_dd", None),
-            "trades": data.get("trades", None),
+            "win_rate": data.get("win_rate"),
+            "max_dd": data.get("max_dd"),
+            "trades": data.get("trades"),
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
         }
 
@@ -69,9 +78,9 @@ async def show_pdca_dashboard(
     def matches(log):
         if strategy and strategy.lower() not in log["strategy"].lower():
             return False
-        if symbol and log["symbol"] != symbol:
+        if symbol and symbol != log["symbol"]:
             return False
-        if signal and log["signal"] != signal:
+        if signal and signal != log["signal"]:
             return False
         if date_from:
             try:
@@ -101,7 +110,6 @@ async def show_pdca_dashboard(
         if sort.startswith("-"):
             sort_key = sort[1:]
             reverse = True
-
         if sort_key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
             filtered_logs.sort(key=get_sort_key_func(sort_key), reverse=reverse)
 
@@ -137,7 +145,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")
+            auth=("airflow", "airflow")  # 必要に応じて認証情報を修正
         )
 
         if response.status_code in [200, 201]:
