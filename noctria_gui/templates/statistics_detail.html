@@ -54,9 +54,11 @@
   <!-- 📊 ヒストグラム -->
   <h3>📊 勝率ヒストグラム</h3>
   <canvas id="winHistogram" height="100"></canvas>
+  <button class="button" onclick="downloadChart('winHistogram', 'win_histogram.png')">💾 勝率ヒストグラム保存</button>
 
   <h3>📊 最大DDヒストグラム</h3>
   <canvas id="ddHistogram" height="100"></canvas>
+  <button class="button" onclick="downloadChart('ddHistogram', 'dd_histogram.png')">💾 最大DDヒストグラム保存</button>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
@@ -157,6 +159,15 @@
       renderHistogram(winRates, 'winHistogram', '勝率の分布', 'rgba(54, 162, 235, 0.7)', binCount);
       renderHistogram(ddRates, 'ddHistogram', '最大DDの分布', 'rgba(255, 99, 132, 0.7)', binCount);
     });
+
+    // 💾 保存処理
+    function downloadChart(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = filename;
+      link.click();
+    }
   </script>
 {% else %}
   <p>⚠ データが存在しません。</p>
