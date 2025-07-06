@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🏅 タグ別戦略ランキング</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f5f5f5;
+      padding: 2rem;
+    }
+    h1 {
+      color: #222;
+      margin-bottom: 1rem;
+    }
+    form {
+      margin-bottom: 2rem;
+    }
+    .ranking-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 1rem;
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.3rem;
+    }
+    ol {
+      padding-left: 1.2rem;
+    }
+    li {
+      margin-bottom: 0.4rem;
+    }
+    .csv-button {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: #007acc;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏅 タグ別戦略ランキング</h1>
+
+  <!-- 🔍 フィルター -->
+  <form method="get">
+    <label>From: <input type="date" name="from" value="{{ filter.from }}"></label>
+    <label>To: <input type="date" name="to" value="{{ filter.to }}"></label>
+    <label>Tag: <input type="text" name="tag" value="{{ filter.tag }}"></label>
+    <button type="submit">適用</button>
+  </form>
+
+  <!-- 📊 ランキング表示 -->
+  <div class="ranking-grid">
+    <div class="card">
+      <h2>📈 勝率ランキング</h2>
+      <ol>
+        {% for item in ranking_win %}
+        <li>{{ item.tag }}（{{ item.avg_win }}%）</li>
+        {% else %}
+        <li>該当データなし</li>
+        {% endfor %}
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>🧘 安定性ランキング（低DD）</h2>
+      <ol>
+        {% for item in ranking_dd %}
+        <li>{{ item.tag }}（{{ item.avg_dd }}%）</li>
+        {% else %}
+        <li>該当データなし</li>
+        {% endfor %}
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>📊 件数ランキング</h2>
+      <ol>
+        {% for item in ranking_count %}
+        <li>{{ item.tag }}（{{ item.count }}件）</li>
+        {% else %}
+        <li>該当データなし</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+
+  <!-- 📤 CSVエクスポート -->
+  <a class="csv-button" href="/statistics/ranking/export?from={{ filter.from }}&to={{ filter.to }}&tag={{ filter.tag }}">CSVエクスポート</a>
+</body>
+</html>
