@@ -87,6 +87,12 @@
       <option value="BUY" {% if filters.signal == 'BUY' %}selected{% endif %}>BUY</option>
       <option value="SELL" {% if filters.signal == 'SELL' %}selected{% endif %}>SELL</option>
     </select>
+    <select name="tag">
+      <option value="">タグ</option>
+      {% for t in available_tags %}
+        <option value="{{ t }}" {% if filters.tag == t %}selected{% endif %}>🏷️ {{ t }}</option>
+      {% endfor %}
+    </select>
     <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
     <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
     <select name="sort">
@@ -108,6 +114,7 @@
       <tr>
         <th>📅 時刻</th>
         <th>🧠 戦略</th>
+        <th>🏷️ タグ</th>
         <th>💡 シグナル</th>
         <th>💱 通貨</th>
         <th>🎯 ロット</th>
@@ -123,6 +130,7 @@
       <tr>
         <td>{{ log.timestamp }}</td>
         <td>{{ log.strategy }}</td>
+        <td>{{ log.tags | join(", ") }}</td>
         <td>{{ log.signal }}</td>
         <td>{{ log.symbol }}</td>
         <td>{{ log.lot }}</td>
