@@ -3,7 +3,7 @@
 
 """
 📜 Veritas昇格戦略ログサービス
-- 昇格ログの読み込み、検索フィルタ、CSV出力、再処理支援
+- 昇格ログの読み込み、検索フィルタ、CSV出力、再処理支援、個別取得
 """
 
 import json
@@ -80,7 +80,6 @@ def export_logs_to_csv(logs: List[Dict], output_path: Path):
         print("⚠️ ログが存在しません、CSV出力をスキップしました。")
         return
 
-    # フィールド名をユニークなキーで定義（全ログからスキャン）
     fieldnames = sorted({key for log in logs for key in log.keys() if not key.startswith("__")})
 
     try:
@@ -95,9 +94,7 @@ def export_logs_to_csv(logs: List[Dict], output_path: Path):
 
 
 def reset_push_flag(strategy_name: str) -> bool:
-    """
-    🔁 指定戦略の `pushed` フラグを False に変更（再Push許可）
-    """
+    """🔁 指定戦略の `pushed` フラグを False に変更（再Push許可）"""
     for file in ACT_LOG_DIR.glob("*.json"):
         try:
             with open(file, "r+", encoding="utf-8") as f:
@@ -115,15 +112,12 @@ def reset_push_flag(strategy_name: str) -> bool:
 
 
 def mark_for_reevaluation(strategy_name: str) -> bool:
-    """
-    🔄 指定戦略を再評価対象として VERITAS_EVAL_LOG に戻す
-    """
+    """🔄 指定戦略を再評価対象として VERITAS_EVAL_LOG に戻す"""
     for file in ACT_LOG_DIR.glob("*.json"):
         try:
             with open(file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if data.get("strategy") == strategy_name:
-                    # 評価ログへ追記
                     eval_data = []
                     if VERITAS_EVAL_LOG.exists():
                         with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as ef:
@@ -135,11 +129,18 @@ def mark_for_reevaluation(strategy_name: str) -> bool:
                     eval_data.append(data)
                     with open(VERITAS_EVAL_LOG, "w", encoding="utf-8") as ef:
                         json.dump(eval_data, ef, indent=2, ensure_ascii=False)
-
-                    # ACTログ削除
                     file.unlink()
                     print(f"🔁 再評価へ戻しました: {strategy_name}")
                     return True
         except Exception as e:
             print(f"⚠️ 再評価処理失敗: {file.name} - {e}")
     return False
+
+
+def get_log_by_strategy(strategy_name: str) -> Optional[Dict]:
+    """🔎 指定戦略のログを1件取得（戦略名が一致する最初のもの）"""
+    logs = load_all_act_logs()
+    for log in logs:
+        if log.get("strategy") == strategy_name:
+            return log
+    return None
