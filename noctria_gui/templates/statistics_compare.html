@@ -63,6 +63,18 @@
   </script>
 {% endif %}
 
+<!-- 📊 統計サマリ -->
+{% if summary_stats %}
+  <div style="margin-top: 2rem;">
+    <h3>📊 統計サマリ</h3>
+    <ul>
+      <li>📈 平均勝率: 平均 {{ summary_stats.avg_win_mean }}%、中央値 {{ summary_stats.avg_win_median }}%</li>
+      <li>📉 平均DD: 平均 {{ summary_stats.avg_dd_mean }}%、中央値 {{ summary_stats.avg_dd_median }}%</li>
+      <li>📊 合計件数: {{ summary_stats.total_count }} 件</li>
+    </ul>
+  </div>
+{% endif %}
+
 <!-- 📊 結果表示 -->
 {% if results %}
   <label>📈 表示形式:</label>
@@ -97,7 +109,7 @@
     </tbody>
   </table>
 
-  <!-- 📈 グラフ表示 -->
+  <!-- 📈 グラフ -->
   <canvas id="winChart" height="100"></canvas>
   <canvas id="ddChart" height="100"></canvas>
 
@@ -115,18 +127,38 @@
         type,
         data: {
           labels,
-          datasets: [{ label: '平均勝率（%）', data: winRates, backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgba(54, 162, 235, 1)', fill: type !== 'line', tension: 0.2 }]
+          datasets: [{
+            label: '平均勝率（%）',
+            data: winRates,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            fill: type !== 'line',
+            tension: 0.2
+          }]
         },
-        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+        options: {
+          responsive: true,
+          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
+        }
       });
 
       ddChartInstance = new Chart(document.getElementById('ddChart'), {
         type,
         data: {
           labels,
-          datasets: [{ label: '平均DD（%）', data: ddRates, backgroundColor: 'rgba(255, 99, 132, 0.7)', borderColor: 'rgba(255, 99, 132, 1)', fill: type !== 'line', tension: 0.2 }]
+          datasets: [{
+            label: '平均DD（%）',
+            data: ddRates,
+            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            fill: type !== 'line',
+            tension: 0.2
+          }]
         },
-        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+        options: {
+          responsive: true,
+          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
+        }
       });
     }
 
@@ -137,10 +169,12 @@
       document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = flag);
       updateCount();
     }
+
     function updateCount() {
       const count = [...document.querySelectorAll('input[type="checkbox"]')].filter(cb => cb.checked).length;
       document.getElementById("selectedCount").textContent = count;
     }
+
     window.onload = updateCount;
   </script>
 {% else %}
