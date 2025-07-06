@@ -2,38 +2,61 @@
 # coding: utf-8
 
 """
-🛠 __init__.py 自動生成スクリプト（Noctria Kingdom）
-- noctria_gui/routes/ 以下の *.py ファイルを検出し、明示的な import 文を記述
-- FastAPI main.py の動的 include_router に対応しつつ、IDE補完と整合性を維持
+🛠 __init__.py 自動生成スクリプト
+- noctria_gui/routes 以下の *.py モジュールから router を収集し、
+  __init__.py を構築して routers[] に登録する構成を生成
 """
 
 import os
 from pathlib import Path
 
-# 📍 ルートディレクトリ推定（このスクリプトが tools/ 以下にある前提）
-CURRENT_DIR = Path(__file__).resolve().parent
-ROUTES_DIR = CURRENT_DIR.parent / "noctria_gui" / "routes"
+# 📌 固定パス（調整する場合は core.path_config 等へ移行しても可）
+ROUTES_DIR = Path("noctria_gui/routes")
 INIT_FILE = ROUTES_DIR / "__init__.py"
 
-def generate_routes_init():
-    """📦 routes/__init__.py を自動生成する"""
-    module_lines = []
-    
-    for py_file in sorted(ROUTES_DIR.glob("*.py")):
-        name = py_file.stem
-        if name.startswith("_") or name == "__init__":
-            continue
-        module_lines.append(f"from . import {name}")
+HEADER = '''#!/usr/bin/env python3
+# coding: utf-8
 
-    banner = "# 📦 このファイルは自動生成されました。手動編集は上書きされます。\n\n"
-    content = banner + "\n".join(module_lines) + "\n"
+"""
+📦 noctria_gui.routes
+- routes/ 以下の *.py モジュールから router を自動収集する
+"""
 
+import importlib
+import pkgutil
+
+# すべての router を格納するリスト
+routers = []
+
+# このパッケージのパスを取得
+__path__ = __path__  # required for pkgutil
+'''
+
+MAIN_LOOP = '''
+# 自動インポート処理
+for _, module_name, _ in pkgutil.iter_modules(__path__):
+    if module_name.startswith("_"):
+        continue  # __init__.py や非公開モジュールは除外
+
+    try:
+        mod = importlib.import_module(f"{__name__}.{module_name}")
+        if hasattr(mod, "router"):
+            routers.append(mod.router)
+            print(f"✅ router 読込: {module_name}")
+        else:
+            print(f"⚠️ router 未定義: {module_name}")
+    except Exception as e:
+        print(f"❌ ルーターインポート失敗: {module_name} - {e}")
+'''
+
+def generate_init():
+    content = HEADER + MAIN_LOOP
     try:
         with open(INIT_FILE, "w", encoding="utf-8") as f:
             f.write(content)
         print(f"✅ __init__.py を更新しました: {INIT_FILE}")
     except Exception as e:
-        print(f"❌ 書き込み失敗: {e}")
+        print(f"❌ __init__.py 書き込み失敗: {e}")
 
 if __name__ == "__main__":
-    generate_routes_init()
+    generate_init()
