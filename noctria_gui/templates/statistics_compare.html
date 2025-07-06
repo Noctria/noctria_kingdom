@@ -4,7 +4,6 @@
 {% block content %}
 <h2>📊 戦略・タグ比較分析</h2>
 
-<!-- 🔍 フィルター（GET） -->
 <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
   <label>📌 モード選択：</label>
   <select name="mode">
@@ -23,7 +22,6 @@
     <option value="check" {% if sort == "check" %}selected{% endif %}>🗂 チェック順</option>
   </select>
 
-  <!-- ✅ 比較対象選択 -->
   <div style="margin: 1rem 0;">
     <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
     <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
@@ -45,38 +43,24 @@
   {% endif %}
 </form>
 
-<!-- 🔗 URL共有 -->
 {% if keys %}
   <div style="margin-top: 1rem;">
     <label>🔗 現在のURL（共有可）:</label><br>
     <input id="shareUrl" type="text" readonly style="width: 90%;" value="{{ request.url }}" />
     <button class="button" onclick="copyUrl()">📋 コピー</button>
   </div>
-  <script>
-    function copyUrl() {
-      const input = document.getElementById("shareUrl");
-      input.select();
-      input.setSelectionRange(0, 99999);
-      document.execCommand("copy");
-      alert("URLをコピーしました！");
-    }
-  </script>
 {% endif %}
 
-<!-- 📊 統計サマリ -->
-{% if summary_stats %}
-  <div style="margin-top: 2rem;">
+{% if results %}
+  <div style="margin-top: 2rem; margin-bottom: 2rem;">
     <h3>📊 統計サマリ</h3>
     <ul>
-      <li>📈 平均勝率: 平均 {{ summary_stats.avg_win_mean }}%、中央値 {{ summary_stats.avg_win_median }}%</li>
-      <li>📉 平均DD: 平均 {{ summary_stats.avg_dd_mean }}%、中央値 {{ summary_stats.avg_dd_median }}%</li>
-      <li>📊 合計件数: {{ summary_stats.total_count }} 件</li>
+      <li>📈 勝率 平均: <strong>{{ summary.avg_win_mean }}</strong>％　| 中央値: <strong>{{ summary.avg_win_median }}</strong>％</li>
+      <li>📉 DD 平均: <strong>{{ summary.avg_dd_mean }}</strong>％　| 中央値: <strong>{{ summary.avg_dd_median }}</strong>％</li>
+      <li>📦 総件数: <strong>{{ summary.total_count }}</strong></li>
     </ul>
   </div>
-{% endif %}
 
-<!-- 📊 結果表示 -->
-{% if results %}
   <label>📈 表示形式:</label>
   <select id="chartTypeSelect">
     <option value="bar">棒グラフ</option>
@@ -109,7 +93,6 @@
     </tbody>
   </table>
 
-  <!-- 📈 グラフ -->
   <canvas id="winChart" height="100"></canvas>
   <canvas id="ddChart" height="100"></canvas>
 
@@ -127,38 +110,18 @@
         type,
         data: {
           labels,
-          datasets: [{
-            label: '平均勝率（%）',
-            data: winRates,
-            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            fill: type !== 'line',
-            tension: 0.2
-          }]
+          datasets: [{ label: '平均勝率（%）', data: winRates, backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgba(54, 162, 235, 1)', fill: type !== 'line', tension: 0.2 }]
         },
-        options: {
-          responsive: true,
-          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
-        }
+        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
       });
 
       ddChartInstance = new Chart(document.getElementById('ddChart'), {
         type,
         data: {
           labels,
-          datasets: [{
-            label: '平均DD（%）',
-            data: ddRates,
-            backgroundColor: 'rgba(255, 99, 132, 0.7)',
-            borderColor: 'rgba(255, 99, 132, 1)',
-            fill: type !== 'line',
-            tension: 0.2
-          }]
+          datasets: [{ label: '平均DD（%）', data: ddRates, backgroundColor: 'rgba(255, 99, 132, 0.7)', borderColor: 'rgba(255, 99, 132, 1)', fill: type !== 'line', tension: 0.2 }]
         },
-        options: {
-          responsive: true,
-          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
-        }
+        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
       });
     }
 
@@ -173,6 +136,14 @@
     function updateCount() {
       const count = [...document.querySelectorAll('input[type="checkbox"]')].filter(cb => cb.checked).length;
       document.getElementById("selectedCount").textContent = count;
+    }
+
+    function copyUrl() {
+      const input = document.getElementById("shareUrl");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand("copy");
+      alert("URLをコピーしました！");
     }
 
     window.onload = updateCount;
