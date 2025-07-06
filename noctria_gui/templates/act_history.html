@@ -3,83 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>📜 採用戦略ログ - Noctria Kingdom</title>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      padding: 2rem;
-      background-color: #f4f4f4;
-    }
-    h1 {
-      color: #222;
-    }
-    form.filter {
-      margin-bottom: 1.5rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: flex-end;
-      background: #fff;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
-    }
-    label {
-      display: flex;
-      flex-direction: column;
-      font-size: 0.9rem;
-    }
-    input, select {
-      padding: 0.3rem 0.6rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: white;
-      margin-top: 1rem;
-      cursor: default;
-    }
-    th, td {
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    th {
-      background-color: #e0e0e0;
-      cursor: pointer;
-    }
-    button {
-      padding: 0.4rem 0.8rem;
-      cursor: pointer;
-    }
-    .action-form {
-      display: inline-block;
-      margin: 0 0.25rem;
-    }
-    .action-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-    .csv-link {
-      text-decoration: none;
-      color: #0066cc;
-      border: 1px solid #0066cc;
-      padding: 0.4rem 0.8rem;
-      border-radius: 4px;
-      background-color: white;
-    }
-    .csv-link:hover {
-      background-color: #eef;
-    }
-  </style>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <h1>📜 Veritas 採用戦略ログ</h1>
 
   <!-- 🔍 フィルターUI -->
-  <form method="get" action="/act-history" class="filter">
+  <form method="get" action="/act-history" class="filter card">
     <label>
       戦略名
       <input type="text" name="strategy_name" value="{{ filters.strategy_name or '' }}">
@@ -117,15 +47,14 @@
         <option value="false" {% if filters.pushed == False %}selected{% endif %}>❌ 未</option>
       </select>
     </label>
-    <button type="submit">🔍 絞り込み</button>
-    <a class="csv-link"
-      href="/act-history/export?strategy_name={{ filters.strategy_name or '' }}&tag={{ filters.tag or '' }}&min_score={{ filters.min_score or '' }}&max_score={{ filters.max_score or '' }}&start_date={{ filters.start_date or '' }}&end_date={{ filters.end_date or '' }}&pushed={{ filters.pushed }}">
+    <button type="submit" class="btn">🔍 絞り込み</button>
+    <a class="btn" href="/act-history/export?strategy_name={{ filters.strategy_name or '' }}&tag={{ filters.tag or '' }}&min_score={{ filters.min_score or '' }}&max_score={{ filters.max_score or '' }}&start_date={{ filters.start_date or '' }}&end_date={{ filters.end_date or '' }}&pushed={{ filters.pushed }}">
       📤 CSV出力
     </a>
   </form>
 
   <!-- 📋 ログ一覧 -->
-  <table id="log-table">
+  <table id="log-table" class="table">
     <thead>
       <tr>
         <th onclick="sortTable(0)">戦略名</th>
@@ -149,11 +78,11 @@
         <td class="action-buttons">
           <form method="post" action="/act-history/repush" class="action-form">
             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-            <button type="submit">再Push可に</button>
+            <button type="submit" class="btn">再Push可に</button>
           </form>
           <form method="post" action="/act-history/reevaluate" class="action-form">
             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-            <button type="submit">再評価</button>
+            <button type="submit" class="btn">再評価</button>
           </form>
         </td>
       </tr>
