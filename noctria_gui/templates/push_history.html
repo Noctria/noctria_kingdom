@@ -1,145 +1,155 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>📦 Push履歴 - Noctria Kingdom</title>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      padding: 2rem;
-      background-color: #f4f4f4;
-    }
-    h1 { color: #222; }
+#!/usr/bin/env python3
+# coding: utf-8
 
-    form.search {
-      margin-bottom: 1.5rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: center;
-    }
-    input, select {
-      padding: 0.4rem 0.8rem;
-      font-size: 1rem;
-    }
-    input[type="text"], input[type="date"] {
-      flex: 1;
-      min-width: 180px;
-    }
-    button {
-      padding: 0.4rem 1rem;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-    .csv-link {
-      text-decoration: none;
-      color: #0066cc;
-      border: 1px solid #0066cc;
-      padding: 0.4rem 0.8rem;
-      border-radius: 4px;
-      background-color: white;
-    }
-    .csv-link:hover { background-color: #eef; }
+"""
+📜 Veritas戦略のPush記録ルート
+- Push履歴の検索・ソート・ページネーション・CSV出力・詳細表示を提供
+"""
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: white;
-    }
-    th, td {
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    th {
-      background-color: #e0e0e0;
-    }
-    a.detail-link {
-      color: #007acc;
-      text-decoration: none;
-    }
-    a.detail-link:hover {
-      text-decoration: underline;
-    }
+from fastapi import APIRouter, Request, Query, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
+from datetime import datetime
+import json
+import csv
+import io
 
-    .pagination {
-      margin-top: 1rem;
-      text-align: center;
-    }
-    .pagination a {
-      margin: 0 0.5rem;
-      text-decoration: none;
-      color: #007acc;
-    }
-    .pagination a.active {
-      font-weight: bold;
-      text-decoration: underline;
-    }
-    .info {
-      margin-top: 1rem;
-      text-align: right;
-      font-size: 0.95rem;
-      color: #666;
-    }
-  </style>
-</head>
-<body>
-  <h1>📦 Veritas Push履歴</h1>
+from core.path_config import PUSH_LOG_DIR, GUI_TEMPLATES_DIR
 
-  <form method="get" action="/push-history" class="search">
-    <input type="text" name="strategy" placeholder="戦略名で検索" value="{{ filters.strategy | default('') }}" />
-    <input type="text" name="tag" placeholder="タグで検索" value="{{ filters.tag | default('') }}" />
-    <input type="date" name="start_date" value="{{ filters.start_date | default('') }}" />
-    <input type="date" name="end_date" value="{{ filters.end_date | default('') }}" />
-    <select name="sort">
-      <option value="desc" {% if filters.sort == "desc" %}selected{% endif %}>Push日時 降順</option>
-      <option value="asc" {% if filters.sort == "asc" %}selected{% endif %}>Push日時 昇順</option>
-    </select>
-    <input type="hidden" name="page" value="1" />
-    <button type="submit">🔍 検索</button>
-    <a class="csv-link"
-       href="/push-history/export?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">
-      📤 CSV出力
-    </a>
-  </form>
+router = APIRouter()
+templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
-  <table>
-    <thead>
-      <tr>
-        <th>戦略名</th>
-        <th>Push日時</th>
-        <th>タグ</th>
-        <th>メッセージ</th>
-        <th>署名者</th>
-        <th>詳細</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for log in logs %}
-      <tr>
-        <td>{{ log.strategy }}</td>
-        <td>{{ log.timestamp }}</td>
-        <td>{{ log.tag }}</td>
-        <td>{{ log.message }}</td>
-        <td>{{ log.pushed_by | default("―") }}</td>
-        <td><a class="detail-link" href="/push-history/detail?timestamp={{ log.timestamp }}">🔎 詳細</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+# 設定：1ページあたりの件数
+PAGE_SIZE = 25
 
-  <div class="info">
-    表示件数: {{ logs | length }} / 総件数: {{ total_count }}
-  </div>
 
-  <div class="pagination">
-    {% for p in range(1, total_pages + 1) %}
-      {% if p == current_page %}
-        <a class="active">{{ p }}</a>
-      {% else %}
-        <a href="?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&sort={{ filters.sort }}&page={{ p }}">{{ p }}</a>
-      {% endif %}
-    {% endfor %}
-  </div>
-</body>
-</html>
+@router.get("/push-history", response_class=HTMLResponse)
+def view_push_history(
+    request: Request,
+    strategy: str = Query(None),
+    tag: str = Query(None),
+    start_date: str = Query(None),
+    end_date: str = Query(None),
+    sort: str = Query("desc"),
+    page: int = Query(1)
+):
+    """
+    📜 Push履歴を一覧表示（検索・ソート・ページネーション対応）
+    """
+    logs = []
+    if not PUSH_LOG_DIR.exists():
+        PUSH_LOG_DIR.mkdir(parents=True)
+
+    for file in sorted(PUSH_LOG_DIR.glob("*.json")):
+        with open(file, "r", encoding="utf-8") as f:
+            try:
+                log = json.load(f)
+                logs.append(log)
+            except Exception as e:
+                print(f"[PushHistory] ⚠️ 読み込み失敗: {file.name} - {e}")
+
+    # フィルター処理
+    if strategy:
+        logs = [log for log in logs if strategy.lower() in log.get("strategy", "").lower()]
+    if tag:
+        logs = [log for log in logs if tag.lower() in log.get("tag", "").lower()]
+    if start_date:
+        logs = [log for log in logs if log.get("timestamp") and log["timestamp"] >= start_date]
+    if end_date:
+        logs = [log for log in logs if log.get("timestamp") and log["timestamp"] <= end_date]
+
+    # ソート
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=(sort == "desc"))
+
+    # ページネーション
+    total_count = len(logs)
+    total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
+    current_page = max(1, min(page, total_pages))
+    start = (current_page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+    logs_page = logs[start:end]
+
+    return templates.TemplateResponse("push_history.html", {
+        "request": request,
+        "logs": logs_page,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": current_page,
+        "filters": {
+            "strategy": strategy or "",
+            "tag": tag or "",
+            "start_date": start_date or "",
+            "end_date": end_date or "",
+            "sort": sort
+        }
+    })
+
+
+@router.get("/push-history/export")
+def export_push_history_csv(
+    strategy: str = Query(None),
+    tag: str = Query(None),
+    start_date: str = Query(None),
+    end_date: str = Query(None),
+):
+    """
+    📤 Push履歴をCSV出力（フィルタ条件反映）
+    """
+    logs = []
+    for file in sorted(PUSH_LOG_DIR.glob("*.json")):
+        with open(file, "r", encoding="utf-8") as f:
+            try:
+                log = json.load(f)
+                logs.append(log)
+            except Exception:
+                continue
+
+    # フィルター処理（act-historyと同様）
+    if strategy:
+        logs = [log for log in logs if strategy.lower() in log.get("strategy", "").lower()]
+    if tag:
+        logs = [log for log in logs if tag.lower() in log.get("tag", "").lower()]
+    if start_date:
+        logs = [log for log in logs if log.get("timestamp") and log["timestamp"] >= start_date]
+    if end_date:
+        logs = [log for log in logs if log.get("timestamp") and log["timestamp"] <= end_date]
+
+    fieldnames = ["timestamp", "strategy", "tag", "message", "pushed_by", "signature"]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for log in logs:
+        writer.writerow({
+            "timestamp": log.get("timestamp", ""),
+            "strategy": log.get("strategy", ""),
+            "tag": log.get("tag", ""),
+            "message": log.get("message", ""),
+            "pushed_by": log.get("pushed_by", ""),
+            "signature": log.get("signature", "")
+        })
+
+    output.seek(0)
+    filename = f"push_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(output, media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename={filename}"
+    })
+
+
+@router.get("/push-history/detail", response_class=HTMLResponse)
+def push_history_detail(request: Request, timestamp: str):
+    """
+    🔍 指定Pushログの詳細表示
+    """
+    log_path = PUSH_LOG_DIR / f"{timestamp}.json"
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Log not found")
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        log = json.load(f)
+
+    return templates.TemplateResponse("push_history_detail.html", {
+        "request": request,
+        "log": log
+    })
