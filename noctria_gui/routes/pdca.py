@@ -26,7 +26,7 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
 # ========================================
-# 📜 /pdca - 履歴表示ページ（フィルター＋ソート対応）
+# 📜 /pdca - 履歴表示ページ（フィルター＋ソート＋タグ分類）
 # ========================================
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
@@ -34,12 +34,14 @@ async def show_pdca_dashboard(
     strategy: str = Query(default=None),
     symbol: str = Query(default=None),
     signal: str = Query(default=None),
+    tag: str = Query(default=None),
     date_from: str = Query(default=None),
     date_to: str = Query(default=None),
     sort: str = Query(default=None),
 ):
     log_files = sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True)
     logs = []
+    tag_set = set()
 
     for log_file in log_files:
         try:
@@ -55,6 +57,11 @@ async def show_pdca_dashboard(
         except Exception:
             ts_dt = None
 
+        tags = data.get("tags", [])
+        if isinstance(tags, str):
+            tags = [tags]
+        tag_set.update(tags)
+
         log_entry = {
             "filename": log_file.name,
             "path": str(log_file),
@@ -69,6 +76,7 @@ async def show_pdca_dashboard(
             "win_rate": data.get("win_rate"),
             "max_dd": data.get("max_dd"),
             "trades": data.get("trades"),
+            "tags": tags,
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
         }
 
@@ -81,6 +89,8 @@ async def show_pdca_dashboard(
         if symbol and symbol != log["symbol"]:
             return False
         if signal and signal != log["signal"]:
+            return False
+        if tag and tag not in log["tags"]:
             return False
         if date_from:
             try:
@@ -120,10 +130,12 @@ async def show_pdca_dashboard(
             "strategy": strategy or "",
             "symbol": symbol or "",
             "signal": signal or "",
+            "tag": tag or "",
             "date_from": date_from or "",
             "date_to": date_to or "",
         },
-        "sort": sort or ""
+        "sort": sort or "",
+        "available_tags": sorted(tag_set),
     })
 
 
@@ -145,7 +157,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")  # 必要に応じて認証情報を修正
+            auth=("airflow", "airflow")  # 認証情報を必要に応じて更新
         )
 
         if response.status_code in [200, 201]:
