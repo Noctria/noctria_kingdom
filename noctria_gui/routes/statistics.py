@@ -25,13 +25,11 @@ async def show_statistics(request: Request):
     """
     📈 統計スコアダッシュボードを表示（フィルタ付き）
     """
-    # 🔍 クエリパラメータ取得（空文字なら None 扱い）
     strategy = request.query_params.get("strategy", "").strip() or None
     symbol = request.query_params.get("symbol", "").strip() or None
     start_date = request.query_params.get("start_date", "").strip() or None
     end_date = request.query_params.get("end_date", "").strip() or None
 
-    # 📥 ログ取得 → フィルタリング → ソート（勝率降順）
     try:
         all_logs = statistics_service.load_all_logs()
         filtered_logs = statistics_service.filter_logs(
@@ -49,7 +47,7 @@ async def show_statistics(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"統計データの処理中にエラーが発生しました: {e}")
 
-    return templates.TemplateResponse("statistics/statistics_dashboard.html", {
+    return templates.TemplateResponse("statistics_dashboard.html", {
         "request": request,
         "statistics": sorted_logs,
         "strategies": statistics_service.get_available_strategies(all_logs),
@@ -72,8 +70,17 @@ async def export_statistics_csv():
     output_path = TOOLS_DIR / f"strategy_statistics_{timestamp}.csv"
 
     try:
-        stats = statistics_service.load_all_logs()
-        statistics_service.export_statistics_to_csv(stats, output_path)
+        all_logs = statistics_service.load_all_logs()
+        sorted_logs = statistics_service.sort_logs(
+            logs=all_logs,
+            sort_key="win_rate",
+            descending=True
+        )
+        if not sorted_logs:
+            raise ValueError("出力する統計ログが存在しません。")
+
+        statistics_service.export_statistics_to_csv(sorted_logs, output_path)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"CSVエクスポートに失敗しました: {e}")
 
