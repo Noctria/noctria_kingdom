@@ -1,100 +1,106 @@
-# routes/statistics_compare.py（抜粋、エクスポート部含む全体）
-
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
+
 from collections import defaultdict
 from statistics import mean, median
-import os, json, csv, io
 from datetime import datetime
+from pathlib import Path
+import os, json, csv, io
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 def parse_date(date_str):
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
-    except:
+    except Exception:
         return None
+
 
 def load_strategy_logs():
     data = []
     for file in os.listdir(ACT_LOG_DIR):
         if file.endswith(".json"):
-            with open(os.path.join(ACT_LOG_DIR, file), "r") as f:
-                try:
+            path = Path(ACT_LOG_DIR) / file
+            try:
+                with open(path, "r", encoding="utf-8") as f:
                     data.append(json.load(f))
-                except:
-                    continue
+            except Exception:
+                continue
     return data
+
+
+def filter_by_date(records, from_date, to_date):
+    filtered = []
+    for d in records:
+        ts = parse_date(d.get("timestamp", "")[:10])
+        if from_date and ts and ts < from_date:
+            continue
+        if to_date and ts and ts > to_date:
+            continue
+        filtered.append(d)
+    return filtered
+
+
+def compute_statistics_grouped(data, mode):
+    stat_map = defaultdict(lambda: defaultdict(list))
+    for entry in data:
+        keys = [entry.get("strategy_name")] if mode == "strategy" else entry.get("tags", [])
+        if not keys:
+            continue
+        for key in keys:
+            for k, v in entry.get("scores", {}).items():
+                if isinstance(v, (int, float)):
+                    stat_map[key][k].append(v)
+    return stat_map
+
 
 @router.get("/statistics/compare", response_class=HTMLResponse)
 async def compare(request: Request):
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
     to_date = parse_date(request.query_params.get("to"))
+
     all_data = load_strategy_logs()
+    filtered = filter_by_date(all_data, from_date, to_date)
+    stat_map = compute_statistics_grouped(filtered, mode)
 
-    filtered = []
-    for d in all_data:
-        ts = parse_date(d.get("timestamp", "")[:10])
-        if from_date and ts and ts < from_date:
-            continue
-        if to_date and ts and ts > to_date:
-            continue
-        filtered.append(d)
-
-    # 集約
-    stat_map = defaultdict(lambda: defaultdict(list))
-    for entry in filtered:
-        keys = [entry["strategy_name"]] if mode == "strategy" else entry.get("tags", [])
-        for key in keys:
-            for k, v in entry.get("scores", {}).items():
-                stat_map[key][k].append(v)
-
-    # 整形
     results = []
     for key, scores in stat_map.items():
-        flat = { "name": key }
+        row = {"name": key}
         for metric, values in scores.items():
-            flat[f"{metric}_mean"] = round(mean(values), 3)
-            flat[f"{metric}_median"] = round(median(values), 3)
-        results.append(flat)
+            row[f"{metric}_mean"] = round(mean(values), 3)
+            row[f"{metric}_median"] = round(median(values), 3)
+        results.append(row)
 
     return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
         "data": results,
-        "filter": { "from": request.query_params.get("from", ""), "to": request.query_params.get("to", "") },
+        "filter": {
+            "from": request.query_params.get("from", ""),
+            "to": request.query_params.get("to", ""),
+        },
     })
+
 
 @router.get("/statistics/compare/export")
 async def export_csv(request: Request):
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
     to_date = parse_date(request.query_params.get("to"))
+
     all_data = load_strategy_logs()
-
-    filtered = []
-    for d in all_data:
-        ts = parse_date(d.get("timestamp", "")[:10])
-        if from_date and ts and ts < from_date:
-            continue
-        if to_date and ts and ts > to_date:
-            continue
-        filtered.append(d)
-
-    stat_map = defaultdict(lambda: defaultdict(list))
-    for entry in filtered:
-        keys = [entry["strategy_name"]] if mode == "strategy" else entry.get("tags", [])
-        for key in keys:
-            for k, v in entry.get("scores", {}).items():
-                stat_map[key][k].append(v)
+    filtered = filter_by_date(all_data, from_date, to_date)
+    stat_map = compute_statistics_grouped(filtered, mode)
 
     rows = []
     headers = ["name"]
     metric_names = set()
+
     for key, scores in stat_map.items():
         row = {"name": key}
         for metric, values in scores.items():
@@ -107,17 +113,13 @@ async def export_csv(request: Request):
 
     headers.extend(sorted(metric_names))
 
-    # 統計行追加
+    # 📊 統計サマリ行追加
     summary_mean = {"name": "📊 平均"}
     summary_median = {"name": "📊 中央値"}
     for metric in metric_names:
-        values = [row[metric] for row in rows if metric in row]
-        if values:
-            summary_mean[metric] = round(mean(values), 3)
-            summary_median[metric] = round(median(values), 3)
-        else:
-            summary_mean[metric] = ""
-            summary_median[metric] = ""
+        values = [row.get(metric) for row in rows if isinstance(row.get(metric), (int, float))]
+        summary_mean[metric] = round(mean(values), 3) if values else ""
+        summary_median[metric] = round(median(values), 3) if values else ""
 
     rows.extend([summary_mean, summary_median])
 
@@ -129,5 +131,5 @@ async def export_csv(request: Request):
     output.seek(0)
 
     return StreamingResponse(output, media_type="text/csv", headers={
-        "Content-Disposition": f"attachment; filename=compare_result.csv"
+        "Content-Disposition": "attachment; filename=compare_result.csv"
     })
