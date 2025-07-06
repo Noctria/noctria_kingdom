@@ -1,4 +1,5 @@
-# noctria_gui/routes/__init__.py
+#!/usr/bin/env python3
+# coding: utf-8
 
 """
 📦 noctria_gui.routes
@@ -11,11 +12,11 @@ import pkgutil
 # すべての router を格納するリスト
 routers = []
 
-# このパッケージのパスを取得
-__path__ = __path__  # required for pkgutil
+# このパッケージのパスを取得（必要：__init__.py 実行時に __path__ が初期化される）
+__path__ = __path__  # required for pkgutil to work correctly
 
-# 自動インポート処理
-for _, module_name, _ in pkgutil.iter_modules(__path__):
+# 🔄 自動インポート処理
+for finder, module_name, ispkg in pkgutil.iter_modules(__path__):
     if module_name.startswith("_"):
         continue  # __init__.py や非公開モジュールは除外
 
