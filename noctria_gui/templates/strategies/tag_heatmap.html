@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>🔥 タグ別戦略指標ヒートマップ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      color: #222;
+    }
+    canvas {
+      max-width: 1000px;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 タグ別戦略指標ヒートマップ</h1>
+
+  <canvas id="heatmapCanvas"></canvas>
+
+  <script>
+    const stats = {{ tag_stats | tojson }};
+    const tags = stats.map(s => s.type);
+    const metrics = ["win_rate", "max_drawdown", "num_trades"];
+    const displayLabels = {
+      win_rate: "勝率（%）",
+      max_drawdown: "最大DD（%）",
+      num_trades: "取引数"
+    };
+
+    const datasets = metrics.map(metric => ({
+      label: displayLabels[metric],
+      data: stats.map(s => s[metric] || 0),
+      backgroundColor: stats.map(s => {
+        const value = s[metric] || 0;
+        const intensity = Math.min(1, value / (metric === "win_rate" ? 100 : metric === "max_drawdown" ? 50 : 100));
+        const hue = 120 * intensity;
+        return `hsl(${hue}, 70%, 75%)`;
+      }),
+      datalabels: {
+        color: "#000",
+        anchor: "center",
+        align: "center",
+        formatter: (v) => metric === "num_trades" ? `${v}` : `${v.toFixed(2)}`
+      }
+    }));
+
+    const data = {
+      labels: tags,
+      datasets: datasets
+    };
+
+    new Chart(document.getElementById("heatmapCanvas"), {
+      type: "bar",
+      data: data,
+      options: {
+        responsive: true,
+        indexAxis: 'y',
+        plugins: {
+          title: {
+            display: true,
+            text: "タグ × 指標 ヒートマップ",
+            font: { size: 18 }
+          },
+          datalabels: {
+            clamp: true
+          },
+          legend: { position: 'top' }
+        },
+        scales: {
+          x: { beginAtZero: true }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+  </script>
+
+  <p><a href="/dashboard">← ダッシュボードへ戻る</a></p>
+</body>
+</html>
