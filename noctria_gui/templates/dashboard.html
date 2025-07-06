@@ -53,39 +53,148 @@
     </div>
   </div>
 
-  <!-- 📈 昇格・Push件数の時系列グラフ -->
-  <div class="card" style="padding: 1rem; margin-bottom: 2rem;" id="graphCard">
+  <!-- 📈 昇格・Push件数グラフ -->
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
     <h2>📅 昇格・Push数 日次推移</h2>
-
-    <!-- 🎛 グラフ切替UI -->
     <label for="graphMode">表示切替：</label>
     <select id="graphMode">
       <option value="both" selected>昇格＋Push</option>
       <option value="promoted">昇格戦略数のみ</option>
       <option value="push">Push完了数のみ</option>
     </select>
-
     <canvas id="logChart" height="80" style="margin-top: 1rem;"></canvas>
   </div>
 
+  <!-- 📉 勝率推移 -->
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
+    <h2>⚖ 勝率の時系列推移</h2>
+    <canvas id="winRateChart" height="80"></canvas>
+  </div>
+
+  <!-- 📉 最大ドローダウン推移 -->
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
+    <h2>📊 最大ドローダウンの時系列推移</h2>
+    <canvas id="ddChart" height="80"></canvas>
+  </div>
+
   <script>
-    // 🌗 ダークモード切替処理
+    const ctx1 = document.getElementById("logChart").getContext("2d");
+    const ctx2 = document.getElementById("winRateChart").getContext("2d");
+    const ctx3 = document.getElementById("ddChart").getContext("2d");
+
+    const chartDates = {{ stats.dates | tojson }};
+
+    const logChart = new Chart(ctx1, {
+      type: "line",
+      data: {
+        labels: chartDates,
+        datasets: [
+          {
+            label: "昇格戦略数",
+            data: {{ stats.promoted_values | tojson }},
+            borderColor: "rgba(75, 192, 192, 1)",
+            backgroundColor: "rgba(75, 192, 192, 0.2)",
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: "Push完了数",
+            data: {{ stats.pushed_values | tojson }},
+            borderColor: "rgba(255, 99, 132, 1)",
+            backgroundColor: "rgba(255, 99, 132, 0.2)",
+            tension: 0.3,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: { display: true, text: "📈 昇格・Push件数（日次）" },
+          legend: { position: "top" }
+        },
+        scales: {
+          x: { title: { display: true, text: "日付" } },
+          y: { beginAtZero: true, title: { display: true, text: "件数" } }
+        }
+      }
+    });
+
+    const winRateChart = new Chart(ctx2, {
+      type: "line",
+      data: {
+        labels: chartDates,
+        datasets: [
+          {
+            label: "平均勝率（%）",
+            data: {{ stats.avg_win_rates | tojson }},
+            borderColor: "rgba(153, 102, 255, 1)",
+            backgroundColor: "rgba(153, 102, 255, 0.2)",
+            tension: 0.3,
+            fill: true,
+            spanGaps: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: { display: true, text: "📉 勝率の時系列推移" },
+          legend: { position: "top" }
+        },
+        scales: {
+          x: { title: { display: true, text: "日付" } },
+          y: { beginAtZero: true, max: 100, title: { display: true, text: "勝率（%）" } }
+        }
+      }
+    });
+
+    const ddChart = new Chart(ctx3, {
+      type: "line",
+      data: {
+        labels: chartDates,
+        datasets: [
+          {
+            label: "平均最大ドローダウン（%）",
+            data: {{ stats.avg_max_dds | tojson }},
+            borderColor: "rgba(255, 159, 64, 1)",
+            backgroundColor: "rgba(255, 159, 64, 0.2)",
+            tension: 0.3,
+            fill: true,
+            spanGaps: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: { display: true, text: "📉 最大ドローダウンの時系列推移" },
+          legend: { position: "top" }
+        },
+        scales: {
+          x: { title: { display: true, text: "日付" } },
+          y: { beginAtZero: true, title: { display: true, text: "最大DD（%）" } }
+        }
+      }
+    });
+
+    document.getElementById("graphMode").addEventListener("change", function () {
+      const mode = this.value;
+      logChart.setDatasetVisibility(0, mode !== "push");
+      logChart.setDatasetVisibility(1, mode !== "promoted");
+      logChart.update();
+    });
+
     const toggleButton = document.getElementById("darkModeToggle");
     const body = document.body;
     const cards = document.querySelectorAll(".card");
     const links = document.querySelectorAll(".nav-link");
-    const graphCard = document.getElementById("graphCard");
     const select = document.getElementById("graphMode");
 
-    // 初期状態適用
     if (localStorage.getItem("darkMode") === "true") enableDarkMode();
 
     toggleButton.addEventListener("click", () => {
-      if (body.classList.contains("dark-mode")) {
-        disableDarkMode();
-      } else {
-        enableDarkMode();
-      }
+      body.classList.contains("dark-mode") ? disableDarkMode() : enableDarkMode();
     });
 
     function enableDarkMode() {
@@ -95,13 +204,7 @@
       select.classList.add("dark-mode");
       toggleButton.classList.add("dark-mode");
       localStorage.setItem("darkMode", "true");
-      logChart.options.plugins.title.color = "#f0f0f0";
-      logChart.options.scales.x.ticks.color = "#f0f0f0";
-      logChart.options.scales.y.ticks.color = "#f0f0f0";
-      logChart.options.scales.x.title.color = "#f0f0f0";
-      logChart.options.scales.y.title.color = "#f0f0f0";
-      logChart.options.plugins.legend.labels.color = "#f0f0f0";
-      logChart.update();
+      [logChart, winRateChart, ddChart].forEach(c => applyDarkStyle(c, "#f0f0f0"));
     }
 
     function disableDarkMode() {
@@ -111,90 +214,28 @@
       select.classList.remove("dark-mode");
       toggleButton.classList.remove("dark-mode");
       localStorage.setItem("darkMode", "false");
-      logChart.options.plugins.title.color = "#000";
-      logChart.options.scales.x.ticks.color = "#000";
-      logChart.options.scales.y.ticks.color = "#000";
-      logChart.options.scales.x.title.color = "#000";
-      logChart.options.scales.y.title.color = "#000";
-      logChart.options.plugins.legend.labels.color = "#000";
-      logChart.update();
+      [logChart, winRateChart, ddChart].forEach(c => applyDarkStyle(c, "#000"));
     }
 
-    // 📈 グラフ描画
-    const ctx = document.getElementById("logChart").getContext("2d");
-    const chartData = {
-      labels: {{ stats.dates | tojson }},
-      datasets: [
-        {
-          label: "昇格戦略数",
-          data: {{ stats.promoted_values | tojson }},
-          borderColor: "rgba(75, 192, 192, 1)",
-          backgroundColor: "rgba(75, 192, 192, 0.2)",
-          tension: 0.3,
-          fill: true,
-        },
-        {
-          label: "Push完了数",
-          data: {{ stats.pushed_values | tojson }},
-          borderColor: "rgba(255, 99, 132, 1)",
-          backgroundColor: "rgba(255, 99, 132, 0.2)",
-          tension: 0.3,
-          fill: true,
-        },
-      ]
-    };
-
-    const logChart = new Chart(ctx, {
-      type: "line",
-      data: chartData,
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: "top" },
-          title: { display: true, text: "📈 昇格・Push件数（日次）" }
-        },
-        scales: {
-          x: { title: { display: true, text: "日付" } },
-          y: { beginAtZero: true, title: { display: true, text: "件数" } }
-        }
-      }
-    });
-
-    // 🎛 表示切替ロジック
-    document.getElementById("graphMode").addEventListener("change", function () {
-      const mode = this.value;
-      logChart.setDatasetVisibility(0, mode !== "push");
-      logChart.setDatasetVisibility(1, mode !== "promoted");
-      logChart.update();
-    });
+    function applyDarkStyle(chart, color) {
+      chart.options.plugins.title.color = color;
+      chart.options.plugins.legend.labels.color = color;
+      chart.options.scales.x.ticks.color = color;
+      chart.options.scales.y.ticks.color = color;
+      chart.options.scales.x.title.color = color;
+      chart.options.scales.y.title.color = color;
+      chart.update();
+    }
   </script>
 
-  <!-- 🔗 統治パネルリンク -->
+  <!-- 🔗 統治リンク -->
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
-    <a href="/act-history" class="card nav-link" style="text-decoration: none;">
-      <h3>🧾 昇格戦略一覧</h3>
-      <p>Veritasにより昇格された戦略の記録</p>
-    </a>
-    <a href="/push-history" class="card nav-link" style="text-decoration: none;">
-      <h3>📤 GitHub Push履歴</h3>
-      <p>昇格戦略が GitHub に送信された記録</p>
-    </a>
-    <a href="/pdca" class="card nav-link" style="text-decoration: none;">
-      <h3>🔁 PDCA履歴</h3>
-      <p>戦略生成・評価・EA命令の自動実行ログ</p>
-    </a>
-    <a href="/statistics/heatmap" class="card nav-link" style="text-decoration: none;">
-      <h3>🔥 タグ別ヒートマップ</h3>
-      <p>戦略タグ × 勝率・DDの視覚分析</p>
-    </a>
-    <a href="/statistics/ranking" class="card nav-link" style="text-decoration: none;">
-      <h3>🏅 ランキング</h3>
-      <p>タグ別勝率・安定性・件数の比較</p>
-    </a>
-    <a href="/strategies/compare" class="card nav-link" style="text-decoration: none;">
-      <h3>📊 戦略比較</h3>
-      <p>複数戦略の勝率や性能を並列分析</p>
-    </a>
+    <a href="/act-history" class="card nav-link"><h3>🧾 昇格戦略一覧</h3><p>Veritasにより昇格された戦略の記録</p></a>
+    <a href="/push-history" class="card nav-link"><h3>📤 GitHub Push履歴</h3><p>昇格戦略が GitHub に送信された記録</p></a>
+    <a href="/pdca" class="card nav-link"><h3>🔁 PDCA履歴</h3><p>戦略生成・評価・EA命令の自動実行ログ</p></a>
+    <a href="/statistics/heatmap" class="card nav-link"><h3>🔥 タグ別ヒートマップ</h3><p>戦略タグ × 勝率・DDの視覚分析</p></a>
+    <a href="/statistics/ranking" class="card nav-link"><h3>🏅 ランキング</h3><p>タグ別勝率・安定性・件数の比較</p></a>
+    <a href="/strategies/compare" class="card nav-link"><h3>📊 戦略比較</h3><p>複数戦略の勝率や性能を並列分析</p></a>
   </div>
 </body>
 </html>
