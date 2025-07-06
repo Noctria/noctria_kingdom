@@ -17,7 +17,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 1rem;
-      align-items: center;
+      align-items: flex-end;
       background: #fff;
       padding: 1rem;
       border-radius: 8px;
@@ -38,6 +38,7 @@
       border-collapse: collapse;
       background-color: white;
       margin-top: 1rem;
+      cursor: default;
     }
     th, td {
       padding: 0.5rem;
@@ -46,6 +47,7 @@
     }
     th {
       background-color: #e0e0e0;
+      cursor: pointer;
     }
     button {
       padding: 0.4rem 0.8rem;
@@ -83,7 +85,12 @@
     </label>
     <label>
       タグ
-      <input type="text" name="tag" value="{{ filters.tag or '' }}">
+      <select name="tag">
+        <option value="">すべて</option>
+        {% for tag_item in tag_list %}
+          <option value="{{ tag_item }}" {% if filters.tag == tag_item %}selected{% endif %}>{{ tag_item }}</option>
+        {% endfor %}
+      </select>
     </label>
     <label>
       最低スコア
@@ -102,7 +109,7 @@
       <input type="date" name="end_date" value="{{ filters.end_date or '' }}">
     </label>
     <label>
-      <span>Push済み</span>
+      Push済み
       <select name="pushed">
         <option value="">すべて</option>
         <option value="true" {% if filters.pushed == True %}selected{% endif %}>✅ 済</option>
@@ -110,20 +117,19 @@
       </select>
     </label>
     <button type="submit">🔍 絞り込み</button>
-
-    {# CSV出力リンクに検索条件を付与 #}
-    <a class="csv-link" href="/act-history/export?strategy_name={{ filters.strategy_name or '' }}&tag={{ filters.tag or '' }}&min_score={{ filters.min_score or '' }}&max_score={{ filters.max_score or '' }}&start_date={{ filters.start_date or '' }}&end_date={{ filters.end_date or '' }}&pushed={{ filters.pushed }}">
+    <a class="csv-link"
+      href="/act-history/export?strategy_name={{ filters.strategy_name or '' }}&tag={{ filters.tag or '' }}&min_score={{ filters.min_score or '' }}&max_score={{ filters.max_score or '' }}&start_date={{ filters.start_date or '' }}&end_date={{ filters.end_date or '' }}&pushed={{ filters.pushed }}">
       📤 CSV出力
     </a>
   </form>
 
-  <table>
+  <table id="log-table">
     <thead>
       <tr>
-        <th>戦略名</th>
+        <th onclick="sortTable(0)">戦略名</th>
         <th>通貨ペア</th>
-        <th>昇格日時</th>
-        <th>スコア</th>
+        <th onclick="sortTable(2)">昇格日時</th>
+        <th onclick="sortTable(3)">スコア</th>
         <th>タグ</th>
         <th>Push済</th>
         <th>操作</th>
@@ -152,5 +158,27 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <script>
+    function sortTable(colIndex) {
+      const table = document.getElementById("log-table");
+      const rows = Array.from(table.rows).slice(1);
+      const isNumeric = colIndex === 3;
+
+      const sorted = rows.sort((a, b) => {
+        const valA = a.cells[colIndex].innerText.trim();
+        const valB = b.cells[colIndex].innerText.trim();
+
+        if (isNumeric) {
+          return parseFloat(valB) - parseFloat(valA);
+        } else {
+          return valA.localeCompare(valB, 'ja');
+        }
+      });
+
+      const tbody = table.tBodies[0];
+      sorted.forEach(row => tbody.appendChild(row));
+    }
+  </script>
 </body>
 </html>
