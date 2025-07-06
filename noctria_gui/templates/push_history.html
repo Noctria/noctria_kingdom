@@ -9,9 +9,8 @@
       padding: 2rem;
       background-color: #f4f4f4;
     }
-    h1 {
-      color: #222;
-    }
+    h1 { color: #222; }
+
     form.search {
       margin-bottom: 1.5rem;
       display: flex;
@@ -40,9 +39,8 @@
       border-radius: 4px;
       background-color: white;
     }
-    .csv-link:hover {
-      background-color: #eef;
-    }
+    .csv-link:hover { background-color: #eef; }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -63,6 +61,26 @@
     a.detail-link:hover {
       text-decoration: underline;
     }
+
+    .pagination {
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .pagination a {
+      margin: 0 0.5rem;
+      text-decoration: none;
+      color: #007acc;
+    }
+    .pagination a.active {
+      font-weight: bold;
+      text-decoration: underline;
+    }
+    .info {
+      margin-top: 1rem;
+      text-align: right;
+      font-size: 0.95rem;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -73,6 +91,11 @@
     <input type="text" name="tag" placeholder="タグで検索" value="{{ filters.tag | default('') }}" />
     <input type="date" name="start_date" value="{{ filters.start_date | default('') }}" />
     <input type="date" name="end_date" value="{{ filters.end_date | default('') }}" />
+    <select name="sort">
+      <option value="desc" {% if filters.sort == "desc" %}selected{% endif %}>Push日時 降順</option>
+      <option value="asc" {% if filters.sort == "asc" %}selected{% endif %}>Push日時 昇順</option>
+    </select>
+    <input type="hidden" name="page" value="1" />
     <button type="submit">🔍 検索</button>
     <a class="csv-link"
        href="/push-history/export?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">
@@ -99,12 +122,24 @@
         <td>{{ log.tag }}</td>
         <td>{{ log.message }}</td>
         <td>{{ log.pushed_by | default("―") }}</td>
-        <td>
-          <a class="detail-link" href="/push-history/detail?timestamp={{ log.timestamp }}">🔎 詳細</a>
-        </td>
+        <td><a class="detail-link" href="/push-history/detail?timestamp={{ log.timestamp }}">🔎 詳細</a></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+
+  <div class="info">
+    表示件数: {{ logs | length }} / 総件数: {{ total_count }}
+  </div>
+
+  <div class="pagination">
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == current_page %}
+        <a class="active">{{ p }}</a>
+      {% else %}
+        <a href="?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&sort={{ filters.sort }}&page={{ p }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+  </div>
 </body>
 </html>
