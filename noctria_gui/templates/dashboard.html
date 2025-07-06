@@ -5,32 +5,56 @@
   <title>🏰 Noctria Kingdom - 統治ダッシュボード</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body.dark-mode {
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+    }
+    .card.dark-mode {
+      background-color: #2e2e2e;
+      color: #f0f0f0;
+      border: 1px solid #444;
+    }
+    .nav-link.dark-mode {
+      background-color: #333;
+      border: 1px solid #555;
+    }
+    select.dark-mode, button.dark-mode {
+      background-color: #333;
+      color: #f0f0f0;
+    }
+  </style>
 </head>
 <body>
   <h1>🏰 Noctria Kingdom - 中央統治ダッシュボード</h1>
 
+  <!-- 🌗 ダークモード切替 -->
+  <div style="margin-bottom: 1rem;">
+    <button id="darkModeToggle">🌗 ダークモード切替</button>
+  </div>
+
   <!-- 📊 サマリカード -->
-  <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
-    <div class="card" style="flex: 1 1 220px;">
+  <div id="cards" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div class="card">
       <h2>📈 昇格戦略数</h2>
       <p><strong>{{ stats.promoted_count }}</strong> 件</p>
     </div>
-    <div class="card" style="flex: 1 1 220px;">
+    <div class="card">
       <h2>📤 Push完了数</h2>
       <p><strong>{{ stats.push_count }}</strong> 件</p>
     </div>
-    <div class="card" style="flex: 1 1 220px;">
+    <div class="card">
       <h2>🧪 PDCA実行数</h2>
       <p><strong>{{ stats.pdca_count }}</strong> 件</p>
     </div>
-    <div class="card" style="flex: 1 1 220px;">
+    <div class="card">
       <h2>⚖ 平均勝率</h2>
       <p><strong>{{ "%.1f"|format(stats.avg_win_rate) }}%</strong></p>
     </div>
   </div>
 
   <!-- 📈 昇格・Push件数の時系列グラフ -->
-  <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;" id="graphCard">
     <h2>📅 昇格・Push数 日次推移</h2>
 
     <!-- 🎛 グラフ切替UI -->
@@ -45,8 +69,59 @@
   </div>
 
   <script>
-    const ctx = document.getElementById("logChart").getContext("2d");
+    // 🌗 ダークモード切替処理
+    const toggleButton = document.getElementById("darkModeToggle");
+    const body = document.body;
+    const cards = document.querySelectorAll(".card");
+    const links = document.querySelectorAll(".nav-link");
+    const graphCard = document.getElementById("graphCard");
+    const select = document.getElementById("graphMode");
 
+    // 初期状態適用
+    if (localStorage.getItem("darkMode") === "true") enableDarkMode();
+
+    toggleButton.addEventListener("click", () => {
+      if (body.classList.contains("dark-mode")) {
+        disableDarkMode();
+      } else {
+        enableDarkMode();
+      }
+    });
+
+    function enableDarkMode() {
+      body.classList.add("dark-mode");
+      cards.forEach(c => c.classList.add("dark-mode"));
+      links.forEach(l => l.classList.add("dark-mode"));
+      select.classList.add("dark-mode");
+      toggleButton.classList.add("dark-mode");
+      localStorage.setItem("darkMode", "true");
+      logChart.options.plugins.title.color = "#f0f0f0";
+      logChart.options.scales.x.ticks.color = "#f0f0f0";
+      logChart.options.scales.y.ticks.color = "#f0f0f0";
+      logChart.options.scales.x.title.color = "#f0f0f0";
+      logChart.options.scales.y.title.color = "#f0f0f0";
+      logChart.options.plugins.legend.labels.color = "#f0f0f0";
+      logChart.update();
+    }
+
+    function disableDarkMode() {
+      body.classList.remove("dark-mode");
+      cards.forEach(c => c.classList.remove("dark-mode"));
+      links.forEach(l => l.classList.remove("dark-mode"));
+      select.classList.remove("dark-mode");
+      toggleButton.classList.remove("dark-mode");
+      localStorage.setItem("darkMode", "false");
+      logChart.options.plugins.title.color = "#000";
+      logChart.options.scales.x.ticks.color = "#000";
+      logChart.options.scales.y.ticks.color = "#000";
+      logChart.options.scales.x.title.color = "#000";
+      logChart.options.scales.y.title.color = "#000";
+      logChart.options.plugins.legend.labels.color = "#000";
+      logChart.update();
+    }
+
+    // 📈 グラフ描画
+    const ctx = document.getElementById("logChart").getContext("2d");
     const chartData = {
       labels: {{ stats.dates | tojson }},
       datasets: [
@@ -100,27 +175,22 @@
       <h3>🧾 昇格戦略一覧</h3>
       <p>Veritasにより昇格された戦略の記録</p>
     </a>
-
     <a href="/push-history" class="card nav-link" style="text-decoration: none;">
       <h3>📤 GitHub Push履歴</h3>
       <p>昇格戦略が GitHub に送信された記録</p>
     </a>
-
     <a href="/pdca" class="card nav-link" style="text-decoration: none;">
       <h3>🔁 PDCA履歴</h3>
       <p>戦略生成・評価・EA命令の自動実行ログ</p>
     </a>
-
     <a href="/statistics/heatmap" class="card nav-link" style="text-decoration: none;">
       <h3>🔥 タグ別ヒートマップ</h3>
       <p>戦略タグ × 勝率・DDの視覚分析</p>
     </a>
-
     <a href="/statistics/ranking" class="card nav-link" style="text-decoration: none;">
       <h3>🏅 ランキング</h3>
       <p>タグ別勝率・安定性・件数の比較</p>
     </a>
-
     <a href="/strategies/compare" class="card nav-link" style="text-decoration: none;">
       <h3>📊 戦略比較</h3>
       <p>複数戦略の勝率や性能を並列分析</p>
