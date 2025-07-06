@@ -4,56 +4,53 @@
 {% block content %}
 <h2>📊 戦略・タグ比較分析</h2>
 
-<!-- 🔍 フィルター（GET） -->
 <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
-  <label>📌 モード選択：</label>
+  <label>📌 モード：</label>
   <select name="mode">
     <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
     <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
   </select>
 
-  <label style="margin-left: 1rem;">📅 期間：</label>
+  <label style="margin-left:1rem;">📅 期間：</label>
   <input type="date" name="from" value="{{ filter.from }}">
   〜
   <input type="date" name="to" value="{{ filter.to }}">
 
-  <div style="margin: 0.5rem 0;">
-    <label>📆 プリセット期間：</label>
-    <button type="button" class="button" onclick="applyPreset(7)">直近7日</button>
-    <button type="button" class="button" onclick="applyPreset(30)">過去30日</button>
-    <button type="button" class="button" onclick="applyThisMonth()">今月</button>
-    <button type="button" class="button" onclick="clearPreset()">クリア</button>
-  </div>
+  <button type="button" class="button" onclick="setPreset('7')">7日</button>
+  <button type="button" class="button" onclick="setPreset('30')">30日</button>
+  <button type="button" class="button" onclick="setPreset('month')">今月</button>
 
-  <div style="margin: 1rem 0;">
+  <div style="margin:1rem 0;">
     <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
-    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
+    <div style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:0.5rem;">
       {% for k in all_keys %}
-        <label style="display: inline-block; margin-right: 1rem;">
+        <label style="display:inline-block; margin-right:1rem;">
           <input type="checkbox" name="{{ mode }}s" value="{{ k }}" {% if k in keys %}checked{% endif %}>
           {{ k }}
         </label>
       {% endfor %}
     </div>
+    <button type="button" class="button" onclick="checkAll(true)">✅ 全選択</button>
+    <button type="button" class="button" onclick="checkAll(false)">❌ 全解除</button>
+    <span id="checkCount" style="margin-left: 1rem;"></span>
   </div>
 
-  <label>🔀 ソート：</label>
+  <label>📌 ソート順：</label>
   <select name="sort">
-    <option value="check" {% if sort == "check" %}selected{% endif %}>☑ チェック順</option>
-    <option value="score" {% if sort == "score" %}selected{% endif %}>⭐ スコア順</option>
+    <option value="check" {% if sort == "check" %}selected{% endif %}>✅ チェック順</option>
+    <option value="score" {% if sort == "score" %}selected{% endif %}>📈 スコア順</option>
   </select>
 
   <button type="submit" class="button">📥 表示</button>
   {% if keys %}
-    <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&sort={{ sort }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSV出力</a>
+    <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&sort={{ sort }}{% for k in keys %}&{{ mode }}s={{ k }}{% endfor %}" class="button">📄 CSV出力</a>
   {% endif %}
 </form>
 
-<!-- 🔗 URL共有 -->
 {% if keys %}
-  <div style="margin-top: 1rem;">
+  <div style="margin-top:1rem;">
     <label>🔗 現在のURL（共有可）:</label><br>
-    <input id="shareUrl" type="text" readonly style="width: 90%;" value="{{ request.url }}" />
+    <input id="shareUrl" type="text" readonly style="width:90%;" value="{{ request.url }}" />
     <button class="button" onclick="copyUrl()">📋 コピー</button>
   </div>
 {% endif %}
@@ -73,27 +70,26 @@
         <th>平均勝率（%）</th>
         <th>平均DD（%）</th>
         <th>件数</th>
-        <th>🔍</th>
       </tr>
     </thead>
     <tbody>
       {% for row in results %}
         <tr>
-          <td>{{ row.key }}</td>
+          <td>
+            <a href="/statistics/detail?mode={{ mode }}&key={{ row.key | urlencode }}&sort_by=date&order=desc">
+              {{ row.key }}
+            </a>
+          </td>
           <td>{{ row.avg_win }}</td>
           <td>{{ row.avg_dd }}</td>
           <td>{{ row.count }}</td>
-          <td><a href="/statistics/detail?mode={{ mode }}&key={{ row.key }}">詳細</a></td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 
   <canvas id="winChart" height="100"></canvas>
-  <button class="button" onclick="downloadChart('winChart', 'win_rate_chart')">📷 勝率グラフ保存</button>
-
   <canvas id="ddChart" height="100"></canvas>
-  <button class="button" onclick="downloadChart('ddChart', 'dd_chart')">📷 DDグラフ保存</button>
 
   <script>
     const labels = {{ results | map(attribute='key') | list | tojson }};
@@ -118,7 +114,10 @@
             tension: 0.2
           }]
         },
-        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+        options: {
+          responsive: true,
+          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
+        }
       });
 
       ddChartInstance = new Chart(document.getElementById('ddChart'), {
@@ -134,23 +133,15 @@
             tension: 0.2
           }]
         },
-        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+        options: {
+          responsive: true,
+          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
+        }
       });
     }
 
-    function downloadChart(canvasId, filename) {
-      const canvas = document.getElementById(canvasId);
-      canvas.toBlob(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename + ".png";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      });
-    }
+    document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
+    renderCharts("bar");
 
     function copyUrl() {
       const input = document.getElementById("shareUrl");
@@ -160,28 +151,37 @@
       alert("URLをコピーしました！");
     }
 
-    function applyPreset(days) {
+    function setPreset(days) {
+      const from = document.querySelector('input[name="from"]');
+      const to = document.querySelector('input[name="to"]');
       const now = new Date();
-      const past = new Date();
-      past.setDate(now.getDate() - days);
-      document.querySelector("input[name='to']").value = now.toISOString().slice(0, 10);
-      document.querySelector("input[name='from']").value = past.toISOString().slice(0, 10);
+      const today = now.toISOString().slice(0, 10);
+
+      if (days === "month") {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        from.value = start.toISOString().slice(0, 10);
+        to.value = today;
+      } else {
+        const offset = new Date(now.getTime() - days * 86400000);
+        from.value = offset.toISOString().slice(0, 10);
+        to.value = today;
+      }
     }
 
-    function applyThisMonth() {
-      const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      document.querySelector("input[name='to']").value = now.toISOString().slice(0, 10);
-      document.querySelector("input[name='from']").value = firstDay.toISOString().slice(0, 10);
+    function checkAll(flag) {
+      document.querySelectorAll(`input[type="checkbox"][name="{{ mode }}s"]`).forEach(cb => cb.checked = flag);
+      updateCheckCount();
     }
 
-    function clearPreset() {
-      document.querySelector("input[name='to']").value = "";
-      document.querySelector("input[name='from']").value = "";
+    function updateCheckCount() {
+      const count = document.querySelectorAll(`input[name="{{ mode }}s"]:checked`).length;
+      document.getElementById("checkCount").innerText = `📌 選択数：${count}`;
     }
 
-    renderCharts("bar");
-    document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
+    document.querySelectorAll(`input[name="{{ mode }}s"]`).forEach(cb =>
+      cb.addEventListener("change", updateCheckCount)
+    );
+    updateCheckCount();
   </script>
 {% else %}
   <p>⚠ 比較対象を選択してください。</p>
