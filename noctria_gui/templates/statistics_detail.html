@@ -37,8 +37,19 @@
     </strong>
   </p>
 
-  <!-- 📊 時系列グラフ -->
+  <!-- 📈 時系列グラフ -->
   <canvas id="detailChart" height="120"></canvas>
+
+  <!-- 🔢 Bin数セレクト -->
+  <div style="margin-top: 2rem;">
+    <label>🔢 ヒストグラムの区間数（Bin数）:</label>
+    <select id="binCountSelect" class="button">
+      <option value="5">5</option>
+      <option value="10" selected>10</option>
+      <option value="15">15</option>
+      <option value="20">20</option>
+    </select>
+  </div>
 
   <!-- 📊 ヒストグラム -->
   <h3>📊 勝率ヒストグラム</h3>
@@ -53,8 +64,10 @@
     const winRates = {{ results | map(attribute='win_rate') | list | tojson }};
     const ddRates = {{ results | map(attribute='max_drawdown') | list | tojson }};
 
+    let winChart, winHistChart, ddHistChart;
+
     // 📈 時系列グラフ
-    new Chart(document.getElementById('detailChart'), {
+    winChart = new Chart(document.getElementById('detailChart'), {
       type: 'line',
       data: {
         labels: labels,
@@ -80,27 +93,17 @@
       options: {
         responsive: true,
         scales: {
-          y: {
-            type: 'linear',
-            position: 'left',
-            beginAtZero: true,
-            title: { display: true, text: '勝率' }
-          },
-          y1: {
-            type: 'linear',
-            position: 'right',
-            beginAtZero: true,
-            grid: { drawOnChartArea: false },
-            title: { display: true, text: '最大DD' }
-          }
+          y: { beginAtZero: true, title: { display: true, text: '勝率' } },
+          y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '最大DD' } }
         }
       }
     });
 
-    // 📊 ヒストグラム生成関数
-    function renderHistogram(data, canvasId, label, color) {
+    // 📊 ヒストグラム描画関数
+    function renderHistogram(data, canvasId, label, color, binCount) {
       const cleanData = data.filter(v => typeof v === 'number');
-      const binCount = 10;
+      if (cleanData.length === 0) return;
+
       const min = Math.min(...cleanData);
       const max = Math.max(...cleanData);
       const binWidth = (max - min) / binCount;
@@ -118,31 +121,42 @@
         binLabels.push(`${start}〜${end}`);
       }
 
-      new Chart(document.getElementById(canvasId), {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      if (canvasId === 'winHistogram' && winHistChart) winHistChart.destroy();
+      if (canvasId === 'ddHistogram' && ddHistChart) ddHistChart.destroy();
+
+      const chart = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: binLabels,
           datasets: [{
             label: label,
             data: bins,
-            backgroundColor: color,
+            backgroundColor: color
           }]
         },
         options: {
           responsive: true,
           scales: {
-            y: {
-              beginAtZero: true,
-              title: { display: true, text: '件数' }
-            }
+            y: { beginAtZero: true, title: { display: true, text: '件数' } }
           }
         }
       });
+
+      if (canvasId === 'winHistogram') winHistChart = chart;
+      if (canvasId === 'ddHistogram') ddHistChart = chart;
     }
 
-    // 📊 勝率とDDのヒストグラム描画
-    renderHistogram(winRates, 'winHistogram', '勝率の分布', 'rgba(54, 162, 235, 0.7)');
-    renderHistogram(ddRates, 'ddHistogram', '最大DDの分布', 'rgba(255, 99, 132, 0.7)');
+    // 📊 初期描画
+    renderHistogram(winRates, 'winHistogram', '勝率の分布', 'rgba(54, 162, 235, 0.7)', 10);
+    renderHistogram(ddRates, 'ddHistogram', '最大DDの分布', 'rgba(255, 99, 132, 0.7)', 10);
+
+    // 🔄 Bin数変更イベント
+    document.getElementById("binCountSelect").addEventListener("change", e => {
+      const binCount = parseInt(e.target.value);
+      renderHistogram(winRates, 'winHistogram', '勝率の分布', 'rgba(54, 162, 235, 0.7)', binCount);
+      renderHistogram(ddRates, 'ddHistogram', '最大DDの分布', 'rgba(255, 99, 132, 0.7)', binCount);
+    });
   </script>
 {% else %}
   <p>⚠ データが存在しません。</p>
