@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>📊 指標比較 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      color: #222;
+      margin-bottom: 1.5rem;
+    }
+    form {
+      margin-bottom: 2rem;
+    }
+    table {
+      width: 100%;
+      background: #fff;
+      border-collapse: collapse;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 0.75rem;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background-color: #e9f2fb;
+    }
+    canvas {
+      max-width: 1000px;
+      margin: 2rem auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 {{ "タグ" if mode == "tag" else "戦略" }}別 指標比較</h1>
+
+  <!-- 🔍 フィルター -->
+  <form method="get">
+    <input type="hidden" name="mode" value="{{ mode }}" />
+    <label>From: <input type="date" name="from" value="{{ filter.from }}"></label>
+    <label>To: <input type="date" name="to" value="{{ filter.to }}"></label>
+    <label>{{ "Tags" if mode == "tag" else "Strategies" }}:
+      <input type="text" name="{{ mode }}s" value="{{ keys|join(',') }}" placeholder="カンマ区切りで入力">
+    </label>
+    <button type="submit">適用</button>
+  </form>
+
+  <!-- 📈 グラフ -->
+  <canvas id="compareChart"></canvas>
+
+  <!-- 📋 比較テーブル -->
+  <table>
+    <thead>
+      <tr>
+        <th>{{ "タグ" if mode == "tag" else "戦略" }}</th>
+        <th>平均勝率（%）</th>
+        <th>平均DD（%）</th>
+        <th>件数</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td>{{ r.key }}</td>
+        <td>{{ r.avg_win }}</td>
+        <td>{{ r.avg_dd }}</td>
+        <td>{{ r.count }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">該当データなし</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    const ctx = document.getElementById('compareChart');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: {{ results | map(attribute='key') | list | tojson }},
+        datasets: [
+          {
+            label: '平均勝率（%）',
+            data: {{ results | map(attribute='avg_win') | list | tojson }},
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          },
+          {
+            label: '平均DD（%）',
+            data: {{ results | map(attribute='avg_dd') | list | tojson }},
+            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
