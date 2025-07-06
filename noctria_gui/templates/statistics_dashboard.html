@@ -1,213 +1,176 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>📊 統計スコアダッシュボード</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: "Segoe UI", sans-serif; background-color: #f5f5f5; padding: 2rem; }
-    h1 { color: #222; margin-bottom: 1rem; }
-    form, table { margin-bottom: 2rem; }
-    table {
-      width: 100%;
-      background: #fff;
-      border-collapse: collapse;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 0.75rem;
-      border-bottom: 1px solid #ddd;
-      text-align: left;
-    }
-    th { background-color: #e9f2fb; }
-    tr:hover { background-color: #f1f7ff; }
-    button {
-      padding: 0.5rem 1rem;
-      margin-right: 1rem;
-      background: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover { background: #005f99; }
-    canvas { max-width: 1000px; margin: 2rem 0; }
-    .chart-toggle { margin-bottom: 1rem; }
-  </style>
-</head>
-<body>
-  <h1>📊 統計スコアダッシュボード</h1>
+{% extends "base_layout.html" %}
 
-  <form method="get" action="/statistics">
-    <label>戦略名:
-      <select name="strategy">
-        <option value="">-- 全て --</option>
-        {% for name in strategies %}
-          <option value="{{ name }}" {% if name == strategy %}selected{% endif %}>{{ name }}</option>
-        {% endfor %}
-      </select>
-    </label>
+{% block content %}
+<h1>📊 統計スコアダッシュボード</h1>
 
-    <label>通貨ペア:
-      <select name="symbol">
-        <option value="">-- 全て --</option>
-        {% for sym in symbols %}
-          <option value="{{ sym }}" {% if sym == symbol %}selected{% endif %}>{{ sym }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <button type="submit">🔍 絞り込み</button>
-    <button type="button" onclick="location.href='/statistics/export'">📤 CSVエクスポート</button>
-  </form>
-
-  <div class="chart-toggle">
-    <button onclick="switchChart('bar')">📊 バー</button>
-    <button onclick="switchChart('radar')">🧩 レーダー</button>
-    <button onclick="switchChart('line')">📈 ライン</button>
-  </div>
-
-  <canvas id="statChart"></canvas>
-
-  <section>
-    <h2>📛 タグ別戦略数</h2>
-    <canvas id="tagChart"></canvas>
-  </section>
-
-  <table>
-    <thead>
-      <tr>
-        <th>戦略名</th>
-        <th>通貨ペア</th>
-        <th>勝率</th>
-        <th>最大DD</th>
-        <th>取引数</th>
-        <th>日付</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for stat in statistics %}
-        {% set win = stat.win_rate or 0 %}
-        {% set hue = 120 * (win / 100) %}
-        <tr>
-          <td>{{ stat.strategy }}</td>
-          <td>{{ stat.symbol }}</td>
-          <td style="background-color: hsl({{ hue }}, 70%, 80%);">
-            {{ "%.2f"|format(win) }}%
-          </td>
-          <td>{{ "%.2f"|format(stat.max_drawdown or 0) }}</td>
-          <td>{{ stat.num_trades or "―" }}</td>
-          <td>{{ stat.date or "―" }}</td>
-        </tr>
+<form method="get" action="/statistics">
+  <label>戦略名:
+    <select name="strategy">
+      <option value="">-- 全て --</option>
+      {% for name in strategies %}
+        <option value="{{ name }}" {% if name == strategy %}selected{% endif %}>{{ name }}</option>
       {% endfor %}
-    </tbody>
-  </table>
+    </select>
+  </label>
 
-  <script>
-    const stats = {{ statistics | tojson }};
-    const tagsCount = {{ tags_count | tojson }};
-    const labels = stats.map(s => s.strategy);
-    const winRates = stats.map(s => s.win_rate || 0);
-    const drawdowns = stats.map(s => s.max_drawdown || 0);
-    const trades = stats.map(s => s.num_trades || 0);
-    let chart = null;
+  <label>通貨ペア:
+    <select name="symbol">
+      <option value="">-- 全て --</option>
+      {% for sym in symbols %}
+        <option value="{{ sym }}" {% if sym == symbol %}selected{% endif %}>{{ sym }}</option>
+      {% endfor %}
+    </select>
+  </label>
 
-    function renderChart(type) {
-      const ctx = document.getElementById("statChart").getContext("2d");
-      if (chart) chart.destroy();
+  <button type="submit">🔍 絞り込み</button>
+  <button type="button" onclick="location.href='/statistics/export'">📤 CSVエクスポート</button>
+</form>
 
-      let chartData = {
-        labels: labels,
-        datasets: [{
-          label: "勝率 (%)",
-          data: winRates,
-          backgroundColor: "rgba(54, 162, 235, 0.6)",
-          borderColor: "rgba(54, 162, 235, 1)",
-          fill: type !== "line"
-        }]
+<div class="chart-toggle">
+  <button onclick="switchChart('bar')">📊 バー</button>
+  <button onclick="switchChart('radar')">🧩 レーダー</button>
+  <button onclick="switchChart('line')">📈 ライン</button>
+</div>
+
+<canvas id="statChart"></canvas>
+
+<section>
+  <h2>📛 タグ別戦略数</h2>
+  <canvas id="tagChart"></canvas>
+</section>
+
+<table>
+  <thead>
+    <tr>
+      <th>戦略名</th>
+      <th>通貨ペア</th>
+      <th>勝率</th>
+      <th>最大DD</th>
+      <th>取引数</th>
+      <th>日付</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for stat in statistics %}
+      {% set win = stat.win_rate or 0 %}
+      {% set hue = 120 * (win / 100) %}
+      <tr>
+        <td>{{ stat.strategy }}</td>
+        <td>{{ stat.symbol }}</td>
+        <td style="background-color: hsl({{ hue }}, 70%, 80%)">
+          {{ "%.2f"|format(win) }}%
+        </td>
+        <td>{{ "%.2f"|format(stat.max_drawdown or 0) }}</td>
+        <td>{{ stat.num_trades or "―" }}</td>
+        <td>{{ stat.date or "―" }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const stats = {{ statistics | tojson }};
+  const tagsCount = {{ tags_count | tojson }};
+  const labels = stats.map(s => s.strategy);
+  const winRates = stats.map(s => s.win_rate || 0);
+  const drawdowns = stats.map(s => s.max_drawdown || 0);
+  const trades = stats.map(s => s.num_trades || 0);
+  let chart = null;
+
+  function renderChart(type) {
+    const ctx = document.getElementById("statChart").getContext("2d");
+    if (chart) chart.destroy();
+
+    let chartData = {
+      labels: labels,
+      datasets: [{
+        label: "勝率 (%)",
+        data: winRates,
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        fill: type !== "line"
+      }]
+    };
+
+    if (type === "radar") {
+      chartData = {
+        labels: ["勝率", "最大DD", "取引数"],
+        datasets: stats.map(s => ({
+          label: s.strategy,
+          data: [
+            s.win_rate || 0,
+            s.max_drawdown || 0,
+            s.num_trades || 0
+          ],
+          fill: true
+        }))
       };
+    }
 
-      if (type === "radar") {
-        chartData = {
-          labels: ["勝率", "最大DD", "取引数"],
-          datasets: stats.map(s => ({
-            label: s.strategy,
-            data: [
-              s.win_rate || 0,
-              s.max_drawdown || 0,
-              s.num_trades || 0
-            ],
-            fill: true
-          }))
-        };
-      }
-
-      chart = new Chart(ctx, {
-        type: type,
-        data: chartData,
-        options: {
-          responsive: true,
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function(ctx) {
-                  const i = ctx.dataIndex;
-                  const s = stats[i] || ctx.dataset;
-                  return `${s.strategy || ctx.dataset.label} → 勝率: ${s.win_rate || "?"}, DD: ${s.max_drawdown || "?"}, 取引: ${s.num_trades || "?"}`;
-                }
+    chart = new Chart(ctx, {
+      type: type,
+      data: chartData,
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                const i = ctx.dataIndex;
+                const s = stats[i] || ctx.dataset;
+                return `${s.strategy || ctx.dataset.label} → 勝率: ${s.win_rate || "?"}, DD: ${s.max_drawdown || "?"}, 取引: ${s.num_trades || "?"}`;
               }
             }
-          },
-          onClick: (e, el) => {
-            if (el.length > 0) {
-              const i = el[0].index;
-              const name = stats[i].strategy;
-              window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
-            }
           }
-        }
-      });
-    }
-
-    function switchChart(type) {
-      renderChart(type);
-    }
-
-    function renderTagChart() {
-      const ctx = document.getElementById("tagChart").getContext("2d");
-      new Chart(ctx, {
-        type: "pie",
-        data: {
-          labels: Object.keys(tagsCount),
-          datasets: [{
-            label: "戦略数",
-            data: Object.values(tagsCount),
-            backgroundColor: Object.keys(tagsCount).map((_, i) =>
-              `hsl(${(i * 360 / Object.keys(tagsCount).length)}, 70%, 70%)`)
-          }]
         },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: "bottom" },
-            tooltip: {
-              callbacks: {
-                label: function(ctx) {
-                  return `${ctx.label}: ${ctx.raw} 戦略`;
-                }
+        onClick: (e, el) => {
+          if (el.length > 0) {
+            const i = el[0].index;
+            const name = stats[i].strategy;
+            window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
+          }
+        }
+      }
+    });
+  }
+
+  function switchChart(type) {
+    renderChart(type);
+  }
+
+  function renderTagChart() {
+    const ctx = document.getElementById("tagChart").getContext("2d");
+    new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels: Object.keys(tagsCount),
+        datasets: [{
+          label: "戦略数",
+          data: Object.values(tagsCount),
+          backgroundColor: Object.keys(tagsCount).map((_, i) =>
+            `hsl(${(i * 360 / Object.keys(tagsCount).length)}, 70%, 70%)`
+          )
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                return `${ctx.label}: ${ctx.raw} 戦略`;
               }
             }
           }
         }
-      });
-    }
+      }
+    });
+  }
 
-    renderChart("bar");
-    renderTagChart();
-  </script>
+  renderChart("bar");
+  renderTagChart();
+</script>
 
-  <p><a href="/">← ダッシュボードに戻る</a></p>
-</body>
-</html>
+{% endblock %}
