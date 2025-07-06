@@ -2,61 +2,68 @@
 # coding: utf-8
 
 """
-🛠 __init__.py 自動生成スクリプト
-- noctria_gui/routes 以下の *.py モジュールから router を収集し、
-  __init__.py を構築して routers[] に登録する構成を生成
+🛠 generate_routes_init.py
+- noctria_gui.routes.__init__.py を自動生成し、すべての router を登録する
 """
 
 import os
 from pathlib import Path
 
-# 📌 固定パス（調整する場合は core.path_config 等へ移行しても可）
-ROUTES_DIR = Path("noctria_gui/routes")
+ROUTES_DIR = Path(__file__).resolve().parent.parent / "noctria_gui" / "routes"
 INIT_FILE = ROUTES_DIR / "__init__.py"
 
-HEADER = '''#!/usr/bin/env python3
-# coding: utf-8
+def find_router_modules():
+    """
+    🔍 routes/ 配下の router 定義モジュールを収集
+    """
+    modules = []
+    for file in ROUTES_DIR.glob("*.py"):
+        if file.name.startswith("_") or file.name == "__init__.py":
+            continue
+        module_name = file.stem
+        modules.append(module_name)
+    return sorted(modules)
 
-"""
-📦 noctria_gui.routes
-- routes/ 以下の *.py モジュールから router を自動収集する
-"""
 
-import importlib
-import pkgutil
+def generate_init_content(modules):
+    """
+    🧩 __init__.py の内容を生成
+    """
+    lines = []
+    lines.append("#!/usr/bin/env python3")
+    lines.append("# coding: utf-8\n")
+    lines.append('"""\n📦 noctria_gui.routes\n- 自動生成された router 一括登録ファイル\n"""\n')
+    lines.append("import importlib")
+    lines.append("from fastapi import APIRouter")
+    lines.append("from typing import List\n")
+    lines.append("routers: List[APIRouter] = []\n")
+    lines.append("# 🔁 自動インポート（generated）")
+    lines.append("__path__ = __path__  # required for pkgutil\n")
 
-# すべての router を格納するリスト
-routers = []
+    for name in modules:
+        lines.append(f"try:")
+        lines.append(f"    mod = importlib.import_module(f\".{{name}}\", package=__name__)")
+        lines.append(f"    if hasattr(mod, \"router\"):")
+        lines.append(f"        routers.append(mod.router)")
+        lines.append(f"        print(f\"[routes] ✅ router 読込成功: {name}\")")
+        lines.append(f"    else:")
+        lines.append(f"        print(f\"[routes] ⚠️ router 未定義: {name}\")")
+        lines.append(f"except Exception as e:")
+        lines.append(f"    print(f\"[routes] ❌ router 読込失敗: {name} - {{repr(e)}}\")\n")
 
-# このパッケージのパスを取得
-__path__ = __path__  # required for pkgutil
-'''
+    return "\n".join(lines)
 
-MAIN_LOOP = '''
-# 自動インポート処理
-for _, module_name, _ in pkgutil.iter_modules(__path__):
-    if module_name.startswith("_"):
-        continue  # __init__.py や非公開モジュールは除外
+
+def main():
+    modules = find_router_modules()
+    content = generate_init_content(modules)
 
     try:
-        mod = importlib.import_module(f"{__name__}.{module_name}")
-        if hasattr(mod, "router"):
-            routers.append(mod.router)
-            print(f"✅ router 読込: {module_name}")
-        else:
-            print(f"⚠️ router 未定義: {module_name}")
+        INIT_FILE.write_text(content, encoding="utf-8")
+        print(f"✅ routes/__init__.py を再生成しました: {INIT_FILE}")
     except Exception as e:
-        print(f"❌ ルーターインポート失敗: {module_name} - {e}")
-'''
+        print(f"❌ 書き込み失敗: {e}")
 
-def generate_init():
-    content = HEADER + MAIN_LOOP
-    try:
-        with open(INIT_FILE, "w", encoding="utf-8") as f:
-            f.write(content)
-        print(f"✅ __init__.py を更新しました: {INIT_FILE}")
-    except Exception as e:
-        print(f"❌ __init__.py 書き込み失敗: {e}")
 
 if __name__ == "__main__":
-    generate_init()
+    main()
