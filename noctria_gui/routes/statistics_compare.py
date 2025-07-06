@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
@@ -96,62 +96,39 @@ def extract_all_keys(data, mode):
 
 
 @router.get("/statistics/compare", response_class=HTMLResponse)
-async def compare_statistics_form(request: Request):
-    mode = request.query_params.get("mode", "tag")
+async def compare_statistics(request: Request):
+    q = request.query_params
+    mode = q.get("mode", "tag")
+    keys = q.get(mode + "s", "").split(",")
+    keys = [k.strip() for k in keys if k.strip()]
+    from_date = parse_date(q.get("from"))
+    to_date = parse_date(q.get("to"))
+
     all_data = load_strategy_logs()
     all_keys = extract_all_keys(all_data, mode)
+    results = compute_comparison(all_data, mode, keys, from_date, to_date) if keys else []
 
     return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
-        "keys": [],
+        "keys": keys,
         "all_keys": all_keys,
-        "results": [],
+        "results": results,
         "filter": {
-            "mode": mode,
-            "from": "",
-            "to": "",
-        }
-    })
-
-
-@router.post("/statistics/compare", response_class=HTMLResponse)
-async def compare_statistics_result(
-    request: Request,
-    mode: str = Form(...),
-    selected_keys: list[str] = Form(default=[]),
-    from_date_str: str = Form(""),
-    to_date_str: str = Form(""),
-):
-    from_date = parse_date(from_date_str)
-    to_date = parse_date(to_date_str)
-
-    all_data = load_strategy_logs()
-    all_keys = extract_all_keys(all_data, mode)
-    result = compute_comparison(all_data, mode, selected_keys, from_date, to_date)
-
-    return templates.TemplateResponse("statistics_compare.html", {
-        "request": request,
-        "mode": mode,
-        "keys": selected_keys,
-        "all_keys": all_keys,
-        "results": result,
-        "filter": {
-            "mode": mode,
-            "from": from_date_str,
-            "to": to_date_str,
+            "from": q.get("from", ""),
+            "to": q.get("to", "")
         }
     })
 
 
 @router.get("/statistics/compare/export")
 async def export_compare_csv(request: Request):
-    params = request.query_params
-    mode = params.get("mode", "tag")
-    keys = params.get(mode + "s", "").split(",")
+    q = request.query_params
+    mode = q.get("mode", "tag")
+    keys = q.get(mode + "s", "").split(",")
     keys = [k.strip() for k in keys if k.strip()]
-    from_date = parse_date(params.get("from"))
-    to_date = parse_date(params.get("to"))
+    from_date = parse_date(q.get("from"))
+    to_date = parse_date(q.get("to"))
 
     all_data = load_strategy_logs()
     result = compute_comparison(all_data, mode, keys, from_date, to_date)
@@ -159,7 +136,6 @@ async def export_compare_csv(request: Request):
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["比較対象", "平均勝率（%）", "平均DD（%）", "件数"])
-
     for row in result:
         writer.writerow([row["key"], row["avg_win"], row["avg_dd"], row["count"]])
 
