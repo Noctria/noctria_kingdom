@@ -72,9 +72,25 @@ def compute_comparison(data, mode, keys, from_date=None, to_date=None):
         count = v["count"]
         avg_win = round(v["win_sum"] / count, 1) if count else 0
         avg_dd = round(v["dd_sum"] / count, 1) if count else 0
-        final.append({"key": k, "avg_win": avg_win, "avg_dd": avg_dd, "count": count})
+        final.append({
+            "key": k,
+            "avg_win": avg_win,
+            "avg_dd": avg_dd,
+            "count": count
+        })
 
     return sorted(final, key=lambda x: (-x["avg_win"], x["avg_dd"]))
+
+def extract_all_keys(data, mode):
+    key_set = set()
+    for record in data:
+        if mode == "tag":
+            key_set.update(record.get("tags", []))
+        else:
+            name = record.get("strategy_name")
+            if name:
+                key_set.add(name)
+    return sorted(list(key_set))
 
 @router.get("/statistics/compare", response_class=HTMLResponse)
 async def compare_statistics(request: Request):
@@ -87,13 +103,16 @@ async def compare_statistics(request: Request):
 
     all_data = load_strategy_logs()
     result = compute_comparison(all_data, mode, keys, from_date, to_date)
+    all_keys = extract_all_keys(all_data, mode)
 
     return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
         "keys": keys,
+        "all_keys": all_keys,
         "results": result,
         "filter": {
+            "mode": mode,
             "from": params.get("from", ""),
             "to": params.get("to", ""),
         }
