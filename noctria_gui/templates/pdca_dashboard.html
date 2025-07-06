@@ -1,181 +1,105 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>📜 Noctria Kingdom - PDCA ダッシュボード</title>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background-color: #f4f4f4;
-      padding: 2rem;
-    }
-    h1 {
-      color: #222;
-      margin-bottom: 1rem;
-    }
-    form.filter-form {
-      background-color: #fff;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: center;
-    }
-    form.filter-form input,
-    form.filter-form select,
-    form.filter-form button {
-      padding: 0.5rem;
-      font-size: 0.9rem;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 0.6rem;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
-    }
-    th {
-      background-color: #333;
-      color: white;
-    }
-    tr:hover {
-      background-color: #f1f1f1;
-    }
-    button {
-      padding: 0.4rem 0.8rem;
-      background-color: #0066cc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #004999;
-    }
-    pre {
-      text-align: left;
-      background-color: #f9f9f9;
-      border: 1px solid #ccc;
-      padding: 1rem;
-      overflow-x: auto;
-      white-space: pre-wrap;
-    }
-    dialog {
-      border: none;
-      border-radius: 8px;
-      padding: 1rem;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      max-width: 700px;
-    }
-  </style>
-</head>
-<body>
-  <h1>📜 PDCA 実行履歴（Veritas Kingdom）</h1>
+{% extends "base_layout.html" %}
 
-  <!-- 🔍 フィルターUI -->
-  <form class="filter-form" method="get" action="/pdca">
-    <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy or '' }}">
-    <input type="text" name="symbol" placeholder="通貨 (例: USDJPY)" value="{{ filters.symbol or '' }}">
-    <select name="signal">
-      <option value="">シグナル</option>
-      <option value="BUY" {% if filters.signal == 'BUY' %}selected{% endif %}>BUY</option>
-      <option value="SELL" {% if filters.signal == 'SELL' %}selected{% endif %}>SELL</option>
-    </select>
-    <select name="tag">
-      <option value="">タグ</option>
-      {% for t in available_tags %}
-        <option value="{{ t }}" {% if filters.tag == t %}selected{% endif %}>🏷️ {{ t }}</option>
-      {% endfor %}
-    </select>
-    <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
-    <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
-    <select name="sort">
-      <option value="">ソートなし</option>
-      <option value="win_rate" {% if sort == 'win_rate' %}selected{% endif %}>📈 勝率 昇順</option>
-      <option value="-win_rate" {% if sort == '-win_rate' %}selected{% endif %}>📈 勝率 降順</option>
-      <option value="max_dd" {% if sort == 'max_dd' %}selected{% endif %}>📉 DD 昇順</option>
-      <option value="-max_dd" {% if sort == '-max_dd' %}selected{% endif %}>📉 DD 降順</option>
-      <option value="trades" {% if sort == 'trades' %}selected{% endif %}>🔁 回数 昇順</option>
-      <option value="-trades" {% if sort == '-trades' %}selected{% endif %}>🔁 回数 降順</option>
-      <option value="timestamp_dt" {% if sort == 'timestamp_dt' %}selected{% endif %}>📅 時刻 昇順</option>
-      <option value="-timestamp_dt" {% if sort == '-timestamp_dt' %}selected{% endif %}>📅 時刻 降順</option>
-    </select>
-    <button type="submit">検索</button>
+{% block content %}
+<h1>📜 PDCA 実行履歴（Veritas Kingdom）</h1>
+
+<!-- 🔍 フィルターUI -->
+<form class="filter-form" method="get" action="/pdca">
+  <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy or '' }}">
+  <input type="text" name="symbol" placeholder="通貨 (例: USDJPY)" value="{{ filters.symbol or '' }}">
+  <select name="signal">
+    <option value="">シグナル</option>
+    <option value="BUY" {% if filters.signal == 'BUY' %}selected{% endif %}>BUY</option>
+    <option value="SELL" {% if filters.signal == 'SELL' %}selected{% endif %}>SELL</option>
+  </select>
+  <select name="tag">
+    <option value="">タグ</option>
+    {% for t in available_tags %}
+      <option value="{{ t }}" {% if filters.tag == t %}selected{% endif %}>🏷️ {{ t }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
+  <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
+  <select name="sort">
+    <option value="">ソートなし</option>
+    <option value="win_rate" {% if sort == 'win_rate' %}selected{% endif %}>📈 勝率 昇順</option>
+    <option value="-win_rate" {% if sort == '-win_rate' %}selected{% endif %}>📈 勝率 降順</option>
+    <option value="max_dd" {% if sort == 'max_dd' %}selected{% endif %}>📉 DD 昇順</option>
+    <option value="-max_dd" {% if sort == '-max_dd' %}selected{% endif %}>📉 DD 降順</option>
+    <option value="trades" {% if sort == 'trades' %}selected{% endif %}>🔁 回数 昇順</option>
+    <option value="-trades" {% if sort == '-trades' %}selected{% endif %}>🔁 回数 降順</option>
+    <option value="timestamp_dt" {% if sort == 'timestamp_dt' %}selected{% endif %}>📅 時刻 昇順</option>
+    <option value="-timestamp_dt" {% if sort == '-timestamp_dt' %}selected{% endif %}>📅 時刻 降順</option>
+  </select>
+  <button type="submit">検索</button>
+</form>
+
+<table>
+  <thead>
+    <tr>
+      <th>📅 時刻</th>
+      <th>🧠 戦略</th>
+      <th>🏷️ タグ</th>
+      <th>💡 シグナル</th>
+      <th>💱 通貨</th>
+      <th>🎯 ロット</th>
+      <th>🎯 TP/SL</th>
+      <th>📈 勝率</th>
+      <th>📉 DD</th>
+      <th>🔁 回数</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td>{{ log.timestamp }}</td>
+      <td>{{ log.strategy }}</td>
+      <td>{{ log.tags | join(", ") }}</td>
+      <td>{{ log.signal }}</td>
+      <td>{{ log.symbol }}</td>
+      <td>{{ log.lot }}</td>
+      <td>{{ log.tp }}/{{ log.sl }}</td>
+      <td>
+        {% if log.win_rate is defined and log.win_rate is not none %}
+          {{ '%.1f' | format(log.win_rate * 100) }}%
+        {% else %}-{% endif %}
+      </td>
+      <td>
+        {% if log.max_dd is defined and log.max_dd is not none %}
+          {{ '%.1f' | format(log.max_dd * 100) }}%
+        {% else %}-{% endif %}
+      </td>
+      <td>{{ log.trades or "-" }}</td>
+      <td>
+        <button onclick="showModal('modal_{{ loop.index }}')">詳細</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- 🔎 モーダル群 -->
+{% for log in logs %}
+<dialog id="modal_{{ loop.index }}">
+  <h3>📄 詳細ログ（{{ log.filename }})</h3>
+  <pre>{{ log.json_text }}</pre>
+  <form method="post" action="/pdca/replay">
+    <input type="hidden" name="log_path" value="{{ log.path }}">
+    <button type="submit">この命令で再実行</button>
   </form>
+  <button onclick="closeModal('modal_{{ loop.index }}')">閉じる</button>
+</dialog>
+{% endfor %}
 
-  <table>
-    <thead>
-      <tr>
-        <th>📅 時刻</th>
-        <th>🧠 戦略</th>
-        <th>🏷️ タグ</th>
-        <th>💡 シグナル</th>
-        <th>💱 通貨</th>
-        <th>🎯 ロット</th>
-        <th>🎯 TP/SL</th>
-        <th>📈 勝率</th>
-        <th>📉 DD</th>
-        <th>🔁 回数</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for log in logs %}
-      <tr>
-        <td>{{ log.timestamp }}</td>
-        <td>{{ log.strategy }}</td>
-        <td>{{ log.tags | join(", ") }}</td>
-        <td>{{ log.signal }}</td>
-        <td>{{ log.symbol }}</td>
-        <td>{{ log.lot }}</td>
-        <td>{{ log.tp }}/{{ log.sl }}</td>
-        <td>
-          {% if log.win_rate is defined and log.win_rate is not none %}
-            {{ '%.1f' | format(log.win_rate * 100) }}%
-          {% else %}-{% endif %}
-        </td>
-        <td>
-          {% if log.max_dd is defined and log.max_dd is not none %}
-            {{ '%.1f' | format(log.max_dd * 100) }}%
-          {% else %}-{% endif %}
-        </td>
-        <td>{{ log.trades or "-" }}</td>
-        <td>
-          <button onclick="showModal('modal_{{ loop.index }}')">詳細</button>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <!-- 🔎 モーダル群 -->
-  {% for log in logs %}
-  <dialog id="modal_{{ loop.index }}">
-    <h3>📄 詳細ログ（{{ log.filename }})</h3>
-    <pre>{{ log.json_text }}</pre>
-    <form method="post" action="/pdca/replay">
-      <input type="hidden" name="log_path" value="{{ log.path }}">
-      <button type="submit">この命令で再実行</button>
-    </form>
-    <button onclick="closeModal('modal_{{ loop.index }}')">閉じる</button>
-  </dialog>
-  {% endfor %}
-
-  <script>
-    function showModal(id) {
-      const el = document.getElementById(id);
-      if (el) el.showModal();
-    }
-    function closeModal(id) {
-      const el = document.getElementById(id);
-      if (el) el.close();
-    }
-  </script>
-</body>
-</html>
+<script>
+  function showModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.showModal();
+  }
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.close();
+  }
+</script>
+{% endblock %}
