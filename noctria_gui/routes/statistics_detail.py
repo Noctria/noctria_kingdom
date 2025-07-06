@@ -1,97 +1,126 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
-from datetime import datetime
-from pathlib import Path
+import os
 import json
-import io
+from datetime import datetime
+from collections import defaultdict
 import csv
+import io
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-def parse_date_safe(s):
+def parse_date(date_str):
     try:
-        return datetime.strptime(s, "%Y-%m-%d")
-    except:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except Exception:
         return None
 
-def load_filtered_results(mode: str, key: str):
-    records = []
-    for path in ACT_LOG_DIR.glob("*.json"):
+def load_strategy_logs():
+    data = []
+    for file in os.listdir(ACT_LOG_DIR):
+        if file.endswith(".json"):
+            try:
+                with open(ACT_LOG_DIR / file, "r", encoding="utf-8") as f:
+                    record = json.load(f)
+                data.append(record)
+            except Exception:
+                continue
+    return data
+
+def compute_comparison(data, mode, keys, from_date=None, to_date=None, sort_mode="score"):
+    result = defaultdict(lambda: {"count": 0, "win_sum": 0, "dd_sum": 0})
+
+    for record in data:
         try:
-            with path.open("r", encoding="utf-8") as f:
-                record = json.load(f)
-            date = parse_date_safe(record.get("date"))
-            if not date:
+            date_str = record.get("date")
+            if not date_str:
+                continue
+            date = datetime.strptime(date_str, "%Y-%m-%d")
+            if from_date and date < from_date:
+                continue
+            if to_date and date > to_date:
                 continue
 
-            if mode == "strategy" and record.get("strategy_name") == key:
-                records.append((date, record))
-            elif mode == "tag" and key in record.get("tags", []):
-                records.append((date, record))
-        except:
+            score = record.get("score", {})
+            win = score.get("win_rate")
+            dd = score.get("max_drawdown")
+
+            if mode == "tag":
+                record_keys = record.get("tags", [])
+            else:
+                record_keys = [record.get("strategy_name")]
+
+            for key in record_keys:
+                if key not in keys:
+                    continue
+                result[key]["count"] += 1
+                if isinstance(win, (int, float)):
+                    result[key]["win_sum"] += win
+                if isinstance(dd, (int, float)):
+                    result[key]["dd_sum"] += dd
+        except Exception:
             continue
 
-    results = []
-    for date, record in records:
-        score = record.get("score", {})
-        results.append({
-            "date": date.strftime("%Y-%m-%d"),
-            "win_rate": score.get("win_rate"),
-            "max_drawdown": score.get("max_drawdown")
+    final = []
+    for k in keys:
+        if k not in result:
+            continue
+        v = result[k]
+        count = v["count"]
+        avg_win = round(v["win_sum"] / count, 1) if count else 0
+        avg_dd = round(v["dd_sum"] / count, 1) if count else 0
+        final.append({
+            "key": k,
+            "avg_win": avg_win,
+            "avg_dd": avg_dd,
+            "count": count
         })
-    return results
 
-@router.get("/statistics/detail", response_class=HTMLResponse)
-async def detail_view(request: Request, mode: str = "tag", key: str = "", sort_by: str = "date", order: str = "asc"):
-    if mode not in ("tag", "strategy"):
-        raise HTTPException(status_code=400, detail="Invalid mode")
-    if sort_by not in ("date", "win_rate", "max_drawdown"):
-        raise HTTPException(status_code=400, detail="Invalid sort_by")
-    if order not in ("asc", "desc"):
-        raise HTTPException(status_code=400, detail="Invalid order")
+    if sort_mode == "score":
+        final.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
+    elif sort_mode == "check":
+        final = sorted(final, key=lambda x: keys.index(x["key"]))  # preserve user order
+    return final
 
-    results = load_filtered_results(mode, key)
+def extract_all_keys(data, mode):
+    key_set = set()
+    for record in data:
+        if mode == "tag":
+            key_set.update(record.get("tags", []))
+        else:
+            name = record.get("strategy_name")
+            if name:
+                key_set.add(name)
+    return sorted(list(key_set))
 
-    reverse = order == "desc"
-    results.sort(key=lambda x: x.get(sort_by) if sort_by != "date" else parse_date_safe(x["date"]), reverse=reverse)
+@router.get("/statistics/compare", response_class=HTMLResponse)
+async def compare_statistics(request: Request):
+    params = request.query_params
+    mode = params.get("mode", "tag")
+    sort = params.get("sort", "score")
+    keys = params.get(mode + "s", "").split(",")
+    keys = [k.strip() for k in keys if k.strip()]
+    from_date = parse_date(params.get("from"))
+    to_date = parse_date(params.get("to"))
 
-    return templates.TemplateResponse("statistics_detail.html", {
+    all_data = load_strategy_logs()
+    result = compute_comparison(all_data, mode, keys, from_date, to_date, sort)
+    all_keys = extract_all_keys(all_data, mode)
+
+    return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
-        "key": key,
-        "results": results,
-        "sort_by": sort_by,
-        "order": order
+        "keys": keys,
+        "all_keys": all_keys,
+        "results": result,
+        "sort": sort,
+        "filter": {
+            "mode": mode,
+            "from": params.get("from", ""),
+            "to": params.get("to", ""),
+        }
     })
-
-@router.get("/statistics/detail/export")
-async def export_detail_csv(mode: str, key: str, sort_by: str = "date", order: str = "asc"):
-    if mode not in ("tag", "strategy"):
-        raise HTTPException(status_code=400, detail="Invalid mode")
-    if sort_by not in ("date", "win_rate", "max_drawdown"):
-        raise HTTPException(status_code=400, detail="Invalid sort_by")
-    if order not in ("asc", "desc"):
-        raise HTTPException(status_code=400, detail="Invalid order")
-
-    results = load_filtered_results(mode, key)
-    reverse = order == "desc"
-    results.sort(key=lambda x: x.get(sort_by) if sort_by != "date" else parse_date_safe(x["date"]), reverse=reverse)
-
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["date", "win_rate", "max_drawdown"])
-    for row in results:
-        writer.writerow([row["date"], row["win_rate"], row["max_drawdown"]])
-
-    buffer.seek(0)
-    filename = f"{mode}_{key}_detail.csv"
-
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
