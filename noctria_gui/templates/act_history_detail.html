@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📄 採用戦略詳細 - Noctria Kingdom</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      color: #222;
+      margin-bottom: 1rem;
+    }
+    .summary {
+      background-color: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 2rem;
+    }
+    .summary dl {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 0.5rem 1rem;
+    }
+    dt {
+      font-weight: bold;
+      color: #555;
+    }
+    dd {
+      margin: 0;
+    }
+    pre {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      white-space: pre-wrap;
+    }
+    .buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      background-color: #0066cc;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #004999;
+    }
+    form {
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>📄 採用戦略詳細</h1>
+
+  <div class="summary">
+    <dl>
+      <dt>戦略名</dt><dd>{{ log.strategy }}</dd>
+      <dt>タグ</dt><dd>{{ log.tag or '-' }}</dd>
+      <dt>通貨ペア</dt><dd>{{ log.symbol }}</dd>
+      <dt>昇格日時</dt><dd>{{ log.promoted_at or log.timestamp }}</dd>
+      <dt>スコア</dt><dd>{{ '%.2f'|format(log.score) if log.score is defined else '-' }}</dd>
+      <dt>Push済</dt><dd>{{ '✅' if log.pushed else '❌' }}</dd>
+      <dt>ファイル名</dt><dd>{{ log.filename }}</dd>
+    </dl>
+
+    <div class="buttons">
+      <form method="post" action="/act-history/repush">
+        <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+        <button type="submit">再Push可にする</button>
+      </form>
+      <form method="post" action="/act-history/reevaluate">
+        <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+        <button type="submit">再評価する</button>
+      </form>
+    </div>
+  </div>
+
+  <h2>📜 ログ内容</h2>
+  <pre>{{ log.json_text }}</pre>
+</body>
+</html>
