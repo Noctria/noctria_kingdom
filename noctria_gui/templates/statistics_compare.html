@@ -19,14 +19,11 @@
 
   <div style="margin: 1rem 0;">
     <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
-
-    <!-- ✅ 全選択・全解除 + カウント表示 -->
     <div style="margin-bottom: 0.5rem;">
       <button type="button" class="button" onclick="checkAll(true)">✅ 全選択</button>
       <button type="button" class="button" onclick="checkAll(false)">❌ 全解除</button>
       <span style="margin-left: 1rem;">🔢 選択中：<strong id="selectedCount">0</strong> 件</span>
     </div>
-
     <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
       {% for k in all_keys %}
         <label style="display: inline-block; margin-right: 1rem;">
@@ -43,7 +40,7 @@
   {% endif %}
 </form>
 
-<!-- 🔗 URL共有 -->
+<!-- 🔗 URL共有リンク -->
 {% if keys %}
   <div style="margin-top: 1rem;">
     <label>🔗 現在のURL（共有可）:</label><br>
@@ -60,7 +57,6 @@
     <option value="radar">レーダーチャート</option>
   </select>
 
-  <!-- 📋 比較表 -->
   <table>
     <thead>
       <tr>
@@ -68,113 +64,99 @@
         <th>平均勝率（%）</th>
         <th>平均DD（%）</th>
         <th>件数</th>
-        <th>🔍 詳細</th>
       </tr>
     </thead>
     <tbody>
       {% for row in results %}
         <tr>
-          <td>{{ row.key }}</td>
+          <td><a href="/statistics/detail?mode={{ mode }}&key={{ row.key }}" class="button" style="padding: 0.3rem 0.5rem;">🔍 {{ row.key }}</a></td>
           <td>{{ row.avg_win }}</td>
           <td>{{ row.avg_dd }}</td>
           <td>{{ row.count }}</td>
-          <td>
-            <a href="/statistics/detail?mode={{ mode }}&key={{ row.key }}" class="button">➡ 開く</a>
-          </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <!-- 📈 グラフ領域 -->
+  <h3>📊 平均勝率グラフ</h3>
   <canvas id="winChart" height="100"></canvas>
+  <button class="button" onclick="downloadChart('winChart', 'win_rate_chart')">📷 勝率グラフ保存</button>
+
+  <h3>📉 平均DDグラフ</h3>
   <canvas id="ddChart" height="100"></canvas>
+  <button class="button" onclick="downloadChart('ddChart', 'dd_chart')">📷 DDグラフ保存</button>
+
+  <script>
+    const labels = {{ results | map(attribute='key') | list | tojson }};
+    const winRates = {{ results | map(attribute='avg_win') | list | tojson }};
+    const ddRates = {{ results | map(attribute='avg_dd') | list | tojson }};
+    let winChartInstance, ddChartInstance;
+
+    function renderCharts(type) {
+      if (winChartInstance) winChartInstance.destroy();
+      if (ddChartInstance) ddChartInstance.destroy();
+
+      winChartInstance = new Chart(document.getElementById('winChart'), {
+        type,
+        data: {
+          labels,
+          datasets: [{ label: '平均勝率（%）', data: winRates, backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgba(54, 162, 235, 1)', fill: type !== 'line', tension: 0.2 }]
+        },
+        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+      });
+
+      ddChartInstance = new Chart(document.getElementById('ddChart'), {
+        type,
+        data: {
+          labels,
+          datasets: [{ label: '平均DD（%）', data: ddRates, backgroundColor: 'rgba(255, 99, 132, 0.7)', borderColor: 'rgba(255, 99, 132, 1)', fill: type !== 'line', tension: 0.2 }]
+        },
+        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+      });
+    }
+
+    renderCharts("bar");
+    document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
+
+    function copyUrl() {
+      const input = document.getElementById("shareUrl");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand("copy");
+      alert("URLをコピーしました！");
+    }
+
+    function checkAll(state) {
+      const boxes = document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]');
+      boxes.forEach(box => box.checked = state);
+      updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+      const checked = document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]:checked');
+      document.getElementById("selectedCount").textContent = checked.length;
+    }
+
+    document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]').forEach(box => {
+      box.addEventListener("change", updateSelectedCount);
+    });
+    updateSelectedCount();
+
+    function downloadChart(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename + ".png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+  </script>
 {% else %}
   <p>⚠ 比較対象を選択してください。</p>
 {% endif %}
-{% endblock %}
-
-{% block script %}
-<script>
-  // ✅ 比較対象一括選択・解除
-  function checkAll(state) {
-    const boxes = document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]');
-    boxes.forEach(box => box.checked = state);
-    updateSelectedCount();
-  }
-
-  // ✅ 選択件数カウント
-  function updateSelectedCount() {
-    const checked = document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]:checked');
-    document.getElementById("selectedCount").textContent = checked.length;
-  }
-
-  // ✅ チェック変化時カウント更新
-  document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]').forEach(box => {
-    box.addEventListener("change", updateSelectedCount);
-  });
-  updateSelectedCount();
-
-  // ✅ URL共有コピー
-  function copyUrl() {
-    const input = document.getElementById("shareUrl");
-    input.select();
-    input.setSelectionRange(0, 99999);
-    document.execCommand("copy");
-    alert("URLをコピーしました！");
-  }
-
-  {% if results %}
-  const labels = {{ results | map(attribute='key') | list | tojson }};
-  const winRates = {{ results | map(attribute='avg_win') | list | tojson }};
-  const ddRates = {{ results | map(attribute='avg_dd') | list | tojson }};
-  let winChartInstance, ddChartInstance;
-
-  function renderCharts(type) {
-    if (winChartInstance) winChartInstance.destroy();
-    if (ddChartInstance) ddChartInstance.destroy();
-
-    winChartInstance = new Chart(document.getElementById('winChart'), {
-      type,
-      data: {
-        labels,
-        datasets: [{
-          label: '平均勝率（%）',
-          data: winRates,
-          backgroundColor: 'rgba(54, 162, 235, 0.7)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          fill: type !== 'line',
-          tension: 0.2
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
-      }
-    });
-
-    ddChartInstance = new Chart(document.getElementById('ddChart'), {
-      type,
-      data: {
-        labels,
-        datasets: [{
-          label: '平均DD（%）',
-          data: ddRates,
-          backgroundColor: 'rgba(255, 99, 132, 0.7)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          fill: type !== 'line',
-          tension: 0.2
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
-      }
-    });
-  }
-
-  renderCharts("bar");
-  document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
-  {% endif %}
-</script>
 {% endblock %}
