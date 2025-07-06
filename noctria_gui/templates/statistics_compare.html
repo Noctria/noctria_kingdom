@@ -4,7 +4,6 @@
 {% block content %}
 <h2>📊 戦略・タグ比較分析</h2>
 
-<!-- 🔍 フィルター（GET） -->
 <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
   <label>📌 モード選択：</label>
   <select name="mode">
@@ -17,6 +16,15 @@
   〜
   <input type="date" name="to" value="{{ filter.to }}">
 
+  <!-- ✅ プリセット -->
+  <div style="margin: 0.5rem 0;">
+    <label>🗓 プリセット期間：</label>
+    <button type="button" class="button" onclick="setPresetDays(0)">本日</button>
+    <button type="button" class="button" onclick="setPresetDays(7)">7日</button>
+    <button type="button" class="button" onclick="setPresetDays(30)">30日</button>
+  </div>
+
+  <!-- ✅ 一括選択・チェック数 -->
   <div style="margin: 1rem 0;">
     <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
     <div style="margin-bottom: 0.5rem;">
@@ -154,6 +162,14 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       });
+    }
+
+    function setPresetDays(days) {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(to.getDate() - days);
+      document.querySelector('input[name="to"]').value = to.toISOString().split("T")[0];
+      document.querySelector('input[name="from"]').value = from.toISOString().split("T")[0];
     }
   </script>
 {% else %}
