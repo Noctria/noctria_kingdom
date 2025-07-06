@@ -13,17 +13,14 @@
       padding: 2rem;
       transition: background 0.3s, color 0.3s;
     }
-
     .dark-mode {
       background: #121212;
       color: #e0e0e0;
     }
-
     .dark-mode table {
       background: #1e1e1e;
       color: #e0e0e0;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -31,20 +28,16 @@
       background: #fff;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-
     th, td {
       padding: 0.75rem;
       border-bottom: 1px solid #ccc;
     }
-
     th {
       background-color: #e0f0ff;
     }
-
     .dark-mode th {
       background-color: #2b2b2b;
     }
-
     .button {
       padding: 0.5rem 1rem;
       background: #007acc;
@@ -54,11 +47,9 @@
       text-decoration: none;
       margin-left: 1rem;
     }
-
     .dark-mode .button {
       background: #0098ff;
     }
-
     #darkToggle {
       float: right;
     }
@@ -70,7 +61,7 @@
   </h1>
 
   <!-- 🔍 フィルター -->
-  <form method="get" action="/statistics/compare" style="margin-bottom: 2rem;">
+  <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
     <label>比較モード:</label>
     <select name="mode">
       <option value="tag" {% if mode == 'tag' %}selected{% endif %}>タグ</option>
@@ -91,8 +82,15 @@
     {% endif %}
   </form>
 
-  <!-- 📋 比較結果テーブル -->
   {% if results %}
+    <label>📈 表示形式:</label>
+    <select id="chartTypeSelect">
+      <option value="bar">棒グラフ</option>
+      <option value="line">折れ線グラフ</option>
+      <option value="radar">レーダーチャート</option>
+    </select>
+
+    <!-- 📋 比較表 -->
     <table>
       <thead>
         <tr>
@@ -114,7 +112,7 @@
       </tbody>
     </table>
 
-    <!-- 📈 Chart.js グラフ表示 -->
+    <!-- 📈 グラフ領域 -->
     <canvas id="winChart" height="100"></canvas>
     <canvas id="ddChart" height="100"></canvas>
 
@@ -123,31 +121,60 @@
       const winRates = {{ results | map(attribute='avg_win') | list | tojson }};
       const ddRates = {{ results | map(attribute='avg_dd') | list | tojson }};
 
-      new Chart(document.getElementById('winChart'), {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: '平均勝率（%）',
-            data: winRates,
-            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-          }]
-        }
+      let winChartInstance, ddChartInstance;
+
+      function renderCharts(type) {
+        if (winChartInstance) winChartInstance.destroy();
+        if (ddChartInstance) ddChartInstance.destroy();
+
+        winChartInstance = new Chart(document.getElementById('winChart'), {
+          type: type,
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '平均勝率（%）',
+              data: winRates,
+              backgroundColor: 'rgba(54, 162, 235, 0.7)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              fill: type !== 'line',
+              tension: 0.2,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: (type !== 'radar') ? { y: { beginAtZero: true } } : {},
+          }
+        });
+
+        ddChartInstance = new Chart(document.getElementById('ddChart'), {
+          type: type,
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '平均DD（%）',
+              data: ddRates,
+              backgroundColor: 'rgba(255, 99, 132, 0.7)',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              fill: type !== 'line',
+              tension: 0.2,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: (type !== 'radar') ? { y: { beginAtZero: true } } : {},
+          }
+        });
+      }
+
+      // 初期表示
+      renderCharts("bar");
+
+      // グラフ切替
+      document.getElementById("chartTypeSelect").addEventListener("change", e => {
+        renderCharts(e.target.value);
       });
 
-      new Chart(document.getElementById('ddChart'), {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: '平均DD（%）',
-            data: ddRates,
-            backgroundColor: 'rgba(255, 99, 132, 0.7)',
-          }]
-        }
-      });
-
-      // 🌗 ダークモード切替
+      // ダークモード切替
       document.getElementById("darkToggle").addEventListener("click", () => {
         document.body.classList.toggle("dark-mode");
       });
