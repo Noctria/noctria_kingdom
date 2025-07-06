@@ -32,34 +32,46 @@
   <!-- 📈 昇格・Push件数の時系列グラフ -->
   <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
     <h2>📅 昇格・Push数 日次推移</h2>
-    <canvas id="logChart" height="80"></canvas>
+
+    <!-- 🎛 グラフ切替UI -->
+    <label for="graphMode">表示切替：</label>
+    <select id="graphMode">
+      <option value="both" selected>昇格＋Push</option>
+      <option value="promoted">昇格戦略数のみ</option>
+      <option value="push">Push完了数のみ</option>
+    </select>
+
+    <canvas id="logChart" height="80" style="margin-top: 1rem;"></canvas>
   </div>
 
   <script>
     const ctx = document.getElementById("logChart").getContext("2d");
+
+    const chartData = {
+      labels: {{ stats.dates | tojson }},
+      datasets: [
+        {
+          label: "昇格戦略数",
+          data: {{ stats.promoted_values | tojson }},
+          borderColor: "rgba(75, 192, 192, 1)",
+          backgroundColor: "rgba(75, 192, 192, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: "Push完了数",
+          data: {{ stats.pushed_values | tojson }},
+          borderColor: "rgba(255, 99, 132, 1)",
+          backgroundColor: "rgba(255, 99, 132, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+      ]
+    };
+
     const logChart = new Chart(ctx, {
       type: "line",
-      data: {
-        labels: {{ stats.dates | tojson }},
-        datasets: [
-          {
-            label: "昇格戦略数",
-            data: {{ stats.promoted_values | tojson }},
-            borderColor: "rgba(75, 192, 192, 1)",
-            backgroundColor: "rgba(75, 192, 192, 0.2)",
-            tension: 0.3,
-            fill: true,
-          },
-          {
-            label: "Push完了数",
-            data: {{ stats.pushed_values | tojson }},
-            borderColor: "rgba(255, 99, 132, 1)",
-            backgroundColor: "rgba(255, 99, 132, 0.2)",
-            tension: 0.3,
-            fill: true,
-          },
-        ],
-      },
+      data: chartData,
       options: {
         responsive: true,
         plugins: {
@@ -67,15 +79,18 @@
           title: { display: true, text: "📈 昇格・Push件数（日次）" }
         },
         scales: {
-          x: {
-            title: { display: true, text: "日付" }
-          },
-          y: {
-            beginAtZero: true,
-            title: { display: true, text: "件数" }
-          }
+          x: { title: { display: true, text: "日付" } },
+          y: { beginAtZero: true, title: { display: true, text: "件数" } }
         }
       }
+    });
+
+    // 🎛 表示切替ロジック
+    document.getElementById("graphMode").addEventListener("change", function () {
+      const mode = this.value;
+      logChart.setDatasetVisibility(0, mode !== "push");
+      logChart.setDatasetVisibility(1, mode !== "promoted");
+      logChart.update();
     });
   </script>
 
