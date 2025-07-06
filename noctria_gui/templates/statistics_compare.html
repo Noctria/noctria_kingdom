@@ -4,6 +4,7 @@
 {% block content %}
 <h2>📊 戦略・タグ比較分析</h2>
 
+<!-- 🔍 フィルター（GET） -->
 <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
   <label>📌 モード選択：</label>
   <select name="mode">
@@ -16,20 +17,17 @@
   〜
   <input type="date" name="to" value="{{ filter.to }}">
 
-  <label style="margin-left: 1rem;">🔽 並び順：</label>
-  <select name="sort">
-    <option value="score" {% if sort == "score" %}selected{% endif %}>📊 スコア順</option>
-    <option value="check" {% if sort == "check" %}selected{% endif %}>☑️ チェック順</option>
-  </select>
+  <div style="margin: 0.5rem 0;">
+    <label>📆 プリセット期間：</label>
+    <button type="button" class="button" onclick="applyPreset(7)">直近7日</button>
+    <button type="button" class="button" onclick="applyPreset(30)">過去30日</button>
+    <button type="button" class="button" onclick="applyThisMonth()">今月</button>
+    <button type="button" class="button" onclick="clearPreset()">クリア</button>
+  </div>
 
   <div style="margin: 1rem 0;">
     <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
     <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
-      <div style="margin-bottom: 0.5rem;">
-        <button type="button" class="button" onclick="checkAll(true)">✅ 全選択</button>
-        <button type="button" class="button" onclick="checkAll(false)">❌ 全解除</button>
-        <span>🔢 選択中：<strong id="selectedCount">0</strong> 件</span>
-      </div>
       {% for k in all_keys %}
         <label style="display: inline-block; margin-right: 1rem;">
           <input type="checkbox" name="{{ mode }}s" value="{{ k }}" {% if k in keys %}checked{% endif %}>
@@ -39,11 +37,26 @@
     </div>
   </div>
 
+  <label>🔀 ソート：</label>
+  <select name="sort">
+    <option value="check" {% if sort == "check" %}selected{% endif %}>☑ チェック順</option>
+    <option value="score" {% if sort == "score" %}selected{% endif %}>⭐ スコア順</option>
+  </select>
+
   <button type="submit" class="button">📥 表示</button>
   {% if keys %}
-    <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSV出力</a>
+    <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&sort={{ sort }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSV出力</a>
   {% endif %}
 </form>
+
+<!-- 🔗 URL共有 -->
+{% if keys %}
+  <div style="margin-top: 1rem;">
+    <label>🔗 現在のURL（共有可）:</label><br>
+    <input id="shareUrl" type="text" readonly style="width: 90%;" value="{{ request.url }}" />
+    <button class="button" onclick="copyUrl()">📋 コピー</button>
+  </div>
+{% endif %}
 
 {% if results %}
   <label>📈 表示形式:</label>
@@ -60,6 +73,7 @@
         <th>平均勝率（%）</th>
         <th>平均DD（%）</th>
         <th>件数</th>
+        <th>🔍</th>
       </tr>
     </thead>
     <tbody>
@@ -69,6 +83,7 @@
           <td>{{ row.avg_win }}</td>
           <td>{{ row.avg_dd }}</td>
           <td>{{ row.count }}</td>
+          <td><a href="/statistics/detail?mode={{ mode }}&key={{ row.key }}">詳細</a></td>
         </tr>
       {% endfor %}
     </tbody>
@@ -76,6 +91,7 @@
 
   <canvas id="winChart" height="100"></canvas>
   <button class="button" onclick="downloadChart('winChart', 'win_rate_chart')">📷 勝率グラフ保存</button>
+
   <canvas id="ddChart" height="100"></canvas>
   <button class="button" onclick="downloadChart('ddChart', 'dd_chart')">📷 DDグラフ保存</button>
 
@@ -99,7 +115,7 @@
             backgroundColor: 'rgba(54, 162, 235, 0.7)',
             borderColor: 'rgba(54, 162, 235, 1)',
             fill: type !== 'line',
-            tension: 0.2,
+            tension: 0.2
           }]
         },
         options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
@@ -115,22 +131,11 @@
             backgroundColor: 'rgba(255, 99, 132, 0.7)',
             borderColor: 'rgba(255, 99, 132, 1)',
             fill: type !== 'line',
-            tension: 0.2,
+            tension: 0.2
           }]
         },
         options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
       });
-    }
-
-    function checkAll(state) {
-      const boxes = document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]');
-      boxes.forEach(box => box.checked = state);
-      updateSelectedCount();
-    }
-
-    function updateSelectedCount() {
-      const checked = document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]:checked');
-      document.getElementById("selectedCount").textContent = checked.length;
     }
 
     function downloadChart(canvasId, filename) {
@@ -147,10 +152,34 @@
       });
     }
 
-    document.querySelectorAll('input[type="checkbox"][name="{{ mode }}s"]').forEach(box => {
-      box.addEventListener("change", updateSelectedCount);
-    });
-    updateSelectedCount();
+    function copyUrl() {
+      const input = document.getElementById("shareUrl");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand("copy");
+      alert("URLをコピーしました！");
+    }
+
+    function applyPreset(days) {
+      const now = new Date();
+      const past = new Date();
+      past.setDate(now.getDate() - days);
+      document.querySelector("input[name='to']").value = now.toISOString().slice(0, 10);
+      document.querySelector("input[name='from']").value = past.toISOString().slice(0, 10);
+    }
+
+    function applyThisMonth() {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      document.querySelector("input[name='to']").value = now.toISOString().slice(0, 10);
+      document.querySelector("input[name='from']").value = firstDay.toISOString().slice(0, 10);
+    }
+
+    function clearPreset() {
+      document.querySelector("input[name='to']").value = "";
+      document.querySelector("input[name='from']").value = "";
+    }
+
     renderCharts("bar");
     document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
   </script>
