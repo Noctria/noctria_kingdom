@@ -23,7 +23,7 @@ from noctria_gui.routes import (
     strategy_compare,         # 📊 戦略比較
     tag_summary,
     tag_summary_detail,
-    tag_heatmap,              # ✅ タグ × 指標ヒートマップ ← 追加
+    tag_heatmap,              # 🔥 タグ × 指標ヒートマップ
     statistics,               # 📈 統計スコアボード
     act_history,
     push_history,
@@ -66,7 +66,7 @@ app.include_router(strategy_detail.router)
 app.include_router(strategy_compare.router)     # ✅ /strategies/compare
 app.include_router(tag_summary.router)
 app.include_router(tag_summary_detail.router)
-app.include_router(tag_heatmap.router)          # ✅ /strategies/tag-heatmap ← 追加
+app.include_router(tag_heatmap.router)          # ✅ /tag-heatmap
 app.include_router(statistics.router)           # ✅ /statistics
 app.include_router(act_history.router)
 app.include_router(push_history.router)
