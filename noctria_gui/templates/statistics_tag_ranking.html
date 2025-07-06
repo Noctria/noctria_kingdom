@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📌 タグ × 指標ランキング</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      color: #222;
+      margin-bottom: 1.5rem;
+    }
+    .select-container {
+      margin-bottom: 2rem;
+    }
+    canvas {
+      max-width: 800px;
+      margin: 0 auto;
+      display: block;
+    }
+    a {
+      display: inline-block;
+      margin-top: 2rem;
+      text-decoration: none;
+      color: #007acc;
+    }
+  </style>
+</head>
+<body>
+  <h1>📌 タグ × 指標ランキング</h1>
+
+  <div class="select-container">
+    <label for="metricSelect">📊 指標を選択：</label>
+    <select id="metricSelect">
+      <option value="win_rate">勝率（%）</option>
+      <option value="max_drawdown">最大ドローダウン（%）</option>
+      <option value="num_trades">取引回数</option>
+    </select>
+  </div>
+
+  <canvas id="rankingChart"></canvas>
+
+  <p><a href="/dashboard">← ダッシュボードへ戻る</a></p>
+
+  <script>
+    const rawData = {{ tag_stats | tojson }};
+    const metrics = {
+      win_rate: { label: "勝率（%）", color: "rgba(60, 179, 113, 0.7)" },
+      max_drawdown: { label: "最大ドローダウン（%）", color: "rgba(220, 20, 60, 0.7)" },
+      num_trades: { label: "取引回数", color: "rgba(30, 144, 255, 0.7)" }
+    };
+
+    let chartInstance = null;
+
+    function renderChart(metric) {
+      const sorted = [...rawData]
+        .filter(d => d[metric] != null)
+        .sort((a, b) => b[metric] - a[metric])
+        .slice(0, 10);
+
+      const labels = sorted.map(d => d.type);
+      const data = sorted.map(d => d[metric]);
+
+      const ctx = document.getElementById("rankingChart").getContext("2d");
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: metrics[metric].label,
+            data: data,
+            backgroundColor: metrics[metric].color
+          }]
+        },
+        options: {
+          responsive: true,
+          indexAxis: 'y',
+          plugins: {
+            title: {
+              display: true,
+              text: `📌 ${metrics[metric].label} 上位タグ`,
+              font: { size: 18 }
+            },
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    document.getElementById("metricSelect").addEventListener("change", (e) => {
+      renderChart(e.target.value);
+    });
+
+    // 初期表示
+    renderChart("win_rate");
+  </script>
+</body>
+</html>
