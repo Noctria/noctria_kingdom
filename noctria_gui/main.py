@@ -24,7 +24,7 @@ from noctria_gui.routes import (
     tag_summary,
     tag_summary_detail,
     tag_heatmap,              # 🔥 タグ × 指標ヒートマップ
-    statistics,               # 📈 統計スコアボード
+    statistics,               # 📈 統計スコアダッシュボード
     act_history,              # 📜 昇格戦略ログ
     act_history_detail,       # 📄 昇格ログの詳細表示
     push_history,             # 📦 GitHub Pushログ
@@ -63,14 +63,14 @@ app.state.templates = templates
 app.include_router(home_routes.router)
 app.include_router(strategy_routes.router)
 app.include_router(strategy_detail.router)
-app.include_router(strategy_compare.router)     # 📊 /strategies/compare
+app.include_router(strategy_compare.router)       # 📊 /strategies/compare
 app.include_router(tag_summary.router)
 app.include_router(tag_summary_detail.router)
-app.include_router(tag_heatmap.router)          # 🔥 /tag-heatmap
-app.include_router(statistics.router)           # 📈 /statistics
-app.include_router(act_history.router)          # 📜 /act-history
-app.include_router(act_history_detail.router)   # 📄 /act-history/detail
-app.include_router(push_history.router)         # 📦 /push-history
-app.include_router(upload.router)
-app.include_router(upload_history.router)
-app.include_router(pdca.router)                 # 🔁 /pdca
+app.include_router(tag_heatmap.router)            # 🔥 /tag-heatmap
+app.include_router(statistics.router)             # 📈 /statistics
+app.include_router(act_history.router)            # 📜 /act-history
+app.include_router(act_history_detail.router)     # 📄 /act-history/detail
+app.include_router(push_history.router)           # 📦 /push-history
+app.include_router(upload.router)                 # ⬆️ /upload
+app.include_router(upload_history.router)         # 🧭 /upload-history
+app.include_router(pdca.router)                   # 🔁 /pdca
