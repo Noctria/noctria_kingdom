@@ -12,6 +12,7 @@ import csv
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
+from collections import defaultdict
 
 from core.path_config import PDCA_LOG_DIR
 
@@ -41,9 +42,6 @@ def filter_logs(
 ) -> List[Dict]:
     """
     🔍 ログにフィルタを適用する
-    - strategy: 戦略名で絞り込み
-    - symbol: 通貨ペアで絞り込み
-    - start_date/end_date: ISO形式文字列（例: '2025-07-01'）
     """
     filtered = []
 
@@ -100,7 +98,6 @@ def get_available_symbols(logs: List[Dict]) -> List[str]:
 def load_all_statistics() -> List[Dict]:
     """
     📊 統計対象として有効なPDCAログを抽出する
-    - 必須項目: strategy, symbol, win_rate, max_drawdown, trade_count, timestamp
     """
     logs = load_all_logs()
     return [
@@ -126,28 +123,59 @@ def filter_statistics(
 def export_statistics_to_csv(logs: List[Dict], output_path: Path):
     """
     📤 Veritas戦略の統計ログをCSV形式で出力する
-    - 勝率 / 最大ドローダウン / 取引回数 など主要項目を抽出
     """
     if not logs:
         print("⚠️ 書き出すログが存在しません")
         return
 
     fieldnames = [
-        "strategy",        # 戦略名
-        "symbol",          # 通貨ペア
-        "win_rate",        # 勝率（float）
-        "max_drawdown",    # 最大DD（float）
-        "trade_count",     # 取引回数
-        "timestamp",       # 評価タイムスタンプ
-        "__log_path__",    # 元ログファイルのパス
+        "strategy",
+        "symbol",
+        "win_rate",
+        "max_drawdown",
+        "trade_count",
+        "timestamp",
+        "__log_path__"
     ]
 
-    with open(output_path, "w", encoding="utf-8", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
+    try:
+        with open(output_path, "w", encoding="utf-8", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for log in logs:
+                row = {key: log.get(key, "") for key in fieldnames}
+                writer.writerow(row)
+        print(f"✅ 統計スコアCSVを出力しました: {output_path}")
+    except Exception as e:
+        print(f"⚠️ CSV出力エラー: {e}")
 
-        for log in logs:
-            row = {key: log.get(key, "") for key in fieldnames}
-            writer.writerow(row)
 
-    print(f"✅ 統計スコアCSVを出力しました: {output_path}")
+def aggregate_by_tag(logs: List[Dict]) -> List[Dict]:
+    """
+    🔥 タグ別に勝率・最大DD・取引数を平均化
+    """
+    tag_groups = defaultdict(list)
+
+    for log in logs:
+        tag = log.get("tag")
+        if not tag:
+            continue
+        tag_groups[tag].append(log)
+
+    tag_stats = []
+
+    for tag, items in tag_groups.items():
+        win_rates = [log.get("win_rate") for log in items if isinstance(log.get("win_rate"), (int, float))]
+        max_dds = [log.get("max_drawdown") for log in items if isinstance(log.get("max_drawdown"), (int, float))]
+        trades = [log.get("trade_count") for log in items if isinstance(log.get("trade_count"), (int, float))]
+
+        tag_stats.append({
+            "type": tag,
+            "win_rate": round(sum(win_rates) / len(win_rates), 2) if win_rates else None,
+            "max_drawdown": round(sum(max_dds) / len(max_dds), 2) if max_dds else None,
+            "num_trades": round(sum(trades) / len(trades), 1) if trades else None,
+            "count": len(items)
+        })
+
+    tag_stats.sort(key=lambda x: (x["win_rate"] is not None, x["win_rate"]), reverse=True)
+    return tag_stats
