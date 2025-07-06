@@ -69,7 +69,7 @@
   <div class="legend">
     <strong>🎨 カラー凡例：</strong><br>
     ✅ <b>勝率（緑）</b>: 高いほど濃く緑に<br>
-    ⚠️ <b>最大ドローダウン（赤）</b>: 高いほど濃く赤に<br>
+    ⚠️ <b>最大ドローダウン（赤）</b>: 高いほど濃く赤に（＝悪化）<br>
     🔁 <b>取引数（青）</b>: 多いほど濃く青に<br>
     各バーの中に数値ラベルも表示されます。
   </div>
@@ -85,20 +85,22 @@
     };
 
     function getColor(metric, value) {
+      if (value == null) return "#ccc";
+      // 色を HSL + 値による濃淡（lightness）で調整
       if (metric === "win_rate") {
-        const hue = 120;
-        const lightness = 95 - Math.min(60, value * 0.6);
-        return `hsl(${hue}, 60%, ${lightness}%)`;
+        const hue = 120; // 緑
+        const lightness = 90 - Math.min(60, value * 0.7);  // 0〜100%
+        return `hsl(${hue}, 70%, ${lightness}%)`;
       }
       if (metric === "max_drawdown") {
-        const hue = 0;
-        const lightness = 95 - Math.min(60, value * 0.8);
-        return `hsl(${hue}, 60%, ${lightness}%)`;
+        const hue = 0; // 赤
+        const lightness = 90 - Math.min(60, value * 0.9);  // DDが高いほど濃赤に
+        return `hsl(${hue}, 70%, ${lightness}%)`;
       }
       if (metric === "num_trades") {
-        const hue = 210;
-        const lightness = 95 - Math.min(60, value / 3);
-        return `hsl(${hue}, 60%, ${lightness}%)`;
+        const hue = 210; // 青
+        const lightness = 90 - Math.min(60, value / 5);  // 多いほど濃青
+        return `hsl(${hue}, 70%, ${lightness}%)`;
       }
       return "#ccc";
     }
@@ -109,7 +111,7 @@
       const filtered = stats.filter(s => (s.num_trades || 0) >= minTrades);
       const labels = filtered.map(s => s.type);
       const values = filtered.map(s => s[metric] || 0);
-      const bgColors = filtered.map(s => getColor(metric, s[metric] || 0));
+      const bgColors = filtered.map(s => getColor(metric, s[metric]));
 
       const data = {
         labels,
@@ -147,7 +149,9 @@
           scales: {
             x: {
               beginAtZero: true,
-              ticks: { stepSize: 10 }
+              ticks: {
+                stepSize: metric === "num_trades" ? 20 : 10
+              }
             }
           }
         },

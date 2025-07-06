@@ -9,24 +9,30 @@
 
 import importlib
 import pkgutil
+from fastapi import APIRouter
+from typing import List
 
-# すべての router を格納するリスト
-routers = []
+# ✅ router 一覧（FastAPI用）
+routers: List[APIRouter] = []
 
-# このパッケージのパスを取得（自動収集のために必要）
-__path__ = __path__  # required for pkgutil
+# ✅ この __init__.py の __path__ がモジュール探索の起点になる
+__path__ = __path__  # required for pkgutil.iter_modules to work correctly
 
-# 動的にモジュールを走査し、router を収集
-for _, module_name, _ in pkgutil.iter_modules(__path__):
+# 🔄 自動インポート処理（routes/ 以下の各 .py にある router を自動登録）
+for finder, module_name, ispkg in pkgutil.iter_modules(__path__):
     if module_name.startswith("_"):
-        continue  # __init__.py や private モジュールは除外
+        continue  # __init__.py や _private.py はスキップ
 
     try:
+        # モジュールインポート
         mod = importlib.import_module(f"{__name__}.{module_name}")
+
+        # router を含むモジュールのみ登録
         if hasattr(mod, "router"):
             routers.append(mod.router)
-            print(f"✅ router 読込: {module_name}")
+            print(f"[routes] ✅ router 読込成功: {module_name}")
         else:
-            print(f"⚠️ router 未定義: {module_name}")
+            print(f"[routes] ⚠️ router 未定義: {module_name}")
+
     except Exception as e:
-        print(f"❌ ルーターインポート失敗: {module_name} - {e}")
+        print(f"[routes] ❌ ルーターインポート失敗: {module_name} - {repr(e)}")

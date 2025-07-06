@@ -39,6 +39,7 @@
       <option value="win_rate">勝率（%）</option>
       <option value="max_drawdown">最大ドローダウン（%）</option>
       <option value="num_trades">取引回数</option>
+      <option value="promotion_rate">昇格率</option>
     </select>
   </div>
 
@@ -49,9 +50,22 @@
   <script>
     const rawData = {{ tag_stats | tojson }};
     const metrics = {
-      win_rate: { label: "勝率（%）", color: "rgba(60, 179, 113, 0.7)" },
-      max_drawdown: { label: "最大ドローダウン（%）", color: "rgba(220, 20, 60, 0.7)" },
-      num_trades: { label: "取引回数", color: "rgba(30, 144, 255, 0.7)" }
+      win_rate: {
+        label: "勝率（%）",
+        color: "rgba(60, 179, 113, 0.7)" // 緑
+      },
+      max_drawdown: {
+        label: "最大ドローダウン（%）",
+        color: "rgba(220, 20, 60, 0.7)" // 赤
+      },
+      num_trades: {
+        label: "取引回数",
+        color: "rgba(30, 144, 255, 0.7)" // 青
+      },
+      promotion_rate: {
+        label: "昇格率",
+        color: "rgba(255, 215, 0, 0.7)" // ゴールド
+      }
     };
 
     let chartInstance = null;
