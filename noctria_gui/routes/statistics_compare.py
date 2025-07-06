@@ -13,13 +13,11 @@ import io
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-
-def parse_date(date_str):
+def parse_date_safe(s: str):
     try:
-        return datetime.strptime(date_str, "%Y-%m-%d")
-    except Exception:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except:
         return None
-
 
 def load_strategy_logs():
     data = []
@@ -28,11 +26,10 @@ def load_strategy_logs():
             try:
                 with open(ACT_LOG_DIR / file, "r", encoding="utf-8") as f:
                     record = json.load(f)
-                data.append(record)
+                    data.append(record)
             except Exception:
                 continue
     return data
-
 
 def compute_comparison(data, mode, keys, from_date=None, to_date=None):
     result = defaultdict(lambda: {"count": 0, "win_sum": 0, "dd_sum": 0})
@@ -42,7 +39,7 @@ def compute_comparison(data, mode, keys, from_date=None, to_date=None):
             date_str = record.get("date")
             if not date_str:
                 continue
-            date = datetime.strptime(date_str, "%Y-%m-%d")
+            date = parse_date_safe(date_str)
             if from_date and date < from_date:
                 continue
             if to_date and date > to_date:
@@ -52,11 +49,9 @@ def compute_comparison(data, mode, keys, from_date=None, to_date=None):
             win = score.get("win_rate")
             dd = score.get("max_drawdown")
 
-            if mode == "tag":
-                record_keys = record.get("tags", [])
-            else:
-                record_keys = [record.get("strategy_name")]
-
+            record_keys = (
+                record.get("tags", []) if mode == "tag" else [record.get("strategy_name")]
+            )
             for key in record_keys:
                 if key not in keys:
                     continue
@@ -80,8 +75,7 @@ def compute_comparison(data, mode, keys, from_date=None, to_date=None):
             "count": count
         })
 
-    return sorted(final, key=lambda x: (-x["avg_win"], x["avg_dd"]))
-
+    return final
 
 def extract_all_keys(data, mode):
     key_set = set()
@@ -94,44 +88,55 @@ def extract_all_keys(data, mode):
                 key_set.add(name)
     return sorted(list(key_set))
 
-
 @router.get("/statistics/compare", response_class=HTMLResponse)
 async def compare_statistics(request: Request):
-    q = request.query_params
-    mode = q.get("mode", "tag")
-    keys = q.get(mode + "s", "").split(",")
+    params = request.query_params
+    mode = params.get("mode", "tag")
+    keys = params.getlist(mode + "s")
     keys = [k.strip() for k in keys if k.strip()]
-    from_date = parse_date(q.get("from"))
-    to_date = parse_date(q.get("to"))
+    from_date = parse_date_safe(params.get("from"))
+    to_date = parse_date_safe(params.get("to"))
+    sort_mode = params.get("sort", "check")  # "check" or "score"
 
     all_data = load_strategy_logs()
     all_keys = extract_all_keys(all_data, mode)
-    results = compute_comparison(all_data, mode, keys, from_date, to_date) if keys else []
+    result = compute_comparison(all_data, mode, keys, from_date, to_date)
+
+    if sort_mode == "score":
+        result.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
+    else:  # default: check順
+        result.sort(key=lambda x: keys.index(x["key"]) if x["key"] in keys else 999)
 
     return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
         "keys": keys,
         "all_keys": all_keys,
-        "results": results,
+        "results": result,
+        "sort": sort_mode,
         "filter": {
-            "from": q.get("from", ""),
-            "to": q.get("to", "")
+            "from": params.get("from", ""),
+            "to": params.get("to", ""),
         }
     })
 
-
 @router.get("/statistics/compare/export")
 async def export_compare_csv(request: Request):
-    q = request.query_params
-    mode = q.get("mode", "tag")
-    keys = q.get(mode + "s", "").split(",")
+    params = request.query_params
+    mode = params.get("mode", "tag")
+    keys = params.getlist(mode + "s")
     keys = [k.strip() for k in keys if k.strip()]
-    from_date = parse_date(q.get("from"))
-    to_date = parse_date(q.get("to"))
+    from_date = parse_date_safe(params.get("from"))
+    to_date = parse_date_safe(params.get("to"))
+    sort_mode = params.get("sort", "check")
 
     all_data = load_strategy_logs()
     result = compute_comparison(all_data, mode, keys, from_date, to_date)
+
+    if sort_mode == "score":
+        result.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
+    else:
+        result.sort(key=lambda x: keys.index(x["key"]) if x["key"] in keys else 999)
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
