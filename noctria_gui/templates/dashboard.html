@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🏰 Noctria Kingdom - 統治ダッシュボード</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>🏰 Noctria Kingdom - 中央統治ダッシュボード</h1>
+
+  <!-- 📊 サマリカード -->
+  <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div class="card" style="flex: 1 1 220px;">
+      <h2>📈 昇格戦略数</h2>
+      <p><strong>{{ stats.promoted_count }}</strong> 件</p>
+    </div>
+    <div class="card" style="flex: 1 1 220px;">
+      <h2>📤 Push完了数</h2>
+      <p><strong>{{ stats.push_count }}</strong> 件</p>
+    </div>
+    <div class="card" style="flex: 1 1 220px;">
+      <h2>🧪 PDCA実行数</h2>
+      <p><strong>{{ stats.pdca_count }}</strong> 件</p>
+    </div>
+    <div class="card" style="flex: 1 1 220px;">
+      <h2>⚖ 平均勝率</h2>
+      <p><strong>{{ "%.1f"|format(stats.avg_win_rate) }}%</strong></p>
+    </div>
+  </div>
+
+  <!-- 🔗 統治パネルリンク -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+    <a href="/act-history" class="card nav-link" style="text-decoration: none;">
+      <h3>🧾 昇格戦略一覧</h3>
+      <p>Veritasにより昇格された戦略の記録</p>
+    </a>
+
+    <a href="/push-history" class="card nav-link" style="text-decoration: none;">
+      <h3>📤 GitHub Push履歴</h3>
+      <p>昇格戦略が GitHub に送信された記録</p>
+    </a>
+
+    <a href="/pdca" class="card nav-link" style="text-decoration: none;">
+      <h3>🔁 PDCA履歴</h3>
+      <p>戦略生成・評価・EA命令の自動実行ログ</p>
+    </a>
+
+    <a href="/statistics/heatmap" class="card nav-link" style="text-decoration: none;">
+      <h3>🔥 タグ別ヒートマップ</h3>
+      <p>戦略タグ × 勝率・DDの視覚分析</p>
+    </a>
+
+    <a href="/statistics/ranking" class="card nav-link" style="text-decoration: none;">
+      <h3>🏅 ランキング</h3>
+      <p>タグ別勝率・安定性・件数の比較</p>
+    </a>
+
+    <a href="/strategies/compare" class="card nav-link" style="text-decoration: none;">
+      <h3>📊 戦略比較</h3>
+      <p>複数戦略の勝率や性能を並列分析</p>
+    </a>
+  </div>
+</body>
+</html>
