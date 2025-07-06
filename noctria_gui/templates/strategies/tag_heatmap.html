@@ -20,6 +20,15 @@
       margin: 2rem auto;
       display: block;
     }
+    .legend {
+      max-width: 1000px;
+      margin: 0 auto 2rem;
+      padding: 1rem;
+      background: #fff;
+      border-left: 4px solid #007acc;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
     a {
       display: inline-block;
       margin-top: 2rem;
@@ -30,6 +39,14 @@
 </head>
 <body>
   <h1>🔥 タグ別戦略指標ヒートマップ</h1>
+
+  <div class="legend">
+    <strong>🎨 カラー凡例：</strong><br>
+    ✅ <b>勝率（緑）</b>: 高いほど濃く緑に<br>
+    ⚠️ <b>最大ドローダウン（赤）</b>: 高いほど濃く赤に<br>
+    🔁 <b>取引数（青）</b>: 多いほど濃く青に<br>
+    各バーの中に数値ラベルも表示されます。
+  </div>
 
   <canvas id="heatmapCanvas"></canvas>
 
@@ -43,20 +60,19 @@
       num_trades: "取引数"
     };
 
-    // 🟩 カラー強調ロジック（勝率は緑、高DDは赤、取引数は青寄り）
     function getColor(metric, value) {
       if (metric === "win_rate") {
-        const hue = Math.min(120, value * 1.2);  // 緑系
+        const hue = Math.min(120, value * 1.2);
         return `hsl(${hue}, 70%, 75%)`;
       }
       if (metric === "max_drawdown") {
-        const hue = 0;  // 赤固定
-        const lightness = 95 - Math.min(80, value * 1.5);  // DDが高いほど濃く
+        const hue = 0;
+        const lightness = 95 - Math.min(80, value * 1.5);
         return `hsl(${hue}, 70%, ${lightness}%)`;
       }
       if (metric === "num_trades") {
-        const hue = 210;  // 青系
-        const lightness = 95 - Math.min(70, value / 3);  // 多いほど濃く
+        const hue = 210;
+        const lightness = 95 - Math.min(70, value / 3);
         return `hsl(${hue}, 60%, ${lightness}%)`;
       }
       return "#ccc";
@@ -82,7 +98,6 @@
       datasets: datasets
     };
 
-    // ✅ Chart.js 登録（Datalabelsプラグイン明示）
     Chart.register(ChartDataLabels);
 
     new Chart(document.getElementById("heatmapCanvas"), {
