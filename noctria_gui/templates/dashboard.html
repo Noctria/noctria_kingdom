@@ -19,7 +19,7 @@
       background-color: #333;
       border: 1px solid #555;
     }
-    select.dark-mode, button.dark-mode {
+    select.dark-mode, button.dark-mode, input.dark-mode {
       background-color: #333;
       color: #f0f0f0;
     }
@@ -32,6 +32,27 @@
   <div style="margin-bottom: 1rem;">
     <button id="darkModeToggle">🌗 ダークモード切替</button>
   </div>
+
+  <!-- 🔍 検索フィルター -->
+  <form method="get" action="/dashboard" style="margin-bottom: 2rem;">
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <label>📅 From:</label>
+        <input type="date" name="from" value="{{ stats.filter.from }}" />
+      </div>
+      <div>
+        <label>📅 To:</label>
+        <input type="date" name="to" value="{{ stats.filter.to }}" />
+      </div>
+      <div>
+        <label>🏷 タグ:</label>
+        <input type="text" name="tag" value="{{ stats.filter.tag }}" placeholder="例: trend" />
+      </div>
+      <div>
+        <button type="submit">🔍 フィルター適用</button>
+      </div>
+    </div>
+  </form>
 
   <!-- 📊 サマリカード -->
   <div id="cards" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
@@ -53,7 +74,7 @@
     </div>
   </div>
 
-  <!-- 📈 昇格・Push件数グラフ -->
+  <!-- 🪄 グラフ切替 -->
   <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
     <h2>📅 昇格・Push数 日次推移</h2>
     <label for="graphMode">表示切替：</label>
@@ -189,7 +210,7 @@
     const body = document.body;
     const cards = document.querySelectorAll(".card");
     const links = document.querySelectorAll(".nav-link");
-    const select = document.getElementById("graphMode");
+    const inputs = document.querySelectorAll("input, select, button");
 
     if (localStorage.getItem("darkMode") === "true") enableDarkMode();
 
@@ -201,7 +222,7 @@
       body.classList.add("dark-mode");
       cards.forEach(c => c.classList.add("dark-mode"));
       links.forEach(l => l.classList.add("dark-mode"));
-      select.classList.add("dark-mode");
+      inputs.forEach(i => i.classList.add("dark-mode"));
       toggleButton.classList.add("dark-mode");
       localStorage.setItem("darkMode", "true");
       [logChart, winRateChart, ddChart].forEach(c => applyDarkStyle(c, "#f0f0f0"));
@@ -211,7 +232,7 @@
       body.classList.remove("dark-mode");
       cards.forEach(c => c.classList.remove("dark-mode"));
       links.forEach(l => l.classList.remove("dark-mode"));
-      select.classList.remove("dark-mode");
+      inputs.forEach(i => i.classList.remove("dark-mode"));
       toggleButton.classList.remove("dark-mode");
       localStorage.setItem("darkMode", "false");
       [logChart, winRateChart, ddChart].forEach(c => applyDarkStyle(c, "#000"));
