@@ -2,22 +2,23 @@
 # coding: utf-8
 
 """
-🌐 Noctria Kingdom GUI 起動スクリプト（自動ルート登録対応版）
+🌐 Noctria Kingdom GUI 起動スクリプト（自動ルート登録版）
 - FastAPIにより王国の統治パネルを展開
-- `noctria_gui.routes/` 配下の全ルートを自動検出・登録
+- routes/ 以下の全ルートを自動登録
 """
 
-import json
-import importlib
-import pkgutil
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+import json
+import importlib
 
 # ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-import noctria_gui.routes  # ルート自動探索用
+
+# ✅ GUIルートモジュール（自動生成された __init__.py を通じてアクセス）
+import noctria_gui.routes as routes_pkg
 
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
@@ -46,19 +47,9 @@ templates.env.filters["from_json"] = from_json
 app.state.templates = templates
 
 # ========================================
-# 🔁 ルート自動登録（routes/*.py を動的に include）
+# 🔁 ルーター自動登録
 # ========================================
-routes_package = noctria_gui.routes
-package_path = Path(routes_package.__file__).parent
-
-for _, module_name, is_pkg in pkgutil.iter_modules([str(package_path)]):
-    if is_pkg or module_name.startswith("_"):
-        continue  # サブパッケージや __init__ は除外
-    try:
-        full_module_name = f"{routes_package.__name__}.{module_name}"
-        module = importlib.import_module(full_module_name)
-        if hasattr(module, "router"):
-            app.include_router(module.router)
-            print(f"✅ ルート登録: {full_module_name}")
-    except Exception as e:
-        print(f"⚠️ ルート登録失敗: {module_name} - {e}")
+for attr_name in dir(routes_pkg):
+    attr = getattr(routes_pkg, attr_name)
+    if hasattr(attr, "router"):
+        app.include_router(attr.router)
