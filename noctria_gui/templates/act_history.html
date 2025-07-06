@@ -15,13 +15,29 @@
     form.filter {
       margin-bottom: 1.5rem;
       display: flex;
+      flex-wrap: wrap;
       gap: 1rem;
       align-items: center;
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.9rem;
+    }
+    input, select {
+      padding: 0.3rem 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       background-color: white;
+      margin-top: 1rem;
     }
     th, td {
       padding: 0.5rem;
@@ -44,12 +60,6 @@
       justify-content: center;
       gap: 0.5rem;
     }
-    .top-actions {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      margin-bottom: 1rem;
-    }
     .csv-link {
       text-decoration: none;
       color: #0066cc;
@@ -67,14 +77,44 @@
   <h1>📜 Veritas 採用戦略ログ</h1>
 
   <form method="get" action="/act-history" class="filter">
-    <div class="top-actions">
-      <label>
-        <input type="checkbox" name="only_unpushed" value="true" {% if only_unpushed %}checked{% endif %}>
-        未Pushのみ表示
-      </label>
-      <button type="submit">絞り込み</button>
-      <a class="csv-link" href="/act-history/export">📤 CSV出力</a>
-    </div>
+    <label>
+      戦略名
+      <input type="text" name="strategy_name" value="{{ filters.strategy_name or '' }}">
+    </label>
+    <label>
+      タグ
+      <input type="text" name="tag" value="{{ filters.tag or '' }}">
+    </label>
+    <label>
+      最低スコア
+      <input type="number" step="0.01" name="min_score" value="{{ filters.min_score or '' }}">
+    </label>
+    <label>
+      最高スコア
+      <input type="number" step="0.01" name="max_score" value="{{ filters.max_score or '' }}">
+    </label>
+    <label>
+      昇格日（開始）
+      <input type="date" name="start_date" value="{{ filters.start_date or '' }}">
+    </label>
+    <label>
+      昇格日（終了）
+      <input type="date" name="end_date" value="{{ filters.end_date or '' }}">
+    </label>
+    <label>
+      <span>Push済み</span>
+      <select name="pushed">
+        <option value="">すべて</option>
+        <option value="true" {% if filters.pushed == True %}selected{% endif %}>✅ 済</option>
+        <option value="false" {% if filters.pushed == False %}selected{% endif %}>❌ 未</option>
+      </select>
+    </label>
+    <button type="submit">🔍 絞り込み</button>
+
+    {# CSV出力リンクに検索条件を付与 #}
+    <a class="csv-link" href="/act-history/export?strategy_name={{ filters.strategy_name or '' }}&tag={{ filters.tag or '' }}&min_score={{ filters.min_score or '' }}&max_score={{ filters.max_score or '' }}&start_date={{ filters.start_date or '' }}&end_date={{ filters.end_date or '' }}&pushed={{ filters.pushed }}">
+      📤 CSV出力
+    </a>
   </form>
 
   <table>
@@ -83,6 +123,8 @@
         <th>戦略名</th>
         <th>通貨ペア</th>
         <th>昇格日時</th>
+        <th>スコア</th>
+        <th>タグ</th>
         <th>Push済</th>
         <th>操作</th>
       </tr>
@@ -92,7 +134,9 @@
       <tr>
         <td>{{ log.strategy }}</td>
         <td>{{ log.symbol }}</td>
-        <td>{{ log.timestamp }}</td>
+        <td>{{ log.promoted_at or log.timestamp }}</td>
+        <td>{{ "%.2f"|format(log.score) if log.score is defined else "-" }}</td>
+        <td>{{ log.tag or "-" }}</td>
         <td>{{ "✅" if log.pushed else "❌" }}</td>
         <td class="action-buttons">
           <form method="post" action="/act-history/repush" class="action-form">
