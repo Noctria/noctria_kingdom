@@ -1,32 +1,38 @@
-# .pre-commit-config.yaml
-# 📌 Noctria Kingdom 用 pre-commit 設定
-# - 自動で routes/__init__.py を更新
-# - フォーマット / Lint / ソートの自動化
+# ===============================================
+# 🛡️ Noctria Kingdom pre-commit 統治設定ファイル
+# - ルート自動生成・コード整形・静的解析を統一
+# - routes/__init__.py 自動更新は王国標準
+# ===============================================
 
 repos:
+  # 🔍 基本チェック（改行・空白・衝突など）
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
-      - id: check-merge-conflict
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
+      - id: check-merge-conflict        # 🔀 マージ衝突チェック
+      - id: end-of-file-fixer           # ⏎ 最終行改行補正
+      - id: trailing-whitespace         # 🚫 行末空白除去
 
+  # 🎨 コードフォーマット（Black）
   - repo: https://github.com/psf/black
     rev: 24.3.0
     hooks:
       - id: black
         language_version: python3
 
+  # 🧹 静的解析（Flake8）
   - repo: https://github.com/PyCQA/flake8
     rev: 7.0.0
     hooks:
       - id: flake8
 
+  # 🧭 import文の順序統一（reorder-python-imports）
   - repo: https://github.com/asottile/reorder_python_imports
     rev: v3.12.0
     hooks:
       - id: reorder-python-imports
 
+  # 🛠️ ローカルフック：routes/__init__.py 自動生成
   - repo: local
     hooks:
       - id: generate-routes-init
