@@ -2,111 +2,93 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>📊 指標比較 - Noctria Kingdom</title>
+  <title>📊 比較分析 - Noctria Kingdom</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: #f4f4f4;
-      padding: 2rem;
-    }
-    h1 {
-      color: #222;
-      margin-bottom: 1.5rem;
-    }
-    form {
-      margin-bottom: 2rem;
-    }
-    table {
-      width: 100%;
-      background: #fff;
-      border-collapse: collapse;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 0.75rem;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
-    }
-    th {
-      background-color: #e9f2fb;
-    }
-    canvas {
-      max-width: 1000px;
-      margin: 2rem auto;
-      display: block;
-    }
-  </style>
 </head>
 <body>
-  <h1>📊 {{ "タグ" if mode == "tag" else "戦略" }}別 指標比較</h1>
+  <h1>📊 戦略・タグ比較分析</h1>
 
   <!-- 🔍 フィルター -->
-  <form method="get">
-    <input type="hidden" name="mode" value="{{ mode }}" />
-    <label>From: <input type="date" name="from" value="{{ filter.from }}"></label>
-    <label>To: <input type="date" name="to" value="{{ filter.to }}"></label>
-    <label>{{ "Tags" if mode == "tag" else "Strategies" }}:
-      <input type="text" name="{{ mode }}s" value="{{ keys|join(',') }}" placeholder="カンマ区切りで入力">
-    </label>
-    <button type="submit">適用</button>
+  <form method="get" action="/statistics/compare" style="margin-bottom: 2rem;">
+    <label>比較モード:</label>
+    <select name="mode">
+      <option value="tag" {% if mode == 'tag' %}selected{% endif %}>タグ</option>
+      <option value="strategy" {% if mode == 'strategy' %}selected{% endif %}>戦略名</option>
+    </select>
+
+    <label>対象:</label>
+    <input type="text" name="{{ mode }}s" value="{{ keys | join(',') }}" style="width: 300px;" />
+
+    <label>From:</label>
+    <input type="date" name="from" value="{{ filter.from }}" />
+    <label>To:</label>
+    <input type="date" name="to" value="{{ filter.to }}" />
+
+    <button type="submit">比較する</button>
+    {% if keys %}
+      <a href="/statistics/compare/export?mode={{ mode }}&{{ mode }}s={{ keys | join(',') }}&from={{ filter.from }}&to={{ filter.to }}" class="button">CSVエクスポート</a>
+    {% endif %}
   </form>
 
-  <!-- 📈 グラフ -->
-  <canvas id="compareChart"></canvas>
+  <!-- 📋 比較結果テーブル -->
+  {% if results %}
+    <table>
+      <thead>
+        <tr>
+          <th>比較対象</th>
+          <th>平均勝率（%）</th>
+          <th>平均DD（%）</th>
+          <th>件数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+          <tr>
+            <td>{{ row.key }}</td>
+            <td>{{ row.avg_win }}</td>
+            <td>{{ row.avg_dd }}</td>
+            <td>{{ row.count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
 
-  <!-- 📋 比較テーブル -->
-  <table>
-    <thead>
-      <tr>
-        <th>{{ "タグ" if mode == "tag" else "戦略" }}</th>
-        <th>平均勝率（%）</th>
-        <th>平均DD（%）</th>
-        <th>件数</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in results %}
-      <tr>
-        <td>{{ r.key }}</td>
-        <td>{{ r.avg_win }}</td>
-        <td>{{ r.avg_dd }}</td>
-        <td>{{ r.count }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4">該当データなし</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <!-- 📈 Chart.js グラフ表示 -->
+    <canvas id="winChart" height="100"></canvas>
+    <canvas id="ddChart" height="100"></canvas>
 
-  <script>
-    const ctx = document.getElementById('compareChart');
-    const chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: {{ results | map(attribute='key') | list | tojson }},
-        datasets: [
-          {
+    <script>
+      const labels = {{ results | map(attribute='key') | list | tojson }};
+      const winRates = {{ results | map(attribute='avg_win') | list | tojson }};
+      const ddRates = {{ results | map(attribute='avg_dd') | list | tojson }};
+
+      new Chart(document.getElementById('winChart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
             label: '平均勝率（%）',
-            data: {{ results | map(attribute='avg_win') | list | tojson }},
-            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          },
-          {
-            label: '平均DD（%）',
-            data: {{ results | map(attribute='avg_dd') | list | tojson }},
-            backgroundColor: 'rgba(255, 99, 132, 0.6)',
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: { beginAtZero: true }
+            data: winRates,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+          }]
         }
-      }
-    });
-  </script>
+      });
+
+      new Chart(document.getElementById('ddChart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '平均DD（%）',
+            data: ddRates,
+            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+          }]
+        }
+      });
+    </script>
+  {% else %}
+    <p>比較対象を指定してください。</p>
+  {% endif %}
 </body>
 </html>
