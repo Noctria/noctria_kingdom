@@ -1,0 +1,84 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Noctria Kingdom{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      color: #222;
+      padding: 2rem;
+      transition: background 0.3s, color 0.3s;
+    }
+    .dark-mode {
+      background: #121212;
+      color: #e0e0e0;
+    }
+    .dark-mode table {
+      background: #1e1e1e;
+      color: #e0e0e0;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    nav a {
+      margin-right: 1rem;
+      text-decoration: none;
+      color: #007acc;
+      font-weight: bold;
+    }
+    nav a:hover {
+      text-decoration: underline;
+    }
+    .dark-mode nav a {
+      color: #66c2ff;
+    }
+    .button {
+      padding: 0.5rem 1rem;
+      background: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .dark-mode .button {
+      background: #0098ff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🏰 Noctria Kingdom - GUI統治</h1>
+    <button id="darkToggle" class="button">🌗 モード切替</button>
+  </header>
+
+  <nav>
+    <a href="/dashboard">📊 ダッシュボード</a>
+    <a href="/statistics/compare">🔍 比較</a>
+    <a href="/statistics/heatmap">🔥 ヒートマップ</a>
+    <a href="/statistics/ranking">🏅 ランキング</a>
+    <a href="/act-history">🧾 昇格ログ</a>
+    <a href="/push-history">🚀 Push履歴</a>
+  </nav>
+
+  <main>
+    {% block content %}
+    <!-- 各ページ固有の内容 -->
+    {% endblock %}
+  </main>
+
+  <script>
+    document.getElementById("darkToggle").addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+    });
+  </script>
+</body>
+</html>
