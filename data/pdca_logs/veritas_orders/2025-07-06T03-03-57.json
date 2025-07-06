@@ -1,0 +1,9 @@
+{
+  "strategy": "sample_strategy.py",
+  "timestamp": "2025-07-06T03:03:57",
+  "signal": "BUY",
+  "symbol": "USDJPY",
+  "lot": 0.1,
+  "tp": 10,
+  "sl": 8
+}

@@ -9,7 +9,7 @@ class PrometheusOracle:
     """🔮 市場予測を行うAI（ヒストリカルデータ利用版・MetaAI改修版）"""
 
     def __init__(self):
-        self.logger = setup_logger("PrometheusLogger", "/opt/airflow/logs/PrometheusLogger.log")
+        self.logger = setup_logger("PrometheusLogger")
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher()
 

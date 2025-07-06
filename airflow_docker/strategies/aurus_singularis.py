@@ -8,7 +8,7 @@ class AurusSingularis:
     """市場トレンド分析と適応戦略設計を行うAI（ヒストリカルデータ利用版）"""
 
     def __init__(self):
-        self.logger = setup_logger("AurusLogger", "/opt/airflow/logs/AurusLogger.log")
+        self.logger = setup_logger("AurusLogger")
 
         self.tf = self._lazy_import_tensorflow()
         self._configure_gpu()

@@ -27,7 +27,7 @@ class Noctria:
 
     def __init__(self):
         # ✅ ロガー設定
-        self.logger = setup_logger("Noctria", "/opt/airflow/logs/Noctria.log")
+        self.logger = setup_logger("Noctria")
 
         # ✅ データ取得と初期化
         self.market_fetcher = MarketDataFetcher()

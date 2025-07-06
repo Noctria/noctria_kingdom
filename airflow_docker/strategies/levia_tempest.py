@@ -12,7 +12,7 @@ class LeviaTempest:
         self.min_liquidity = min_liquidity
         self.max_spread = max_spread
         self.market_fetcher = MarketDataFetcher()
-        self.logger = setup_logger("LeviaLogger", "/opt/airflow/logs/LeviaLogger.log")
+        self.logger = setup_logger("LeviaLogger")
 
         # ✅ ヒストリカルデータ取得（1時間足・1ヶ月分）
         data_array = self.market_fetcher.get_usdjpy_historical_data(interval="1h", period="1mo")

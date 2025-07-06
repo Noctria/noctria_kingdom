@@ -11,7 +11,7 @@ class NoctusSentinella:
         self.risk_threshold = risk_threshold
         self.max_spread = max_spread
         self.min_liquidity = min_liquidity
-        self.logger = setup_logger("NoctusLogger", "/opt/airflow/logs/NoctusLogger.log")
+        self.logger = setup_logger("NoctusLogger")
         self.market_fetcher = MarketDataFetcher()
 
         # ✅ ヒストリカルデータ取得
