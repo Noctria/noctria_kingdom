@@ -1,36 +1,98 @@
+/* ============================================
+   📜 Noctria Kingdom GUI 統治スタイル v1.0
+   荘厳と洗練の美、そして格式の統一
+   ============================================ */
+
 body {
-    font-family: 'Segoe UI', sans-serif;
-    padding: 2em;
-    background-color: #fdfdfd;
-    color: #333;
+  font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+  background-color: #f0f4f8;
+  color: #1c1c1c;
+  margin: 0;
+  padding: 2rem;
+  line-height: 1.6;
+}
+
+h1, h2, h3 {
+  color: #2c3e50;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  letter-spacing: 0.5px;
 }
 
 h1 {
-    margin-bottom: 1em;
-    color: #1a1a1a;
+  font-size: 2rem;
+  border-left: 6px solid #4b7bec;
+  padding-left: 1rem;
 }
 
-ul {
-    list-style-type: none;
-    padding: 0;
+.btn {
+  background: linear-gradient(to right, #4b7bec, #3867d6);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+  transition: background 0.3s ease, transform 0.2s ease;
 }
 
-li {
-    background: #f0f0f0;
-    margin: 0.5em 0;
-    padding: 0.5em 1em;
-    border-radius: 6px;
-    font-weight: 500;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+.btn:hover {
+  background: linear-gradient(to right, #3867d6, #4b7bec);
+  transform: translateY(-2px);
 }
 
-a {
-    display: inline-block;
-    margin-top: 1em;
-    color: #3366cc;
-    text-decoration: none;
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-a:hover {
-    text-decoration: underline;
+.table th {
+  background-color: #ecf3fa;
+  padding: 0.8rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #34495e;
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #e1e8f0;
+}
+
+.table tr:hover {
+  background-color: #f7fbff;
+}
+
+.card {
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.nav-link {
+  margin-right: 1rem;
+  color: #2c3e50;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  color: #4b7bec;
+}
+
+input[type="text"],
+select {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #d0d7e2;
+  border-radius: 6px;
+  background-color: #fff;
+  font-size: 1rem;
+  margin-right: 1rem;
 }
