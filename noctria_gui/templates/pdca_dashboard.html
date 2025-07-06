@@ -80,16 +80,15 @@
 
   <!-- 🔍 フィルターUI -->
   <form class="filter-form" method="get" action="/pdca">
-    <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy }}">
-    <input type="text" name="symbol" placeholder="通貨 (例: USDJPY)" value="{{ filters.symbol }}">
+    <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy or '' }}">
+    <input type="text" name="symbol" placeholder="通貨 (例: USDJPY)" value="{{ filters.symbol or '' }}">
     <select name="signal">
       <option value="">シグナル</option>
       <option value="BUY" {% if filters.signal == 'BUY' %}selected{% endif %}>BUY</option>
       <option value="SELL" {% if filters.signal == 'SELL' %}selected{% endif %}>SELL</option>
     </select>
-    <input type="date" name="date_from" value="{{ filters.date_from }}">
-    <input type="date" name="date_to" value="{{ filters.date_to }}">
-
+    <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
+    <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
     <select name="sort">
       <option value="">ソートなし</option>
       <option value="win_rate" {% if sort == 'win_rate' %}selected{% endif %}>📈 勝率 昇順</option>
@@ -101,7 +100,6 @@
       <option value="timestamp_dt" {% if sort == 'timestamp_dt' %}selected{% endif %}>📅 時刻 昇順</option>
       <option value="-timestamp_dt" {% if sort == '-timestamp_dt' %}selected{% endif %}>📅 時刻 降順</option>
     </select>
-
     <button type="submit">検索</button>
   </form>
 
@@ -130,18 +128,14 @@
         <td>{{ log.lot }}</td>
         <td>{{ log.tp }}/{{ log.sl }}</td>
         <td>
-          {% if log.win_rate is not none %}
+          {% if log.win_rate is defined and log.win_rate is not none %}
             {{ '%.1f' | format(log.win_rate * 100) }}%
-          {% else %}
-            -
-          {% endif %}
+          {% else %}-{% endif %}
         </td>
         <td>
-          {% if log.max_dd is not none %}
+          {% if log.max_dd is defined and log.max_dd is not none %}
             {{ '%.1f' | format(log.max_dd * 100) }}%
-          {% else %}
-            -
-          {% endif %}
+          {% else %}-{% endif %}
         </td>
         <td>{{ log.trades or "-" }}</td>
         <td>
@@ -167,10 +161,12 @@
 
   <script>
     function showModal(id) {
-      document.getElementById(id).showModal();
+      const el = document.getElementById(id);
+      if (el) el.showModal();
     }
     function closeModal(id) {
-      document.getElementById(id).close();
+      const el = document.getElementById(id);
+      if (el) el.close();
     }
   </script>
 </body>
