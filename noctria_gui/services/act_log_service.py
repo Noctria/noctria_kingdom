@@ -3,13 +3,15 @@
 
 """
 📜 Veritas昇格戦略ログサービス
-- 昇格ログの読み込み、CSV出力、再処理支援
+- 昇格ログの読み込み、検索フィルタ、CSV出力、再処理支援
 """
 
 import json
 import csv
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
+from datetime import datetime
+
 from core.path_config import ACT_LOG_DIR, VERITAS_EVAL_LOG
 
 
@@ -25,6 +27,51 @@ def load_all_act_logs() -> List[Dict]:
         except Exception as e:
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
     return logs
+
+
+def filter_act_logs(
+    logs: List[Dict],
+    strategy_name: Optional[str] = None,
+    tag: Optional[str] = None,
+    score_range: Optional[Tuple[float, float]] = None,
+    date_range: Optional[Tuple[datetime, datetime]] = None,
+    pushed: Optional[bool] = None
+) -> List[Dict]:
+    """🔍 昇格ログのフィルタ処理"""
+    filtered = logs
+
+    if strategy_name:
+        filtered = [log for log in filtered if strategy_name.lower() in log.get("strategy", "").lower()]
+
+    if tag:
+        filtered = [log for log in filtered if tag in log.get("tag", "")]
+
+    if score_range:
+        min_score, max_score = score_range
+        filtered = [
+            log for log in filtered
+            if isinstance(log.get("score"), (int, float)) and min_score <= log["score"] <= max_score
+        ]
+
+    if date_range:
+        start, end = date_range
+        filtered = [
+            log for log in filtered
+            if "promoted_at" in log and _within_date_range(log["promoted_at"], start, end)
+        ]
+
+    if pushed is not None:
+        filtered = [log for log in filtered if log.get("pushed", False) == pushed]
+
+    return filtered
+
+
+def _within_date_range(date_str: str, start: datetime, end: datetime) -> bool:
+    try:
+        dt = datetime.fromisoformat(date_str)
+        return start <= dt <= end
+    except Exception:
+        return False
 
 
 def export_logs_to_csv(logs: List[Dict], output_path: Path):
@@ -82,10 +129,7 @@ def mark_for_reevaluation(strategy_name: str) -> bool:
                         with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as ef:
                             try:
                                 loaded = json.load(ef)
-                                if isinstance(loaded, list):
-                                    eval_data = loaded
-                                else:
-                                    eval_data = [loaded]
+                                eval_data = loaded if isinstance(loaded, list) else [loaded]
                             except json.JSONDecodeError:
                                 pass
                     eval_data.append(data)
