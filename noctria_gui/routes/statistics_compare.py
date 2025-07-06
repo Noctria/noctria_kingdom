@@ -1,6 +1,4 @@
-# routes/statistics_compare.py
-
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
@@ -15,11 +13,13 @@ import io
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 def parse_date(date_str):
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
+
 
 def load_strategy_logs():
     data = []
@@ -32,6 +32,7 @@ def load_strategy_logs():
             except Exception:
                 continue
     return data
+
 
 def compute_comparison(data, mode, keys, from_date=None, to_date=None):
     result = defaultdict(lambda: {"count": 0, "win_sum": 0, "dd_sum": 0})
@@ -81,6 +82,7 @@ def compute_comparison(data, mode, keys, from_date=None, to_date=None):
 
     return sorted(final, key=lambda x: (-x["avg_win"], x["avg_dd"]))
 
+
 def extract_all_keys(data, mode):
     key_set = set()
     for record in data:
@@ -92,31 +94,55 @@ def extract_all_keys(data, mode):
                 key_set.add(name)
     return sorted(list(key_set))
 
-@router.get("/statistics/compare", response_class=HTMLResponse)
-async def compare_statistics(request: Request):
-    params = request.query_params
-    mode = params.get("mode", "tag")
-    keys = params.get(mode + "s", "").split(",")
-    keys = [k.strip() for k in keys if k.strip()]
-    from_date = parse_date(params.get("from"))
-    to_date = parse_date(params.get("to"))
 
+@router.get("/statistics/compare", response_class=HTMLResponse)
+async def compare_statistics_form(request: Request):
+    mode = request.query_params.get("mode", "tag")
     all_data = load_strategy_logs()
-    result = compute_comparison(all_data, mode, keys, from_date, to_date)
     all_keys = extract_all_keys(all_data, mode)
 
     return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
-        "keys": keys,
+        "keys": [],
+        "all_keys": all_keys,
+        "results": [],
+        "filter": {
+            "mode": mode,
+            "from": "",
+            "to": "",
+        }
+    })
+
+
+@router.post("/statistics/compare", response_class=HTMLResponse)
+async def compare_statistics_result(
+    request: Request,
+    mode: str = Form(...),
+    selected_keys: list[str] = Form(default=[]),
+    from_date_str: str = Form(""),
+    to_date_str: str = Form(""),
+):
+    from_date = parse_date(from_date_str)
+    to_date = parse_date(to_date_str)
+
+    all_data = load_strategy_logs()
+    all_keys = extract_all_keys(all_data, mode)
+    result = compute_comparison(all_data, mode, selected_keys, from_date, to_date)
+
+    return templates.TemplateResponse("statistics_compare.html", {
+        "request": request,
+        "mode": mode,
+        "keys": selected_keys,
         "all_keys": all_keys,
         "results": result,
         "filter": {
             "mode": mode,
-            "from": params.get("from", ""),
-            "to": params.get("to", ""),
+            "from": from_date_str,
+            "to": to_date_str,
         }
     })
+
 
 @router.get("/statistics/compare/export")
 async def export_compare_csv(request: Request):
