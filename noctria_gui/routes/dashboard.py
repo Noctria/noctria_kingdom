@@ -1,72 +1,232 @@
-# routes/dashboard.py
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🏰 Noctria Kingdom - 統治ダッシュボード</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body.dark-mode {
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+    }
+    .card.dark-mode {
+      background-color: #2e2e2e;
+      color: #f0f0f0;
+      border: 1px solid #444;
+    }
+    .nav-link.dark-mode {
+      background-color: #333;
+      border: 1px solid #555;
+    }
+    select.dark-mode, button.dark-mode {
+      background-color: #333;
+      color: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏰 Noctria Kingdom - 中央統治ダッシュボード</h1>
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, PUSH_LOG_DIR, PDCA_LOG_DIR
+  <!-- 🌗 ダークモード切替 -->
+  <div style="margin-bottom: 1rem;">
+    <button id="darkModeToggle">🌗 ダークモード切替</button>
+  </div>
 
-from collections import defaultdict
-from datetime import datetime
-import json
-import os
+  <!-- 📊 サマリカード -->
+  <div id="cards" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div class="card">
+      <h2>📈 昇格戦略数</h2>
+      <p><strong>{{ stats.promoted_count }}</strong> 件</p>
+    </div>
+    <div class="card">
+      <h2>📤 Push完了数</h2>
+      <p><strong>{{ stats.push_count }}</strong> 件</p>
+    </div>
+    <div class="card">
+      <h2>🧪 PDCA実行数</h2>
+      <p><strong>{{ stats.pdca_count }}</strong> 件</p>
+    </div>
+    <div class="card">
+      <h2>⚖ 平均勝率</h2>
+      <p><strong>{{ "%.1f"|format(stats.avg_win_rate) }}%</strong></p>
+    </div>
+  </div>
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+  <!-- 📈 昇格・Push件数の時系列グラフ -->
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;" id="graphCard">
+    <h2>📅 昇格・Push数 日次推移</h2>
 
+    <label for="graphMode">表示切替：</label>
+    <select id="graphMode">
+      <option value="both" selected>昇格＋Push</option>
+      <option value="promoted">昇格戦略数のみ</option>
+      <option value="push">Push完了数のみ</option>
+    </select>
 
-def load_logs_by_date(log_dir, extract_score=False):
-    counter = defaultdict(int)
-    win_rate_data = defaultdict(list)
+    <canvas id="logChart" height="80" style="margin-top: 1rem;"></canvas>
+  </div>
 
-    for file in os.listdir(log_dir):
-        if file.endswith(".json"):
-            with open(os.path.join(log_dir, file), "r", encoding="utf-8") as f:
-                data = json.load(f)
-                date_str = data.get("date")
-                if date_str:
-                    try:
-                        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-                        key = date_obj.strftime("%Y-%m-%d")
-                        counter[key] += 1
+  <!-- 📉 勝率推移グラフ -->
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;" id="winCard">
+    <h2>⚖ 勝率の時系列推移</h2>
+    <canvas id="winRateChart" height="80"></canvas>
+  </div>
 
-                        if extract_score:
-                            score = data.get("score", {})
-                            win = score.get("win_rate")
-                            if isinstance(win, (int, float)):
-                                win_rate_data[key].append(win)
-                    except Exception:
-                        continue
-    return counter, win_rate_data
+  <script>
+    // 🌗 ダークモード切替処理
+    const toggleButton = document.getElementById("darkModeToggle");
+    const body = document.body;
+    const cards = document.querySelectorAll(".card");
+    const links = document.querySelectorAll(".nav-link");
+    const select = document.getElementById("graphMode");
 
+    if (localStorage.getItem("darkMode") === "true") enableDarkMode();
 
-@router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    """
-    🏰 統治ダッシュボード
-    - 昇格数、Push数、PDCA数、平均勝率、日次グラフを表示
-    """
-    act_counter, win_rate_data = load_logs_by_date(str(ACT_LOG_DIR), extract_score=True)
-    push_counter, _ = load_logs_by_date(str(PUSH_LOG_DIR))
-    pdca_counter, _ = load_logs_by_date(str(PDCA_LOG_DIR))
+    toggleButton.addEventListener("click", () => {
+      if (body.classList.contains("dark-mode")) {
+        disableDarkMode();
+      } else {
+        enableDarkMode();
+      }
+    });
 
-    all_dates = sorted(set(act_counter.keys()) | set(push_counter.keys()) | set(win_rate_data.keys()))
-    promoted_values = [act_counter.get(d, 0) for d in all_dates]
-    pushed_values = [push_counter.get(d, 0) for d in all_dates]
-    avg_win_rates = [round(sum(win_rate_data[d])/len(win_rate_data[d]), 1) if d in win_rate_data else None for d in all_dates]
-
-    # 平均計算（Noneは除外）
-    flat_win_rates = [w for w in avg_win_rates if w is not None]
-    avg_win = sum(flat_win_rates) / len(flat_win_rates) if flat_win_rates else 0
-
-    stats = {
-        "promoted_count": sum(promoted_values),
-        "push_count": sum(pushed_values),
-        "pdca_count": sum(pdca_counter.values()),
-        "avg_win_rate": avg_win,
-        "dates": all_dates,
-        "promoted_values": promoted_values,
-        "pushed_values": pushed_values,
-        "avg_win_rates": avg_win_rates,
+    function enableDarkMode() {
+      body.classList.add("dark-mode");
+      cards.forEach(c => c.classList.add("dark-mode"));
+      links.forEach(l => l.classList.add("dark-mode"));
+      select.classList.add("dark-mode");
+      toggleButton.classList.add("dark-mode");
+      localStorage.setItem("darkMode", "true");
+      updateChartColors("#f0f0f0");
     }
 
-    return templates.TemplateResponse("dashboard.html", {"request": request, "stats": stats})
+    function disableDarkMode() {
+      body.classList.remove("dark-mode");
+      cards.forEach(c => c.classList.remove("dark-mode"));
+      links.forEach(l => l.classList.remove("dark-mode"));
+      select.classList.remove("dark-mode");
+      toggleButton.classList.remove("dark-mode");
+      localStorage.setItem("darkMode", "false");
+      updateChartColors("#000");
+    }
+
+    function updateChartColors(color) {
+      [logChart, winRateChart].forEach(chart => {
+        chart.options.plugins.title.color = color;
+        chart.options.scales.x.ticks.color = color;
+        chart.options.scales.y.ticks.color = color;
+        chart.options.scales.x.title.color = color;
+        chart.options.scales.y.title.color = color;
+        chart.options.plugins.legend.labels.color = color;
+        chart.update();
+      });
+    }
+
+    // 📊 昇格・Push件数グラフ
+    const ctx = document.getElementById("logChart").getContext("2d");
+    const logChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: {{ stats.dates | tojson }},
+        datasets: [
+          {
+            label: "昇格戦略数",
+            data: {{ stats.promoted_values | tojson }},
+            borderColor: "rgba(75, 192, 192, 1)",
+            backgroundColor: "rgba(75, 192, 192, 0.2)",
+            tension: 0.3,
+            fill: true,
+          },
+          {
+            label: "Push完了数",
+            data: {{ stats.pushed_values | tojson }},
+            borderColor: "rgba(255, 99, 132, 1)",
+            backgroundColor: "rgba(255, 99, 132, 0.2)",
+            tension: 0.3,
+            fill: true,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "top" },
+          title: { display: true, text: "📈 昇格・Push件数（日次）" }
+        },
+        scales: {
+          x: { title: { display: true, text: "日付" } },
+          y: { beginAtZero: true, title: { display: true, text: "件数" } }
+        }
+      }
+    });
+
+    // 🎛 表示切替
+    document.getElementById("graphMode").addEventListener("change", function () {
+      const mode = this.value;
+      logChart.setDatasetVisibility(0, mode !== "push");
+      logChart.setDatasetVisibility(1, mode !== "promoted");
+      logChart.update();
+    });
+
+    // 📉 勝率推移グラフ
+    const winCtx = document.getElementById("winRateChart").getContext("2d");
+    const winRateChart = new Chart(winCtx, {
+      type: "line",
+      data: {
+        labels: {{ stats.dates | tojson }},
+        datasets: [
+          {
+            label: "平均勝率（%）",
+            data: {{ stats.avg_win_rates | tojson }},
+            borderColor: "rgba(153, 102, 255, 1)",
+            backgroundColor: "rgba(153, 102, 255, 0.2)",
+            tension: 0.3,
+            fill: true,
+            spanGaps: true,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "top" },
+          title: { display: true, text: "📉 勝率の時系列推移" }
+        },
+        scales: {
+          x: { title: { display: true, text: "日付" } },
+          y: { beginAtZero: true, max: 100, title: { display: true, text: "勝率（%）" } }
+        }
+      }
+    });
+  </script>
+
+  <!-- 🔗 統治パネルリンク -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+    <a href="/act-history" class="card nav-link" style="text-decoration: none;">
+      <h3>🧾 昇格戦略一覧</h3>
+      <p>Veritasにより昇格された戦略の記録</p>
+    </a>
+    <a href="/push-history" class="card nav-link" style="text-decoration: none;">
+      <h3>📤 GitHub Push履歴</h3>
+      <p>昇格戦略が GitHub に送信された記録</p>
+    </a>
+    <a href="/pdca" class="card nav-link" style="text-decoration: none;">
+      <h3>🔁 PDCA履歴</h3>
+      <p>戦略生成・評価・EA命令の自動実行ログ</p>
+    </a>
+    <a href="/statistics/heatmap" class="card nav-link" style="text-decoration: none;">
+      <h3>🔥 タグ別ヒートマップ</h3>
+      <p>戦略タグ × 勝率・DDの視覚分析</p>
+    </a>
+    <a href="/statistics/ranking" class="card nav-link" style="text-decoration: none;">
+      <h3>🏅 ランキング</h3>
+      <p>タグ別勝率・安定性・件数の比較</p>
+    </a>
+    <a href="/strategies/compare" class="card nav-link" style="text-decoration: none;">
+      <h3>📊 戦略比較</h3>
+      <p>複数戦略の勝率や性能を並列分析</p>
+    </a>
+  </div>
+</body>
+</html>
