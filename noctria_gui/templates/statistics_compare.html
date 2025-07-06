@@ -1,65 +1,10 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>📊 比較分析 - Noctria Kingdom</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: #f4f4f4;
-      color: #222;
-      padding: 2rem;
-      transition: background 0.3s, color 0.3s;
-    }
-    .dark-mode {
-      background: #121212;
-      color: #e0e0e0;
-    }
-    .dark-mode table {
-      background: #1e1e1e;
-      color: #e0e0e0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 2rem;
-      background: #fff;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 0.75rem;
-      border-bottom: 1px solid #ccc;
-    }
-    th {
-      background-color: #e0f0ff;
-    }
-    .dark-mode th {
-      background-color: #2b2b2b;
-    }
-    .button {
-      padding: 0.5rem 1rem;
-      background: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      text-decoration: none;
-      margin-left: 1rem;
-      cursor: pointer;
-    }
-    .dark-mode .button {
-      background: #0098ff;
-    }
-    #darkToggle {
-      float: right;
-    }
-  </style>
-</head>
-<body>
-  <h1>📊 戦略・タグ比較分析
-    <button id="darkToggle" class="button">🌗 切替</button>
-  </h1>
+{# templates/statistics_compare.html #}
+{% extends "base.html" %}
+
+{% block title %}📊 比較分析 - Noctria Kingdom{% endblock %}
+
+{% block content %}
+  <h2>📊 戦略・タグ比較分析</h2>
 
   <!-- 🔍 フィルター -->
   <form method="post" action="/statistics/compare" style="margin-bottom: 1.5rem;">
@@ -181,13 +126,8 @@
       document.getElementById("chartTypeSelect").addEventListener("change", e => {
         renderCharts(e.target.value);
       });
-
-      document.getElementById("darkToggle").addEventListener("click", () => {
-        document.body.classList.toggle("dark-mode");
-      });
     </script>
   {% else %}
     <p>⚠ 比較対象を選択してください。</p>
   {% endif %}
-</body>
-</html>
+{% endblock %}
