@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>📊 タグ別戦略統計ヒートマップ</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f5f5f5;
+      padding: 2rem;
+    }
+    h1 {
+      color: #222;
+      margin-bottom: 1rem;
+    }
+    form {
+      margin-bottom: 2rem;
+    }
+    table {
+      width: 100%;
+      background: #fff;
+      border-collapse: collapse;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 0.75rem;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #e9f2fb;
+    }
+    tr:hover {
+      background-color: #f1f7ff;
+    }
+    a.button {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: #007acc;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 タグ別戦略統計ヒートマップ</h1>
+
+  <!-- 🔍 フィルター -->
+  <form method="get">
+    <label>From: <input type="date" name="from" value="{{ filter.from }}"></label>
+    <label>To: <input type="date" name="to" value="{{ filter.to }}"></label>
+    <label>Tag: <input type="text" name="tag" value="{{ filter.tag }}"></label>
+    <button type="submit">適用</button>
+  </form>
+
+  <!-- 📋 表形式 -->
+  <table>
+    <thead>
+      <tr>
+        <th>🏷 タグ</th>
+        <th>件数</th>
+        <th>平均勝率（%）</th>
+        <th>最大DD（%）</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tag, info in data.items() %}
+      <tr>
+        <td>{{ tag }}</td>
+        <td>{{ info.count }}</td>
+        <td>{{ info.avg_win if info.avg_win is not none else '-' }}</td>
+        <td>{{ info.avg_dd if info.avg_dd is not none else '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">該当するデータがありません。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- 📤 エクスポートリンク -->
+  <a class="button" href="/statistics/heatmap/export?from={{ filter.from }}&to={{ filter.to }}&tag={{ filter.tag }}">CSVエクスポート</a>
+</body>
+</html>
