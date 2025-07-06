@@ -2,36 +2,22 @@
 # coding: utf-8
 
 """
-🌐 Noctria Kingdom GUI 起動スクリプト
+🌐 Noctria Kingdom GUI 起動スクリプト（自動ルート登録対応版）
 - FastAPIにより王国の統治パネルを展開
+- `noctria_gui.routes/` 配下の全ルートを自動検出・登録
 """
 
+import json
+import importlib
+import pkgutil
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-import json
 
 # ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-
-# ✅ 統治ルートの招集
-from noctria_gui.routes import (
-    home_routes,
-    strategy_routes,
-    strategy_detail,
-    strategy_compare,         # 📊 戦略比較
-    tag_summary,
-    tag_summary_detail,
-    tag_heatmap,              # 🔥 タグ × 指標ヒートマップ
-    statistics,               # 📈 統計スコアダッシュボード
-    act_history,              # 📜 昇格戦略ログ
-    act_history_detail,       # 📄 昇格ログの詳細表示
-    push_history,             # 📦 GitHub Pushログ
-    upload,                   # ⬆️ 戦略アップロード
-    upload_history,           # 🧭 アップロード履歴
-    pdca                      # 🔁 PDCAダッシュボード
-)
+import noctria_gui.routes  # ルート自動探索用
 
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
@@ -59,18 +45,20 @@ templates.env.filters["from_json"] = from_json
 # ✅ テンプレート環境を app.state に格納（共通アクセス用）
 app.state.templates = templates
 
-# ✅ 各ルートを FastAPI アプリに結合
-app.include_router(home_routes.router)
-app.include_router(strategy_routes.router)
-app.include_router(strategy_detail.router)
-app.include_router(strategy_compare.router)       # 📊 /strategies/compare
-app.include_router(tag_summary.router)
-app.include_router(tag_summary_detail.router)
-app.include_router(tag_heatmap.router)            # 🔥 /tag-heatmap
-app.include_router(statistics.router)             # 📈 /statistics
-app.include_router(act_history.router)            # 📜 /act-history
-app.include_router(act_history_detail.router)     # 📄 /act-history/detail
-app.include_router(push_history.router)           # 📦 /push-history
-app.include_router(upload.router)                 # ⬆️ /upload
-app.include_router(upload_history.router)         # 🧭 /upload-history
-app.include_router(pdca.router)                   # 🔁 /pdca
+# ========================================
+# 🔁 ルート自動登録（routes/*.py を動的に include）
+# ========================================
+routes_package = noctria_gui.routes
+package_path = Path(routes_package.__file__).parent
+
+for _, module_name, is_pkg in pkgutil.iter_modules([str(package_path)]):
+    if is_pkg or module_name.startswith("_"):
+        continue  # サブパッケージや __init__ は除外
+    try:
+        full_module_name = f"{routes_package.__name__}.{module_name}"
+        module = importlib.import_module(full_module_name)
+        if hasattr(module, "router"):
+            app.include_router(module.router)
+            print(f"✅ ルート登録: {full_module_name}")
+    except Exception as e:
+        print(f"⚠️ ルート登録失敗: {module_name} - {e}")
