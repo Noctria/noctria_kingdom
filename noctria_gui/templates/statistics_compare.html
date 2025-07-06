@@ -46,6 +46,7 @@
       border-radius: 4px;
       text-decoration: none;
       margin-left: 1rem;
+      cursor: pointer;
     }
     .dark-mode .button {
       background: #0098ff;
@@ -61,27 +62,31 @@
   </h1>
 
   <!-- 🔍 フィルター -->
-  <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
-    <input type="hidden" name="mode" value="{{ mode }}">
+  <form method="post" action="/statistics/compare" style="margin-bottom: 1.5rem;">
+    <label>📌 モード選択：</label>
+    <select name="mode">
+      <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
+      <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+    </select>
 
-    <label>📅 期間指定：</label>
-    <input type="date" name="from" value="{{ filter.from }}">
+    <label style="margin-left: 1rem;">📅 期間：</label>
+    <input type="date" name="from_date_str" value="{{ filter.from }}">
     〜
-    <input type="date" name="to" value="{{ filter.to }}">
+    <input type="date" name="to_date_str" value="{{ filter.to }}">
 
     <div style="margin: 1rem 0;">
       <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
       <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
         {% for k in all_keys %}
           <label style="display: inline-block; margin-right: 1rem;">
-            <input type="checkbox" name="{{ mode }}s" value="{{ k }}" {% if k in keys %}checked{% endif %}>
+            <input type="checkbox" name="selected_keys" value="{{ k }}" {% if k in keys %}checked{% endif %}>
             {{ k }}
           </label>
         {% endfor %}
       </div>
     </div>
 
-    <button type="submit">📥 表示</button>
+    <button type="submit" class="button">📥 表示</button>
     {% if keys %}
       <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSVエクスポート</a>
     {% endif %}
