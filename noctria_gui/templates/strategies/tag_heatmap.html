@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>🔥 タグ別戦略指標ヒートマップ</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
@@ -17,7 +17,14 @@
     }
     canvas {
       max-width: 1000px;
-      margin: auto;
+      margin: 2rem auto;
+      display: block;
+    }
+    a {
+      display: inline-block;
+      margin-top: 2rem;
+      text-decoration: none;
+      color: #007acc;
     }
   </style>
 </head>
@@ -36,20 +43,37 @@
       num_trades: "取引数"
     };
 
+    // 🟩 カラー強調ロジック（勝率は緑、高DDは赤、取引数は青寄り）
+    function getColor(metric, value) {
+      if (metric === "win_rate") {
+        const hue = Math.min(120, value * 1.2);  // 緑系
+        return `hsl(${hue}, 70%, 75%)`;
+      }
+      if (metric === "max_drawdown") {
+        const hue = 0;  // 赤固定
+        const lightness = 95 - Math.min(80, value * 1.5);  // DDが高いほど濃く
+        return `hsl(${hue}, 70%, ${lightness}%)`;
+      }
+      if (metric === "num_trades") {
+        const hue = 210;  // 青系
+        const lightness = 95 - Math.min(70, value / 3);  // 多いほど濃く
+        return `hsl(${hue}, 60%, ${lightness}%)`;
+      }
+      return "#ccc";
+    }
+
     const datasets = metrics.map(metric => ({
       label: displayLabels[metric],
       data: stats.map(s => s[metric] || 0),
-      backgroundColor: stats.map(s => {
-        const value = s[metric] || 0;
-        const intensity = Math.min(1, value / (metric === "win_rate" ? 100 : metric === "max_drawdown" ? 50 : 100));
-        const hue = 120 * intensity;
-        return `hsl(${hue}, 70%, 75%)`;
-      }),
+      backgroundColor: stats.map(s => getColor(metric, s[metric] || 0)),
       datalabels: {
         color: "#000",
         anchor: "center",
         align: "center",
-        formatter: (v) => metric === "num_trades" ? `${v}` : `${v.toFixed(2)}`
+        formatter: (v) => {
+          if (v == null) return "―";
+          return metric === "num_trades" ? `${v}` : `${v.toFixed(2)}`;
+        }
       }
     }));
 
@@ -57,6 +81,9 @@
       labels: tags,
       datasets: datasets
     };
+
+    // ✅ Chart.js 登録（Datalabelsプラグイン明示）
+    Chart.register(ChartDataLabels);
 
     new Chart(document.getElementById("heatmapCanvas"), {
       type: "bar",
@@ -70,13 +97,20 @@
             text: "タグ × 指標 ヒートマップ",
             font: { size: 18 }
           },
+          legend: {
+            position: 'top'
+          },
           datalabels: {
             clamp: true
-          },
-          legend: { position: 'top' }
+          }
         },
         scales: {
-          x: { beginAtZero: true }
+          x: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 10
+            }
+          }
         }
       },
       plugins: [ChartDataLabels]
