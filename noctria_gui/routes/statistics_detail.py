@@ -19,9 +19,13 @@ def parse_date_safe(s):
         return None
 
 @router.get("/statistics/detail", response_class=HTMLResponse)
-async def detail_view(request: Request, mode: str = "tag", key: str = ""):
+async def detail_view(request: Request, mode: str = "tag", key: str = "", sort_by: str = "date", order: str = "asc"):
     if mode not in ("tag", "strategy"):
         raise HTTPException(status_code=400, detail="Invalid mode")
+    if sort_by not in ("date", "win_rate", "max_drawdown"):
+        raise HTTPException(status_code=400, detail="Invalid sort_by")
+    if order not in ("asc", "desc"):
+        raise HTTPException(status_code=400, detail="Invalid order")
 
     records = []
     for path in ACT_LOG_DIR.glob("*.json"):
@@ -39,7 +43,6 @@ async def detail_view(request: Request, mode: str = "tag", key: str = ""):
         except:
             continue
 
-    records.sort(key=lambda x: x[0])
     results = []
     for date, record in records:
         score = record.get("score", {})
@@ -49,9 +52,14 @@ async def detail_view(request: Request, mode: str = "tag", key: str = ""):
             "max_drawdown": score.get("max_drawdown")
         })
 
+    reverse = order == "desc"
+    results.sort(key=lambda x: x.get(sort_by) if sort_by != "date" else parse_date_safe(x["date"]), reverse=reverse)
+
     return templates.TemplateResponse("statistics_detail.html", {
         "request": request,
         "mode": mode,
         "key": key,
-        "results": results
+        "results": results,
+        "sort_by": sort_by,
+        "order": order
     })
