@@ -39,11 +39,11 @@
   </thead>
   <tbody>
     {% for row in results %}
-      <tr>
-        <td>{{ row.date }}</td>
-        <td>{{ row.win_rate }}</td>
-        <td>{{ row.max_drawdown }}</td>
-      </tr>
+    <tr>
+      <td>{{ row.date }}</td>
+      <td>{{ row.win_rate }}</td>
+      <td>{{ row.max_drawdown }}</td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>
@@ -69,15 +69,19 @@
   <button class="button" onclick="downloadChart('ddHistogram', 'dd_histogram.png')">💾 最大DDヒストグラム保存</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   const rawData = {{ results | tojson }};
-  let winChart, ddChart;
+  let winChart = null;
+  let ddChart = null;
 
-  function renderHistogram(data, canvasId, label, color, binCount = 10) {
-    const values = data.filter(v => typeof v === 'number');
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const step = (max - min) / binCount;
+  function renderHistogram(values, canvasId, label, color, binCount = 10) {
+    const filtered = values.filter(v => typeof v === 'number' && !isNaN(v));
+    if (filtered.length === 0) return;
+
+    const min = Math.min(...filtered);
+    const max = Math.max(...filtered);
+    const step = (max - min) / binCount || 1;
 
     const bins = Array(binCount).fill(0);
     const labels = [];
@@ -85,17 +89,17 @@
     for (let i = 0; i < binCount; i++) {
       const start = min + step * i;
       const end = start + step;
-      labels.push(`${start.toFixed(1)}-${end.toFixed(1)}`);
+      labels.push(`${start.toFixed(1)}〜${end.toFixed(1)}`);
     }
 
-    values.forEach(v => {
-      const index = Math.min(Math.floor((v - min) / step), binCount - 1);
-      bins[index]++;
+    filtered.forEach(v => {
+      const idx = Math.min(Math.floor((v - min) / step), binCount - 1);
+      bins[idx]++;
     });
 
     const ctx = document.getElementById(canvasId).getContext("2d");
-    if (canvasId === 'winHistogram' && winChart) winChart.destroy();
-    if (canvasId === 'ddHistogram' && ddChart) ddChart.destroy();
+    if (canvasId === "winHistogram" && winChart) winChart.destroy();
+    if (canvasId === "ddHistogram" && ddChart) ddChart.destroy();
 
     const chart = new Chart(ctx, {
       type: "bar",
@@ -110,24 +114,34 @@
       options: {
         responsive: true,
         plugins: {
-          legend: { display: false }
+          legend: { display: false },
         },
         scales: {
-          y: { beginAtZero: true }
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1,
+              precision: 0,
+              color: "#444"
+            }
+          },
+          x: {
+            ticks: { color: "#444" }
+          }
         }
       }
     });
 
-    if (canvasId === 'winHistogram') winChart = chart;
-    if (canvasId === 'ddHistogram') ddChart = chart;
+    if (canvasId === "winHistogram") winChart = chart;
+    if (canvasId === "ddHistogram") ddChart = chart;
   }
 
   function drawAllHistograms() {
     const binCount = parseInt(document.getElementById("binCountSelect").value);
-    const winData = rawData.map(r => r.win_rate);
-    const ddData = rawData.map(r => r.max_drawdown);
-    renderHistogram(winData, "winHistogram", "勝率分布", "rgba(54, 162, 235, 0.7)", binCount);
-    renderHistogram(ddData, "ddHistogram", "最大DD分布", "rgba(255, 99, 132, 0.7)", binCount);
+    const winRates = rawData.map(r => Number(r.win_rate));
+    const drawdowns = rawData.map(r => Number(r.max_drawdown));
+    renderHistogram(winRates, "winHistogram", "勝率分布", "rgba(54, 162, 235, 0.7)", binCount);
+    renderHistogram(drawdowns, "ddHistogram", "最大DD分布", "rgba(255, 99, 132, 0.7)", binCount);
   }
 
   document.getElementById("binCountSelect").addEventListener("change", drawAllHistograms);
@@ -135,8 +149,8 @@
 
   function downloadChart(canvasId, filename) {
     const canvas = document.getElementById(canvasId);
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png", 1.0);
     link.download = filename;
     link.click();
   }
