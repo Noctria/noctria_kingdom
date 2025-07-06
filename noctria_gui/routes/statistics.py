@@ -31,27 +31,27 @@ async def show_statistics(request: Request):
     end_date = request.query_params.get("end_date", "").strip() or None
 
     try:
-        all_logs = statistics_service.load_all_logs()
-        filtered_logs = statistics_service.filter_logs(
-            logs=all_logs,
+        logs = statistics_service.load_all_logs()
+        filtered = statistics_service.filter_logs(
+            logs=logs,
             strategy=strategy,
             symbol=symbol,
             start_date=start_date,
             end_date=end_date
         )
         sorted_logs = statistics_service.sort_logs(
-            logs=filtered_logs,
+            logs=filtered,
             sort_key="win_rate",
             descending=True
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"統計データの処理中にエラーが発生しました: {e}")
 
-    return templates.TemplateResponse("statistics_dashboard.html", {
+    return templates.TemplateResponse("statistics/statistics_dashboard.html", {
         "request": request,
         "statistics": sorted_logs,
-        "strategies": statistics_service.get_available_strategies(all_logs),
-        "symbols": statistics_service.get_available_symbols(all_logs),
+        "strategies": statistics_service.get_available_strategies(logs),
+        "symbols": statistics_service.get_available_symbols(logs),
         "filters": {
             "strategy": strategy or "",
             "symbol": symbol or "",
@@ -70,9 +70,9 @@ async def export_statistics_csv():
     output_path = TOOLS_DIR / f"strategy_statistics_{timestamp}.csv"
 
     try:
-        all_logs = statistics_service.load_all_logs()
+        logs = statistics_service.load_all_logs()
         sorted_logs = statistics_service.sort_logs(
-            logs=all_logs,
+            logs=logs,
             sort_key="win_rate",
             descending=True
         )

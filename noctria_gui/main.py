@@ -12,12 +12,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json
-import importlib
 
 # ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ✅ GUIルートモジュール（自動生成された __init__.py を通じてアクセス）
+# ✅ GUIルートモジュール（__init__.pyで router 一覧を構築）
 import noctria_gui.routes as routes_pkg
 
 # ========================================
@@ -47,9 +46,12 @@ templates.env.filters["from_json"] = from_json
 app.state.templates = templates
 
 # ========================================
-# 🔁 ルーター自動登録
+# 🔁 ルーターの自動登録（__init__.py内で構築された routers を利用）
 # ========================================
-for attr_name in dir(routes_pkg):
-    attr = getattr(routes_pkg, attr_name)
-    if hasattr(attr, "router"):
-        app.include_router(attr.router)
+
+if hasattr(routes_pkg, "routers"):
+    for router in routes_pkg.routers:
+        app.include_router(router)
+        print(f"🔗 router 統合: {router.tags}")
+else:
+    print("⚠️ noctria_gui.routes に routers が定義されていません")
