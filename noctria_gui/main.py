@@ -25,12 +25,12 @@ from noctria_gui.routes import (
     tag_summary_detail,
     tag_heatmap,              # 🔥 タグ × 指標ヒートマップ
     statistics,               # 📈 統計スコアボード
-    act_history,
-    push_history,
-    logs_routes,
-    upload,
-    upload_history,
-    pdca
+    act_history,              # 📜 昇格戦略ログ
+    push_history,             # 📦 GitHub Pushログ
+    logs_routes,              # 🧾 ログ全般
+    upload,                   # ⬆️ 戦略アップロード
+    upload_history,           # 🧭 アップロード履歴
+    pdca                      # 🔁 PDCAダッシュボード
 )
 
 # ========================================
@@ -68,8 +68,8 @@ app.include_router(tag_summary.router)
 app.include_router(tag_summary_detail.router)
 app.include_router(tag_heatmap.router)          # ✅ /tag-heatmap
 app.include_router(statistics.router)           # ✅ /statistics
-app.include_router(act_history.router)
-app.include_router(push_history.router)
+app.include_router(act_history.router)          # ✅ /act-history
+app.include_router(push_history.router)         # ✅ /push-history
 app.include_router(logs_routes.router)
 app.include_router(upload.router)
 app.include_router(upload_history.router)
