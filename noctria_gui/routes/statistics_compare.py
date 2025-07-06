@@ -1,17 +1,13 @@
-# routes/statistics_compare.py
+# routes/statistics_compare.py（抜粋、エクスポート部含む全体）
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
-
-import os
-import json
-from datetime import datetime
 from collections import defaultdict
-import csv
-import io
 from statistics import mean, median
+import os, json, csv, io
+from datetime import datetime
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -19,134 +15,119 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 def parse_date(date_str):
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
-    except Exception:
+    except:
         return None
 
 def load_strategy_logs():
     data = []
     for file in os.listdir(ACT_LOG_DIR):
         if file.endswith(".json"):
-            try:
-                with open(ACT_LOG_DIR / file, "r", encoding="utf-8") as f:
-                    record = json.load(f)
-                data.append(record)
-            except Exception:
-                continue
+            with open(os.path.join(ACT_LOG_DIR, file), "r") as f:
+                try:
+                    data.append(json.load(f))
+                except:
+                    continue
     return data
 
-def compute_comparison(data, mode, keys, from_date=None, to_date=None, sort_mode="score"):
-    result = defaultdict(lambda: {"count": 0, "win_sum": 0, "dd_sum": 0})
-
-    for record in data:
-        try:
-            date_str = record.get("date")
-            if not date_str:
-                continue
-            date = datetime.strptime(date_str, "%Y-%m-%d")
-            if from_date and date < from_date:
-                continue
-            if to_date and date > to_date:
-                continue
-
-            score = record.get("score", {})
-            win = score.get("win_rate")
-            dd = score.get("max_drawdown")
-
-            if mode == "tag":
-                record_keys = record.get("tags", [])
-            else:
-                record_keys = [record.get("strategy_name")]
-
-            for key in record_keys:
-                if key not in keys:
-                    continue
-                result[key]["count"] += 1
-                if isinstance(win, (int, float)):
-                    result[key]["win_sum"] += win
-                if isinstance(dd, (int, float)):
-                    result[key]["dd_sum"] += dd
-        except Exception:
-            continue
-
-    final = []
-    for k in keys:
-        if k not in result:
-            continue
-        v = result[k]
-        count = v["count"]
-        avg_win = round(v["win_sum"] / count, 1) if count else 0
-        avg_dd = round(v["dd_sum"] / count, 1) if count else 0
-        final.append({
-            "key": k,
-            "avg_win": avg_win,
-            "avg_dd": avg_dd,
-            "count": count
-        })
-
-    if sort_mode == "score":
-        final.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
-    elif sort_mode == "check":
-        final = sorted(final, key=lambda x: keys.index(x["key"]))  # preserve user order
-
-    return final
-
-def compute_summary_stats(results):
-    if not results:
-        return {
-            "avg_win_mean": 0, "avg_win_median": 0,
-            "avg_dd_mean": 0, "avg_dd_median": 0,
-            "total_count": 0
-        }
-
-    win_rates = [r["avg_win"] for r in results]
-    dd_rates = [r["avg_dd"] for r in results]
-    counts = [r["count"] for r in results]
-
-    return {
-        "avg_win_mean": round(mean(win_rates), 1),
-        "avg_win_median": round(median(win_rates), 1),
-        "avg_dd_mean": round(mean(dd_rates), 1),
-        "avg_dd_median": round(median(dd_rates), 1),
-        "total_count": sum(counts)
-    }
-
-def extract_all_keys(data, mode):
-    key_set = set()
-    for record in data:
-        if mode == "tag":
-            key_set.update(record.get("tags", []))
-        else:
-            name = record.get("strategy_name")
-            if name:
-                key_set.add(name)
-    return sorted(list(key_set))
-
 @router.get("/statistics/compare", response_class=HTMLResponse)
-async def compare_statistics(request: Request):
-    params = request.query_params
-    mode = params.get("mode", "tag")
-    sort = params.get("sort", "score")
-    keys = params.get(mode + "s", "").split(",")
-    keys = [k.strip() for k in keys if k.strip()]
-    from_date = parse_date(params.get("from"))
-    to_date = parse_date(params.get("to"))
-
+async def compare(request: Request):
+    mode = request.query_params.get("mode", "strategy")
+    from_date = parse_date(request.query_params.get("from"))
+    to_date = parse_date(request.query_params.get("to"))
     all_data = load_strategy_logs()
-    result = compute_comparison(all_data, mode, keys, from_date, to_date, sort)
-    all_keys = extract_all_keys(all_data, mode)
-    summary = compute_summary_stats(result)
+
+    filtered = []
+    for d in all_data:
+        ts = parse_date(d.get("timestamp", "")[:10])
+        if from_date and ts and ts < from_date:
+            continue
+        if to_date and ts and ts > to_date:
+            continue
+        filtered.append(d)
+
+    # 集約
+    stat_map = defaultdict(lambda: defaultdict(list))
+    for entry in filtered:
+        keys = [entry["strategy_name"]] if mode == "strategy" else entry.get("tags", [])
+        for key in keys:
+            for k, v in entry.get("scores", {}).items():
+                stat_map[key][k].append(v)
+
+    # 整形
+    results = []
+    for key, scores in stat_map.items():
+        flat = { "name": key }
+        for metric, values in scores.items():
+            flat[f"{metric}_mean"] = round(mean(values), 3)
+            flat[f"{metric}_median"] = round(median(values), 3)
+        results.append(flat)
 
     return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
-        "keys": keys,
-        "all_keys": all_keys,
-        "results": result,
-        "summary": summary,
-        "sort": sort,
-        "filter": {
-            "mode": mode,
-            "from": params.get("from", ""),
-            "to": params.get("to", "")
-        }
+        "data": results,
+        "filter": { "from": request.query_params.get("from", ""), "to": request.query_params.get("to", "") },
+    })
+
+@router.get("/statistics/compare/export")
+async def export_csv(request: Request):
+    mode = request.query_params.get("mode", "strategy")
+    from_date = parse_date(request.query_params.get("from"))
+    to_date = parse_date(request.query_params.get("to"))
+    all_data = load_strategy_logs()
+
+    filtered = []
+    for d in all_data:
+        ts = parse_date(d.get("timestamp", "")[:10])
+        if from_date and ts and ts < from_date:
+            continue
+        if to_date and ts and ts > to_date:
+            continue
+        filtered.append(d)
+
+    stat_map = defaultdict(lambda: defaultdict(list))
+    for entry in filtered:
+        keys = [entry["strategy_name"]] if mode == "strategy" else entry.get("tags", [])
+        for key in keys:
+            for k, v in entry.get("scores", {}).items():
+                stat_map[key][k].append(v)
+
+    rows = []
+    headers = ["name"]
+    metric_names = set()
+    for key, scores in stat_map.items():
+        row = {"name": key}
+        for metric, values in scores.items():
+            m = round(mean(values), 3)
+            med = round(median(values), 3)
+            row[f"{metric}_mean"] = m
+            row[f"{metric}_median"] = med
+            metric_names.update([f"{metric}_mean", f"{metric}_median"])
+        rows.append(row)
+
+    headers.extend(sorted(metric_names))
+
+    # 統計行追加
+    summary_mean = {"name": "📊 平均"}
+    summary_median = {"name": "📊 中央値"}
+    for metric in metric_names:
+        values = [row[metric] for row in rows if metric in row]
+        if values:
+            summary_mean[metric] = round(mean(values), 3)
+            summary_median[metric] = round(median(values), 3)
+        else:
+            summary_mean[metric] = ""
+            summary_median[metric] = ""
+
+    rows.extend([summary_mean, summary_median])
+
+    # CSV 出力
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(rows)
+    output.seek(0)
+
+    return StreamingResponse(output, media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename=compare_result.csv"
     })
