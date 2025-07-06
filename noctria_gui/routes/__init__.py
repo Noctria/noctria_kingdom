@@ -1,30 +1,30 @@
-#!/usr/bin/env python3
-# coding: utf-8
+# noctria_gui/routes/__init__.py
 
 """
-🔗 Noctria GUI ルート統合モジュール
-- 各ページ用ルーターの一括読み込みと登録
+📦 noctria_gui.routes
+- routes/ 以下の *.py モジュールから router を自動収集する
 """
 
-from . import home_routes
-from . import strategy_routes
-from . import pdca
-from . import upload
-from . import upload_history
-from . import act_history
-from . import act_history_detail
-from . import push_history
-from . import strategy_compare
+import importlib
+import pkgutil
 
-# ルートを app.include_router() で登録する側（main.py）から読み込まれる前提
-routers = [
-    home_routes.router,
-    strategy_routes.router,
-    pdca.router,
-    upload.router,
-    upload_history.router,
-    act_history.router,
-    act_history_detail.router,
-    push_history.router,
-    strategy_compare.router,
-]
+# すべての router を格納するリスト
+routers = []
+
+# このパッケージのパスを取得
+__path__ = __path__  # required for pkgutil
+
+# 自動インポート処理
+for _, module_name, _ in pkgutil.iter_modules(__path__):
+    if module_name.startswith("_"):
+        continue  # __init__.py や非公開モジュールは除外
+
+    try:
+        mod = importlib.import_module(f"{__name__}.{module_name}")
+        if hasattr(mod, "router"):
+            routers.append(mod.router)
+            print(f"✅ router 読込: {module_name}")
+        else:
+            print(f"⚠️ router 未定義: {module_name}")
+    except Exception as e:
+        print(f"❌ ルーターインポート失敗: {module_name} - {e}")
