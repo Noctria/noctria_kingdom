@@ -1,171 +1,149 @@
-# routes/statistics_compare.py
+{% extends "base.html" %}
+{% block title %}📊 比較分析 - Noctria Kingdom{% endblock %}
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
+{% block content %}
+<h2>📊 戦略・タグ比較分析</h2>
 
-import os
-import json
-from datetime import datetime
-from collections import defaultdict
-import csv
-import io
+<!-- 🔍 フィルター（GET） -->
+<form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
+  <label>📌 モード選択：</label>
+  <select name="mode">
+    <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
+    <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+  </select>
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+  <label style="margin-left: 1rem;">📅 期間：</label>
+  <input type="date" name="from" value="{{ filter.from }}">
+  〜
+  <input type="date" name="to" value="{{ filter.to }}">
 
+  <label style="margin-left: 1rem;">🔽 ソート：</label>
+  <select name="sort">
+    <option value="score" {% if sort == "score" %}selected{% endif %}>📈 勝率・DD順</option>
+    <option value="check" {% if sort == "check" %}selected{% endif %}>🗂 チェック順</option>
+  </select>
 
-def parse_date(date_str):
-    try:
-        return datetime.strptime(date_str, "%Y-%m-%d")
-    except Exception:
-        return None
+  <!-- ✅ 比較対象選択 -->
+  <div style="margin: 1rem 0;">
+    <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
+    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
+      <button type="button" class="button" onclick="selectAll(true)">✅ 全選択</button>
+      <button type="button" class="button" onclick="selectAll(false)">❌ 全解除</button>
+      <span style="margin-left: 1rem;">✅ 選択数: <span id="selectedCount">0</span></span><br><br>
+      {% for k in all_keys %}
+        <label style="display: inline-block; margin-right: 1rem;">
+          <input type="checkbox" name="{{ mode }}s" value="{{ k }}" {% if k in keys %}checked{% endif %} onchange="updateCount()">
+          {{ k }}
+        </label>
+      {% endfor %}
+    </div>
+  </div>
 
+  <button type="submit" class="button">📥 表示</button>
+  {% if keys %}
+    <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&sort={{ sort }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSV出力</a>
+  {% endif %}
+</form>
 
-def load_strategy_logs():
-    data = []
-    for file in os.listdir(ACT_LOG_DIR):
-        if file.endswith(".json"):
-            try:
-                with open(ACT_LOG_DIR / file, "r", encoding="utf-8") as f:
-                    record = json.load(f)
-                data.append(record)
-            except Exception:
-                continue
-    return data
+<!-- 🔗 URL共有 -->
+{% if keys %}
+  <div style="margin-top: 1rem;">
+    <label>🔗 現在のURL（共有可）:</label><br>
+    <input id="shareUrl" type="text" readonly style="width: 90%;" value="{{ request.url }}" />
+    <button class="button" onclick="copyUrl()">📋 コピー</button>
+  </div>
+  <script>
+    function copyUrl() {
+      const input = document.getElementById("shareUrl");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand("copy");
+      alert("URLをコピーしました！");
+    }
+  </script>
+{% endif %}
 
+<!-- 📊 結果表示 -->
+{% if results %}
+  <label>📈 表示形式:</label>
+  <select id="chartTypeSelect">
+    <option value="bar">棒グラフ</option>
+    <option value="line">折れ線グラフ</option>
+    <option value="radar">レーダーチャート</option>
+  </select>
 
-def compute_comparison(data, mode, keys, from_date=None, to_date=None):
-    result = defaultdict(lambda: {"count": 0, "win_sum": 0, "dd_sum": 0})
+  <table>
+    <thead>
+      <tr>
+        <th>比較対象</th>
+        <th>平均勝率（%）</th>
+        <th>平均DD（%）</th>
+        <th>件数</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in results %}
+        <tr>
+          <td>
+            <a href="/statistics/detail?mode={{ mode }}&key={{ row.key | urlencode }}&sort_by=date&order=desc">
+              {{ row.key }}
+            </a>
+          </td>
+          <td>{{ row.avg_win }}</td>
+          <td>{{ row.avg_dd }}</td>
+          <td>{{ row.count }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
-    for record in data:
-        try:
-            date_str = record.get("date")
-            if not date_str:
-                continue
-            date = datetime.strptime(date_str, "%Y-%m-%d")
-            if from_date and date < from_date:
-                continue
-            if to_date and date > to_date:
-                continue
+  <!-- 📈 グラフ表示 -->
+  <canvas id="winChart" height="100"></canvas>
+  <canvas id="ddChart" height="100"></canvas>
 
-            score = record.get("score", {})
-            win = score.get("win_rate")
-            dd = score.get("max_drawdown")
+  <script>
+    const labels = {{ results | map(attribute='key') | list | tojson }};
+    const winRates = {{ results | map(attribute='avg_win') | list | tojson }};
+    const ddRates = {{ results | map(attribute='avg_dd') | list | tojson }};
+    let winChartInstance, ddChartInstance;
 
-            if mode == "tag":
-                record_keys = record.get("tags", [])
-            else:
-                record_keys = [record.get("strategy_name")]
+    function renderCharts(type) {
+      if (winChartInstance) winChartInstance.destroy();
+      if (ddChartInstance) ddChartInstance.destroy();
 
-            for key in record_keys:
-                if key not in keys:
-                    continue
-                result[key]["count"] += 1
-                if isinstance(win, (int, float)):
-                    result[key]["win_sum"] += win
-                if isinstance(dd, (int, float)):
-                    result[key]["dd_sum"] += dd
-        except Exception:
-            continue
-
-    final = []
-    for k, v in result.items():
-        count = v["count"]
-        avg_win = round(v["win_sum"] / count, 1) if count else 0
-        avg_dd = round(v["dd_sum"] / count, 1) if count else 0
-        final.append({
-            "key": k,
-            "avg_win": avg_win,
-            "avg_dd": avg_dd,
-            "count": count
-        })
-
-    return final
-
-
-def extract_all_keys(data, mode):
-    key_set = set()
-    for record in data:
-        if mode == "tag":
-            key_set.update(record.get("tags", []))
-        else:
-            name = record.get("strategy_name")
-            if name:
-                key_set.add(name)
-    return sorted(list(key_set))
-
-
-@router.get("/statistics/compare", response_class=HTMLResponse)
-async def compare_statistics(request: Request):
-    params = request.query_params
-    mode = params.get("mode", "tag")
-    sort = params.get("sort", "score")
-
-    keys = params.getlist(f"{mode}s")
-    keys = [k.strip() for k in keys if k.strip()]
-
-    from_date = parse_date(params.get("from"))
-    to_date = parse_date(params.get("to"))
-
-    all_data = load_strategy_logs()
-    result = compute_comparison(all_data, mode, keys, from_date, to_date)
-
-    if sort == "check":
-        # 入力された keys の順に並べる
-        key_order = {k: i for i, k in enumerate(keys)}
-        result.sort(key=lambda x: key_order.get(x["key"], 9999))
-    else:
-        # スコア順（勝率降順・DD昇順）
-        result.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
-
-    all_keys = extract_all_keys(all_data, mode)
-
-    return templates.TemplateResponse("statistics_compare.html", {
-        "request": request,
-        "mode": mode,
-        "keys": keys,
-        "all_keys": all_keys,
-        "results": result,
-        "filter": {
-            "mode": mode,
-            "from": params.get("from", ""),
-            "to": params.get("to", "")
+      winChartInstance = new Chart(document.getElementById('winChart'), {
+        type,
+        data: {
+          labels,
+          datasets: [{ label: '平均勝率（%）', data: winRates, backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgba(54, 162, 235, 1)', fill: type !== 'line', tension: 0.2 }]
         },
-        "sort": sort
-    })
+        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+      });
 
+      ddChartInstance = new Chart(document.getElementById('ddChart'), {
+        type,
+        data: {
+          labels,
+          datasets: [{ label: '平均DD（%）', data: ddRates, backgroundColor: 'rgba(255, 99, 132, 0.7)', borderColor: 'rgba(255, 99, 132, 1)', fill: type !== 'line', tension: 0.2 }]
+        },
+        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+      });
+    }
 
-@router.get("/statistics/compare/export")
-async def export_compare_csv(request: Request):
-    params = request.query_params
-    mode = params.get("mode", "tag")
-    sort = params.get("sort", "score")
-    keys = params.getlist(f"{mode}s")
-    keys = [k.strip() for k in keys if k.strip()]
-    from_date = parse_date(params.get("from"))
-    to_date = parse_date(params.get("to"))
+    renderCharts("bar");
+    document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
 
-    all_data = load_strategy_logs()
-    result = compute_comparison(all_data, mode, keys, from_date, to_date)
-
-    if sort == "check":
-        key_order = {k: i for i, k in enumerate(keys)}
-        result.sort(key=lambda x: key_order.get(x["key"], 9999))
-    else:
-        result.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
-
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["比較対象", "平均勝率（%）", "平均DD（%）", "件数"])
-    for row in result:
-        writer.writerow([row["key"], row["avg_win"], row["avg_dd"], row["count"]])
-    buffer.seek(0)
-
-    filename = f"compare_export_{mode}.csv"
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    function selectAll(flag) {
+      document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = flag);
+      updateCount();
+    }
+    function updateCount() {
+      const count = [...document.querySelectorAll('input[type="checkbox"]')].filter(cb => cb.checked).length;
+      document.getElementById("selectedCount").textContent = count;
+    }
+    window.onload = updateCount;
+  </script>
+{% else %}
+  <p>⚠ 比較対象を選択してください。</p>
+{% endif %}
+{% endblock %}
