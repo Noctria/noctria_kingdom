@@ -4,14 +4,48 @@
 {% block content %}
 <h2>📄 詳細表示（{{ "戦略" if mode == "strategy" else "タグ" }}）: {{ key }}</h2>
 
+<!-- 🔽 ソート選択 -->
+<form method="get" action="/statistics/detail" style="margin-bottom: 1rem;">
+  <input type="hidden" name="mode" value="{{ mode }}">
+  <input type="hidden" name="key" value="{{ key }}">
+
+  <label>🔃 並び順:</label>
+  <select name="sort_by">
+    <option value="date" {% if sort_by == 'date' %}selected{% endif %}>📅 日付</option>
+    <option value="win_rate" {% if sort_by == 'win_rate' %}selected{% endif %}>📈 勝率</option>
+    <option value="max_drawdown" {% if sort_by == 'max_drawdown' %}selected{% endif %}>📉 最大DD</option>
+  </select>
+
+  <select name="order">
+    <option value="asc" {% if order == 'asc' %}selected{% endif %}>昇順</option>
+    <option value="desc" {% if order == 'desc' %}selected{% endif %}>降順</option>
+  </select>
+
+  <button type="submit" class="button">🔄 並び替え</button>
+</form>
+
 {% if results %}
   <p>📌 データ件数: <strong>{{ results | length }}</strong></p>
   <p>
-    📈 平均勝率（%）: <strong>{{ results | map(attribute='win_rate') | select('!=', none) | list | sum / results|length | round(1) }}</strong><br>
-    📉 平均DD（%）: <strong>{{ results | map(attribute='max_drawdown') | select('!=', none) | list | sum / results|length | round(1) }}</strong>
+    📈 平均勝率（%）:
+    <strong>
+      {{ results | map(attribute='win_rate') | select('!=', none) | list | sum / results|length | round(1) }}
+    </strong><br>
+    📉 平均DD（%）:
+    <strong>
+      {{ results | map(attribute='max_drawdown') | select('!=', none) | list | sum / results|length | round(1) }}
+    </strong>
   </p>
 
+  <!-- 📊 時系列グラフ -->
   <canvas id="detailChart" height="120"></canvas>
+
+  <!-- 📊 ヒストグラム -->
+  <h3>📊 勝率ヒストグラム</h3>
+  <canvas id="winHistogram" height="100"></canvas>
+
+  <h3>📊 最大DDヒストグラム</h3>
+  <canvas id="ddHistogram" height="100"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
@@ -19,6 +53,7 @@
     const winRates = {{ results | map(attribute='win_rate') | list | tojson }};
     const ddRates = {{ results | map(attribute='max_drawdown') | list | tojson }};
 
+    // 📈 時系列グラフ
     new Chart(document.getElementById('detailChart'), {
       type: 'line',
       data: {
@@ -61,10 +96,57 @@
         }
       }
     });
+
+    // 📊 ヒストグラム生成関数
+    function renderHistogram(data, canvasId, label, color) {
+      const cleanData = data.filter(v => typeof v === 'number');
+      const binCount = 10;
+      const min = Math.min(...cleanData);
+      const max = Math.max(...cleanData);
+      const binWidth = (max - min) / binCount;
+      const bins = new Array(binCount).fill(0);
+      const binLabels = [];
+
+      cleanData.forEach(val => {
+        const index = Math.min(Math.floor((val - min) / binWidth), binCount - 1);
+        bins[index]++;
+      });
+
+      for (let i = 0; i < binCount; i++) {
+        const start = (min + i * binWidth).toFixed(1);
+        const end = (min + (i + 1) * binWidth).toFixed(1);
+        binLabels.push(`${start}〜${end}`);
+      }
+
+      new Chart(document.getElementById(canvasId), {
+        type: 'bar',
+        data: {
+          labels: binLabels,
+          datasets: [{
+            label: label,
+            data: bins,
+            backgroundColor: color,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: '件数' }
+            }
+          }
+        }
+      });
+    }
+
+    // 📊 勝率とDDのヒストグラム描画
+    renderHistogram(winRates, 'winHistogram', '勝率の分布', 'rgba(54, 162, 235, 0.7)');
+    renderHistogram(ddRates, 'ddHistogram', '最大DDの分布', 'rgba(255, 99, 132, 0.7)');
   </script>
 {% else %}
   <p>⚠ データが存在しません。</p>
 {% endif %}
 
-<a href="/statistics/compare" class="button" style="margin-top: 1rem;">← 戻る</a>
+<a href="/statistics/compare" class="button" style="margin-top: 1rem;">← 比較ページへ戻る</a>
 {% endblock %}
