@@ -3,10 +3,10 @@
 
 """
 📜 Veritas戦略の昇格記録ダッシュボードルート
-- 採用ログの一覧表示、フィルタ、再評価、Push、CSV出力対応
+- 採用ログの一覧表示、検索フィルタ、再評価、Push、CSV出力対応
 """
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
@@ -20,19 +20,52 @@ templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 
 @router.get("/act-history", response_class=HTMLResponse)
-async def show_act_history(request: Request, only_unpushed: bool = False):
+async def show_act_history(
+    request: Request,
+    strategy_name: str = Query(None),
+    tag: str = Query(None),
+    min_score: float = Query(None),
+    max_score: float = Query(None),
+    start_date: str = Query(None),
+    end_date: str = Query(None),
+    pushed: bool = Query(None)
+):
     """
-    📋 採用戦略ログを一覧表示
-    - 未Pushフィルター機能あり
+    📋 採用戦略ログを一覧表示（検索・絞り込み対応）
     """
     logs = act_log_service.load_all_act_logs()
-    if only_unpushed:
-        logs = [log for log in logs if not log.get("pushed", False)]
+
+    # フィルター処理
+    try:
+        score_range = (min_score, max_score) if min_score is not None and max_score is not None else None
+        date_range = (
+            datetime.strptime(start_date, "%Y-%m-%d"),
+            datetime.strptime(end_date, "%Y-%m-%d"),
+        ) if start_date and end_date else None
+
+        logs = act_log_service.filter_act_logs(
+            logs,
+            strategy_name=strategy_name,
+            tag=tag,
+            score_range=score_range,
+            date_range=date_range,
+            pushed=pushed,
+        )
+    except Exception as e:
+        print(f"[act_history] ⚠️ フィルターエラー: {e}")
 
     return templates.TemplateResponse("act_history.html", {
         "request": request,
         "logs": logs,
-        "only_unpushed": only_unpushed
+        "filters": {
+            "strategy_name": strategy_name,
+            "tag": tag,
+            "min_score": min_score,
+            "max_score": max_score,
+            "start_date": start_date,
+            "end_date": end_date,
+            "pushed": pushed,
+        }
     })
 
 
@@ -55,14 +88,41 @@ async def reevaluate_strategy(strategy_name: str = Form(...)):
 
 
 @router.get("/act-history/export")
-async def export_act_log_csv():
+async def export_act_log_csv(
+    strategy_name: str = Query(None),
+    tag: str = Query(None),
+    min_score: float = Query(None),
+    max_score: float = Query(None),
+    start_date: str = Query(None),
+    end_date: str = Query(None),
+    pushed: bool = Query(None),
+):
     """
-    📤 採用戦略ログをCSV形式で出力
+    📤 採用戦略ログをCSV形式で出力（検索条件を反映）
     """
+    logs = act_log_service.load_all_act_logs()
+
+    try:
+        score_range = (min_score, max_score) if min_score is not None and max_score is not None else None
+        date_range = (
+            datetime.strptime(start_date, "%Y-%m-%d"),
+            datetime.strptime(end_date, "%Y-%m-%d"),
+        ) if start_date and end_date else None
+
+        logs = act_log_service.filter_act_logs(
+            logs,
+            strategy_name=strategy_name,
+            tag=tag,
+            score_range=score_range,
+            date_range=date_range,
+            pushed=pushed,
+        )
+    except Exception as e:
+        print(f"[act_history/export] ⚠️ フィルターエラー: {e}")
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = TOOLS_DIR / f"veritas_adoptions_{timestamp}.csv"
 
-    logs = act_log_service.load_all_act_logs()
     act_log_service.export_logs_to_csv(logs, output_path)
 
     return FileResponse(
