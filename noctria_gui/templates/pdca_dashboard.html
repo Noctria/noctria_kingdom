@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Noctria Kingdom - PDCA ダッシュボード</title>
+  <title>📜 Noctria Kingdom - PDCA ダッシュボード</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
@@ -155,7 +155,7 @@
   <!-- 🔎 モーダル群 -->
   {% for log in logs %}
   <dialog id="modal_{{ loop.index }}">
-    <h3>📄 詳細ログ（{{ log.filename }}）</h3>
+    <h3>📄 詳細ログ（{{ log.filename }})</h3>
     <pre>{{ log.json_text }}</pre>
     <form method="post" action="/pdca/replay">
       <input type="hidden" name="log_path" value="{{ log.path }}">
