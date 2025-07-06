@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>🏰 Noctria Kingdom - 統治ダッシュボード</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h1>🏰 Noctria Kingdom - 中央統治ダッシュボード</h1>
@@ -27,6 +28,56 @@
       <p><strong>{{ "%.1f"|format(stats.avg_win_rate) }}%</strong></p>
     </div>
   </div>
+
+  <!-- 📈 昇格・Push件数の時系列グラフ -->
+  <div class="card" style="padding: 1rem; margin-bottom: 2rem;">
+    <h2>📅 昇格・Push数 日次推移</h2>
+    <canvas id="logChart" height="80"></canvas>
+  </div>
+
+  <script>
+    const ctx = document.getElementById("logChart").getContext("2d");
+    const logChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: {{ stats.dates | tojson }},
+        datasets: [
+          {
+            label: "昇格戦略数",
+            data: {{ stats.promoted_values | tojson }},
+            borderColor: "rgba(75, 192, 192, 1)",
+            backgroundColor: "rgba(75, 192, 192, 0.2)",
+            tension: 0.3,
+            fill: true,
+          },
+          {
+            label: "Push完了数",
+            data: {{ stats.pushed_values | tojson }},
+            borderColor: "rgba(255, 99, 132, 1)",
+            backgroundColor: "rgba(255, 99, 132, 0.2)",
+            tension: 0.3,
+            fill: true,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "top" },
+          title: { display: true, text: "📈 昇格・Push件数（日次）" }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: "日付" }
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: "件数" }
+          }
+        }
+      }
+    });
+  </script>
 
   <!-- 🔗 統治パネルリンク -->
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
