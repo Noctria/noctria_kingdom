@@ -3,7 +3,7 @@
 
 """
 📜 Veritas戦略の昇格記録ダッシュボードルート
-- 採用ログの一覧表示、検索フィルタ、再評価、Push、CSV出力対応
+- 採用ログの一覧表示、検索フィルタ、詳細表示、再評価、Push、CSV出力対応
 """
 
 from fastapi import APIRouter, Request, Form, Query
@@ -28,7 +28,7 @@ async def show_act_history(
     max_score: float = Query(None),
     start_date: str = Query(None),
     end_date: str = Query(None),
-    pushed: bool = Query(None)
+    pushed: bool = Query(None),
 ):
     """
     📋 採用戦略ログを一覧表示（検索・絞り込み対応）
@@ -54,9 +54,12 @@ async def show_act_history(
     except Exception as e:
         print(f"[act_history] ⚠️ フィルターエラー: {e}")
 
+    tag_list = sorted({log.get("tag") for log in logs if log.get("tag")})
+
     return templates.TemplateResponse("act_history.html", {
         "request": request,
         "logs": logs,
+        "tag_list": tag_list,
         "filters": {
             "strategy_name": strategy_name,
             "tag": tag,
@@ -66,6 +69,21 @@ async def show_act_history(
             "end_date": end_date,
             "pushed": pushed,
         }
+    })
+
+
+@router.get("/act-history/detail", response_class=HTMLResponse)
+async def show_act_detail(request: Request, strategy_name: str = Query(...)):
+    """
+    🔍 指定戦略の詳細ログページ
+    """
+    log = act_log_service.get_log_by_strategy(strategy_name)
+    if not log:
+        return HTMLResponse(content="指定された戦略ログが見つかりませんでした。", status_code=404)
+
+    return templates.TemplateResponse("act_history_detail.html", {
+        "request": request,
+        "log": log
     })
 
 
