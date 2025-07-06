@@ -17,7 +17,6 @@ import requests
 
 from core.path_config import (
     PDCA_LOG_DIR,
-    VERITAS_ORDER_JSON,
     NOCTRIA_GUI_TEMPLATES_DIR,
 )
 
@@ -39,11 +38,11 @@ async def show_pdca_dashboard(
     date_to: str = Query(default=None),
     sort: str = Query(default=None),
 ):
-    log_files = sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True)
     logs = []
     tag_set = set()
 
-    for log_file in log_files:
+    # 📥 ログ読み込み
+    for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
             with open(log_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -54,7 +53,7 @@ async def show_pdca_dashboard(
         ts = data.get("timestamp", "")
         try:
             ts_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
-        except Exception:
+        except:
             ts_dt = None
 
         tags = data.get("tags", [])
@@ -62,7 +61,7 @@ async def show_pdca_dashboard(
             tags = [tags]
         tag_set.update(tags)
 
-        log_entry = {
+        logs.append({
             "filename": log_file.name,
             "path": str(log_file),
             "strategy": data.get("strategy", "N/A"),
@@ -78,11 +77,9 @@ async def show_pdca_dashboard(
             "trades": data.get("trades"),
             "tags": tags,
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
-        }
+        })
 
-        logs.append(log_entry)
-
-    # 🔍 フィルター処理
+    # 🔍 フィルター
     def matches(log):
         if strategy and strategy.lower() not in log["strategy"].lower():
             return False
@@ -110,20 +107,14 @@ async def show_pdca_dashboard(
 
     filtered_logs = [log for log in logs if matches(log)]
 
-    # 🔃 ソート処理
-    def get_sort_key_func(key):
-        return lambda log: log.get(key) or 0
-
+    # 🔃 ソート
     if sort:
-        reverse = False
-        sort_key = sort
-        if sort.startswith("-"):
-            sort_key = sort[1:]
-            reverse = True
-        if sort_key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
-            filtered_logs.sort(key=get_sort_key_func(sort_key), reverse=reverse)
+        reverse = sort.startswith("-")
+        key = sort.lstrip("-")
+        if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
+            filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
 
-    return templates.TemplateResponse("pdca_dashboard.html", {
+    return templates.TemplateResponse("pdca_history.html", {
         "request": request,
         "logs": filtered_logs,
         "filters": {
@@ -147,9 +138,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
     airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
     dag_id = "veritas_replay_dag"
 
-    payload = {
-        "conf": {"log_path": log_path}
-    }
+    payload = {"conf": {"log_path": log_path}}
     headers = {"Content-Type": "application/json"}
 
     try:
@@ -157,16 +146,16 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")  # 認証情報を必要に応じて更新
+            auth=("airflow", "airflow")  # 必要に応じて認証情報更新
         )
 
         if response.status_code in [200, 201]:
-            print(f"✅ 再送DAG起動成功: {log_path}")
+            print(f"✅ DAG起動成功: {log_path}")
             return RedirectResponse(url="/pdca", status_code=303)
         else:
-            print("❌ DAGトリガー失敗:", response.text)
+            print(f"❌ DAGトリガー失敗: {response.text}")
             return JSONResponse(status_code=500, content={"detail": "DAG起動に失敗しました"})
 
     except Exception as e:
-        print("❌ DAG通信エラー:", str(e))
+        print(f"❌ DAG通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
