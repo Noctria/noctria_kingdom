@@ -22,11 +22,24 @@
       background: #1e1e1e;
       color: #e0e0e0;
     }
+    .dark-mode th {
+      background: #2b2b2b;
+    }
+    .dark-mode td {
+      border-color: #444;
+    }
+    .dark-mode nav a {
+      color: #66c2ff;
+    }
+
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 2rem;
+    }
+    nav {
+      margin-bottom: 1.5rem;
     }
     nav a {
       margin-right: 1rem;
@@ -37,9 +50,7 @@
     nav a:hover {
       text-decoration: underline;
     }
-    .dark-mode nav a {
-      color: #66c2ff;
-    }
+
     .button {
       padding: 0.5rem 1rem;
       background: #007acc;
@@ -53,6 +64,8 @@
       background: #0098ff;
     }
   </style>
+
+  {% block style %}{% endblock %}
 </head>
 <body>
   <header>
@@ -80,5 +93,7 @@
       document.body.classList.toggle("dark-mode");
     });
   </script>
+
+  {% block script %}{% endblock %}
 </body>
 </html>
