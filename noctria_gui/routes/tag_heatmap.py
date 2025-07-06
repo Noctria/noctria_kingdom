@@ -16,7 +16,7 @@ router = APIRouter(tags=["tag-heatmap"])
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 
-@router.get("/tag-heatmap", response_class=HTMLResponse)
+@router.get("/strategies/tag-heatmap", response_class=HTMLResponse)
 async def tag_heatmap(request: Request):
     """
     🔥 タグ × 指標 のヒートマップを表示
@@ -28,7 +28,7 @@ async def tag_heatmap(request: Request):
         tag_stats = []
         print(f"[tag_heatmap] ⚠️ 集計失敗: {e}")
 
-    return templates.TemplateResponse("tag_heatmap.html", {
+    return templates.TemplateResponse("strategies/tag_heatmap.html", {
         "request": request,
         "tag_stats": tag_stats
     })
