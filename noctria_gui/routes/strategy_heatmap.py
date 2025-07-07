@@ -15,12 +15,16 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 def parse_date(date_str):
+    """'YYYY-MM-DD'形式→datetime。失敗時None"""
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
 
 def load_strategy_stats(from_date=None, to_date=None, strategy_keyword=None):
+    """
+    戦略名ごとに勝率・DDを集計する
+    """
     stats = defaultdict(lambda: {"count": 0, "win_rates": [], "drawdowns": []})
     act_dir = Path(ACT_LOG_DIR)
 
