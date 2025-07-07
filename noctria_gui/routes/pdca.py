@@ -150,7 +150,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")  # 認証情報は環境変数化推奨
+            auth=("admin", "admin")  # 認証情報は環境変数化推奨
         )
 
         if response.status_code in [200, 201]:
@@ -180,7 +180,7 @@ async def trigger_strategy_recheck(strategy_id: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")  # 認証情報は環境変数化が望ましい
+            auth=("admin", "admin")  # 認証情報は環境変数化が望ましい
         )
 
         if response.status_code in [200, 201]:
