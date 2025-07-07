@@ -13,7 +13,6 @@ from typing import List, Dict, Any, Optional
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     if not date_str:
         return None
@@ -21,7 +20,6 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
-
 
 def load_strategy_logs() -> List[Dict[str, Any]]:
     data = []
@@ -35,7 +33,6 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
             except Exception:
                 continue
     return data
-
 
 def compute_comparison(
     data: List[Dict[str, Any]],
@@ -99,7 +96,6 @@ def compute_comparison(
 
     return final
 
-
 def extract_all_keys(data: List[Dict[str, Any]], mode: str) -> List[str]:
     key_set = set()
     for record in data:
@@ -111,11 +107,10 @@ def extract_all_keys(data: List[Dict[str, Any]], mode: str) -> List[str]:
                 key_set.add(name)
     return sorted(key_set)
 
-
 @router.get("/statistics/compare", response_class=HTMLResponse)
 async def compare_statistics(request: Request) -> HTMLResponse:
     params = request.query_params
-    mode = params.get("mode", "tag")
+    mode = params.get("mode", "tag")  # "strategy" or "tag"
     sort = params.get("sort", "score")
     keys = params.get(mode + "s", "").split(",")
     keys = [k.strip() for k in keys if k.strip()]
