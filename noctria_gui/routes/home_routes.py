@@ -11,11 +11,13 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    # ✅ 最低限の stats を仮定義して UndefinedError を防止
+    # ✅ 仮データ：Jinjaテンプレート側の参照に備えて最低限の構造を確保
     stats = {
         "promoted_count": 0,
         "pushed_count": 0,
         "avg_win_rate": 0.0,
+        "dates": [],  # ✅ tojson用に必須
+        "daily_scores": [],  # ✅ tojson用に必須
         "filter": {
             "from": "",
             "to": ""
