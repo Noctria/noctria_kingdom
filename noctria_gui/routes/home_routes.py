@@ -10,8 +10,11 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    # 修正：index.html → dashboard.html に変更
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    # ✅ 修正: dashboard.html に切り替え、stats を渡す
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "stats": {}  # 空でも定義すれば Jinja の UndefinedError 回避可能
+    })
 
 @router.get("/path-check", response_class=HTMLResponse)
 async def path_check_form(request: Request):
