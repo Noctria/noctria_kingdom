@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSON
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 from core.path_config import ACT_LOG_DIR, TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import act_log_service
@@ -30,7 +30,82 @@ def parse_bool(s):
         return s.lower() in ["true", "1", "on"]
     return None
 
-# 省略（show_act_history, show_act_detail, repush_strategy, reevaluate_strategy は変わらず）
+@router.get("/act-history", response_class=HTMLResponse)
+async def show_act_history(
+    request: Request,
+    strategy_name: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    min_score: Optional[str] = Query(None),
+    max_score: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    pushed: Optional[str] = Query(None),
+):
+    min_score_val = parse_float(min_score)
+    max_score_val = parse_float(max_score)
+    pushed_val = parse_bool(pushed)
+    strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
+    tag_val = tag if tag and tag not in ["", "None"] else None
+    start_date_val = start_date if start_date and start_date not in ["", "None"] else None
+    end_date_val = end_date if end_date and end_date not in ["", "None"] else None
+
+    logs = act_log_service.load_all_act_logs()
+
+    try:
+        score_range = (min_score_val, max_score_val) if min_score_val is not None and max_score_val is not None else None
+        date_range = (
+            datetime.strptime(start_date_val, "%Y-%m-%d"),
+            datetime.strptime(end_date_val, "%Y-%m-%d"),
+        ) if start_date_val and end_date_val else None
+
+        logs = act_log_service.filter_act_logs(
+            logs,
+            strategy_name=strategy_name_val,
+            tag=tag_val,
+            score_range=score_range,
+            date_range=date_range,
+            pushed=pushed_val,
+        )
+    except Exception as e:
+        print(f"[act_history] ⚠️ フィルターエラー: {e}")
+
+    tag_list = sorted({log.get("tag") for log in logs if log.get("tag")})
+
+    return templates.TemplateResponse("act_history.html", {
+        "request": request,
+        "logs": logs,
+        "tag_list": tag_list,
+        "filters": {
+            "strategy_name": strategy_name_val,
+            "tag": tag_val,
+            "min_score": min_score_val,
+            "max_score": max_score_val,
+            "start_date": start_date_val,
+            "end_date": end_date_val,
+            "pushed": pushed_val,
+        }
+    })
+
+@router.get("/act-history/detail", response_class=HTMLResponse)
+async def show_act_detail(request: Request, strategy_name: str = Query(...)):
+    log = act_log_service.get_log_by_strategy(strategy_name)
+    if not log:
+        return HTMLResponse(content="指定された戦略ログが見つかりませんでした。", status_code=404)
+
+    return templates.TemplateResponse("act_history_detail.html", {
+        "request": request,
+        "log": log
+    })
+
+@router.post("/act-history/repush")
+async def repush_strategy(strategy_name: str = Form(...)):
+    act_log_service.reset_push_flag(strategy_name)
+    return RedirectResponse(url="/act-history", status_code=303)
+
+@router.post("/act-history/reevaluate")
+async def reevaluate_strategy(strategy_name: str = Form(...)):
+    act_log_service.mark_for_reevaluation(strategy_name)
+    return RedirectResponse(url="/act-history", status_code=303)
 
 @router.get("/act-history/export")
 async def export_act_log_csv(
@@ -42,10 +117,6 @@ async def export_act_log_csv(
     end_date: Optional[str] = Query(None),
     pushed: Optional[str] = Query(None),
 ):
-    """
-    📤 採用戦略ログをCSV形式で出力（検索条件を反映）
-    """
-    # 全部strで受けて、ここで変換
     min_score_val = parse_float(min_score)
     max_score_val = parse_float(max_score)
     pushed_val = parse_bool(pushed)
@@ -75,13 +146,14 @@ async def export_act_log_csv(
         print(f"[act_history/export] ⚠️ フィルターエラー: {e}")
 
     if not logs:
-        # 空ログならエラー応答
         return JSONResponse(status_code=404, content={"detail": "出力可能なログがありません"})
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = TOOLS_DIR / f"veritas_adoptions_{timestamp}.csv"
 
-    act_log_service.export_logs_to_csv(logs, output_path)
+    success = act_log_service.export_logs_to_csv(logs, output_path)
+    if not success:
+        return JSONResponse(status_code=500, content={"detail": "CSV出力に失敗しました"})
 
     return FileResponse(
         output_path,
