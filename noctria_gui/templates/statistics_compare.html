@@ -6,7 +6,7 @@
 
 <form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
   <label>📌 モード選択：</label>
-  <select name="mode">
+  <select name="mode" onchange="this.form.submit()">
     <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
     <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
   </select>
@@ -185,8 +185,13 @@
       const input = document.getElementById("shareUrl");
       input.select();
       input.setSelectionRange(0, 99999);
-      document.execCommand("copy");
-      alert("URLをコピーしました！");
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(input.value);
+        alert("URLをコピーしました！");
+      } else {
+        document.execCommand("copy");
+        alert("URLをコピーしました！");
+      }
     }
 
     function selectAll(flag) {
