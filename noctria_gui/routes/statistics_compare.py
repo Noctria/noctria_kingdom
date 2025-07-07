@@ -18,6 +18,7 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
+    """文字列を日付(datetime)に変換。失敗時はNone。"""
     if not date_str:
         return None
     try:
@@ -27,10 +28,12 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
 
 
 def load_strategy_logs() -> List[Dict[str, Any]]:
-    data = []
-    for file in os.listdir(ACT_LOG_DIR):
+    """ACT_LOG_DIR配下の全JSONをロード。辞書型のみ抽出。"""
+    data: List[Dict[str, Any]] = []
+    log_dir = Path(ACT_LOG_DIR)
+    for file in os.listdir(log_dir):
         if file.endswith(".json"):
-            path = Path(ACT_LOG_DIR) / file
+            path = log_dir / file
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     obj = json.load(f)
@@ -41,7 +44,12 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
     return data
 
 
-def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]) -> List[Dict[str, Any]]:
+def filter_by_date(
+    records: List[Dict[str, Any]],
+    from_date: Optional[datetime],
+    to_date: Optional[datetime]
+) -> List[Dict[str, Any]]:
+    """timestampフィールドの日付で範囲フィルタ"""
     filtered = []
     for d in records:
         ts_str = d.get("timestamp", "")[:10]
@@ -54,13 +62,22 @@ def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime],
     return filtered
 
 
-def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[str, Dict[str, List[float]]]:
-    stat_map = defaultdict(lambda: defaultdict(list))
+def compute_statistics_grouped(
+    data: List[Dict[str, Any]],
+    mode: str
+) -> Dict[str, Dict[str, List[float]]]:
+    """
+    mode="strategy"なら戦略ごと、mode="tag"ならタグごとに
+    各指標ごとのスコア配列を構築。
+    """
+    stat_map: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
     for entry in data:
         keys = [entry.get("strategy_name")] if mode == "strategy" else entry.get("tags", [])
         if not keys:
             continue
         for key in keys:
+            if not key:
+                continue
             for k, v in entry.get("scores", {}).items():
                 if isinstance(v, (int, float)):
                     stat_map[key][k].append(v)
@@ -68,7 +85,7 @@ def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[st
 
 
 @router.get("/statistics/compare", response_class=HTMLResponse)
-async def compare(request: Request):
+async def compare(request: Request) -> HTMLResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
     to_date = parse_date(request.query_params.get("to"))
@@ -81,8 +98,12 @@ async def compare(request: Request):
     for key, scores in stat_map.items():
         row = {"name": key}
         for metric, values in scores.items():
-            row[f"{metric}_mean"] = round(mean(values), 3)
-            row[f"{metric}_median"] = round(median(values), 3)
+            if values:
+                row[f"{metric}_mean"] = round(mean(values), 3)
+                row[f"{metric}_median"] = round(median(values), 3)
+            else:
+                row[f"{metric}_mean"] = ""
+                row[f"{metric}_median"] = ""
         results.append(row)
 
     return templates.TemplateResponse("statistics_compare.html", {
@@ -97,7 +118,7 @@ async def compare(request: Request):
 
 
 @router.get("/statistics/compare/export")
-async def export_csv(request: Request):
+async def export_csv(request: Request) -> StreamingResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
     to_date = parse_date(request.query_params.get("to"))
@@ -113,8 +134,8 @@ async def export_csv(request: Request):
     for key, scores in stat_map.items():
         row = {"name": key}
         for metric, values in scores.items():
-            m = round(mean(values), 3)
-            med = round(median(values), 3)
+            m = round(mean(values), 3) if values else ""
+            med = round(median(values), 3) if values else ""
             row[f"{metric}_mean"] = m
             row[f"{metric}_median"] = med
             metric_names.update([f"{metric}_mean", f"{metric}_median"])
