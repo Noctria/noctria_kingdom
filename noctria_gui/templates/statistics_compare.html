@@ -68,7 +68,10 @@
     <option value="radar">レーダーチャート</option>
   </select>
 
-  <table>
+  <!-- 💾 画像保存 -->
+  <button class="button" onclick="downloadCharts()">💾 グラフ画像を保存</button>
+
+  <table style="margin-top: 1rem;">
     <thead>
       <tr>
         <th>比較対象</th>
@@ -96,6 +99,7 @@
   <canvas id="winChart" height="100"></canvas>
   <canvas id="ddChart" height="100"></canvas>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const labels = {{ results | map(attribute='key') | list | tojson }};
     const winRates = {{ results | map(attribute='avg_win') | list | tojson }};
@@ -110,23 +114,58 @@
         type,
         data: {
           labels,
-          datasets: [{ label: '平均勝率（%）', data: winRates, backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgba(54, 162, 235, 1)', fill: type !== 'line', tension: 0.2 }]
+          datasets: [{
+            label: '平均勝率（%）',
+            data: winRates,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            fill: type !== 'line',
+            tension: 0.2
+          }]
         },
-        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+        options: {
+          responsive: true,
+          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
+        }
       });
 
       ddChartInstance = new Chart(document.getElementById('ddChart'), {
         type,
         data: {
           labels,
-          datasets: [{ label: '平均DD（%）', data: ddRates, backgroundColor: 'rgba(255, 99, 132, 0.7)', borderColor: 'rgba(255, 99, 132, 1)', fill: type !== 'line', tension: 0.2 }]
+          datasets: [{
+            label: '平均DD（%）',
+            data: ddRates,
+            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            fill: type !== 'line',
+            tension: 0.2
+          }]
         },
-        options: { responsive: true, scales: type !== 'radar' ? { y: { beginAtZero: true } } : {} }
+        options: {
+          responsive: true,
+          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
+        }
       });
     }
 
-    renderCharts("bar");
-    document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
+    function downloadCharts() {
+      [winChartInstance, ddChartInstance].forEach((chart, i) => {
+        const canvas = chart.canvas;
+        const link = document.createElement("a");
+        link.href = canvas.toDataURL("image/png");
+        link.download = i === 0 ? "win_chart.png" : "dd_chart.png";
+        link.click();
+      });
+    }
+
+    function copyUrl() {
+      const input = document.getElementById("shareUrl");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand("copy");
+      alert("URLをコピーしました！");
+    }
 
     function selectAll(flag) {
       document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = flag);
@@ -138,15 +177,11 @@
       document.getElementById("selectedCount").textContent = count;
     }
 
-    function copyUrl() {
-      const input = document.getElementById("shareUrl");
-      input.select();
-      input.setSelectionRange(0, 99999);
-      document.execCommand("copy");
-      alert("URLをコピーしました！");
-    }
-
-    window.onload = updateCount;
+    window.onload = function () {
+      updateCount();
+      renderCharts("bar");
+      document.getElementById("chartTypeSelect").addEventListener("change", e => renderCharts(e.target.value));
+    };
   </script>
 {% else %}
   <p>⚠ 比較対象を選択してください。</p>
