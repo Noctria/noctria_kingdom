@@ -8,13 +8,27 @@ from core.path_config import CATEGORY_MAP, NOCTRIA_GUI_TEMPLATES_DIR
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    # ✅ 修正: dashboard.html に切り替え、stats を渡す
+    # ✅ dashboard.html 用の構造化された stats を渡す
+    stats = {
+        "filter": {
+            "from": "",
+            "to": "",
+            "mode": "strategy",
+            "sort": "score"
+        },
+        "promoted_count": 0,
+        "pushed_count": 0,
+        "active_strategy_count": 0,
+        "tag_count": 0
+    }
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "stats": {}  # 空でも定義すれば Jinja の UndefinedError 回避可能
+        "stats": stats
     })
+
 
 @router.get("/path-check", response_class=HTMLResponse)
 async def path_check_form(request: Request):
@@ -24,6 +38,7 @@ async def path_check_form(request: Request):
         "categories": categories,
         "result": None
     })
+
 
 @router.get("/path-check/run", response_class=HTMLResponse)
 async def run_check(request: Request, category: str = "all", strict: bool = False):
@@ -51,6 +66,7 @@ async def run_check(request: Request, category: str = "all", strict: bool = Fals
         "strict": strict,
         "result": result_json
     })
+
 
 @router.get("/api/check-paths")
 async def check_paths_api(category: str = "all", strict: bool = False):
