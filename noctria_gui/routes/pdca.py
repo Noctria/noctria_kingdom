@@ -116,7 +116,6 @@ async def show_pdca_dashboard(
         if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
             filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
 
-    # === ここでシリアライズ（tojson対策）
     logs_serializable = [make_json_serializable(log) for log in filtered_logs]
 
     return templates.TemplateResponse("pdca_history.html", {
