@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>📑 比較条件選択</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>📑 比較する{{ "戦略" if mode == "strategy" else "タグ" }}を選択</h1>
+  <form method="get" action="/statistics/compare" onsubmit="return setKeys()">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <input type="hidden" name="sort" value="check">
+    <input type="hidden" id="keys" name="{{ mode }}s" value="">
+    <div id="options">
+      {% for k in all_keys %}
+        <label style="display:block;">
+          <input type="checkbox" value="{{ k }}">
+          {{ k }}
+        </label>
+      {% endfor %}
+    </div>
+    <button type="submit">📈 比較する</button>
+  </form>
+  <script>
+    function setKeys() {
+      const boxes = document.querySelectorAll('#options input[type=checkbox]');
+      const selected = [];
+      boxes.forEach(box => { if (box.checked) selected.push(box.value); });
+      document.getElementById('keys').value = selected.join(',');
+      return true;
+    }
+  </script>
+</body>
+</html>
