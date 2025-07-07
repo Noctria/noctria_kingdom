@@ -8,9 +8,6 @@
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
 
-  <!-- 🔍 フィルターUI（拡張予定） -->
-  <!-- <form method="get" action="/pdca" class="filter card"> ... </form> -->
-
   <!-- 📋 履歴一覧 -->
   <table class="table">
     <thead>
@@ -22,14 +19,14 @@
         <th>📈 勝率</th>
         <th>📉 最大DD</th>
         <th>🧪 詳細</th>
-        <th>🔁 再実行</th>
+        <th colspan="2">🔁 アクション</th>
       </tr>
     </thead>
     <tbody>
       {% for log in logs %}
       <tr>
         <td>{{ log.timestamp }}</td>
-        <td>{{ log.strategy }}</td>
+        <td>{{ log.strategy or '不明' }}</td>
         <td>{{ log.signal }}</td>
         <td>{{ log.symbol }}</td>
         <td>{{ log.win_rate or 'N/A' }}</td>
@@ -38,9 +35,17 @@
           <button class="btn" onclick="showDetails({{ log | tojson | safe }})">詳細</button>
         </td>
         <td>
+          <!-- 再実行フォーム -->
           <form method="post" action="/pdca/replay" class="action-form">
             <input type="hidden" name="log_path" value="{{ log.path }}">
             <button type="submit" class="btn">再実行</button>
+          </form>
+        </td>
+        <td>
+          <!-- ✅ 再評価フォーム -->
+          <form method="post" action="/pdca/recheck" class="action-form">
+            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+            <button type="submit" class="btn">再評価</button>
           </form>
         </td>
       </tr>
