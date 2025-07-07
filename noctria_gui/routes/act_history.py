@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from core.path_config import ACT_LOG_DIR, TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import act_log_service
@@ -22,17 +23,37 @@ templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 @router.get("/act-history", response_class=HTMLResponse)
 async def show_act_history(
     request: Request,
-    strategy_name: str = Query(None),
-    tag: str = Query(None),
-    min_score: float = Query(None),
-    max_score: float = Query(None),
-    start_date: str = Query(None),
-    end_date: str = Query(None),
-    pushed: bool = Query(None),
+    strategy_name: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    min_score: Optional[float] = Query(None),
+    max_score: Optional[float] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    pushed: Optional[str] = Query(None),
 ):
     """
     📋 採用戦略ログを一覧表示（検索・絞り込み対応）
     """
+    # 空文字や"None"もNone扱いに変換
+    if not strategy_name or strategy_name in ["", "None"]:
+        strategy_name = None
+    if not tag or tag in ["", "None"]:
+        tag = None
+    if not min_score or min_score in ["", "None"]:
+        min_score = None
+    if not max_score or max_score in ["", "None"]:
+        max_score = None
+    if not start_date or start_date in ["", "None"]:
+        start_date = None
+    if not end_date or end_date in ["", "None"]:
+        end_date = None
+    if not pushed or pushed in ["", "None"]:
+        pushed = None
+
+    # pushed型変換
+    if pushed is not None:
+        pushed = pushed.lower() in ["true", "1", "on"]
+
     logs = act_log_service.load_all_act_logs()
 
     # フィルター処理
@@ -107,17 +128,37 @@ async def reevaluate_strategy(strategy_name: str = Form(...)):
 
 @router.get("/act-history/export")
 async def export_act_log_csv(
-    strategy_name: str = Query(None),
-    tag: str = Query(None),
-    min_score: float = Query(None),
-    max_score: float = Query(None),
-    start_date: str = Query(None),
-    end_date: str = Query(None),
-    pushed: bool = Query(None),
+    strategy_name: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    min_score: Optional[float] = Query(None),
+    max_score: Optional[float] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    pushed: Optional[str] = Query(None),
 ):
     """
     📤 採用戦略ログをCSV形式で出力（検索条件を反映）
     """
+    # 空文字や"None"もNone扱いに変換
+    if not strategy_name or strategy_name in ["", "None"]:
+        strategy_name = None
+    if not tag or tag in ["", "None"]:
+        tag = None
+    if not min_score or min_score in ["", "None"]:
+        min_score = None
+    if not max_score or max_score in ["", "None"]:
+        max_score = None
+    if not start_date or start_date in ["", "None"]:
+        start_date = None
+    if not end_date or end_date in ["", "None"]:
+        end_date = None
+    if not pushed or pushed in ["", "None"]:
+        pushed = None
+
+    # pushed型変換
+    if pushed is not None:
+        pushed = pushed.lower() in ["true", "1", "on"]
+
     logs = act_log_service.load_all_act_logs()
 
     try:
