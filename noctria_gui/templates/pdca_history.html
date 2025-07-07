@@ -42,9 +42,9 @@
           </form>
         </td>
         <td>
-          <!-- ✅ 再評価フォーム -->
+          <!-- ✅ 再評価フォーム（修正済） -->
           <form method="post" action="/pdca/recheck" class="action-form">
-            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+            <input type="hidden" name="strategy_id" value="{{ log.strategy }}">
             <button type="submit" class="btn">再評価</button>
           </form>
         </td>
