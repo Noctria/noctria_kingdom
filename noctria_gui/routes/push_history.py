@@ -19,6 +19,8 @@ from core.path_config import PUSH_LOG_DIR, GUI_TEMPLATES_DIR
 router = APIRouter()
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
+# デフォルトページング設定
+PAGE_SIZE = 50
 
 @router.get("/push-history", response_class=HTMLResponse)
 def view_push_history(
@@ -28,9 +30,10 @@ def view_push_history(
     start_date: str = Query(default="", description="開始日 YYYY-MM-DD"),
     end_date: str = Query(default="", description="終了日 YYYY-MM-DD"),
     keyword: str = Query(default="", description="メッセージ内検索キーワード"),
+    page: int = Query(default=1, ge=1, description="ページ番号")
 ):
     """
-    📋 Push履歴一覧（フィルタ付き）
+    📋 Push履歴一覧（フィルタ付き・ページング対応）
     """
     logs = []
 
@@ -60,9 +63,19 @@ def view_push_history(
 
     tag_list = sorted({log.get("tag") for log in logs if log.get("tag")})
 
+    # ---- ページング ----
+    total_count = len(logs)
+    total_pages = max((total_count + PAGE_SIZE - 1) // PAGE_SIZE, 1)
+    # 範囲外のページ指定は1に矯正
+    if page > total_pages:
+        page = total_pages
+    start = (page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+    paged_logs = logs[start:end]
+
     return templates.TemplateResponse("push_history.html", {
         "request": request,
-        "logs": logs,
+        "logs": paged_logs,
         "tag_list": tag_list,
         "filters": {
             "strategy": strategy,
@@ -70,7 +83,11 @@ def view_push_history(
             "start_date": start_date,
             "end_date": end_date,
             "keyword": keyword
-        }
+        },
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page,
+        "page_size": PAGE_SIZE,
     })
 
 
