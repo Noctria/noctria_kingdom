@@ -1,5 +1,3 @@
-# routes/scoreboard.py
-
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -7,6 +5,7 @@ from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 import os
 import json
 import io
@@ -15,22 +14,21 @@ import csv
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-
 def parse_date(date_str):
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
 
-
 def load_tag_stats(from_date=None, to_date=None, tag_keyword=None):
     tag_stats = defaultdict(lambda: {"count": 0, "win_rates": [], "drawdowns": []})
+    act_dir = Path(ACT_LOG_DIR)
 
-    for file in os.listdir(ACT_LOG_DIR):
+    for file in os.listdir(act_dir):
         if not file.endswith(".json"):
             continue
         try:
-            with open(ACT_LOG_DIR / file, "r", encoding="utf-8") as f:
+            with open(act_dir / file, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             date_str = data.get("date")
@@ -58,11 +56,9 @@ def load_tag_stats(from_date=None, to_date=None, tag_keyword=None):
                     tag_stats[t]["win_rates"].append(win)
                 if isinstance(dd, (int, float)):
                     tag_stats[t]["drawdowns"].append(dd)
-
         except Exception:
             continue
 
-    # 平均計算
     final_stats = {}
     for tag, values in tag_stats.items():
         count = values["count"]
@@ -73,9 +69,7 @@ def load_tag_stats(from_date=None, to_date=None, tag_keyword=None):
             "avg_win": win_avg,
             "avg_dd": dd_avg,
         }
-
     return final_stats
-
 
 @router.get("/statistics/heatmap", response_class=HTMLResponse)
 async def heatmap(request: Request):
@@ -98,7 +92,6 @@ async def heatmap(request: Request):
             "tag": tag_keyword or ""
         }
     })
-
 
 @router.get("/statistics/heatmap/export")
 async def export_heatmap_csv(request: Request):
