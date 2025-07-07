@@ -106,9 +106,37 @@
     const ddRates = {{ results | map(attribute='avg_dd') | list | tojson }};
     let winChartInstance, ddChartInstance;
 
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const chartColors = {
+      text: isDark ? '#eee' : '#222',
+      grid: isDark ? '#444' : '#ccc',
+      win: 'rgba(54, 162, 235, 0.7)',
+      winBorder: 'rgba(54, 162, 235, 1)',
+      dd: 'rgba(255, 99, 132, 0.7)',
+      ddBorder: 'rgba(255, 99, 132, 1)'
+    };
+
     function renderCharts(type) {
       if (winChartInstance) winChartInstance.destroy();
       if (ddChartInstance) ddChartInstance.destroy();
+
+      const commonOptions = {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: chartColors.text } }
+        },
+        scales: type !== 'radar' ? {
+          y: {
+            beginAtZero: true,
+            ticks: { color: chartColors.text },
+            grid: { color: chartColors.grid }
+          },
+          x: {
+            ticks: { color: chartColors.text },
+            grid: { color: chartColors.grid }
+          }
+        } : {}
+      };
 
       winChartInstance = new Chart(document.getElementById('winChart'), {
         type,
@@ -117,16 +145,13 @@
           datasets: [{
             label: '平均勝率（%）',
             data: winRates,
-            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-            borderColor: 'rgba(54, 162, 235, 1)',
+            backgroundColor: chartColors.win,
+            borderColor: chartColors.winBorder,
             fill: type !== 'line',
             tension: 0.2
           }]
         },
-        options: {
-          responsive: true,
-          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
-        }
+        options: commonOptions
       });
 
       ddChartInstance = new Chart(document.getElementById('ddChart'), {
@@ -136,16 +161,13 @@
           datasets: [{
             label: '平均DD（%）',
             data: ddRates,
-            backgroundColor: 'rgba(255, 99, 132, 0.7)',
-            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: chartColors.dd,
+            borderColor: chartColors.ddBorder,
             fill: type !== 'line',
             tension: 0.2
           }]
         },
-        options: {
-          responsive: true,
-          scales: type !== 'radar' ? { y: { beginAtZero: true } } : {}
-        }
+        options: commonOptions
       });
     }
 
