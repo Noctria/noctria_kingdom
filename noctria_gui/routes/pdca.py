@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# coding: utf-8
-
-"""
-📜 PDCA履歴管理ルート
-- 実行ログの表示・フィルタリング・再送命令（DAGトリガー）を統括
-"""
-
 from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -24,9 +16,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
-# ========================================
-# 📜 /pdca - 履歴表示ページ（フィルター＋ソート＋タグ分類）
-# ========================================
+# ============================
+# 📜 /pdca - 履歴表示
+# ============================
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
     request: Request,
@@ -41,7 +33,6 @@ async def show_pdca_dashboard(
     logs = []
     tag_set = set()
 
-    # 📥 ログ読み込み
     for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
             with open(log_file, "r", encoding="utf-8") as f:
@@ -79,7 +70,6 @@ async def show_pdca_dashboard(
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
         })
 
-    # 🔍 フィルター処理
     def matches(log):
         if strategy and strategy.lower() not in log["strategy"].lower():
             return False
@@ -107,7 +97,6 @@ async def show_pdca_dashboard(
 
     filtered_logs = [log for log in logs if matches(log)]
 
-    # 🔃 ソート処理
     if sort:
         reverse = sort.startswith("-")
         key = sort.lstrip("-")
@@ -130,9 +119,9 @@ async def show_pdca_dashboard(
     })
 
 
-# ========================================
-# 🔁 /pdca/replay - 再送命令 & DAGトリガー
-# ========================================
+# ============================
+# 🔁 /pdca/replay - 戦略再送信
+# ============================
 @router.post("/pdca/replay")
 async def replay_order_from_log(log_path: str = Form(...)):
     airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
@@ -146,7 +135,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")  # 必要に応じて認証情報を更新
+            auth=("airflow", "airflow")
         )
 
         if response.status_code in [200, 201]:
@@ -158,4 +147,35 @@ async def replay_order_from_log(log_path: str = Form(...)):
 
     except Exception as e:
         print(f"❌ DAG通信エラー: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+# ============================
+# 🧪 /pdca/recheck - スコア再評価トリガー
+# ============================
+@router.post("/pdca/recheck")
+async def trigger_strategy_recheck(strategy_id: str = Form(...)):
+    airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
+    dag_id = "recheck_dag"
+
+    payload = {"conf": {"strategy_id": strategy_id}}
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(
+            f"{airflow_url}/dags/{dag_id}/dagRuns",
+            json=payload,
+            headers=headers,
+            auth=("airflow", "airflow")
+        )
+
+        if response.status_code in [200, 201]:
+            print(f"✅ 再評価DAG起動成功: {strategy_id}")
+            return RedirectResponse(url="/pdca", status_code=303)
+        else:
+            print(f"❌ 再評価DAG失敗: {response.text}")
+            return JSONResponse(status_code=500, content={"detail": "再評価に失敗しました"})
+
+    except Exception as e:
+        print(f"❌ 通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
