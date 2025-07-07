@@ -11,22 +11,20 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    # ✅ dashboard.html 用の構造化された stats を渡す
+    # ✅ 最低限の stats を仮定義して UndefinedError を防止
     stats = {
-        "filter": {
-            "from": "",
-            "to": "",
-            "mode": "strategy",
-            "sort": "score"
-        },
         "promoted_count": 0,
         "pushed_count": 0,
-        "active_strategy_count": 0,
-        "tag_count": 0
+        "avg_win_rate": 0.0,
+        "filter": {
+            "from": "",
+            "to": ""
+        }
     }
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "stats": stats
+        "stats": stats,
     })
 
 
