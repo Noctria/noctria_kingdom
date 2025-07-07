@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
@@ -134,3 +134,9 @@ async def compare_statistics(request: Request) -> HTMLResponse:
             "to": params.get("to", ""),
         }
     })
+
+# --- 404対策用リダイレクト（必要なら追加！） ---
+@router.get("/strategies/compare")
+async def redirect_strategies_compare():
+    """旧パスから新パスへリダイレクト"""
+    return RedirectResponse(url="/statistics/compare")
