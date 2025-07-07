@@ -15,6 +15,19 @@ from core.path_config import (
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+def make_json_serializable(log):
+    """datetime型などをテンプレートtojson用に文字列化"""
+    new_log = log.copy()
+    # 典型的なdatetimeフィールドの処理
+    for key in ["timestamp_dt"]:
+        val = new_log.get(key)
+        if isinstance(val, datetime):
+            new_log[key] = val.isoformat()
+    # tagsも必ずリスト化
+    tags = new_log.get("tags")
+    if isinstance(tags, str):
+        new_log["tags"] = [tags]
+    return new_log
 
 # ============================
 # 📜 /pdca - 履歴表示
@@ -44,7 +57,7 @@ async def show_pdca_dashboard(
         ts = data.get("timestamp", "")
         try:
             ts_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
-        except:
+        except Exception:
             ts_dt = None
 
         tags = data.get("tags", [])
@@ -84,14 +97,14 @@ async def show_pdca_dashboard(
                 from_dt = datetime.strptime(date_from, "%Y-%m-%d")
                 if log["timestamp_dt"] and log["timestamp_dt"] < from_dt:
                     return False
-            except:
+            except Exception:
                 pass
         if date_to:
             try:
                 to_dt = datetime.strptime(date_to, "%Y-%m-%d")
                 if log["timestamp_dt"] and log["timestamp_dt"] > to_dt:
                     return False
-            except:
+            except Exception:
                 pass
         return True
 
@@ -103,9 +116,12 @@ async def show_pdca_dashboard(
         if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
             filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
 
+    # === ここでシリアライズ（tojson対策）
+    logs_serializable = [make_json_serializable(log) for log in filtered_logs]
+
     return templates.TemplateResponse("pdca_history.html", {
         "request": request,
-        "logs": filtered_logs,
+        "logs": logs_serializable,
         "filters": {
             "strategy": strategy or "",
             "symbol": symbol or "",
