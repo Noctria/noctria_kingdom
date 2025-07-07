@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
-from pathlib import Path
 import os
 import json
 import requests
@@ -12,8 +11,16 @@ from core.path_config import (
     NOCTRIA_GUI_TEMPLATES_DIR,
 )
 
+from dotenv import load_dotenv
+
+load_dotenv()  # カレントディレクトリの .env を読み込む
+
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
+AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
+AIRFLOW_API_USER = os.getenv("AIRFLOW_API_USER", "admin")
+AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "admin")
 
 def make_json_serializable(log):
     """datetime型などをテンプレートtojson用に文字列化"""
@@ -130,18 +137,16 @@ async def show_pdca_dashboard(
 
 @router.post("/pdca/replay")
 async def replay_order_from_log(log_path: str = Form(...)):
-    airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
     dag_id = "veritas_replay_dag"
-
     payload = {"conf": {"log_path": log_path}}
     headers = {"Content-Type": "application/json"}
 
     try:
         response = requests.post(
-            f"{airflow_url}/dags/{dag_id}/dagRuns",
+            f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("admin", "admin")  # 認証情報は環境変数化推奨
+            auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
         )
 
         if response.status_code in [200, 201]:
@@ -157,18 +162,16 @@ async def replay_order_from_log(log_path: str = Form(...)):
 
 @router.post("/pdca/recheck")
 async def trigger_strategy_recheck(strategy_id: str = Form(...)):
-    airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
     dag_id = "recheck_dag"
-
     payload = {"conf": {"strategy_id": strategy_id}}
     headers = {"Content-Type": "application/json"}
 
     try:
         response = requests.post(
-            f"{airflow_url}/dags/{dag_id}/dagRuns",
+            f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("admin", "admin")  # 認証情報は環境変数化が望ましい
+            auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
         )
 
         if response.status_code in [200, 201]:
