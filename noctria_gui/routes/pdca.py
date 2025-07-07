@@ -134,7 +134,6 @@ async def show_pdca_dashboard(
         "available_tags": sorted(tag_set),
     })
 
-
 # ============================
 # 🔁 /pdca/replay - 戦略再送信
 # ============================
@@ -151,7 +150,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")
+            auth=("airflow", "airflow")  # 認証情報は環境変数化推奨
         )
 
         if response.status_code in [200, 201]:
@@ -164,7 +163,6 @@ async def replay_order_from_log(log_path: str = Form(...)):
     except Exception as e:
         print(f"❌ DAG通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
-
 
 # ============================
 # 🧪 /pdca/recheck - スコア再評価トリガー
@@ -182,7 +180,7 @@ async def trigger_strategy_recheck(strategy_id: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")
+            auth=("airflow", "airflow")  # 認証情報は環境変数化が望ましい
         )
 
         if response.status_code in [200, 201]:
