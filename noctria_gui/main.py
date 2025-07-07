@@ -3,7 +3,7 @@
 
 """
 🌐 Noctria Kingdom GUI 起動スクリプト（自動ルート登録版）
-- FastAPIにより王国の統治パネルを展開
+- FastAPIで王国の統治パネルを展開
 - routes/ 以下の全ルートを自動登録
 """
 
@@ -11,13 +11,13 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-import json
 from typing import Any
+import json
 
 # ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ✅ GUIルートモジュール（__init__.pyで router 一覧を構築）
+# ✅ GUIルートモジュール（__init__.pyで routers 一覧を構築）
 import noctria_gui.routes as routes_pkg
 
 # ========================================
@@ -44,15 +44,16 @@ def from_json(value: str) -> Any:
 templates.env.filters["from_json"] = from_json
 
 # ✅ テンプレート環境を app.state に格納（共通アクセス用）
-app.state.templates: Jinja2Templates = templates
+app.state.templates = templates  # 型アノテはFastAPI流だとここは不要
 
 # ========================================
-# 🔁 ルーターの自動登録（__init__.py内で構築された routers を利用）
+# 🔁 ルーターの自動登録
 # ========================================
 
-if hasattr(routes_pkg, "routers"):
-    for router in routes_pkg.routers:
+routers = getattr(routes_pkg, "routers", None)
+if routers is not None and isinstance(routers, (list, tuple)):
+    for router in routers:
         app.include_router(router)
-        print(f"🔗 router 統合: {router.tags}")
+        print(f"🔗 router 統合: {getattr(router, 'tags', [])}")
 else:
     print("⚠️ noctria_gui.routes に routers が定義されていません")
