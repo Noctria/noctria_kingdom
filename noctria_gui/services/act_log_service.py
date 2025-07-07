@@ -74,11 +74,11 @@ def _within_date_range(date_str: str, start: datetime, end: datetime) -> bool:
         return False
 
 
-def export_logs_to_csv(logs: List[Dict], output_path: Path):
+def export_logs_to_csv(logs: List[Dict], output_path: Path) -> bool:
     """📤 昇格ログをCSV出力する"""
     if not logs:
         print("⚠️ ログが存在しません、CSV出力をスキップしました。")
-        return
+        return False
 
     fieldnames = sorted({key for log in logs for key in log.keys() if not key.startswith("__")})
 
@@ -89,8 +89,10 @@ def export_logs_to_csv(logs: List[Dict], output_path: Path):
             for log in logs:
                 writer.writerow({k: log.get(k, "") for k in fieldnames})
         print(f"✅ CSV出力完了: {output_path}")
+        return True
     except Exception as e:
         print(f"⚠️ CSV出力失敗: {e}")
+        return False
 
 
 def reset_push_flag(strategy_name: str) -> bool:
