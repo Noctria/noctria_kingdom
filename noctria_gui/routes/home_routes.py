@@ -11,17 +11,21 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    # ✅ 仮データ：Jinjaテンプレート側の参照に備えて最低限の構造を確保
+    # ✅ 仮データ：dashboard.html 用 stats を最低限安全に初期化
     stats = {
         "promoted_count": 0,
         "pushed_count": 0,
         "avg_win_rate": 0.0,
-        "dates": [],  # ✅ tojson用に必須
-        "daily_scores": [],  # ✅ tojson用に必須
         "filter": {
             "from": "",
             "to": ""
-        }
+        },
+        # 🛡️ tojson フィルタで参照される構造
+        "dates": [],
+        "daily_scores": [],
+        "promoted_values": [],
+        "pushed_values": [],
+        "win_rate_values": [],
     }
 
     return templates.TemplateResponse("dashboard.html", {
