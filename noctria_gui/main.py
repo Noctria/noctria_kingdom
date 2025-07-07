@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json
+from typing import Any
 
 # ✅ 統治下の正式パス
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
@@ -34,7 +35,7 @@ app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="s
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # ✅ Jinja2 カスタムフィルタ：from_json（文字列 → dict）
-def from_json(value: str):
+def from_json(value: str) -> Any:
     try:
         return json.loads(value)
     except Exception:
@@ -43,7 +44,7 @@ def from_json(value: str):
 templates.env.filters["from_json"] = from_json
 
 # ✅ テンプレート環境を app.state に格納（共通アクセス用）
-app.state.templates = templates
+app.state.templates: Jinja2Templates = templates
 
 # ========================================
 # 🔁 ルーターの自動登録（__init__.py内で構築された routers を利用）
