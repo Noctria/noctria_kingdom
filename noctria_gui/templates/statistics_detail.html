@@ -4,6 +4,14 @@
 {% block content %}
 <h2>📊 詳細分析（{{ mode }}: {{ key }}）</h2>
 
+<!-- 📌 再評価ボタン（戦略モード限定） -->
+{% if mode == "strategy" %}
+<form method="post" action="/pdca/recheck" style="margin-bottom: 1rem;">
+  <input type="hidden" name="strategy_name" value="{{ key }}">
+  <button class="button">📌 この戦略を再評価</button>
+</form>
+{% endif %}
+
 <!-- 🔍 ソート設定 -->
 <form method="get" action="/statistics/detail" style="margin-bottom: 1rem;">
   <input type="hidden" name="mode" value="{{ mode }}">
@@ -99,7 +107,6 @@
   const rawData = {{ results | tojson }};
   let winChart, ddChart, lineChart;
 
-  // 🌗 ダークモード対応カラー
   const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const chartColors = {
     text: isDark ? "#ccc" : "#222",
@@ -116,35 +123,19 @@
     const q2 = sorted[Math.floor(n * 0.5)];
     const q3 = sorted[Math.floor(n * 0.75)];
     return {
-      count: n,
-      min: sorted[0],
-      q1: q1,
-      median: q2,
-      q3: q3,
-      max: sorted[n - 1]
+      count: n, min: sorted[0], q1: q1, median: q2, q3: q3, max: sorted[n - 1]
     };
   }
 
   function renderSummary() {
     const winStats = computeStats(rawData.map(r => Number(r.win_rate)));
     const ddStats = computeStats(rawData.map(r => Number(r.max_drawdown)));
-
     const tbody = document.getElementById("statSummary");
     tbody.innerHTML = "";
 
     function rowHTML(label, stats) {
       if (!stats) return `<tr><td>${label}</td><td colspan="6">データなし</td></tr>`;
-      return `
-        <tr>
-          <td>${label}</td>
-          <td>${stats.count}</td>
-          <td>${stats.min}</td>
-          <td>${stats.q1}</td>
-          <td>${stats.median}</td>
-          <td>${stats.q3}</td>
-          <td>${stats.max}</td>
-        </tr>
-      `;
+      return `<tr><td>${label}</td><td>${stats.count}</td><td>${stats.min}</td><td>${stats.q1}</td><td>${stats.median}</td><td>${stats.q3}</td><td>${stats.max}</td></tr>`;
     }
 
     tbody.innerHTML += rowHTML("勝率（%）", winStats);
@@ -162,50 +153,17 @@
       data: {
         labels: labels,
         datasets: [
-          {
-            label: "勝率",
-            data: winData,
-            borderColor: chartColors.win,
-            backgroundColor: chartColors.win,
-            tension: 0.3,
-            yAxisID: "y1"
-          },
-          {
-            label: "最大DD",
-            data: ddData,
-            borderColor: chartColors.dd,
-            backgroundColor: chartColors.dd,
-            tension: 0.3,
-            yAxisID: "y2"
-          }
+          { label: "勝率", data: winData, borderColor: chartColors.win, backgroundColor: chartColors.win, tension: 0.3, yAxisID: "y1" },
+          { label: "最大DD", data: ddData, borderColor: chartColors.dd, backgroundColor: chartColors.dd, tension: 0.3, yAxisID: "y2" }
         ]
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { position: "top" }
-        },
+        plugins: { legend: { position: "top" }},
         scales: {
-          y1: {
-            type: "linear",
-            position: "left",
-            beginAtZero: true,
-            title: { display: true, text: "勝率", color: chartColors.text },
-            ticks: { color: chartColors.text },
-            grid: { color: chartColors.grid }
-          },
-          y2: {
-            type: "linear",
-            position: "right",
-            beginAtZero: true,
-            title: { display: true, text: "最大DD", color: chartColors.text },
-            ticks: { color: chartColors.text },
-            grid: { drawOnChartArea: false }
-          },
-          x: {
-            ticks: { color: chartColors.text },
-            grid: { color: chartColors.grid }
-          }
+          y1: { type: "linear", position: "left", beginAtZero: true, title: { display: true, text: "勝率", color: chartColors.text }, ticks: { color: chartColors.text }, grid: { color: chartColors.grid }},
+          y2: { type: "linear", position: "right", beginAtZero: true, title: { display: true, text: "最大DD", color: chartColors.text }, ticks: { color: chartColors.text }, grid: { drawOnChartArea: false }},
+          x: { ticks: { color: chartColors.text }, grid: { color: chartColors.grid } }
         }
       }
     });
@@ -213,14 +171,12 @@
 
   function renderHistogram(values, canvasId, label, color, binCount = 10) {
     const filtered = values.filter(v => typeof v === 'number' && !isNaN(v));
-    const min = Math.min(...filtered);
-    const max = Math.max(...filtered);
+    const min = Math.min(...filtered), max = Math.max(...filtered);
     const step = (max - min) / binCount || 1;
-    const bins = Array(binCount).fill(0);
-    const labels = [];
+    const bins = Array(binCount).fill(0), labels = [];
+
     for (let i = 0; i < binCount; i++) {
-      const start = min + step * i;
-      const end = start + step;
+      const start = min + step * i, end = start + step;
       labels.push(`${start.toFixed(1)}〜${end.toFixed(1)}`);
     }
     filtered.forEach(v => {
@@ -236,25 +192,14 @@
       type: "bar",
       data: {
         labels: labels,
-        datasets: [{
-          label: label,
-          data: bins,
-          backgroundColor: color,
-        }]
+        datasets: [{ label: label, data: bins, backgroundColor: color }]
       },
       options: {
         responsive: true,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }},
         scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1, precision: 0, color: chartColors.text },
-            grid: { color: chartColors.grid }
-          },
-          x: {
-            ticks: { color: chartColors.text },
-            grid: { color: chartColors.grid }
-          }
+          y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0, color: chartColors.text }, grid: { color: chartColors.grid }},
+          x: { ticks: { color: chartColors.text }, grid: { color: chartColors.grid }}
         }
       }
     });
@@ -279,7 +224,6 @@
     link.click();
   }
 
-  // 初期描画
   renderSummary();
   drawLineChart();
   drawAllHistograms();
