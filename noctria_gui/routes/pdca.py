@@ -79,7 +79,7 @@ async def show_pdca_dashboard(
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
         })
 
-    # 🔍 フィルター
+    # 🔍 フィルター処理
     def matches(log):
         if strategy and strategy.lower() not in log["strategy"].lower():
             return False
@@ -107,7 +107,7 @@ async def show_pdca_dashboard(
 
     filtered_logs = [log for log in logs if matches(log)]
 
-    # 🔃 ソート
+    # 🔃 ソート処理
     if sort:
         reverse = sort.startswith("-")
         key = sort.lstrip("-")
@@ -146,7 +146,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
             f"{airflow_url}/dags/{dag_id}/dagRuns",
             json=payload,
             headers=headers,
-            auth=("airflow", "airflow")  # 必要に応じて認証情報更新
+            auth=("airflow", "airflow")  # 必要に応じて認証情報を更新
         )
 
         if response.status_code in [200, 201]:
