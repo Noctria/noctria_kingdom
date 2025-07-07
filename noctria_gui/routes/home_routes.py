@@ -10,7 +10,8 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # 修正：index.html → dashboard.html に変更
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @router.get("/path-check", response_class=HTMLResponse)
 async def path_check_form(request: Request):
