@@ -10,17 +10,28 @@ import os
 import json
 import io
 import csv
+from typing import Optional, Dict, Any
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-def parse_date(date_str):
+def parse_date(date_str: Optional[str]) -> Optional[datetime]:
+    """'YYYY-MM-DD'形式の日付文字列→datetime。エラー時None"""
     try:
+        if not date_str:
+            return None
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
 
-def load_tag_stats(from_date=None, to_date=None, tag_keyword=None):
+def load_tag_stats(
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
+    tag_keyword: Optional[str] = None
+) -> Dict[str, Dict[str, Any]]:
+    """
+    タグごとに勝率・DDなどを集計。
+    """
     tag_stats = defaultdict(lambda: {"count": 0, "win_rates": [], "drawdowns": []})
     act_dir = Path(ACT_LOG_DIR)
 
@@ -36,6 +47,7 @@ def load_tag_stats(from_date=None, to_date=None, tag_keyword=None):
                 continue
             date_obj = datetime.strptime(date_str, "%Y-%m-%d")
 
+            # 期間フィルタ
             if from_date and date_obj < from_date:
                 continue
             if to_date and date_obj > to_date:
@@ -59,6 +71,7 @@ def load_tag_stats(from_date=None, to_date=None, tag_keyword=None):
         except Exception:
             continue
 
+    # 平均値など整形
     final_stats = {}
     for tag, values in tag_stats.items():
         count = values["count"]
