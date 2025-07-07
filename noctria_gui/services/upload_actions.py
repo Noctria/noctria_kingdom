@@ -9,9 +9,11 @@ from core.path_config import STRATEGIES_DIR
 UPLOADED_DIR = STRATEGIES_DIR / "uploaded"
 OFFICIAL_DIR = STRATEGIES_DIR / "official"
 
+
 def list_uploaded_strategies():
     """アップロード済戦略をリスト形式で返す"""
     return sorted([f.name for f in UPLOADED_DIR.glob("*.py")])
+
 
 def delete_uploaded_strategy(filename: str) -> bool:
     """アップロード済み戦略を削除"""
@@ -20,6 +22,11 @@ def delete_uploaded_strategy(filename: str) -> bool:
         target.unlink()
         return True
     return False
+
+
+# ✅ upload_history 用に export: delete_strategy_log = delete_uploaded_strategy
+delete_strategy_log = delete_uploaded_strategy
+
 
 def re_evaluate_strategy(filename: str) -> dict:
     """
@@ -45,6 +52,7 @@ def re_evaluate_strategy(filename: str) -> dict:
     except Exception as e:
         return {"success": False, "message": str(e)}
 
+
 def promote_to_official(filename: str) -> bool:
     """
     アップロード戦略を official/ に昇格コピーする
@@ -56,6 +64,7 @@ def promote_to_official(filename: str) -> bool:
         shutil.copy2(src, dst)
         return True
     return False
+
 
 def save_uploaded_strategy(file_bytes: bytes, filename: str) -> str:
     """
