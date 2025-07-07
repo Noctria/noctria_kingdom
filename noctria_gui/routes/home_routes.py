@@ -25,7 +25,8 @@ async def home(request: Request):
         "promoted_values": [],
         "pushed_values": [],
         "win_rate_values": [],
-        "avg_win_rates": [],  # ← 🔥 これが抜けていたためエラーになっていた
+        "avg_win_rates": [],
+        "avg_max_dds": [],  # ← 🔥 これも明示的に追加しておく
     }
 
     return templates.TemplateResponse("dashboard.html", {
