@@ -8,6 +8,7 @@
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.utils.dates import days_ago
 from datetime import datetime
 import subprocess
 
@@ -22,7 +23,7 @@ def run_recheck(**context):
 
     print(f"🔁 再評価対象: {strategy_id}")
 
-    # 評価スクリプトを実行（エラー時は Airflow が検知）
+    # 評価スクリプトを実行
     result = subprocess.run(
         ["python3", "scripts/recheck_runner.py", strategy_id],
         capture_output=True,
@@ -37,18 +38,24 @@ def run_recheck(**context):
     if result.returncode != 0:
         raise RuntimeError(f"再評価スクリプトが失敗しました: {result.stderr}")
 
-# DAG定義
-with DAG(
+# ✅ DAG定義（明示的に dag 変数を残すこと）
+default_args = {
+    "owner": "airflow",
+}
+
+dag = DAG(
     dag_id="recheck_dag",
     description="Noctria Kingdom - 戦略再評価処理（recheck）",
+    default_args=default_args,
     start_date=datetime(2025, 1, 1),
-    schedule_interval=None,  # 手動実行
+    schedule_interval=None,
     catchup=False,
     tags=["pdca", "recheck"],
-) as dag:
+)
 
-    recheck_task = PythonOperator(
-        task_id="run_recheck",
-        python_callable=run_recheck,
-        provide_context=True,
-    )
+# ✅ タスク定義
+recheck_task = PythonOperator(
+    task_id="run_recheck",
+    python_callable=run_recheck,
+    dag=dag,
+)
