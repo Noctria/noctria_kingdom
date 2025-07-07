@@ -19,14 +19,24 @@ from noctria_gui.services import act_log_service
 router = APIRouter()
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
+def parse_float(s):
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+def parse_bool(s):
+    if isinstance(s, str):
+        return s.lower() in ["true", "1", "on"]
+    return None
 
 @router.get("/act-history", response_class=HTMLResponse)
 async def show_act_history(
     request: Request,
     strategy_name: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
-    min_score: Optional[float] = Query(None),
-    max_score: Optional[float] = Query(None),
+    min_score: Optional[str] = Query(None),
+    max_score: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     pushed: Optional[str] = Query(None),
@@ -34,43 +44,32 @@ async def show_act_history(
     """
     📋 採用戦略ログを一覧表示（検索・絞り込み対応）
     """
-    # 空文字や"None"もNone扱いに変換
-    if not strategy_name or strategy_name in ["", "None"]:
-        strategy_name = None
-    if not tag or tag in ["", "None"]:
-        tag = None
-    if not min_score or min_score in ["", "None"]:
-        min_score = None
-    if not max_score or max_score in ["", "None"]:
-        max_score = None
-    if not start_date or start_date in ["", "None"]:
-        start_date = None
-    if not end_date or end_date in ["", "None"]:
-        end_date = None
-    if not pushed or pushed in ["", "None"]:
-        pushed = None
-
-    # pushed型変換
-    if pushed is not None:
-        pushed = pushed.lower() in ["true", "1", "on"]
+    # 全部strで受けて、ここで変換
+    min_score_val = parse_float(min_score)
+    max_score_val = parse_float(max_score)
+    pushed_val = parse_bool(pushed)
+    strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
+    tag_val = tag if tag and tag not in ["", "None"] else None
+    start_date_val = start_date if start_date and start_date not in ["", "None"] else None
+    end_date_val = end_date if end_date and end_date not in ["", "None"] else None
 
     logs = act_log_service.load_all_act_logs()
 
     # フィルター処理
     try:
-        score_range = (min_score, max_score) if min_score is not None and max_score is not None else None
+        score_range = (min_score_val, max_score_val) if min_score_val is not None and max_score_val is not None else None
         date_range = (
-            datetime.strptime(start_date, "%Y-%m-%d"),
-            datetime.strptime(end_date, "%Y-%m-%d"),
-        ) if start_date and end_date else None
+            datetime.strptime(start_date_val, "%Y-%m-%d"),
+            datetime.strptime(end_date_val, "%Y-%m-%d"),
+        ) if start_date_val and end_date_val else None
 
         logs = act_log_service.filter_act_logs(
             logs,
-            strategy_name=strategy_name,
-            tag=tag,
+            strategy_name=strategy_name_val,
+            tag=tag_val,
             score_range=score_range,
             date_range=date_range,
-            pushed=pushed,
+            pushed=pushed_val,
         )
     except Exception as e:
         print(f"[act_history] ⚠️ フィルターエラー: {e}")
@@ -82,13 +81,13 @@ async def show_act_history(
         "logs": logs,
         "tag_list": tag_list,
         "filters": {
-            "strategy_name": strategy_name,
-            "tag": tag,
-            "min_score": min_score,
-            "max_score": max_score,
-            "start_date": start_date,
-            "end_date": end_date,
-            "pushed": pushed,
+            "strategy_name": strategy_name_val,
+            "tag": tag_val,
+            "min_score": min_score_val,
+            "max_score": max_score_val,
+            "start_date": start_date_val,
+            "end_date": end_date_val,
+            "pushed": pushed_val,
         }
     })
 
@@ -130,8 +129,8 @@ async def reevaluate_strategy(strategy_name: str = Form(...)):
 async def export_act_log_csv(
     strategy_name: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
-    min_score: Optional[float] = Query(None),
-    max_score: Optional[float] = Query(None),
+    min_score: Optional[str] = Query(None),
+    max_score: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     pushed: Optional[str] = Query(None),
@@ -139,42 +138,31 @@ async def export_act_log_csv(
     """
     📤 採用戦略ログをCSV形式で出力（検索条件を反映）
     """
-    # 空文字や"None"もNone扱いに変換
-    if not strategy_name or strategy_name in ["", "None"]:
-        strategy_name = None
-    if not tag or tag in ["", "None"]:
-        tag = None
-    if not min_score or min_score in ["", "None"]:
-        min_score = None
-    if not max_score or max_score in ["", "None"]:
-        max_score = None
-    if not start_date or start_date in ["", "None"]:
-        start_date = None
-    if not end_date or end_date in ["", "None"]:
-        end_date = None
-    if not pushed or pushed in ["", "None"]:
-        pushed = None
-
-    # pushed型変換
-    if pushed is not None:
-        pushed = pushed.lower() in ["true", "1", "on"]
+    # 全部strで受けて、ここで変換
+    min_score_val = parse_float(min_score)
+    max_score_val = parse_float(max_score)
+    pushed_val = parse_bool(pushed)
+    strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
+    tag_val = tag if tag and tag not in ["", "None"] else None
+    start_date_val = start_date if start_date and start_date not in ["", "None"] else None
+    end_date_val = end_date if end_date and end_date not in ["", "None"] else None
 
     logs = act_log_service.load_all_act_logs()
 
     try:
-        score_range = (min_score, max_score) if min_score is not None and max_score is not None else None
+        score_range = (min_score_val, max_score_val) if min_score_val is not None and max_score_val is not None else None
         date_range = (
-            datetime.strptime(start_date, "%Y-%m-%d"),
-            datetime.strptime(end_date, "%Y-%m-%d"),
-        ) if start_date and end_date else None
+            datetime.strptime(start_date_val, "%Y-%m-%d"),
+            datetime.strptime(end_date_val, "%Y-%m-%d"),
+        ) if start_date_val and end_date_val else None
 
         logs = act_log_service.filter_act_logs(
             logs,
-            strategy_name=strategy_name,
-            tag=tag,
+            strategy_name=strategy_name_val,
+            tag=tag_val,
             score_range=score_range,
             date_range=date_range,
-            pushed=pushed,
+            pushed=pushed_val,
         )
     except Exception as e:
         print(f"[act_history/export] ⚠️ フィルターエラー: {e}")
