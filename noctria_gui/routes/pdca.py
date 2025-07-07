@@ -18,20 +18,15 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 def make_json_serializable(log):
     """datetime型などをテンプレートtojson用に文字列化"""
     new_log = log.copy()
-    # 典型的なdatetimeフィールドの処理
     for key in ["timestamp_dt"]:
         val = new_log.get(key)
         if isinstance(val, datetime):
             new_log[key] = val.isoformat()
-    # tagsも必ずリスト化
     tags = new_log.get("tags")
     if isinstance(tags, str):
         new_log["tags"] = [tags]
     return new_log
 
-# ============================
-# 📜 /pdca - 履歴表示
-# ============================
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
     request: Request,
@@ -133,9 +128,6 @@ async def show_pdca_dashboard(
         "available_tags": sorted(tag_set),
     })
 
-# ============================
-# 🔁 /pdca/replay - 戦略再送信
-# ============================
 @router.post("/pdca/replay")
 async def replay_order_from_log(log_path: str = Form(...)):
     airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
@@ -163,9 +155,6 @@ async def replay_order_from_log(log_path: str = Form(...)):
         print(f"❌ DAG通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-# ============================
-# 🧪 /pdca/recheck - スコア再評価トリガー
-# ============================
 @router.post("/pdca/recheck")
 async def trigger_strategy_recheck(strategy_id: str = Form(...)):
     airflow_url = os.environ.get("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
