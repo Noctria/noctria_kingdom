@@ -8,7 +8,7 @@
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
 
-  <!-- 🔍 フィルターUI（将来的に拡張可） -->
+  <!-- 🔍 フィルターUI（拡張予定） -->
   <!-- <form method="get" action="/pdca" class="filter card"> ... </form> -->
 
   <!-- 📋 履歴一覧 -->
@@ -17,8 +17,10 @@
       <tr>
         <th>🕒 実行日時</th>
         <th>📘 戦略名</th>
-        <th>⚙ フェーズ</th>
-        <th>📈 ステータス</th>
+        <th>⚙ シグナル</th>
+        <th>💹 通貨ペア</th>
+        <th>📈 勝率</th>
+        <th>📉 最大DD</th>
         <th>🧪 詳細</th>
         <th>🔁 再実行</th>
       </tr>
@@ -27,16 +29,17 @@
       {% for log in logs %}
       <tr>
         <td>{{ log.timestamp }}</td>
-        <td>{{ log.strategy_name }}</td>
-        <td>{{ log.phase }}</td>
-        <td>{{ log.status }}</td>
+        <td>{{ log.strategy }}</td>
+        <td>{{ log.signal }}</td>
+        <td>{{ log.symbol }}</td>
+        <td>{{ log.win_rate or 'N/A' }}</td>
+        <td>{{ log.max_dd or 'N/A' }}</td>
         <td>
           <button class="btn" onclick="showDetails({{ log | tojson | safe }})">詳細</button>
         </td>
         <td>
           <form method="post" action="/pdca/replay" class="action-form">
-            <input type="hidden" name="strategy_name" value="{{ log.strategy_name }}">
-            <input type="hidden" name="phase" value="{{ log.phase }}">
+            <input type="hidden" name="log_path" value="{{ log.path }}">
             <button type="submit" class="btn">再実行</button>
           </form>
         </td>
