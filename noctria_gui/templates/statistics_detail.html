@@ -99,7 +99,15 @@
   const rawData = {{ results | tojson }};
   let winChart, ddChart, lineChart;
 
-  // 📘 統計計算（四分位数含む）
+  // 🌗 ダークモード対応カラー
+  const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const chartColors = {
+    text: isDark ? "#ccc" : "#222",
+    grid: isDark ? "#444" : "#ccc",
+    win: "rgba(54, 162, 235, 0.7)",
+    dd: "rgba(255, 99, 132, 0.7)"
+  };
+
   function computeStats(values) {
     const sorted = values.filter(v => typeof v === 'number' && !isNaN(v)).sort((a, b) => a - b);
     const n = sorted.length;
@@ -143,13 +151,138 @@
     tbody.innerHTML += rowHTML("最大DD（%）", ddStats);
   }
 
-  // 既存の drawLineChart, drawAllHistograms, downloadChart 関数は省略（前回までと同じ）
+  function drawLineChart() {
+    const labels = rawData.map(r => r.date);
+    const winData = rawData.map(r => Number(r.win_rate));
+    const ddData = rawData.map(r => Number(r.max_drawdown));
+    const ctx = document.getElementById("lineChart").getContext("2d");
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "勝率",
+            data: winData,
+            borderColor: chartColors.win,
+            backgroundColor: chartColors.win,
+            tension: 0.3,
+            yAxisID: "y1"
+          },
+          {
+            label: "最大DD",
+            data: ddData,
+            borderColor: chartColors.dd,
+            backgroundColor: chartColors.dd,
+            tension: 0.3,
+            yAxisID: "y2"
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "top" }
+        },
+        scales: {
+          y1: {
+            type: "linear",
+            position: "left",
+            beginAtZero: true,
+            title: { display: true, text: "勝率", color: chartColors.text },
+            ticks: { color: chartColors.text },
+            grid: { color: chartColors.grid }
+          },
+          y2: {
+            type: "linear",
+            position: "right",
+            beginAtZero: true,
+            title: { display: true, text: "最大DD", color: chartColors.text },
+            ticks: { color: chartColors.text },
+            grid: { drawOnChartArea: false }
+          },
+          x: {
+            ticks: { color: chartColors.text },
+            grid: { color: chartColors.grid }
+          }
+        }
+      }
+    });
+  }
 
-  document.getElementById("binCountSelect").addEventListener("change", drawAllHistograms);
+  function renderHistogram(values, canvasId, label, color, binCount = 10) {
+    const filtered = values.filter(v => typeof v === 'number' && !isNaN(v));
+    const min = Math.min(...filtered);
+    const max = Math.max(...filtered);
+    const step = (max - min) / binCount || 1;
+    const bins = Array(binCount).fill(0);
+    const labels = [];
+    for (let i = 0; i < binCount; i++) {
+      const start = min + step * i;
+      const end = start + step;
+      labels.push(`${start.toFixed(1)}〜${end.toFixed(1)}`);
+    }
+    filtered.forEach(v => {
+      const idx = Math.min(Math.floor((v - min) / step), binCount - 1);
+      bins[idx]++;
+    });
+
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    if (canvasId === "winHistogram" && winChart) winChart.destroy();
+    if (canvasId === "ddHistogram" && ddChart) ddChart.destroy();
+
+    const chart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: label,
+          data: bins,
+          backgroundColor: color,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1, precision: 0, color: chartColors.text },
+            grid: { color: chartColors.grid }
+          },
+          x: {
+            ticks: { color: chartColors.text },
+            grid: { color: chartColors.grid }
+          }
+        }
+      }
+    });
+
+    if (canvasId === "winHistogram") winChart = chart;
+    if (canvasId === "ddHistogram") ddChart = chart;
+  }
+
+  function drawAllHistograms() {
+    const binCount = parseInt(document.getElementById("binCountSelect").value);
+    const winRates = rawData.map(r => Number(r.win_rate));
+    const drawdowns = rawData.map(r => Number(r.max_drawdown));
+    renderHistogram(winRates, "winHistogram", "勝率分布", chartColors.win, binCount);
+    renderHistogram(drawdowns, "ddHistogram", "最大DD分布", chartColors.dd, binCount);
+  }
+
+  function downloadChart(canvasId, filename) {
+    const canvas = document.getElementById(canvasId);
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png", 1.0);
+    link.download = filename;
+    link.click();
+  }
 
   // 初期描画
   renderSummary();
   drawLineChart();
   drawAllHistograms();
+  document.getElementById("binCountSelect").addEventListener("change", drawAllHistograms);
 </script>
 {% endblock %}
