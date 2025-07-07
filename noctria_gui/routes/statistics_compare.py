@@ -7,36 +7,45 @@ from collections import defaultdict
 from statistics import mean, median
 from datetime import datetime
 from pathlib import Path
-import os, json, csv, io
+import os
+import json
+import csv
+import io
+from typing import Optional, List, Dict, Any
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
-def parse_date(date_str):
+def parse_date(date_str: Optional[str]) -> Optional[datetime]:
+    if not date_str:
+        return None
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
 
 
-def load_strategy_logs():
+def load_strategy_logs() -> List[Dict[str, Any]]:
     data = []
     for file in os.listdir(ACT_LOG_DIR):
         if file.endswith(".json"):
             path = Path(ACT_LOG_DIR) / file
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    data.append(json.load(f))
+                    obj = json.load(f)
+                    if isinstance(obj, dict):
+                        data.append(obj)
             except Exception:
                 continue
     return data
 
 
-def filter_by_date(records, from_date, to_date):
+def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]) -> List[Dict[str, Any]]:
     filtered = []
     for d in records:
-        ts = parse_date(d.get("timestamp", "")[:10])
+        ts_str = d.get("timestamp", "")[:10]
+        ts = parse_date(ts_str)
         if from_date and ts and ts < from_date:
             continue
         if to_date and ts and ts > to_date:
@@ -45,7 +54,7 @@ def filter_by_date(records, from_date, to_date):
     return filtered
 
 
-def compute_statistics_grouped(data, mode):
+def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[str, Dict[str, List[float]]]:
     stat_map = defaultdict(lambda: defaultdict(list))
     for entry in data:
         keys = [entry.get("strategy_name")] if mode == "strategy" else entry.get("tags", [])
@@ -123,7 +132,6 @@ async def export_csv(request: Request):
 
     rows.extend([summary_mean, summary_median])
 
-    # CSV 出力
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=headers)
     writer.writeheader()
