@@ -36,10 +36,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # DAG, logs, plugins（ホスト→コンテナ）
-      - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
-      - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
-      - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+      # ✅ DAGフォルダは Airflow標準パスにマウント
+      - ${HOST_DAGS_PATH}:/opt/airflow/dags
+      - ${HOST_LOGS_PATH}:/opt/airflow/logs
+      - ${HOST_PLUGINS_PATH}:/opt/airflow/plugins
 
       # Noctria Kingdom コンポーネント群
       - ../core:/opt/airflow/core
@@ -63,12 +63,10 @@ services:
       - redis
     env_file: .env
     volumes:
-      # DAG, logs, plugins（ホスト→コンテナ）
-      - ${HOST_DAGS_PATH}:/opt/airflow/airflow_docker/dags
-      - ${HOST_LOGS_PATH}:/opt/airflow/airflow_docker/logs
-      - ${HOST_PLUGINS_PATH}:/opt/airflow/airflow_docker/plugins
+      - ${HOST_DAGS_PATH}:/opt/airflow/dags
+      - ${HOST_LOGS_PATH}:/opt/airflow/logs
+      - ${HOST_PLUGINS_PATH}:/opt/airflow/plugins
 
-      # Noctria Kingdom コンポーネント群
       - ../core:/opt/airflow/core
       - ../scripts:/opt/airflow/scripts
       - ../strategies:/opt/airflow/strategies
