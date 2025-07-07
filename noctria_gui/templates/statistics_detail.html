@@ -48,7 +48,12 @@
   </tbody>
 </table>
 
-<!-- 📈 グラフ -->
+<!-- 📈 折れ線グラフ -->
+<h3 style="margin-top: 2rem;">📈 勝率・最大DDの時系列推移</h3>
+<canvas id="lineChart" height="100"></canvas>
+
+<!-- 📈 ヒストグラム -->
+<h3 style="margin-top: 2rem;">📊 ヒストグラム</h3>
 <canvas id="winHistogram" height="100"></canvas>
 <canvas id="ddHistogram" height="100"></canvas>
 
@@ -67,6 +72,7 @@
 <div style="margin-top: 1rem;">
   <button class="button" onclick="downloadChart('winHistogram', 'win_histogram.png')">💾 勝率ヒストグラム保存</button>
   <button class="button" onclick="downloadChart('ddHistogram', 'dd_histogram.png')">💾 最大DDヒストグラム保存</button>
+  <button class="button" onclick="downloadChart('lineChart', 'time_series_chart.png')">💾 時系列グラフ保存</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -74,7 +80,65 @@
   const rawData = {{ results | tojson }};
   let winChart = null;
   let ddChart = null;
+  let lineChart = null;
 
+  // 📈 折れ線グラフ描画
+  function drawLineChart() {
+    const labels = rawData.map(r => r.date);
+    const winData = rawData.map(r => Number(r.win_rate));
+    const ddData = rawData.map(r => Number(r.max_drawdown));
+
+    const ctx = document.getElementById("lineChart").getContext("2d");
+    if (lineChart) lineChart.destroy();
+
+    lineChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "勝率",
+            data: winData,
+            borderColor: "rgba(54, 162, 235, 1)",
+            backgroundColor: "rgba(54, 162, 235, 0.2)",
+            tension: 0.3,
+            yAxisID: "y1"
+          },
+          {
+            label: "最大DD",
+            data: ddData,
+            borderColor: "rgba(255, 99, 132, 1)",
+            backgroundColor: "rgba(255, 99, 132, 0.2)",
+            tension: 0.3,
+            yAxisID: "y2"
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "top" }
+        },
+        scales: {
+          y1: {
+            type: "linear",
+            position: "left",
+            beginAtZero: true,
+            title: { display: true, text: "勝率" }
+          },
+          y2: {
+            type: "linear",
+            position: "right",
+            beginAtZero: true,
+            title: { display: true, text: "最大DD" },
+            grid: { drawOnChartArea: false }
+          }
+        }
+      }
+    });
+  }
+
+  // 📊 ヒストグラム描画
   function renderHistogram(values, canvasId, label, color, binCount = 10) {
     const filtered = values.filter(v => typeof v === 'number' && !isNaN(v));
     if (filtered.length === 0) return;
@@ -145,6 +209,9 @@
   }
 
   document.getElementById("binCountSelect").addEventListener("change", drawAllHistograms);
+
+  // 初期描画
+  drawLineChart();
   drawAllHistograms();
 
   function downloadChart(canvasId, filename) {
