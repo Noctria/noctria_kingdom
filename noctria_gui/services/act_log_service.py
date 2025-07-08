@@ -16,17 +16,26 @@ from core.path_config import ACT_LOG_DIR, VERITAS_EVAL_LOG
 
 
 def load_all_act_logs() -> List[Dict]:
-    """📂 ACTログディレクトリから全ログを読み込む"""
+    """📂 ACTログディレクトリから全ログを読み込み、score整形"""
     logs = []
     for file in sorted(ACT_LOG_DIR.glob("*.json"), reverse=True):
         try:
             with open(file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 data["__log_path__"] = str(file)
+                data = _normalize_score(data)
                 logs.append(data)
         except Exception as e:
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
     return logs
+
+
+def _normalize_score(log: Dict) -> Dict:
+    """📐 scoreがdict型ならmeanだけ取り出す"""
+    score = log.get("score")
+    if isinstance(score, dict) and "mean" in score:
+        log["score"] = score["mean"]
+    return log
 
 
 def filter_act_logs(
@@ -75,7 +84,7 @@ def _within_date_range(date_str: str, start: datetime, end: datetime) -> bool:
 
 
 def export_logs_to_csv(logs: List[Dict], output_path: Path) -> bool:
-    """📤 昇格ログをCSV出力する"""
+    """📤 昇格ログをCSV出力する（辞書・リストはJSON化）"""
     if not logs:
         print("⚠️ ログが存在しません、CSV出力をスキップしました。")
         return False
@@ -87,7 +96,13 @@ def export_logs_to_csv(logs: List[Dict], output_path: Path) -> bool:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for log in logs:
-                writer.writerow({k: log.get(k, "") for k in fieldnames})
+                # 値が dict や list の場合は文字列に変換して出力
+                safe_row = {
+                    k: json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v
+                    for k, v in log.items()
+                    if k in fieldnames
+                }
+                writer.writerow(safe_row)
         print(f"✅ CSV出力完了: {output_path}")
         return True
     except Exception as e:
