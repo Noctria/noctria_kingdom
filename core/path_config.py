@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-📌 Noctria Kingdom Path Config (v3.6)
+📌 Noctria Kingdom Path Config (v3.7)
 - 王国全体のパス構造を一元管理
 - Docker/WSL/ローカルの差異を吸収し、自動で切り替える
 """
