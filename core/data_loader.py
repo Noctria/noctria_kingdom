@@ -3,6 +3,7 @@
 import requests
 import numpy as np
 import logging
+import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 class MarketDataFetcher:
@@ -65,3 +66,42 @@ class MarketDataFetcher:
             return "bearish"
         else:
             return "neutral"
+
+    def fetch_daily_data(self, from_symbol="USD", to_symbol="JPY", max_days=90) -> pd.DataFrame:
+        """
+        📅 Alpha Vantage から日次為替データ（終値）を取得
+        :param from_symbol: 通貨（例: USD）
+        :param to_symbol: 通貨（例: JPY）
+        :param max_days: 取得する最大日数（新しい順）
+        :return: DataFrame（date, close）
+        """
+        params = {
+            "function": "FX_DAILY",
+            "from_symbol": from_symbol,
+            "to_symbol": to_symbol,
+            "apikey": self.api_key,
+            "outputsize": "compact"
+        }
+
+        try:
+            response = requests.get(self.base_url, params=params)
+            data = response.json()
+
+            if "Time Series FX (Daily)" not in data:
+                self.logger.warning("為替日次データが見つかりません")
+                return pd.DataFrame()
+
+            raw = data["Time Series FX (Daily)"]
+            records = [
+                {"date": date, "close": float(info["4. close"])}
+                for date, info in raw.items()
+            ]
+            df = pd.DataFrame(records)
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.sort_values("date").reset_index(drop=True)
+
+            return df.tail(max_days)
+
+        except Exception as e:
+            self.logger.error(f"日次データ取得エラー: {e}")
+            return pd.DataFrame()
