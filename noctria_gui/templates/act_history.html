@@ -72,7 +72,19 @@
         <td>{{ log.strategy }}</td>
         <td>{{ log.symbol }}</td>
         <td>{{ log.promoted_at or log.timestamp }}</td>
-        <td>{{ "%.2f"|format(log.score) if log.score is defined else "-" }}</td>
+        <td>
+          {% if log.score is defined %}
+            {% if log.score.__class__.__name__ == "dict" and "mean" in log.score %}
+              {{ "%.2f"|format(log.score.mean) }}
+            {% elif log.score.__class__.__name__ in ["float", "int"] %}
+              {{ "%.2f"|format(log.score) }}
+            {% else %}
+              -
+            {% endif %}
+          {% else %}
+            -
+          {% endif %}
+        </td>
         <td>{{ log.tag or "-" }}</td>
         <td>{{ "✅" if log.pushed else "❌" }}</td>
         <td class="action-buttons">
