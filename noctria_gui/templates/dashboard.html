@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <title>🏰 Noctria Kingdom - 統治ダッシュボード</title>
-  
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -22,26 +22,7 @@
 
   <!-- 🔍 検索フィルター＆CSV出力 -->
   <form method="get" action="/dashboard" class="mb-6">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-      <div>
-        <label class="block mb-1">📅 From:</label>
-        <input type="date" name="from" value="{{ stats.filter.from }}" class="w-full px-2 py-1 rounded border border-gray-300 dark:bg-gray-800 dark:border-gray-700">
-      </div>
-      <div>
-        <label class="block mb-1">📅 To:</label>
-        <input type="date" name="to" value="{{ stats.filter.to }}" class="w-full px-2 py-1 rounded border border-gray-300 dark:bg-gray-800 dark:border-gray-700">
-      </div>
-      <div>
-        <label class="block mb-1">🏷 タグ:</label>
-        <input type="text" name="tag" value="{{ stats.filter.tag }}" placeholder="例: trend" class="w-full px-2 py-1 rounded border border-gray-300 dark:bg-gray-800 dark:border-gray-700">
-      </div>
-      <div>
-        <button type="submit" class="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">🔍 フィルター適用</button>
-      </div>
-      <div>
-        <a id="csvDownloadLink" href="#" class="block text-center px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition">📁 CSV出力</a>
-      </div>
-    </div>
+    <!-- フィルター省略（必要なら戻す） -->
   </form>
 
   <!-- 📊 サマリカード -->
@@ -64,15 +45,10 @@
     </div>
   </div>
 
-  <!-- 📈 グラフセクション -->
+  <!-- 📈 市場予測チャート -->
   <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 mb-6">
-    <h2 class="text-lg font-semibold mb-2">📅 昇格・Push数 日次推移</h2>
-    <select id="graphMode" class="mb-4 px-2 py-1 rounded border border-gray-300 dark:bg-gray-700">
-      <option value="both">昇格＋Push</option>
-      <option value="promoted">昇格戦略数のみ</option>
-      <option value="push">Push完了数のみ</option>
-    </select>
-    <canvas id="logChart" height="100"></canvas>
+    <h2 class="text-lg font-semibold mb-2">🔮 市場予測（PrometheusOracle）</h2>
+    <canvas id="forecastChart" height="100"></canvas>
   </div>
 
   <!-- 🔗 統治リンク -->
@@ -85,23 +61,68 @@
       <h3 class="font-semibold">🔁 PDCA履歴</h3><p>戦略生成・評価・EA命令のログ</p></a>
   </div>
 
-  <!-- 🌗 ダークモード管理スクリプト -->
+  <!-- 🌗 ダークモード切替 -->
   <script>
     const darkToggle = document.getElementById("darkModeToggle");
     const html = document.documentElement;
-    if(localStorage.theme==='dark')html.classList.add('dark');
-
-    darkToggle.onclick=()=>{
+    if (localStorage.theme === 'dark') html.classList.add('dark');
+    darkToggle.onclick = () => {
       html.classList.toggle('dark');
-      localStorage.theme=html.classList.contains('dark')?'dark':'light';
+      localStorage.theme = html.classList.contains('dark') ? 'dark' : 'light';
     };
+  </script>
 
-    // CSVリンク生成
-    const csvLink = document.getElementById("csvDownloadLink");
-    csvLink.href = "/dashboard/export" + window.location.search;
-    
-    // Chart.jsグラフ (JSの詳細は元のコードを再利用してください)
-    // （ここに既存のChart.jsコードを追加してください）
+  <!-- 📊 Chart.js 描画ロジック -->
+  <script>
+    const forecast = {{ forecast | tojson }};
+    const dates = forecast.map(d => d.date);
+    const y_pred = forecast.map(d => d.y_pred);
+    const y_lower = forecast.map(d => d.y_lower);
+    const y_upper = forecast.map(d => d.y_upper);
+
+    const ctx = document.getElementById("forecastChart").getContext("2d");
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [
+          {
+            label: '予測値',
+            data: y_pred,
+            borderColor: 'rgba(54, 162, 235, 1)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            fill: false,
+            tension: 0.3
+          },
+          {
+            label: '上限 (y_upper)',
+            data: y_upper,
+            borderColor: 'rgba(255, 99, 132, 0.5)',
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.3
+          },
+          {
+            label: '下限 (y_lower)',
+            data: y_lower,
+            borderColor: 'rgba(255, 159, 64, 0.5)',
+            borderDash: [5, 5],
+            fill: '-1',  // Fill between lower and upper
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: '日次市場予測と信頼区間' }
+        },
+        scales: {
+          y: { beginAtZero: false }
+        }
+      }
+    });
   </script>
 </body>
 </html>
