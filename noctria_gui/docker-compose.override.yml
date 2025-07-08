@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  # ✅ FastAPIバックエンド
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    depends_on:
+      - airflow-webserver
+    volumes:
+      - ../core:/opt/airflow/core
+      - ../execution:/opt/airflow/execution
+      - ../strategies:/opt/airflow/strategies
+    environment:
+      - PYTHONPATH=/opt/airflow:/opt/airflow/core:/opt/airflow/execution:/opt/airflow/strategies
+
+  # ✅ フロントエンド（例: Streamlit）
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+
+  # ✅ Airflow Webサーバ
+  airflow-webserver:
+    image: apache/airflow:2.9.0
+    container_name: airflow-webserver
+    restart: always
+    depends_on:
+      - postgres
+    volumes:
+      - ../core:/opt/airflow/core
+      - ../execution:/opt/airflow/execution
+      - ../strategies:/opt/airflow/strategies
+      - ../airflow_docker/dags:/opt/airflow/airflow_docker/dags
+      - ../airflow_docker/logs:/opt/airflow/airflow_docker/logs
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/airflow_docker/dags
+      - AIRFLOW__LOGGING__BASE_LOG_FOLDER=/opt/airflow/airflow_docker/logs
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+      - PYTHONPATH=/opt/airflow:/opt/airflow/core:/opt/airflow/execution:/opt/airflow/strategies
+    ports:
+      - "8080:8080"
+    command: webserver
+    e
