@@ -20,6 +20,17 @@
     </button>
   </header>
 
+  <!-- ✅ 実行メッセージ表示 -->
+  {% if message == "success" %}
+    <div class="mb-4 p-4 bg-green-100 text-green-800 border border-green-300 rounded">
+      ✅ 市場予測を再実行しました（PrometheusOracle）
+    </div>
+  {% elif message == "error" %}
+    <div class="mb-4 p-4 bg-red-100 text-red-800 border border-red-300 rounded">
+      ❌ 市場予測の実行に失敗しました
+    </div>
+  {% endif %}
+
   <!-- 🔍 検索フィルター＆CSV出力 -->
   <form method="get" action="/dashboard" class="mb-6">
     <!-- フィルター省略（必要なら戻す） -->
