@@ -18,8 +18,10 @@
       タグ
       <select name="tag">
         <option value="">すべて</option>
-        {% for tag_item in tag_list %}
-          <option value="{{ tag_item }}" {% if filters.tag == tag_item %}selected{% endif %}>{{ tag_item }}</option>
+        {% for norm_tag, display_tag in tag_list %}
+          <option value="{{ norm_tag }}" {% if filters.tag == norm_tag %}selected{% endif %}>
+            {{ display_tag }}
+          </option>
         {% endfor %}
       </select>
     </label>
