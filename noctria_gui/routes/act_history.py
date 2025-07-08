@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSON
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional
 
 from core.path_config import ACT_LOG_DIR, TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import act_log_service
@@ -29,6 +29,13 @@ def parse_bool(s):
     if isinstance(s, str):
         return s.lower() in ["true", "1", "on"]
     return None
+
+def normalize_score(log: dict) -> dict:
+    """scoreがdictの場合はmeanに変換して統一"""
+    score = log.get("score")
+    if isinstance(score, dict) and "mean" in score:
+        log["score"] = score["mean"]
+    return log
 
 @router.get("/act-history", response_class=HTMLResponse)
 async def show_act_history(
@@ -69,6 +76,9 @@ async def show_act_history(
     except Exception as e:
         print(f"[act_history] ⚠️ フィルターエラー: {e}")
 
+    # ✅ スコア整形（テンプレートで安心して "%.2f" 可）
+    logs = [normalize_score(log) for log in logs]
+
     tag_list = sorted({log.get("tag") for log in logs if log.get("tag")})
 
     return templates.TemplateResponse("act_history.html", {
@@ -91,10 +101,9 @@ async def show_act_detail(request: Request, strategy_name: str = Query(...)):
     log = act_log_service.get_log_by_strategy(strategy_name)
     if not log:
         return HTMLResponse(content="指定された戦略ログが見つかりませんでした。", status_code=404)
-
     return templates.TemplateResponse("act_history_detail.html", {
         "request": request,
-        "log": log
+        "log": normalize_score(log)
     })
 
 @router.post("/act-history/repush")
@@ -144,6 +153,8 @@ async def export_act_log_csv(
         )
     except Exception as e:
         print(f"[act_history/export] ⚠️ フィルターエラー: {e}")
+
+    logs = [normalize_score(log) for log in logs]
 
     if not logs:
         return JSONResponse(status_code=404, content={"detail": "出力可能なログがありません"})
