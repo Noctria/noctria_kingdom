@@ -1,6 +1,9 @@
+# routes/dashboard.py
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 from models.prometheus_oracle import PrometheusOracle
 
