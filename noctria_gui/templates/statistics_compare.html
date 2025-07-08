@@ -7,7 +7,6 @@
 <!-- フィルター -->
 <form method="get" action="/statistics/compare" class="mb-6">
   <div class="flex flex-wrap gap-4 items-end">
-
     <div>
       <label for="mode">📌 モード選択：</label>
       <select id="mode" name="mode" onchange="this.form.submit()">
@@ -98,9 +97,14 @@
         {% for row in results %}
         <tr class="hover:bg-gray-100">
           <td class="border px-2 py-1">
-            <a href="/statistics/detail?mode={{ mode }}&key={{ row.key | urlencode }}&sort_by=date&order=desc">
-              {{ row.key }}
-            </a>
+            <div>
+              <a href="/statistics/detail?mode={{ mode }}&key={{ row.key | urlencode }}&sort_by=date&order=desc" class="text-blue-600 hover:underline">
+                {{ row.key }}
+              </a><br>
+              {% if mode == 'strategy' %}
+                <a href="/strategies/detail?name={{ row.key | urlencode }}" class="text-sm text-gray-500 hover:underline">🔍 詳細</a>
+              {% endif %}
+            </div>
           </td>
           <td class="border px-2 py-1">{{ row.avg_win }}</td>
           <td class="border px-2 py-1">{{ row.avg_dd }}</td>
