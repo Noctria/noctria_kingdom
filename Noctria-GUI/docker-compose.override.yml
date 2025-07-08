@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  # ======================
+  # 🚀 FastAPIバックエンド
+  # ======================
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    depends_on:
+      - airflow-webserver
+
+  # ======================
+  # 🖥️ フロントエンド（例: Streamlit）
+  # ======================
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+
+  # ======================
+  # 📊 Airflow Webサーバ
+  # ======================
+  airflow-webserver:
+    image: apache/airflow:2.9.0
+    container_name: airflow-webserver
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/airflow_docker/dags
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+    volumes:
+      - ../airflow_docker/dags:/opt/airflow/airflow_docker/dags
+      - ../airflow_docker/logs:/opt/airflow/logs
+    ports:
+      - "8080:8080"
+    command: webserver
+    env_file:
+      - ../.env
+
+  # ======================
+  # ⏱️ Airflow スケジューラ
+  # ======================
+  airflow-scheduler:
+    image: apache/airflow:2.9.0
+    container_name: airflow-scheduler
+    restart: always
+    depends_on:
+      - postgres
+    volumes:
+      - ../airflow_docker/dags:/opt/airflow/airflow_docker/dags
+    command: scheduler
+    env_file:
+      - ../.env
+
+  # ======================
+  # 🐘 PostgreSQL（Airflow用）
+  # ======================
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_pg_data:/var/lib/postgresql/data
+
+volumes:
+  airflow_pg_data:
