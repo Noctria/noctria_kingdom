@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
-from models.prometheus_oracle import PrometheusOracle
+from strategies.prometheus_oracle import PrometheusOracle  # ✅ 修正済インポート
 
 from datetime import datetime
 from pathlib import Path
