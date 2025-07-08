@@ -2,16 +2,14 @@
 # coding: utf-8
 
 """
-📌 /pdca/recheck - 戦略の再評価処理（スコア再計算）
+📌 /pdca/recheck - 戦略の再評価処理（Airflow DAG経由でスコア再計算をトリガー）
 """
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse, RedirectResponse
-from core.path_config import STRATEGIES_DIR, ACT_LOG_DIR
-from datetime import datetime
+from core.path_config import STRATEGIES_DIR
+from backend.app.veritas_trigger_api import trigger_recheck_dag  # 🔥 Airflow連携トリガー関数
 from pathlib import Path
-import json
-import random
 import urllib.parse
 
 router = APIRouter()
@@ -20,43 +18,30 @@ router = APIRouter()
 async def recheck_strategy(strategy_name: str = Form(...)):
     """
     📌 指定された戦略を再評価（スコア再計算）するルート
+    - Airflow の recheck DAG を REST API 経由で実行
     """
     strategy_path = STRATEGIES_DIR / "veritas_generated" / f"{strategy_name}.json"
     if not strategy_path.exists():
-        return JSONResponse(status_code=404, content={"detail": f"戦略が存在しません: {strategy_name}"})
-
-
-    try:
-        with open(strategy_path, "r", encoding="utf-8") as f:
-            strategy_data = json.load(f)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": f"読み込みエラー: {str(e)}"})
-
-    # 🎯 疑似スコア生成（安定的にするため seed 固定）
-    seed_value = sum(ord(c) for c in strategy_name)
-    random.seed(seed_value)
-    new_win_rate = round(50 + random.uniform(0, 50), 2)
-    new_max_dd = round(random.uniform(5, 30), 2)
-
-    result = {
-        "strategy": strategy_name,
-        "timestamp": datetime.now().isoformat(),
-        "win_rate": new_win_rate,
-        "max_dd": new_max_dd,
-        "source": "recheck",
-    }
-
-    # 📦 保存ファイル名
-    timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_path = ACT_LOG_DIR / f"recheck_{strategy_name}_{timestamp_str}.json"
+        return JSONResponse(
+            status_code=404,
+            content={"detail": f"戦略が存在しません: {strategy_name}"}
+        )
 
     try:
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+        # ✅ Airflow DAG 実行（非同期トリガー）
+        response = trigger_recheck_dag(strategy_name)
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": f"保存エラー: {str(e)}"})
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Airflow DAGトリガー失敗: {str(e)}"}
+        )
 
-    print(f"✅ 再評価完了: {output_path.name}")
+    # 💥 エラーレスポンス検知
+    if response.status_code not in [200, 201, 202]:
+        return JSONResponse(
+            status_code=response.status_code,
+            content={"detail": f"DAGトリガー失敗: {response.text}"}
+        )
 
     # 🎯 結果ページへリダイレクト（URLエンコード付き）
     query = urllib.parse.urlencode({"mode": "strategy", "key": strategy_name})
