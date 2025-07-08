@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from core.data_loader import MarketDataFetcher
 from core.risk_manager import RiskManager
-from core.settings import ALPHAVANTAGE_API_KEY  # ✅ .env からAPIキーを読み込み
+from core.settings import ALPHAVANTAGE_API_KEY
 
 
 class PrometheusOracle:
@@ -15,12 +15,19 @@ class PrometheusOracle:
     📈 市場予測を行うAIモデル
     - 実データ（日足）に基づいた予測
     - 信頼区間付き日次予測に対応
+    - ✅ RiskManager はオプション（将来の拡張用）
     """
 
-    def __init__(self):
+    def __init__(self, use_risk: bool = False):
         self.model = self._build_model()
         self.market_fetcher = MarketDataFetcher(api_key=ALPHAVANTAGE_API_KEY)
-        self.risk_manager = RiskManager()
+        self.risk_manager = None
+
+        # 🔐 RiskManagerの初期化はオプション（データ依存）
+        if use_risk:
+            df = self.market_fetcher.fetch_daily_data(from_symbol="USD", to_symbol="JPY", max_days=90)
+            if df is not None and not df.empty:
+                self.risk_manager = RiskManager(df)
 
     def _build_model(self):
         """📐 予測モデル（ダミー構成、将来は学習済み重みをロード）"""
