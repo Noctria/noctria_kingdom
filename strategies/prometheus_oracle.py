@@ -25,8 +25,8 @@ class PrometheusOracle:
     def predict_market(self, market_data):
         """市場データを解析し、未来の価格を予測"""
         processed_data = self._preprocess_data(market_data)
-        prediction = self.model.predict(processed_data)
-        return float(prediction)
+        prediction = self.model.predict(processed_data, verbose=0)
+        return float(prediction[0][0])
 
     def _preprocess_data(self, market_data):
         """市場データの前処理"""
@@ -44,9 +44,16 @@ class PrometheusOracle:
 if __name__ == "__main__":
     oracle = PrometheusOracle()
     mock_market_data = {
-        "price": 1.2345, "volume": 1000, "sentiment": 0.8, "trend_strength": 0.7,
-        "volatility": 0.15, "order_block": 0.6, "institutional_flow": 0.8,
-        "short_interest": 0.5, "momentum": 0.9, "trend_prediction": "bullish",
+        "price": 1.2345,
+        "volume": 1000,
+        "sentiment": 0.8,
+        "trend_strength": 0.7,
+        "volatility": 0.15,
+        "order_block": 0.6,
+        "institutional_flow": 0.8,
+        "short_interest": 0.5,
+        "momentum": 0.9,
+        "trend_prediction": "bullish",
         "liquidity_ratio": 1.2
     }
     forecast = oracle.predict_market(mock_market_data)
