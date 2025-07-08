@@ -26,14 +26,12 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-
 # ===============================
 # ✅ 外部呼び出し用 FastAPI ルート
 # ===============================
 class VeritasTriggerRequest(BaseModel):
     conf: dict = {}
     dag_id: str = "veritas_master_dag"
-
 
 @router.post("/trigger/veritas")
 def trigger_veritas(request: VeritasTriggerRequest):
@@ -86,7 +84,7 @@ def trigger_recheck_dag(strategy_name: str) -> requests.Response:
     AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
     AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
     AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
-    dag_id = "veritas_master_dag"
+    dag_id = "veritas_recheck_dag"  # ✅ 再評価専用DAGに変更
 
     execution_date = datetime.utcnow().isoformat()
     payload = {
