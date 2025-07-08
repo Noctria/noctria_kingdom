@@ -1,17 +1,18 @@
 # routes/dashboard.py
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
-from strategies.prometheus_oracle import PrometheusOracle  # ✅ 修正済インポート
+from strategies.prometheus_oracle import PrometheusOracle  # ✅ Oracle本体インポート
 
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 import os
 import json
+import subprocess
 from typing import Optional, Dict, Any
 
 router = APIRouter()
@@ -90,3 +91,15 @@ async def show_dashboard(request: Request):
         "forecast": forecast_data,
         "stats": stats
     })
+
+
+@router.post("/oracle/predict")
+async def trigger_oracle_prediction():
+    """
+    📈 GUIから PrometheusOracle を再実行するエンドポイント
+    """
+    try:
+        subprocess.run(["python3", "strategies/prometheus_oracle.py"], check=True)
+    except subprocess.CalledProcessError as e:
+        print("🔴 Oracle実行失敗:", e)
+    return RedirectResponse(url="/dashboard", status_code=303)
