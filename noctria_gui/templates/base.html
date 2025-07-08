@@ -3,94 +3,53 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>{% block title %}Noctria Kingdom{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <title>{% block title %}🏰 Noctria Kingdom{% endblock %}</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: #f4f4f4;
-      color: #222;
-      padding: 2rem;
-      transition: background 0.3s, color 0.3s;
-    }
-    .dark-mode {
-      background: #121212;
-      color: #e0e0e0;
-    }
-    .dark-mode table {
-      background: #1e1e1e;
-      color: #e0e0e0;
-    }
-    .dark-mode th {
-      background: #2b2b2b;
-    }
-    .dark-mode td {
-      border-color: #444;
-    }
-    .dark-mode nav a {
-      color: #66c2ff;
-    }
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-    }
-    nav {
-      margin-bottom: 1.5rem;
-    }
-    nav a {
-      margin-right: 1rem;
-      text-decoration: none;
-      color: #007acc;
-      font-weight: bold;
-    }
-    nav a:hover {
-      text-decoration: underline;
-    }
-
-    .button {
-      padding: 0.5rem 1rem;
-      background: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    .dark-mode .button {
-      background: #0098ff;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   {% block style %}{% endblock %}
 </head>
-<body>
-  <header>
-    <h1>🏰 Noctria Kingdom - GUI統治</h1>
-    <button id="darkToggle" class="button">🌗 モード切替</button>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition duration-300 font-sans p-4 md:p-6">
+  <header class="flex flex-col md:flex-row justify-between items-center mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold">🏰 Noctria Kingdom - GUI統治</h1>
+    <button id="darkToggle" class="mt-2 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+      🌗 モード切替
+    </button>
   </header>
 
-  <nav>
-    <a href="/dashboard">📊 ダッシュボード</a>
-    <a href="/statistics/compare">🔍 比較</a>
-    <a href="/statistics/heatmap">🔥 ヒートマップ</a>
-    <a href="/statistics/ranking">🏅 ランキング</a>
-    <a href="/act-history">🧾 昇格ログ</a>
-    <a href="/push-history">🚀 Push履歴</a>
+  <nav class="flex flex-wrap gap-2 md:gap-4 mb-6">
+    <a href="/dashboard" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">📊 ダッシュボード</a>
+    <a href="/statistics/compare" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🔍 比較</a>
+    <a href="/statistics/heatmap" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🔥 ヒートマップ</a>
+    <a href="/statistics/ranking" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🏅 ランキング</a>
+    <a href="/act-history" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🧾 昇格ログ</a>
+    <a href="/push-history" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🚀 Push履歴</a>
   </nav>
 
-  <main>
+  <main class="container mx-auto">
     {% block content %}
     <!-- 各ページ固有の内容 -->
     {% endblock %}
   </main>
 
   <script>
-    document.getElementById("darkToggle").addEventListener("click", () => {
-      document.body.classList.toggle("dark-mode");
+    const toggleBtn = document.getElementById("darkToggle");
+    const bodyEl = document.body;
+
+    // ページ読み込み時にテーマ設定を保持
+    if (localStorage.theme === 'dark') {
+      bodyEl.classList.add('dark');
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      bodyEl.classList.toggle("dark");
+      localStorage.theme = bodyEl.classList.contains('dark') ? 'dark' : 'light';
     });
   </script>
 
