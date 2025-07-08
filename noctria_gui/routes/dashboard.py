@@ -86,10 +86,14 @@ async def show_dashboard(request: Request):
     # 📊 サマリ統計集計
     stats = aggregate_dashboard_stats()
 
+    # ✅ 実行メッセージ取得（クエリパラメータから）
+    message = request.query_params.get("message")
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "forecast": forecast_data,
-        "stats": stats
+        "stats": stats,
+        "message": message,  # ✅ テンプレートに渡す
     })
 
 
@@ -100,6 +104,7 @@ async def trigger_oracle_prediction():
     """
     try:
         subprocess.run(["python3", "strategies/prometheus_oracle.py"], check=True)
+        return RedirectResponse(url="/dashboard?message=success", status_code=303)
     except subprocess.CalledProcessError as e:
         print("🔴 Oracle実行失敗:", e)
-    return RedirectResponse(url="/dashboard", status_code=303)
+        return RedirectResponse(url="/dashboard?message=error", status_code=303)
