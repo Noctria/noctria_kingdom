@@ -8,6 +8,8 @@
 
 import json
 import csv
+import re
+import unicodedata
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
@@ -15,8 +17,18 @@ from datetime import datetime
 from core.path_config import ACT_LOG_DIR, VERITAS_EVAL_LOG
 
 
+def normalize_tag(tag: Optional[str]) -> str:
+    """🧹 タグ表記ゆれを吸収（小文字化・記号除去・全角→半角）"""
+    if not tag:
+        return ""
+    tag = tag.strip().lower()
+    tag = unicodedata.normalize("NFKC", tag)  # 全角→半角
+    tag = re.sub(r"[^a-z0-9]+", "", tag)      # 記号除去
+    return tag
+
+
 def load_all_act_logs() -> List[Dict]:
-    """📂 ACTログディレクトリから全ログを読み込み、score整形"""
+    """📂 ACTログディレクトリから全ログを読み込み、score整形＋tag正規化"""
     logs = []
     for file in sorted(ACT_LOG_DIR.glob("*.json"), reverse=True):
         try:
@@ -24,6 +36,7 @@ def load_all_act_logs() -> List[Dict]:
                 data = json.load(f)
                 data["__log_path__"] = str(file)
                 data = _normalize_score(data)
+                data["normalized_tag"] = normalize_tag(data.get("tag"))
                 logs.append(data)
         except Exception as e:
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
@@ -53,7 +66,8 @@ def filter_act_logs(
         filtered = [log for log in filtered if strategy_name.lower() in log.get("strategy", "").lower()]
 
     if tag:
-        filtered = [log for log in filtered if tag in log.get("tag", "")]
+        normalized = normalize_tag(tag)
+        filtered = [log for log in filtered if log.get("normalized_tag") == normalized]
 
     if score_range:
         min_score, max_score = score_range
@@ -96,7 +110,6 @@ def export_logs_to_csv(logs: List[Dict], output_path: Path) -> bool:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for log in logs:
-                # 値が dict や list の場合は文字列に変換して出力
                 safe_row = {
                     k: json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v
                     for k, v in log.items()
