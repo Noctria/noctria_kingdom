@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
 from core.data.market_data_fetcher import MarketDataFetcher
-from core.risk_manager import RiskManager
+from core.risk_manager import RiskManager  # ← クラス名に統一必要
 
 class NoctusSentinella:
     """
     🛡️ Noctria Kingdomの守護者：リスク管理と異常検知を担う戦略AI。
-    - ヒストリカルデータを用いてVaR（Value at Risk）ベースの評価を行い、
+    - ヒストリカルデータを用いてVaRベースの評価を行い、
       市場流動性やボラティリティを加味して意思決定を行う。
     """
 
@@ -26,7 +26,7 @@ class NoctusSentinella:
         historical_data = pd.DataFrame(data_array, columns=columns)
 
         # ✅ リスク管理AIにヒストリカルデータを渡す
-        self.risk_manager = RiskManagement(historical_data=historical_data)
+        self.risk_manager = RiskManager(historical_data=historical_data)  # ← クラス名に注意
 
     def process(self, market_data):
         """
@@ -43,14 +43,14 @@ class NoctusSentinella:
         order_block_impact = market_data.get("order_block", 0.0)
         volatility = market_data.get("volatility", 0.0)
 
-        # 🔍 流動性・スプレッドのチェック
-        if liquidity < self.min_liquidity or spread > self.max_spread:
-            return "AVOID_TRADING"
-
-        # ⚖️ リスク評価閾値の動的補正
         adjusted_risk_threshold = self.risk_threshold * (1 + order_block_impact)
 
-        # 🔺 リスク判定
+        print(f"[Noctus] risk_score={risk_score:.5f}, threshold={adjusted_risk_threshold:.5f}, volatility={volatility:.3f}")
+
+        if liquidity < self.min_liquidity or spread > self.max_spread:
+            print("[Noctus] 🚫 流動性不足 or スプレッド高 → 回避")
+            return "AVOID_TRADING"
+
         if risk_score > adjusted_risk_threshold and volatility > 0.2:
             return "REDUCE_RISK"
         else:
@@ -58,18 +58,20 @@ class NoctusSentinella:
 
     def _calculate_risk(self, market_data):
         """
-        VaR（Value at Risk）を用いたリスクスコア計算。
-        ➜ price / price_history の存在を確認し、防御的にスコア返却。
+        VaRを用いたリスクスコア計算（priceに対するVaRの比率）。
         """
         price_history = market_data.get("price_history", [])
-        price = market_data.get("price", 1.0)  # 0除算防止用
+        price = market_data.get("price", 1.0)
 
-        if not price_history:
+        if not price_history or price <= 0:
             return 0.0
 
-        volatility = np.std(price_history)
-        risk_value = self.risk_manager.calculate_var()
-        return risk_value / price if price != 0 else 0.0
+        try:
+            risk_value = self.risk_manager.calculate_var()
+            return risk_value / price if risk_value is not None else 0.0
+        except Exception as e:
+            print(f"[Noctus] ❌ リスク計算失敗: {e}")
+            return 0.0
 
 # ✅ 単体テスト
 if __name__ == "__main__":
@@ -82,5 +84,5 @@ if __name__ == "__main__":
         "order_block": 0.5,
         "volatility": 0.22
     }
-    risk_decision = noctus_ai.process(mock_market_data)
-    print("🧠 Risk Management Decision:", risk_decision)
+    decision = noctus_ai.process(mock_market_data)
+    print("🧠 Risk Management Decision:", decision)
