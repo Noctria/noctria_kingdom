@@ -19,16 +19,19 @@ from noctria_gui.services import act_log_service
 router = APIRouter()
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
+
 def parse_float(s):
     try:
         return float(s)
     except (TypeError, ValueError):
         return None
 
+
 def parse_bool(s):
     if isinstance(s, str):
         return s.lower() in ["true", "1", "on"]
     return None
+
 
 def normalize_score(log: dict) -> dict:
     """scoreがdictの場合はmeanに変換して統一"""
@@ -36,6 +39,7 @@ def normalize_score(log: dict) -> dict:
     if isinstance(score, dict) and "mean" in score:
         log["score"] = score["mean"]
     return log
+
 
 @router.get("/act-history", response_class=HTMLResponse)
 async def show_act_history(
@@ -52,7 +56,8 @@ async def show_act_history(
     max_score_val = parse_float(max_score)
     pushed_val = parse_bool(pushed)
     strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
-    tag_val = tag if tag and tag not in ["", "None"] else None
+    tag_val_raw = tag if tag and tag not in ["", "None"] else None
+    tag_val = act_log_service.normalize_tag(tag_val_raw)
     start_date_val = start_date if start_date and start_date not in ["", "None"] else None
     end_date_val = end_date if end_date and end_date not in ["", "None"] else None
 
@@ -79,7 +84,14 @@ async def show_act_history(
     # ✅ スコア整形（テンプレートで安心して "%.2f" 可）
     logs = [normalize_score(log) for log in logs]
 
-    tag_list = sorted({log.get("tag") for log in logs if log.get("tag")})
+    # ✅ タグ一覧（正規タグ → 表示名）
+    tag_map = {}
+    for log in logs:
+        raw_tag = log.get("tag")
+        norm_tag = log.get("normalized_tag", "")
+        if norm_tag and raw_tag:
+            tag_map[norm_tag] = raw_tag
+    tag_list = sorted(tag_map.items())  # List of (normalized_tag, display_tag)
 
     return templates.TemplateResponse("act_history.html", {
         "request": request,
@@ -96,6 +108,7 @@ async def show_act_history(
         }
     })
 
+
 @router.get("/act-history/detail", response_class=HTMLResponse)
 async def show_act_detail(request: Request, strategy_name: str = Query(...)):
     log = act_log_service.get_log_by_strategy(strategy_name)
@@ -106,15 +119,18 @@ async def show_act_detail(request: Request, strategy_name: str = Query(...)):
         "log": normalize_score(log)
     })
 
+
 @router.post("/act-history/repush")
 async def repush_strategy(strategy_name: str = Form(...)):
     act_log_service.reset_push_flag(strategy_name)
     return RedirectResponse(url="/act-history", status_code=303)
 
+
 @router.post("/act-history/reevaluate")
 async def reevaluate_strategy(strategy_name: str = Form(...)):
     act_log_service.mark_for_reevaluation(strategy_name)
     return RedirectResponse(url="/act-history", status_code=303)
+
 
 @router.get("/act-history/export")
 async def export_act_log_csv(
@@ -130,7 +146,8 @@ async def export_act_log_csv(
     max_score_val = parse_float(max_score)
     pushed_val = parse_bool(pushed)
     strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
-    tag_val = tag if tag and tag not in ["", "None"] else None
+    tag_val_raw = tag if tag and tag not in ["", "None"] else None
+    tag_val = act_log_service.normalize_tag(tag_val_raw)
     start_date_val = start_date if start_date and start_date not in ["", "None"] else None
     end_date_val = end_date if end_date and end_date not in ["", "None"] else None
 
