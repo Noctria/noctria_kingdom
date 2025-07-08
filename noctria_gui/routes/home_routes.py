@@ -13,10 +13,14 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
-    # dashboard.html に必要な構造を初期化
+    """
+    🏠 トップページ（dashboard.html へフォールバック表示）
+    - 初期値だけ設定し、forecast を空で送ることで tojson エラーを回避
+    """
     stats = {
         "promoted_count": 0,
         "pushed_count": 0,
+        "pdca_count": 0,
         "avg_win_rate": 0.0,
         "filter": {"from": "", "to": ""},
         "dates": [],
@@ -27,14 +31,21 @@ async def home(request: Request) -> HTMLResponse:
         "avg_win_rates": [],
         "avg_max_dds": [],
     }
+
+    forecast = []  # ← これがないと Jinja2 で TypeError 発生
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
+        "forecast": forecast,
     })
 
 
 @router.get("/path-check", response_class=HTMLResponse)
 async def path_check_form(request: Request) -> HTMLResponse:
+    """
+    🛠 パス設定チェックフォーム（GUI）
+    """
     categories = list(CATEGORY_MAP.keys())
     return templates.TemplateResponse("path_checker.html", {
         "request": request,
@@ -47,6 +58,9 @@ async def path_check_form(request: Request) -> HTMLResponse:
 async def run_check(
     request: Request, category: str = "all", strict: bool = False
 ) -> HTMLResponse:
+    """
+    🛠 パス設定チェックを実行（GUI経由）
+    """
     command = ["python3", "tools/verify_path_config.py", "--json"]
     if category != "all":
         command += ["--category", category]
@@ -77,6 +91,9 @@ async def run_check(
 async def check_paths_api(
     category: str = "all", strict: bool = False
 ) -> Any:
+    """
+    🔍 API版パスチェック（JSON形式）
+    """
     command = ["python3", "tools/verify_path_config.py", "--json"]
     if category != "all":
         command += ["--category", category]
