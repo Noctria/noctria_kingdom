@@ -2,32 +2,43 @@
 {% block title %}📊 比較分析 - Noctria Kingdom{% endblock %}
 
 {% block content %}
-<h2>📊 戦略・タグ比較分析</h2>
+<h2 class="text-xl font-bold mb-4">📊 戦略・タグ比較分析</h2>
 
-<form method="get" action="/statistics/compare" style="margin-bottom: 1.5rem;">
-  <label>📌 モード選択：</label>
-  <select name="mode" onchange="this.form.submit()">
-    <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
-    <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
-  </select>
+<!-- フィルター -->
+<form method="get" action="/statistics/compare" class="mb-6">
+  <div class="flex flex-wrap gap-4 items-end">
 
-  <label style="margin-left: 1rem;">📅 期間：</label>
-  <input type="date" name="from" value="{{ filter.from }}">
-  〜
-  <input type="date" name="to" value="{{ filter.to }}">
+    <div>
+      <label for="mode">📌 モード選択：</label>
+      <select id="mode" name="mode" onchange="this.form.submit()">
+        <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
+        <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+      </select>
+    </div>
 
-  <label style="margin-left: 1rem;">🔽 ソート：</label>
-  <select name="sort">
-    <option value="score" {% if sort == "score" %}selected{% endif %}>📈 勝率・DD順</option>
-    <option value="check" {% if sort == "check" %}selected{% endif %}>🗂 チェック順</option>
-  </select>
+    <div>
+      <label>📅 期間：</label>
+      <input type="date" name="from" value="{{ filter.from }}">
+      〜
+      <input type="date" name="to" value="{{ filter.to }}">
+    </div>
 
-  <div style="margin: 1rem 0;">
+    <div>
+      <label for="sort">🔽 ソート：</label>
+      <select id="sort" name="sort">
+        <option value="score" {% if sort == "score" %}selected{% endif %}>📈 勝率・DD順</option>
+        <option value="check" {% if sort == "check" %}selected{% endif %}>🗂 チェック順</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="mt-4">
     <label>{{ "🔖 タグ一覧：" if mode == "tag" else "🧠 戦略一覧：" }}</label>
     <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem;">
       <button type="button" class="button" onclick="selectAll(true)">✅ 全選択</button>
       <button type="button" class="button" onclick="selectAll(false)">❌ 全解除</button>
       <span style="margin-left: 1rem;">✅ 選択数: <span id="selectedCount">0</span></span><br><br>
+
       {% for k in all_keys %}
         <label style="display: inline-block; margin-right: 1rem;">
           <input type="checkbox" name="{{ mode }}s" value="{{ k }}" {% if k in keys %}checked{% endif %} onchange="updateCount()">
@@ -37,14 +48,16 @@
     </div>
   </div>
 
-  <button type="submit" class="button">📥 表示</button>
-  {% if keys %}
-    <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&sort={{ sort }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSV出力</a>
-  {% endif %}
+  <div class="mt-4 flex gap-2">
+    <button type="submit" class="button">📥 表示</button>
+    {% if keys %}
+      <a href="/statistics/compare/export?mode={{ mode }}&from={{ filter.from }}&to={{ filter.to }}&sort={{ sort }}&{{ mode }}s={{ keys | join(',') }}" class="button">📄 CSV出力</a>
+    {% endif %}
+  </div>
 </form>
 
 {% if keys %}
-  <div style="margin-top: 1rem;">
+  <div class="mt-4 mb-6">
     <label>🔗 現在のURL（共有可）:</label><br>
     <input id="shareUrl" type="text" readonly style="width: 90%;" value="{{ request.url }}" />
     <button class="button" onclick="copyUrl()">📋 コピー</button>
@@ -52,8 +65,8 @@
 {% endif %}
 
 {% if results %}
-  <div style="margin-top: 2rem; margin-bottom: 2rem;">
-    <h3>📊 統計サマリ</h3>
+  <div class="mb-6">
+    <h3 class="font-semibold text-lg mb-2">📊 統計サマリ</h3>
     <ul>
       <li>📈 勝率 平均: <strong>{{ summary.avg_win_mean }}</strong>％　| 中央値: <strong>{{ summary.avg_win_median }}</strong>％</li>
       <li>📉 DD 平均: <strong>{{ summary.avg_dd_mean }}</strong>％　| 中央値: <strong>{{ summary.avg_dd_median }}</strong>％</li>
@@ -61,40 +74,42 @@
     </ul>
   </div>
 
-  <label>📈 表示形式:</label>
-  <select id="chartTypeSelect">
-    <option value="bar">棒グラフ</option>
-    <option value="line">折れ線グラフ</option>
-    <option value="radar">レーダーチャート</option>
-  </select>
+  <div class="mb-4">
+    <label for="chartTypeSelect">📈 表示形式:</label>
+    <select id="chartTypeSelect">
+      <option value="bar">棒グラフ</option>
+      <option value="line">折れ線グラフ</option>
+      <option value="radar">レーダーチャート</option>
+    </select>
+    <button class="button ml-4" onclick="downloadCharts()">💾 グラフ画像を保存</button>
+  </div>
 
-  <!-- 💾 画像保存 -->
-  <button class="button" onclick="downloadCharts()">💾 グラフ画像を保存</button>
-
-  <table style="margin-top: 1rem;">
-    <thead>
-      <tr>
-        <th>比較対象</th>
-        <th>平均勝率（%）</th>
-        <th>平均DD（%）</th>
-        <th>件数</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in results %}
+  <div class="overflow-x-auto">
+    <table class="table-auto border border-gray-400 w-full mb-4">
+      <thead class="bg-gray-200">
         <tr>
-          <td>
+          <th class="border px-2 py-1">比較対象</th>
+          <th class="border px-2 py-1">平均勝率（%）</th>
+          <th class="border px-2 py-1">平均DD（%）</th>
+          <th class="border px-2 py-1">件数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        <tr class="hover:bg-gray-100">
+          <td class="border px-2 py-1">
             <a href="/statistics/detail?mode={{ mode }}&key={{ row.key | urlencode }}&sort_by=date&order=desc">
               {{ row.key }}
             </a>
           </td>
-          <td>{{ row.avg_win }}</td>
-          <td>{{ row.avg_dd }}</td>
-          <td>{{ row.count }}</td>
+          <td class="border px-2 py-1">{{ row.avg_win }}</td>
+          <td class="border px-2 py-1">{{ row.avg_dd }}</td>
+          <td class="border px-2 py-1">{{ row.count }}</td>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
   <canvas id="winChart" height="100"></canvas>
   <canvas id="ddChart" height="100"></canvas>
@@ -126,15 +141,8 @@
           legend: { labels: { color: chartColors.text } }
         },
         scales: type !== 'radar' ? {
-          y: {
-            beginAtZero: true,
-            ticks: { color: chartColors.text },
-            grid: { color: chartColors.grid }
-          },
-          x: {
-            ticks: { color: chartColors.text },
-            grid: { color: chartColors.grid }
-          }
+          y: { beginAtZero: true, ticks: { color: chartColors.text }, grid: { color: chartColors.grid } },
+          x: { ticks: { color: chartColors.text }, grid: { color: chartColors.grid } }
         } : {}
       };
 
@@ -185,13 +193,9 @@
       const input = document.getElementById("shareUrl");
       input.select();
       input.setSelectionRange(0, 99999);
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(input.value);
+      navigator.clipboard.writeText(input.value).then(() => {
         alert("URLをコピーしました！");
-      } else {
-        document.execCommand("copy");
-        alert("URLをコピーしました！");
-      }
+      });
     }
 
     function selectAll(flag) {
@@ -211,6 +215,6 @@
     };
   </script>
 {% else %}
-  <p>⚠ 比較対象を選択してください。</p>
+  <p class="mt-6 text-gray-600">⚠ 比較対象を選択してください。</p>
 {% endif %}
 {% endblock %}
