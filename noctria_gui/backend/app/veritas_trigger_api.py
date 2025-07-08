@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📡 veritas_trigger_api.py - Airflow DAGトリガーAPI
+- 外部APIルート: /trigger/veritas（FastAPI経由）
+- 内部関数: trigger_recheck_dag(strategy_name)（FastAPI以外のPython内部呼び出し用）
+"""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import requests
@@ -11,14 +20,26 @@ router = APIRouter()
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 log_path = os.path.join(LOG_DIR, "veritas_trigger.log")
-logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    filename=log_path,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
+
+# ===============================
+# ✅ 外部呼び出し用 FastAPI ルート
+# ===============================
 class VeritasTriggerRequest(BaseModel):
     conf: dict = {}
     dag_id: str = "veritas_master_dag"
 
+
 @router.post("/trigger/veritas")
 def trigger_veritas(request: VeritasTriggerRequest):
+    """
+    🔁 API経由で DAG をトリガー
+    """
     AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
     AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
     AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
@@ -38,7 +59,7 @@ def trigger_veritas(request: VeritasTriggerRequest):
             json=payload
         )
 
-        if response.status_code in (200, 201):
+        if response.status_code in (200, 201, 202):
             logging.info(f"[TRIGGERED] DAG={request.dag_id} | Payload={payload}")
             return {
                 "status": "success",
@@ -53,3 +74,38 @@ def trigger_veritas(request: VeritasTriggerRequest):
     except Exception as e:
         logging.exception("[ERROR] Exception while triggering DAG")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =========================================
+# ✅ 内部からの関数呼び出し用（GUI連携向け）
+# =========================================
+def trigger_recheck_dag(strategy_name: str) -> requests.Response:
+    """
+    📌 GUIルートなどから Airflow DAG を直接トリガーするための関数
+    """
+    AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
+    AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
+    AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
+    dag_id = "veritas_master_dag"
+
+    execution_date = datetime.utcnow().isoformat()
+    payload = {
+        "conf": {"strategy_name": strategy_name},
+        "execution_date": execution_date
+    }
+
+    trigger_url = f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns"
+
+    response = requests.post(
+        trigger_url,
+        auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
+        json=payload
+    )
+
+    # ✅ ログ記録
+    if response.status_code in (200, 201, 202):
+        logging.info(f"[TRIGGERED] DAG={dag_id} | strategy={strategy_name} | Payload={payload}")
+    else:
+        logging.error(f"[FAILED] DAG={dag_id} | Status={response.status_code} | Text={response.text}")
+
+    return response
