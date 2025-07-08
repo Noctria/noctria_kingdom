@@ -1,99 +1,49 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>📊 タグ統合スコアボード</title>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background-color: #f5f5f5;
-      padding: 2rem;
-    }
-    h1 {
-      color: #222;
-      margin-bottom: 1rem;
-    }
-    table {
-      width: 100%;
-      background: #fff;
-      border-collapse: collapse;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 0.75rem;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
-    }
-    th {
-      background-color: #e9f2fb;
-      cursor: pointer;
-    }
-    tr:hover {
-      background-color: #f1f7ff;
-    }
-    .green {
-      background-color: #d0f0d0;
-    }
-    .red {
-      background-color: #f8d0d0;
-    }
-    .gold {
-      background-color: #fff5cc;
-    }
-    a {
-      display: inline-block;
-      margin-top: 2rem;
-      text-decoration: none;
-      color: #007acc;
-    }
-  </style>
-</head>
-<body>
-  <h1>📊 タグ統合スコアボード</h1>
+{% extends "base.html" %}
 
-  <table id="scoreboard">
-    <thead>
-      <tr>
-        <th onclick="sortTable(0)">タグ</th>
-        <th onclick="sortTable(1)">勝率（%）</th>
-        <th onclick="sortTable(2)">最大DD（%）</th>
-        <th onclick="sortTable(3)">取引数</th>
-        <th onclick="sortTable(4)">昇格率</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in tag_stats %}
-      <tr>
-        <td>{{ row.type }}</td>
-        <td class="{{ 'green' if row.win_rate >= 70 else '' }}">{{ row.win_rate or '―' }}</td>
-        <td class="{{ 'red' if row.max_drawdown >= 10 else '' }}">{{ row.max_drawdown or '―' }}</td>
-        <td>{{ row.num_trades or '―' }}</td>
-        <td class="{{ 'gold' if row.promotion_rate >= 0.5 else '' }}">{{ row.promotion_rate or '―' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{% block title %}📊 タグ別スコアボード - Noctria Kingdom{% endblock %}
 
-  <a href="/dashboard">← ダッシュボードへ戻る</a>
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">📊 タグ別統合スコアボード</h2>
 
-  <script>
-    function sortTable(colIndex) {
-      const table = document.getElementById("scoreboard");
-      const rows = Array.from(table.rows).slice(1);
-      const isNumeric = colIndex > 0;
-      const sorted = rows.sort((a, b) => {
-        const valA = a.cells[colIndex].innerText;
-        const valB = b.cells[colIndex].innerText;
-        if (isNumeric) {
-          return parseFloat(valB) - parseFloat(valA);
-        }
-        return valA.localeCompare(valB);
-      });
-      for (const row of sorted) {
-        table.tBodies[0].appendChild(row);
-      }
-    }
-  </script>
-</body>
-</html>
+<!-- 🔽 ソート選択 -->
+<form method="get" action="/statistics/scoreboard" class="mb-4">
+  <label class="font-semibold mr-2">🔽 ソート項目:</label>
+  <select name="sort" onchange="this.form.submit()" class="px-2 py-1 border rounded dark:bg-gray-800 dark:text-white">
+    <option value="count" {% if sort_key == "count" %}selected{% endif %}>📦 件数（多い順）</option>
+    <option value="avg_win" {% if sort_key == "avg_win" %}selected{% endif %}>⚔ 勝率（高い順）</option>
+    <option value="avg_dd" {% if sort_key == "avg_dd" %}selected{% endif %}>📉 最大DD（大きい順）</option>
+  </select>
+</form>
+
+<!-- 📋 タグ別スコア表 -->
+<table class="min-w-full border-collapse bg-white dark:bg-gray-800 rounded shadow">
+  <thead>
+    <tr class="bg-gray-100 dark:bg-gray-700 text-left">
+      <th class="px-4 py-2 border-b">🏷 タグ名</th>
+      <th class="px-4 py-2 border-b">📦 件数</th>
+      <th class="px-4 py-2 border-b">⚔ 平均勝率（%）</th>
+      <th class="px-4 py-2 border-b">📉 最大DD（%）</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for tag, stats in tag_stats %}
+    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+      <td class="px-4 py-2 border-b font-medium">{{ tag }}</td>
+      <td class="px-4 py-2 border-b">{{ stats.count }}</td>
+      <td class="px-4 py-2 border-b">{{ "%.1f"|format(stats.avg_win) if stats.avg_win is not none else "-" }}</td>
+      <td class="px-4 py-2 border-b">{{ "%.1f"|format(stats.avg_dd) if stats.avg_dd is not none else "-" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- 🔽 CSVエクスポート（オプション） -->
+<!--
+<div class="mt-4">
+  <a href="/statistics/scoreboard/export?sort={{ sort_key }}" class="inline-block px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition">
+    📁 CSV出力
+  </a>
+</div>
+-->
+
+{% endblock %}
