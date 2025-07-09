@@ -42,6 +42,33 @@ async def show_pdca_dashboard(
     logs = []
     tag_set = set()
 
+    # ✅ ステータス判定用マップ（戦略 → success/fail/pending）
+    status_map = {}
+    latest_status = {}
+
+    for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            continue
+
+        strategy_name = data.get("strategy")
+        status = data.get("status")
+        ts = data.get("timestamp")
+
+        if strategy_name and status:
+            prev_ts = latest_status.get(strategy_name, {}).get("timestamp", "")
+            if not prev_ts or ts > prev_ts:
+                latest_status[strategy_name] = {
+                    "status": status,
+                    "timestamp": ts,
+                }
+
+    for strategy_name, info in latest_status.items():
+        status_map[strategy_name] = info["status"]
+
+    # ✅ 通常のログ読み込み処理
     for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
             with open(log_file, "r", encoding="utf-8") as f:
@@ -128,6 +155,7 @@ async def show_pdca_dashboard(
     return templates.TemplateResponse("pdca_history.html", {
         "request": request,
         "logs": logs_serializable,
+        "status_map": status_map,
         "filters": {
             "strategy": strategy or "",
             "symbol": symbol or "",
@@ -171,7 +199,7 @@ async def replay_order_from_log(log_path: str = Form(...)):
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 # ================================
-# 🔁 単一戦略の再評価（veritas_eval_single_dag）
+# 🔁 単一戦略の再評価
 # ================================
 @router.post("/pdca/recheck")
 async def trigger_strategy_recheck(strategy_name: str = Form(...)):
@@ -199,7 +227,7 @@ async def trigger_strategy_recheck(strategy_name: str = Form(...)):
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 # ================================
-# 🔁 全戦略一括再評価（veritas_eval_single_dagを複数回呼ぶ）
+# 🔁 全戦略一括再評価
 # ================================
 @router.post("/pdca/recheck_all")
 async def trigger_all_strategy_rechecks():
