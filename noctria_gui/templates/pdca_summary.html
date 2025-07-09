@@ -37,7 +37,7 @@
 <body>
   <h1>📊 PDCA 再評価サマリー</h1>
 
-  <!-- 📅 期間・モード指定フォーム -->
+  <!-- 📅 期間・モード・件数フォーム -->
   <form method="get" action="/pdca/summary" style="margin-bottom: 1.5rem;">
     <label>📅 開始日: <input type="date" name="from" value="{{ filter.from }}"></label>
     <label style="margin-left: 1rem;">📅 終了日: <input type="date" name="to" value="{{ filter.to }}"></label>
@@ -46,6 +46,13 @@
     <select name="mode">
       <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
       <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+    </select>
+
+    <label style="margin-left: 2rem;">🔢 表示件数:</label>
+    <select name="limit">
+      <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
+      <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
+      <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
     </select>
 
     <button type="submit" style="margin-left: 1rem;">🔍 絞り込む</button>
@@ -61,11 +68,11 @@
   </div>
 
   <!-- 📈 勝率改善グラフ -->
-  <h2>📈 勝率改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
+  <h2>📈 勝率改善（{{ "戦略別" if mode == "strategy" else "タグ別" }})</h2>
   <canvas id="winRateChart" width="600" height="300"></canvas>
 
   <!-- 📉 最大DD改善グラフ -->
-  <h2>📉 最大DD改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
+  <h2>📉 最大DD改善（{{ "戦略別" if mode == "strategy" else "タグ別" }})</h2>
   <canvas id="ddChart" width="600" height="300"></canvas>
 
   <script>
@@ -125,8 +132,8 @@
     });
   </script>
 
-  <!-- 🧮 表形式の統計 + CSVダウンロード -->
-  <h2>🧮 評価詳細（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
+  <!-- 🧮 評価詳細テーブル -->
+  <h2>🧮 評価詳細（{{ "戦略別" if mode == "strategy" else "タグ別" }})</h2>
   <button class="download-btn" onclick="downloadCSV()">📥 CSVダウンロード</button>
 
   <table id="summary-table">
