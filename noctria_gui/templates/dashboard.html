@@ -51,15 +51,21 @@
     </div>
   </div>
 
-  <!-- 📈 市場予測チャート & 再実行ボタン -->
+  <!-- 📈 市場予測チャート & 再実行ボタン + CSV出力 -->
   <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 mb-6">
     <div class="flex justify-between items-center mb-2">
       <h2 class="text-lg font-semibold">🔮 市場予測（PrometheusOracle）</h2>
-      <form method="post" action="/oracle/predict">
-        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
-          🔄 予測を再実行
-        </button>
-      </form>
+      <!-- 🔄 再実行 & 📥 CSV出力 -->
+      <div class="flex gap-2">
+        <form method="post" action="/oracle/predict">
+          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+            🔄 予測を再実行
+          </button>
+        </form>
+        <a href="/oracle/export" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition">
+          📥 CSV出力
+        </a>
+      </div>
     </div>
     <canvas id="forecastChart" height="100"></canvas>
   </div>
