@@ -34,6 +34,13 @@
   <button type="submit">検索</button>
 </form>
 
+<!-- 🔁 一括再評価ボタン追加 -->
+<form method="post" action="/pdca/recheck_all" style="margin: 1rem 0;">
+  <button type="submit" onclick="return confirm('⚠️ 全戦略を一括で再評価します。続行しますか？');">
+    🔁 一括再評価（全 Veritas 戦略）
+  </button>
+</form>
+
 <table>
   <thead>
     <tr>
