@@ -4,6 +4,24 @@
   <meta charset="UTF-8" />
   <title>🔁 PDCA履歴 - Noctria Kingdom</title>
   <link rel="stylesheet" href="/static/style.css" />
+
+  <!-- ✅ ローディングスピナー用CSS -->
+  <style>
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #ccc;
+      border-top: 2px solid #333;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
@@ -42,10 +60,13 @@
           </form>
         </td>
         <td>
-          <!-- ✅ 再評価フォーム（strategy_name に修正） -->
-          <form method="post" action="/pdca/recheck" class="action-form">
+          <!-- ✅ 再評価フォーム（ローディング付き） -->
+          <form method="post" action="/pdca/recheck" class="action-form" onsubmit="return showLoading(this)">
             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-            <button type="submit" class="btn">再評価</button>
+            <button type="submit" class="btn">
+              <span class="btn-text">再評価</span>
+              <span class="spinner" style="display:none;"></span>
+            </button>
           </form>
         </td>
       </tr>
@@ -60,12 +81,25 @@
     <button onclick="document.getElementById('detailModal').close()" class="btn">閉じる</button>
   </dialog>
 
+  <!-- ✅ ローディング処理 -->
   <script>
     function showDetails(log) {
       const modal = document.getElementById("detailModal");
       const content = document.getElementById("detailContent");
       content.textContent = JSON.stringify(log, null, 2);
       modal.showModal();
+    }
+
+    function showLoading(form) {
+      const button = form.querySelector('button');
+      const text = button.querySelector('.btn-text');
+      const spinner = button.querySelector('.spinner');
+
+      text.style.display = 'none';
+      spinner.style.display = 'inline-block';
+      button.disabled = true;
+
+      return true;
     }
   </script>
 </body>
