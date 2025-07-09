@@ -2,84 +2,90 @@
 # coding: utf-8
 
 """
-📊 /pdca/summary - PDCA再評価の統計ダッシュボード
+📊 /pdca/summary - PDCA再評価の統計サマリ画面
+- 再評価結果ログを集計し、改善率や採用数を表示
+- 📅 期間指定（from～to）によるフィルタに対応
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from datetime import datetime
 from pathlib import Path
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
 import json
+
+from core.path_config import PDCA_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+def parse_date_safe(date_str: str) -> datetime | None:
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except Exception:
+        return None
+
 @router.get("/pdca/summary", response_class=HTMLResponse)
-async def show_pdca_summary(request: Request):
-    eval_log_path = LOGS_DIR / "veritas_eval_result.json"
+async def pdca_summary(
+    request: Request,
+    from_: str = Query(default=None, alias="from"),
+    to: str = Query(default=None)
+):
+    from_date = parse_date_safe(from_)
+    to_date = parse_date_safe(to)
 
-    if not eval_log_path.exists():
-        return templates.TemplateResponse("pdca_summary.html", {
-            "request": request,
-            "stats": {},
-            "chart": {"labels": [], "data": []},
-        })
+    results = []
+    for file in sorted(PDCA_LOG_DIR.glob("*.json")):
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                data = json.load(f)
 
-    with open(eval_log_path, "r", encoding="utf-8") as f:
-        logs = json.load(f)
+            recheck_ts = data.get("recheck_timestamp")
+            if not recheck_ts:
+                continue
 
-    win_diffs = []
-    dd_diffs = []
-    adopted_count = 0
-    win_improved = 0
-    dd_improved = 0
-    labels = []
-    win_diff_values = []
+            ts = datetime.strptime(recheck_ts, "%Y-%m-%dT%H:%M:%S")
+            if from_date and ts < from_date:
+                continue
+            if to_date and ts > to_date:
+                continue
 
-    for log in logs:
-        before = log.get("win_rate_before")
-        after = log.get("win_rate_after")
-        dd_before = log.get("max_dd_before")
-        dd_after = log.get("max_dd_after")
-        strategy = log.get("strategy", "N/A")
-        status = log.get("status", "")
+            results.append({
+                "strategy": data.get("strategy"),
+                "win_rate_before": data.get("win_rate_before"),
+                "win_rate_after": data.get("win_rate_after"),
+                "diff": round(data.get("win_rate_after", 0) - data.get("win_rate_before", 0), 2),
+                "max_dd_before": data.get("max_dd_before"),
+                "max_dd_after": data.get("max_dd_after"),
+                "dd_diff": round(data.get("max_dd_before", 0) - data.get("max_dd_after", 0), 2),
+                "status": data.get("status", "unknown")
+            })
+        except Exception:
+            continue
 
-        if status == "adopted":
-            adopted_count += 1
-
-        if before is not None and after is not None:
-            diff = round(after - before, 2)
-            win_diffs.append(diff)
-            if diff > 0:
-                win_improved += 1
-            labels.append(strategy)
-            win_diff_values.append(diff)
-
-        if dd_before is not None and dd_after is not None:
-            dd_diff = round(dd_before - dd_after, 2)
-            dd_diffs.append(dd_diff)
-            if dd_diff > 0:
-                dd_improved += 1
-
-    avg_win_diff = round(sum(win_diffs) / len(win_diffs), 2) if win_diffs else 0.0
-    avg_dd_diff = round(sum(dd_diffs) / len(dd_diffs), 2) if dd_diffs else 0.0
-
-    chart_data = {
-        "labels": labels,
-        "data": win_diff_values,
-    }
+    # 📊 統計値集計
+    win_diffs = [r["diff"] for r in results]
+    dd_diffs = [r["dd_diff"] for r in results]
 
     stats = {
-        "avg_win_rate_diff": avg_win_diff,
-        "avg_dd_diff": avg_dd_diff,
-        "win_rate_improved": win_improved,
-        "dd_improved": dd_improved,
-        "adopted": adopted_count,
+        "avg_win_rate_diff": round(sum(win_diffs) / len(win_diffs), 2) if win_diffs else 0.0,
+        "avg_dd_diff": round(sum(dd_diffs) / len(dd_diffs), 2) if dd_diffs else 0.0,
+        "win_rate_improved": sum(1 for r in results if r["diff"] > 0),
+        "dd_improved": sum(1 for r in results if r["dd_diff"] > 0),
+        "adopted": sum(1 for r in results if r["status"] == "adopted"),
+        "detail": results,
     }
 
     return templates.TemplateResponse("pdca_summary.html", {
         "request": request,
         "stats": stats,
-        "chart": chart_data,
+        "chart": {
+            "labels": [r["strategy"] for r in results],
+            "data": [r["diff"] for r in results],
+            "dd_data": [r["dd_diff"] for r in results],
+        },
+        "filter": {
+            "from": from_ or "",
+            "to": to or "",
+        }
     })
