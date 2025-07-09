@@ -23,9 +23,6 @@ AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
 AIRFLOW_API_USER = os.getenv("AIRFLOW_API_USER", "admin")
 AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "admin")
 
-# ================================
-# 🔍 PDCAログ一覧表示
-# ================================
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
     request: Request,
@@ -36,13 +33,15 @@ async def show_pdca_dashboard(
     date_from: str = Query(default=None),
     date_to: str = Query(default=None),
     sort: str = Query(default=None),
+    recheck_status: str = Query(default=None),
+    diff_filter: str = Query(default=None),  # ✅ 差分フィルター
     recheck_success: int = Query(default=None),
     recheck_fail: int = Query(default=None),
 ):
     logs = []
     tag_set = set()
 
-    # ✅ ステータス判定用マップ（戦略 → success/fail/pending）
+    # ステータス抽出マップ（success/fail）
     status_map = {}
     latest_status = {}
 
@@ -68,7 +67,6 @@ async def show_pdca_dashboard(
     for strategy_name, info in latest_status.items():
         status_map[strategy_name] = info["status"]
 
-    # ✅ 通常のログ読み込み処理
     for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
             with open(log_file, "r", encoding="utf-8") as f:
@@ -129,6 +127,29 @@ async def show_pdca_dashboard(
                     return False
             except Exception:
                 pass
+        if recheck_status:
+            try:
+                parsed = json.loads(log["json_text"])
+                has_recheck = "recheck_timestamp" in parsed
+                if recheck_status == "done" and not has_recheck:
+                    return False
+                if recheck_status == "pending" and has_recheck:
+                    return False
+            except Exception:
+                return False
+        if diff_filter:
+            try:
+                parsed = json.loads(log["json_text"])
+                wr_b = parsed.get("win_rate_before")
+                wr_a = parsed.get("win_rate_after")
+                dd_b = parsed.get("max_dd_before")
+                dd_a = parsed.get("max_dd_after")
+                if diff_filter == "win_rate_up" and (wr_b is None or wr_a is None or wr_a <= wr_b):
+                    return False
+                if diff_filter == "max_dd_down" and (dd_b is None or dd_a is None or dd_a >= dd_b):
+                    return False
+            except Exception:
+                return False
         return True
 
     filtered_logs = [log for log in logs if matches(log)]
@@ -136,7 +157,7 @@ async def show_pdca_dashboard(
     if sort:
         reverse = sort.startswith("-")
         key = sort.lstrip("-")
-        if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
+        if key in ["win_rate", "max_dd", "trades", "timestamp_dt", "win_rate_diff", "max_dd_diff"]:
             filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
 
     def make_json_serializable(log):
@@ -145,9 +166,19 @@ async def show_pdca_dashboard(
             val = new_log.get(key)
             if isinstance(val, datetime):
                 new_log[key] = val.isoformat()
-        tags = new_log.get("tags")
-        if isinstance(tags, str):
-            new_log["tags"] = [tags]
+
+        try:
+            parsed = json.loads(new_log["json_text"])
+            wr_b = parsed.get("win_rate_before")
+            wr_a = parsed.get("win_rate_after")
+            new_log["win_rate_diff"] = wr_a - wr_b if wr_a is not None and wr_b is not None else None
+            dd_b = parsed.get("max_dd_before")
+            dd_a = parsed.get("max_dd_after")
+            new_log["max_dd_diff"] = dd_a - dd_b if dd_a is not None and dd_b is not None else None
+        except Exception:
+            new_log["win_rate_diff"] = None
+            new_log["max_dd_diff"] = None
+
         return new_log
 
     logs_serializable = [make_json_serializable(log) for log in filtered_logs]
@@ -164,104 +195,10 @@ async def show_pdca_dashboard(
             "date_from": date_from or "",
             "date_to": date_to or "",
         },
+        "recheck_status": recheck_status or "",
+        "diff_filter": diff_filter or "",
         "sort": sort or "",
         "available_tags": sorted(tag_set),
         "recheck_success": recheck_success,
         "recheck_fail": recheck_fail,
     })
-
-# ================================
-# 🔁 ログから注文を再実行
-# ================================
-@router.post("/pdca/replay")
-async def replay_order_from_log(log_path: str = Form(...)):
-    dag_id = "veritas_replay_dag"
-    payload = {"conf": {"log_path": log_path}}
-    headers = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.post(
-            f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
-            json=payload,
-            headers=headers,
-            auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
-        )
-
-        if response.status_code in [200, 201]:
-            print(f"✅ DAG起動成功: {log_path}")
-            return RedirectResponse(url="/pdca", status_code=303)
-        else:
-            print(f"❌ DAGトリガー失敗: {response.text}")
-            return JSONResponse(status_code=500, content={"detail": "DAG起動に失敗しました"})
-
-    except Exception as e:
-        print(f"❌ DAG通信エラー: {e}")
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-
-# ================================
-# 🔁 単一戦略の再評価
-# ================================
-@router.post("/pdca/recheck")
-async def trigger_strategy_recheck(strategy_name: str = Form(...)):
-    dag_id = "veritas_eval_single_dag"
-    payload = {"conf": {"strategy_name": strategy_name}}
-    headers = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.post(
-            f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
-            json=payload,
-            headers=headers,
-            auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
-        )
-
-        if response.status_code in [200, 201]:
-            print(f"✅ 再評価DAG起動成功: {strategy_name}")
-            return RedirectResponse(url="/pdca", status_code=303)
-        else:
-            print(f"❌ 再評価DAG失敗: {response.text}")
-            return JSONResponse(status_code=500, content={"detail": "再評価に失敗しました"})
-
-    except Exception as e:
-        print(f"❌ 通信エラー: {e}")
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-
-# ================================
-# 🔁 全戦略一括再評価
-# ================================
-@router.post("/pdca/recheck_all")
-async def trigger_all_strategy_rechecks():
-    dag_id = "veritas_eval_single_dag"
-    headers = {"Content-Type": "application/json"}
-    strategy_dir = STRATEGIES_VERITAS_GENERATED_DIR
-
-    triggered = []
-    errors = []
-
-    for strategy_file in strategy_dir.glob("*.py"):
-        strategy_name = strategy_file.name
-        payload = {"conf": {"strategy_name": strategy_name}}
-
-        try:
-            response = requests.post(
-                f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
-                json=payload,
-                headers=headers,
-                auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
-            )
-
-            if response.status_code in [200, 201]:
-                print(f"✅ 起動: {strategy_name}")
-                triggered.append(strategy_name)
-            else:
-                print(f"❌ 失敗: {strategy_name} -> {response.text}")
-                errors.append(strategy_name)
-        except Exception as e:
-            print(f"❌ 通信エラー: {strategy_name} -> {e}")
-            errors.append(strategy_name)
-
-    result_params = urlencode({
-        "recheck_success": len(triggered),
-        "recheck_fail": len(errors)
-    })
-    return RedirectResponse(url=f"/pdca?{result_params}", status_code=303)
