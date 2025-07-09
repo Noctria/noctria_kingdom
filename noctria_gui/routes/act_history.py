@@ -34,10 +34,19 @@ def parse_bool(s):
 
 
 def normalize_score(log: dict) -> dict:
-    """scoreがdictの場合はmeanに変換して統一"""
+    """
+    scoreがdictの場合は各評価指標に分解してテンプレートで扱いやすくする
+    """
     score = log.get("score")
-    if isinstance(score, dict) and "mean" in score:
-        log["score"] = score["mean"]
+    if isinstance(score, dict):
+        log["score_mean"] = score.get("mean", None)
+        log["rmse"] = score.get("RMSE", None)
+        log["mae"] = score.get("MAE", None)
+        log["mape"] = score.get("MAPE", None)
+        log["win_rate"] = score.get("win_rate", None)
+        log["max_drawdown"] = score.get("max_drawdown", None)
+    else:
+        log["score_mean"] = score
     return log
 
 
@@ -81,17 +90,15 @@ async def show_act_history(
     except Exception as e:
         print(f"[act_history] ⚠️ フィルターエラー: {e}")
 
-    # ✅ スコア整形（テンプレートで安心して "%.2f" 可）
     logs = [normalize_score(log) for log in logs]
 
-    # ✅ タグ一覧（正規タグ → 表示名）
     tag_map = {}
     for log in logs:
         raw_tag = log.get("tag")
         norm_tag = log.get("normalized_tag", "")
         if norm_tag and raw_tag:
             tag_map[norm_tag] = raw_tag
-    tag_list = sorted(tag_map.items())  # List of (normalized_tag, display_tag)
+    tag_list = sorted(tag_map.items())
 
     return templates.TemplateResponse("act_history.html", {
         "request": request,
