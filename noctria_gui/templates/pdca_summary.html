@@ -11,6 +11,27 @@
       margin-bottom: 1rem;
       background-color: #f9f9f9;
     }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 2rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .download-btn {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -25,7 +46,7 @@
     <p>🔰 採用戦略数: <strong>{{ stats.adopted }}</strong></p>
   </div>
 
-  <!-- 📊 勝率改善グラフ -->
+  <!-- 📈 勝率改善グラフ -->
   <h2>📈 勝率改善分布</h2>
   <canvas id="winRateChart" width="600" height="300"></canvas>
 
@@ -90,6 +111,55 @@
         }
       }
     });
+  </script>
+
+  <!-- 🧮 表形式の統計 + CSVダウンロード -->
+  <h2>🧮 戦略別 評価詳細</h2>
+  <button class="download-btn" onclick="downloadCSV()">📥 CSVダウンロード</button>
+
+  <table id="summary-table">
+    <thead>
+      <tr>
+        <th>戦略名</th>
+        <th>勝率 (Before)</th>
+        <th>勝率 (After)</th>
+        <th>差分 (%)</th>
+        <th>最大DD (Before)</th>
+        <th>最大DD (After)</th>
+        <th>採用</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in stats.detail %}
+      <tr>
+        <td>{{ row.strategy }}</td>
+        <td>{{ row.win_rate_before }}</td>
+        <td>{{ row.win_rate_after }}</td>
+        <td>{{ row.diff }}</td>
+        <td>{{ row.max_dd_before }}</td>
+        <td>{{ row.max_dd_after }}</td>
+        <td>{{ row.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function downloadCSV() {
+      let csv = "戦略名,勝率(Before),勝率(After),差分(%),最大DD(Before),最大DD(After),採用\n";
+      const rows = document.querySelectorAll("#summary-table tbody tr");
+      rows.forEach(row => {
+        const cols = row.querySelectorAll("td");
+        const rowData = Array.from(cols).map(td => `"${td.innerText}"`).join(",");
+        csv += rowData + "\n";
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "pdca_summary.csv";
+      link.click();
+    }
   </script>
 </body>
 </html>
