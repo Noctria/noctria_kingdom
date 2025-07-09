@@ -81,6 +81,14 @@ async def show_dashboard(request: Request):
     # 📈 市場予測呼び出し
     oracle = PrometheusOracle()
     df = oracle.predict_with_confidence(n_days=14)
+
+    # ✅ 列名をテンプレート用に統一
+    df = df.rename(columns={
+        "forecast": "y_pred",
+        "lower": "y_lower",
+        "upper": "y_upper"
+    })
+
     forecast_data = df.to_dict(orient="records")
 
     # 📊 サマリ統計集計
