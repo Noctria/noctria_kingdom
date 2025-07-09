@@ -37,6 +37,13 @@
 <body>
   <h1>📊 PDCA 再評価サマリー</h1>
 
+  <!-- 📅 期間指定フォーム -->
+  <form method="get" action="/pdca/summary" style="margin-bottom: 1.5rem;">
+    <label>📅 開始日: <input type="date" name="from" value="{{ filter.from }}"></label>
+    <label style="margin-left: 1rem;">📅 終了日: <input type="date" name="to" value="{{ filter.to }}"></label>
+    <button type="submit" style="margin-left: 1rem;">🔍 絞り込む</button>
+  </form>
+
   <!-- ✅ サマリー統計 -->
   <div class="summary-card">
     <p>📈 勝率平均改善: <strong>{{ stats.avg_win_rate_diff }}%</strong></p>
@@ -55,7 +62,6 @@
   <canvas id="ddChart" width="600" height="300"></canvas>
 
   <script>
-    // 勝率改善グラフ
     const winCtx = document.getElementById('winRateChart').getContext('2d');
     new Chart(winCtx, {
       type: 'bar',
@@ -85,7 +91,6 @@
       }
     });
 
-    // 最大DD改善グラフ
     const ddCtx = document.getElementById('ddChart').getContext('2d');
     new Chart(ddCtx, {
       type: 'bar',
