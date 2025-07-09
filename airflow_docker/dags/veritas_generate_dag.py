@@ -1,18 +1,24 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📡 veritas_generate_dag.py - LLM戦略生成 DAG（Airflow）
+- conf 経由で symbol / tag / target_metric を受け取りプロンプトを生成
+"""
+
+from core.path_config import CORE_DIR, STRATEGIES_DIR, MODELS_DIR
 import os
 import logging
 import psycopg2
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.python import get_current_context
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from dotenv import load_dotenv
 import torch
 
-# ✅ パス集中管理（v2.0対応）
-from core.path_config import MODELS_DIR, STRATEGIES_DIR, CORE_DIR
-
-# ✅ .env 読み込み（Airflow起動時に一度だけ読み込まれる想定）
+# ✅ .env 読み込み
 load_dotenv(dotenv_path=str(CORE_DIR.parent / ".env"))
 
 # === 環境変数 ===
@@ -73,10 +79,21 @@ def save_and_push_strategy(code: str, strategy_name: str = None):
         raise
 
 def run_veritas_and_save():
-    prompt = "USDJPYについて、来週のFX戦略を日本語で5つ提案してください。"
+    # ✅ DAG run conf を取得
+    context = get_current_context()
+    conf = context.get("dag_run").conf if context.get("dag_run") else {}
+
+    symbol = conf.get("symbol", "USDJPY")
+    tag = conf.get("tag", "default")
+    target_metric = conf.get("target_metric", "win_rate")
+
+    # ✅ プロンプト生成（自由にカスタマイズ可能）
+    prompt = f"{symbol}の為替市場において、{tag}系の戦略で{target_metric}を最大化するためのFX戦略を日本語で5つ提案してください。"
+
+    # === LLMによる生成 ===
     response = generate_fx_strategy(prompt)
 
-    # ✅ PostgreSQL保存
+    # === PostgreSQL保存 ===
     conn = None
     try:
         conn = psycopg2.connect(
@@ -103,7 +120,7 @@ def run_veritas_and_save():
         if conn:
             conn.close()
 
-    # ✅ GitHubへ戦略反映
+    # === GitHubへ戦略保存 ===
     save_and_push_strategy(response)
 
 # === DAG定義 ===
