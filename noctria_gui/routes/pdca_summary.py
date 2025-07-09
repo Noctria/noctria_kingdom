@@ -1,90 +1,85 @@
-# routes/pdca_summary.py
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📊 /pdca/summary - PDCA再評価の統計ダッシュボード
+"""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
-
 from pathlib import Path
+from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
 import json
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-
 @router.get("/pdca/summary", response_class=HTMLResponse)
 async def show_pdca_summary(request: Request):
-    """
-    📊 PDCA再評価結果の集計ダッシュボード
-    """
     eval_log_path = LOGS_DIR / "veritas_eval_result.json"
-    stats = {
-        "count": 0,
-        "adopted_count": 0,
-        "rejected_count": 0,
-        "error_count": 0,
-        "avg_win_rate_diff": 0.0,
-        "avg_dd_diff": 0.0,
-        "improved_win_rate_count": 0,
-        "improved_dd_count": 0,
-        "win_rate_diffs": [],
-        "dd_diffs": [],
-    }
 
     if not eval_log_path.exists():
         return templates.TemplateResponse("pdca_summary.html", {
             "request": request,
-            "stats": stats,
+            "stats": {},
+            "chart": {"labels": [], "data": []},
         })
 
     with open(eval_log_path, "r", encoding="utf-8") as f:
-        try:
-            logs = json.load(f)
-        except Exception as e:
-            print(f"⚠️ ログ読み込みエラー: {e}")
-            logs = []
+        logs = json.load(f)
 
-    total_win_rate_diff = 0.0
-    total_dd_diff = 0.0
-    valid_count = 0
+    win_diffs = []
+    dd_diffs = []
+    adopted_count = 0
+    win_improved = 0
+    dd_improved = 0
+    labels = []
+    win_diff_values = []
 
-    for entry in logs:
-        status = entry.get("status")
+    for log in logs:
+        before = log.get("win_rate_before")
+        after = log.get("win_rate_after")
+        dd_before = log.get("max_dd_before")
+        dd_after = log.get("max_dd_after")
+        strategy = log.get("strategy", "N/A")
+        status = log.get("status", "")
+
         if status == "adopted":
-            stats["adopted_count"] += 1
-        elif status == "rejected":
-            stats["rejected_count"] += 1
-        elif status == "error":
-            stats["error_count"] += 1
+            adopted_count += 1
 
-        # 差分算出
-        win_before = entry.get("win_rate_before")
-        win_after = entry.get("win_rate_after")
-        dd_before = entry.get("max_dd_before")
-        dd_after = entry.get("max_dd_after")
-
-        if win_before is not None and win_after is not None:
-            diff = win_after - win_before
-            stats["win_rate_diffs"].append(diff)
-            total_win_rate_diff += diff
+        if before is not None and after is not None:
+            diff = round(after - before, 2)
+            win_diffs.append(diff)
             if diff > 0:
-                stats["improved_win_rate_count"] += 1
-            valid_count += 1
+                win_improved += 1
+            labels.append(strategy)
+            win_diff_values.append(diff)
 
         if dd_before is not None and dd_after is not None:
-            dd_diff = dd_before - dd_after  # DDは小さい方が良い
-            stats["dd_diffs"].append(dd_diff)
-            total_dd_diff += dd_diff
+            dd_diff = round(dd_before - dd_after, 2)
+            dd_diffs.append(dd_diff)
             if dd_diff > 0:
-                stats["improved_dd_count"] += 1
+                dd_improved += 1
 
-    stats["count"] = len(logs)
-    if valid_count > 0:
-        stats["avg_win_rate_diff"] = round(total_win_rate_diff / valid_count * 100, 2)  # パーセント表記
-        stats["avg_dd_diff"] = round(total_dd_diff / valid_count, 2)
+    avg_win_diff = round(sum(win_diffs) / len(win_diffs), 2) if win_diffs else 0.0
+    avg_dd_diff = round(sum(dd_diffs) / len(dd_diffs), 2) if dd_diffs else 0.0
+
+    chart_data = {
+        "labels": labels,
+        "data": win_diff_values,
+    }
+
+    stats = {
+        "avg_win_rate_diff": avg_win_diff,
+        "avg_dd_diff": avg_dd_diff,
+        "win_rate_improved": win_improved,
+        "dd_improved": dd_improved,
+        "adopted": adopted_count,
+    }
 
     return templates.TemplateResponse("pdca_summary.html", {
         "request": request,
         "stats": stats,
+        "chart": chart_data,
     })
