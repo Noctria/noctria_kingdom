@@ -2,74 +2,63 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>📊 再評価サマリ - Noctria Kingdom</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>📊 PDCA サマリー</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    .card {
-      border: 1px solid #ccc;
+    .summary-card {
       padding: 1rem;
-      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 1rem;
       background-color: #f9f9f9;
-      margin: 0.5rem;
-      flex: 1 1 220px;
-    }
-    .card h3 {
-      margin: 0;
-      font-size: 1.1rem;
-      color: #333;
-    }
-    .card p {
-      font-size: 1.3rem;
-      margin-top: 0.4rem;
-    }
-    .cards-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 2rem;
     }
   </style>
 </head>
 <body>
-  <h1>📊 Veritas PDCA 再評価サマリ</h1>
+  <h1>📊 PDCA 再評価サマリー</h1>
 
-  {% if stats.count == 0 %}
-    <p>📭 再評価ログが存在しません。</p>
-  {% else %}
-    <div class="cards-container">
-      <div class="card">
-        <h3>📄 評価総数</h3>
-        <p>{{ stats.count }} 件</p>
-      </div>
-      <div class="card">
-        <h3>📈 勝率改善平均</h3>
-        <p>{{ stats.avg_win_rate_diff }} %</p>
-      </div>
-      <div class="card">
-        <h3>📉 DD改善平均</h3>
-        <p>{{ stats.avg_dd_diff }}</p>
-      </div>
-      <div class="card">
-        <h3>✅ 昇格数</h3>
-        <p>{{ stats.adopted_count }} 件</p>
-      </div>
-      <div class="card">
-        <h3>❌ 非昇格数</h3>
-        <p>{{ stats.rejected_count }} 件</p>
-      </div>
-      <div class="card">
-        <h3>🚫 エラー</h3>
-        <p>{{ stats.error_count }} 件</p>
-      </div>
-      <div class="card">
-        <h3>🟢 勝率改善件数</h3>
-        <p>{{ stats.improved_win_rate_count }} 件</p>
-      </div>
-      <div class="card">
-        <h3>🟡 DD改善件数</h3>
-        <p>{{ stats.improved_dd_count }} 件</p>
-      </div>
-    </div>
-  {% endif %}
+  <!-- ✅ 数値統計 -->
+  <div class="summary-card">
+    <p>📈 勝率平均改善: <strong>{{ stats.avg_win_rate_diff }}%</strong></p>
+    <p>📉 最大DD平均改善: <strong>{{ stats.avg_dd_diff }}</strong></p>
+    <p>🎯 勝率改善戦略数: <strong>{{ stats.win_rate_improved }}</strong></p>
+    <p>🛡 DD改善戦略数: <strong>{{ stats.dd_improved }}</strong></p>
+    <p>🔰 採用戦略数: <strong>{{ stats.adopted }}</strong></p>
+  </div>
+
+  <!-- 📊 グラフ：勝率改善分布 -->
+  <canvas id="winRateChart" width="600" height="300"></canvas>
+
+  <script>
+    const ctx = document.getElementById('winRateChart').getContext('2d');
+    const winRateChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: {{ chart.labels | safe }},
+        datasets: [{
+          label: '📈 勝率改善率 (%)',
+          data: {{ chart.data | safe }},
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: '勝率改善（after - before）分布'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return value + "%";
+              }
+            }
+          }
+        }
+      }
+    });
+  </script>
 </body>
 </html>
