@@ -34,12 +34,14 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
 def aggregate_dashboard_stats() -> Dict[str, Any]:
     """
     📊 ダッシュボード用サマリ統計を集計（昇格数 / Push数 / PDCA数 / 勝率平均）
+    + Oracleモデル評価指標（RMSE / MAE / MAPE）も追加
     """
     stats = {
         "promoted_count": 0,
         "push_count": 0,
         "pdca_count": 0,
         "avg_win_rate": 0.0,
+        "oracle_metrics": {},  # 👈 精度指標
     }
 
     act_dir = Path(ACT_LOG_DIR)
@@ -70,6 +72,19 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
             continue
 
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
+
+    # 📈 Oracleモデル評価追加
+    try:
+        oracle = PrometheusOracle()
+        metrics = oracle.evaluate_model()
+        stats["oracle_metrics"] = {
+            "RMSE": round(metrics.get("RMSE", 0.0), 4),
+            "MAE": round(metrics.get("MAE", 0.0), 4),
+            "MAPE": round(metrics.get("MAPE", 0.0), 4),
+        }
+    except Exception as e:
+        stats["oracle_metrics"] = {"error": str(e)}
+
     return stats
 
 
@@ -93,7 +108,7 @@ async def show_dashboard(request: Request):
 
     forecast_data = df.to_dict(orient="records")
 
-    # 📊 サマリ統計集計
+    # 📊 サマリ統計集計（＋Oracle評価指標含む）
     stats = aggregate_dashboard_stats()
 
     # ✅ 実行メッセージ取得（クエリパラメータから）
