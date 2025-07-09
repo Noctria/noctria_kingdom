@@ -16,7 +16,7 @@
 <body>
   <h1>📊 PDCA 再評価サマリー</h1>
 
-  <!-- ✅ 数値統計 -->
+  <!-- ✅ サマリー統計 -->
   <div class="summary-card">
     <p>📈 勝率平均改善: <strong>{{ stats.avg_win_rate_diff }}%</strong></p>
     <p>📉 最大DD平均改善: <strong>{{ stats.avg_dd_diff }}</strong></p>
@@ -25,17 +25,23 @@
     <p>🔰 採用戦略数: <strong>{{ stats.adopted }}</strong></p>
   </div>
 
-  <!-- 📊 グラフ：勝率改善分布 -->
+  <!-- 📊 勝率改善グラフ -->
+  <h2>📈 勝率改善分布</h2>
   <canvas id="winRateChart" width="600" height="300"></canvas>
 
+  <!-- 📉 最大DD改善グラフ -->
+  <h2>📉 最大ドローダウン改善分布</h2>
+  <canvas id="ddChart" width="600" height="300"></canvas>
+
   <script>
-    const ctx = document.getElementById('winRateChart').getContext('2d');
-    const winRateChart = new Chart(ctx, {
+    // 勝率改善グラフ
+    const winCtx = document.getElementById('winRateChart').getContext('2d');
+    new Chart(winCtx, {
       type: 'bar',
       data: {
         labels: {{ chart.labels | safe }},
         datasets: [{
-          label: '📈 勝率改善率 (%)',
+          label: '勝率改善率 (%)',
           data: {{ chart.data | safe }},
         }]
       },
@@ -51,10 +57,35 @@
           y: {
             beginAtZero: true,
             ticks: {
-              callback: function(value) {
-                return value + "%";
-              }
+              callback: value => value + "%"
             }
+          }
+        }
+      }
+    });
+
+    // 最大DD改善グラフ
+    const ddCtx = document.getElementById('ddChart').getContext('2d');
+    new Chart(ddCtx, {
+      type: 'bar',
+      data: {
+        labels: {{ chart.labels | safe }},
+        datasets: [{
+          label: '最大DD改善 (before - after)',
+          data: {{ chart.dd_data | safe }},
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: '最大DD改善（before - after）分布'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
           }
         }
       }
