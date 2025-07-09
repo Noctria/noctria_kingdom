@@ -1,7 +1,7 @@
 # routes/dashboard.py
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
@@ -14,6 +14,8 @@ import os
 import json
 import subprocess
 from typing import Optional, Dict, Any
+import io
+import csv
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -111,7 +113,6 @@ async def trigger_oracle_prediction():
     📈 GUIから PrometheusOracle を再実行するエンドポイント
     """
     try:
-        # ✅ PYTHONPATH を指定して core モジュールを正しく解決
         subprocess.run(
             ["python3", "strategies/prometheus_oracle.py"],
             check=True,
@@ -121,3 +122,27 @@ async def trigger_oracle_prediction():
     except subprocess.CalledProcessError as e:
         print("🔴 Oracle実行失敗:", e)
         return RedirectResponse(url="/dashboard?message=error", status_code=303)
+
+
+@router.get("/oracle/export")
+async def export_oracle_csv():
+    """
+    📥 Oracle予測結果をCSVとしてダウンロード
+    """
+    oracle = PrometheusOracle()
+    df = oracle.predict_with_confidence(n_days=14).rename(columns={
+        "forecast": "y_pred",
+        "lower": "y_lower",
+        "upper": "y_upper"
+    })
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["date", "y_pred", "y_lower", "y_upper"])
+    for _, row in df.iterrows():
+        writer.writerow([row["date"], row["y_pred"], row["y_lower"], row["y_upper"]])
+
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type="text/csv", headers={
+        "Content-Disposition": "attachment; filename=oracle_forecast.csv"
+    })
