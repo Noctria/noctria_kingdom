@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import json
 import requests
-from urllib.parse import urlencode  # ✅ クエリ組み立て用
+from urllib.parse import urlencode
 
 from core.path_config import (
     PDCA_LOG_DIR,
@@ -37,7 +37,7 @@ async def show_pdca_dashboard(
     date_to: str = Query(default=None),
     sort: str = Query(default=None),
     recheck_success: int = Query(default=None),
-    recheck_fail: int = Query(default=None),  # ✅ クエリ受け取り追加
+    recheck_fail: int = Query(default=None),
 ):
     logs = []
     tag_set = set()
@@ -142,7 +142,6 @@ async def show_pdca_dashboard(
         "recheck_fail": recheck_fail,
     })
 
-
 # ================================
 # 🔁 ログから注文を再実行
 # ================================
@@ -171,14 +170,13 @@ async def replay_order_from_log(log_path: str = Form(...)):
         print(f"❌ DAG通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-
 # ================================
-# 🔁 単一戦略の再評価
+# 🔁 単一戦略の再評価（veritas_eval_single_dag）
 # ================================
 @router.post("/pdca/recheck")
-async def trigger_strategy_recheck(strategy_id: str = Form(...)):
-    dag_id = "recheck_dag"
-    payload = {"conf": {"strategy_id": strategy_id}}
+async def trigger_strategy_recheck(strategy_name: str = Form(...)):
+    dag_id = "veritas_eval_single_dag"
+    payload = {"conf": {"strategy_name": strategy_name}}
     headers = {"Content-Type": "application/json"}
 
     try:
@@ -190,7 +188,7 @@ async def trigger_strategy_recheck(strategy_id: str = Form(...)):
         )
 
         if response.status_code in [200, 201]:
-            print(f"✅ 再評価DAG起動成功: {strategy_id}")
+            print(f"✅ 再評価DAG起動成功: {strategy_name}")
             return RedirectResponse(url="/pdca", status_code=303)
         else:
             print(f"❌ 再評価DAG失敗: {response.text}")
@@ -200,13 +198,12 @@ async def trigger_strategy_recheck(strategy_id: str = Form(...)):
         print(f"❌ 通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-
 # ================================
-# 🔁 全戦略一括再評価（リダイレクト＋結果付与）
+# 🔁 全戦略一括再評価（veritas_eval_single_dagを複数回呼ぶ）
 # ================================
 @router.post("/pdca/recheck_all")
 async def trigger_all_strategy_rechecks():
-    dag_id = "recheck_dag"
+    dag_id = "veritas_eval_single_dag"
     headers = {"Content-Type": "application/json"}
     strategy_dir = STRATEGIES_VERITAS_GENERATED_DIR
 
@@ -214,8 +211,8 @@ async def trigger_all_strategy_rechecks():
     errors = []
 
     for strategy_file in strategy_dir.glob("*.py"):
-        strategy_id = strategy_file.stem
-        payload = {"conf": {"strategy_id": strategy_id}}
+        strategy_name = strategy_file.name
+        payload = {"conf": {"strategy_name": strategy_name}}
 
         try:
             response = requests.post(
@@ -226,14 +223,14 @@ async def trigger_all_strategy_rechecks():
             )
 
             if response.status_code in [200, 201]:
-                print(f"✅ 起動: {strategy_id}")
-                triggered.append(strategy_id)
+                print(f"✅ 起動: {strategy_name}")
+                triggered.append(strategy_name)
             else:
-                print(f"❌ 失敗: {strategy_id} -> {response.text}")
-                errors.append(strategy_id)
+                print(f"❌ 失敗: {strategy_name} -> {response.text}")
+                errors.append(strategy_name)
         except Exception as e:
-            print(f"❌ 通信エラー: {strategy_id} -> {e}")
-            errors.append(strategy_id)
+            print(f"❌ 通信エラー: {strategy_name} -> {e}")
+            errors.append(strategy_name)
 
     result_params = urlencode({
         "recheck_success": len(triggered),
