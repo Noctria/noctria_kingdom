@@ -9,6 +9,14 @@
     .row-fail { background-color: #ffe6e6; }     /* 赤：失敗 */
     .row-pending { background-color: #f2f2f2; }  /* 灰：未評価 */
   </style>
+  <script>
+    function onRecheckSubmit(form) {
+      const button = form.querySelector('button');
+      button.disabled = true;
+      button.textContent = '再評価中...';
+      return true;
+    }
+  </script>
 </head>
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
@@ -33,6 +41,8 @@
         <th>📈 勝率</th>
         <th>📉 最大DD</th>
         <th>🧪 詳細</th>
+        <th>📄 戦略詳細</th>
+        <th>⏱ 再評価時刻</th>
         <th>🔁 再評価</th>
       </tr>
     </thead>
@@ -53,7 +63,14 @@
             </details>
           </td>
           <td>
-            <form method="post" action="/pdca/recheck">
+            <a href="/statistics/detail?strategy={{ log.strategy }}" target="_blank">📄 詳細</a>
+          </td>
+          <td>
+            {% set parsed = log.json_text | from_json %}
+            {{ parsed.recheck_timestamp if parsed.recheck_timestamp is defined else "-" }}
+          </td>
+          <td>
+            <form method="post" action="/pdca/recheck" onsubmit="return onRecheckSubmit(this);">
               <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
               <button type="submit">再評価</button>
             </form>
