@@ -23,6 +23,7 @@ AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
 AIRFLOW_API_USER = os.getenv("AIRFLOW_API_USER", "admin")
 AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "admin")
 
+
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
     request: Request,
@@ -33,39 +34,13 @@ async def show_pdca_dashboard(
     date_from: str = Query(default=None),
     date_to: str = Query(default=None),
     sort: str = Query(default=None),
-    recheck_status: str = Query(default=None),
-    diff_filter: str = Query(default=None),  # ✅ 差分フィルター
+    diff_filter: str = Query(default=None),
+    win_rate_min_diff: float = Query(default=None),
     recheck_success: int = Query(default=None),
     recheck_fail: int = Query(default=None),
 ):
     logs = []
     tag_set = set()
-
-    # ステータス抽出マップ（success/fail）
-    status_map = {}
-    latest_status = {}
-
-    for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
-        try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            continue
-
-        strategy_name = data.get("strategy")
-        status = data.get("status")
-        ts = data.get("timestamp")
-
-        if strategy_name and status:
-            prev_ts = latest_status.get(strategy_name, {}).get("timestamp", "")
-            if not prev_ts or ts > prev_ts:
-                latest_status[strategy_name] = {
-                    "status": status,
-                    "timestamp": ts,
-                }
-
-    for strategy_name, info in latest_status.items():
-        status_map[strategy_name] = info["status"]
 
     for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
@@ -99,7 +74,10 @@ async def show_pdca_dashboard(
             "sl": data.get("sl", "N/A"),
             "win_rate": data.get("win_rate"),
             "max_dd": data.get("max_dd"),
-            "trades": data.get("trades"),
+            "win_rate_before": data.get("win_rate_before"),
+            "win_rate_after": data.get("win_rate_after"),
+            "max_dd_before": data.get("max_dd_before"),
+            "max_dd_after": data.get("max_dd_after"),
             "tags": tags,
             "json_text": json.dumps(data, indent=2, ensure_ascii=False),
         })
@@ -127,29 +105,32 @@ async def show_pdca_dashboard(
                     return False
             except Exception:
                 pass
-        if recheck_status:
-            try:
-                parsed = json.loads(log["json_text"])
-                has_recheck = "recheck_timestamp" in parsed
-                if recheck_status == "done" and not has_recheck:
+
+        # 差分フィルター
+        try:
+            if diff_filter == "win_rate_up":
+                if log["win_rate_after"] is None or log["win_rate_before"] is None:
                     return False
-                if recheck_status == "pending" and has_recheck:
+                if log["win_rate_after"] <= log["win_rate_before"]:
+                    return False
+            elif diff_filter == "max_dd_down":
+                if log["max_dd_after"] is None or log["max_dd_before"] is None:
+                    return False
+                if log["max_dd_after"] >= log["max_dd_before"]:
+                    return False
+        except Exception:
+            return False
+
+        # しきい値フィルター
+        if win_rate_min_diff is not None:
+            try:
+                wr_b = log.get("win_rate_before")
+                wr_a = log.get("win_rate_after")
+                if wr_b is None or wr_a is None or (wr_a - wr_b) < win_rate_min_diff:
                     return False
             except Exception:
                 return False
-        if diff_filter:
-            try:
-                parsed = json.loads(log["json_text"])
-                wr_b = parsed.get("win_rate_before")
-                wr_a = parsed.get("win_rate_after")
-                dd_b = parsed.get("max_dd_before")
-                dd_a = parsed.get("max_dd_after")
-                if diff_filter == "win_rate_up" and (wr_b is None or wr_a is None or wr_a <= wr_b):
-                    return False
-                if diff_filter == "max_dd_down" and (dd_b is None or dd_a is None or dd_a >= dd_b):
-                    return False
-            except Exception:
-                return False
+
         return True
 
     filtered_logs = [log for log in logs if matches(log)]
@@ -157,36 +138,12 @@ async def show_pdca_dashboard(
     if sort:
         reverse = sort.startswith("-")
         key = sort.lstrip("-")
-        if key in ["win_rate", "max_dd", "trades", "timestamp_dt", "win_rate_diff", "max_dd_diff"]:
+        if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
             filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
-
-    def make_json_serializable(log):
-        new_log = log.copy()
-        for key in ["timestamp_dt"]:
-            val = new_log.get(key)
-            if isinstance(val, datetime):
-                new_log[key] = val.isoformat()
-
-        try:
-            parsed = json.loads(new_log["json_text"])
-            wr_b = parsed.get("win_rate_before")
-            wr_a = parsed.get("win_rate_after")
-            new_log["win_rate_diff"] = wr_a - wr_b if wr_a is not None and wr_b is not None else None
-            dd_b = parsed.get("max_dd_before")
-            dd_a = parsed.get("max_dd_after")
-            new_log["max_dd_diff"] = dd_a - dd_b if dd_a is not None and dd_b is not None else None
-        except Exception:
-            new_log["win_rate_diff"] = None
-            new_log["max_dd_diff"] = None
-
-        return new_log
-
-    logs_serializable = [make_json_serializable(log) for log in filtered_logs]
 
     return templates.TemplateResponse("pdca_history.html", {
         "request": request,
-        "logs": logs_serializable,
-        "status_map": status_map,
+        "logs": filtered_logs,
         "filters": {
             "strategy": strategy or "",
             "symbol": symbol or "",
@@ -195,10 +152,10 @@ async def show_pdca_dashboard(
             "date_from": date_from or "",
             "date_to": date_to or "",
         },
-        "recheck_status": recheck_status or "",
-        "diff_filter": diff_filter or "",
         "sort": sort or "",
         "available_tags": sorted(tag_set),
+        "diff_filter": diff_filter or "",
+        "win_rate_min_diff": win_rate_min_diff or "",
         "recheck_success": recheck_success,
         "recheck_fail": recheck_fail,
     })
