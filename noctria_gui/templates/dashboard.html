@@ -31,11 +31,6 @@
     </div>
   {% endif %}
 
-  <!-- 🔍 検索フィルター＆CSV出力 -->
-  <form method="get" action="/dashboard" class="mb-6">
-    <!-- フィルター省略（必要なら戻す） -->
-  </form>
-
   <!-- 📊 サマリカード -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
@@ -60,7 +55,6 @@
   <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 mb-6">
     <div class="flex justify-between items-center mb-2">
       <h2 class="text-lg font-semibold">🔮 市場予測（PrometheusOracle）</h2>
-      <!-- 🔄 再実行ボタン -->
       <form method="post" action="/oracle/predict">
         <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
           🔄 予測を再実行
@@ -120,19 +114,21 @@
             tension: 0.3
           },
           {
-            label: '上限 (y_upper)',
+            label: '信頼区間',
             data: y_upper,
-            borderColor: 'rgba(255, 99, 132, 0.5)',
-            borderDash: [5, 5],
-            fill: false,
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            borderWidth: 0,
+            pointRadius: 0,
+            fill: '+1',
             tension: 0.3
           },
           {
-            label: '下限 (y_lower)',
+            label: '',
             data: y_lower,
-            borderColor: 'rgba(255, 159, 64, 0.5)',
-            borderDash: [5, 5],
-            fill: '-1',
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            borderWidth: 0,
+            pointRadius: 0,
+            fill: false,
             tension: 0.3
           }
         ]
@@ -141,7 +137,7 @@
         responsive: true,
         plugins: {
           legend: { position: 'top' },
-          title: { display: true, text: '日次市場予測と信頼区間' }
+          title: { display: true, text: '🔮 市場予測と信頼区間' }
         },
         scales: {
           y: { beginAtZero: false }
