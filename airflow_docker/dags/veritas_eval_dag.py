@@ -1,20 +1,13 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+from core.path_config import STRATEGIES_DIR, LOGS_DIR, DATA_DIR
+from core.strategy_evaluator import evaluate_strategy, is_strategy_adopted
+from core.market_loader import load_market_data
+
 import os
 import json
 from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-# ✅ Noctria Kingdom v2.0 パス一元管理
-from core.path_config import (
-    STRATEGIES_DIR,
-    LOGS_DIR,
-    DATA_DIR
-)
-
-from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
-from core.market_loader import load_market_data
 
 # === DAG基本設定 ===
 default_args = {
@@ -30,13 +23,12 @@ default_args = {
 dag = DAG(
     dag_id='veritas_eval_dag',
     default_args=default_args,
-    description='✅ Veritas生成戦略の評価・採用判定DAG（dict対応）',
+    description='✅ Veritas生成戦略の評価・採用判定DAG（共通評価関数対応）',
     schedule_interval=None,
     catchup=False,
     tags=['veritas', 'evaluation', 'pdca'],
 )
 
-# === 評価＆昇格処理 ===
 def evaluate_and_adopt_strategies():
     generated_dir = STRATEGIES_DIR / "veritas_generated"
     official_dir = STRATEGIES_DIR / "official"
@@ -59,34 +51,22 @@ def evaluate_and_adopt_strategies():
             continue
 
         path = generated_dir / filename
-        print(f"🔍 評価対象: {filename}")
+        print(f"📊 評価中: {filename}")
+        result = evaluate_strategy(str(path), market_data)
 
-        result = simulate_strategy_adjusted(str(path), market_data)
-
-        log_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "filename": filename,
-            "status": result.get("status", "error"),
-            "final_capital": result.get("final_capital"),
-            "win_rate": result.get("win_rate"),
-            "max_drawdown": result.get("max_drawdown"),
-            "total_trades": result.get("total_trades"),
-            "error_message": result.get("error_message")
-        }
-
-        if result["status"] == "ok" and result.get("final_capital", 0) >= 1_050_000:
+        if is_strategy_adopted(result):
             save_path = official_dir / filename
             with open(path, "r") as src, open(save_path, "w") as dst:
                 dst.write(src.read())
             print(f"✅ 採用: {filename}（資産 {result['final_capital']:,.0f}円）")
-            log_entry["status"] = "adopted"
+            result["status"] = "adopted"
         elif result["status"] == "ok":
-            print(f"❌ 不採用: {filename}（資産 {result['final_capital']:,.0f}円）")
-            log_entry["status"] = "rejected"
+            print(f"❌ 不採用: {filename}")
+            result["status"] = "rejected"
         else:
-            print(f"🚫 エラー: {filename} ➜ {result['error_message']}")
+            print(f"🚫 エラー: {filename} ➜ {result.get('error_message')}")
 
-        eval_logs.append(log_entry)
+        eval_logs.append(result)
 
     with open(log_path, "w") as f:
         json.dump(eval_logs, f, indent=2)
