@@ -37,10 +37,17 @@
 <body>
   <h1>📊 PDCA 再評価サマリー</h1>
 
-  <!-- 📅 期間指定フォーム -->
+  <!-- 📅 期間・モード指定フォーム -->
   <form method="get" action="/pdca/summary" style="margin-bottom: 1.5rem;">
     <label>📅 開始日: <input type="date" name="from" value="{{ filter.from }}"></label>
     <label style="margin-left: 1rem;">📅 終了日: <input type="date" name="to" value="{{ filter.to }}"></label>
+
+    <label style="margin-left: 2rem;">📊 表示モード:</label>
+    <select name="mode">
+      <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
+      <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+    </select>
+
     <button type="submit" style="margin-left: 1rem;">🔍 絞り込む</button>
   </form>
 
@@ -54,11 +61,11 @@
   </div>
 
   <!-- 📈 勝率改善グラフ -->
-  <h2>📈 勝率改善分布</h2>
+  <h2>📈 勝率改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
   <canvas id="winRateChart" width="600" height="300"></canvas>
 
   <!-- 📉 最大DD改善グラフ -->
-  <h2>📉 最大ドローダウン改善分布</h2>
+  <h2>📉 最大DD改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
   <canvas id="ddChart" width="600" height="300"></canvas>
 
   <script>
@@ -119,13 +126,13 @@
   </script>
 
   <!-- 🧮 表形式の統計 + CSVダウンロード -->
-  <h2>🧮 戦略別 評価詳細</h2>
+  <h2>🧮 評価詳細（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
   <button class="download-btn" onclick="downloadCSV()">📥 CSVダウンロード</button>
 
   <table id="summary-table">
     <thead>
       <tr>
-        <th>戦略名</th>
+        <th>{{ "戦略名" if mode == "strategy" else "タグ" }}</th>
         <th>勝率 (Before)</th>
         <th>勝率 (After)</th>
         <th>差分 (%)</th>
@@ -151,7 +158,7 @@
 
   <script>
     function downloadCSV() {
-      let csv = "戦略名,勝率(Before),勝率(After),差分(%),最大DD(Before),最大DD(After),採用\n";
+      let csv = "{{ '戦略名' if mode == 'strategy' else 'タグ' }},勝率(Before),勝率(After),差分(%),最大DD(Before),最大DD(After),採用\n";
       const rows = document.querySelectorAll("#summary-table tbody tr");
       rows.forEach(row => {
         const cols = row.querySelectorAll("td");
