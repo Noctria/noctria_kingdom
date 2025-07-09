@@ -9,11 +9,11 @@ import requests
 from core.path_config import (
     PDCA_LOG_DIR,
     NOCTRIA_GUI_TEMPLATES_DIR,
+    STRATEGIES_VERITAS_GENERATED_DIR,
 )
 
 from dotenv import load_dotenv
-
-load_dotenv()  # カレントディレクトリの .env を読み込む
+load_dotenv()
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -22,18 +22,9 @@ AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
 AIRFLOW_API_USER = os.getenv("AIRFLOW_API_USER", "admin")
 AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "admin")
 
-def make_json_serializable(log):
-    """datetime型などをテンプレートtojson用に文字列化"""
-    new_log = log.copy()
-    for key in ["timestamp_dt"]:
-        val = new_log.get(key)
-        if isinstance(val, datetime):
-            new_log[key] = val.isoformat()
-    tags = new_log.get("tags")
-    if isinstance(tags, str):
-        new_log["tags"] = [tags]
-    return new_log
-
+# ================================
+# 🔍 PDCAログ一覧表示
+# ================================
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
     request: Request,
@@ -118,6 +109,17 @@ async def show_pdca_dashboard(
         if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
             filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
 
+    def make_json_serializable(log):
+        new_log = log.copy()
+        for key in ["timestamp_dt"]:
+            val = new_log.get(key)
+            if isinstance(val, datetime):
+                new_log[key] = val.isoformat()
+        tags = new_log.get("tags")
+        if isinstance(tags, str):
+            new_log["tags"] = [tags]
+        return new_log
+
     logs_serializable = [make_json_serializable(log) for log in filtered_logs]
 
     return templates.TemplateResponse("pdca_history.html", {
@@ -135,6 +137,10 @@ async def show_pdca_dashboard(
         "available_tags": sorted(tag_set),
     })
 
+
+# ================================
+# 🔁 ログから注文を再実行
+# ================================
 @router.post("/pdca/replay")
 async def replay_order_from_log(log_path: str = Form(...)):
     dag_id = "veritas_replay_dag"
@@ -160,6 +166,10 @@ async def replay_order_from_log(log_path: str = Form(...)):
         print(f"❌ DAG通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
+
+# ================================
+# 🔁 単一戦略の再評価
+# ================================
 @router.post("/pdca/recheck")
 async def trigger_strategy_recheck(strategy_id: str = Form(...)):
     dag_id = "recheck_dag"
@@ -184,3 +194,46 @@ async def trigger_strategy_recheck(strategy_id: str = Form(...)):
     except Exception as e:
         print(f"❌ 通信エラー: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+# ================================
+# 🔁 全戦略一括再評価
+# ================================
+@router.post("/pdca/recheck_all")
+async def trigger_all_strategy_rechecks():
+    dag_id = "recheck_dag"
+    headers = {"Content-Type": "application/json"}
+    strategy_dir = STRATEGIES_VERITAS_GENERATED_DIR
+
+    triggered = []
+    errors = []
+
+    for strategy_file in strategy_dir.glob("*.py"):
+        strategy_id = strategy_file.stem
+        payload = {"conf": {"strategy_id": strategy_id}}
+
+        try:
+            response = requests.post(
+                f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
+                json=payload,
+                headers=headers,
+                auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
+            )
+
+            if response.status_code in [200, 201]:
+                print(f"✅ 起動: {strategy_id}")
+                triggered.append(strategy_id)
+            else:
+                print(f"❌ 失敗: {strategy_id} -> {response.text}")
+                errors.append({"strategy": strategy_id, "error": response.text})
+
+        except Exception as e:
+            print(f"❌ 通信エラー: {strategy_id} -> {e}")
+            errors.append({"strategy": strategy_id, "error": str(e)})
+
+    return JSONResponse({
+        "status": "completed",
+        "triggered_count": len(triggered),
+        "triggered": triggered,
+        "errors": errors,
+    })
