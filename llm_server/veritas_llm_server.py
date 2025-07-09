@@ -2,15 +2,15 @@
 
 import os
 import torch
+import time
 from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
 
-# ✅ Veritasテンプレ読み込み
 from veritas.generate.llm_prompt_builder import load_strategy_template
 
-# ✅ .env 読み込み
+# ✅ .env読み込み
 load_dotenv()
 model_path = os.getenv("MODEL_DIR", "/home/user/noctria-kingdom-main/airflow_docker/models/elyza-7b-instruct")
 
@@ -21,7 +21,7 @@ if not os.path.exists(model_path):
 print(f"📦 モデル読み込み中: {model_path}")
 torch.cuda.empty_cache()
 
-# ✅ モデルとトークナイザーの読み込み
+# ✅ モデル・トークナイザーの読み込み
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
@@ -31,13 +31,11 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 model.eval()
 
-# ✅ FastAPI サーバー
+# ✅ FastAPI サーバー初期化
 app = FastAPI()
-
-# ✅ 戦略テンプレートを起動時に読み込み
 strategy_template = load_strategy_template()
 
-# ✅ リクエスト定義
+# ✅ リクエスト形式
 class PromptRequest(BaseModel):
     prompt: str
     max_new_tokens: int = 128
@@ -51,7 +49,9 @@ def root():
 
 @app.post("/generate")
 def generate(req: PromptRequest):
-    # ✅ テンプレートを含んだプロンプトを構築
+    start_time = time.time()
+
+    # ✅ テンプレート組込み
     full_prompt = f"""あなたはAI戦略生成者Veritasです。
 以下のテンプレートに準拠した形式で、新しい戦略をPythonコードで生成してください。
 
@@ -62,8 +62,14 @@ def generate(req: PromptRequest):
 {req.prompt}
 """
 
-    # ✅ モデル入力と推論
-    inputs = tokenizer(full_prompt, return_tensors="pt").to(model.device)
+    # ✅ Tokenize & Generate
+    inputs = tokenizer(
+        full_prompt,
+        return_tensors="pt",
+        truncation=True,  # 長過ぎる入力をカット
+        max_length=2048   # モデルの制限に応じて調整
+    ).to(model.device)
+
     outputs = model.generate(
         **inputs,
         max_new_tokens=req.max_new_tokens,
@@ -73,4 +79,12 @@ def generate(req: PromptRequest):
     )
 
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return {"response": result}
+
+    elapsed = round(time.time() - start_time, 2)
+    print(f"🕒 推論時間: {elapsed}s | 📝 入力長: {len(full_prompt)}文字")
+
+    return {
+        "response": result,
+        "elapsed_time": elapsed,
+        "input_length": len(full_prompt)
+    }
