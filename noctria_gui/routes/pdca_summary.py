@@ -5,6 +5,7 @@
 📊 /pdca/summary - PDCA再評価の統計サマリ画面
 - 再評価結果ログを集計し、改善率や採用数を表示
 - 📅 期間指定（from～to）によるフィルタに対応
+- 📌 モード切替（戦略別 / タグ別）
 """
 
 from fastapi import APIRouter, Request, Query
@@ -12,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
+from collections import defaultdict
 import json
 
 from core.path_config import PDCA_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
@@ -29,12 +31,13 @@ def parse_date_safe(date_str: str) -> datetime | None:
 async def pdca_summary(
     request: Request,
     from_: str = Query(default=None, alias="from"),
-    to: str = Query(default=None)
+    to: str = Query(default=None),
+    mode: str = Query(default="strategy")  # "strategy" or "tag"
 ):
     from_date = parse_date_safe(from_)
     to_date = parse_date_safe(to)
 
-    results = []
+    raw_results = []
     for file in sorted(PDCA_LOG_DIR.glob("*.json")):
         try:
             with open(file, "r", encoding="utf-8") as f:
@@ -50,8 +53,9 @@ async def pdca_summary(
             if to_date and ts > to_date:
                 continue
 
-            results.append({
+            raw_results.append({
                 "strategy": data.get("strategy"),
+                "tag": data.get("tag", "unknown"),
                 "win_rate_before": data.get("win_rate_before"),
                 "win_rate_after": data.get("win_rate_after"),
                 "diff": round(data.get("win_rate_after", 0) - data.get("win_rate_before", 0), 2),
@@ -63,26 +67,65 @@ async def pdca_summary(
         except Exception:
             continue
 
-    # 📊 統計値集計
-    win_diffs = [r["diff"] for r in results]
-    dd_diffs = [r["dd_diff"] for r in results]
+    # 📊 モード（strategy or tag）ごとの集計
+    group_key = "strategy" if mode == "strategy" else "tag"
+    grouped = defaultdict(list)
+    for r in raw_results:
+        key = r.get(group_key) or "unknown"
+        grouped[key].append(r)
+
+    # 📈 集計処理
+    detail_rows = []
+    chart_labels = []
+    chart_data = []
+    chart_dd_data = []
+
+    for key, group in grouped.items():
+        avg_win_rate_before = sum(g["win_rate_before"] for g in group) / len(group)
+        avg_win_rate_after = sum(g["win_rate_after"] for g in group) / len(group)
+        avg_diff = round(avg_win_rate_after - avg_win_rate_before, 2)
+
+        avg_dd_before = sum(g["max_dd_before"] for g in group) / len(group)
+        avg_dd_after = sum(g["max_dd_after"] for g in group) / len(group)
+        dd_diff = round(avg_dd_before - avg_dd_after, 2)
+
+        adopted = any(g["status"] == "adopted" for g in group)
+
+        detail_rows.append({
+            "strategy": key,
+            "win_rate_before": round(avg_win_rate_before, 2),
+            "win_rate_after": round(avg_win_rate_after, 2),
+            "diff": avg_diff,
+            "max_dd_before": round(avg_dd_before, 2),
+            "max_dd_after": round(avg_dd_after, 2),
+            "status": "adopted" if adopted else "pending",
+        })
+
+        chart_labels.append(key)
+        chart_data.append(avg_diff)
+        chart_dd_data.append(dd_diff)
+
+    # 📊 サマリー統計（全体）
+    all_diffs = [r["diff"] for r in raw_results]
+    all_dd_diffs = [r["dd_diff"] for r in raw_results]
 
     stats = {
-        "avg_win_rate_diff": round(sum(win_diffs) / len(win_diffs), 2) if win_diffs else 0.0,
-        "avg_dd_diff": round(sum(dd_diffs) / len(dd_diffs), 2) if dd_diffs else 0.0,
-        "win_rate_improved": sum(1 for r in results if r["diff"] > 0),
-        "dd_improved": sum(1 for r in results if r["dd_diff"] > 0),
-        "adopted": sum(1 for r in results if r["status"] == "adopted"),
-        "detail": results,
+        "avg_win_rate_diff": round(sum(all_diffs) / len(all_diffs), 2) if all_diffs else 0.0,
+        "avg_dd_diff": round(sum(all_dd_diffs) / len(all_dd_diffs), 2) if all_dd_diffs else 0.0,
+        "win_rate_improved": sum(1 for r in raw_results if r["diff"] > 0),
+        "dd_improved": sum(1 for r in raw_results if r["dd_diff"] > 0),
+        "adopted": sum(1 for r in raw_results if r["status"] == "adopted"),
+        "detail": detail_rows,
     }
 
     return templates.TemplateResponse("pdca_summary.html", {
         "request": request,
         "stats": stats,
+        "mode": mode,
         "chart": {
-            "labels": [r["strategy"] for r in results],
-            "data": [r["diff"] for r in results],
-            "dd_data": [r["dd_diff"] for r in results],
+            "labels": chart_labels,
+            "data": chart_data,
+            "dd_data": chart_dd_data,
         },
         "filter": {
             "from": from_ or "",
