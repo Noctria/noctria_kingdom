@@ -6,6 +6,7 @@
 - 単一戦略ファイルを指定して評価を実行
 - 採用基準に基づいて official に昇格
 - 結果は logs/veritas_eval_result.json に追記
+- PDCAログも veritas_orders/*.json を更新
 """
 
 import sys
@@ -51,7 +52,7 @@ def main():
         print(f"🚫 エラー: {strategy_name} ➜ {result.get('error_message')}")
         result["status"] = "error"
 
-    # ✅ ログ追記
+    # ✅ 評価ログ追記
     if log_path.exists():
         with open(log_path, "r") as f:
             logs = json.load(f)
@@ -61,6 +62,40 @@ def main():
     logs.append(result)
     with open(log_path, "w") as f:
         json.dump(logs, f, indent=2)
+
+    # ✅ PDCAログ（veritas_orders）を更新
+    pdca_log_path = DATA_DIR / "pdca_logs" / "veritas_orders" / f"{strategy_name}.json"
+    if pdca_log_path.exists():
+        with open(pdca_log_path, "r", encoding="utf-8") as f:
+            pdca_data = json.load(f)
+    else:
+        pdca_data = {
+            "strategy": strategy_name,
+            "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+
+    # 既存値を保持（あれば）
+    if "win_rate_after" in pdca_data:
+        pdca_data["win_rate_before"] = pdca_data["win_rate_after"]
+    elif "win_rate" in pdca_data:
+        pdca_data["win_rate_before"] = pdca_data["win_rate"]
+
+    if "max_dd_after" in pdca_data:
+        pdca_data["max_dd_before"] = pdca_data["max_dd_after"]
+    elif "max_dd" in pdca_data:
+        pdca_data["max_dd_before"] = pdca_data["max_dd"]
+
+    # 再評価結果を追記
+    pdca_data["recheck_timestamp"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    pdca_data["win_rate_after"] = result.get("win_rate")
+    pdca_data["max_dd_after"] = result.get("max_dd")
+    pdca_data["trades"] = result.get("trades")
+    pdca_data["status"] = result.get("status", "error")
+
+    with open(pdca_log_path, "w", encoding="utf-8") as f:
+        json.dump(pdca_data, f, indent=2, ensure_ascii=False)
+
+    print(f"📄 PDCAログ更新: {pdca_log_path}")
 
 if __name__ == "__main__":
     main()
