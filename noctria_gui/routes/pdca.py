@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import json
 import requests
+from urllib.parse import urlencode  # ✅ クエリ組み立て用
 
 from core.path_config import (
     PDCA_LOG_DIR,
@@ -35,6 +36,8 @@ async def show_pdca_dashboard(
     date_from: str = Query(default=None),
     date_to: str = Query(default=None),
     sort: str = Query(default=None),
+    recheck_success: int = Query(default=None),
+    recheck_fail: int = Query(default=None),  # ✅ クエリ受け取り追加
 ):
     logs = []
     tag_set = set()
@@ -135,6 +138,8 @@ async def show_pdca_dashboard(
         },
         "sort": sort or "",
         "available_tags": sorted(tag_set),
+        "recheck_success": recheck_success,
+        "recheck_fail": recheck_fail,
     })
 
 
@@ -197,7 +202,7 @@ async def trigger_strategy_recheck(strategy_id: str = Form(...)):
 
 
 # ================================
-# 🔁 全戦略一括再評価
+# 🔁 全戦略一括再評価（リダイレクト＋結果付与）
 # ================================
 @router.post("/pdca/recheck_all")
 async def trigger_all_strategy_rechecks():
@@ -225,15 +230,13 @@ async def trigger_all_strategy_rechecks():
                 triggered.append(strategy_id)
             else:
                 print(f"❌ 失敗: {strategy_id} -> {response.text}")
-                errors.append({"strategy": strategy_id, "error": response.text})
-
+                errors.append(strategy_id)
         except Exception as e:
             print(f"❌ 通信エラー: {strategy_id} -> {e}")
-            errors.append({"strategy": strategy_id, "error": str(e)})
+            errors.append(strategy_id)
 
-    return JSONResponse({
-        "status": "completed",
-        "triggered_count": len(triggered),
-        "triggered": triggered,
-        "errors": errors,
+    result_params = urlencode({
+        "recheck_success": len(triggered),
+        "recheck_fail": len(errors)
     })
+    return RedirectResponse(url=f"/pdca?{result_params}", status_code=303)
