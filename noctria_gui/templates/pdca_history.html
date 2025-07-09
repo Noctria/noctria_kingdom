@@ -1,279 +1,135 @@
-from fastapi import APIRouter, Request, Form, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from datetime import datetime
-import os
-import json
-import requests
-from urllib.parse import urlencode
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔁 PDCA履歴 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .row-success { background-color: #e6ffe6; }
+    .row-fail { background-color: #ffe6e6; }
+    .row-pending { background-color: #f2f2f2; }
+  </style>
+  <script>
+    function onRecheckSubmit(form) {
+      const button = form.querySelector('button');
+      button.disabled = true;
+      button.textContent = '再評価中...';
+      return true;
+    }
+  </script>
+</head>
+<body>
+  <h1>🔁 Veritas PDCA実行履歴</h1>
 
-from core.path_config import (
-    PDCA_LOG_DIR,
-    NOCTRIA_GUI_TEMPLATES_DIR,
-    STRATEGIES_VERITAS_GENERATED_DIR,
-)
+  {% if recheck_success is not none or recheck_fail is not none %}
+    <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
+      ✅ 一括再評価 実行結果：
+      {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
+      {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
+    </div>
+  {% endif %}
 
-from dotenv import load_dotenv
-load_dotenv()
+  <!-- 🔍 フィルター -->
+  <form method="get" action="/pdca" style="margin-bottom: 1rem;">
+    <label>戦略名: <input type="text" name="strategy" value="{{ filters.strategy }}"></label>
 
-router = APIRouter()
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+    <label style="margin-left: 1rem;">
+      <input type="radio" name="recheck_status" value="" {% if recheck_status == "" %}checked{% endif %}> 全て
+    </label>
+    <label>
+      <input type="radio" name="recheck_status" value="done" {% if recheck_status == "done" %}checked{% endif %}> ✅ 再評価済
+    </label>
+    <label>
+      <input type="radio" name="recheck_status" value="pending" {% if recheck_status == "pending" %}checked{% endif %}> ⏱ 未再評価
+    </label>
 
-AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
-AIRFLOW_API_USER = os.getenv("AIRFLOW_API_USER", "admin")
-AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "admin")
+    <label style="margin-left: 1rem;">📈 差分フィルタ:
+      <select name="diff_filter">
+        <option value="">-- 全て --</option>
+        <option value="win_rate_up" {% if diff_filter == "win_rate_up" %}selected{% endif %}>📈 勝率が改善</option>
+        <option value="max_dd_down" {% if diff_filter == "max_dd_down" %}selected{% endif %}>📉 最大DDが改善</option>
+      </select>
+    </label>
 
-# ================================
-# 🔍 PDCAログ一覧表示
-# ================================
-@router.get("/pdca", response_class=HTMLResponse)
-async def show_pdca_dashboard(
-    request: Request,
-    strategy: str = Query(default=None),
-    symbol: str = Query(default=None),
-    signal: str = Query(default=None),
-    tag: str = Query(default=None),
-    date_from: str = Query(default=None),
-    date_to: str = Query(default=None),
-    sort: str = Query(default=None),
-    recheck_status: str = Query(default=None),  # ✅ 追加: done / pending
-    recheck_success: int = Query(default=None),
-    recheck_fail: int = Query(default=None),
-):
-    logs = []
-    tag_set = set()
+    <button type="submit" style="margin-left: 1rem;">🔍 フィルター</button>
+  </form>
 
-    # ✅ ステータスマップ構築
-    status_map = {}
-    latest_status = {}
-
-    for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
-        try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            continue
-
-        strategy_name = data.get("strategy")
-        status = data.get("status")
-        ts = data.get("timestamp")
-
-        if strategy_name and status:
-            prev_ts = latest_status.get(strategy_name, {}).get("timestamp", "")
-            if not prev_ts or ts > prev_ts:
-                latest_status[strategy_name] = {
-                    "status": status,
-                    "timestamp": ts,
-                }
-
-    for strategy_name, info in latest_status.items():
-        status_map[strategy_name] = info["status"]
-
-    # ✅ ログ一覧の読み込み
-    for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
-        try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception as e:
-            print(f"⚠️ ログ読み込み失敗: {log_file} -> {e}")
-            continue
-
-        ts = data.get("timestamp", "")
-        try:
-            ts_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
-        except Exception:
-            ts_dt = None
-
-        tags = data.get("tags", [])
-        if isinstance(tags, str):
-            tags = [tags]
-        tag_set.update(tags)
-
-        logs.append({
-            "filename": log_file.name,
-            "path": str(log_file),
-            "strategy": data.get("strategy", "N/A"),
-            "timestamp": ts,
-            "timestamp_dt": ts_dt,
-            "signal": data.get("signal", "N/A"),
-            "symbol": data.get("symbol", "N/A"),
-            "lot": data.get("lot", "N/A"),
-            "tp": data.get("tp", "N/A"),
-            "sl": data.get("sl", "N/A"),
-            "win_rate": data.get("win_rate"),
-            "max_dd": data.get("max_dd"),
-            "trades": data.get("trades"),
-            "tags": tags,
-            "json_text": json.dumps(data, indent=2, ensure_ascii=False),
-        })
-
-    def matches(log):
-        if strategy and strategy.lower() not in log["strategy"].lower():
-            return False
-        if symbol and symbol != log["symbol"]:
-            return False
-        if signal and signal != log["signal"]:
-            return False
-        if tag and tag not in log["tags"]:
-            return False
-        if date_from:
-            try:
-                from_dt = datetime.strptime(date_from, "%Y-%m-%d")
-                if log["timestamp_dt"] and log["timestamp_dt"] < from_dt:
-                    return False
-            except Exception:
-                pass
-        if date_to:
-            try:
-                to_dt = datetime.strptime(date_to, "%Y-%m-%d")
-                if log["timestamp_dt"] and log["timestamp_dt"] > to_dt:
-                    return False
-            except Exception:
-                pass
-        if recheck_status:
-            try:
-                parsed = json.loads(log["json_text"])
-                has_recheck = "recheck_timestamp" in parsed
-                if recheck_status == "done" and not has_recheck:
-                    return False
-                if recheck_status == "pending" and has_recheck:
-                    return False
-            except Exception:
-                return False
-        return True
-
-    filtered_logs = [log for log in logs if matches(log)]
-
-    if sort:
-        reverse = sort.startswith("-")
-        key = sort.lstrip("-")
-        if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
-            filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
-
-    def make_json_serializable(log):
-        new_log = log.copy()
-        for key in ["timestamp_dt"]:
-            val = new_log.get(key)
-            if isinstance(val, datetime):
-                new_log[key] = val.isoformat()
-        tags = new_log.get("tags")
-        if isinstance(tags, str):
-            new_log["tags"] = [tags]
-        return new_log
-
-    logs_serializable = [make_json_serializable(log) for log in filtered_logs]
-
-    return templates.TemplateResponse("pdca_history.html", {
-        "request": request,
-        "logs": logs_serializable,
-        "status_map": status_map,
-        "filters": {
-            "strategy": strategy or "",
-            "symbol": symbol or "",
-            "signal": signal or "",
-            "tag": tag or "",
-            "date_from": date_from or "",
-            "date_to": date_to or "",
-        },
-        "recheck_status": recheck_status or "",
-        "sort": sort or "",
-        "available_tags": sorted(tag_set),
-        "recheck_success": recheck_success,
-        "recheck_fail": recheck_fail,
-    })
-
-# ================================
-# 🔁 ログから注文を再実行
-# ================================
-@router.post("/pdca/replay")
-async def replay_order_from_log(log_path: str = Form(...)):
-    dag_id = "veritas_replay_dag"
-    payload = {"conf": {"log_path": log_path}}
-    headers = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.post(
-            f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
-            json=payload,
-            headers=headers,
-            auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
-        )
-
-        if response.status_code in [200, 201]:
-            print(f"✅ DAG起動成功: {log_path}")
-            return RedirectResponse(url="/pdca", status_code=303)
-        else:
-            print(f"❌ DAGトリガー失敗: {response.text}")
-            return JSONResponse(status_code=500, content={"detail": "DAG起動に失敗しました"})
-
-    except Exception as e:
-        print(f"❌ DAG通信エラー: {e}")
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-
-# ================================
-# 🔁 単一戦略の再評価
-# ================================
-@router.post("/pdca/recheck")
-async def trigger_strategy_recheck(strategy_name: str = Form(...)):
-    dag_id = "veritas_eval_single_dag"
-    payload = {"conf": {"strategy_name": strategy_name}}
-    headers = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.post(
-            f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
-            json=payload,
-            headers=headers,
-            auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
-        )
-
-        if response.status_code in [200, 201]:
-            print(f"✅ 再評価DAG起動成功: {strategy_name}")
-            return RedirectResponse(url="/pdca", status_code=303)
-        else:
-            print(f"❌ 再評価DAG失敗: {response.text}")
-            return JSONResponse(status_code=500, content={"detail": "再評価に失敗しました"})
-
-    except Exception as e:
-        print(f"❌ 通信エラー: {e}")
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-
-# ================================
-# 🔁 全戦略一括再評価
-# ================================
-@router.post("/pdca/recheck_all")
-async def trigger_all_strategy_rechecks():
-    dag_id = "veritas_eval_single_dag"
-    headers = {"Content-Type": "application/json"}
-    strategy_dir = STRATEGIES_VERITAS_GENERATED_DIR
-
-    triggered = []
-    errors = []
-
-    for strategy_file in strategy_dir.glob("*.py"):
-        strategy_name = strategy_file.name
-        payload = {"conf": {"strategy_name": strategy_name}}
-
-        try:
-            response = requests.post(
-                f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns",
-                json=payload,
-                headers=headers,
-                auth=(AIRFLOW_API_USER, AIRFLOW_API_PASSWORD)
-            )
-
-            if response.status_code in [200, 201]:
-                print(f"✅ 起動: {strategy_name}")
-                triggered.append(strategy_name)
-            else:
-                print(f"❌ 失敗: {strategy_name} -> {response.text}")
-                errors.append(strategy_name)
-        except Exception as e:
-            print(f"❌ 通信エラー: {strategy_name} -> {e}")
-            errors.append(strategy_name)
-
-    result_params = urlencode({
-        "recheck_success": len(triggered),
-        "recheck_fail": len(errors)
-    })
-    return RedirectResponse(url=f"/pdca?{result_params}", status_code=303)
+  <!-- 📋 テーブル -->
+  <table class="table">
+    <thead>
+      <tr>
+        <th>🕒 実行日時</th>
+        <th>📘 戦略名</th>
+        <th>⚙ シグナル</th>
+        <th>💹 通貨ペア</th>
+        <th>📈 勝率</th>
+        <th>📉 最大DD</th>
+        <th>📈 差分</th>
+        <th>📉 差分</th>
+        <th>🧪 詳細</th>
+        <th>📄 詳細</th>
+        <th>⏱ 再評価時刻</th>
+        <th>🔁 再評価</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+        {% set status = status_map.get(log.strategy, "pending") %}
+        <tr class="row-{{ status }}">
+          <td>{{ log.timestamp or "N/A" }}</td>
+          <td>{{ log.strategy }}</td>
+          <td>{{ log.signal }}</td>
+          <td>{{ log.symbol }}</td>
+          <td>{{ log.win_rate if log.win_rate is not none else "-" }}</td>
+          <td>{{ log.max_dd if log.max_dd is not none else "-" }}</td>
+          <td>
+            {% if log.win_rate_diff is not none %}
+              {% if log.win_rate_diff > 0 %}
+                <span style="color: green;">📈 +{{ (log.win_rate_diff * 100) | round(2) }}%</span>
+              {% elif log.win_rate_diff < 0 %}
+                <span style="color: red;">📉 {{ (log.win_rate_diff * 100) | round(2) }}%</span>
+              {% else %}
+                ±0.00%
+              {% endif %}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if log.max_dd_diff is not none %}
+              {% if log.max_dd_diff < 0 %}
+                <span style="color: green;">📉 {{ log.max_dd_diff | round(3) }}</span>
+              {% elif log.max_dd_diff > 0 %}
+                <span style="color: red;">📈 +{{ log.max_dd_diff | round(3) }}</span>
+              {% else %}
+                ±0.000
+              {% endif %}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            <details>
+              <summary>表示</summary>
+              <pre style="max-height: 300px; overflow-y: auto;">{{ log.json_text }}</pre>
+            </details>
+          </td>
+          <td>
+            <a href="/statistics/detail?strategy={{ log.strategy }}" target="_blank">📄 詳細</a>
+          </td>
+          <td>
+            {% set parsed = log.json_text | from_json %}
+            {{ parsed.recheck_timestamp if parsed.recheck_timestamp is defined else "-" }}
+          </td>
+          <td>
+            <form method="post" action="/pdca/recheck" onsubmit="return onRecheckSubmit(this);">
+              <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+              <button type="submit" class="recheck-btn">再評価</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
