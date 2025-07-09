@@ -126,6 +126,7 @@ async def pdca_summary(
         "request": request,
         "stats": stats,
         "mode": mode,
+        "limit": limit,  # ✅ これが必要
         "chart": {
             "labels": chart_labels,
             "data": chart_data,
