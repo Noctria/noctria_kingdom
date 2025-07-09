@@ -3,6 +3,15 @@
 {% block content %}
 <h1>📜 PDCA 実行履歴（Veritas Kingdom）</h1>
 
+<!-- ✅ フラッシュ表示（再評価結果） -->
+{% if recheck_success is not none or recheck_fail is not none %}
+  <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
+    ✅ 一括再評価 実行結果：
+    {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
+    {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
+  </div>
+{% endif %}
+
 <!-- 🔍 フィルターUI -->
 <form class="filter-form" method="get" action="/pdca">
   <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy or '' }}">
@@ -34,7 +43,7 @@
   <button type="submit">検索</button>
 </form>
 
-<!-- 🔁 一括再評価ボタン追加 -->
+<!-- 🔁 一括再評価ボタン -->
 <form method="post" action="/pdca/recheck_all" style="margin: 1rem 0;">
   <button type="submit" onclick="return confirm('⚠️ 全戦略を一括で再評価します。続行しますか？');">
     🔁 一括再評価（全 Veritas 戦略）
