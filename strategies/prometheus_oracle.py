@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 from datetime import datetime, timedelta
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from core.data_loader import MarketDataFetcher
 from core.risk_manager import RiskManager
@@ -82,3 +83,39 @@ class PrometheusOracle:
             })
 
         return pd.DataFrame(records)
+
+    def evaluate_model(self, n_days: int = 14) -> dict:
+        """
+        🧠 モデルの精度評価（RMSE / MAE / MAPE）
+        - 過去の実測データ vs モデル出力を比較
+        - 将来的には検証セットなどに拡張可能
+        """
+        df = self.market_fetcher.fetch_daily_data(from_symbol="USD", to_symbol="JPY", max_days=90)
+        if df.empty or len(df) < n_days + 10:
+            return {}
+
+        df["days"] = (df["date"] - df["date"].min()).dt.days
+        df = df.sort_values("days")
+
+        # 入力データ
+        X = df[["days"]].values
+        y = df["close"].values
+
+        # モデル再学習
+        self.model.fit(X, y, epochs=50, verbose=0)
+
+        # 検証対象データ（直近 n_days）
+        X_val = X[-n_days:]
+        y_true = y[-n_days:]
+        y_pred = self.model.predict(X_val).flatten()
+
+        # 指標計算
+        rmse = mean_squared_error(y_true, y_pred, squared=False)
+        mae = mean_absolute_error(y_true, y_pred)
+        mape = np.mean(np.abs((y_true - y_pred) / np.clip(y_true, 1e-6, None))) * 100
+
+        return {
+            "rmse": round(rmse, 4),
+            "mae": round(mae, 4),
+            "mape": round(mape, 2),
+        }
