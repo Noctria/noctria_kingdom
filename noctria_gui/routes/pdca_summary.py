@@ -6,6 +6,7 @@
 - 再評価結果ログを集計し、改善率や採用数を表示
 - 📅 期間指定（from～to）によるフィルタに対応
 - 📌 モード切替（戦略別 / タグ別）
+- 🧮 平均勝率差分で降順ソート
 """
 
 from fastapi import APIRouter, Request, Query
@@ -74,12 +75,8 @@ async def pdca_summary(
         key = r.get(group_key) or "unknown"
         grouped[key].append(r)
 
-    # 📈 集計処理
+    # 📈 集計処理（まずは辞書へ）
     detail_rows = []
-    chart_labels = []
-    chart_data = []
-    chart_dd_data = []
-
     for key, group in grouped.items():
         avg_win_rate_before = sum(g["win_rate_before"] for g in group) / len(group)
         avg_win_rate_after = sum(g["win_rate_after"] for g in group) / len(group)
@@ -101,9 +98,13 @@ async def pdca_summary(
             "status": "adopted" if adopted else "pending",
         })
 
-        chart_labels.append(key)
-        chart_data.append(avg_diff)
-        chart_dd_data.append(dd_diff)
+    # 🔽 平均勝率差分で降順ソート
+    detail_rows.sort(key=lambda x: x["diff"], reverse=True)
+
+    # 📊 ソート後の順序に合わせてグラフデータを構築
+    chart_labels = [r["strategy"] for r in detail_rows]
+    chart_data = [r["diff"] for r in detail_rows]
+    chart_dd_data = [r["max_dd_before"] - r["max_dd_after"] for r in detail_rows]
 
     # 📊 サマリー統計（全体）
     all_diffs = [r["diff"] for r in raw_results]
