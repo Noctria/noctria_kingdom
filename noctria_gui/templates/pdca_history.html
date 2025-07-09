@@ -4,29 +4,25 @@
   <meta charset="UTF-8" />
   <title>🔁 PDCA履歴 - Noctria Kingdom</title>
   <link rel="stylesheet" href="/static/style.css" />
-
-  <!-- ✅ ローディングスピナー用CSS -->
   <style>
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #ccc;
-      border-top: 2px solid #333;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      vertical-align: middle;
-      margin-left: 6px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    .row-success { background-color: #e6ffe6; }  /* 緑：成功 */
+    .row-fail { background-color: #ffe6e6; }     /* 赤：失敗 */
+    .row-pending { background-color: #f2f2f2; }  /* 灰：未評価 */
   </style>
 </head>
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
 
-  <!-- 📋 履歴一覧 -->
+  <!-- ✅ 一括再評価結果の通知 -->
+  {% if recheck_success is not none or recheck_fail is not none %}
+    <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
+      ✅ 一括再評価 実行結果：
+      {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
+      {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- 📋 履歴テーブル -->
   <table class="table">
     <thead>
       <tr>
@@ -37,70 +33,34 @@
         <th>📈 勝率</th>
         <th>📉 最大DD</th>
         <th>🧪 詳細</th>
-        <th colspan="2">🔁 アクション</th>
+        <th>🔁 再評価</th>
       </tr>
     </thead>
     <tbody>
       {% for log in logs %}
-      <tr>
-        <td>{{ log.timestamp }}</td>
-        <td>{{ log.strategy or '不明' }}</td>
-        <td>{{ log.signal }}</td>
-        <td>{{ log.symbol }}</td>
-        <td>{{ log.win_rate or 'N/A' }}</td>
-        <td>{{ log.max_dd or 'N/A' }}</td>
-        <td>
-          <button class="btn" onclick="showDetails({{ log | tojson | safe }})">詳細</button>
-        </td>
-        <td>
-          <!-- 再実行フォーム -->
-          <form method="post" action="/pdca/replay" class="action-form">
-            <input type="hidden" name="log_path" value="{{ log.path }}">
-            <button type="submit" class="btn">再実行</button>
-          </form>
-        </td>
-        <td>
-          <!-- ✅ 再評価フォーム（ローディング付き） -->
-          <form method="post" action="/pdca/recheck" class="action-form" onsubmit="return showLoading(this)">
-            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-            <button type="submit" class="btn">
-              <span class="btn-text">再評価</span>
-              <span class="spinner" style="display:none;"></span>
-            </button>
-          </form>
-        </td>
-      </tr>
+        {% set status = status_map.get(log.strategy, "pending") %}
+        <tr class="row-{{ status }}">
+          <td>{{ log.timestamp or "N/A" }}</td>
+          <td>{{ log.strategy }}</td>
+          <td>{{ log.signal }}</td>
+          <td>{{ log.symbol }}</td>
+          <td>{{ log.win_rate if log.win_rate is not none else "-" }}</td>
+          <td>{{ log.max_dd if log.max_dd is not none else "-" }}</td>
+          <td>
+            <details>
+              <summary>表示</summary>
+              <pre style="max-height: 300px; overflow-y: auto;">{{ log.json_text }}</pre>
+            </details>
+          </td>
+          <td>
+            <form method="post" action="/pdca/recheck">
+              <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+              <button type="submit">再評価</button>
+            </form>
+          </td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
-
-  <!-- 🪞 モーダル表示 -->
-  <dialog id="detailModal">
-    <h2>🧾 PDCA実行詳細</h2>
-    <pre id="detailContent" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto; background: #f4f4f4; padding: 1rem; border-radius: 8px;"></pre>
-    <button onclick="document.getElementById('detailModal').close()" class="btn">閉じる</button>
-  </dialog>
-
-  <!-- ✅ ローディング処理 -->
-  <script>
-    function showDetails(log) {
-      const modal = document.getElementById("detailModal");
-      const content = document.getElementById("detailContent");
-      content.textContent = JSON.stringify(log, null, 2);
-      modal.showModal();
-    }
-
-    function showLoading(form) {
-      const button = form.querySelector('button');
-      const text = button.querySelector('.btn-text');
-      const spinner = button.querySelector('.spinner');
-
-      text.style.display = 'none';
-      spinner.style.display = 'inline-block';
-      button.disabled = true;
-
-      return true;
-    }
-  </script>
 </body>
 </html>
