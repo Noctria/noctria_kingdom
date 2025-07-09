@@ -9,18 +9,11 @@
     .row-fail { background-color: #ffe6e6; }
     .row-pending { background-color: #f2f2f2; }
   </style>
-  <script>
-    function onRecheckSubmit(form) {
-      const button = form.querySelector('button');
-      button.disabled = true;
-      button.textContent = '再評価中...';
-      return true;
-    }
-  </script>
 </head>
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
 
+  <!-- ✅ 実行結果 -->
   {% if recheck_success is not none or recheck_fail is not none %}
     <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
       ✅ 一括再評価 実行結果：
@@ -31,27 +24,34 @@
 
   <!-- 🔍 フィルター -->
   <form method="get" action="/pdca" style="margin-bottom: 1rem;">
-    <label>戦略名: <input type="text" name="strategy" value="{{ filters.strategy }}"></label>
-
+    <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy }}">
+    <input type="text" name="symbol" placeholder="通貨ペア" value="{{ filters.symbol }}">
+    <input type="text" name="signal" placeholder="シグナル" value="{{ filters.signal }}">
+    <select name="tag">
+      <option value="">タグ（全て）</option>
+      {% for t in available_tags %}
+        <option value="{{ t }}" {% if filters.tag == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    <label>
+      日付:
+      <input type="date" name="date_from" value="{{ filters.date_from }}">
+      〜
+      <input type="date" name="date_to" value="{{ filters.date_to }}">
+    </label>
     <label style="margin-left: 1rem;">
-      <input type="radio" name="recheck_status" value="" {% if recheck_status == "" %}checked{% endif %}> 全て
-    </label>
-    <label>
-      <input type="radio" name="recheck_status" value="done" {% if recheck_status == "done" %}checked{% endif %}> ✅ 再評価済
-    </label>
-    <label>
-      <input type="radio" name="recheck_status" value="pending" {% if recheck_status == "pending" %}checked{% endif %}> ⏱ 未再評価
-    </label>
-
-    <label style="margin-left: 1rem;">📈 差分フィルタ:
+      📊 フィルター:
       <select name="diff_filter">
-        <option value="">-- 全て --</option>
-        <option value="win_rate_up" {% if diff_filter == "win_rate_up" %}selected{% endif %}>📈 勝率が改善</option>
-        <option value="max_dd_down" {% if diff_filter == "max_dd_down" %}selected{% endif %}>📉 最大DDが改善</option>
+        <option value="">すべて</option>
+        <option value="win_rate_up" {% if diff_filter == "win_rate_up" %}selected{% endif %}>📈 勝率上昇</option>
+        <option value="max_dd_down" {% if diff_filter == "max_dd_down" %}selected{% endif %}>📉 DD改善</option>
       </select>
     </label>
-
-    <button type="submit" style="margin-left: 1rem;">🔍 フィルター</button>
+    <label style="margin-left: 1rem;">
+      📈 勝率差分（最小%）:
+      <input type="number" step="0.01" name="win_rate_min_diff" value="{{ win_rate_min_diff }}" style="width: 5em;">
+    </label>
+    <button type="submit">🔍 フィルター適用</button>
   </form>
 
   <!-- 📋 テーブル -->
@@ -64,18 +64,14 @@
         <th>💹 通貨ペア</th>
         <th>📈 勝率</th>
         <th>📉 最大DD</th>
-        <th>📈 差分</th>
-        <th>📉 差分</th>
+        <th>📊 差分</th>
         <th>🧪 詳細</th>
-        <th>📄 詳細</th>
-        <th>⏱ 再評価時刻</th>
         <th>🔁 再評価</th>
       </tr>
     </thead>
     <tbody>
       {% for log in logs %}
-        {% set status = status_map.get(log.strategy, "pending") %}
-        <tr class="row-{{ status }}">
+        <tr class="row-{{ log.status or 'pending' }}">
           <td>{{ log.timestamp or "N/A" }}</td>
           <td>{{ log.strategy }}</td>
           <td>{{ log.signal }}</td>
@@ -83,29 +79,11 @@
           <td>{{ log.win_rate if log.win_rate is not none else "-" }}</td>
           <td>{{ log.max_dd if log.max_dd is not none else "-" }}</td>
           <td>
-            {% if log.win_rate_diff is not none %}
-              {% if log.win_rate_diff > 0 %}
-                <span style="color: green;">📈 +{{ (log.win_rate_diff * 100) | round(2) }}%</span>
-              {% elif log.win_rate_diff < 0 %}
-                <span style="color: red;">📉 {{ (log.win_rate_diff * 100) | round(2) }}%</span>
-              {% else %}
-                ±0.00%
-              {% endif %}
-            {% else %}
-              -
+            {% if log.win_rate_before is not none and log.win_rate_after is not none %}
+              📈 {{ '%+.2f' | format(log.win_rate_after - log.win_rate_before) }}
             {% endif %}
-          </td>
-          <td>
-            {% if log.max_dd_diff is not none %}
-              {% if log.max_dd_diff < 0 %}
-                <span style="color: green;">📉 {{ log.max_dd_diff | round(3) }}</span>
-              {% elif log.max_dd_diff > 0 %}
-                <span style="color: red;">📈 +{{ log.max_dd_diff | round(3) }}</span>
-              {% else %}
-                ±0.000
-              {% endif %}
-            {% else %}
-              -
+            {% if log.max_dd_before is not none and log.max_dd_after is not none %}
+              <br>📉 {{ '%+.3f' | format(log.max_dd_after - log.max_dd_before) }}
             {% endif %}
           </td>
           <td>
@@ -115,16 +93,9 @@
             </details>
           </td>
           <td>
-            <a href="/statistics/detail?strategy={{ log.strategy }}" target="_blank">📄 詳細</a>
-          </td>
-          <td>
-            {% set parsed = log.json_text | from_json %}
-            {{ parsed.recheck_timestamp if parsed.recheck_timestamp is defined else "-" }}
-          </td>
-          <td>
-            <form method="post" action="/pdca/recheck" onsubmit="return onRecheckSubmit(this);">
+            <form method="post" action="/pdca/recheck">
               <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-              <button type="submit" class="recheck-btn">再評価</button>
+              <button type="submit">再評価</button>
             </form>
           </td>
         </tr>
