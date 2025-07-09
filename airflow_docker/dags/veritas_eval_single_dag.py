@@ -6,6 +6,10 @@ from airflow.operators.python import get_current_context
 
 from datetime import datetime, timedelta
 import subprocess
+import json
+from pathlib import Path
+
+# === DAG定義 ===
 
 default_args = {
     'owner': 'Veritas',
@@ -39,6 +43,26 @@ def call_single_eval_script():
         ["python3", "/noctria_kingdom/scripts/evaluate_single_strategy.py", strategy_name],
         check=True
     )
+
+    # ✅ 評価完了後、PDCAログに recheck_timestamp を追記
+    log_path = Path("/noctria_kingdom/data/pdca_logs/veritas_orders") / f"{strategy_name}.json"
+    if not log_path.exists():
+        raise FileNotFoundError(f"PDCAログが見つかりません: {log_path}")
+
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["recheck_timestamp"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        print(f"✅ 再評価タイムスタンプを追記: {log_path}")
+
+    except Exception as e:
+        print(f"❌ ログ更新に失敗: {e}")
+        raise
 
 # === DAG登録 ===
 with dag:
