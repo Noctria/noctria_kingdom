@@ -7,6 +7,7 @@
 - 📅 期間指定（from～to）によるフィルタに対応
 - 📌 モード切替（戦略別 / タグ別）
 - 🧮 平均勝率差分で降順ソート
+- ✂️ 表示件数制限（limit）
 """
 
 from fastapi import APIRouter, Request, Query
@@ -33,7 +34,8 @@ async def pdca_summary(
     request: Request,
     from_: str = Query(default=None, alias="from"),
     to: str = Query(default=None),
-    mode: str = Query(default="strategy")  # "strategy" or "tag"
+    mode: str = Query(default="strategy"),  # "strategy" or "tag"
+    limit: int = Query(default=20),         # 表示件数制限
 ):
     from_date = parse_date_safe(from_)
     to_date = parse_date_safe(to)
@@ -75,7 +77,7 @@ async def pdca_summary(
         key = r.get(group_key) or "unknown"
         grouped[key].append(r)
 
-    # 📈 集計処理（まずは辞書へ）
+    # 📈 平均計算 + 採用判定
     detail_rows = []
     for key, group in grouped.items():
         avg_win_rate_before = sum(g["win_rate_before"] for g in group) / len(group)
@@ -98,13 +100,14 @@ async def pdca_summary(
             "status": "adopted" if adopted else "pending",
         })
 
-    # 🔽 平均勝率差分で降順ソート
+    # 🔽 勝率差分で降順ソート → ✂️ 上位N件に制限
     detail_rows.sort(key=lambda x: x["diff"], reverse=True)
+    limited_rows = detail_rows[:limit]
 
-    # 📊 ソート後の順序に合わせてグラフデータを構築
-    chart_labels = [r["strategy"] for r in detail_rows]
-    chart_data = [r["diff"] for r in detail_rows]
-    chart_dd_data = [r["max_dd_before"] - r["max_dd_after"] for r in detail_rows]
+    # 📊 グラフデータの構築（limit後の順序で）
+    chart_labels = [r["strategy"] for r in limited_rows]
+    chart_data = [r["diff"] for r in limited_rows]
+    chart_dd_data = [r["max_dd_before"] - r["max_dd_after"] for r in limited_rows]
 
     # 📊 サマリー統計（全体）
     all_diffs = [r["diff"] for r in raw_results]
@@ -116,7 +119,7 @@ async def pdca_summary(
         "win_rate_improved": sum(1 for r in raw_results if r["diff"] > 0),
         "dd_improved": sum(1 for r in raw_results if r["dd_diff"] > 0),
         "adopted": sum(1 for r in raw_results if r["status"] == "adopted"),
-        "detail": detail_rows,
+        "detail": limited_rows,
     }
 
     return templates.TemplateResponse("pdca_summary.html", {
