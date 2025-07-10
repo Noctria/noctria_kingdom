@@ -47,6 +47,11 @@ def normalize_score(log: dict) -> dict:
         log["max_drawdown"] = score.get("max_drawdown", None)
     else:
         log["score_mean"] = score
+
+    # タグフィールドがない場合に備えて補完
+    if "tags" not in log or not isinstance(log["tags"], list):
+        log["tags"] = []
+
     return log
 
 
@@ -92,13 +97,11 @@ async def show_act_history(
 
     logs = [normalize_score(log) for log in logs]
 
-    tag_map = {}
+    # 全ログからタグ一覧を抽出してソート
+    tag_set = set()
     for log in logs:
-        raw_tag = log.get("tag")
-        norm_tag = log.get("normalized_tag", "")
-        if norm_tag and raw_tag:
-            tag_map[norm_tag] = raw_tag
-    tag_list = sorted(tag_map.items())
+        tag_set.update(log.get("tags", []))
+    tag_list = sorted(tag_set)
 
     return templates.TemplateResponse("act_history.html", {
         "request": request,
