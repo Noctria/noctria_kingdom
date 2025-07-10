@@ -2,12 +2,12 @@ from core.path_config import STRATEGIES_DIR, LOGS_DIR, DATA_DIR
 from core.strategy_evaluator import evaluate_strategy, is_strategy_adopted
 from core.market_loader import load_market_data
 
-import os
-import json
-from datetime import datetime, timedelta
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+
+from datetime import datetime, timedelta
+import os
+import json
 
 # === DAG基本設定 ===
 default_args = {
@@ -41,7 +41,7 @@ def evaluate_and_adopt_strategies():
     market_data = load_market_data(str(data_csv_path))
 
     if log_path.exists():
-        with open(log_path, "r") as f:
+        with open(log_path, "r", encoding="utf-8") as f:
             eval_logs = json.load(f)
     else:
         eval_logs = []
@@ -52,24 +52,36 @@ def evaluate_and_adopt_strategies():
 
         path = generated_dir / filename
         print(f"📊 評価中: {filename}")
-        result = evaluate_strategy(str(path), market_data)
 
-        if is_strategy_adopted(result):
+        try:
+            result = evaluate_strategy(str(path), market_data)
+        except Exception as e:
+            print(f"🚫 エラー: {filename} ➜ {e}")
+            result = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "filename": filename,
+                "status": "error",
+                "error_message": str(e),
+            }
+
+        result["timestamp"] = datetime.utcnow().isoformat()
+        result["filename"] = filename
+
+        if result.get("status") == "ok" and is_strategy_adopted(result):
             save_path = official_dir / filename
-            with open(path, "r") as src, open(save_path, "w") as dst:
+            with open(path, "r", encoding="utf-8") as src, open(save_path, "w", encoding="utf-8") as dst:
                 dst.write(src.read())
             print(f"✅ 採用: {filename}（資産 {result['final_capital']:,.0f}円）")
             result["status"] = "adopted"
-        elif result["status"] == "ok":
+
+        elif result.get("status") == "ok":
             print(f"❌ 不採用: {filename}")
             result["status"] = "rejected"
-        else:
-            print(f"🚫 エラー: {filename} ➜ {result.get('error_message')}")
 
         eval_logs.append(result)
 
-    with open(log_path, "w") as f:
-        json.dump(eval_logs, f, indent=2)
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(eval_logs, f, indent=2, ensure_ascii=False)
 
 # === DAGへ登録 ===
 with dag:
