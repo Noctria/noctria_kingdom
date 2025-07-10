@@ -29,17 +29,14 @@ Thumbs.db
 # ==========================
 # 🔹 Airflow 関連（/opt/airflow移行後）
 # ==========================
-logs/
-tmp/
-output/
-
+# 共通ログ・テンポラリ
 airflow_docker/logs/
 airflow_docker/tmp/
 airflow_docker/airflow.cfg
 airflow_docker/.env
 airflow_docker/.env.*
 
-# 初期検証用DB
+# 初期検証用SQLite DB
 airflow.db
 
 # ==========================
@@ -74,5 +71,7 @@ docker/*.tar
 # ==========================
 strategies/veritas_generated/*
 !strategies/veritas_generated/.gitkeep
+
+# 旧形式・一時的な戦略出力（必要に応じて保持）
 veritas_generated/
 output_generated/
