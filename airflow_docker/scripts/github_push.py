@@ -10,6 +10,7 @@
 import os
 import subprocess
 from pathlib import Path
+from typing import List
 from dotenv import load_dotenv
 
 # ================================
@@ -27,7 +28,7 @@ else:
 # ================================
 # 🛠️ コマンド実行ユーティリティ
 # ================================
-def run_command(cmd: list[str], allow_fail: bool = False):
+def run_command(cmd: List[str], allow_fail: bool = False) -> subprocess.CompletedProcess:
     """Shellコマンドを実行し、標準出力・エラーを表示"""
     print(f"\n💻 実行: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -63,7 +64,9 @@ def main():
         ["git", "commit", "-m", "🤖 Veritas採用戦略を自動コミット"],
         allow_fail=True
     )
-    if "nothing to commit" in (commit_result.stderr or "").lower():
+
+    output = (commit_result.stdout or "") + (commit_result.stderr or "")
+    if "nothing to commit" in output.lower():
         print("ℹ️ 変更なしのため、commitはスキップされました")
         return
 
