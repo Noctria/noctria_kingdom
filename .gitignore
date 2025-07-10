@@ -1,42 +1,19 @@
-<<<<<<< HEAD
-# Python
-__pycache__/
-*.py[cod]
-*.pkl
-*.log
-
-# Environments
-.venv/
-venv/
-.env
-*.env
-
-# Jupyter/Notebook
-.ipynb_checkpoints/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs/Outputs
-/logs/
-/tests/*.deb
-*.bak
-
-# Airflow/Meta
-airflow_docker/.airflow
-=======
 # ==========================
 # 🔹 Python & 仮想環境
 # ==========================
 *.pyc
-__pycache__/
 *.pyo
 *.pyd
+__pycache__/
+*.py[cod]
+*.pkl
+*.log
+*.tmp
 
+.venv/
 venv/
 venv_*/
-.env/
+.env
 .env.*
 .local/
 
@@ -47,35 +24,28 @@ venv_*/
 .DS_Store
 .vscode/
 .idea/
+Thumbs.db
 
 # ==========================
 # 🔹 Airflow 関連（/opt/airflow移行後）
 # ==========================
-# キャッシュやログ
 logs/
-__pycache__/
 tmp/
 output/
 
-# airflow_docker関連（Airflow実体）
 airflow_docker/logs/
 airflow_docker/tmp/
 airflow_docker/airflow.cfg
 airflow_docker/.env
 airflow_docker/.env.*
 
-# airflow sqlite（初期検証用DB）
+# 初期検証用DB
 airflow.db
 
 # ==========================
-# 🔹 データ・学習系ログ
+# 🔹 データ・学習系ログ・生成物
 # ==========================
-# TensorBoardログなど
 logs/ppo_tensorboard_logs/
-*.log
-*.tmp
-
-# プライベートデータや生成物
 data/private_data/
 data/**/*.parquet
 data/**/*.feather
@@ -83,7 +53,7 @@ data/**/*.pkl
 data/**/*.npy
 
 # ==========================
-# 🔹 Kubernetes・セキュリティ関連
+# 🔹 セキュリティ・Kubernetes
 # ==========================
 .secrets/
 secrets/
@@ -100,13 +70,9 @@ kubeconfig_final.yaml
 docker/*.tar
 
 # ==========================
-# 🔹 Veritas戦略生成（自動生成ファイル）
+# 🔹 Veritas戦略生成（除外 → .gitkeepで保持）
 # ==========================
-strategies/veritas_generated/
+strategies/veritas_generated/*
+!strategies/veritas_generated/.gitkeep
 veritas_generated/
 output_generated/
->>>>>>> 572191d22755722942baf299a92693377c177f7a
-
-# Python bytecode
-*.pyc
-__pycache__/
