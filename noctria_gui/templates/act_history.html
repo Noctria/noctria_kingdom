@@ -84,7 +84,15 @@
         </td>
 
         <!-- タグ -->
-        <td>{{ log.tag or "-" }}</td>
+        <td>
+          {% if log.tags %}
+            {% for tag in log.tags %}
+              <span class="tag">{{ tag }}</span>
+            {% endfor %}
+          {% else %}
+            -
+          {% endif %}
+        </td>
 
         <!-- Push済 -->
         <td>{{ "✅" if log.pushed else "❌" }}</td>
