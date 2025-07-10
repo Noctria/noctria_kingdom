@@ -1,0 +1,71 @@
+# ==========================
+# 🔹 Python バイトコード/仮想環境
+# ==========================
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.venv/
+venv/
+venv_*/
+.env
+.env.*
+.local/
+
+# ==========================
+# 🔹 Jupyter, IDE, OS キャッシュ
+# ==========================
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ==========================
+# 🔹 学習ログ・データ・出力
+# ==========================
+logs/
+tmp/
+output/
+airflow_docker/logs/
+airflow_docker/tmp/
+ppo_tensorboard_logs/
+data/
+*.pkl
+*.npy
+*.parquet
+*.feather
+
+# ==========================
+# 🔹 セキュリティ・鍵・設定
+# ==========================
+.secrets/
+secrets/
+*.key
+*.pem
+*.crt
+kubeconfig_final.yaml
+airflow_docker/.env
+airflow_docker/.env.*
+
+# ==========================
+# 🔹 Docker ビルド不要ファイル
+# ==========================
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.bak
+*.old
+.cache/
+__pycache__/
+strategies/veritas_generated/*
+!strategies/veritas_generated/.gitkeep
+
+# ==========================
+# 🔹 Git & CI/CD
+# ==========================
+.git
+.gitignore
+.gitattributes
+.github/
