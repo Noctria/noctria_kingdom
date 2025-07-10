@@ -1,29 +1,36 @@
-# noctria_gui/routes/pdca_push.py
-
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 import requests
 from datetime import datetime
 import os
+import logging
 
 router = APIRouter(tags=["PDCA Push"])
+logger = logging.getLogger(__name__)
 
-@router.post("/pdca/push")
+class DAGTriggerResponse(BaseModel):
+    detail: str
+    dag_run_id: str | None = None
+    response_body: str | None = None
+
+@router.post("/pdca/push", response_model=DAGTriggerResponse)
 async def push_strategy_to_github(strategy_name: str = Form(...)):
     """
     GitHub に戦略を Push する Airflow DAG をトリガーするエンドポイント。
     - DAG名: veritas_push_dag
-    - 引数: strategy_name
+    - 引数: strategy_name（例: "Aurora_VX2"）
     """
 
-    # DAG 実行 ID をユニークなタイムスタンプで生成
+    strategy_name = strategy_name.strip()
+    if not strategy_name:
+        raise HTTPException(status_code=400, detail="strategy_name が空です")
+
     dag_run_id = f"veritas_push__{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    # Airflow Webserver エンドポイントを環境変数から取得（またはデフォルト）
     airflow_url = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
     dag_trigger_url = f"{airflow_url}/api/v1/dags/veritas_push_dag/dagRuns"
 
-    # 実行時パラメータ
     payload = {
         "dag_run_id": dag_run_id,
         "conf": {
@@ -43,26 +50,20 @@ async def push_strategy_to_github(strategy_name: str = Form(...)):
         )
 
         if response.status_code in (200, 201):
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "detail": f"✅ Airflow DAGトリガー成功 (Run ID: {dag_run_id})",
-                    "dag_run_id": dag_run_id
-                }
-            )
-        else:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "detail": f"❌ Airflowからエラー応答 (HTTP {response.status_code})",
-                    "response_body": response.text
-                }
+            logger.info(f"DAG triggered successfully: {dag_run_id}")
+            return DAGTriggerResponse(
+                detail=f"✅ Airflow DAGトリガー成功 (Run ID: {dag_run_id})",
+                dag_run_id=dag_run_id
             )
 
+        logger.error(f"Airflow response error: HTTP {response.status_code} → {response.text}")
+        return DAGTriggerResponse(
+            detail=f"❌ Airflowからエラー応答 (HTTP {response.status_code})",
+            response_body=response.text
+        )
+
     except requests.RequestException as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": f"🚨 Airflow Webserver への通信に失敗: {str(e)}"
-            }
+        logger.exception("Airflow Webserver 通信失敗")
+        return DAGTriggerResponse(
+            detail=f"🚨 Airflow Webserver への通信に失敗: {str(e)}"
         )
