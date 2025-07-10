@@ -1,5 +1,3 @@
-# core/strategy_evaluator.py
-
 """
 📈 Veritas戦略の共通評価モジュール
 - バックテスト評価結果を取得
@@ -8,32 +6,48 @@
 
 import os
 from datetime import datetime
-from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
-from core.market_loader import load_market_data
+from typing import Dict
+import pandas as pd
 
-def evaluate_strategy(strategy_path: str, market_data: dict) -> dict:
+from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
+
+
+def evaluate_strategy(strategy_path: str, market_data: pd.DataFrame) -> Dict:
     """
     📊 指定された戦略ファイルを評価し、評価指標を返す
 
     Parameters:
         strategy_path (str): 評価対象の戦略ファイルのパス
-        market_data (dict): 市場データ（load_market_data() で取得）
+        market_data (pd.DataFrame): 市場データ（load_market_data() で取得）
 
     Returns:
         dict: 評価結果（勝率、DD、資産、取引数、エラーなど）
     """
-    result = simulate_strategy_adjusted(strategy_path, market_data)
+    try:
+        result = simulate_strategy_adjusted(strategy_path, market_data)
 
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "filename": os.path.basename(strategy_path),
-        "status": result.get("status", "error"),
-        "final_capital": result.get("final_capital"),
-        "win_rate": result.get("win_rate"),
-        "max_drawdown": result.get("max_drawdown"),
-        "total_trades": result.get("total_trades"),
-        "error_message": result.get("error_message")
-    }
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "filename": os.path.basename(strategy_path),
+            "status": result.get("status", "error"),
+            "final_capital": result.get("final_capital"),
+            "win_rate": result.get("win_rate"),
+            "max_drawdown": result.get("max_drawdown"),
+            "total_trades": result.get("total_trades"),
+            "error_message": result.get("error_message"),
+        }
+
+    except Exception as e:
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "filename": os.path.basename(strategy_path),
+            "status": "error",
+            "final_capital": None,
+            "win_rate": None,
+            "max_drawdown": None,
+            "total_trades": None,
+            "error_message": str(e),
+        }
 
 
 def is_strategy_adopted(eval_result: dict, capital_threshold: int = 1_050_000) -> bool:
@@ -48,6 +62,6 @@ def is_strategy_adopted(eval_result: dict, capital_threshold: int = 1_050_000) -
         bool: 採用なら True、不採用なら False
     """
     return (
-        eval_result["status"] == "ok" and
+        eval_result.get("status") == "ok" and
         eval_result.get("final_capital", 0) >= capital_threshold
     )
