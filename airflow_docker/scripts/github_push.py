@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 project_root = Path(__file__).resolve().parents[1]
 dotenv_path = project_root / ".env"
 
-if not dotenv_path.exists():
-    raise FileNotFoundError(f"❌ .envファイルが見つかりません: {dotenv_path}")
-
-load_dotenv(dotenv_path=dotenv_path)
+if dotenv_path.exists():
+    load_dotenv(dotenv_path=dotenv_path)
+else:
+    print(f"⚠️ .envファイルが見つかりません（継続）: {dotenv_path}")
 
 def run_command(cmd: list[str]):
     print(f"💻 {' '.join(cmd)}")
@@ -24,18 +24,19 @@ def run_command(cmd: list[str]):
     return result.returncode
 
 def main():
-    # GITHUB_PATの使用は不要（初回 clone で認証済のため）
+    # 🧠 Git user 情報のセット
     commands = [
         ["git", "config", "--global", "user.email", "veritas@noctria.ai"],
         ["git", "config", "--global", "user.name", "Veritas Machina"],
-        ["git", "add", "strategies/official/"],
-        ["git", "commit", "-m", "🤖 Veritas戦略をofficialに自動反映"],
+        ["git", "add", "strategies/veritas_generated/"],
+        ["git", "commit", "-m", "🤖 Veritas採用戦略を自動コミット"],
         ["git", "push", "origin", "main"]
     ]
 
     for cmd in commands:
         code = run_command(cmd)
         if code != 0:
+            # ⚠️ 変更がなく commit 失敗するのは正常（commitはスキップして終了）
             if "commit" in cmd:
                 print("ℹ️ 変更なしのため、commitはスキップされました")
             break
