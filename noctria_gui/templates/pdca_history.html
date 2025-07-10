@@ -8,12 +8,22 @@
     .row-success { background-color: #e6ffe6; }
     .row-fail { background-color: #ffe6e6; }
     .row-pending { background-color: #f2f2f2; }
+    button.loading {
+      pointer-events: none;
+      opacity: 0.6;
+    }
   </style>
+  <script>
+    function showLoading(btn) {
+      btn.classList.add('loading');
+      btn.innerText = '⏳ 再評価中...';
+    }
+  </script>
 </head>
 <body>
   <h1>🔁 Veritas PDCA実行履歴</h1>
 
-  <!-- ✅ 実行結果 -->
+  <!-- ✅ 実行結果表示 -->
   {% if recheck_success is not none or recheck_fail is not none %}
     <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
       ✅ 一括再評価 実行結果：
@@ -54,7 +64,7 @@
     <button type="submit">🔍 フィルター適用</button>
   </form>
 
-  <!-- 📋 テーブル -->
+  <!-- 📋 実行ログテーブル -->
   <table class="table">
     <thead>
       <tr>
@@ -93,7 +103,7 @@
             </details>
           </td>
           <td>
-            <form method="post" action="/pdca/recheck">
+            <form method="post" action="/pdca/recheck" onsubmit="showLoading(this.querySelector('button'));">
               <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
               <button type="submit">再評価</button>
             </form>
