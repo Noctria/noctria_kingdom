@@ -96,3 +96,17 @@ select {
   font-size: 1rem;
   margin-right: 1rem;
 }
+
+/* ==========================
+   🏷️ タグ表示バッジ
+   ========================== */
+.tag {
+  display: inline-block;
+  background-color: #e1ecf4;
+  color: #3b5998;
+  padding: 0.25em 0.6em;
+  margin: 0.1em;
+  font-size: 0.85em;
+  border-radius: 10px;
+  font-weight: 500;
+}
