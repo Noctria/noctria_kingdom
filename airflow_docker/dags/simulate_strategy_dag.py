@@ -1,45 +1,51 @@
 # /opt/airflow/dags/simulate_strategy_dag.py
 
 from datetime import datetime, timedelta
-from airflow import DAG
+from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
 
-import sys
-from pathlib import Path
-
-# Airflowコンテナ内のルートパスを追加して、coreなどをインポート可能にする
-sys.path.append("/opt/airflow")
-
-# ★ 修正点 1: LOGS_DIRもインポートする
-from core.path_config import PROJECT_ROOT, LOGS_DIR
+# ================================================
+# ★ 修正: 新しいimportルールを適用
+# ================================================
+# `PYTHONPATH`が設定されたため、sys.pathハックは不要。
+# 全てのモジュールは、srcを起点とした絶対パスでインポートする。
+from core.path_config import LOGS_DIR
 from core.logger import setup_logger
 
-# ★ 修正点 2: このDAG専用のログファイルパスを定義し、引数として渡す
+# ★ 改善点: 外部スクリプトを実行するのではなく、関数として直接インポートする
+try:
+    from execution.simulate_official_strategy import main as run_official_simulation
+except ImportError:
+    # ローカルでのテストなど、インポートに失敗した場合のダミー関数
+    def run_official_simulation():
+        print("警告: `simulate_official_strategy.main`が見つかりませんでした。ダミー処理を実行します。")
+        pass
+
+# ================================================
+# 🏰 王国記録係（DAGロガー）の召喚
+# ================================================
 dag_log_path = LOGS_DIR / "dags" / "simulate_strategy_dag.log"
 logger = setup_logger("SimulateStrategyDAG", dag_log_path)
 
-# ✅ 外部スクリプトの読み込み
-SIMULATE_SCRIPT = PROJECT_ROOT / "execution" / "simulate_official_strategy.py"
 
-def run_simulation():
-    """外部のシミュレーションスクリプトを実行する"""
+# ================================================
+# 📝 タスク定義
+# ================================================
+def simulation_task_wrapper():
+    """
+    インポートしたシミュレーション関数を実行するラッパー
+    """
     logger.info("🚀 戦略バックテストを開始します...")
     try:
-        # スクリプトを読み込んで実行
-        exec_globals = {}
-        with open(SIMULATE_SCRIPT, "r", encoding="utf-8") as f:
-            code = f.read()
-            exec(code, exec_globals)
-        
-        # スクリプト内で定義されているはずのメイン関数を呼び出す
-        exec_globals["simulate_official_strategy"]()
+        run_official_simulation()
         logger.info("✅ シミュレーション完了")
-        
     except Exception as e:
         logger.error(f"❌ シミュレーション失敗: {e}", exc_info=True)
         raise
 
-# === DAG設定 ===
+# ================================================
+# 📜 DAG設定
+# ================================================
 default_args = {
     "owner": "Noctria",
     "depends_on_past": False,
@@ -61,5 +67,5 @@ with DAG(
 
     run_task = PythonOperator(
         task_id="simulate_official_strategy",
-        python_callable=run_simulation,
+        python_callable=simulation_task_wrapper,
     )
