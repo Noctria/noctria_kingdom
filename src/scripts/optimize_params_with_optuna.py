@@ -27,7 +27,7 @@ from stable_baselines3.common.callbacks import EvalCallback
 from optuna.integration.skopt import SkoptSampler
 from optuna.pruners import MedianPruner
 from optuna.integration import TensorBoardCallback as OptunaTensorBoardCallback # OptunaのTensorBoardCallback
-from optuna.integration.sb3 import TrialPruningCallback # ★修正: sb3連携用のパスからインポート
+from optuna_integration.sb3 import TrialPruningCallback # ★正しいパス: `optuna_integration`から直接インポート
 
 # ✅ 王国記録係（ログ）を召喚
 logger = setup_logger("optimize_script", LOGS_DIR / "pdca" / "optimize.log")
