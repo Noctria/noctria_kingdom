@@ -10,7 +10,7 @@ from core.path_config import CORE_DIR
 # ✅ Airflowコンテナ上で core/, strategies/ などを参照可能にする
 
 # ✅ 王のAIロジック本体
-from core.noctria import Noctria
+from noctria_ai.noctria import Noctria
 
 # === DAG共通設定 ===
 default_args = {
