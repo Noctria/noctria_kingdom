@@ -9,7 +9,7 @@ tensorboard==2.15.1
 # LLM & 最適化
 transformers==4.40.2
 optuna==3.6.1
-optuna-integration==3.6.0  # ★ 修正: 存在するバージョンに変更
+optuna-integration[sb3]==3.5.0  # ★ 修正: 安定バージョンと追加部品を指定
 scikit-optimize==0.10.2
 
 # 強化学習環境
