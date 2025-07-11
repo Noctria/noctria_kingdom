@@ -1,0 +1,58 @@
+## 提案：王国統一計画（アーキテクチャリファクタリング）
+ゴール: プロジェクトのルートに**唯一の「ソースコード領域（src）」**を作成し、そこに全てのPythonロジックを集約します。AirflowやGUI、LLMサーバーは、このsrcから必要なモジュールをインポートして利用する形に統一します。
+
+【理想のディレクトリ構成案】
+noctria_kingdom/
+├── src/  <-- ★ 新設：全てのPythonロジックをここに集約
+│   ├── core/
+│   ├── strategies/
+│   ├── execution/
+│   ├── veritas/
+│   ├── noctria_ai/  <-- NoctriaMasterAIやMetaAIEnvなどの頭脳部分
+│   └── ... (その他、共通で使うPythonモジュール)
+│
+├── airflow_docker/
+│   ├── dags/
+│   └── docker-compose.yaml  <-- この中で src をマウントする
+│
+├── noctria_gui/
+│   ├── main.py
+│   └── ... (GUI関連ファイル)
+│
+├── llm_server/
+│   └── ... (LLMサーバー関連ファイル)
+│
+├── data/
+├── models/
+├── experts/
+├── tools/
+├── tests/
+└── ... (その他の設定ファイル)
+この構成にすることで、あなたの設計原則**「責務単位での物理分離」**が完全に実現されます。
+
+## 実行計画（具体的なステップ）
+この「王国統一」は、以下のステップで進めることをお勧めします。
+
+ステップ1：srcディレクトリの作成
+まず、プロジェクトのルートにsrcという名前の新しいディレクトリを作成します。
+
+ステップ2：Pythonモジュールの集約
+./core, airflow_docker/coreなど、2箇所に分散しているcore, strategies, execution, veritasといったディレクトリのうち、最新かつ正しい方をsrc/の中に移動します。移動が完了したら、古い方や重複している方は完全に削除します。
+
+ステップ3：docker-compose.yamlの修正
+airflow_docker/docker-compose.yamlを開き、volumesセクションを以下のように変更します。これにより、srcディレクトリ全体がコンテナ内の/opt/airflow/srcとして認識されます。
+
+YAML
+
+# airflow-webserver, airflow-scheduler の volumes:
+volumes:
+  - ./dags:/opt/airflow/dags
+  - ./logs:/opt/airflow/logs # logsも同様にプロジェクトルートで管理
+  - ./src:/opt/airflow/src   # ★重要: srcディレクトリ全体をマウント
+同時に、PYTHONPATH環境変数も/opt/airflow/srcに設定すると、import文がさらにクリーンになります。
+
+ステップ4：import文の修正
+全てのファイル（特にDAGファイルやsrc内の各ファイル）で、import文を見直します。sys.path.appendのようなハックは不要になり、from core.logger import ... のように、常にsrcを起点としたクリーンな形でインポートできるようになります。
+
+ステップ5：動作確認
+tests/にあるテストを実行し、主要なDAGを手動でトリガーして、全ての連携が正しく動作することを確認します。
