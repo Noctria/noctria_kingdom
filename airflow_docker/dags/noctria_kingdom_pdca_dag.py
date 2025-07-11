@@ -1,15 +1,26 @@
-from core.path_config import SCRIPTS_DIR
-import sys
+# airflow_docker/dags/noctria_kingdom_pdca_dag.py
+
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# 🏰 勅令: 外部戦略スクリプトの召喚
-from scripts.optimize_params_with_optuna import optimize_main
-from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
-from scripts.apply_best_params_to_kingdom import apply_best_params_to_kingdom
+# ================================
+# 🛣️ パス調整（scriptsをimport可能に）
+# ================================
+from core.path_config import SCRIPTS_DIR
+import sys
+sys.path.append(str(SCRIPTS_DIR))
 
+# ================================
+# 🏰 勅令: 外部戦略スクリプトの召喚
+# ================================
+from optimize_params_with_optuna import optimize_main
+from apply_best_params_to_metaai import apply_best_params_to_metaai
+from apply_best_params_to_kingdom import apply_best_params_to_kingdom
+
+# ================================
 # 📜 王命: DAG共通設定
+# ================================
 default_args = {
     "owner": "Noctria",
     "depends_on_past": False,
@@ -17,12 +28,14 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
+# ================================
 # 👑 王命: Noctria Kingdom 統合PDCAサイクル
+# ================================
 with DAG(
     dag_id="noctria_kingdom_pdca_dag",
     description="🏰 Noctria KingdomのPDCAサイクル統合DAG（Optuna最適化 → MetaAI再学習 → 王国戦略反映）",
     default_args=default_args,
-    schedule_interval=None,
+    schedule_interval=None,  # 手動実行想定
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=["noctria", "kingdom", "pdca", "metaai"],
