@@ -50,6 +50,7 @@ services:
       - ../veritas:/opt/airflow/veritas
       - ../data:/opt/airflow/data
       - ../tools:/opt/airflow/tools
+      - ../execution:/opt/airflow/execution # ★ 修正点
     command: webserver
     restart: always
 
@@ -71,12 +72,14 @@ services:
       - ${HOST_LOGS_PATH}:/opt/airflow/logs
       - ${HOST_PLUGINS_PATH}:/opt/airflow/plugins
 
+      # Noctria Kingdom コンポーネント群
       - ../core:/opt/airflow/core
       - ../scripts:/opt/airflow/scripts
       - ../strategies:/opt/airflow/strategies
       - ../veritas:/opt/airflow/veritas
       - ../data:/opt/airflow/data
       - ../tools:/opt/airflow/tools
+      - ../execution:/opt/airflow/execution # ★ 修正点
     command: scheduler
     restart: always
 
