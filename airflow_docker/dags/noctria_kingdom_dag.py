@@ -1,7 +1,7 @@
 import sys
-sys.path.append("/opt/airflow")  # ← 追加
+sys.path.append("/opt/airflow")
 
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+from core.path_config import LOGS_DIR, STRATEGIES_DIR
 import os
 import importlib.util
 from datetime import datetime, timedelta
@@ -10,6 +10,9 @@ from airflow.operators.python import PythonOperator
 from core.logger import setup_logger
 from core.noctria import Noctria
 
+# ================================================
+# 📜 王命: DAG共通設定
+# ================================================
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -19,7 +22,10 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-dag = DAG(
+# ================================================
+# 👑 王命: Noctria Kingdom 統合戦略DAG
+# ================================================
+with DAG(
     dag_id='noctria_kingdom_dag',
     default_args=default_args,
     description='Noctria王国戦略統合DAG（official戦略を動的適用）',
@@ -27,50 +33,64 @@ dag = DAG(
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'kingdom', 'veritas']
-)
+) as dag:
 
-logger = setup_logger("NoctriaDecision")
+    # ================================================
+    # 🏰 王国記録係（ログ）の召喚
+    # ★ 修正点: このDAG専用のログファイルパスを定義し、引数として渡す
+    # ================================================
+    dag_log_path = LOGS_DIR / "dags" / "noctria_kingdom_dag.log"
+    logger = setup_logger("NoctriaKingdomDAG", dag_log_path)
 
-OFFICIAL_DIR = STRATEGIES_DIR / "official"
+    OFFICIAL_DIR = STRATEGIES_DIR / "official"
 
-def create_strategy_task(strategy_name, strategy_path):
-    def strategy_callable(**kwargs):
-        try:
-            spec = importlib.util.spec_from_file_location(strategy_name, strategy_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+    def create_strategy_task(strategy_name, strategy_path):
+        """動的に戦略実行タスクを生成する関数"""
+        def strategy_callable(**kwargs):
+            try:
+                spec = importlib.util.spec_from_file_location(strategy_name, strategy_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
 
-            if not hasattr(module, "simulate"):
-                logger.warning(f"❌ {strategy_name} は simulate() を定義していません")
-                return
+                if not hasattr(module, "simulate"):
+                    logger.warning(f"❌ {strategy_name} は simulate() を定義していません")
+                    return
 
-            result = module.simulate()
-            logger.info(f"[{strategy_name}] result: {result}")
-            kwargs["ti"].xcom_push(key=f"{strategy_name}_decision", value=result)
+                result = module.simulate()
+                logger.info(f"[{strategy_name}] result: {result}")
+                kwargs["ti"].xcom_push(key=f"{strategy_name}_decision", value=result)
 
-        except Exception as e:
-            logger.error(f"[{strategy_name}] 実行エラー: {e}")
+            except Exception as e:
+                logger.error(f"[{strategy_name}] 実行エラー: {e}", exc_info=True)
+                raise
 
-    return strategy_callable
+        return strategy_callable
 
-with dag:
+    # ================================================
+    # ⚔️ 各戦略の並行実行
+    # ================================================
     strategy_tasks = []
-    for fname in os.listdir(OFFICIAL_DIR):
-        if fname.endswith(".py"):
-            strategy_name = os.path.splitext(fname)[0]
-            strategy_path = str(OFFICIAL_DIR / fname)
-            task = PythonOperator(
-                task_id=f"{strategy_name}_strategy",
-                python_callable=create_strategy_task(strategy_name, strategy_path)
-            )
-            strategy_tasks.append((strategy_name, task))
+    if OFFICIAL_DIR.exists():
+        for fname in os.listdir(OFFICIAL_DIR):
+            if fname.endswith(".py") and not fname.startswith("__"):
+                strategy_name = os.path.splitext(fname)[0]
+                strategy_path = str(OFFICIAL_DIR / fname)
+                task = PythonOperator(
+                    task_id=f"{strategy_name}_strategy",
+                    python_callable=create_strategy_task(strategy_name, strategy_path)
+                )
+                strategy_tasks.append((strategy_name, task))
 
+    # ================================================
+    # 👑 MetaAIによる最終判断
+    # ================================================
     def noctria_final_decision(**kwargs):
         ti = kwargs['ti']
         decisions = {}
         for strategy_name, _ in strategy_tasks:
             val = ti.xcom_pull(key=f"{strategy_name}_decision", task_ids=f"{strategy_name}_strategy")
             decisions[strategy_name] = val
+            
         logger.info(f"👑 Noctriaが受け取った判断: {decisions}")
         noctria = Noctria()
         final_action = noctria.meta_ai.decide_final_action(decisions)
@@ -81,5 +101,9 @@ with dag:
         python_callable=noctria_final_decision
     )
 
-    for _, task in strategy_tasks:
-        task >> final_task
+    # ================================================
+    # 🔗 依存関係の定義
+    # ================================================
+    if strategy_tasks:
+        for _, task in strategy_tasks:
+            task >> final_task
