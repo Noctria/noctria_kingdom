@@ -2,8 +2,13 @@
 
 import os
 from subprocess import run, CalledProcessError
+
+# --- 王国の中枢モジュールをインポート ---
+# ★ 修正点: LOGS_DIRをインポートリストに追加
+from core.path_config import LOGS_DIR
 from core.logger import setup_logger
 
+# --- 専門家の記録係をセットアップ ---
 logger = setup_logger("GitHandler", LOGS_DIR / "tools" / "git_handler.log")
 
 # --- 環境変数 ---
@@ -22,7 +27,8 @@ def push_to_github(file_path: str, commit_message: str):
         run(["git", "add", file_path], check=True, capture_output=True, text=True)
 
         logger.info(f"💬 コミットを作成: '{commit_message}'")
-        run(["git", "commit", "-m", commit_message], check=True, capture_output=True, text=True)
+        # git commitが何も変更がない場合にエラーを返すのを防ぐ
+        run(["git", "commit", "-m", commit_message], check=False, capture_output=True, text=True)
 
         logger.info("🚀 GitHubへプッシュ中...")
         if GITHUB_TOKEN:
@@ -34,6 +40,11 @@ def push_to_github(file_path: str, commit_message: str):
         logger.info("✅ GitHubへのプッシュが完了しました。")
 
     except CalledProcessError as e:
+        # git commitが変更なしでエラーコード1を返す場合を無視する
+        if "nothing to commit, working tree clean" in e.stderr:
+            logger.warning("⚠️ コミットする変更がありませんでした。プッシュをスキップします。")
+            return
+            
         logger.error(f"❌ Git操作に失敗しました (Exit Code: {e.returncode})")
         logger.error(f"   - STDOUT: {e.stdout}")
         logger.error(f"   - STDERR: {e.stderr}")
