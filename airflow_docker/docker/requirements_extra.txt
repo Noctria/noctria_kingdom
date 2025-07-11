@@ -9,8 +9,8 @@ tensorboard==2.15.1
 # LLM & 最適化
 transformers==4.40.2
 optuna==3.6.1
-optuna-integration==3.6.1  # ★ 追加: Optunaの拡張機能
-scikit-optimize==0.10.2    # ★ 追加: SkoptSamplerの依存関係
+optuna-integration==3.6.0  # ★ 修正: 存在するバージョンに変更
+scikit-optimize==0.10.2
 
 # 強化学習環境
 stable-baselines3==2.2.1
