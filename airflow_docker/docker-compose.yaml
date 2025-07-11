@@ -8,9 +8,9 @@ services:
     image: postgres:13
     env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     restart: always
@@ -27,7 +27,8 @@ services:
   # ======================================
   airflow-webserver:
     build:
-      context: ./docker
+      context: . # ★ 修正点: ビルドコンテキストをカレントディレクトリに変更
+      dockerfile: ./docker/Dockerfile # ★ 修正点: Dockerfileの場所を明示
     image: noctria-airflow
     depends_on:
       - postgres
@@ -35,22 +36,21 @@ services:
     env_file: .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - PYTHONPATH=/opt/airflow/src  # ★ 修正点: Pythonがモジュールを探す場所を指定
     ports:
       - "8080:8080"
     volumes:
-      # ✅ DAGフォルダは Airflow標準パスにマウント
-      - ${HOST_DAGS_PATH}:/opt/airflow/dags
-      - ${HOST_LOGS_PATH}:/opt/airflow/logs
-      - ${HOST_PLUGINS_PATH}:/opt/airflow/plugins
+      # ★ 修正点: プロジェクトルートからの相対パスでシンプルに記述
+      - ./dags:/opt/airflow/dags
+      - ../logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../src:/opt/airflow/src # ★ 修正点: srcディレクトリ全体をマウント
 
-      # Noctria Kingdom コンポーネント群
-      - ../core:/opt/airflow/core
-      - ../scripts:/opt/airflow/scripts
-      - ../strategies:/opt/airflow/strategies
-      - ../veritas:/opt/airflow/veritas
-      - ../data:/opt/airflow/data
-      - ../tools:/opt/airflow/tools
-      - ../execution:/opt/airflow/execution # ★ 修正点
+      # ★ 削除: 古い個別マウントはすべて不要
+      # - ../core:/opt/airflow/core
+      # - ../scripts:/opt/airflow/scripts
+      # ...など
+
     command: webserver
     restart: always
 
@@ -59,7 +59,8 @@ services:
   # ======================================
   airflow-scheduler:
     build:
-      context: ./docker
+      context: . # ★ 修正点
+      dockerfile: ./docker/Dockerfile # ★ 修正点
     image: noctria-airflow
     depends_on:
       - postgres
@@ -67,19 +68,15 @@ services:
     env_file: .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - PYTHONPATH=/opt/airflow/src # ★ 修正点
     volumes:
-      - ${HOST_DAGS_PATH}:/opt/airflow/dags
-      - ${HOST_LOGS_PATH}:/opt/airflow/logs
-      - ${HOST_PLUGINS_PATH}:/opt/airflow/plugins
+      - ./dags:/opt/airflow/dags
+      - ../logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../src:/opt/airflow/src # ★ 修正点
 
-      # Noctria Kingdom コンポーネント群
-      - ../core:/opt/airflow/core
-      - ../scripts:/opt/airflow/scripts
-      - ../strategies:/opt/airflow/strategies
-      - ../veritas:/opt/airflow/veritas
-      - ../data:/opt/airflow/data
-      - ../tools:/opt/airflow/tools
-      - ../execution:/opt/airflow/execution # ★ 修正点
+      # ★ 削除: 古い個別マウントはすべて不要
+
     command: scheduler
     restart: always
 
