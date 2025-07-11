@@ -2,21 +2,20 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from datetime import timedelta
-import sys
 
 # ========================================
 # 🏛️ Noctria Kingdom - Veritas EA命令DAG
 # ========================================
 
 # ✅ パス集中管理（王国統治ルールに準拠）
-from core.path_config import SCRIPTS_DIR, VERITAS_DIR, EXECUTION_DIR
-
-# ✅ Python モジュール参照用に sys.path 追加（Airflow環境下のパス問題対策）
-sys.path.append(str(SCRIPTS_DIR))
-sys.path.append(str(VERITAS_DIR))
-sys.path.append(str(EXECUTION_DIR))
+# BASE_DIRがPYTHONPATHに含まれているため、直接インポート可能
+# from core.path_config import SCRIPTS_DIR, VERITAS_DIR, EXECUTION_DIR
+# これらのパス定数は、各callable関数内で必要に応じて利用されるべきであり、
+# DAGファイル内でsys.pathに追加する必要はありません。
 
 # ✅ 各フェーズ関数を外部からインポート（ロジックはDAGに書かない）
+# 環境のPYTHONPATHに /opt/airflow が含まれていれば、
+# これらのモジュールはトップレベルのパッケージとして認識されます。
 from veritas.evaluate_veritas import evaluate_strategies
 from veritas.promote_accepted_strategies import promote_strategies
 from execution.generate_order_json import generate_order_json
@@ -34,7 +33,7 @@ with DAG(
     dag_id="veritas_to_order_dag",
     description="Veritas戦略 → EA命令JSON生成までの完全自動化DAG",
     default_args=default_args,
-    schedule_interval=None,        # 🔁 手動実行前提（定期化は任意）
+    schedule_interval=None,      # 🔁 手動実行前提（定期化は任意）
     start_date=days_ago(1),
     catchup=False,
     tags=["veritas", "pdca", "auto-ea"],
