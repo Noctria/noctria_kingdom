@@ -13,7 +13,7 @@ from pathlib import Path
 # 🏰 基本ディレクトリ判定（Docker or ローカル）
 # ========================================
 BASE_DIR = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parent.parent
-PROJECT_ROOT = BASE_DIR  # ★修正点: PROJECT_ROOT を別名として追加
+PROJECT_ROOT = BASE_DIR
 
 # ========================================
 # 🏛 Airflow構成領域
@@ -116,7 +116,7 @@ def _lint_path_config():
 # 🌐 公開定数（王の地図として他モジュールに輸出）
 # ========================================
 __all__ = [
-    "BASE_DIR", "PROJECT_ROOT", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR", # ★修正点: PROJECT_ROOT をエクスポート
+    "BASE_DIR", "PROJECT_ROOT", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
     "TOOLS_DIR", "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
     "EXECUTION_DIR", "EXPERTS_DIR", "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
     "MODELS_DIR", "INSTITUTIONS_DIR", "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR",
@@ -124,7 +124,7 @@ __all__ = [
     "GUI_ROUTES_DIR", "GUI_SERVICES_DIR", "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
     "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR",
-    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVLUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
+    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT", # ★ 修正点
     "GITHUB_PUSH_SCRIPT", "GITHUB_REPO_URL",
     "CATEGORY_MAP", "_lint_path_config"
 ]
