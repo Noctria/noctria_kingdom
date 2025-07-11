@@ -1,27 +1,21 @@
-# veritas_master_dag.py
-
-import sys
 import os
 import json
 import random
 from datetime import datetime, timedelta
 
-# ✅ パス設定とsys.path追加（Airflow context対応）
-from core.path_config import STRATEGIES_DIR, LOGS_DIR
-BASE_DIR = str(STRATEGIES_DIR.parent)
-if BASE_DIR not in sys.path:
-    sys.path.append(BASE_DIR)
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# ✅ 四臣インポート
+# =====================================
+# ★ 修正: 新しいimportルールを適用
+# =====================================
+# `PYTHONPATH`が設定されたため、sys.pathハックは不要。
+# 全てのモジュールは、srcを起点とした絶対パスでインポートする。
+from core.path_config import STRATEGIES_DIR, LOGS_DIR
 from strategies.prometheus_oracle import PrometheusOracle
 from strategies.aurus_singularis import AurusSingularis
 from strategies.noctus_sentinella import NoctusSentinella
 from strategies.levia_tempest import LeviaTempest
-
-# ✅ GitHub Pushスクリプト
 from scripts.push_generated_strategy import push_generated_strategies
 
 # =====================================
@@ -72,7 +66,7 @@ with DAG(
         print(f"🧠 Veritasが生成した市場データ: {market_data}")
 
         # ✅ ログとして保存
-        os.makedirs(LOGS_DIR, exist_ok=True)
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
         log_path = LOGS_DIR / "veritas_market_data.json"
         with open(log_path, "w") as f:
             json.dump(market_data, f, indent=2)
@@ -133,6 +127,7 @@ with DAG(
     # 3. GitHub Pushタスク（採用戦略）
     # =====================================
     def push_to_github(**kwargs):
+        # 注意: このスクリプトも src/scripts/ にある必要があります
         push_generated_strategies()
         print("📤 採用された戦略をGitHubにpushしました")
 
