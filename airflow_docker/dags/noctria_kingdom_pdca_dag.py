@@ -5,10 +5,9 @@ from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
 
 # ================================
-# ★ 修正: 新しいimportルールを適用
+# ★ 修正済み: 新しいimportルール
 # ================================
-# `PYTHONPATH`が設定されたため、sys.pathハックは不要。
-# 全てのモジュールは、srcを起点とした絶対パスでインポートする。
+# `src/scripts/__init__.py`を作成すれば、このimport文が正しく機能します。
 from core.path_config import LOGS_DIR
 from core.logger import setup_logger
 from scripts.optimize_params_with_optuna import optimize_main
@@ -72,7 +71,6 @@ with DAG(
     # 📝 タスクラッパー関数（XComsとロギングを統合）
     # ================================
     def _optimize_task(**kwargs):
-        # ... (この部分のロジックは変更なし) ...
         n_trials = kwargs["params"].get("n_trials", 100)
         logger.info(f"🎯 叡智の探求を開始します (試行回数: {n_trials})")
         best_params = optimize_main(n_trials=n_trials)
@@ -82,17 +80,14 @@ with DAG(
         return best_params
 
     def _apply_metaai_task(**kwargs):
-        # ... (この部分のロジックは変更なし) ...
         ti = kwargs["ti"]
         best_params = ti.xcom_pull(task_ids="optimize_with_optuna", key="return_value")
         logger.info(f"🧠 MetaAIへの叡智継承を開始します (パラメータ: {best_params})")
-        # apply_best_params_to_metaaiは、モデルのパスとスコアを返すと仮定
         model_info = apply_best_params_to_metaai(best_params=best_params)
         logger.info(f"✅ MetaAIへの継承が完了しました: {model_info}")
-        return model_info # 次のタスクへモデル情報を渡す
+        return model_info
 
     def _apply_kingdom_task(**kwargs):
-        # ... (この部分のロジックは変更なし) ...
         ti = kwargs["ti"]
         model_info = ti.xcom_pull(task_ids="apply_best_params_to_metaai", key="return_value")
         logger.info(f"⚔️ 王国戦略の制定を開始します (モデル情報: {model_info})")
