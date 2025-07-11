@@ -3,7 +3,8 @@
 from datetime import datetime
 from typing import Dict
 
-from airflow.decorators import dag, task, param
+# ★ 修正点 1: 'param'をインポートリストから削除
+from airflow.decorators import dag, task
 
 # --- 王国の中枢モジュールをインポート ---
 from core.path_config import LOGS_DIR
@@ -17,19 +18,15 @@ logger = setup_logger("MetaAIApplyDAG", dag_log_path)
 # === DAG定義 (TaskFlow APIを使用) ===
 @dag(
     dag_id="metaai_apply_dag",
-    schedule=None,  # 手動実行 or 他DAGからのトリガー前提
+    schedule=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=["noctria", "metaai", "retrain", "apply"],
     description="📌 MetaAIに指定された最適パラメータを適用し、再学習・評価・保存する単体DAG",
-    # ★改善点: 手動実行時にJSONでパラメータを受け取る
+    
+    # ★ 修正点 2: パラメータ定義をシンプルな辞書形式に変更
     params={
-        "best_params": param(
-            {},  # デフォルト値は空の辞書
-            type="object",
-            title="Best Hyperparameters",
-            description="適用する最適化済みハイパーパラメータをJSON形式で入力します。"
-        )
+        "best_params": {}  # デフォルト値は空の辞書
     }
 )
 def metaai_apply_pipeline():
@@ -43,6 +40,7 @@ def metaai_apply_pipeline():
         """
         DAG実行時に渡されたパラメータを使って、再学習プロセスを実行するタスク
         """
+        # paramsの取得方法は変更なし
         best_params = params.get("best_params")
         if not best_params:
             logger.error("❌ 実行パラメータ 'best_params' が指定されていません。")
@@ -50,7 +48,6 @@ def metaai_apply_pipeline():
 
         logger.info(f"🧠 MetaAIへの叡智継承を開始します (パラメータ: {best_params})")
         
-        # 外部スクリプトを呼び出し、結果（モデル情報）を受け取る
         model_info = apply_best_params_to_metaai(best_params=best_params)
         
         logger.info(f"✅ MetaAIへの継承が完了しました: {model_info}")
