@@ -9,7 +9,7 @@ from strategies.levia_tempest import LeviaTempest
 from strategies.noctus_sentinella import NoctusSentinella
 from strategies.prometheus_oracle import PrometheusOracle
 
-from core.meta_ai import MetaAI
+from core.meta_ai import MetaAIEnv
 from core.data.market_data_fetcher import MarketDataFetcher
 from core.risk_manager import RiskManager
 
