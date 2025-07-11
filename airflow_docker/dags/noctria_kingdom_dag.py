@@ -1,14 +1,18 @@
-import sys
-sys.path.append("/opt/airflow")
-
-from core.path_config import LOGS_DIR, STRATEGIES_DIR
 import os
 import importlib.util
 from datetime import datetime, timedelta
-from airflow import DAG
+
+from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
+
+# ================================================
+# ★ 修正: 新しいimportルールを適用
+# ================================================
+# `PYTHONPATH`が設定されたため、sys.pathハックは不要。
+# 全てのモジュールは、srcを起点とした絶対パスでインポートする。
+from core.path_config import LOGS_DIR, STRATEGIES_DIR
 from core.logger import setup_logger
-from core.noctria import Noctria
+from noctria_ai.noctria import Noctria # `noctria_ai`モジュールからインポート
 
 # ================================================
 # 📜 王命: DAG共通設定
@@ -37,7 +41,6 @@ with DAG(
 
     # ================================================
     # 🏰 王国記録係（ログ）の召喚
-    # ★ 修正点: このDAG専用のログファイルパスを定義し、引数として渡す
     # ================================================
     dag_log_path = LOGS_DIR / "dags" / "noctria_kingdom_dag.log"
     logger = setup_logger("NoctriaKingdomDAG", dag_log_path)
@@ -70,7 +73,8 @@ with DAG(
     # ⚔️ 各戦略の並行実行
     # ================================================
     strategy_tasks = []
-    if OFFICIAL_DIR.exists():
+    # officialディレクトリが存在し、アクセス可能か確認
+    if OFFICIAL_DIR.exists() and os.access(OFFICIAL_DIR, os.R_OK):
         for fname in os.listdir(OFFICIAL_DIR):
             if fname.endswith(".py") and not fname.startswith("__"):
                 strategy_name = os.path.splitext(fname)[0]
@@ -90,10 +94,17 @@ with DAG(
         for strategy_name, _ in strategy_tasks:
             val = ti.xcom_pull(key=f"{strategy_name}_decision", task_ids=f"{strategy_name}_strategy")
             decisions[strategy_name] = val
-            
+        
         logger.info(f"👑 Noctriaが受け取った判断: {decisions}")
-        noctria = Noctria()
-        final_action = noctria.meta_ai.decide_final_action(decisions)
+        
+        # ★ Noctria（オーケストレーター）をインスタンス化
+        # この中で学習済みのRLエージェントなどがロードされる
+        noctria_orchestrator = Noctria()
+        
+        # ★ 市場データと戦略の意見から最終判断を下す
+        # (この部分はNoctriaクラスの実装に応じて要調整)
+        final_action = noctria_orchestrator.decide_final_action(decisions)
+        
         logger.info(f"🏰 王国最終判断: {final_action}")
 
     final_task = PythonOperator(
