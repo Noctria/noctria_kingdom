@@ -6,10 +6,12 @@ import psycopg2
 from datetime import datetime
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# coreモジュールから設定とロガーをインポート
-from core.path_config import MODELS_DIR, STRATEGIES_DIR
+# --- 王国の中枢モジュールをインポート ---
+# ★ 修正点: LOGS_DIRをインポートリストに追加
+from core.path_config import MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from core.logger import setup_logger
 
+# --- 専門家の記録係をセットアップ ---
 logger = setup_logger("VeritasGenerator", LOGS_DIR / "veritas" / "generator.log")
 
 # --- 環境変数 (core.settings に集約するのが望ましい) ---
@@ -21,7 +23,6 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 MODEL_PATH = os.getenv("MODEL_DIR", str(MODELS_DIR / "nous-hermes-2"))
 
 # --- LLMモデルのロード ---
-# Airflowのコンテキストで安全にロードするため、グローバルキャッシュは使わず関数内でロード
 def load_llm_model():
     """LLMモデルとトークナイザーをロードする"""
     if not os.path.exists(MODEL_PATH):
