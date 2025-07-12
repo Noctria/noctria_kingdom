@@ -1,20 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>Noctria Kingdom - 王命発令</title>
+    <meta charset="UTF-8" />
+    <title>📯 King's Decree - Noctria Kingdom HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
 </head>
 <body>
-    <h1>👑 Noctria Kingdom - 王命発令システム</h1>
-    <form method="post" action="/trigger">
-        <label for="manual_reason">📜 王命の理由:</label><br>
-        <input type="text" id="manual_reason" name="manual_reason" value="GUIからの命令" required>
-        <br><br>
-        <button type="submit">📯 発令する（PDCA起動）</button>
-    </form>
 
-    {% if result %}
-        <hr>
-        <h3>{{ result }}</h3>
-    {% endif %}
+    <div class="hud-container-simple">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-bullhorn"></i> KING'S DECREE</h1>
+            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+        </header>
+
+        <!-- Trigger Panel -->
+        <main class="hud-panel trigger-panel">
+            <h2 class="panel-title">ISSUE A ROYAL COMMAND (INITIATE PDCA)</h2>
+            <form method="post" action="/trigger" class="trigger-form">
+                <label for="manual_reason">📜 REASON FOR DECREE:</label>
+                <input type="text" id="manual_reason" name="manual_reason" value="GUIからの命令" required>
+                <button type="submit" class="hud-btn"><i class="fas fa-play-circle"></i> 発令する</button>
+            </form>
+        </main>
+
+        <!-- Result Panel (conditionally shown) -->
+        {% if result %}
+        <section class="hud-panel result-panel">
+            <h2 class="panel-title">EXECUTION RESULT</h2>
+            <div class="result-content">{{ result }}</div>
+        </section>
+        {% endif %}
+
+    </div>
+
 </body>
 </html>
