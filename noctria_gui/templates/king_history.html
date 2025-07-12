@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>👑 評議会ログ履歴 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>👑 評議会ログ履歴</h1>
+
+  {% if logs %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>🕒 日時</th>
+        <th>📜 最終判断</th>
+        <th>📘 Veritas</th>
+        <th>📈 Prometheus</th>
+        <th>🗡️ Aurus</th>
+        <th>🌊 Levia</th>
+        <th>🛡️ Noctus</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.timestamp }}</td>
+        <td><strong>{{ log.decision.final_decision }}</strong></td>
+        <td>{{ log.decision.veritas }}</td>
+        <td>
+          {% if log.decision.prometheus_forecast %}
+            {{ log.decision.prometheus_forecast.forecast }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ log.decision.aurus }}</td>
+        <td>{{ log.decision.levia }}</td>
+        <td>{{ log.decision.noctus }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>履歴がまだ存在しません。</p>
+  {% endif %}
+</body>
+</html>
