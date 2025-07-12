@@ -4,18 +4,10 @@
 import sys
 from pathlib import Path
 
-# ───────────────────────────────────────────────────────────
-# 1) プロジェクトルート（noctria_kingdom）を sys.path に追加
-# ───────────────────────────────────────────────────────────
 # __file__ は main.py のファイルパスです。親ディレクトリから noctria_kingdom を参照します。
-project_root = Path(__file__).resolve().parents[2]  # noctria_kingdom へのパス
-src_dir = project_root / "src"  # src/ ディレクトリを設定
+# ただし、`sys.path` の設定は不要なので、これを削除します。
 
-# src ディレクトリを sys.path に追加（これにより src/core や src/noctria_gui がインポート可能に）
-if str(src_dir) not in sys.path:
-    sys.path.insert(0, str(src_dir))
-
-# これで src/core や src/noctria_gui をインポートできるようになります
+# core.path_config と noctria_gui.routes をそのままインポートします
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 import noctria_gui.routes
 
