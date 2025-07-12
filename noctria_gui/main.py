@@ -7,7 +7,8 @@
 - routes/ 以下の全ルートを自動登録
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -23,7 +24,6 @@ import noctria_gui.routes as routes_pkg
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
 # ========================================
-
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
@@ -47,13 +47,30 @@ templates.env.filters["from_json"] = from_json
 app.state.templates = templates  # FastAPIの慣習的保存方法
 
 # ========================================
+# 🔀 ルートハンドラー
+# ========================================
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    """
+    ルートアクセス時は /dashboard にリダイレクト
+    """
+    return RedirectResponse(url="/dashboard")
+
+@app.get("/main", include_in_schema=False)
+async def main_alias() -> RedirectResponse:
+    """
+    /main へのアクセスも /dashboard にリダイレクト
+    """
+    return RedirectResponse(url="/dashboard")
+
+
+# ========================================
 # 🔁 ルーターの自動登録
 # ========================================
-
 routers = getattr(routes_pkg, "routers", None)
 if routers is not None and isinstance(routers, (list, tuple)):
     for router in routers:
         app.include_router(router)
-        print(f"🔗 router 統合: {getattr(router, 'tags', [])}")
+        print(f"🔗 router 統合: tags={getattr(router, 'tags', [])}")
 else:
     print("⚠️ noctria_gui.routes に routers が定義されていません")
