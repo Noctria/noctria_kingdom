@@ -11,7 +11,7 @@ from core.settings import ALPHAVANTAGE_API_KEY
 
 class PrometheusOracle:
     """
-    📈 市場予測を行うAIモデル
+    🔮 未来予測を担うAI「Prometheus」
     - 実データ（日足）に基づいた予測
     - 信頼区間付き日次予測に対応
     - ✅ RiskManager はオプション（将来の拡張用）
@@ -28,10 +28,6 @@ class PrometheusOracle:
                 self.risk_manager = RiskManager(df)
 
     def _build_model(self):
-        """
-        📐 簡易予測モデル（単変量回帰）
-        将来的には LSTM / Transformer に差し替え可能
-        """
         model = tf.keras.Sequential([
             tf.keras.layers.Dense(128, activation='relu', input_shape=(1,)),
             tf.keras.layers.Dense(64, activation='relu'),
@@ -42,9 +38,6 @@ class PrometheusOracle:
         return model
 
     def predict_with_confidence(self, n_days: int = 14) -> pd.DataFrame:
-        """
-        🔮 実データ（日次終値）に基づいた予測＋信頼区間
-        """
         df = self.market_fetcher.fetch_daily_data(from_symbol="USD", to_symbol="JPY", max_days=90)
         if df.empty or len(df) < 10:
             raise ValueError("為替日次データの取得に失敗、またはデータ不足")
@@ -54,15 +47,12 @@ class PrometheusOracle:
         X = df[["days"]].values
         y = df["close"].values
 
-        # モデル学習
         self.model.fit(X, y, epochs=50, verbose=0)
 
-        # 未来の日数生成
         last_day = df["days"].max()
         future_days = np.arange(last_day + 1, last_day + 1 + n_days).reshape(-1, 1)
         preds = self.model.predict(future_days).flatten()
 
-        # 信頼区間推定（標準偏差ベース）
         residuals = y - self.model.predict(X).flatten()
         std_dev = np.std(residuals)
 
@@ -80,10 +70,6 @@ class PrometheusOracle:
         return pd.DataFrame(records)
 
     def evaluate_model(self, n_days: int = 14) -> dict:
-        """
-        🧪 モデルの精度評価（直近n日分）
-        - 指標: RMSE, MAE, MAPE
-        """
         df = self.market_fetcher.fetch_daily_data(from_symbol="USD", to_symbol="JPY", max_days=90)
         if df.empty or len(df) < n_days + 10:
             raise ValueError("評価に必要な過去データが不足しています")
@@ -94,7 +80,6 @@ class PrometheusOracle:
         X = df[["days"]].values
         y = df["close"].values
 
-        # モデル再学習
         self.model.fit(X, y, epochs=50, verbose=0)
 
         X_val = X[-n_days:]
@@ -110,3 +95,46 @@ class PrometheusOracle:
             "MAE": round(mae, 4),
             "MAPE": round(mape, 2),
         }
+
+    def propose(self, n_days: int = 3) -> dict:
+        """
+        📩 王Noctriaへの献上：予測情報を簡易サマリーとして提供
+        """
+        try:
+            df_forecast = self.predict_with_confidence(n_days=n_days)
+            latest = df_forecast.iloc[0]
+
+            score = round(latest["y_pred"], 4)
+            lower = round(latest["y_lower"], 4)
+            upper = round(latest["y_upper"], 4)
+
+            # 上昇見込み or 下降見込みの判定
+            direction = "BUY" if lower > latest["y_pred"] else "SELL" if upper < latest["y_pred"] else "HOLD"
+
+            return {
+                "name": "Prometheus",
+                "type": "forecasting",
+                "signal": direction,
+                "score": score,
+                "confidence": {"lower": lower, "upper": upper},
+                "symbol": "USDJPY",
+                "priority": "future"
+            }
+
+        except Exception as e:
+            print(f"[Prometheus] ❌ 提案生成失敗: {e}")
+            return {
+                "name": "Prometheus",
+                "type": "forecasting",
+                "signal": "UNKNOWN",
+                "score": 0.0,
+                "symbol": "USDJPY",
+                "priority": "future"
+            }
+
+
+# ✅ 単体テスト
+if __name__ == "__main__":
+    oracle = PrometheusOracle()
+    result = oracle.propose()
+    print("📈 未来予測提案:", result)
