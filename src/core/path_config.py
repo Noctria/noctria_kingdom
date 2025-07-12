@@ -139,5 +139,12 @@ __all__ = [
     "ORACLE_FORECAST_JSON",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
     "GITHUB_PUSH_SCRIPT", "GITHUB_REPO_URL", "CATEGORY_MAP",
-    "_lint_path_config"
+    "_lint_path_config",
+    # 追加した項目
+    "STRATEGIES_VERITAS_GENERATED_DIR"
 ]
+
+# ========================================
+# 🧠 Veritas戦略保存ディレクトリ設定
+# ========================================
+STRATEGIES_VERITAS_GENERATED_DIR = BASE_DIR / "strategies" / "veritas_generated"
