@@ -1,31 +1,52 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>📊 戦略比較の選択</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <style>
-    body { font-family: sans-serif; padding: 2rem; }
-    h1 { margin-bottom: 1rem; }
-    .strategy-list { margin: 1rem 0; }
-    label { display: block; margin: 4px 0; }
-  </style>
+    <meta charset="UTF-8" />
+    <title>⚔️ Strategy Comparison - Noctria Kingdom HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
 </head>
 <body>
-  <h1>📊 比較する戦略を選択</h1>
 
-  <form method="post" action="/strategies/compare/render">
-    <div class="strategy-list">
-      {% for s in strategies %}
-        <label>
-          <input type="checkbox" name="selected" value="{{ s.strategy }}">
-          {{ s.strategy }}（勝率: {{ s.win_rate }}%, DD: {{ s.max_drawdown }}）
-        </label>
-      {% endfor %}
+    <div class="hud-container-simple">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-balance-scale"></i> STRATEGY COMPARISON</h1>
+            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+        </header>
+
+        <!-- Selection Panel -->
+        <main class="hud-panel selection-panel">
+            <h2 class="panel-title">SELECT STRATEGIES TO COMPARE (CHOOSE 2 OR MORE)</h2>
+            <form method="post" action="/strategies/compare/render" class="selection-form">
+                <div class="strategy-list-wrapper">
+                    <div class="strategy-list">
+                        {% for s in strategies %}
+                        <label class="strategy-item">
+                            <input type="checkbox" name="selected" value="{{ s.strategy }}">
+                            <span class="custom-checkbox"></span>
+                            <span class="strategy-name">{{ s.strategy }}</span>
+                            <span class="strategy-stats">
+                                (Win: <span class="text-green">{{ s.win_rate }}%</span>, DD: <span class="text-magenta">{{ s.max_drawdown }}%</span>)
+                            </span>
+                        </label>
+                        {% else %}
+                        <p style="text-align: center; padding: 2rem;">No strategies available for comparison.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                <button type="submit" class="hud-btn"><i class="fas fa-chart-bar"></i> 比較する</button>
+            </form>
+        </main>
     </div>
-    <button type="submit">📈 比較する</button>
-  </form>
 
-  <p><a href="/">← トップへ戻る</a></p>
 </body>
 </html>
