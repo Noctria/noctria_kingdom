@@ -1,51 +1,43 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.5
-   (比較結果ページスタイルを追加)
+   🏰 Noctria Kingdom - HUD Interface Style v1.6
+   (ブルーグローテーマ)
    ============================================ */
 
-/* --- Root Variables --- */
+/* --- Root Variables: ブルーグローテーマ --- */
 :root {
-    --bg-color: #0a192f;
-    --primary-glow: #7DF9FF; /* Aqua/Cyan */
-    --secondary-glow: #00e5ff;
-    --panel-bg: rgba(0, 30, 60, 0.5);
-    --panel-border: rgba(0, 229, 255, 0.4);
-    --panel-shadow: rgba(0, 229, 255, 0.5);
-    --text-color: #ccd6f6;
-    --title-color: #fff;
-    --font-family: 'Roboto Mono', monospace;
-    --green: #00ff9b;
-    --cyan: #7DF9FF;
-    --magenta: #ff79c6;
-    --yellow: #f1fa8c;
+    --bg-color: #0a192f; /* 背景色 (変更なし) */
+    
+    /* 色の定義: 濃い青 -> 明るい水色へ */
+    --glow-primary: #7DF9FF;      /* 最も明るい輝き (Aqua/Cyan) */
+    --glow-secondary: #00e5ff;    /* 2番目に明るい輝き */
+    --accent-color-1: #7DF9FF;    /* 強調色1 (勝率などポジティブな指標) */
+    --accent-color-2: #4b90ff;    /* 強調色2 (中間的な指標) */
+    --accent-color-3: #2c6cb5;    /* 強調色3 (DDなどネガティブな指標) */
+
+    --panel-bg: rgba(17, 34, 64, 0.6); /* パネル背景を少し青みがける */
+    --panel-border: rgba(0, 229, 255, 0.3);
+    --panel-shadow: rgba(0, 229, 255, 0.4);
+
+    --text-color-base: #a8b2d1;   /* 基本テキスト色 (ライトスレートブルー) */
+    --text-color-title: #e6f1ff; /* タイトル色 (ごく薄い青) */
+    
+    /* 発光エフェクト */
+    --glow-effect: 0 0 6px var(--glow-primary);
 }
 
 /* --- Base & Body --- */
 body {
     background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: var(--font-family);
+    color: var(--text-color-base);
+    font-family: var(--font-family, 'Roboto Mono', monospace);
     margin: 0;
     padding: 1rem;
-    overflow: hidden; /* ページ全体のスクロールを禁止 */
+    overflow: hidden;
+    background-image: 
+        linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
 }
-
-/* --- HUD Layouts --- */
-.hud-container {
-    display: grid; height: calc(100vh - 2rem);
-    grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: auto 1fr 1fr;
-    gap: 1rem;
-    grid-template-areas:
-        "header header header header"
-        "metrics chart-panel chart-panel chart-panel"
-        "nav nav council-form council-form";
-}
-.hud-container-simple {
-    display: grid; height: calc(100vh - 2rem);
-    grid-template-rows: auto 1fr; /* header, main content */
-    gap: 1rem;
-}
-
 
 /* --- Panel Styling --- */
 .hud-panel {
@@ -57,7 +49,7 @@ body {
 .hud-panel::before, .hud-panel::after,
 .hud-panel > :first-child::before, .hud-panel > :first-child::after {
     content: ''; position: absolute; width: 15px; height: 15px;
-    border-color: var(--primary-glow); border-style: solid;
+    border-color: var(--glow-primary); border-style: solid;
 }
 .hud-panel::before { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
 .hud-panel::after { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
@@ -65,89 +57,62 @@ body {
 .hud-panel > :first-child::after { bottom: -2px; right: -2px; border-width: 0 0 2px 2px; }
 
 .panel-title {
-    color: var(--title-color); font-size: 1.1rem; font-weight: 700;
+    color: var(--text-color-title); font-size: 1.1rem; font-weight: 700;
     margin: 0 0 1rem 0; text-transform: uppercase; letter-spacing: 2px;
-    text-shadow: 0 0 5px var(--secondary-glow);
+    text-shadow: var(--glow-effect);
     border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem;
     flex-shrink: 0;
+}
+.panel-title i {
+    text-shadow: var(--glow-effect);
+    margin-right: 0.5em;
 }
 
 /* --- Header & Navigation --- */
 .header { flex-direction: row; justify-content: space-between; align-items: center; }
-.hud-title { font-size: 1.5rem; color: var(--title-color); text-shadow: 0 0 8px var(--secondary-glow); margin: 0; border: none; }
+.hud-title { font-size: 1.5rem; color: var(--text-color-title); text-shadow: 0 0 8px var(--glow-secondary); margin: 0; border: none; }
+.hud-title i { text-shadow: 0 0 8px var(--glow-secondary); }
+.system-time { font-size: 1rem; color: var(--glow-primary); text-shadow: var(--glow-effect); }
 .nav-item-back {
-    background: transparent; border: 1px solid var(--panel-border); color: var(--text-color);
+    background: transparent; border: 1px solid var(--panel-border); color: var(--text-color-base);
     text-decoration: none; padding: 0.5rem 1rem; transition: all 0.2s ease;
     display: flex; align-items: center; gap: 0.5rem; border-radius: 4px;
 }
-.nav-item-back:hover { background: var(--primary-glow); color: var(--bg-color); box-shadow: 0 0 10px var(--primary-glow); }
+.nav-item-back:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 10px var(--glow-primary); }
+.nav-item-back:hover span, .nav-item-back:hover i { text-shadow: none; }
 
+/* --- Metrics & Colored Text --- */
+.metric-value { font-size: 1.75rem; font-weight: 700; margin: 0; }
+.text-green, .text-cyan { color: var(--accent-color-1); text-shadow: 0 0 5px var(--accent-color-1); }
+.text-magenta { color: var(--accent-color-2); text-shadow: 0 0 5px var(--accent-color-2); }
+.text-yellow { color: var(--accent-color-3); text-shadow: 0 0 5px var(--accent-color-3); }
+.metric-item h3 i { text-shadow: var(--glow-effect); }
 
-/* ======================================== */
-/* 新規追加: 比較結果ページスタイル */
-/* ======================================== */
-.chart-display-panel {
-    padding: 0; /* 内側の要素でパディングを管理 */
+/* --- Buttons --- */
+.hud-btn {
+    background: transparent; border: 1px solid var(--glow-primary); color: var(--glow-primary);
+    padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s ease; width: 100%; text-shadow: var(--glow-effect);
 }
-.chart-controls {
-    padding: 1rem;
-    border-bottom: 1px solid var(--panel-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap; /* ボタンが多い場合に折り返す */
-    gap: 1rem;
-}
-.chart-controls .panel-title {
-    border: none;
-    margin: 0;
-    padding: 0;
-}
-.hud-btn-group {
-    display: flex;
-    border: 1px solid var(--panel-border);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.hud-btn-group .hud-btn {
-    border: none;
-    border-left: 1px solid var(--panel-border);
-    border-radius: 0;
-    width: auto;
-    padding: 0.5rem 1rem;
-}
-.hud-btn-group .hud-btn:first-child {
-    border-left: none;
-}
-.hud-btn-group .hud-btn.active {
-    background: var(--primary-glow);
-    color: var(--bg-color);
-    text-shadow: none;
-    box-shadow: 0 0 15px var(--primary-glow);
-}
-.chart-wrapper {
-    position: relative;
-    flex-grow: 1;
-    min-height: 0;
-    padding: 1rem;
-}
+.hud-btn:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 15px var(--glow-primary); text-shadow: none; }
+.hud-btn i { margin-right: 0.5em; }
 
-
-/* (以下、既存のスタイル) */
-.selection-panel { flex-grow: 1; }
-.selection-form { display: flex; flex-direction: column; height: 100%; }
-.strategy-list-wrapper { flex-grow: 1; overflow-y: auto; border: 1px solid var(--panel-border); padding: 1rem; background: rgba(0,0,0,0.2); margin-bottom: 1rem; min-height: 0; }
-.strategy-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.strategy-item { display: flex; align-items: center; padding: 0.75rem; background: var(--panel-bg); border: 1px solid transparent; cursor: pointer; transition: all 0.2s ease; border-radius: 4px; }
-.strategy-item:hover { border-color: var(--primary-glow); background: rgba(0, 229, 255, 0.1); }
-.strategy-item input[type="checkbox"] { display: none; }
-.custom-checkbox { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--panel-border); margin-right: 1rem; position: relative; transition: all 0.2s; flex-shrink: 0; }
-.custom-checkbox::after { content: ''; position: absolute; top: 2px; left: 6px; width: 6px; height: 12px; border: solid var(--primary-glow); border-width: 0 3px 3px 0; transform: rotate(45deg); opacity: 0; transition: opacity 0.2s; }
-.strategy-item input:checked ~ .custom-checkbox { background-color: var(--primary-glow); border-color: var(--primary-glow); }
-.strategy-item input:checked ~ .custom-checkbox::after { opacity: 1; }
-.strategy-name { font-weight: 700; color: var(--title-color); }
-.strategy-stats { margin-left: auto; color: var(--text-color); opacity: 0.8; font-size: 0.9em; padding-left: 1rem; white-space: nowrap; }
-.hud-btn { background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; width: 100%; }
-.hud-btn:hover { background: var(--primary-glow); color: var(--bg-color); box-shadow: 0 0 15px var(--primary-glow); }
-.text-green { color: var(--green); } .text-cyan { color: var(--cyan); }
-.text-magenta { color: var(--magenta); } .text-yellow { color: var(--yellow); }
+/* (以下、既存のスタイルとの統合と微調整) */
+.hud-container-simple { display: grid; height: calc(100vh - 2rem); grid-template-rows: auto 1fr; gap: 1rem; }
+.chart-wrapper { position: relative; flex-grow: 1; min-height: 0; }
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; flex-grow: 1; }
+.metric-item { background: rgba(0,0,0,0.2); padding: 0.75rem; border-left: 3px solid var(--glow-primary); }
+.metric-item h3 { font-size: 0.9rem; margin: 0 0 0.5rem 0; color: var(--text-color-base); font-weight: 400; }
+.nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; flex-grow: 1; }
+.nav-item { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-color-base); text-decoration: none; padding: 1rem; text-align: center; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
+.nav-item:hover { background: var(--glow-primary); color: var(--bg-color); text-shadow: none; box-shadow: 0 0 15px var(--glow-primary); }
+.nav-item span { text-shadow: var(--glow-effect); }
+.nav-item i { font-size: 1.5rem; text-shadow: var(--glow-effect); }
+.nav-item:hover span, .nav-item:hover i { text-shadow: none; }
+.council-form input { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); color: var(--text-color-base); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; }
+.chart-display-panel { padding: 0; }
+.chart-controls { padding: 1rem; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.hud-btn-group { display: flex; border: 1px solid var(--panel-border); border-radius: 4px; overflow: hidden; }
+.hud-btn-group .hud-btn { border: none; border-left: 1px solid var(--panel-border); border-radius: 0; width: auto; padding: 0.5rem 1rem; }
+.hud-btn-group .hud-btn:first-child { border-left: none; }
+.hud-btn-group .hud-btn.active { background: var(--glow-primary); color: var(--bg-color); text-shadow: none; box-shadow: 0 0 15px var(--glow-primary); }
