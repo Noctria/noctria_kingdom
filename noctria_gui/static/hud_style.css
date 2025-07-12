@@ -1,6 +1,6 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.10
-   (ヒートマップスタイルを追加)
+   🏰 Noctria Kingdom - HUD Interface Style v1.11
+   (統計DBページスタイルを追加)
    ============================================ */
 
 /* --- Root Variables --- */
@@ -48,19 +48,6 @@ body {
     backdrop-filter: blur(5px); padding: 1rem; position: relative;
     border-radius: 4px; display: flex; flex-direction: column;
 }
-.panel-header-flex {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--panel-border);
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
-}
-.panel-header-flex .panel-title {
-    border: none;
-    margin: 0;
-    padding: 0;
-}
 .panel-title {
     color: var(--text-color-title); font-size: 1.1rem; font-weight: 700;
     margin: 0 0 1rem 0; text-transform: uppercase; letter-spacing: 2px;
@@ -68,7 +55,6 @@ body {
     border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem;
     flex-shrink: 0;
 }
-.panel-title i { text-shadow: var(--glow-effect); margin-right: 0.5em; }
 
 /* --- Header & Navigation --- */
 .header { flex-direction: row; justify-content: space-between; align-items: center; }
@@ -78,11 +64,11 @@ body {
     text-decoration: none; padding: 0.5rem 1rem; transition: all 0.2s ease;
     display: flex; align-items: center; gap: 0.5rem; border-radius: 4px;
 }
-.nav-item-back:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 10px var(--glow-primary); }
+.nav-item-back:hover { background: var(--glow-primary); color: var(--bg-color); }
 
 /* --- Forms & Buttons --- */
-.filter-form { display: flex; gap: 1rem; align-items: center; }
-.filter-form input, .filter-form select {
+.filter-form { display: flex; gap: 1rem; align-items: center; flex-grow: 1; }
+.filter-form input {
     background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border);
     color: var(--text-color-base); padding: 0.75rem;
     font-family: var(--font-family); font-size: 1rem;
@@ -94,19 +80,38 @@ body {
     cursor: pointer; transition: all 0.2s ease; text-shadow: var(--glow-effect);
     display: flex; align-items: center; gap: 0.5rem;
 }
-.hud-btn:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 15px var(--glow-primary); text-shadow: none; }
-.hud-btn-small {
-    background: transparent; border: 1px solid var(--panel-border);
-    color: var(--text-color-base); padding: 0.4rem 0.8rem;
-    font-family: var(--font-family); font-size: 0.8rem;
-    cursor: pointer; transition: all 0.2s ease; border-radius: 4px;
-    display: flex; align-items: center; gap: 0.4rem;
-    text-decoration: none;
-}
-.hud-btn-small:hover { border-color: var(--glow-primary); color: var(--glow-primary); }
+.hud-btn:hover { background: var(--glow-primary); color: var(--bg-color); }
 
-/* --- Table Styling --- */
-.table-wrapper { overflow-y: auto; flex-grow: 1; }
+/* ======================================== */
+/* 新規追加: 統計DBページ専用スタイル */
+/* ======================================== */
+.controls-panel {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+}
+.separator {
+    width: 2px;
+    height: 80%;
+    background-color: var(--panel-border);
+}
+.analysis-panel {
+    padding: 1rem;
+    gap: 1rem;
+}
+.chart-container-half {
+    height: 40%;
+    min-height: 200px;
+    position: relative;
+    flex-shrink: 0;
+    border: 1px solid var(--panel-border);
+    padding: 1rem;
+    background: rgba(0,0,0,0.2);
+}
+.table-wrapper {
+    overflow-y: auto;
+    flex-grow: 1;
+}
 .hud-table { width: 100%; border-collapse: collapse; }
 .hud-table th, .hud-table td {
     padding: 0.75rem 1rem; text-align: center;
@@ -114,33 +119,52 @@ body {
     white-space: nowrap;
 }
 .hud-table th {
-    color: var(--text-color-title); text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-color-title); text-transform: uppercase;
     font-weight: 700; position: sticky; top: 0;
     background: var(--bg-color);
 }
+.hud-table th.sortable { cursor: pointer; }
+.hud-table th.sortable:hover { color: var(--glow-primary); }
+.hud-table th .fa-sort { color: #677c9a; margin-left: 0.5em; }
+.hud-table th[data-sort-dir="asc"] .fa-sort::before { content: "\f0de"; color: var(--glow-primary); }
+.hud-table th[data-sort-dir="desc"] .fa-sort::before { content: "\f0dd"; color: var(--glow-primary); }
 .hud-table tbody tr:hover { background-color: var(--panel-bg); }
 .hud-table .tag-name-cell { text-align: left; font-weight: 700; }
-
-
-/* ======================================== */
-/* 新規追加: ヒートマップスタイル */
-/* ======================================== */
-.heatmap-table td {
-    position: relative;
-    z-index: 1;
-    transition: background-color 0.3s ease;
+.hud-tag {
+    display: inline-block; padding: 0.2em 0.6em;
+    background-color: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 4px; font-size: 0.8em; margin: 0.1em;
 }
-.heatmap-cell::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    /* calc()とvar()を使って動的に幅を計算 */
-    width: calc(var(--value, 0) / var(--max, 100) * 100%);
-    /* var()を使って動的に色を計算 */
-    background-color: var(--color, var(--accent-color-1));
-    opacity: 0.2;
-    z-index: -1;
-    transition: width 0.5s ease;
+.action-links a {
+    color: var(--glow-primary);
+    text-decoration: none;
+    margin: 0 0.5rem;
 }
+.action-links a:hover { text-decoration: underline; }
+.strategy-item-checkbox {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+.strategy-item-checkbox input[type="checkbox"] { display: none; }
+.custom-checkbox {
+    display: inline-block; width: 20px; height: 20px;
+    border: 2px solid var(--panel-border);
+    position: relative; transition: all 0.2s;
+}
+.custom-checkbox::after {
+    content: ''; position: absolute; top: 2px; left: 6px;
+    width: 6px; height: 12px; border: solid var(--glow-primary);
+    border-width: 0 3px 3px 0; transform: rotate(45deg);
+    opacity: 0; transition: opacity 0.2s;
+}
+.strategy-item-checkbox input:checked ~ .custom-checkbox {
+    background-color: var(--glow-primary);
+    border-color: var(--glow-primary);
+}
+.strategy-item-checkbox input:checked ~ .custom-checkbox::after { opacity: 1; }
+.text-green { color: var(--accent-color-1); }
+.text-magenta { color: var(--accent-color-2); }
+.text-yellow { color: var(--accent-color-3); }
