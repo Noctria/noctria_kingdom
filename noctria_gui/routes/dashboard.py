@@ -7,6 +7,7 @@ import random
 from datetime import datetime, timedelta
 import os
 import httpx
+from pathlib import Path # 修正点: Pathオブジェクトをインポート
 
 # FastAPI関連のインポート
 from fastapi import APIRouter, Request
@@ -23,13 +24,11 @@ from core.king_noctria import KingNoctria
 # ========================================
 # ⚙️ ルーターとテンプレートのセットアップ
 # ========================================
-# 修正点: appではなくAPIRouterを使用
 router = APIRouter(
     prefix="/dashboard",  # このルーターの全パスは /dashboard から始まる
     tags=["Dashboard"]    # FastAPIのドキュメント用のタグ
 )
 
-# このファイル専用のテンプレートインスタンス
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
@@ -64,7 +63,8 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
                 win = data.get("score", {}).get("win_rate")
                 if isinstance(win, (int, float)):
                     win_rates.append(win)
-            except Exception:
+            except Exception as e:
+                print(f"Warning: Failed to process log file {file_name}. Error: {e}")
                 continue
     
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
@@ -76,7 +76,8 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
             "RMSE": metrics.get("RMSE", 0.0), "MAE": metrics.get("MAE", 0.0), "MAPE": metrics.get("MAPE", 0.0),
         }
     except Exception as e:
-        stats["oracle_metrics"] = {"error": str(e)}
+        print(f"Warning: Failed to get Oracle metrics. Error: {e}")
+        stats["oracle_metrics"] = {"error": "N/A"}
     return stats
 
 def aggregate_push_stats() -> int:
@@ -91,14 +92,14 @@ def aggregate_push_stats() -> int:
 # 🔀 ルートハンドラー
 # ========================================
 
-# --- ダッシュボード表示 ---
-# 修正点: @app.getから@router.getに変更。パスは"/" (prefixと結合して/dashboardになる)
 @router.get("/", response_class=HTMLResponse)
 async def show_dashboard(request: Request):
-    """実データを集計してダッシュボードを表示する"""
+    """
+    統計情報と予測データを集計し、メインのダッシュボードページをレンダリングします。
+    """
     forecast_data = []
     try:
-        # ダミーデータ生成ロジック (APIが利用できない場合の代替)
+        # ダミーデータ生成ロジック
         today = datetime.now()
         price = 150.0
         for i in range(14):
@@ -112,7 +113,7 @@ async def show_dashboard(request: Request):
             })
             price = actual_price
     except Exception as e:
-        print(f"🔴 Oracle予測取得エラー: {e}")
+        print(f"🔴 Error generating forecast data: {e}")
 
     stats = aggregate_dashboard_stats()
     stats["pushed_count"] = aggregate_push_stats()
@@ -120,7 +121,7 @@ async def show_dashboard(request: Request):
     context = {"request": request, "forecast": forecast_data, "stats": stats}
     return templates.TemplateResponse("dashboard.html", context)
 
-# --- 評議会開催フォームの処理 ---
+
 class MarketData(BaseModel):
     price: float
     previous_price: float | None = None
@@ -135,14 +136,16 @@ class MarketData(BaseModel):
     momentum: float | None = None
     short_interest: float | None = None
 
-# 修正点: @app.postから@router.postに変更。パスは"/king/hold-council" (prefixと結合)
 @router.post("/king/hold-council", response_class=JSONResponse)
 async def hold_council(market_data: MarketData):
-    """評議会開催フォームからのPOSTリクエストを処理する"""
+    """
+    評議会開催フォームからのPOSTリクエストを処理し、王の判断を返します。
+    """
     try:
         king = KingNoctria()
         council_result = king.hold_council(market_data.dict())
         return JSONResponse(content=council_result)
     except Exception as e:
+        print(f"🔴 Error during council meeting: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
