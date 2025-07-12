@@ -14,7 +14,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ../tools:/docker-entrypoint-initdb.d  # ★ 初期化SQL（init_optuna.sql）実行
+      - ./docker:/docker-entrypoint-initdb.d  # ✅ 初期化SQL（init_optuna.sql）を実行
     ports:
       - "5432:5432"
     restart: always
@@ -59,7 +59,7 @@ services:
   # ======================================
   airflow-scheduler:
     build:
-      context: .
+      context: .  # ビルドコンテキスト
       dockerfile: ./docker/Dockerfile
     image: noctria-airflow
     container_name: airflow-scheduler
