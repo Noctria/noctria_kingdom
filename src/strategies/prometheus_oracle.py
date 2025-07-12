@@ -31,12 +31,14 @@ class PrometheusOracle:
         y_pred = np.linspace(150, 160, n_days) + np.random.normal(0, 1, n_days)
         y_lower = y_pred - np.random.uniform(1, 2, n_days)
         y_upper = y_pred + np.random.uniform(1, 2, n_days)
+        y_true = y_pred + np.random.normal(0, 2, n_days)  # ✅ 仮の実測値
 
         return pd.DataFrame({
             "date": [d.strftime("%Y-%m-%d") for d in dates],
             "y_pred": y_pred.round(2),
             "y_lower": y_lower.round(2),
             "y_upper": y_upper.round(2),
+            "y_true": y_true.round(2),  # ✅ 追加
         })
 
     def predict_with_confidence(
@@ -68,12 +70,14 @@ class PrometheusOracle:
             y_pred = np.linspace(150, 160, n_days_calc) + np.random.normal(0, 1, n_days_calc)
             y_lower = y_pred - np.random.uniform(1, 2, n_days_calc)
             y_upper = y_pred + np.random.uniform(1, 2, n_days_calc)
+            y_true = y_pred + np.random.normal(0, 2, n_days_calc)  # ✅ 仮の実測値
 
             return pd.DataFrame({
                 "date": [d.strftime("%Y-%m-%d") for d in dates],
                 "forecast": y_pred.round(2),
                 "lower": y_lower.round(2),
                 "upper": y_upper.round(2),
+                "y_true": y_true.round(2),  # ✅ 追加
             })
 
         except Exception as e:
