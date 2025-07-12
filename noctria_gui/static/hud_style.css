@@ -1,5 +1,6 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.0
+   🏰 Noctria Kingdom - HUD Interface Style v1.2
+   (フィルター、高機能テーブルスタイルを追加)
    ============================================ */
 
 /* --- Root Variables --- */
@@ -33,167 +34,143 @@ body {
     background-size: 20px 20px;
 }
 
-/* --- HUD Container Layout --- */
+/* --- HUD Layouts --- */
 .hud-container {
-    display: grid;
-    height: calc(100vh - 2rem);
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    grid-template-rows: auto 1fr 1fr auto;
+    display: grid; height: calc(100vh - 2rem);
+    grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: auto 1fr 1fr;
     gap: 1rem;
     grid-template-areas:
         "header header header header"
         "metrics chart-panel chart-panel chart-panel"
-        "nav nav council-form council-form"
-        "footer footer footer footer";
+        "nav nav council-form council-form";
 }
+.hud-container-simple {
+    display: grid; height: calc(100vh - 2rem);
+    grid-template-rows: auto auto 1fr; /* header, filter, main */
+    gap: 1rem;
+}
+
 
 /* --- Panel Styling --- */
 .hud-panel {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
     box-shadow: 0 0 15px var(--panel-shadow), inset 0 0 10px rgba(0, 30, 60, 0.5);
-    backdrop-filter: blur(5px);
-    padding: 1rem;
-    position: relative;
-    border-radius: 4px;
+    backdrop-filter: blur(5px); padding: 1rem; position: relative;
+    border-radius: 4px; display: flex; flex-direction: column;
 }
-
-/* Panel corner brackets */
-.hud-panel::before, .hud-panel::after {
-    content: '';
-    position: absolute;
-    width: 15px;
-    height: 15px;
-    border-color: var(--primary-glow);
-    border-style: solid;
+.hud-panel::before, .hud-panel::after,
+.hud-panel > :first-child::before, .hud-panel > :first-child::after {
+    content: ''; position: absolute; width: 15px; height: 15px;
+    border-color: var(--primary-glow); border-style: solid;
 }
 .hud-panel::before { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
 .hud-panel::after { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
-/* Bottom corners */
-.hud-panel > :first-child::before, .hud-panel > :first-child::after {
-    content: '';
-    position: absolute;
-    width: 15px;
-    height: 15px;
-    border-color: var(--primary-glow);
-    border-style: solid;
-}
 .hud-panel > :first-child::before { bottom: -2px; left: -2px; border-width: 0 0 2px 2px; }
 .hud-panel > :first-child::after { bottom: -2px; right: -2px; border-width: 0 0 2px 2px; }
 
-
 .panel-title {
-    color: var(--title-color);
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 1rem 0;
-    text-transform: uppercase;
-    letter-spacing: 2px;
+    color: var(--title-color); font-size: 1.1rem; font-weight: 700;
+    margin: 0 0 1rem 0; text-transform: uppercase; letter-spacing: 2px;
     text-shadow: 0 0 5px var(--secondary-glow);
-    border-bottom: 1px solid var(--panel-border);
-    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem;
+    flex-shrink: 0;
 }
 
-/* --- Specific Panel Areas --- */
-.header { grid-area: header; display: flex; justify-content: space-between; align-items: center; }
-.metrics { grid-area: metrics; }
-.chart-panel { grid-area: chart-panel; }
-.navigation { grid-area: nav; }
-.council-form { grid-area: council-form; }
+/* --- Header & Navigation --- */
+.header { flex-direction: row; justify-content: space-between; align-items: center; }
+.hud-title { font-size: 1.5rem; color: var(--title-color); text-shadow: 0 0 8px var(--secondary-glow); margin: 0; border: none; }
+.nav-item-back {
+    background: transparent; border: 1px solid var(--panel-border); color: var(--text-color);
+    text-decoration: none; padding: 0.5rem 1rem; transition: all 0.2s ease;
+    display: flex; align-items: center; gap: 0.5rem; border-radius: 4px;
+}
+.nav-item-back:hover { background: var(--primary-glow); color: var(--bg-color); box-shadow: 0 0 10px var(--primary-glow); }
 
-/* Header */
-.hud-title { font-size: 1.5rem; color: var(--title-color); text-shadow: 0 0 8px var(--secondary-glow); margin: 0; }
-.system-time { font-size: 1rem; color: var(--primary-glow); }
 
-/* Metrics Panel */
-.metrics-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+/* ======================================== */
+/* 新規追加: フィルターパネルスタイル */
+/* ======================================== */
+.filter-form {
+    display: flex;
     gap: 1rem;
-    height: calc(100% - 40px);
+    align-items: center;
 }
-.metric-item {
-    background: rgba(0,0,0,0.2);
-    padding: 0.75rem;
-    border-left: 3px solid var(--primary-glow);
+.filter-form input, .filter-form select {
+    background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border);
+    color: var(--text-color); padding: 0.75rem;
+    font-family: var(--font-family); font-size: 1rem;
+    border-radius: 4px; flex-grow: 1;
 }
+.filter-form select option {
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+
+/* ======================================== */
+/* 更新: HUDテーブルスタイル */
+/* ======================================== */
+.table-wrapper { overflow-y: auto; flex-grow: 1; }
+.hud-table { width: 100%; border-collapse: collapse; }
+.hud-table th, .hud-table td {
+    padding: 0.75rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--panel-border);
+    white-space: nowrap; /* テーブルのセルが折り返さないように */
+}
+.hud-table th {
+    color: var(--title-color); text-transform: uppercase; letter-spacing: 1px;
+    font-weight: 700; position: sticky; top: 0;
+    background: var(--bg-color);
+}
+.hud-table th[onclick] { cursor: pointer; }
+.hud-table th[onclick]:hover { color: var(--primary-glow); }
+.hud-table th .fa-sort { color: #677c9a; margin-left: 0.5em; transition: color 0.2s; }
+.hud-table th[data-sort-dir="asc"] .fa-sort::before { content: "\f0de"; color: var(--primary-glow); } /* up arrow */
+.hud-table th[data-sort-dir="desc"] .fa-sort::before { content: "\f0dd"; color: var(--primary-glow); } /* down arrow */
+
+.hud-table tbody tr:hover { background-color: var(--panel-bg); }
+.table-link { color: var(--primary-glow); text-decoration: none; font-weight: 700; }
+.table-link:hover { text-decoration: underline; text-shadow: 0 0 5px var(--primary-glow); }
+.status-icon { font-size: 1.2rem; }
+
+/* ======================================== */
+/* 新規追加: タグとアクションボタン */
+/* ======================================== */
+.hud-tag {
+    display: inline-block; padding: 0.2em 0.6em;
+    background-color: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 4px; font-size: 0.8em;
+    margin: 0.1em;
+}
+.action-buttons { display: flex; gap: 0.5rem; }
+.action-form { margin: 0; }
+.hud-btn-small {
+    background: transparent; border: 1px solid var(--panel-border);
+    color: var(--text-color); padding: 0.4rem 0.8rem;
+    font-family: var(--font-family); font-size: 0.8rem;
+    cursor: pointer; transition: all 0.2s ease; border-radius: 4px;
+    display: flex; align-items: center; gap: 0.4rem;
+}
+.hud-btn-small:hover { border-color: var(--primary-glow); color: var(--primary-glow); }
+
+
+/* (以下、ダッシュボード用のスタイルは変更なし) */
+.chart-wrapper { position: relative; flex-grow: 1; min-height: 0; }
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; flex-grow: 1; }
+.metric-item { background: rgba(0,0,0,0.2); padding: 0.75rem; border-left: 3px solid var(--primary-glow); }
 .metric-item h3 { font-size: 0.9rem; margin: 0 0 0.5rem 0; color: var(--text-color); font-weight: 400; }
 .metric-value { font-size: 1.75rem; font-weight: 700; margin: 0; }
-.text-green { color: var(--green); text-shadow: 0 0 5px var(--green); }
-.text-cyan { color: var(--cyan); text-shadow: 0 0 5px var(--cyan); }
-.text-magenta { color: var(--magenta); text-shadow: 0 0 5px var(--magenta); }
-.text-yellow { color: var(--yellow); text-shadow: 0 0 5px var(--yellow); }
-
-/* Navigation Panel */
-.nav-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 1rem;
-}
-.nav-item {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    color: var(--text-color);
-    text-decoration: none;
-    padding: 1rem;
-    text-align: center;
-    transition: all 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-}
-.nav-item:hover {
-    background: var(--primary-glow);
-    color: var(--bg-color);
-    text-shadow: none;
-    box-shadow: 0 0 15px var(--primary-glow);
-}
+.text-green { color: var(--green); } .text-cyan { color: var(--cyan); }
+.text-magenta { color: var(--magenta); } .text-yellow { color: var(--yellow); }
+.nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; flex-grow: 1; }
+.nav-item { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-color); text-decoration: none; padding: 1rem; text-align: center; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
+.nav-item:hover { background: var(--primary-glow); color: var(--bg-color); text-shadow: none; box-shadow: 0 0 15px var(--primary-glow); }
 .nav-item i { font-size: 1.5rem; }
-
-/* Council Form Panel */
-.council-form form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-.council-form input {
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--panel-border);
-    color: var(--text-color);
-    padding: 0.75rem;
-    font-family: var(--font-family);
-    font-size: 1rem;
-}
+.council-form form { display: flex; flex-direction: column; gap: 1rem; margin-top: auto; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.council-form input { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); color: var(--text-color); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; }
 .council-form input::placeholder { color: rgba(204, 214, 246, 0.5); }
-.hud-btn {
-    background: transparent;
-    border: 1px solid var(--primary-glow);
-    color: var(--primary-glow);
-    padding: 0.75rem;
-    font-family: var(--font-family);
-    font-size: 1rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.hud-btn:hover {
-    background: var(--primary-glow);
-    color: var(--bg-color);
-    box-shadow: 0 0 15px var(--primary-glow);
-}
-.council-result {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: rgba(0,0,0,0.3);
-    border: 1px dashed var(--panel-border);
-    min-height: 40px;
-    text-align: center;
-}
-
+.hud-btn { background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+.hud-btn:hover { background: var(--primary-glow); color: var(--bg-color); box-shadow: 0 0 15px var(--primary-glow); }
+.council-result { margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.3); border: 1px dashed var(--panel-border); min-height: 40px; text-align: center; }
