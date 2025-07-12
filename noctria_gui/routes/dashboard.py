@@ -95,20 +95,21 @@ async def show_dashboard(request: Request):
     """
     統計情報と予測データを集計し、メインのダッシュボードページをレンダリングします。
     """
-    # ★★★★★ ここからが重要です ★★★★★
-    # forecast_dataを初期化し、データを生成します。
     forecast_data = []
     try:
         today = datetime.now()
         price = 150.0
         for i in range(14):
-            date = today + timedelta(days=i)
-            actual_price = price + random.uniform(-1.5, 1.5)
-            pred_price = actual_price + random.uniform(-0.5, 0.5)
+            # 修正点: 過去14日間のデータを生成するように変更
+            date = today - timedelta(days=(13 - i)) 
+            actual_price = price + (random.random() - 0.5) * 3
+            pred_price = actual_price + (random.random() - 0.5) * 1
             forecast_data.append({
                 "date": date.strftime("%Y-%m-%d"),
-                "y_actual": round(actual_price, 2), "y_pred": round(pred_price, 2),
-                "y_lower": round(pred_price - 1.5, 2), "y_upper": round(pred_price + 1.5, 2),
+                "y_actual": round(actual_price, 2), 
+                "y_pred": round(pred_price, 2),
+                "y_lower": round(pred_price - 1.5, 2), 
+                "y_upper": round(pred_price + 1.5, 2),
             })
             price = actual_price
     except Exception as e:
@@ -117,13 +118,11 @@ async def show_dashboard(request: Request):
     stats = aggregate_dashboard_stats()
     stats["pushed_count"] = aggregate_push_stats()
     
-    # context辞書に、キー"forecast"で生成したデータを格納します。
     context = {
         "request": request,
         "stats": stats,
-        "forecast": forecast_data  # この行が最も重要です！
+        "forecast": forecast_data
     }
-    # ★★★★★ ここまでが重要です ★★★★★
     
     return templates.TemplateResponse("dashboard.html", context)
 
