@@ -1,87 +1,77 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>📊 タグ別戦略統計ヒートマップ</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background-color: #f5f5f5;
-      padding: 2rem;
-    }
-    h1 {
-      color: #222;
-      margin-bottom: 1rem;
-    }
-    form {
-      margin-bottom: 2rem;
-    }
-    table {
-      width: 100%;
-      background: #fff;
-      border-collapse: collapse;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 0.75rem;
-      text-align: center;
-      border-bottom: 1px solid #ddd;
-    }
-    th {
-      background-color: #e9f2fb;
-    }
-    tr:hover {
-      background-color: #f1f7ff;
-    }
-    a.button {
-      display: inline-block;
-      margin-top: 1rem;
-      padding: 0.5rem 1rem;
-      background: #007acc;
-      color: white;
-      text-decoration: none;
-      border-radius: 5px;
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <title>📊 Tag Heatmap - Noctria Kingdom HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
 </head>
 <body>
-  <h1>📊 タグ別戦略統計ヒートマップ</h1>
 
-  <!-- 🔍 フィルター -->
-  <form method="get">
-    <label>From: <input type="date" name="from" value="{{ filter.from }}"></label>
-    <label>To: <input type="date" name="to" value="{{ filter.to }}"></label>
-    <label>Tag: <input type="text" name="tag" value="{{ filter.tag }}"></label>
-    <button type="submit">適用</button>
-  </form>
+    <div class="hud-container-simple">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-th"></i> TAG STRATEGY HEATMAP</h1>
+            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+        </header>
 
-  <!-- 📋 表形式 -->
-  <table>
-    <thead>
-      <tr>
-        <th>🏷 タグ</th>
-        <th>件数</th>
-        <th>平均勝率（%）</th>
-        <th>最大DD（%）</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for tag, info in data.items() %}
-      <tr>
-        <td>{{ tag }}</td>
-        <td>{{ info.count }}</td>
-        <td>{{ info.avg_win if info.avg_win is not none else '-' }}</td>
-        <td>{{ info.avg_dd if info.avg_dd is not none else '-' }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4">該当するデータがありません。</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        <!-- Filter Panel -->
+        <section class="hud-panel filter-panel">
+            <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
+            <form method="get" class="filter-form">
+                <input type="date" name="from" value="{{ filter.from }}">
+                <input type="date" name="to" value="{{ filter.to }}">
+                <input type="text" name="tag" placeholder="Tag name..." value="{{ filter.tag }}">
+                <button type="submit" class="hud-btn"><i class="fas fa-check"></i> APPLY</button>
+            </form>
+        </section>
 
-  <!-- 📤 エクスポートリンク -->
-  <a class="button" href="/statistics/heatmap/export?from={{ filter.from }}&to={{ filter.to }}&tag={{ filter.tag }}">CSVエクスポート</a>
+        <!-- Heatmap Panel -->
+        <main class="hud-panel log-panel">
+            <div class="panel-header-flex">
+                <h2 class="panel-title">HEATMAP DATA</h2>
+                <a class="hud-btn-small" href="/statistics/heatmap/export?from={{ filter.from }}&to={{ filter.to }}&tag={{ filter.tag }}">
+                    <i class="fas fa-file-csv"></i> CSVエクスポート
+                </a>
+            </div>
+            <div class="table-wrapper">
+                <table class="hud-table heatmap-table">
+                    <thead>
+                        <tr>
+                            <th>🏷 タグ</th>
+                            <th><i class="fas fa-hashtag"></i> 件数</th>
+                            <th><i class="fas fa-chart-line"></i> 平均勝率 (%)</th>
+                            <th><i class="fas fa-chart-area"></i> 最大DD (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tag, info in data.items() %}
+                        <tr>
+                            <td class="tag-name-cell">{{ tag }}</td>
+                            <td>{{ info.count }}</td>
+                            <td class="heatmap-cell" style="--value: {{ info.avg_win if info.avg_win is not none else 0 }}; --max: 100; --color: var(--accent-color-1);">
+                                {{ '%.2f'|format(info.avg_win) if info.avg_win is not none else '-' }}
+                            </td>
+                            <td class="heatmap-cell" style="--value: {{ info.avg_dd if info.avg_dd is not none else 0 }}; --max: 30; --color: var(--accent-color-2);">
+                                {{ '%.2f'|format(info.avg_dd) if info.avg_dd is not none else '-' }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" style="text-align: center;">該当するデータがありません。</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
 </body>
 </html>
