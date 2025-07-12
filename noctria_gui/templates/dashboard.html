@@ -2,116 +2,126 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>🏰 Noctria Kingdom - 統治ダッシュボード</title>
+  <title>🛡 Noctria Kingdom - HUD ダッシュボード</title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- 🌐 カスタムHUD風スタイル -->
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at center, #0f172a, #020617);
+    }
+    .hud-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      border-radius: 1rem;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+    }
+    .hud-title {
+      color: #00f7ff;
+      text-shadow: 0 0 3px #00f7ff;
+    }
+    .glow-text {
+      color: #7dd3fc;
+      text-shadow: 0 0 5px #38bdf8;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition duration-300 font-sans p-4 md:p-6">
-  <header class="mb-6 flex flex-col md:flex-row justify-between items-center">
-    <h1 class="text-2xl md:text-3xl font-bold">🏰 Noctria Kingdom - 中央統治ダッシュボード</h1>
-    <button id="darkModeToggle" class="mt-2 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
-      🌗 ダークモード切替
-    </button>
+
+<body class="text-white p-6">
+
+  <!-- 🔰 ヘッダー -->
+  <header class="mb-8 text-center">
+    <h1 class="text-4xl font-bold hud-title">🛡 Noctria Kingdom - HUD Dashboard</h1>
+    <p class="text-sm text-gray-400 mt-2">Prometheus Oracle × Veritas × PDCA Monitoring</p>
   </header>
 
-  <!-- ✅ 実行メッセージ表示 -->
+  <!-- ✅ 実行メッセージ -->
   {% if message == "success" %}
-    <div class="mb-4 p-4 bg-green-100 text-green-800 border border-green-300 rounded">
+    <div class="mb-6 p-4 bg-green-600/20 border border-green-500 text-green-300 rounded-lg text-center">
       ✅ 市場予測を再実行しました（PrometheusOracle）
     </div>
   {% elif message == "error" %}
-    <div class="mb-4 p-4 bg-red-100 text-red-800 border border-red-300 rounded">
+    <div class="mb-6 p-4 bg-red-600/20 border border-red-500 text-red-300 rounded-lg text-center">
       ❌ 市場予測の実行に失敗しました
     </div>
   {% endif %}
 
-  <!-- 📊 サマリカード -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+  <!-- 🧊 サマリーカード（昇格 / Push / PDCA / 勝率） -->
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="hud-card p-5 text-center">
       <h2 class="text-lg font-semibold">📈 昇格戦略数</h2>
-      <p class="text-3xl font-bold">{{ stats.promoted_count }} 件</p>
+      <p class="text-4xl font-bold glow-text mt-2">{{ stats.promoted_count }} 件</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+    <div class="hud-card p-5 text-center">
       <h2 class="text-lg font-semibold">📤 Push完了数</h2>
-      <p class="text-3xl font-bold">{{ stats.push_count }} 件</p>
+      <p class="text-4xl font-bold glow-text mt-2">{{ stats.push_count }} 件</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
-      <h2 class="text-lg font-semibold">🧪 PDCA実行数</h2>
-      <p class="text-3xl font-bold">{{ stats.pdca_count }} 件</p>
+    <div class="hud-card p-5 text-center">
+      <h2 class="text-lg font-semibold">🔁 PDCA実行数</h2>
+      <p class="text-4xl font-bold glow-text mt-2">{{ stats.pdca_count }} 件</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+    <div class="hud-card p-5 text-center">
       <h2 class="text-lg font-semibold">⚖ 平均勝率</h2>
-      <p class="text-3xl font-bold">{{ "%.1f"|format(stats.avg_win_rate) }}%</p>
+      <p class="text-4xl font-bold glow-text mt-2">{{ "%.1f"|format(stats.avg_win_rate) }}%</p>
     </div>
-  </div>
+  </section>
 
-  <!-- 📊 Oracle モデル評価指標 -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 col-span-1">
-      <h2 class="text-lg font-semibold">📊 Oracle評価（精度指標）</h2>
-      {% if stats.oracle_metrics.error %}
-        <p class="text-red-500 mt-2">エラー: {{ stats.oracle_metrics.error }}</p>
-      {% else %}
-        <ul class="mt-2 space-y-1">
-          <li>🔹 RMSE: <strong>{{ stats.oracle_metrics.RMSE }}</strong></li>
-          <li>🔹 MAE: <strong>{{ stats.oracle_metrics.MAE }}</strong></li>
-          <li>🔹 MAPE: <strong>{{ stats.oracle_metrics.MAPE }}%</strong></li>
-        </ul>
-      {% endif %}
-    </div>
-  </div>
+  <!-- 📊 Oracle評価指標 -->
+  <section class="hud-card p-6 mb-8">
+    <h2 class="text-xl font-semibold mb-2">📊 Oracle評価指標</h2>
+    {% if stats.oracle_metrics.error %}
+      <p class="text-red-400">エラー: {{ stats.oracle_metrics.error }}</p>
+    {% else %}
+      <ul class="space-y-1 text-lg">
+        <li>🔹 RMSE: <span class="glow-text">{{ stats.oracle_metrics.RMSE }}</span></li>
+        <li>🔹 MAE: <span class="glow-text">{{ stats.oracle_metrics.MAE }}</span></li>
+        <li>🔹 MAPE: <span class="glow-text">{{ stats.oracle_metrics.MAPE }}%</span></li>
+      </ul>
+    {% endif %}
+  </section>
 
-  <!-- 📈 市場予測チャート & 再実行ボタン + CSV出力 -->
-  <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4 mb-6">
-    <div class="flex justify-between items-center mb-2">
-      <h2 class="text-lg font-semibold">🔮 市場予測（PrometheusOracle）</h2>
-      <!-- 🔄 再実行 & 📥 CSV出力 -->
-      <div class="flex gap-2">
+  <!-- 🔮 市場予測チャート -->
+  <section class="hud-card p-6 mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">🔮 市場予測チャート（PrometheusOracle）</h2>
+      <div class="flex gap-3">
         <form method="post" action="/oracle/predict">
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
-            🔄 予測を再実行
+          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            🔄 再予測
           </button>
         </form>
-        <a href="/oracle/export" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition">
+        <a href="/oracle/export" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
           📥 CSV出力
         </a>
       </div>
     </div>
-    <canvas id="forecastChart" height="100"></canvas>
-  </div>
+    <canvas id="forecastChart" height="120"></canvas>
+  </section>
 
   <!-- 🔗 統治リンク -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    <a href="/act-history" class="bg-white dark:bg-gray-800 p-4 shadow rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-      <h3 class="font-semibold">🧾 昇格戦略一覧</h3>
-      <p>Veritasによる戦略昇格の記録</p>
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <a href="/act-history" class="hud-card p-5 hover:ring-2 hover:ring-cyan-500 transition">
+      <h3 class="text-lg font-semibold">🧾 昇格戦略一覧</h3>
+      <p class="text-sm text-gray-300 mt-1">Veritasによる昇格履歴</p>
     </a>
-    <a href="/push-history" class="bg-white dark:bg-gray-800 p-4 shadow rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-      <h3 class="font-semibold">📤 GitHub Push履歴</h3>
-      <p>戦略のGitHub送信履歴</p>
+    <a href="/push-history" class="hud-card p-5 hover:ring-2 hover:ring-cyan-500 transition">
+      <h3 class="text-lg font-semibold">📤 GitHub Push履歴</h3>
+      <p class="text-sm text-gray-300 mt-1">戦略のバージョン管理ログ</p>
     </a>
-    <a href="/pdca" class="bg-white dark:bg-gray-800 p-4 shadow rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-      <h3 class="font-semibold">🔁 PDCA履歴</h3>
-      <p>戦略生成・評価・EA命令のログ</p>
+    <a href="/pdca" class="hud-card p-5 hover:ring-2 hover:ring-cyan-500 transition">
+      <h3 class="text-lg font-semibold">🔁 PDCA履歴</h3>
+      <p class="text-sm text-gray-300 mt-1">PDCAサイクルの記録</p>
     </a>
-  </div>
+  </section>
 
-  <!-- 🌗 ダークモード切替 -->
-  <script>
-    const darkToggle = document.getElementById("darkModeToggle");
-    const html = document.documentElement;
-    if (localStorage.theme === 'dark') html.classList.add('dark');
-    darkToggle.onclick = () => {
-      html.classList.toggle('dark');
-      localStorage.theme = html.classList.contains('dark') ? 'dark' : 'light';
-    };
-  </script>
-
-  <!-- 📊 Chart.js 描画ロジック -->
+  <!-- 🌙 Chart.js: 予測チャート描画 -->
   <script>
     const forecast = {{ forecast | tojson }};
     const dates = forecast.map(d => d.date);
@@ -119,36 +129,35 @@
     const y_lower = forecast.map(d => d.y_lower);
     const y_upper = forecast.map(d => d.y_upper);
 
-    const ctx = document.getElementById("forecastChart").getContext("2d");
-    new Chart(ctx, {
+    new Chart(document.getElementById("forecastChart"), {
       type: 'line',
       data: {
         labels: dates,
         datasets: [
           {
-            label: '予測値',
+            label: "予測値",
             data: y_pred,
-            borderColor: 'rgba(54, 162, 235, 1)',
-            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            borderColor: "cyan",
+            backgroundColor: "rgba(0, 255, 255, 0.2)",
+            tension: 0.3,
             fill: false,
-            tension: 0.3
           },
           {
-            label: '信頼区間',
+            label: "信頼区間上限",
             data: y_upper,
-            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            backgroundColor: "rgba(0, 255, 255, 0.1)",
             borderWidth: 0,
             pointRadius: 0,
             fill: '+1',
             tension: 0.3
           },
           {
-            label: '',
+            label: "信頼区間下限",
             data: y_lower,
-            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            backgroundColor: "rgba(0, 255, 255, 0.1)",
             borderWidth: 0,
             pointRadius: 0,
-            fill: false,
+            fill: '-1',
             tension: 0.3
           }
         ]
@@ -156,14 +165,20 @@
       options: {
         responsive: true,
         plugins: {
-          legend: { position: 'top' },
-          title: { display: true, text: '🔮 市場予測と信頼区間' }
+          legend: { display: true },
+          title: {
+            display: true,
+            text: "🔮 市場予測と信頼区間",
+            color: "#7dd3fc"
+          }
         },
         scales: {
-          y: { beginAtZero: false }
+          x: { ticks: { color: "#ccc" } },
+          y: { ticks: { color: "#ccc" }, beginAtZero: false }
         }
       }
     });
   </script>
+
 </body>
 </html>
