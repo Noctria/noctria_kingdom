@@ -8,10 +8,10 @@ from typing import List
 # === FastAPI 初期化 ===
 app = FastAPI(title="Noctria LLM Server")
 
-# CORS（GUIなど外部からアクセスする場合に必要）
+# CORS設定（GUIなど外部アクセス時に必要）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 本番運用では限定すべき
+    allow_origins=["*"],  # 本番環境では適宜制限してください
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,15 +41,19 @@ def get_veritas_eval_results():
     if not os.path.exists(EVAL_RESULT_PATH):
         return []
 
-    with open(EVAL_RESULT_PATH, "r") as f:
+    with open(EVAL_RESULT_PATH, "r", encoding="utf-8") as f:
         try:
             data = json.load(f)
         except json.JSONDecodeError:
             return []
 
-    # 必要なフィールドだけ抽出
     filtered = []
     for entry in data:
-        if "filename" in entry and "final_capital" in entry and "result" in entry:
+        if (
+            isinstance(entry, dict) and
+            "filename" in entry and
+            "final_capital" in entry and
+            "result" in entry
+        ):
             filtered.append(StrategyEvaluation(**entry))
     return filtered
