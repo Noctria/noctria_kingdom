@@ -2,9 +2,9 @@ from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, STRATEGIES_DIR, ORACLE_FORECAST_JSON
+from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, ORACLE_FORECAST_JSON
 from strategies.prometheus_oracle import PrometheusOracle
-from core.king_noctria import KingNoctria  # 👑 中央統治AIをインポート
+from core.king_noctria import KingNoctria
 
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +14,7 @@ import json
 import subprocess
 import io
 import csv
+import httpx
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -81,15 +82,12 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard(request: Request):
-    # 🔮 Oracle予測
     try:
-        oracle = PrometheusOracle()
-        df = oracle.predict_with_confidence(n_days=14).rename(columns={
-            "forecast": "y_pred",
-            "lower": "y_lower",
-            "upper": "y_upper"
-        })
-        forecast_data = df.to_dict(orient="records")
+        async with httpx.AsyncClient() as client:
+            res = await client.get("http://localhost:8000/prometheus/predict?n_days=14")
+            res.raise_for_status()
+            data = res.json()
+            forecast_data = data.get("predictions", [])
     except Exception as e:
         forecast_data = []
         print("🔴 Oracle予測取得エラー:", e)
@@ -97,7 +95,6 @@ async def show_dashboard(request: Request):
     stats = aggregate_dashboard_stats()
     message = request.query_params.get("message")
 
-    # 👑 評議会（五臣会議）開催（初期表示用）
     try:
         king = KingNoctria()
         mock_market = {
@@ -124,7 +121,7 @@ async def show_dashboard(request: Request):
         "forecast": forecast_data,
         "stats": stats,
         "message": message,
-        "council": council_result  # 👑 結果を渡す
+        "council": council_result
     })
 
 
