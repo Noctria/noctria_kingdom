@@ -1,128 +1,170 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>📈 戦略比較グラフ</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="/static/style.css">
-  <style>
-    body { padding: 2rem; background: #f9f9f9; }
-    canvas { max-width: 800px; margin-bottom: 2rem; }
-    .nav { margin-bottom: 1rem; }
-    .btn { padding: 0.5rem 1rem; margin-right: 1rem; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    .btn:hover { background: #005f99; }
-  </style>
+    <meta charset="UTF-8" />
+    <title>📈 Strategy Comparison - Noctria Kingdom HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h1>📈 選択戦略の比較</h1>
 
-  <div class="nav">
-    <button class="btn" onclick="showChart('win')">勝率</button>
-    <button class="btn" onclick="showChart('dd')">最大DD</button>
-    <button class="btn" onclick="showChart('trades')">取引数</button>
-    <button class="btn" onclick="showRadar()">🧩 レーダーチャート</button>
-  </div>
+    <div class="hud-container-simple">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-chart-bar"></i> STRATEGY SHOWDOWN</h1>
+            <a href="/strategy/compare" class="nav-item-back"><i class="fas fa-arrow-left"></i><span>BACK TO SELECTION</span></a>
+        </header>
 
-  <canvas id="chart"></canvas>
+        <!-- Chart Panel -->
+        <main class="hud-panel chart-display-panel">
+            <div class="chart-controls">
+                <h2 class="panel-title">ANALYSIS VIEW</h2>
+                <div class="hud-btn-group" id="chart-controls">
+                    <button class="hud-btn active" onclick="showChart('win')">勝率</button>
+                    <button class="hud-btn" onclick="showChart('dd')">最大DD</button>
+                    <button class="hud-btn" onclick="showChart('trades')">取引数</button>
+                    <button class="hud-btn" onclick="showRadar()">🧩 レーダーチャート</button>
+                </div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </main>
+    </div>
 
-  <script>
-    const strategies = {{ strategies | tojson }};
-    const labels = strategies.map(s => s.strategy);
+    <!-- データを安全に埋め込むための専用scriptタグ -->
+    <script type="application/json" id="strategies-data">
+        {{ strategies | tojson | safe }}
+    </script>
 
-    const tooltips = strategies.map(s =>
-      `タグ: ${(s.tags || []).join(', ')}\n取引数: ${s.num_trades || '―'}\n最大DD: ${s.max_drawdown || '―'}`
-    );
-
-    const datasets = {
-      win: {
-        label: "勝率 (%)",
-        data: strategies.map(s => s.win_rate),
-        backgroundColor: "rgba(54, 162, 235, 0.6)"
-      },
-      dd: {
-        label: "最大DD",
-        data: strategies.map(s => s.max_drawdown),
-        backgroundColor: "rgba(255, 99, 132, 0.6)"
-      },
-      trades: {
-        label: "取引数",
-        data: strategies.map(s => s.num_trades),
-        backgroundColor: "rgba(75, 192, 192, 0.6)"
-      }
-    };
-
-    let chart;
-    function showChart(type) {
-      if (chart) chart.destroy();
-      chart = new Chart(document.getElementById("chart"), {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [datasets[type]]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: { beginAtZero: true }
-          },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const index = context.dataIndex;
-                  return tooltips[index];
-                }
-              }
-            },
-            legend: { display: false }
-          },
-          onClick: (evt, elements) => {
-            if (elements.length > 0) {
-              const index = elements[0].index;
-              const name = strategies[index].strategy;
-              window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const strategiesDataElement = document.getElementById('strategies-data');
+            if (!strategiesDataElement || !strategiesDataElement.textContent) {
+                console.error("戦略データが見つかりません。");
+                return;
             }
-          }
-        }
-      });
-    }
+            const strategies = JSON.parse(strategiesDataElement.textContent);
+            const labels = strategies.map(s => s.strategy);
 
-    function showRadar() {
-      if (chart) chart.destroy();
-      chart = new Chart(document.getElementById("chart"), {
-        type: 'radar',
-        data: {
-          labels: ["勝率", "最大DD", "取引数"],
-          datasets: strategies.map(s => ({
-            label: s.strategy,
-            data: [
-              s.win_rate || 0,
-              s.max_drawdown || 0,
-              s.num_trades || 0
-            ],
-            fill: true
-          }))
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const i = context.datasetIndex;
-                  return `${strategies[i].strategy}: 勝率=${strategies[i].win_rate}%, DD=${strategies[i].max_drawdown}, 取引=${strategies[i].num_trades}`;
+            const tooltips = strategies.map(s =>
+                `Tags: ${(s.tags || []).join(', ')}\nTrades: ${s.num_trades || 'N/A'}\nMax DD: ${s.max_drawdown || 'N/A'}`
+            );
+
+            // HUDテーマに合わせたカラーセット
+            const hudColors = {
+                win: 'rgba(0, 255, 155, 0.7)',
+                dd: 'rgba(255, 121, 198, 0.7)',
+                trades: 'rgba(125, 249, 255, 0.7)'
+            };
+            const hudBorderColors = {
+                win: 'rgb(0, 255, 155)',
+                dd: 'rgb(255, 121, 198)',
+                trades: 'rgb(125, 249, 255)'
+            };
+            const radarColors = [
+                { bg: 'rgba(0, 255, 155, 0.2)', border: 'rgb(0, 255, 155)' },
+                { bg: 'rgba(125, 249, 255, 0.2)', border: 'rgb(125, 249, 255)' },
+                { bg: 'rgba(255, 121, 198, 0.2)', border: 'rgb(255, 121, 198)' },
+                { bg: 'rgba(241, 250, 140, 0.2)', border: 'rgb(241, 250, 140)' },
+            ];
+
+            const datasets = {
+                win: { label: "勝率 (%)", data: strategies.map(s => s.win_rate), backgroundColor: hudColors.win, borderColor: hudBorderColors.win, borderWidth: 1 },
+                dd: { label: "最大DD (%)", data: strategies.map(s => s.max_drawdown), backgroundColor: hudColors.dd, borderColor: hudBorderColors.dd, borderWidth: 1 },
+                trades: { label: "取引数", data: strategies.map(s => s.num_trades), backgroundColor: hudColors.trades, borderColor: hudBorderColors.trades, borderWidth: 1 }
+            };
+            
+            const chartCanvas = document.getElementById("comparisonChart");
+            let chart;
+
+            const baseOptions = {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 30, 60, 0.8)', titleFont: { family: "'Roboto Mono', monospace" },
+                        bodyFont: { family: "'Roboto Mono', monospace" }, borderColor: '#00e5ff', borderWidth: 1
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } }, grid: { color: 'rgba(0, 229, 255, 0.2)' } },
+                    y: { beginAtZero: true, ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } }, grid: { color: 'rgba(0, 229, 255, 0.2)' } }
                 }
-              }
+            };
+
+            window.showChart = function(type) {
+                if (chart) chart.destroy();
+                chart = new Chart(chartCanvas, {
+                    type: "bar",
+                    data: { labels: labels, datasets: [datasets[type]] },
+                    options: { ...baseOptions,
+                        onClick: (evt, elements) => {
+                            if (elements.length > 0) {
+                                const index = elements[0].index;
+                                const name = strategies[index].strategy;
+                                window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
+                            }
+                        }
+                    }
+                });
+                updateActiveButton(type);
             }
-          }
-        }
-      });
-    }
 
-    // 初期表示
-    showChart('win');
-  </script>
+            window.showRadar = function() {
+                if (chart) chart.destroy();
+                const radarData = {
+                    labels: ["勝率", "最大DD", "取引数"],
+                    datasets: strategies.map((s, i) => ({
+                        label: s.strategy,
+                        data: [ s.win_rate || 0, s.max_drawdown || 0, s.num_trades || 0 ],
+                        fill: true,
+                        backgroundColor: radarColors[i % radarColors.length].bg,
+                        borderColor: radarColors[i % radarColors.length].border,
+                        pointBackgroundColor: radarColors[i % radarColors.length].border,
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: radarColors[i % radarColors.length].border
+                    }))
+                };
+                const radarOptions = { ...baseOptions, plugins: { legend: { display: true, labels: { color: '#00e5ff' } } },
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(204, 214, 246, 0.2)' },
+                            grid: { color: 'rgba(204, 214, 246, 0.2)' },
+                            pointLabels: { font: { size: 12, family: "'Roboto Mono', monospace" }, color: '#ccd6f6' },
+                            ticks: { color: '#0a192f', backdropColor: 'rgba(204, 214, 246, 0.8)', borderRadius: 4, }
+                        }
+                    }
+                };
+                chart = new Chart(chartCanvas, { type: 'radar', data: radarData, options: radarOptions });
+                updateActiveButton('radar');
+            }
 
-  <p><a href="/strategies/compare">← 戦略選択に戻る</a></p>
+            function updateActiveButton(type) {
+                const buttons = document.querySelectorAll('#chart-controls .hud-btn');
+                buttons.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.textContent.includes(type) || (type === 'radar' && btn.textContent.includes('レーダー'))) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
+            // 初期表示
+            showChart('win');
+        });
+    </script>
 </body>
 </html>
