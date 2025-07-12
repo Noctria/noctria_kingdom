@@ -8,8 +8,20 @@
 <body>
   <h1>📤 Veritas Push履歴一覧</h1>
 
+  <!-- 🚀 Pushトリガーフォーム -->
+  <div class="card">
+    <h2>🚀 戦略をGitHubへPush</h2>
+    <form method="post" action="/push/trigger">
+      <label>
+        戦略名（例: Aurora_VX2）:
+        <input type="text" name="strategy_name" required placeholder="例: Aurora_VX2">
+      </label>
+      <button type="submit" class="btn">🚀 Push実行</button>
+    </form>
+  </div>
+
   <!-- 🔍 フィルターUI -->
-  <form method="get" action="/push-history" class="filter card">
+  <form method="get" action="/push/history" class="filter card">
     <label>
       戦略名
       <input type="text" name="strategy" value="{{ filters.strategy }}">
@@ -35,7 +47,7 @@
     </label>
     <button type="submit" class="btn">🔍 検索</button>
     <a class="btn"
-       href="/push-history/export?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">
+       href="/push/export?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">
       📤 CSV出力
     </a>
   </form>
@@ -61,7 +73,7 @@
         <td>{{ log.pushed_by or "-" }}</td>
         <td>{{ log.message or "-" }}</td>
         <td>
-          <a href="/push-history/detail?timestamp={{ log.timestamp }}" class="btn">🔍 詳細</a>
+          <a href="/push/detail?timestamp={{ log.timestamp }}" class="btn">🔍 詳細</a>
         </td>
       </tr>
       {% endfor %}
