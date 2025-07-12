@@ -1,10 +1,10 @@
 # noctria_gui/routes/dashboard.py
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, STRATEGIES_DIR
+from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, STRATEGIES_DIR, ORACLE_FORECAST_JSON
 from strategies.prometheus_oracle import PrometheusOracle
 
 from datetime import datetime
@@ -111,20 +111,24 @@ async def show_dashboard(request: Request):
     })
 
 
-# 🔄 Oracle再予測トリガー
+# 🔄 Oracle再予測トリガー（期間指定対応）
 @router.post("/oracle/predict")
-async def trigger_oracle_prediction():
+async def trigger_oracle_prediction(
+    from_date: Optional[str] = Form(None),
+    to_date: Optional[str] = Form(None)
+):
     try:
-        subprocess.run(
-            ["python3", str(STRATEGIES_DIR / "prometheus_oracle.py")],
-            check=True,
-            env={**os.environ, "PYTHONPATH": "."},
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        oracle = PrometheusOracle()
+        df = oracle.predict_with_confidence(from_date=from_date, to_date=to_date)
+        df = df.rename(columns={"forecast": "y_pred", "lower": "y_lower", "upper": "y_upper"})
+
+        # 保存パスにJSON出力
+        ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
+        df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False)
+
         return RedirectResponse(url="/dashboard?message=success", status_code=303)
-    except subprocess.CalledProcessError as e:
-        print("🔴 Oracle実行失敗:", e.stderr.decode())
+    except Exception as e:
+        print("🔴 Oracle予測失敗:", e)
         return RedirectResponse(url="/dashboard?message=error", status_code=303)
 
 
