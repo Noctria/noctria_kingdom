@@ -10,7 +10,7 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition duration-300 font-sans p-4 md:p-6">
   <header class="mb-6 flex flex-col md:flex-row justify-between items-center">
@@ -42,23 +42,23 @@
     </div>
   </section>
 
-  <!-- 📤 マーケットデータ送信フォーム -->
+  <!-- 📤 評議会開催フォーム -->
   <section class="card mb-8 bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
     <h2 class="text-xl font-semibold mb-4">📤 評議会開催フォーム</h2>
     <form id="councilForm">
       <div class="grid grid-cols-2 gap-4">
-        <input type="number" name="price" placeholder="現価格" class="input" required>
-        <input type="number" name="previous_price" placeholder="前回価格" class="input">
-        <input type="number" name="volume" placeholder="出来高" class="input">
-        <input type="number" name="spread" placeholder="スプレッド" class="input" step="0.001">
-        <input type="number" name="order_block" placeholder="オーダーブロック" class="input" step="0.01">
-        <input type="number" name="volatility" placeholder="ボラティリティ" class="input" step="0.01">
-        <input type="text" name="trend_prediction" placeholder="トレンド予測 (bullish/bearish)" class="input">
-        <input type="number" name="sentiment" placeholder="センチメント(0~1)" class="input" step="0.01">
-        <input type="number" name="trend_strength" placeholder="トレンド強度" class="input" step="0.01">
-        <input type="number" name="liquidity_ratio" placeholder="流動性比率" class="input" step="0.01">
-        <input type="number" name="momentum" placeholder="モメンタム" class="input" step="0.01">
-        <input type="number" name="short_interest" placeholder="ショート残高" class="input" step="0.01">
+        <input type="number" name="price" placeholder="現価格" class="input" required step="any" />
+        <input type="number" name="previous_price" placeholder="前回価格" class="input" step="any" />
+        <input type="number" name="volume" placeholder="出来高" class="input" step="any" />
+        <input type="number" name="spread" placeholder="スプレッド" class="input" step="0.001" />
+        <input type="number" name="order_block" placeholder="オーダーブロック" class="input" step="0.01" />
+        <input type="number" name="volatility" placeholder="ボラティリティ" class="input" step="0.01" />
+        <input type="text" name="trend_prediction" placeholder="トレンド予測 (bullish/bearish)" class="input" />
+        <input type="number" name="sentiment" placeholder="センチメント(0~1)" class="input" step="0.01" />
+        <input type="number" name="trend_strength" placeholder="トレンド強度" class="input" step="0.01" />
+        <input type="number" name="liquidity_ratio" placeholder="流動性比率" class="input" step="0.01" />
+        <input type="number" name="momentum" placeholder="モメンタム" class="input" step="0.01" />
+        <input type="number" name="short_interest" placeholder="ショート残高" class="input" step="0.01" />
       </div>
       <button type="submit" class="btn mt-4">📣 評議会を開催</button>
     </form>
@@ -86,9 +86,9 @@
       data: {
         labels: forecast.map(item => item.date),
         datasets: [
-          { label: "予測", data: forecast.map(item => item.y_pred), borderWidth: 2 },
-          { label: "下限", data: forecast.map(item => item.y_lower), borderWidth: 1, borderDash: [5, 5] },
-          { label: "上限", data: forecast.map(item => item.y_upper), borderWidth: 1, borderDash: [5, 5] },
+          { label: "予測", data: forecast.map(item => item.y_pred), borderWidth: 2, fill: false, borderColor: 'rgb(59, 130, 246)' },
+          { label: "下限", data: forecast.map(item => item.y_lower), borderWidth: 1, borderDash: [5, 5], fill: false, borderColor: 'rgb(147, 197, 253)' },
+          { label: "上限", data: forecast.map(item => item.y_upper), borderWidth: 1, borderDash: [5, 5], fill: false, borderColor: 'rgb(147, 197, 253)' },
         ]
       },
       options: {
@@ -105,28 +105,37 @@
       e.preventDefault();
       const formData = new FormData(councilForm);
       const marketData = {};
-      formData.forEach((v, k) => { marketData[k] = isNaN(v) ? v : Number(v); });
+      formData.forEach((v, k) => {
+        // nullや空文字は除外して数値は変換。文字列はそのまま
+        if (v === null || v === "") return;
+        const num = Number(v);
+        marketData[k] = isNaN(num) ? v : num;
+      });
 
       resultDiv.innerHTML = "⏳ 評議会開催中…";
 
-      const res = await fetch("/king/hold-council", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(marketData)
-      });
+      try {
+        const res = await fetch("/king/hold-council", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(marketData)
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        resultDiv.innerHTML = `
-          <strong>👑 王の判断:</strong> ${data.final_decision}<br/>
-          <strong>📘 Veritas:</strong> ${JSON.stringify(data.veritas)}<br/>
-          <strong>📈 Prometheus:</strong> ${JSON.stringify(data.prometheus_forecast)}<br/>
-          <strong>⚙ Aurus:</strong> ${data.aurus}<br/>
-          <strong>🌊 Levia:</strong> ${data.levia}<br/>
-          <strong>🛡 Noctus:</strong> ${data.noctus}
-        `;
-      } else {
-        resultDiv.innerHTML = "❌ エラーが発生しました。";
+        if (res.ok) {
+          const data = await res.json();
+          resultDiv.innerHTML = `
+            <strong>👑 王の判断:</strong> ${data.final_decision}<br/>
+            <strong>📘 Veritas:</strong> ${JSON.stringify(data.veritas)}<br/>
+            <strong>📈 Prometheus:</strong> ${JSON.stringify(data.prometheus_forecast)}<br/>
+            <strong>⚙ Aurus:</strong> ${data.aurus}<br/>
+            <strong>🌊 Levia:</strong> ${data.levia}<br/>
+            <strong>🛡 Noctus:</strong> ${data.noctus}
+          `;
+        } else {
+          resultDiv.innerHTML = "❌ エラーが発生しました。";
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `❌ 通信エラーが発生しました: ${error.message}`;
       }
     });
   </script>
