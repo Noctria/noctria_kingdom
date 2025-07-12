@@ -1,7 +1,15 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
+from core.path_config import (
+    NOCTRIA_GUI_TEMPLATES_DIR,
+    ACT_LOG_DIR,
+    PDCA_LOG_DIR,
+    PUSH_LOG_DIR,
+    ORACLE_FORECAST_JSON,
+)
+from strategies.prometheus_oracle import PrometheusOracle
+from core.king_noctria import KingNoctria
 
 from collections import defaultdict
 from datetime import datetime
@@ -14,12 +22,14 @@ import csv
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 def parse_date(date_str):
     """'YYYY-MM-DD'形式→datetime。失敗時None"""
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
+
 
 def load_strategy_stats(from_date=None, to_date=None, strategy_keyword=None):
     """
@@ -75,6 +85,7 @@ def load_strategy_stats(from_date=None, to_date=None, strategy_keyword=None):
         }
     return final_stats
 
+
 @router.get("/statistics/strategy-heatmap", response_class=HTMLResponse)
 async def strategy_heatmap(request: Request):
     """
@@ -96,6 +107,7 @@ async def strategy_heatmap(request: Request):
             "strategy": strategy_keyword or ""
         }
     })
+
 
 @router.get("/statistics/strategy-heatmap/export")
 async def export_strategy_heatmap_csv(request: Request):
