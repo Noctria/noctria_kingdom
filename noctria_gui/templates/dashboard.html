@@ -56,7 +56,10 @@
         <!-- Oracle Forecast Chart -->
         <section class="hud-panel chart-panel">
             <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
-            <canvas id="forecastChart"></canvas>
+            <!-- 修正点: canvasをラッパーdivで囲む -->
+            <div class="chart-wrapper">
+                <canvas id="forecastChart"></canvas>
+            </div>
         </section>
         
         <!-- Navigation Panel -->
@@ -89,12 +92,12 @@
 
     </div>
 
-    <!-- 修正点: データを安全に埋め込むための専用scriptタグ -->
+    <!-- データを安全に埋め込むための専用scriptタグ -->
     <script type="application/json" id="forecast-data">
         {{ forecast | tojson | safe }}
     </script>
 
-    <!-- Main Logic Script -->
+    <!-- Main Logic Script (変更なし) -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // System Time
@@ -109,7 +112,6 @@
             // Chart.js
             let forecastChart;
             try {
-                // 修正点: 専用のscriptタグからデータを読み込み、パースする
                 const forecastDataElement = document.getElementById('forecast-data');
                 if (!forecastDataElement || !forecastDataElement.textContent) {
                     throw new Error("データ要素が見つからないか、空です。");
