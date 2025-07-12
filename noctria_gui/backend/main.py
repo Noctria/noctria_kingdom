@@ -12,29 +12,38 @@ from typing import Any
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 # ========================================
-# 修正点: 考えられる全てのルーターをインポート
+# 修正点: 実行されているファイルに必要な全てのルーターをインポート
 # ========================================
 # routesディレクトリ内の各機能（ページ）のロジックを読み込みます
-# ファイル名とモジュール名が一致していることを前提としています
+# 以前のログで読み込みが確認されたものを全て含めます
 from noctria_gui.routes import (
     dashboard, 
     home_routes,
-    # --- 各機能ページのルーター ---
     act_history,
     act_history_detail,
     king_routes,
     logs_routes,
+    path_checker,
+    pdca,
+    pdca_recheck,
     pdca_routes,
     prometheus_routes,
     push,
     statistics,
-    strategy_routes,
+    statistics_compare,
+    statistics_detail,
+    statistics_ranking,
+    statistics_scoreboard,
+    statistics_tag_ranking,
     strategy_compare,
     strategy_detail,
+    strategy_heatmap,
+    strategy_routes,
+    tag_heatmap,
     tag_summary,
     upload,
     upload_history,
-    # (他のファイルも必要に応じて同様に追加)
+    # trigger.pyはroutesディレクトリ外なので、別途対応が必要な場合があります
 )
 
 
@@ -44,7 +53,7 @@ from noctria_gui.routes import (
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="1.3.0",
+    version="1.4.0",
 )
 
 # ✅ 静的ファイルとテンプレートの登録
@@ -63,25 +72,35 @@ templates.env.filters["from_json"] = from_json
 # ========================================
 # 🔁 ルーターの自動登録
 # ========================================
-# 読み込んだ各機能のルーターをアプリケーションに登録します
-print("Integrating routers...")
+# 読み込んだ全てのルーターをアプリケーションに登録します
+print("Integrating all routers into the main application...")
 
-# コアとなるルーター
+# プレフィックスが異なる、あるいは無い可能性のあるものを先に登録
 app.include_router(dashboard.router)
 app.include_router(home_routes.router)
 
-# 機能ごとのルーター
+# 各機能ページのルーター
 app.include_router(act_history.router)
 app.include_router(act_history_detail.router)
 app.include_router(king_routes.router)
 app.include_router(logs_routes.router)
+app.include_router(path_checker.router)
+app.include_router(pdca.router)
+app.include_router(pdca_recheck.router)
 app.include_router(pdca_routes.router)
 app.include_router(prometheus_routes.router)
 app.include_router(push.router)
 app.include_router(statistics.router)
-app.include_router(strategy_routes.router)
+app.include_router(statistics_compare.router)
+app.include_router(statistics_detail.router)
+app.include_router(statistics_ranking.router)
+app.include_router(statistics_scoreboard.router)
+app.include_router(statistics_tag_ranking.router)
 app.include_router(strategy_compare.router)
 app.include_router(strategy_detail.router)
+app.include_router(strategy_heatmap.router)
+app.include_router(strategy_routes.router)
+app.include_router(tag_heatmap.router)
 app.include_router(tag_summary.router)
 app.include_router(upload.router)
 app.include_router(upload_history.router)
