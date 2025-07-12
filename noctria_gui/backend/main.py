@@ -9,7 +9,7 @@ from pathlib import Path
 
 # core.path_config と noctria_gui.routes をそのままインポートします
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-import noctria_gui.routes
+import noctria_gui.routes as routes_pkg  # 修正: noctria_gui.routesをimportし、routes_pkgとして使う
 
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
@@ -64,6 +64,7 @@ async def main_alias() -> RedirectResponse:
 # ========================================
 # 🔁 ルーターの自動登録
 # ========================================
+# 修正: routes_pkgとしてインポートした後、routersを取得して自動登録
 routers = getattr(routes_pkg, "routers", None)
 if routers is not None and isinstance(routers, (list, tuple)):
     for router in routers:
