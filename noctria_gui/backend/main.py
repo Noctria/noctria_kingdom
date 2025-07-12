@@ -3,20 +3,17 @@
 
 import sys
 from pathlib import Path
+import json
+from typing import Any
 
-# __file__ は main.py のファイルパスです。親ディレクトリから noctria_kingdom を参照します。
-# ただし、`sys.path` の設定は不要なので、これを削除します。
-
-# core.path_config と noctria_gui.routes をそのままインポートします
+# core.path_config と noctria_gui.routes をインポート
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-import noctria_gui.routes as routes_pkg  # 修正: noctria_gui.routesをimportし、routes_pkgとして使う
+import noctria_gui.routes as routes_pkg
 
-from fastapi import FastAPI, Request, Query  # 修正: Queryをインポート
-from fastapi.responses import RedirectResponse, HTMLResponse  # 修正: HTMLResponseをインポート
+from fastapi import FastAPI, Request, Query
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from typing import Any
-import json
 
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
@@ -33,9 +30,10 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # ✅ Jinja2 カスタムフィルタ：from_json（文字列 → dict）
 def from_json(value: str) -> Any:
+    """Jinja2テンプレート内でJSON文字列をPythonオブジェクトに変換するフィルタ"""
     try:
         return json.loads(value)
-    except Exception:
+    except (json.JSONDecodeError, TypeError):
         return {}
 
 templates.env.filters["from_json"] = from_json
@@ -66,6 +64,7 @@ async def main_alias() -> RedirectResponse:
 
 @app.get("/act-history", response_class=HTMLResponse)
 async def show_act_history(request: Request):
+    # 仮のログデータ
     logs = [
         {"strategy": "Strategy A", "symbol": "USD/JPY", "timestamp": "2025-07-13", "score": 85},
         {"strategy": "Strategy B", "symbol": "EUR/USD", "timestamp": "2025-07-12", "score": 78},
@@ -73,17 +72,35 @@ async def show_act_history(request: Request):
     return templates.TemplateResponse("act_history.html", {"request": request, "logs": logs})
 
 @app.get("/act-history/detail", response_class=HTMLResponse)
-async def show_act_detail(request: Request, strategy_name: str = Query(...)):  # 修正: Queryを使ってパラメータを取得
-    log = {"strategy": strategy_name, "symbol": "USD/JPY", "timestamp": "2025-07-13", "score": 85}  # 仮のデータ
+async def show_act_detail(request: Request, strategy_name: str = Query(...)):
+    # クエリパラメータで受け取った戦略名に基づく仮のデータ
+    log = {"strategy": strategy_name, "symbol": "USD/JPY", "timestamp": "2025-07-13", "score": 85}
     return templates.TemplateResponse("act_history_detail.html", {"request": request, "log": log})
 
 @app.get("/base", response_class=HTMLResponse)
 async def show_base(request: Request):
     return templates.TemplateResponse("base.html", {"request": request})
 
+# 修正点: dashboardに統計情報を渡す
 @app.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    """
+    ダッシュボードページを表示します。
+    テンプレートで必要となる統計情報(stats)を渡します。
+    """
+    # 本来はデータベースなどから取得する統計情報のダミーデータ
+    stats_data = {
+        "total_strategies": 128,
+        "active_strategies": 76,
+        "avg_win_rate": 62.5,
+        "total_trades": 1540
+    }
+    # "stats"というキーでテンプレートにデータを渡す
+    context = {
+        "request": request,
+        "stats": stats_data
+    }
+    return templates.TemplateResponse("dashboard.html", context)
 
 @app.get("/king-history", response_class=HTMLResponse)
 async def show_king_history(request: Request):
@@ -93,7 +110,6 @@ async def show_king_history(request: Request):
 async def show_pdca_dashboard(request: Request):
     return templates.TemplateResponse("pdca_dashboard.html", {"request": request})
 
-# 追加のHTMLファイルに対応するルートを追加
 @app.get("/logs-dashboard", response_class=HTMLResponse)
 async def show_logs_dashboard(request: Request):
     return templates.TemplateResponse("logs_dashboard.html", {"request": request})
@@ -181,3 +197,4 @@ if routers is not None and isinstance(routers, (list, tuple)):
         print(f"🔗 router 統合: tags={getattr(router, 'tags', [])}")
 else:
     print("⚠️ noctria_gui.routes に routers が定義されていません")
+
