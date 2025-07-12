@@ -1,3 +1,5 @@
+# noctria_gui/routes/dashboard.py
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -8,10 +10,11 @@ from strategies.prometheus_oracle import PrometheusOracle
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
+from typing import Optional, Dict, Any
+
 import os
 import json
 import subprocess
-from typing import Optional, Dict, Any
 import io
 import csv
 
@@ -19,6 +22,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
+# 🔍 日付パース
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     try:
         if not date_str:
@@ -28,6 +32,7 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
         return None
 
 
+# 📊 HUDカード用統計集計
 def aggregate_dashboard_stats() -> Dict[str, Any]:
     stats = {
         "promoted_count": 0,
@@ -56,8 +61,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
             if "pdca_cycle" in data:
                 stats["pdca_count"] += 1
 
-            score = data.get("score", {})
-            win = score.get("win_rate")
+            win = data.get("score", {}).get("win_rate")
             if isinstance(win, (int, float)):
                 win_rates.append(win)
 
@@ -66,6 +70,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
 
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
 
+    # 🔮 Oracle評価指標
     try:
         oracle = PrometheusOracle()
         metrics = oracle.evaluate_model()
@@ -80,12 +85,12 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
     return stats
 
 
+# 🌐 ダッシュボード表示
 @router.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard(request: Request):
     try:
         oracle = PrometheusOracle()
-        df = oracle.predict_with_confidence(n_days=14)
-        df = df.rename(columns={
+        df = oracle.predict_with_confidence(n_days=14).rename(columns={
             "forecast": "y_pred",
             "lower": "y_lower",
             "upper": "y_upper"
@@ -106,6 +111,7 @@ async def show_dashboard(request: Request):
     })
 
 
+# 🔄 Oracle再予測トリガー
 @router.post("/oracle/predict")
 async def trigger_oracle_prediction():
     try:
@@ -122,22 +128,28 @@ async def trigger_oracle_prediction():
         return RedirectResponse(url="/dashboard?message=error", status_code=303)
 
 
+# 📥 予測結果のCSVダウンロード
 @router.get("/oracle/export")
 async def export_oracle_csv():
-    oracle = PrometheusOracle()
-    df = oracle.predict_with_confidence(n_days=14).rename(columns={
-        "forecast": "y_pred",
-        "lower": "y_lower",
-        "upper": "y_upper"
-    })
+    try:
+        oracle = PrometheusOracle()
+        df = oracle.predict_with_confidence(n_days=14).rename(columns={
+            "forecast": "y_pred",
+            "lower": "y_lower",
+            "upper": "y_upper"
+        })
 
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["date", "y_pred", "y_lower", "y_upper"])
-    for _, row in df.iterrows():
-        writer.writerow([row["date"], row["y_pred"], row["y_lower"], row["y_upper"]])
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["date", "y_pred", "y_lower", "y_upper"])
+        for _, row in df.iterrows():
+            writer.writerow([row["date"], row["y_pred"], row["y_lower"], row["y_upper"]])
 
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="text/csv", headers={
-        "Content-Disposition": "attachment; filename=oracle_forecast.csv"
-    })
+        buffer.seek(0)
+        return StreamingResponse(buffer, media_type="text/csv", headers={
+            "Content-Disposition": "attachment; filename=oracle_forecast.csv"
+        })
+
+    except Exception as e:
+        print("🔴 CSVエクスポート失敗:", e)
+        return RedirectResponse(url="/dashboard?message=error", status_code=303)
