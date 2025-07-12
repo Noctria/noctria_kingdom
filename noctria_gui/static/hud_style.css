@@ -1,6 +1,6 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.9
-   (トリガーページスタイルを追加)
+   🏰 Noctria Kingdom - HUD Interface Style v1.10
+   (ヒートマップスタイルを追加)
    ============================================ */
 
 /* --- Root Variables --- */
@@ -48,16 +48,19 @@ body {
     backdrop-filter: blur(5px); padding: 1rem; position: relative;
     border-radius: 4px; display: flex; flex-direction: column;
 }
-.hud-panel::before, .hud-panel::after,
-.hud-panel > :first-child::before, .hud-panel > :first-child::after {
-    content: ''; position: absolute; width: 15px; height: 15px;
-    border-color: var(--glow-primary); border-style: solid;
+.panel-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
 }
-.hud-panel::before { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
-.hud-panel::after { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
-.hud-panel > :first-child::before { bottom: -2px; left: -2px; border-width: 0 0 2px 2px; }
-.hud-panel > :first-child::after { bottom: -2px; right: -2px; border-width: 0 0 2px 2px; }
-
+.panel-header-flex .panel-title {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
 .panel-title {
     color: var(--text-color-title); font-size: 1.1rem; font-weight: 700;
     margin: 0 0 1rem 0; text-transform: uppercase; letter-spacing: 2px;
@@ -70,68 +73,74 @@ body {
 /* --- Header & Navigation --- */
 .header { flex-direction: row; justify-content: space-between; align-items: center; }
 .hud-title { font-size: 1.5rem; color: var(--text-color-title); text-shadow: 0 0 6px var(--glow-secondary); margin: 0; border: none; }
-.hud-title i { text-shadow: 0 0 6px var(--glow-secondary); }
 .nav-item-back {
     background: transparent; border: 1px solid var(--panel-border); color: var(--text-color-base);
     text-decoration: none; padding: 0.5rem 1rem; transition: all 0.2s ease;
     display: flex; align-items: center; gap: 0.5rem; border-radius: 4px;
 }
 .nav-item-back:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 10px var(--glow-primary); }
-.nav-item-back:hover span, .nav-item-back:hover i { text-shadow: none; }
 
-
-/* ======================================== */
-/* 新規追加: トリガーページスタイル */
-/* ======================================== */
-.trigger-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+/* --- Forms & Buttons --- */
+.filter-form { display: flex; gap: 1rem; align-items: center; }
+.filter-form input, .filter-form select {
+    background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border);
+    color: var(--text-color-base); padding: 0.75rem;
+    font-family: var(--font-family); font-size: 1rem;
+    border-radius: 4px; flex-grow: 1;
 }
-.trigger-form label {
-    font-weight: 700;
-    color: var(--text-color-title);
-    text-shadow: var(--glow-effect);
+.hud-btn {
+    background: transparent; border: 1px solid var(--glow-primary); color: var(--glow-primary);
+    padding: 0.75rem 1.5rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s ease; text-shadow: var(--glow-effect);
+    display: flex; align-items: center; gap: 0.5rem;
 }
-.trigger-form input[type="text"] {
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--panel-border);
-    color: var(--text-color-base);
-    padding: 0.75rem;
-    font-family: var(--font-family);
-    font-size: 1rem;
-    border-radius: 4px;
-    width: 100%;
-    box-sizing: border-box; /* paddingを含めて幅100%にする */
-}
-.trigger-form .hud-btn {
-    width: auto; /* ボタン幅をコンテンツに合わせる */
-    align-self: flex-start; /* ボタンを左寄せにする */
-}
-.result-content {
-    background-color: rgba(0, 0, 0, 0.3);
-    padding: 1rem;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    flex-grow: 1;
-    font-size: 1rem;
-    color: var(--text-color-title);
-    border: 1px solid var(--panel-border);
-}
-
-
-/* (以下、既存のスタイル) */
-.text-green, .text-cyan { color: var(--accent-color-1); text-shadow: 0 0 4px var(--accent-color-1); }
-.text-magenta { color: var(--accent-color-2); text-shadow: 0 0 4px var(--accent-color-2); }
-.text-yellow { color: var(--accent-color-3); text-shadow: 0 0 4px var(--accent-color-3); }
-.hud-btn { background: transparent; border: 1px solid var(--glow-primary); color: var(--glow-primary); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; text-shadow: var(--glow-effect); }
 .hud-btn:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 15px var(--glow-primary); text-shadow: none; }
-.upload-form { display: flex; gap: 1rem; align-items: center; }
-input[type="file"] { display: none; }
-.custom-file-upload { border: 1px dashed var(--panel-border); background: rgba(0,0,0,0.2); display: inline-block; padding: 1rem; cursor: pointer; flex-grow: 1; text-align: center; transition: all 0.2s ease; color: var(--text-color-base); }
-.custom-file-upload:hover { border-color: var(--glow-primary); color: var(--glow-primary); }
-.custom-file-upload i { margin-right: 0.75rem; }
-.upload-form .hud-btn { width: auto; flex-shrink: 0; }
-.result-panel { flex-grow: 1; }
-.result-pre { background-color: rgba(0, 0, 0, 0.3); padding: 1rem; border-radius: 4px; white-space: pre-wrap; word-break: break-all; overflow-y: auto; flex-grow: 1; font-size: 0.9rem; color: var(--text-color-base); border: 1px solid var(--panel-border); }
+.hud-btn-small {
+    background: transparent; border: 1px solid var(--panel-border);
+    color: var(--text-color-base); padding: 0.4rem 0.8rem;
+    font-family: var(--font-family); font-size: 0.8rem;
+    cursor: pointer; transition: all 0.2s ease; border-radius: 4px;
+    display: flex; align-items: center; gap: 0.4rem;
+    text-decoration: none;
+}
+.hud-btn-small:hover { border-color: var(--glow-primary); color: var(--glow-primary); }
+
+/* --- Table Styling --- */
+.table-wrapper { overflow-y: auto; flex-grow: 1; }
+.hud-table { width: 100%; border-collapse: collapse; }
+.hud-table th, .hud-table td {
+    padding: 0.75rem 1rem; text-align: center;
+    border-bottom: 1px solid var(--panel-border);
+    white-space: nowrap;
+}
+.hud-table th {
+    color: var(--text-color-title); text-transform: uppercase; letter-spacing: 1px;
+    font-weight: 700; position: sticky; top: 0;
+    background: var(--bg-color);
+}
+.hud-table tbody tr:hover { background-color: var(--panel-bg); }
+.hud-table .tag-name-cell { text-align: left; font-weight: 700; }
+
+
+/* ======================================== */
+/* 新規追加: ヒートマップスタイル */
+/* ======================================== */
+.heatmap-table td {
+    position: relative;
+    z-index: 1;
+    transition: background-color 0.3s ease;
+}
+.heatmap-cell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    /* calc()とvar()を使って動的に幅を計算 */
+    width: calc(var(--value, 0) / var(--max, 100) * 100%);
+    /* var()を使って動的に色を計算 */
+    background-color: var(--color, var(--accent-color-1));
+    opacity: 0.2;
+    z-index: -1;
+    transition: width 0.5s ease;
+}
