@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 # --- Local Application Imports ---
+# 注意: 以下のモジュールが正しく存在し、インポート可能であることを確認してください
 from core.king_noctria import KingNoctria
 from core.path_config import (ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR,
                               PUSH_LOG_DIR)
@@ -26,8 +27,8 @@ from strategies.prometheus_oracle import PrometheusOracle
 # ⚙️ ルーターとテンプレートのセットアップ
 # ========================================
 router = APIRouter(
-    prefix="/dashboard",  # このルーターの全パスは /dashboard から始まる
-    tags=["Dashboard"]    # FastAPIのドキュメント用のタグ
+    prefix="/dashboard",
+    tags=["Dashboard"]
 )
 
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -39,13 +40,9 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 def aggregate_dashboard_stats() -> Dict[str, Any]:
     """ダッシュボードに表示する各種統計情報を集計する"""
     stats = {
-        "promoted_count": 0,
-        "pushed_count": 0,
-        "pdca_count": 0,
-        "avg_win_rate": 0.0,
-        "oracle_metrics": {},
-        "recheck_success": 0,
-        "recheck_fail": 0,
+        "promoted_count": 0, "pushed_count": 0, "pdca_count": 0,
+        "avg_win_rate": 0.0, "oracle_metrics": {},
+        "recheck_success": 0, "recheck_fail": 0,
     }
     act_dir = Path(ACT_LOG_DIR)
     win_rates = []
@@ -71,7 +68,6 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
 
     try:
-        # このブロックで 'PrometheusOracle' object has no attribute 'evaluate_model' エラーが発生している
         oracle = PrometheusOracle()
         metrics = oracle.evaluate_model() 
         stats["oracle_metrics"] = {
@@ -79,13 +75,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
         }
     except Exception as e:
         print(f"Warning: Failed to get Oracle metrics. Error: {e}")
-        # 修正点: エラー発生時もテンプレートが期待するキー構造を維持する
-        stats["oracle_metrics"] = {
-            "RMSE": 0.0, 
-            "MAE": 0.0, 
-            "MAPE": 0.0,
-            "error": "N/A" # エラーがあったことを示すフラグを追加
-        }
+        stats["oracle_metrics"] = { "RMSE": 0.0, "MAE": 0.0, "MAPE": 0.0, "error": "N/A" }
     return stats
 
 def aggregate_push_stats() -> int:
@@ -105,9 +95,10 @@ async def show_dashboard(request: Request):
     """
     統計情報と予測データを集計し、メインのダッシュボードページをレンダリングします。
     """
+    # ★★★★★ ここからが重要です ★★★★★
+    # forecast_dataを初期化し、データを生成します。
     forecast_data = []
     try:
-        # ダミーデータ生成ロジック
         today = datetime.now()
         price = 150.0
         for i in range(14):
@@ -126,7 +117,14 @@ async def show_dashboard(request: Request):
     stats = aggregate_dashboard_stats()
     stats["pushed_count"] = aggregate_push_stats()
     
-    context = {"request": request, "forecast": forecast_data, "stats": stats}
+    # context辞書に、キー"forecast"で生成したデータを格納します。
+    context = {
+        "request": request,
+        "stats": stats,
+        "forecast": forecast_data  # この行が最も重要です！
+    }
+    # ★★★★★ ここまでが重要です ★★★★★
+    
     return templates.TemplateResponse("dashboard.html", context)
 
 
