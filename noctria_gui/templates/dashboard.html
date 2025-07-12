@@ -65,9 +65,7 @@
       </div>
     </section>
 
-    <!-- ======================================== -->
-    <!-- ナビゲーションメニューの追加 -->
-    <!-- ======================================== -->
+    <!-- ナビゲーションメニュー -->
     <section class="mb-8">
         <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">メインメニュー</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -86,14 +84,6 @@
             <a href="/upload-strategy" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                 <h3 class="font-bold text-lg mb-2 text-yellow-500">📤 戦略アップロード</h3>
                 <p class="text-gray-600 dark:text-gray-400">新しい戦略ファイルや設定をシステムに登録します。</p>
-            </a>
-            <a href="/pdca-dashboard" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-2 text-indigo-500">🔄 PDCAサイクル</h3>
-                <p class="text-gray-600 dark:text-gray-400">戦略の改善サイクル（PDCA）の状況を管理します。</p>
-            </a>
-            <a href="/logs-dashboard" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-2 text-pink-500">📄 ログ閲覧</h3>
-                <p class="text-gray-600 dark:text-gray-400">システム全体の各種動作ログを確認します。</p>
             </a>
         </div>
     </section>
@@ -124,14 +114,18 @@
     <!-- 📈 Chart.js グラフ -->
     <section class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
       <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">📊 Oracle 予測チャート</h2>
-      <!-- 修正点: | safe フィルタを削除 -->
-      <div id="forecastDataContainer" data-forecast='{{ forecast | tojson }}' style="display: none;"></div>
       <canvas id="forecastChart"></canvas>
     </section>
   </div>
 
+  <!-- 修正点: データをJavaScript変数に直接格納するための専用scriptタグ -->
   <script>
-    // (JavaScript部分は変更なし)
+    // Python/Jinja2から渡されたデータをグローバルJavaScript変数に格納します。
+    // `<script>`タグ内で安全にJSONを出力するため、`| safe` フィルタは不可欠です。
+    window.forecastData = {{ forecast | tojson | safe }};
+  </script>
+
+  <script>
     // 🌙 ダークモード切替
     const darkModeToggle = document.getElementById('darkModeToggle');
     const body = document.body;
@@ -155,33 +149,58 @@
         lightIcon.classList.remove('hidden');
         darkIcon.classList.add('hidden');
       }
-      forecastChart.options.scales.x.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
-      forecastChart.options.scales.y.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
-      forecastChart.options.plugins.legend.labels.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
-      forecastChart.update();
-    });
-
-    // 📈 Chart.js描画
-    const forecastDataElement = document.getElementById('forecastDataContainer');
-    const forecastData = JSON.parse(forecastDataElement.dataset.forecast);
-    const ctx = document.getElementById("forecastChart").getContext("2d");
-    const forecastChart = new Chart(ctx, {
-      type: "line", data: { labels: forecastData.map(item => item.date),
-        datasets: [
-          { label: "実績", data: forecastData.map(item => item.y_actual), borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.1)', borderWidth: 2, fill: true, },
-          { label: "予測", data: forecastData.map(item => item.y_pred), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, },
-          { label: "予測下限", data: forecastData.map(item => item.y_lower), borderWidth: 1, borderDash: [5, 5], fill: false, borderColor: 'rgba(147, 197, 253, 0.8)', pointRadius: 0, },
-          { label: "予測上限", data: forecastData.map(item => item.y_upper), borderWidth: 1, borderDash: [5, 5], fill: '-1', borderColor: 'rgba(147, 197, 253, 0.8)', backgroundColor: 'rgba(147, 197, 253, 0.2)', pointRadius: 0, }
-        ]
-      },
-      options: { responsive: true, maintainAspectRatio: false,
-        scales: {
-          x: { ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } },
-          y: { beginAtZero: false, ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } }
-        },
-        plugins: { legend: { labels: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } } }
+      if (window.forecastChart) {
+          forecastChart.options.scales.x.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
+          forecastChart.options.scales.y.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
+          forecastChart.options.plugins.legend.labels.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
+          forecastChart.update();
       }
     });
+
+    // グローバルスコープでチャートインスタンスを保持
+    let forecastChart;
+
+    // 📈 Chart.js描画
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            // 修正点: グローバルスコープに格納された`window.forecastData`を使用
+            const forecastData = window.forecastData;
+            
+            if (!forecastData || !Array.isArray(forecastData)) {
+                throw new Error("グラフデータが空または不正です。");
+            }
+
+            const ctx = document.getElementById("forecastChart").getContext("2d");
+            
+            forecastChart = new Chart(ctx, {
+              type: "line", data: { labels: forecastData.map(item => item.date),
+                datasets: [
+                  { label: "実績", data: forecastData.map(item => item.y_actual), borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.1)', borderWidth: 2, fill: true, },
+                  { label: "予測", data: forecastData.map(item => item.y_pred), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, },
+                  { label: "予測下限", data: forecastData.map(item => item.y_lower), borderWidth: 1, borderDash: [5, 5], fill: false, borderColor: 'rgba(147, 197, 253, 0.8)', pointRadius: 0, },
+                  { label: "予測上限", data: forecastData.map(item => item.y_upper), borderWidth: 1, borderDash: [5, 5], fill: '-1', borderColor: 'rgba(147, 197, 253, 0.8)', backgroundColor: 'rgba(147, 197, 253, 0.2)', pointRadius: 0, }
+                ]
+              },
+              options: { responsive: true, maintainAspectRatio: false,
+                scales: {
+                  x: { ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } },
+                  y: { beginAtZero: false, ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } }
+                },
+                plugins: { legend: { labels: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } } }
+              }
+            });
+        } catch (e) {
+            console.error("Chart.jsの描画に失敗しました:", e);
+            const chartCanvas = document.getElementById("forecastChart");
+            if(chartCanvas) {
+                const ctx = chartCanvas.getContext("2d");
+                ctx.font = "16px sans-serif";
+                ctx.fillStyle = "red";
+                ctx.fillText("グラフデータの読み込みに失敗しました。", 10, 50);
+            }
+        }
+    });
+
 
     // 👑 評議会フォーム送信処理
     const councilForm = document.getElementById("councilForm");
@@ -197,7 +216,7 @@
       });
       resultDiv.innerHTML = "⏳ 評議会開催中…";
       try {
-        const res = await fetch("/dashboard/king/hold-council", { // URLを修正
+        const res = await fetch("/dashboard/king/hold-council", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(marketData)
         });
         const data = await res.json();
