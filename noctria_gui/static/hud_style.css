@@ -1,6 +1,6 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.4
-   (戦略比較ページスタイルを追加)
+   🏰 Noctria Kingdom - HUD Interface Style v1.5
+   (比較結果ページスタイルを追加)
    ============================================ */
 
 /* --- Root Variables --- */
@@ -82,108 +82,71 @@ body {
 }
 .nav-item-back:hover { background: var(--primary-glow); color: var(--bg-color); box-shadow: 0 0 10px var(--primary-glow); }
 
-/* --- Table & Filter --- */
-.table-wrapper { overflow-y: auto; flex-grow: 1; }
-.hud-table { width: 100%; border-collapse: collapse; }
-.hud-table th, .hud-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--panel-border); white-space: nowrap; }
-.hud-table th { color: var(--title-color); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; position: sticky; top: 0; background: var(--bg-color); }
-.filter-form { display: flex; gap: 1rem; align-items: center; }
-.filter-form input, .filter-form select { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); color: var(--text-color); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; border-radius: 4px; flex-grow: 1; }
-.filter-form select option { background: var(--bg-color); color: var(--text-color); }
 
 /* ======================================== */
-/* 新規追加: 戦略比較選択ページスタイル */
+/* 新規追加: 比較結果ページスタイル */
 /* ======================================== */
-.selection-panel {
-    flex-grow: 1;
+.chart-display-panel {
+    padding: 0; /* 内側の要素でパディングを管理 */
 }
-.selection-form {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-.strategy-list-wrapper {
-    flex-grow: 1;
-    overflow-y: auto; /* スクロール可能にする */
-    border: 1px solid var(--panel-border);
+.chart-controls {
     padding: 1rem;
-    background: rgba(0,0,0,0.2);
-    margin-bottom: 1rem;
-    min-height: 0; /* flexアイテムが縮むために必要 */
-}
-.strategy-list {
+    border-bottom: 1px solid var(--panel-border);
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.strategy-item {
-    display: flex;
+    justify-content: space-between;
     align-items: center;
-    padding: 0.75rem;
-    background: var(--panel-bg);
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    flex-wrap: wrap; /* ボタンが多い場合に折り返す */
+    gap: 1rem;
+}
+.chart-controls .panel-title {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+.hud-btn-group {
+    display: flex;
+    border: 1px solid var(--panel-border);
     border-radius: 4px;
+    overflow: hidden;
 }
-.strategy-item:hover {
-    border-color: var(--primary-glow);
-    background: rgba(0, 229, 255, 0.1);
+.hud-btn-group .hud-btn {
+    border: none;
+    border-left: 1px solid var(--panel-border);
+    border-radius: 0;
+    width: auto;
+    padding: 0.5rem 1rem;
 }
-.strategy-item input[type="checkbox"] {
-    display: none; /* 元のチェックボックスを隠す */
+.hud-btn-group .hud-btn:first-child {
+    border-left: none;
 }
-.custom-checkbox {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--panel-border);
-    margin-right: 1rem;
+.hud-btn-group .hud-btn.active {
+    background: var(--primary-glow);
+    color: var(--bg-color);
+    text-shadow: none;
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+.chart-wrapper {
     position: relative;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
-/* チェックマークのスタイル */
-.custom-checkbox::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 6px;
-    width: 6px;
-    height: 12px;
-    border: solid var(--primary-glow);
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-/* チェックされたときのスタイル */
-.strategy-item input:checked ~ .custom-checkbox {
-    background-color: var(--primary-glow);
-    border-color: var(--primary-glow);
-}
-.strategy-item input:checked ~ .custom-checkbox::after {
-    opacity: 1;
-}
-.strategy-name {
-    font-weight: 700;
-    color: var(--title-color);
-}
-.strategy-stats {
-    margin-left: auto; /* 右端に寄せる */
-    color: var(--text-color);
-    opacity: 0.8;
-    font-size: 0.9em;
-    padding-left: 1rem;
-    white-space: nowrap;
+    flex-grow: 1;
+    min-height: 0;
+    padding: 1rem;
 }
 
 
 /* (以下、既存のスタイル) */
-.hud-dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.75rem 1.5rem; font-size: 1rem; }
-.hud-dl dt { color: var(--text-color); font-weight: 700; opacity: 0.7; }
-.hud-dl dd { margin: 0; font-weight: 700; color: var(--title-color); }
-.hud-tag { display: inline-block; padding: 0.2em 0.6em; background-color: rgba(0, 229, 255, 0.15); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 4px; font-size: 0.8em; margin: 0.1em; }
+.selection-panel { flex-grow: 1; }
+.selection-form { display: flex; flex-direction: column; height: 100%; }
+.strategy-list-wrapper { flex-grow: 1; overflow-y: auto; border: 1px solid var(--panel-border); padding: 1rem; background: rgba(0,0,0,0.2); margin-bottom: 1rem; min-height: 0; }
+.strategy-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.strategy-item { display: flex; align-items: center; padding: 0.75rem; background: var(--panel-bg); border: 1px solid transparent; cursor: pointer; transition: all 0.2s ease; border-radius: 4px; }
+.strategy-item:hover { border-color: var(--primary-glow); background: rgba(0, 229, 255, 0.1); }
+.strategy-item input[type="checkbox"] { display: none; }
+.custom-checkbox { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--panel-border); margin-right: 1rem; position: relative; transition: all 0.2s; flex-shrink: 0; }
+.custom-checkbox::after { content: ''; position: absolute; top: 2px; left: 6px; width: 6px; height: 12px; border: solid var(--primary-glow); border-width: 0 3px 3px 0; transform: rotate(45deg); opacity: 0; transition: opacity 0.2s; }
+.strategy-item input:checked ~ .custom-checkbox { background-color: var(--primary-glow); border-color: var(--primary-glow); }
+.strategy-item input:checked ~ .custom-checkbox::after { opacity: 1; }
+.strategy-name { font-weight: 700; color: var(--title-color); }
+.strategy-stats { margin-left: auto; color: var(--text-color); opacity: 0.8; font-size: 0.9em; padding-left: 1rem; white-space: nowrap; }
 .hud-btn { background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; width: 100%; }
 .hud-btn:hover { background: var(--primary-glow); color: var(--bg-color); box-shadow: 0 0 15px var(--primary-glow); }
 .text-green { color: var(--green); } .text-cyan { color: var(--cyan); }
