@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-"""
-🌐 Noctria Kingdom GUI 起動スクリプト（自動ルート登録版）
-- FastAPIで王国の統治パネルを展開
-- routes/ 以下の全ルートを自動登録
-"""
+import sys
+from pathlib import Path
+
+# ───────────────────────────────────────────────────────────
+# 1) プロジェクトルート（noctria_kingdom）を sys.path に追加
+# ───────────────────────────────────────────────────────────
+# __file__ は main.py のファイルパスです。親ディレクトリから noctria_kingdom を参照します。
+project_root = Path(__file__).resolve().parents[2]  # noctria_kingdom へのパス
+src_dir = project_root / "src"  # src/ ディレクトリを設定
+
+# src ディレクトリを sys.path に追加（これにより src/core や src/noctria_gui がインポート可能に）
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# これで src/core や src/noctria_gui をインポートできるようになります
+from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+import noctria_gui.routes
 
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
 from typing import Any
 import json
-
-# ✅ 統治下の正式パス（core/path_config.pyに定義済み）
-from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-
-# ✅ GUIルートモジュール（__init__.pyで routers 一覧を構築）
-import noctria_gui.routes as routes_pkg
 
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
