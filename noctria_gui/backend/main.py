@@ -60,7 +60,6 @@ async def main_alias() -> RedirectResponse:
     """
     return RedirectResponse(url="/dashboard")
 
-
 # ========================================
 # 各HTMLページのルートを追加
 # ========================================
