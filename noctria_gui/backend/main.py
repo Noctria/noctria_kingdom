@@ -11,7 +11,7 @@ from pathlib import Path
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 import noctria_gui.routes as routes_pkg  # 修正: noctria_gui.routesをimportし、routes_pkgとして使う
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query  # 修正: Queryをインポート
 from fastapi.responses import RedirectResponse, HTMLResponse  # 修正: HTMLResponseをインポート
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -74,7 +74,7 @@ async def show_act_history(request: Request):
     return templates.TemplateResponse("act_history.html", {"request": request, "logs": logs})
 
 @app.get("/act-history/detail", response_class=HTMLResponse)
-async def show_act_detail(request: Request, strategy_name: str = Query(...)):
+async def show_act_detail(request: Request, strategy_name: str = Query(...)):  # 修正: Queryを使ってパラメータを取得
     log = {"strategy": strategy_name, "symbol": "USD/JPY", "timestamp": "2025-07-13", "score": 85}  # 仮のデータ
     return templates.TemplateResponse("act_history_detail.html", {"request": request, "log": log})
 
