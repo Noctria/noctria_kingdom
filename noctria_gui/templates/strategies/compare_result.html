@@ -43,35 +43,35 @@
         </main>
     </div>
 
-    <!-- データを安全に埋め込むための専用scriptタグ -->
-    <script type="application/json" id="strategies-data">
-        {{ strategies | tojson | safe }}
-    </script>
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const strategiesDataElement = document.getElementById('strategies-data');
-            if (!strategiesDataElement || !strategiesDataElement.textContent) {
-                console.error("戦略データが見つかりません。");
+            // --- 修正点 ---
+            // サーバーからのデータ受け渡し問題を切り分けるため、一時的にダミーデータを使用します。
+            // これで表示が正常になれば、問題はPython側にあることが確定します。
+            const strategies = [
+                { "strategy": "Alpha-01", "win_rate": 75.5, "max_drawdown": 12.3, "num_trades": 150, "tags": ["High-Freq", "USD"] },
+                { "strategy": "Beta-07", "win_rate": 62.1, "max_drawdown": 8.5, "num_trades": 210, "tags": ["Mid-Freq", "EUR"] },
+                { "strategy": "Gamma-03", "win_rate": 58.9, "max_drawdown": 15.8, "num_trades": 95, "tags": ["Low-Freq", "Swing"] }
+            ];
+            // --- ここまでがダミーデータです ---
+
+            if (!Array.isArray(strategies) || strategies.length === 0) {
+                console.error("比較対象の戦略データが見つからないか、空です。");
+                const ctx = document.getElementById("comparisonChart").getContext("2d");
+                ctx.font = "16px 'Roboto Mono', monospace";
+                ctx.fillStyle = "#ff79c6"; // magenta
+                ctx.fillText("No comparable strategy data found.", 20, 50);
+                document.querySelectorAll('#chart-controls .hud-btn').forEach(btn => btn.disabled = true);
                 return;
             }
-            const strategies = JSON.parse(strategiesDataElement.textContent);
+            
             const labels = strategies.map(s => s.strategy);
 
-            const tooltips = strategies.map(s =>
-                `Tags: ${(s.tags || []).join(', ')}\nTrades: ${s.num_trades || 'N/A'}\nMax DD: ${s.max_drawdown || 'N/A'}`
-            );
-
-            // HUDテーマに合わせたカラーセット
             const hudColors = {
-                win: 'rgba(0, 255, 155, 0.7)',
-                dd: 'rgba(255, 121, 198, 0.7)',
-                trades: 'rgba(125, 249, 255, 0.7)'
+                win: 'rgba(0, 255, 155, 0.7)', dd: 'rgba(255, 121, 198, 0.7)', trades: 'rgba(125, 249, 255, 0.7)'
             };
             const hudBorderColors = {
-                win: 'rgb(0, 255, 155)',
-                dd: 'rgb(255, 121, 198)',
-                trades: 'rgb(125, 249, 255)'
+                win: 'rgb(0, 255, 155)', dd: 'rgb(255, 121, 198)', trades: 'rgb(125, 249, 255)'
             };
             const radarColors = [
                 { bg: 'rgba(0, 255, 155, 0.2)', border: 'rgb(0, 255, 155)' },
@@ -107,17 +107,7 @@
             window.showChart = function(type) {
                 if (chart) chart.destroy();
                 chart = new Chart(chartCanvas, {
-                    type: "bar",
-                    data: { labels: labels, datasets: [datasets[type]] },
-                    options: { ...baseOptions,
-                        onClick: (evt, elements) => {
-                            if (elements.length > 0) {
-                                const index = elements[0].index;
-                                const name = strategies[index].strategy;
-                                window.location.href = `/strategy/detail?name=${encodeURIComponent(name)}`;
-                            }
-                        }
-                    }
+                    type: "bar", data: { labels: labels, datasets: [datasets[type]] }, options: { ...baseOptions }
                 });
                 updateActiveButton(type);
             }
@@ -127,24 +117,18 @@
                 const radarData = {
                     labels: ["勝率", "最大DD", "取引数"],
                     datasets: strategies.map((s, i) => ({
-                        label: s.strategy,
-                        data: [ s.win_rate || 0, s.max_drawdown || 0, s.num_trades || 0 ],
-                        fill: true,
-                        backgroundColor: radarColors[i % radarColors.length].bg,
-                        borderColor: radarColors[i % radarColors.length].border,
-                        pointBackgroundColor: radarColors[i % radarColors.length].border,
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: radarColors[i % radarColors.length].border
+                        label: s.strategy, data: [ s.win_rate || 0, s.max_drawdown || 0, s.num_trades || 0 ],
+                        fill: true, backgroundColor: radarColors[i % radarColors.length].bg,
+                        borderColor: radarColors[i % radarColors.length].border, pointBackgroundColor: radarColors[i % radarColors.length].border,
+                        pointBorderColor: '#fff', pointHoverBackgroundColor: '#fff', pointHoverBorderColor: radarColors[i % radarColors.length].border
                     }))
                 };
                 const radarOptions = { ...baseOptions, plugins: { legend: { display: true, labels: { color: '#00e5ff' } } },
                     scales: {
                         r: {
-                            angleLines: { color: 'rgba(204, 214, 246, 0.2)' },
-                            grid: { color: 'rgba(204, 214, 246, 0.2)' },
+                            angleLines: { color: 'rgba(204, 214, 246, 0.2)' }, grid: { color: 'rgba(204, 214, 246, 0.2)' },
                             pointLabels: { font: { size: 12, family: "'Roboto Mono', monospace" }, color: '#ccd6f6' },
-                            ticks: { color: '#0a192f', backdropColor: 'rgba(204, 214, 246, 0.8)', borderRadius: 4, }
+                            ticks: { display: false }
                         }
                     }
                 };
@@ -156,13 +140,13 @@
                 const buttons = document.querySelectorAll('#chart-controls .hud-btn');
                 buttons.forEach(btn => {
                     btn.classList.remove('active');
-                    if (btn.textContent.includes(type) || (type === 'radar' && btn.textContent.includes('レーダー'))) {
+                    const btnText = btn.textContent;
+                    if (btnText.includes(type) || (type === 'radar' && btnText.includes('レーダー'))) {
                         btn.classList.add('active');
                     }
                 });
             }
 
-            // 初期表示
             showChart('win');
         });
     </script>
