@@ -14,7 +14,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ../tools:/docker-entrypoint-initdb.d  # ★ 初期化SQLを自動実行するために tools/ をマウント
+      - ../tools:/docker-entrypoint-initdb.d  # ★ 初期化SQL（init_optuna.sql）実行
     ports:
       - "5432:5432"
     restart: always
@@ -32,7 +32,7 @@ services:
   # ======================================
   airflow-webserver:
     build:
-      context: .  # ★ 相対パスでビルドコンテキスト指定
+      context: .  # ビルドコンテキスト
       dockerfile: ./docker/Dockerfile
     image: noctria-airflow
     container_name: airflow-webserver
@@ -42,7 +42,7 @@ services:
     env_file: .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - PYTHONPATH=/opt/airflow/src  # ★ モジュール参照用
+      - PYTHONPATH=/opt/airflow/src
     ports:
       - "8080:8080"
     volumes:
@@ -50,7 +50,7 @@ services:
       - ../logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ../src:/opt/airflow/src
-      - ../data:/opt/airflow/data  # データ共有（任意）
+      - ../data:/opt/airflow/data
     command: webserver
     restart: always
 
