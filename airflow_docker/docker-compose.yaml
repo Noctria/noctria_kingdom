@@ -6,6 +6,7 @@ services:
   # ======================================
   postgres:
     image: postgres:13
+    container_name: postgres
     env_file: .env
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -13,6 +14,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
+      - ../tools:/docker-entrypoint-initdb.d  # ★ 初期化SQLを自動実行するために tools/ をマウント
+    ports:
+      - "5432:5432"
     restart: always
 
   # ======================================
@@ -20,6 +24,7 @@ services:
   # ======================================
   redis:
     image: redis:latest
+    container_name: redis
     restart: always
 
   # ======================================
@@ -27,30 +32,25 @@ services:
   # ======================================
   airflow-webserver:
     build:
-      context: . # ★ 修正点: ビルドコンテキストをカレントディレクトリに変更
-      dockerfile: ./docker/Dockerfile # ★ 修正点: Dockerfileの場所を明示
+      context: .  # ★ 相対パスでビルドコンテキスト指定
+      dockerfile: ./docker/Dockerfile
     image: noctria-airflow
+    container_name: airflow-webserver
     depends_on:
       - postgres
       - redis
     env_file: .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - PYTHONPATH=/opt/airflow/src  # ★ 修正点: Pythonがモジュールを探す場所を指定
+      - PYTHONPATH=/opt/airflow/src  # ★ モジュール参照用
     ports:
       - "8080:8080"
     volumes:
-      # ★ 修正点: プロジェクトルートからの相対パスでシンプルに記述
       - ./dags:/opt/airflow/dags
       - ../logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ../src:/opt/airflow/src # ★ 修正点: srcディレクトリ全体をマウント
-
-      # ★ 削除: 古い個別マウントはすべて不要
-      # - ../core:/opt/airflow/core
-      # - ../scripts:/opt/airflow/scripts
-      # ...など
-
+      - ../src:/opt/airflow/src
+      - ../data:/opt/airflow/data  # データ共有（任意）
     command: webserver
     restart: always
 
@@ -59,30 +59,28 @@ services:
   # ======================================
   airflow-scheduler:
     build:
-      context: . # ★ 修正点
-      dockerfile: ./docker/Dockerfile # ★ 修正点
+      context: .
+      dockerfile: ./docker/Dockerfile
     image: noctria-airflow
+    container_name: airflow-scheduler
     depends_on:
       - postgres
       - redis
     env_file: .env
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - PYTHONPATH=/opt/airflow/src # ★ 修正点
+      - PYTHONPATH=/opt/airflow/src
     volumes:
       - ./dags:/opt/airflow/dags
       - ../logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ../src:/opt/airflow/src
       - ../data:/opt/airflow/data
-
-      # ★ 削除: 古い個別マウントはすべて不要
-
     command: scheduler
     restart: always
 
 # ======================================
-# 🗃 永続ボリューム定義（Postgres用）
+# 🗃 永続ボリューム定義（PostgreSQL用）
 # ======================================
 volumes:
   postgres-db-volume:
