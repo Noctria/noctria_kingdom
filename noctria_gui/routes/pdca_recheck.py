@@ -8,7 +8,7 @@
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse, RedirectResponse
 from core.path_config import STRATEGIES_DIR
-from backend.app.veritas_trigger_api import trigger_recheck_dag
+from ..backend.app.veritas_trigger_api import trigger_recheck_dag
 from pathlib import Path
 import urllib.parse
 
