@@ -4,16 +4,19 @@
 import sys
 from pathlib import Path
 import json
-from typing import Any
+from typing import Any, Dict
+import random
+from datetime import datetime, timedelta
 
 # core.path_config と noctria_gui.routes をインポート
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 import noctria_gui.routes as routes_pkg
 
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
@@ -81,26 +84,85 @@ async def show_act_detail(request: Request, strategy_name: str = Query(...)):
 async def show_base(request: Request):
     return templates.TemplateResponse("base.html", {"request": request})
 
-# 修正点: dashboardに統計情報を渡す
+# 修正点: dashboardにHTMLが必要とする全ての統計情報とグラフデータを渡す
 @app.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard(request: Request):
     """
     ダッシュボードページを表示します。
-    テンプレートで必要となる統計情報(stats)を渡します。
+    テンプレートで必要となる統計情報(stats)とグラフデータ(forecast)を渡します。
     """
-    # 本来はデータベースなどから取得する統計情報のダミーデータ
+    # 修正点: HTMLテンプレートが要求するキー(oracle_metrics, promoted_countなど)を全て含むようにstats_dataを定義
     stats_data = {
-        "total_strategies": 128,
-        "active_strategies": 76,
-        "avg_win_rate": 62.5,
-        "total_trades": 1540
+        "avg_win_rate": 75.8,
+        "promoted_count": 42,
+        "pushed_count": 123,
+        "oracle_metrics": {
+            "RMSE": 0.0123,
+            "MAE": 0.0098,
+            "MAPE": 1.5
+        }
     }
-    # "stats"というキーでテンプレートにデータを渡す
+
+    # Chart.jsで描画するためのダミー予測データ
+    forecast_data = []
+    today = datetime.now()
+    price = 150.0
+    for i in range(30):
+        date = today - timedelta(days=i)
+        actual_price = price + random.uniform(-1.5, 1.5)
+        pred_price = actual_price + random.uniform(-0.5, 0.5)
+        forecast_data.append({
+            "date": date.strftime("%m-%d"),
+            "y_actual": round(actual_price, 2),
+            "y_pred": round(pred_price, 2),
+            "y_lower": round(pred_price - random.uniform(0.8, 1.2), 2),
+            "y_upper": round(pred_price + random.uniform(0.8, 1.2), 2),
+        })
+        price = actual_price
+    forecast_data.reverse() # 日付を昇順にする
+
     context = {
         "request": request,
-        "stats": stats_data
+        "stats": stats_data,
+        "forecast": forecast_data
     }
     return templates.TemplateResponse("dashboard.html", context)
+
+
+# Pydanticモデルを定義してリクエストボディの型を定義
+class MarketData(BaseModel):
+    price: float
+    previous_price: float | None = None
+    volume: float | None = None
+    spread: float | None = None
+    order_block: float | None = None
+    volatility: float | None = None
+    trend_prediction: str | None = None
+    sentiment: float | None = None
+    trend_strength: float | None = None
+    liquidity_ratio: float | None = None
+    momentum: float | None = None
+    short_interest: float | None = None
+
+# 追加: /king/hold-council エンドポイント
+@app.post("/king/hold-council", response_class=JSONResponse)
+async def hold_council(market_data: MarketData):
+    """
+    評議会開催フォームからのリクエストを処理するAPIエンドポイント。
+    ダミーの判断結果を返します。
+    """
+    decision = random.choice(["BUY", "SELL", "STAY"])
+    response_data = {
+        "final_decision": decision,
+        "veritas": {"decision": decision, "score": round(random.uniform(0.6, 0.95), 3)},
+        "prometheus_forecast": {"prediction": random.choice(["bullish", "bearish"]), "confidence": round(random.uniform(0.7, 0.9), 2)},
+        "aurus": "OK",
+        "levia": "OK",
+        "noctus": "OK",
+        "received_data": market_data.dict()
+    }
+    return JSONResponse(content=response_data)
+
 
 @app.get("/king-history", response_class=HTMLResponse)
 async def show_king_history(request: Request):
@@ -110,6 +172,7 @@ async def show_king_history(request: Request):
 async def show_pdca_dashboard(request: Request):
     return templates.TemplateResponse("pdca_dashboard.html", {"request": request})
 
+# (以下、他のエンドポイントは変更なし)
 @app.get("/logs-dashboard", response_class=HTMLResponse)
 async def show_logs_dashboard(request: Request):
     return templates.TemplateResponse("logs_dashboard.html", {"request": request})
@@ -197,4 +260,3 @@ if routers is not None and isinstance(routers, (list, tuple)):
         print(f"🔗 router 統合: tags={getattr(router, 'tags', [])}")
 else:
     print("⚠️ noctria_gui.routes に routers が定義されていません")
-
