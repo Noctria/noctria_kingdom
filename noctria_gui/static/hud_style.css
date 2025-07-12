@@ -1,6 +1,6 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.6
-   (ブルーグローテーマ)
+   🏰 Noctria Kingdom - HUD Interface Style v1.7
+   (グローエフェクト調整版)
    ============================================ */
 
 /* --- Root Variables: ブルーグローテーマ --- */
@@ -21,8 +21,8 @@
     --text-color-base: #a8b2d1;   /* 基本テキスト色 (ライトスレートブルー) */
     --text-color-title: #e6f1ff; /* タイトル色 (ごく薄い青) */
     
-    /* 発光エフェクト */
-    --glow-effect: 0 0 6px var(--glow-primary);
+    /* 修正点: 発光エフェクトのぼかしを6pxから4pxに弱める */
+    --glow-effect: 0 0 4px var(--glow-primary);
 }
 
 /* --- Base & Body --- */
@@ -70,8 +70,9 @@ body {
 
 /* --- Header & Navigation --- */
 .header { flex-direction: row; justify-content: space-between; align-items: center; }
-.hud-title { font-size: 1.5rem; color: var(--text-color-title); text-shadow: 0 0 8px var(--glow-secondary); margin: 0; border: none; }
-.hud-title i { text-shadow: 0 0 8px var(--glow-secondary); }
+/* 修正点: タイトルのぼかしを8pxから6pxに */
+.hud-title { font-size: 1.5rem; color: var(--text-color-title); text-shadow: 0 0 6px var(--glow-secondary); margin: 0; border: none; }
+.hud-title i { text-shadow: 0 0 6px var(--glow-secondary); }
 .system-time { font-size: 1rem; color: var(--glow-primary); text-shadow: var(--glow-effect); }
 .nav-item-back {
     background: transparent; border: 1px solid var(--panel-border); color: var(--text-color-base);
@@ -83,9 +84,10 @@ body {
 
 /* --- Metrics & Colored Text --- */
 .metric-value { font-size: 1.75rem; font-weight: 700; margin: 0; }
-.text-green, .text-cyan { color: var(--accent-color-1); text-shadow: 0 0 5px var(--accent-color-1); }
-.text-magenta { color: var(--accent-color-2); text-shadow: 0 0 5px var(--accent-color-2); }
-.text-yellow { color: var(--accent-color-3); text-shadow: 0 0 5px var(--accent-color-3); }
+/* 修正点: 各強調色のぼかしを5pxから4pxに */
+.text-green, .text-cyan { color: var(--accent-color-1); text-shadow: 0 0 4px var(--accent-color-1); }
+.text-magenta { color: var(--accent-color-2); text-shadow: 0 0 4px var(--accent-color-2); }
+.text-yellow { color: var(--accent-color-3); text-shadow: 0 0 4px var(--accent-color-3); }
 .metric-item h3 i { text-shadow: var(--glow-effect); }
 
 /* --- Buttons --- */
