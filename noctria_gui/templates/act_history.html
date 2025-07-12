@@ -1,137 +1,149 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>📜 採用戦略ログ - Noctria Kingdom</title>
-  <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8" />
+    <title>📜 Act History - Noctria Kingdom HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
 </head>
 <body>
-  <h1>📜 Veritas 採用戦略ログ</h1>
 
-  <!-- 🔍 フィルターUI -->
-  <form method="get" action="/act-history" class="filter card">
-    <!-- （略）フィルター部分はそのまま -->
-    ...
-  </form>
+    <div class="hud-container-simple">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-scroll"></i> VERITAS ADOPTION LOG</h1>
+            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+        </header>
 
-  <!-- 📋 ログ一覧 -->
-  <table id="log-table" class="table">
-    <thead>
-      <tr>
-        <th onclick="sortTable(0)">戦略名</th>
-        <th>通貨ペア</th>
-        <th onclick="sortTable(2)">昇格日時</th>
-        <th onclick="sortTable(3)">平均スコア</th>
-        <th>📈 勝率</th>
-        <th>📉 DD</th>
-        <th>RMSE</th>
-        <th>MAE</th>
-        <th>MAPE</th>
-        <th>タグ</th>
-        <th>Push済</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for log in logs %}
-      <tr>
-        <td>{{ log.strategy }}</td>
-        <td>{{ log.symbol }}</td>
-        <td>{{ log.promoted_at or log.timestamp }}</td>
+        <!-- Filter Panel -->
+        <section class="hud-panel filter-panel">
+            <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
+            <form method="get" action="/act-history" class="filter-form">
+                <input type="text" name="strategy_name" placeholder="Strategy Name..." value="{{ request.query_params.get('strategy_name', '') }}">
+                <select name="pushed">
+                    <option value="">Push Status...</option>
+                    <option value="true" {% if request.query_params.get('pushed') == 'true' %}selected{% endif %}>Pushed</option>
+                    <option value="false" {% if request.query_params.get('pushed') == 'false' %}Not Pushed</option>
+                </select>
+                <button type="submit" class="hud-btn"><i class="fas fa-search"></i> APPLY</button>
+            </form>
+        </section>
 
-        <!-- 平均スコア -->
-        <td>
-          {% if log.score_mean is defined %}
-            {{ "%.2f"|format(log.score_mean) }}
-          {% else %}-{% endif %}
-        </td>
+        <!-- History Log Panel -->
+        <main class="hud-panel log-panel">
+            <h2 class="panel-title">SYSTEM ACTIVITY LOGS</h2>
+            <div class="table-wrapper">
+                <table class="hud-table" id="log-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable(0)">戦略名 <i class="fas fa-sort"></i></th>
+                            <th>通貨ペア</th>
+                            <th onclick="sortTable(2)">昇格日時 <i class="fas fa-sort"></i></th>
+                            <th onclick="sortTable(3)">平均スコア <i class="fas fa-sort"></i></th>
+                            <th onclick="sortTable(4)">勝率 <i class="fas fa-sort"></i></th>
+                            <th onclick="sortTable(5)">最大DD <i class="fas fa-sort"></i></th>
+                            <th>タグ</th>
+                            <th>Push済</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.strategy }}</td>
+                            <td>{{ log.symbol }}</td>
+                            <td>{{ log.promoted_at or log.timestamp }}</td>
+                            <td class="text-cyan">{{ "%.2f"|format(log.score_mean) if log.score_mean is defined else '-' }}</td>
+                            <td>
+                                {% if log.win_rate is defined %}
+                                    <span class="{% if log.win_rate > 70 %}text-green{% elif log.win_rate < 50 %}text-magenta{% else %}text-yellow{% endif %}">
+                                        {{ "%.1f"|format(log.win_rate) }}%
+                                    </span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(log.max_drawdown) if log.max_drawdown is defined else '-' }}%</td>
+                            <td>
+                                {% if log.tags %}
+                                    {% for tag in log.tags %}
+                                        <span class="hud-tag">{{ tag }}</span>
+                                    {% endfor %}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>
+                                <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
+                            </td>
+                            <td class="action-buttons">
+                                <form method="post" action="/act-history/repush" class="action-form">
+                                    <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+                                    <button type="submit" class="hud-btn-small"><i class="fas fa-redo"></i>再Push可に</button>
+                                </form>
+                                <form method="post" action="/act-history/reevaluate" class="action-form">
+                                    <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+                                    <button type="submit" class="hud-btn-small"><i class="fas fa-cogs"></i>再評価</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" style="text-align: center;">No activity logs found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
 
-        <!-- 勝率 -->
-        <td>
-          {% if log.win_rate is defined %}
-            <span style="color: {{ log.win_rate > 70 and 'green' or log.win_rate < 50 and 'red' or 'orange' }}">
-              {{ "%.1f"|format(log.win_rate) }}%
-            </span>
-          {% else %}-{% endif %}
-        </td>
+    <script>
+        function sortTable(colIndex) {
+            const table = document.getElementById("log-table");
+            const tbody = table.tBodies[0];
+            const rows = Array.from(tbody.rows);
+            const isNumeric = [3, 4, 5].includes(colIndex);
 
-        <!-- 最大DD -->
-        <td>
-          {% if log.max_drawdown is defined %}
-            {{ "%.2f"|format(log.max_drawdown) }}%
-          {% else %}-{% endif %}
-        </td>
+            // 現在のソート方向を取得 (なければ 'desc' を初期値とする)
+            const currentDir = table.querySelectorAll('th')[colIndex].dataset.sortDir || 'desc';
+            const newDir = currentDir === 'asc' ? 'desc' : 'asc';
 
-        <!-- RMSE -->
-        <td>
-          {% if log.rmse is defined %}
-            {{ "%.4f"|format(log.rmse) }}
-          {% else %}-{% endif %}
-        </td>
+            // 全てのヘッダーからソート方向表示をリセット
+            table.querySelectorAll('th').forEach(th => th.dataset.sortDir = '');
+            // クリックされたヘッダーに新しいソート方向を設定
+            table.querySelectorAll('th')[colIndex].dataset.sortDir = newDir;
 
-        <!-- MAE -->
-        <td>
-          {% if log.mae is defined %}
-            {{ "%.4f"|format(log.mae) }}
-          {% else %}-{% endif %}
-        </td>
+            const sortedRows = rows.sort((a, b) => {
+                const valA = a.cells[colIndex].innerText.trim().replace(/%|,/g, '');
+                const valB = b.cells[colIndex].innerText.trim().replace(/%|,/g, '');
 
-        <!-- MAPE -->
-        <td>
-          {% if log.mape is defined %}
-            {{ "%.2f"|format(log.mape) }}%
-          {% else %}-{% endif %}
-        </td>
+                if (valA === '-' || valB === '-') return valA === '-' ? 1 : -1;
 
-        <!-- タグ -->
-        <td>
-          {% if log.tags %}
-            {% for tag in log.tags %}
-              <span class="tag">{{ tag }}</span>
-            {% endfor %}
-          {% else %}
-            -
-          {% endif %}
-        </td>
+                const numA = isNumeric ? parseFloat(valA) : valA;
+                const numB = isNumeric ? parseFloat(valB) : valB;
 
-        <!-- Push済 -->
-        <td>{{ "✅" if log.pushed else "❌" }}</td>
-
-        <!-- 操作 -->
-        <td class="action-buttons">
-          <form method="post" action="/act-history/repush" class="action-form">
-            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-            <button type="submit" class="btn">再Push可に</button>
-          </form>
-          <form method="post" action="/act-history/reevaluate" class="action-form">
-            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-            <button type="submit" class="btn">再評価</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <script>
-    function sortTable(colIndex) {
-      const table = document.getElementById("log-table");
-      const rows = Array.from(table.rows).slice(1);
-      const isNumeric = [3,4,5,6,7,8].includes(colIndex); // スコア・指標系
-
-      const sorted = rows.sort((a, b) => {
-        const valA = a.cells[colIndex].innerText.trim().replace('%','');
-        const valB = b.cells[colIndex].innerText.trim().replace('%','');
-        if (isNumeric) {
-          return parseFloat(valB) - parseFloat(valA);
-        } else {
-          return valA.localeCompare(valB, 'ja');
+                if (numA < numB) {
+                    return newDir === 'asc' ? -1 : 1;
+                }
+                if (numA > numB) {
+                    return newDir === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+            
+            // DOMから行を一度削除
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+            // ソートされた行を再追加
+            tbody.append(...sortedRows);
         }
-      });
+    </script>
 
-      const tbody = table.tBodies[0];
-      sorted.forEach(row => tbody.appendChild(row));
-    }
-  </script>
 </body>
 </html>
