@@ -1,5 +1,3 @@
-# noctria_gui/routes/dashboard.py
-
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -9,9 +7,7 @@ from strategies.prometheus_oracle import PrometheusOracle
 
 from datetime import datetime
 from pathlib import Path
-from collections import defaultdict
 from typing import Optional, Dict, Any
-
 import os
 import json
 import subprocess
@@ -94,6 +90,7 @@ async def show_dashboard(request: Request):
             "forecast": "y_pred",
             "lower": "y_lower",
             "upper": "y_upper"
+            # y_true はそのまま出力
         })
         forecast_data = df.to_dict(orient="records")
     except Exception as e:
@@ -120,9 +117,13 @@ async def trigger_oracle_prediction(
     try:
         oracle = PrometheusOracle()
         df = oracle.predict_with_confidence(from_date=from_date, to_date=to_date)
-        df = df.rename(columns={"forecast": "y_pred", "lower": "y_lower", "upper": "y_upper"})
+        df = df.rename(columns={
+            "forecast": "y_pred",
+            "lower": "y_lower",
+            "upper": "y_upper"
+            # y_true はそのまま含める
+        })
 
-        # 保存パスにJSON出力
         ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
         df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False)
 
@@ -145,9 +146,9 @@ async def export_oracle_csv():
 
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow(["date", "y_pred", "y_lower", "y_upper"])
+        writer.writerow(["date", "y_pred", "y_lower", "y_upper", "y_true"])
         for _, row in df.iterrows():
-            writer.writerow([row["date"], row["y_pred"], row["y_lower"], row["y_upper"]])
+            writer.writerow([row["date"], row["y_pred"], row["y_lower"], row["y_upper"], row.get("y_true", "")])
 
         buffer.seek(0)
         return StreamingResponse(buffer, media_type="text/csv", headers={
