@@ -85,6 +85,11 @@ ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
 PUSH_LOG_DIR = DATA_DIR / "push_logs"
 
 # ========================================
+# 🔮 Oracle予測結果保存先（将来活用用）
+# ========================================
+ORACLE_FORECAST_JSON = DATA_DIR / "oracle" / "forecast.json"
+
+# ========================================
 # 🧠 Veritas関連スクリプトパス
 # ========================================
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "generate_strategy_file.py"
@@ -131,6 +136,7 @@ __all__ = [
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
     "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR",
+    "ORACLE_FORECAST_JSON",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
     "GITHUB_PUSH_SCRIPT", "GITHUB_REPO_URL", "CATEGORY_MAP",
     "_lint_path_config"
