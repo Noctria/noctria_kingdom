@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from backend.dag_runner import trigger_dag
-from backend.xcom_fetcher import fetch_xcom_result
+from .dag_runner import trigger_dag
+from .xcom_fetcher import fetch_xcom_result
 
 app = FastAPI()
 
