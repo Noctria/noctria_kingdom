@@ -2,7 +2,13 @@ from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, ORACLE_FORECAST_JSON
+from core.path_config import (
+    NOCTRIA_GUI_TEMPLATES_DIR,
+    ACT_LOG_DIR,
+    PDCA_LOG_DIR,
+    PUSH_LOG_DIR,
+    ORACLE_FORECAST_JSON,
+)
 from strategies.prometheus_oracle import PrometheusOracle
 from core.king_noctria import KingNoctria
 
@@ -11,22 +17,12 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import os
 import json
-import subprocess
 import io
 import csv
 import httpx
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
-
-
-def parse_date(date_str: Optional[str]) -> Optional[datetime]:
-    try:
-        if not date_str:
-            return None
-        return datetime.strptime(date_str, "%Y-%m-%d")
-    except Exception:
-        return None
 
 
 def aggregate_dashboard_stats() -> Dict[str, Any]:
@@ -36,6 +32,8 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
         "pdca_count": 0,
         "avg_win_rate": 0.0,
         "oracle_metrics": {},
+        "recheck_success": 0,
+        "recheck_fail": 0,
     }
 
     act_dir = Path(ACT_LOG_DIR)
@@ -57,6 +55,11 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
             if "pdca_cycle" in data:
                 stats["pdca_count"] += 1
 
+            if data.get("recheck_status") == "success":
+                stats["recheck_success"] += 1
+            elif data.get("recheck_status") == "fail":
+                stats["recheck_fail"] += 1
+
             win = data.get("score", {}).get("win_rate")
             if isinstance(win, (int, float)):
                 win_rates.append(win)
@@ -66,6 +69,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
 
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
 
+    # Oracle評価指標
     try:
         oracle = PrometheusOracle()
         metrics = oracle.evaluate_model()
@@ -78,6 +82,13 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
         stats["oracle_metrics"] = {"error": str(e)}
 
     return stats
+
+
+def aggregate_push_stats() -> int:
+    push_dir = Path(PUSH_LOG_DIR)
+    if not push_dir.exists():
+        return 0
+    return len(list(push_dir.glob("*.json")))
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -93,6 +104,8 @@ async def show_dashboard(request: Request):
         print("🔴 Oracle予測取得エラー:", e)
 
     stats = aggregate_dashboard_stats()
+    stats["pushed_count"] = aggregate_push_stats()
+
     message = request.query_params.get("message")
 
     try:
@@ -123,52 +136,3 @@ async def show_dashboard(request: Request):
         "message": message,
         "council": council_result
     })
-
-
-@router.post("/oracle/predict")
-async def trigger_oracle_prediction(
-    from_date: Optional[str] = Form(None),
-    to_date: Optional[str] = Form(None)
-):
-    try:
-        oracle = PrometheusOracle()
-        df = oracle.predict_with_confidence(from_date=from_date, to_date=to_date)
-        df = df.rename(columns={
-            "forecast": "y_pred",
-            "lower": "y_lower",
-            "upper": "y_upper"
-        })
-
-        ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
-        df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False)
-
-        return RedirectResponse(url="/dashboard?message=success", status_code=303)
-    except Exception as e:
-        print("🔴 Oracle予測失敗:", e)
-        return RedirectResponse(url="/dashboard?message=error", status_code=303)
-
-
-@router.get("/oracle/export")
-async def export_oracle_csv():
-    try:
-        oracle = PrometheusOracle()
-        df = oracle.predict_with_confidence(n_days=14).rename(columns={
-            "forecast": "y_pred",
-            "lower": "y_lower",
-            "upper": "y_upper"
-        })
-
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(["date", "y_pred", "y_lower", "y_upper", "y_true"])
-        for _, row in df.iterrows():
-            writer.writerow([row["date"], row["y_pred"], row["y_lower"], row["y_upper"], row.get("y_true", "")])
-
-        buffer.seek(0)
-        return StreamingResponse(buffer, media_type="text/csv", headers={
-            "Content-Disposition": "attachment; filename=oracle_forecast.csv"
-        })
-
-    except Exception as e:
-        print("🔴 CSVエクスポート失敗:", e)
-        return RedirectResponse(url="/dashboard?message=error", status_code=303)
