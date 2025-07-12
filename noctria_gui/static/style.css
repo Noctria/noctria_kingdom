@@ -12,6 +12,9 @@ body {
   line-height: 1.6;
 }
 
+/* ==========
+   🏷️ 見出し
+   ========== */
 h1, h2, h3 {
   color: #2c3e50;
   font-weight: 600;
@@ -25,6 +28,9 @@ h1 {
   padding-left: 1rem;
 }
 
+/* ==========
+   🔘 ボタン
+   ========== */
 .btn {
   background: linear-gradient(to right, #4b7bec, #3867d6);
   color: white;
@@ -42,6 +48,9 @@ h1 {
   transform: translateY(-2px);
 }
 
+/* ==========
+   📋 テーブル
+   ========== */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -68,6 +77,9 @@ h1 {
   background-color: #f7fbff;
 }
 
+/* ==========
+   🧊 カード
+   ========== */
 .card {
   background-color: white;
   border-radius: 16px;
@@ -76,6 +88,9 @@ h1 {
   margin-bottom: 2rem;
 }
 
+/* ==========
+   🧭 ナビゲーションリンク
+   ========== */
 .nav-link {
   margin-right: 1rem;
   color: #2c3e50;
@@ -87,6 +102,9 @@ h1 {
   color: #4b7bec;
 }
 
+/* ==========
+   🔍 フォーム入力
+   ========== */
 input[type="text"],
 select {
   padding: 0.5rem 0.8rem;
