@@ -1,0 +1,199 @@
+/* ============================================
+   🏰 Noctria Kingdom - HUD Interface Style v1.0
+   ============================================ */
+
+/* --- Root Variables --- */
+:root {
+    --bg-color: #0a192f;
+    --primary-glow: #7DF9FF; /* Aqua/Cyan */
+    --secondary-glow: #00e5ff;
+    --panel-bg: rgba(0, 30, 60, 0.5);
+    --panel-border: rgba(0, 229, 255, 0.4);
+    --panel-shadow: rgba(0, 229, 255, 0.5);
+    --text-color: #ccd6f6;
+    --title-color: #fff;
+    --font-family: 'Roboto Mono', monospace;
+    --green: #00ff9b;
+    --cyan: #7DF9FF;
+    --magenta: #ff79c6;
+    --yellow: #f1fa8c;
+}
+
+/* --- Base & Body --- */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-family);
+    margin: 0;
+    padding: 1rem;
+    overflow-x: hidden;
+    background-image: 
+        linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* --- HUD Container Layout --- */
+.hud-container {
+    display: grid;
+    height: calc(100vh - 2rem);
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-rows: auto 1fr 1fr auto;
+    gap: 1rem;
+    grid-template-areas:
+        "header header header header"
+        "metrics chart-panel chart-panel chart-panel"
+        "nav nav council-form council-form"
+        "footer footer footer footer";
+}
+
+/* --- Panel Styling --- */
+.hud-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 0 15px var(--panel-shadow), inset 0 0 10px rgba(0, 30, 60, 0.5);
+    backdrop-filter: blur(5px);
+    padding: 1rem;
+    position: relative;
+    border-radius: 4px;
+}
+
+/* Panel corner brackets */
+.hud-panel::before, .hud-panel::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-color: var(--primary-glow);
+    border-style: solid;
+}
+.hud-panel::before { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
+.hud-panel::after { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
+/* Bottom corners */
+.hud-panel > :first-child::before, .hud-panel > :first-child::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-color: var(--primary-glow);
+    border-style: solid;
+}
+.hud-panel > :first-child::before { bottom: -2px; left: -2px; border-width: 0 0 2px 2px; }
+.hud-panel > :first-child::after { bottom: -2px; right: -2px; border-width: 0 0 2px 2px; }
+
+
+.panel-title {
+    color: var(--title-color);
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 1rem 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 5px var(--secondary-glow);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 0.5rem;
+}
+
+/* --- Specific Panel Areas --- */
+.header { grid-area: header; display: flex; justify-content: space-between; align-items: center; }
+.metrics { grid-area: metrics; }
+.chart-panel { grid-area: chart-panel; }
+.navigation { grid-area: nav; }
+.council-form { grid-area: council-form; }
+
+/* Header */
+.hud-title { font-size: 1.5rem; color: var(--title-color); text-shadow: 0 0 8px var(--secondary-glow); margin: 0; }
+.system-time { font-size: 1rem; color: var(--primary-glow); }
+
+/* Metrics Panel */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    height: calc(100% - 40px);
+}
+.metric-item {
+    background: rgba(0,0,0,0.2);
+    padding: 0.75rem;
+    border-left: 3px solid var(--primary-glow);
+}
+.metric-item h3 { font-size: 0.9rem; margin: 0 0 0.5rem 0; color: var(--text-color); font-weight: 400; }
+.metric-value { font-size: 1.75rem; font-weight: 700; margin: 0; }
+.text-green { color: var(--green); text-shadow: 0 0 5px var(--green); }
+.text-cyan { color: var(--cyan); text-shadow: 0 0 5px var(--cyan); }
+.text-magenta { color: var(--magenta); text-shadow: 0 0 5px var(--magenta); }
+.text-yellow { color: var(--yellow); text-shadow: 0 0 5px var(--yellow); }
+
+/* Navigation Panel */
+.nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+}
+.nav-item {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text-color);
+    text-decoration: none;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.nav-item:hover {
+    background: var(--primary-glow);
+    color: var(--bg-color);
+    text-shadow: none;
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+.nav-item i { font-size: 1.5rem; }
+
+/* Council Form Panel */
+.council-form form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.council-form input {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--panel-border);
+    color: var(--text-color);
+    padding: 0.75rem;
+    font-family: var(--font-family);
+    font-size: 1rem;
+}
+.council-form input::placeholder { color: rgba(204, 214, 246, 0.5); }
+.hud-btn {
+    background: transparent;
+    border: 1px solid var(--primary-glow);
+    color: var(--primary-glow);
+    padding: 0.75rem;
+    font-family: var(--font-family);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.hud-btn:hover {
+    background: var(--primary-glow);
+    color: var(--bg-color);
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+.council-result {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(0,0,0,0.3);
+    border: 1px dashed var(--panel-border);
+    min-height: 40px;
+    text-align: center;
+}
+
