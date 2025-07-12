@@ -12,7 +12,7 @@ from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 import noctria_gui.routes as routes_pkg  # 修正: noctria_gui.routesをimportし、routes_pkgとして使う
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse  # 修正: HTMLResponseをインポート
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Any
