@@ -3,8 +3,6 @@
 
 """
 📘 scripts/recheck_runner.py（v3.1統合版）
-- strategy_id を指定して再評価（スコア再計算）を行う
-- 共通評価関数 evaluate_strategy を呼び出す
 """
 
 import sys
