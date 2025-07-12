@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 import json
 
-# ✅ 統治下の正式パス
+# ✅ 統治下の正式パス（core/path_config.pyに定義済み）
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 # ✅ GUIルートモジュール（__init__.pyで routers 一覧を構築）
@@ -44,7 +44,7 @@ def from_json(value: str) -> Any:
 templates.env.filters["from_json"] = from_json
 
 # ✅ テンプレート環境を app.state に格納（共通アクセス用）
-app.state.templates = templates  # 型アノテはFastAPI流だとここは不要
+app.state.templates = templates  # FastAPIの慣習的保存方法
 
 # ========================================
 # 🔁 ルーターの自動登録
