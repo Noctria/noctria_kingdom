@@ -6,7 +6,7 @@ import json
 import os
 import random
 from datetime import datetime, timedelta
-from pathlib import Path  # ★★★ この行が重要です: Pathオブジェクトをインポートします ★★★
+from pathlib import Path
 from typing import Any, Dict
 
 # --- Third-party Imports ---
@@ -71,14 +71,21 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
 
     try:
+        # このブロックで 'PrometheusOracle' object has no attribute 'evaluate_model' エラーが発生している
         oracle = PrometheusOracle()
-        metrics = oracle.evaluate_model()
+        metrics = oracle.evaluate_model() 
         stats["oracle_metrics"] = {
             "RMSE": metrics.get("RMSE", 0.0), "MAE": metrics.get("MAE", 0.0), "MAPE": metrics.get("MAPE", 0.0),
         }
     except Exception as e:
         print(f"Warning: Failed to get Oracle metrics. Error: {e}")
-        stats["oracle_metrics"] = {"error": "N/A"}
+        # 修正点: エラー発生時もテンプレートが期待するキー構造を維持する
+        stats["oracle_metrics"] = {
+            "RMSE": 0.0, 
+            "MAE": 0.0, 
+            "MAPE": 0.0,
+            "error": "N/A" # エラーがあったことを示すフラグを追加
+        }
     return stats
 
 def aggregate_push_stats() -> int:
