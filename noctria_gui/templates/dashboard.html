@@ -5,12 +5,10 @@
     <title>🏰 Noctria Kingdom - Central Governance HUD</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Google Fonts (Roboto Mono) -->
+    <!-- Google Fonts & Font Awesome -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-
-    <!-- Font Awesome (for Icons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- 専用CSSファイル -->
@@ -56,7 +54,6 @@
         <!-- Oracle Forecast Chart -->
         <section class="hud-panel chart-panel">
             <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
-            <!-- 修正点: canvasをラッパーdivで囲む -->
             <div class="chart-wrapper">
                 <canvas id="forecastChart"></canvas>
             </div>
@@ -71,7 +68,7 @@
                 <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
                 <a href="/upload-strategy" class="nav-item"><i class="fas fa-upload"></i><span>アップロード</span></a>
                 <a href="/pdca-dashboard" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
-                <a href="/logs-dashboard" class="nav-item"><i class="fas fa-file-alt"></i><span>ログ</span></a>
+                <a href="/trigger" class="nav-item"><i class="fas fa-bullhorn"></i><span>王命発令</span></a>
             </div>
         </section>
 
@@ -97,65 +94,68 @@
         {{ forecast | tojson | safe }}
     </script>
 
-    <!-- Main Logic Script (変更なし) -->
+    <!-- Main Logic Script -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // System Time
             const timeElement = document.getElementById('system-time');
             function updateTime() {
                 const now = new Date();
-                timeElement.textContent = now.toISOString();
+                const options = {
+                    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                };
+                const formatter = new Intl.DateTimeFormat('en-CA', options);
+                const jstString = formatter.format(now).replace(', ', ' ');
+                timeElement.textContent = `${jstString} JST`;
             }
             setInterval(updateTime, 1000);
             updateTime();
 
             // Chart.js
-            let forecastChart;
             try {
                 const forecastDataElement = document.getElementById('forecast-data');
-                if (!forecastDataElement || !forecastDataElement.textContent) {
-                    throw new Error("データ要素が見つからないか、空です。");
-                }
-                const forecastData = JSON.parse(forecastDataElement.textContent);
+                const rawData = forecastDataElement ? forecastDataElement.textContent.trim() : null;
 
-                if (!Array.isArray(forecastData)) {
-                    throw new Error("グラフデータが配列ではありません。");
+                if (!rawData || rawData.startsWith('{'+'{') || rawData === "null") {
+                    throw new Error("サーバーからグラフデータが提供されませんでした。");
+                }
+                
+                const forecastData = JSON.parse(rawData);
+
+                if (!Array.isArray(forecastData) || forecastData.length === 0) {
+                    throw new Error("グラフデータが空または不正な形式です。");
                 }
 
                 const ctx = document.getElementById("forecastChart").getContext("2d");
-                
                 const hudChartOptions = {
                     responsive: true, maintainAspectRatio: false,
                     chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
                     scales: {
                         x: {
-                            type: 'time',
-                            time: { unit: 'day' },
-                            ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                            type: 'time', time: { unit: 'day' },
+                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
                             grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
                         },
                         y: {
-                            ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
                             grid: { color: 'rgba(0, 229, 255, 0.2)' }
                         }
                     },
                     plugins: {
-                        legend: { labels: { color: '#00e5ff', font: { family: "'Roboto Mono', monospace" } } },
+                        legend: { labels: { color: '#e6f1ff', font: { family: "'Roboto Mono', monospace" } } },
                         tooltip: {
                             backgroundColor: 'rgba(0, 30, 60, 0.8)', titleFont: { family: "'Roboto Mono', monospace" },
-                            bodyFont: { family: "'Roboto Mono', monospace" },
-                            borderColor: '#00e5ff', borderWidth: 1
+                            bodyFont: { family: "'Roboto Mono', monospace" }, borderColor: '#00e5ff', borderWidth: 1
                         }
                     }
                 };
-
-                forecastChart = new Chart(ctx, {
+                new Chart(ctx, {
                     type: "line",
                     data: {
                         datasets: [
                             { label: "実績", data: forecastData.map(d => ({x: d.date, y: d.y_actual})), borderColor: '#00ff9b', backgroundColor: 'rgba(0, 255, 155, 0.2)', borderWidth: 2, tension: 0.3, pointRadius: 2 },
                             { label: "予測", data: forecastData.map(d => ({x: d.date, y: d.y_pred})), borderColor: '#7DF9FF', backgroundColor: 'rgba(125, 249, 255, 0.2)', borderWidth: 2, tension: 0.3, pointRadius: 2 },
-                            { label: "予測範囲", data: forecastData.map(d => ({x: d.date, y: [d.y_lower, d.y_upper]})), fill: '-1', borderColor: 'rgba(0, 229, 255, 0.3)', backgroundColor: 'rgba(0, 229, 255, 0.1)', borderWidth: 1, pointRadius: 0, tension: 0.3 }
                         ]
                     },
                     options: hudChartOptions
@@ -167,8 +167,9 @@
                 if(chartCanvas) {
                     const ctx = chartCanvas.getContext("2d");
                     ctx.font = "16px 'Roboto Mono', monospace";
-                    ctx.fillStyle = "red";
-                    ctx.fillText("グラフデータの読み込みに失敗しました。", 10, 50);
+                    ctx.fillStyle = "#ff79c6"; // magenta
+                    ctx.textAlign = "center";
+                    ctx.fillText(e.message, chartCanvas.width / 2, 50);
                 }
             }
 
