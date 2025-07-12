@@ -1,0 +1,17 @@
+[
+  {
+    "timestamp": "2025-07-15T12:34:56",
+    "market_data": {
+      "price": 1.25,
+      "volume": 150
+    },
+    "result": {
+      "final_decision": "BUY",
+      "veritas": {"strategy": "sample_strategy", "win_rate": 0.8},
+      "prometheus_forecast": {"forecast": 1.26},
+      "aurus": "BUY",
+      "levia": "HOLD",
+      "noctus": "SELL"
+    }
+  }
+]
