@@ -2,19 +2,55 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>📊 PDCA サマリー</title>
+  <title>📊 PDCA サマリー - Noctria Kingdom</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    h1, h2 {
+      margin-top: 2rem;
+      color: #2c3e50;
+    }
     .summary-card {
       padding: 1rem;
       border: 1px solid #ccc;
-      margin-bottom: 1rem;
-      background-color: #f9f9f9;
+      margin-bottom: 2rem;
+      background-color: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    form {
+      margin-bottom: 2rem;
+      background-color: #fff;
+      padding: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    label {
+      margin-right: 1.5rem;
+    }
+    select, input[type="date"] {
+      padding: 4px 6px;
+      border-radius: 4px;
+    }
+    button {
+      padding: 0.4rem 1rem;
+      background-color: #2e86de;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 2rem;
+      margin-top: 1.5rem;
+      background-color: #fff;
     }
     th, td {
       border: 1px solid #ccc;
@@ -26,10 +62,12 @@
     }
     .download-btn {
       margin-top: 1rem;
+      margin-bottom: 1rem;
       padding: 0.5rem 1rem;
       background-color: #4caf50;
       color: white;
       border: none;
+      border-radius: 4px;
       cursor: pointer;
     }
   </style>
@@ -38,24 +76,23 @@
   <h1>📊 PDCA 再評価サマリー</h1>
 
   <!-- 📅 期間・モード・件数フォーム -->
-  <form method="get" action="/pdca/summary" style="margin-bottom: 1.5rem;">
+  <form method="get" action="/pdca/summary">
     <label>📅 開始日: <input type="date" name="from" value="{{ filter.from }}"></label>
-    <label style="margin-left: 1rem;">📅 終了日: <input type="date" name="to" value="{{ filter.to }}"></label>
-
-    <label style="margin-left: 2rem;">📊 表示モード:</label>
-    <select name="mode">
-      <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
-      <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
-    </select>
-
-    <label style="margin-left: 2rem;">🔢 表示件数:</label>
-    <select name="limit">
-      <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
-      <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
-      <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
-    </select>
-
-    <button type="submit" style="margin-left: 1rem;">🔍 絞り込む</button>
+    <label>📅 終了日: <input type="date" name="to" value="{{ filter.to }}"></label>
+    <label>📊 表示モード:
+      <select name="mode">
+        <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
+        <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+      </select>
+    </label>
+    <label>🔢 表示件数:
+      <select name="limit">
+        <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
+        <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
+        <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
+      </select>
+    </label>
+    <button type="submit">🔍 絞り込む</button>
   </form>
 
   <!-- ✅ サマリー統計 -->
@@ -83,7 +120,8 @@
         labels: {{ chart.labels | safe }},
         datasets: [{
           label: '勝率改善率 (%)',
-          data: {{ chart.data | safe }},
+          backgroundColor: '#2ecc71',
+          data: {{ chart.data | safe }}
         }]
       },
       options: {
@@ -91,7 +129,7 @@
         plugins: {
           title: {
             display: true,
-            text: '勝率改善（after - before）分布'
+            text: '勝率改善（After - Before）'
           }
         },
         scales: {
@@ -111,8 +149,9 @@
       data: {
         labels: {{ chart.labels | safe }},
         datasets: [{
-          label: '最大DD改善 (before - after)',
-          data: {{ chart.dd_data | safe }},
+          label: '最大DD改善 (Before - After)',
+          backgroundColor: '#e74c3c',
+          data: {{ chart.dd_data | safe }}
         }]
       },
       options: {
@@ -120,7 +159,7 @@
         plugins: {
           title: {
             display: true,
-            text: '最大DD改善（before - after）分布'
+            text: '最大DD改善（Before - After）'
           }
         },
         scales: {
