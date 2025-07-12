@@ -14,29 +14,24 @@
   <style>
     /* カスタムスタイル */
     .input {
-      padding: 0.75rem;
-      border: 1px solid #d1d5db; /* gray-300 */
-      border-radius: 8px;
-      width: 100%;
-      background-color: #f9fafb; /* gray-50 */
-      color: #111827; /* gray-900 */
+      padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; width: 100%;
+      background-color: #f9fafb; color: #111827;
     }
     .dark .input {
-      border-color: #4b5563; /* gray-600 */
-      background-color: #374151; /* gray-700 */
-      color: #f9fafb; /* gray-50 */
+      border-color: #4b5563; background-color: #374151; color: #f9fafb;
     }
     .btn {
-      background-color: #2563eb; /* blue-600 */
-      color: white;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background-color 0.2s;
+      background-color: #2563eb; color: white; padding: 0.75rem 1.5rem;
+      border-radius: 8px; cursor: pointer; font-weight: 600; transition: background-color 0.2s;
     }
-    .btn:hover {
-      background-color: #1d4ed8; /* blue-700 */
+    .btn:hover { background-color: #1d4ed8; }
+    .nav-card {
+      display: block;
+      transition: all 0.3s ease;
+    }
+    .nav-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
   </style>
 </head>
@@ -70,6 +65,39 @@
       </div>
     </section>
 
+    <!-- ======================================== -->
+    <!-- ナビゲーションメニューの追加 -->
+    <!-- ======================================== -->
+    <section class="mb-8">
+        <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">メインメニュー</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <a href="/statistics/dashboard" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="font-bold text-lg mb-2 text-blue-500">📊 統計ダッシュボード</h3>
+                <p class="text-gray-600 dark:text-gray-400">全体のパフォーマンスとランキングを詳細に分析します。</p>
+            </a>
+            <a href="/strategy/compare" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="font-bold text-lg mb-2 text-green-500">⚔️ 戦略比較</h3>
+                <p class="text-gray-600 dark:text-gray-400">複数の戦略を並べて、優劣を詳細に比較・評価します。</p>
+            </a>
+            <a href="/act-history" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="font-bold text-lg mb-2 text-purple-500">📜 Act履歴</h3>
+                <p class="text-gray-600 dark:text-gray-400">過去の全決定ログ（Act Log）を時系列で閲覧します。</p>
+            </a>
+            <a href="/upload-strategy" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="font-bold text-lg mb-2 text-yellow-500">📤 戦略アップロード</h3>
+                <p class="text-gray-600 dark:text-gray-400">新しい戦略ファイルや設定をシステムに登録します。</p>
+            </a>
+            <a href="/pdca-dashboard" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="font-bold text-lg mb-2 text-indigo-500">🔄 PDCAサイクル</h3>
+                <p class="text-gray-600 dark:text-gray-400">戦略の改善サイクル（PDCA）の状況を管理します。</p>
+            </a>
+            <a href="/logs-dashboard" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <h3 class="font-bold text-lg mb-2 text-pink-500">📄 ログ閲覧</h3>
+                <p class="text-gray-600 dark:text-gray-400">システム全体の各種動作ログを確認します。</p>
+            </a>
+        </div>
+    </section>
+
     <!-- 📤 評議会開催フォーム -->
     <section class="mb-8 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
       <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">📤 評議会開催フォーム</h2>
@@ -96,13 +124,14 @@
     <!-- 📈 Chart.js グラフ -->
     <section class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
       <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">📊 Oracle 予測チャート</h2>
-      <!-- 修正点: データを格納するためのdiv要素を追加 -->
-      <div id="forecastDataContainer" data-forecast='{{ forecast | tojson | safe }}' style="display: none;"></div>
+      <!-- 修正点: | safe フィルタを削除 -->
+      <div id="forecastDataContainer" data-forecast='{{ forecast | tojson }}' style="display: none;"></div>
       <canvas id="forecastChart"></canvas>
     </section>
   </div>
 
   <script>
+    // (JavaScript部分は変更なし)
     // 🌙 ダークモード切替
     const darkModeToggle = document.getElementById('darkModeToggle');
     const body = document.body;
@@ -126,7 +155,6 @@
         lightIcon.classList.remove('hidden');
         darkIcon.classList.add('hidden');
       }
-      // チャートを再描画してダークモードのスタイルを適用
       forecastChart.options.scales.x.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
       forecastChart.options.scales.y.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
       forecastChart.options.plugins.legend.labels.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
@@ -134,77 +162,30 @@
     });
 
     // 📈 Chart.js描画
-    // 修正点: data属性からJSONデータを読み込む
     const forecastDataElement = document.getElementById('forecastDataContainer');
     const forecastData = JSON.parse(forecastDataElement.dataset.forecast);
-
     const ctx = document.getElementById("forecastChart").getContext("2d");
     const forecastChart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: forecastData.map(item => item.date),
+      type: "line", data: { labels: forecastData.map(item => item.date),
         datasets: [
-          {
-            label: "実績",
-            data: forecastData.map(item => item.y_actual),
-            borderColor: 'rgb(34, 197, 94)', // green-500
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            borderWidth: 2,
-            fill: true,
-          },
-          {
-            label: "予測",
-            data: forecastData.map(item => item.y_pred),
-            borderColor: 'rgb(59, 130, 246)', // blue-500
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderWidth: 2,
-            fill: true,
-          },
-          {
-            label: "予測下限",
-            data: forecastData.map(item => item.y_lower),
-            borderWidth: 1,
-            borderDash: [5, 5],
-            fill: false,
-            borderColor: 'rgba(147, 197, 253, 0.8)', // blue-300
-            pointRadius: 0,
-          },
-          {
-            label: "予測上限",
-            data: forecastData.map(item => item.y_upper),
-            borderWidth: 1,
-            borderDash: [5, 5],
-            fill: '-1', // 上下限の間を塗る
-            borderColor: 'rgba(147, 197, 253, 0.8)',
-            backgroundColor: 'rgba(147, 197, 253, 0.2)',
-            pointRadius: 0,
-          }
+          { label: "実績", data: forecastData.map(item => item.y_actual), borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.1)', borderWidth: 2, fill: true, },
+          { label: "予測", data: forecastData.map(item => item.y_pred), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, },
+          { label: "予測下限", data: forecastData.map(item => item.y_lower), borderWidth: 1, borderDash: [5, 5], fill: false, borderColor: 'rgba(147, 197, 253, 0.8)', pointRadius: 0, },
+          { label: "予測上限", data: forecastData.map(item => item.y_upper), borderWidth: 1, borderDash: [5, 5], fill: '-1', borderColor: 'rgba(147, 197, 253, 0.8)', backgroundColor: 'rgba(147, 197, 253, 0.2)', pointRadius: 0, }
         ]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
+      options: { responsive: true, maintainAspectRatio: false,
         scales: {
-          x: {
-            ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' }
-          },
-          y: {
-            beginAtZero: false,
-            ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' }
-          }
+          x: { ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } },
+          y: { beginAtZero: false, ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } }
         },
-        plugins: {
-          legend: {
-            labels: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' }
-          }
-        }
+        plugins: { legend: { labels: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } } }
       }
     });
 
     // 👑 評議会フォーム送信処理
     const councilForm = document.getElementById("councilForm");
     const resultDiv = document.getElementById("councilResult");
-
     councilForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const formData = new FormData(councilForm);
@@ -214,16 +195,11 @@
         const num = Number(value);
         marketData[key] = isNaN(num) ? value : num;
       });
-
       resultDiv.innerHTML = "⏳ 評議会開催中…";
-
       try {
-        const res = await fetch("/king/hold-council", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(marketData)
+        const res = await fetch("/dashboard/king/hold-council", { // URLを修正
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(marketData)
         });
-
         const data = await res.json();
         if (res.ok) {
           resultDiv.innerHTML = `
