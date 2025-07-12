@@ -73,7 +73,8 @@ services:
       - ./dags:/opt/airflow/dags
       - ../logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ../src:/opt/airflow/src # ★ 修正点
+      - ../src:/opt/airflow/src
+      - ../data:/opt/airflow/data
 
       # ★ 削除: 古い個別マウントはすべて不要
 
