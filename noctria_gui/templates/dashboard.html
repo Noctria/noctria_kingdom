@@ -1,239 +1,203 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>🏰 Noctria Kingdom - 中央統治ダッシュボード</title>
+    <meta charset="UTF-8" />
+    <title>🏰 Noctria Kingdom - Central Governance HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Roboto Mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome (for Icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    /* カスタムスタイル */
-    .input {
-      padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; width: 100%;
-      background-color: #f9fafb; color: #111827;
-    }
-    .dark .input {
-      border-color: #4b5563; background-color: #374151; color: #f9fafb;
-    }
-    .btn {
-      background-color: #2563eb; color: white; padding: 0.75rem 1.5rem;
-      border-radius: 8px; cursor: pointer; font-weight: 600; transition: background-color 0.2s;
-    }
-    .btn:hover { background-color: #1d4ed8; }
-    .nav-card {
-      display: block;
-      transition: all 0.3s ease;
-    }
-    .nav-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-  </style>
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition duration-300 font-sans">
-  <div class="container mx-auto p-4 md:p-6">
-    <header class="mb-6 flex flex-col md:flex-row justify-between items-center">
-      <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">🏰 中央統治ダッシュボード</h1>
-      <button id="darkModeToggle" class="mt-2 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <span class="light-mode-icon">🌙</span>
-        <span class="dark-mode-icon hidden">☀️</span>
-      </button>
-    </header>
+<body>
 
-    <!-- 統計HUD -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
-        <h2 class="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">📈 平均勝率</h2>
-        <p class="text-3xl font-bold text-green-500">{{ stats.avg_win_rate | round(2) }}%</p>
-      </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
-        <h2 class="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">📌 採用戦略数</h2>
-        <p class="text-3xl font-bold text-blue-500">{{ stats.promoted_count }}</p>
-      </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
-        <h2 class="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">🚀 Push実行数</h2>
-        <p class="text-3xl font-bold text-purple-500">{{ stats.pushed_count }}</p>
-      </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
-        <h2 class="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">🔮 Oracle精度 (RMSE)</h2>
-        <p class="text-3xl font-bold text-yellow-500">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
-      </div>
-    </section>
+    <div class="hud-container">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-chess-king"></i> NOCTRIA KINGDOM - CENTRAL GOVERNANCE HUD</h1>
+            <div id="system-time" class="system-time"></div>
+        </header>
 
-    <!-- ナビゲーションメニュー -->
-    <section class="mb-8">
-        <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">メインメニュー</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <a href="/statistics/dashboard" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-2 text-blue-500">📊 統計ダッシュボード</h3>
-                <p class="text-gray-600 dark:text-gray-400">全体のパフォーマンスとランキングを詳細に分析します。</p>
-            </a>
-            <a href="/strategy/compare" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-2 text-green-500">⚔️ 戦略比較</h3>
-                <p class="text-gray-600 dark:text-gray-400">複数の戦略を並べて、優劣を詳細に比較・評価します。</p>
-            </a>
-            <a href="/act-history" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-2 text-purple-500">📜 Act履歴</h3>
-                <p class="text-gray-600 dark:text-gray-400">過去の全決定ログ（Act Log）を時系列で閲覧します。</p>
-            </a>
-            <a href="/upload-strategy" class="nav-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-2 text-yellow-500">📤 戦略アップロード</h3>
-                <p class="text-gray-600 dark:text-gray-400">新しい戦略ファイルや設定をシステムに登録します。</p>
-            </a>
-        </div>
-    </section>
+        <!-- Key Metrics Panel -->
+        <section class="hud-panel metrics">
+            <h2 class="panel-title">KEY METRICS</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+                    <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
+                </div>
+                <div class="metric-item">
+                    <h3><i class="fas fa-check-double"></i> 採用戦略数</h3>
+                    <p class="metric-value text-cyan">{{ stats.promoted_count }}</p>
+                </div>
+                <div class="metric-item">
+                    <h3><i class="fas fa-rocket"></i> PUSH実行数</h3>
+                    <p class="metric-value text-magenta">{{ stats.pushed_count }}</p>
+                </div>
+                <div class="metric-item">
+                    <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
+                    <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
+                </div>
+            </div>
+        </section>
 
-    <!-- 📤 評議会開催フォーム -->
-    <section class="mb-8 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-      <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">📤 評議会開催フォーム</h2>
-      <form id="councilForm">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <input type="number" name="price" placeholder="現価格" class="input" required step="any" />
-          <input type="number" name="previous_price" placeholder="前回価格" class="input" step="any" />
-          <input type="number" name="volume" placeholder="出来高" class="input" step="any" />
-          <input type="number" name="spread" placeholder="スプレッド" class="input" step="0.001" />
-          <input type="number" name="order_block" placeholder="オーダーブロック" class="input" step="0.01" />
-          <input type="number" name="volatility" placeholder="ボラティリティ" class="input" step="0.01" />
-          <input type="text" name="trend_prediction" placeholder="トレンド予測 (bullish/bearish)" class="input" />
-          <input type="number" name="sentiment" placeholder="センチメント(0~1)" class="input" step="0.01" />
-          <input type="number" name="trend_strength" placeholder="トレンド強度" class="input" step="0.01" />
-          <input type="number" name="liquidity_ratio" placeholder="流動性比率" class="input" step="0.01" />
-          <input type="number" name="momentum" placeholder="モメンタム" class="input" step="0.01" />
-          <input type="number" name="short_interest" placeholder="ショート残高" class="input" step="0.01" />
-        </div>
-        <button type="submit" class="btn mt-6 w-full md:w-auto">📣 評議会を開催</button>
-      </form>
-      <div id="councilResult" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[50px] font-mono text-sm"></div>
-    </section>
+        <!-- Oracle Forecast Chart -->
+        <section class="hud-panel chart-panel">
+            <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
+            <canvas id="forecastChart"></canvas>
+        </section>
+        
+        <!-- Navigation Panel -->
+        <section class="hud-panel navigation">
+            <h2 class="panel-title"><i class="fas fa-compass"></i> NAVIGATION</h2>
+            <div class="nav-grid">
+                <a href="/statistics/dashboard" class="nav-item"><i class="fas fa-chart-pie"></i><span>統計DB</span></a>
+                <a href="/strategy/compare" class="nav-item"><i class="fas fa-balance-scale"></i><span>戦略比較</span></a>
+                <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
+                <a href="/upload-strategy" class="nav-item"><i class="fas fa-upload"></i><span>アップロード</span></a>
+                <a href="/pdca-dashboard" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
+                <a href="/logs-dashboard" class="nav-item"><i class="fas fa-file-alt"></i><span>ログ</span></a>
+            </div>
+        </section>
 
-    <!-- 📈 Chart.js グラフ -->
-    <section class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-      <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">📊 Oracle 予測チャート</h2>
-      <canvas id="forecastChart"></canvas>
-    </section>
-  </div>
+        <!-- Council Form Panel -->
+        <section class="hud-panel council-form">
+            <h2 class="panel-title"><i class="fas fa-gavel"></i> HOLD COUNCIL</h2>
+            <form id="councilForm">
+                <div class="form-grid">
+                    <input type="number" name="price" placeholder="PRICE" required step="any" />
+                    <input type="number" name="volume" placeholder="VOLUME" step="any" />
+                    <input type="number" name="volatility" placeholder="VOLATILITY" step="0.01" />
+                    <input type="text" name="trend_prediction" placeholder="TREND (bull/bear)" />
+                </div>
+                <button type="submit" class="hud-btn">EXECUTE</button>
+            </form>
+            <div id="councilResult" class="council-result">Awaiting command...</div>
+        </section>
 
-  <!-- 修正点: データをJavaScript変数に直接格納するための専用scriptタグ -->
-  <script>
-    // Python/Jinja2から渡されたデータをグローバルJavaScript変数に格納します。
-    // `<script>`タグ内で安全にJSONを出力するため、`| safe` フィルタは不可欠です。
-    window.forecastData = {{ forecast | tojson | safe }};
-  </script>
+    </div>
 
-  <script>
-    // 🌙 ダークモード切替
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const body = document.body;
-    const lightIcon = darkModeToggle.querySelector('.light-mode-icon');
-    const darkIcon = darkModeToggle.querySelector('.dark-mode-icon');
+    <!-- 修正点: データを安全に埋め込むための専用scriptタグ -->
+    <script type="application/json" id="forecast-data">
+        {{ forecast | tojson | safe }}
+    </script>
 
-    if (localStorage.getItem('darkMode') === 'enabled') {
-        body.classList.add('dark');
-        lightIcon.classList.add('hidden');
-        darkIcon.classList.remove('hidden');
-    }
+    <!-- Main Logic Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // System Time
+            const timeElement = document.getElementById('system-time');
+            function updateTime() {
+                const now = new Date();
+                timeElement.textContent = now.toISOString();
+            }
+            setInterval(updateTime, 1000);
+            updateTime();
 
-    darkModeToggle.addEventListener('click', () => {
-      body.classList.toggle('dark');
-      if (body.classList.contains('dark')) {
-        localStorage.setItem('darkMode', 'enabled');
-        lightIcon.classList.add('hidden');
-        darkIcon.classList.remove('hidden');
-      } else {
-        localStorage.setItem('darkMode', 'disabled');
-        lightIcon.classList.remove('hidden');
-        darkIcon.classList.add('hidden');
-      }
-      if (window.forecastChart) {
-          forecastChart.options.scales.x.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
-          forecastChart.options.scales.y.ticks.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
-          forecastChart.options.plugins.legend.labels.color = body.classList.contains('dark') ? '#e5e7eb' : '#6b7280';
-          forecastChart.update();
-      }
-    });
+            // Chart.js
+            let forecastChart;
+            try {
+                // 修正点: 専用のscriptタグからデータを読み込み、パースする
+                const forecastDataElement = document.getElementById('forecast-data');
+                if (!forecastDataElement || !forecastDataElement.textContent) {
+                    throw new Error("データ要素が見つからないか、空です。");
+                }
+                const forecastData = JSON.parse(forecastDataElement.textContent);
 
-    // グローバルスコープでチャートインスタンスを保持
-    let forecastChart;
+                if (!Array.isArray(forecastData)) {
+                    throw new Error("グラフデータが配列ではありません。");
+                }
 
-    // 📈 Chart.js描画
-    document.addEventListener('DOMContentLoaded', () => {
-        try {
-            // 修正点: グローバルスコープに格納された`window.forecastData`を使用
-            const forecastData = window.forecastData;
-            
-            if (!forecastData || !Array.isArray(forecastData)) {
-                throw new Error("グラフデータが空または不正です。");
+                const ctx = document.getElementById("forecastChart").getContext("2d");
+                
+                const hudChartOptions = {
+                    responsive: true, maintainAspectRatio: false,
+                    chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'day' },
+                            ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                            grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
+                        },
+                        y: {
+                            ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                            grid: { color: 'rgba(0, 229, 255, 0.2)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#00e5ff', font: { family: "'Roboto Mono', monospace" } } },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 30, 60, 0.8)', titleFont: { family: "'Roboto Mono', monospace" },
+                            bodyFont: { family: "'Roboto Mono', monospace" },
+                            borderColor: '#00e5ff', borderWidth: 1
+                        }
+                    }
+                };
+
+                forecastChart = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        datasets: [
+                            { label: "実績", data: forecastData.map(d => ({x: d.date, y: d.y_actual})), borderColor: '#00ff9b', backgroundColor: 'rgba(0, 255, 155, 0.2)', borderWidth: 2, tension: 0.3, pointRadius: 2 },
+                            { label: "予測", data: forecastData.map(d => ({x: d.date, y: d.y_pred})), borderColor: '#7DF9FF', backgroundColor: 'rgba(125, 249, 255, 0.2)', borderWidth: 2, tension: 0.3, pointRadius: 2 },
+                            { label: "予測範囲", data: forecastData.map(d => ({x: d.date, y: [d.y_lower, d.y_upper]})), fill: '-1', borderColor: 'rgba(0, 229, 255, 0.3)', backgroundColor: 'rgba(0, 229, 255, 0.1)', borderWidth: 1, pointRadius: 0, tension: 0.3 }
+                        ]
+                    },
+                    options: hudChartOptions
+                });
+
+            } catch (e) {
+                console.error("Chart.jsの描画に失敗しました:", e);
+                const chartCanvas = document.getElementById("forecastChart");
+                if(chartCanvas) {
+                    const ctx = chartCanvas.getContext("2d");
+                    ctx.font = "16px 'Roboto Mono', monospace";
+                    ctx.fillStyle = "red";
+                    ctx.fillText("グラフデータの読み込みに失敗しました。", 10, 50);
+                }
             }
 
-            const ctx = document.getElementById("forecastChart").getContext("2d");
-            
-            forecastChart = new Chart(ctx, {
-              type: "line", data: { labels: forecastData.map(item => item.date),
-                datasets: [
-                  { label: "実績", data: forecastData.map(item => item.y_actual), borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.1)', borderWidth: 2, fill: true, },
-                  { label: "予測", data: forecastData.map(item => item.y_pred), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, fill: true, },
-                  { label: "予測下限", data: forecastData.map(item => item.y_lower), borderWidth: 1, borderDash: [5, 5], fill: false, borderColor: 'rgba(147, 197, 253, 0.8)', pointRadius: 0, },
-                  { label: "予測上限", data: forecastData.map(item => item.y_upper), borderWidth: 1, borderDash: [5, 5], fill: '-1', borderColor: 'rgba(147, 197, 253, 0.8)', backgroundColor: 'rgba(147, 197, 253, 0.2)', pointRadius: 0, }
-                ]
-              },
-              options: { responsive: true, maintainAspectRatio: false,
-                scales: {
-                  x: { ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } },
-                  y: { beginAtZero: false, ticks: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } }
-                },
-                plugins: { legend: { labels: { color: body.classList.contains('dark') ? '#e5e7eb' : '#6b7280' } } }
-              }
+            // Council Form
+            const councilForm = document.getElementById("councilForm");
+            const resultDiv = document.getElementById("councilResult");
+            councilForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const formData = new FormData(councilForm);
+                const marketData = {};
+                formData.forEach((value, key) => {
+                    if (value === null || value === "") return;
+                    const num = Number(value);
+                    marketData[key] = isNaN(num) ? value : num;
+                });
+                resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Council...';
+                try {
+                    const res = await fetch("/dashboard/king/hold-council", {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(marketData)
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        resultDiv.textContent = `Decision: ${data.final_decision}`;
+                    } else {
+                        resultDiv.textContent = `Error: ${data.detail || 'Unknown'}`;
+                    }
+                } catch (error) {
+                    resultDiv.textContent = `Communication Error: ${error.message}`;
+                }
             });
-        } catch (e) {
-            console.error("Chart.jsの描画に失敗しました:", e);
-            const chartCanvas = document.getElementById("forecastChart");
-            if(chartCanvas) {
-                const ctx = chartCanvas.getContext("2d");
-                ctx.font = "16px sans-serif";
-                ctx.fillStyle = "red";
-                ctx.fillText("グラフデータの読み込みに失敗しました。", 10, 50);
-            }
-        }
-    });
-
-
-    // 👑 評議会フォーム送信処理
-    const councilForm = document.getElementById("councilForm");
-    const resultDiv = document.getElementById("councilResult");
-    councilForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const formData = new FormData(councilForm);
-      const marketData = {};
-      formData.forEach((value, key) => {
-        if (value === null || value === "") return;
-        const num = Number(value);
-        marketData[key] = isNaN(num) ? value : num;
-      });
-      resultDiv.innerHTML = "⏳ 評議会開催中…";
-      try {
-        const res = await fetch("/dashboard/king/hold-council", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(marketData)
         });
-        const data = await res.json();
-        if (res.ok) {
-          resultDiv.innerHTML = `
-            <strong class="text-green-500">👑 王の判断: ${data.final_decision}</strong><br/>
-            <span>📘 Veritas: ${data.veritas.decision} (Score: ${data.veritas.score})</span><br/>
-            <span>📈 Prometheus: ${data.prometheus_forecast.prediction}</span><br/>
-            <span>...</span>
-          `;
-        } else {
-          resultDiv.innerHTML = `<strong class="text-red-500">❌ エラー: ${data.detail || '不明なエラー'}</strong>`;
-        }
-      } catch (error) {
-        resultDiv.innerHTML = `<strong class="text-red-500">❌ 通信エラー: ${error.message}</strong>`;
-      }
-    });
-  </script>
+    </script>
 </body>
 </html>
