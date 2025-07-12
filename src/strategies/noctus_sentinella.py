@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from core.data.market_data_fetcher import MarketDataFetcher
-from core.risk_manager import RiskManager  # ← クラス名に統一必要
+from core.risk_manager import RiskManager
 
 class NoctusSentinella:
     """
@@ -26,7 +26,24 @@ class NoctusSentinella:
         historical_data = pd.DataFrame(data_array, columns=columns)
 
         # ✅ リスク管理AIにヒストリカルデータを渡す
-        self.risk_manager = RiskManager(historical_data=historical_data)  # ← クラス名に注意
+        self.risk_manager = RiskManager(historical_data=historical_data)
+
+    def _calculate_risk(self, market_data):
+        """
+        VaRを用いたリスクスコア計算（priceに対するVaRの比率）。
+        """
+        price_history = market_data.get("price_history", [])
+        price = market_data.get("price", 1.0)
+
+        if not price_history or price <= 0:
+            return 0.0
+
+        try:
+            risk_value = self.risk_manager.calculate_var()
+            return risk_value / price if risk_value is not None else 0.0
+        except Exception as e:
+            print(f"[Noctus] ❌ リスク計算失敗: {e}")
+            return 0.0
 
     def process(self, market_data):
         """
@@ -56,22 +73,34 @@ class NoctusSentinella:
         else:
             return "MAINTAIN_POSITION"
 
-    def _calculate_risk(self, market_data):
+    def propose(self, market_data: dict) -> dict:
         """
-        VaRを用いたリスクスコア計算（priceに対するVaRの比率）。
+        📩 王Noctriaへの献上：リスク状況の提言を返す
         """
-        price_history = market_data.get("price_history", [])
-        price = market_data.get("price", 1.0)
+        risk_score = self._calculate_risk(market_data)
+        spread = market_data.get("spread", 0.0)
+        liquidity = market_data.get("volume", 0.0)
+        volatility = market_data.get("volatility", 0.0)
+        order_block_impact = market_data.get("order_block", 0.0)
+        adjusted_threshold = self.risk_threshold * (1 + order_block_impact)
 
-        if not price_history or price <= 0:
-            return 0.0
+        if liquidity < self.min_liquidity or spread > self.max_spread:
+            signal = "AVOID_TRADING"
+        elif risk_score > adjusted_threshold and volatility > 0.2:
+            signal = "REDUCE_RISK"
+        else:
+            signal = "MAINTAIN_POSITION"
 
-        try:
-            risk_value = self.risk_manager.calculate_var()
-            return risk_value / price if risk_value is not None else 0.0
-        except Exception as e:
-            print(f"[Noctus] ❌ リスク計算失敗: {e}")
-            return 0.0
+        score = round(risk_score, 4)
+
+        return {
+            "name": "Noctus",
+            "type": "risk_management",
+            "signal": signal,
+            "score": score,
+            "symbol": market_data.get("symbol", "USDJPY"),
+            "priority": "critical"
+        }
 
 # ✅ 単体テスト
 if __name__ == "__main__":
@@ -82,7 +111,8 @@ if __name__ == "__main__":
         "spread": 0.015,
         "volume": 120,
         "order_block": 0.5,
-        "volatility": 0.22
+        "volatility": 0.22,
+        "symbol": "USDJPY"
     }
-    decision = noctus_ai.process(mock_market_data)
-    print("🧠 Risk Management Decision:", decision)
+    result = noctus_ai.propose(mock_market_data)
+    print("🧠 王への提案（Noctus）:", result)
