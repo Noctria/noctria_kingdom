@@ -4,9 +4,11 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from datetime import datetime, timedelta
+from typing import Optional
+from pathlib import Path
+
 from core.data_loader import MarketDataFetcher
 from core.settings import ALPHAVANTAGE_API_KEY
-from pathlib import Path
 
 
 class PrometheusOracle:
@@ -24,11 +26,12 @@ class PrometheusOracle:
         return model
 
     def predict(self, n_days: int = 30) -> pd.DataFrame:
-        # ダミーデータで予測（本来は学習・推論済みモデルを使用）
+        """固定日数による予測"""
         dates = [datetime.today() + timedelta(days=i) for i in range(n_days)]
         y_pred = np.linspace(150, 160, n_days) + np.random.normal(0, 1, n_days)
         y_lower = y_pred - np.random.uniform(1, 2, n_days)
         y_upper = y_pred + np.random.uniform(1, 2, n_days)
+
         return pd.DataFrame({
             "date": [d.strftime("%Y-%m-%d") for d in dates],
             "y_pred": y_pred.round(2),
@@ -36,7 +39,49 @@ class PrometheusOracle:
             "y_upper": y_upper.round(2),
         })
 
-# ✅ GUIから呼び出し用
+    def predict_with_confidence(
+        self,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        n_days: Optional[int] = 14
+    ) -> pd.DataFrame:
+        """日付範囲指定対応の予測メソッド（GUI連携用）"""
+        try:
+            if from_date:
+                start_date = datetime.strptime(from_date, "%Y-%m-%d")
+            else:
+                start_date = datetime.today()
+
+            if to_date:
+                end_date = datetime.strptime(to_date, "%Y-%m-%d")
+            else:
+                end_date = start_date + timedelta(days=n_days - 1)
+
+            # 日付の正規化
+            if end_date < start_date:
+                start_date, end_date = end_date, start_date
+
+            n_days_calc = (end_date - start_date).days + 1
+            dates = [start_date + timedelta(days=i) for i in range(n_days_calc)]
+
+            # 🔮 ダミー予測（将来はモデルに置換）
+            y_pred = np.linspace(150, 160, n_days_calc) + np.random.normal(0, 1, n_days_calc)
+            y_lower = y_pred - np.random.uniform(1, 2, n_days_calc)
+            y_upper = y_pred + np.random.uniform(1, 2, n_days_calc)
+
+            return pd.DataFrame({
+                "date": [d.strftime("%Y-%m-%d") for d in dates],
+                "forecast": y_pred.round(2),
+                "lower": y_lower.round(2),
+                "upper": y_upper.round(2),
+            })
+
+        except Exception as e:
+            print(f"🔴 日付指定付き予測エラー: {e}")
+            raise
+
+
+# ✅ GUIから呼び出し用ユーティリティ
 def predict_and_save(output_path: Path, n_days: int = 30):
     oracle = PrometheusOracle()
     df = oracle.predict(n_days=n_days)
