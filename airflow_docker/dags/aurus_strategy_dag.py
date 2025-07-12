@@ -1,15 +1,11 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-import sys
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from core.path_config import STRATEGIES_DIR  # 絶対パスで統一
 
-# ✅ パスの統一管理（Noctria Kingdom v2.0 構成）
-from core.path_config import STRATEGIES_DIR
-
-# ✅ Airflowコンテナ環境対応
-
-# ✅ DAG共通設定
+# ===============================
+# DAG共通設定
+# ===============================
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -29,7 +25,9 @@ dag = DAG(
     tags=['noctria', 'trend-analysis'],
 )
 
-# ✅ Veritas（模擬データ生成）
+# ===============================
+# Veritas模擬データ生成タスク
+# ===============================
 def veritas_trigger_task(**kwargs):
     ti = kwargs['ti']
     mock_market_data = {
@@ -47,29 +45,23 @@ def veritas_trigger_task(**kwargs):
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
-# ✅ Aurus戦略判断
+# ===============================
+# Aurus戦略解析タスク
+# ===============================
 def aurus_strategy_task(**kwargs):
     ti = kwargs['ti']
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
 
     if input_data is None:
-        print("⚠️ Veritasからのデータが無かったため、デフォルトで実行します")
-        input_data = {
-            "price": 1.0,
-            "volume": 0.0,
-            "sentiment": 0.0,
-            "trend_strength": 0.0,
-            "volatility": 0.0,
-            "order_block": 0.0,
-            "institutional_flow": 0.0,
-            "short_interest": 0.0,
-            "momentum": 0.0,
-            "trend_prediction": 0.0,
-            "liquidity_ratio": 0.0,
-        }
+        print("⚠️ Veritasからのデータが無かったため、デフォルトデータを使用します")
+        input_data = {key: 0.0 for key in [
+            "price", "volume", "sentiment", "trend_strength", "volatility",
+            "order_block", "institutional_flow", "short_interest", "momentum",
+            "trend_prediction", "liquidity_ratio"
+        ]}
 
     try:
-        from aurus_singularis import AurusSingularis  # STRATEGIES_DIR に含まれると仮定
+        from strategies.aurus.aurus_singularis import AurusSingularis  # src/strategies/aurus/
         aurus = AurusSingularis()
         decision = aurus.process(input_data)
         ti.xcom_push(key='aurus_decision', value=decision)
@@ -78,7 +70,9 @@ def aurus_strategy_task(**kwargs):
         print(f"❌ Aurus戦略中にエラー発生: {e}")
         raise
 
-# ✅ DAG構築（Airflow指揮官）
+# ===============================
+# DAGタスク定義
+# ===============================
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
