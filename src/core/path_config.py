@@ -2,9 +2,10 @@
 # coding: utf-8
 
 """
-📌 Noctria Kingdom Path Config (v3.7)
+📌 Noctria Kingdom Path Config (v4.0)
 - 王国全体のパス構造を一元管理
 - Docker/WSL/ローカルの差異を吸収し、自動で切り替える
+- src/ 配下に統合された構成を前提とする
 """
 
 from pathlib import Path
@@ -12,8 +13,10 @@ from pathlib import Path
 # ========================================
 # 🏰 基本ディレクトリ判定（Docker or ローカル）
 # ========================================
-BASE_DIR = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parent.parent
+BASE_DIR = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BASE_DIR
+
+SRC_DIR = BASE_DIR / "src"
 
 # ========================================
 # 🏛 Airflow構成領域
@@ -27,12 +30,13 @@ TOOLS_DIR = BASE_DIR / "tools"
 # ========================================
 # 🧠 知性領域（AI・戦略・評価・実行）
 # ========================================
-CORE_DIR = BASE_DIR / "core"
-SCRIPTS_DIR = BASE_DIR / "scripts"
-VERITAS_DIR = BASE_DIR / "veritas"
-STRATEGIES_DIR = BASE_DIR / "strategies"
-EXECUTION_DIR = BASE_DIR / "execution"
-EXPERTS_DIR = BASE_DIR / "experts"
+CORE_DIR = SRC_DIR / "core"
+SCRIPTS_DIR = SRC_DIR / "scripts"
+VERITAS_DIR = SRC_DIR / "veritas"
+STRATEGIES_DIR = SRC_DIR / "strategies"
+EXECUTION_DIR = SRC_DIR / "execution"
+EXPERTS_DIR = SRC_DIR / "experts"
+NOCTRIA_AI_DIR = SRC_DIR / "noctria_ai"
 
 # ========================================
 # 📦 データ・モデル領域
@@ -50,7 +54,7 @@ NOCTRIA_GUI_DIR = BASE_DIR / "noctria_gui"
 NOCTRIA_GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
 NOCTRIA_GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
 GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # alias
-GUI_STATIC_DIR = NOCTRIA_GUI_STATIC_DIR      # alias
+GUI_STATIC_DIR = NOCTRIA_GUI_STATIC_DIR        # alias
 GUI_ROUTES_DIR = NOCTRIA_GUI_DIR / "routes"
 GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
 
@@ -78,7 +82,7 @@ else:
 # ========================================
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
-PUSH_LOG_DIR = DATA_DIR / "push_logs"  # 🔁 Pushログ拡張用
+PUSH_LOG_DIR = DATA_DIR / "push_logs"
 
 # ========================================
 # 🧠 Veritas関連スクリプトパス
@@ -91,7 +95,7 @@ GENERATE_ORDER_SCRIPT = EXECUTION_DIR / "generate_order_json.py"
 # 🔁 GitHub関連設定
 # ========================================
 GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
-GITHUB_REPO_URL = "https://github.com/Noctria/noctria_kingdom"  # 🔗 Pushログで使用
+GITHUB_REPO_URL = "https://github.com/Noctria/noctria_kingdom"
 
 # ========================================
 # 🗂 戦略カテゴリ分類マップ（GUI用）
@@ -116,15 +120,18 @@ def _lint_path_config():
 # 🌐 公開定数（王の地図として他モジュールに輸出）
 # ========================================
 __all__ = [
-    "BASE_DIR", "PROJECT_ROOT", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
+    "BASE_DIR", "PROJECT_ROOT", "SRC_DIR",
+    "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
     "TOOLS_DIR", "SCRIPTS_DIR", "CORE_DIR", "VERITAS_DIR", "STRATEGIES_DIR",
-    "EXECUTION_DIR", "EXPERTS_DIR", "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
-    "MODELS_DIR", "INSTITUTIONS_DIR", "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR",
-    "NOCTRIA_GUI_STATIC_DIR", "GUI_TEMPLATES_DIR", "GUI_STATIC_DIR",
-    "GUI_ROUTES_DIR", "GUI_SERVICES_DIR", "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
+    "EXECUTION_DIR", "EXPERTS_DIR", "NOCTRIA_AI_DIR",
+    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
+    "MODELS_DIR", "INSTITUTIONS_DIR",
+    "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
+    "GUI_TEMPLATES_DIR", "GUI_STATIC_DIR", "GUI_ROUTES_DIR", "GUI_SERVICES_DIR",
+    "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
     "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR",
-    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT", # ★ 修正点
-    "GITHUB_PUSH_SCRIPT", "GITHUB_REPO_URL",
-    "CATEGORY_MAP", "_lint_path_config"
+    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
+    "GITHUB_PUSH_SCRIPT", "GITHUB_REPO_URL", "CATEGORY_MAP",
+    "_lint_path_config"
 ]
