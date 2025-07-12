@@ -28,11 +28,14 @@
             <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
             <form method="get" action="/act-history" class="filter-form">
                 <input type="text" name="strategy_name" placeholder="Strategy Name..." value="{{ request.query_params.get('strategy_name', '') }}">
+                
+                <!-- 修正点: ifブロックをインラインifに書き換えて構文エラーを回避 -->
                 <select name="pushed">
                     <option value="">Push Status...</option>
-                    <option value="true" {% if request.query_params.get('pushed') == 'true' %}selected{% endif %}>Pushed</option>
-                    <option value="false" {% if request.query_params.get('pushed') == 'false' %}Not Pushed</option>
+                    <option value="true" {{ 'selected' if request.query_params.get('pushed') == 'true' }}>Pushed</option>
+                    <option value="false" {{ 'selected' if request.query_params.get('pushed') == 'false' }}>Not Pushed</option>
                 </select>
+                
                 <button type="submit" class="hud-btn"><i class="fas fa-search"></i> APPLY</button>
             </form>
         </section>
@@ -64,7 +67,8 @@
                             <td class="text-cyan">{{ "%.2f"|format(log.score_mean) if log.score_mean is defined else '-' }}</td>
                             <td>
                                 {% if log.win_rate is defined %}
-                                    <span class="{% if log.win_rate > 70 %}text-green{% elif log.win_rate < 50 %}text-magenta{% else %}text-yellow{% endif %}">
+                                    <!-- 修正点: ネストしたifブロックを、よりシンプルなインラインifに書き換え -->
+                                    <span class="{{ 'text-green' if log.win_rate > 70 else 'text-magenta' if log.win_rate < 50 else 'text-yellow' }}">
                                         {{ "%.1f"|format(log.win_rate) }}%
                                     </span>
                                 {% else %}-{% endif %}
@@ -75,7 +79,9 @@
                                     {% for tag in log.tags %}
                                         <span class="hud-tag">{{ tag }}</span>
                                     {% endfor %}
-                                {% else %}-{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
                             </td>
                             <td>
                                 <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
@@ -109,13 +115,10 @@
             const rows = Array.from(tbody.rows);
             const isNumeric = [3, 4, 5].includes(colIndex);
 
-            // 現在のソート方向を取得 (なければ 'desc' を初期値とする)
             const currentDir = table.querySelectorAll('th')[colIndex].dataset.sortDir || 'desc';
             const newDir = currentDir === 'asc' ? 'desc' : 'asc';
 
-            // 全てのヘッダーからソート方向表示をリセット
             table.querySelectorAll('th').forEach(th => th.dataset.sortDir = '');
-            // クリックされたヘッダーに新しいソート方向を設定
             table.querySelectorAll('th')[colIndex].dataset.sortDir = newDir;
 
             const sortedRows = rows.sort((a, b) => {
@@ -136,11 +139,9 @@
                 return 0;
             });
             
-            // DOMから行を一度削除
             while (tbody.firstChild) {
                 tbody.removeChild(tbody.firstChild);
             }
-            // ソートされた行を再追加
             tbody.append(...sortedRows);
         }
     </script>
