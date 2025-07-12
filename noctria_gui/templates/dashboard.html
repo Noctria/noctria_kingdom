@@ -136,6 +136,7 @@
     const y_pred = forecast.map(d => d.y_pred);
     const y_lower = forecast.map(d => d.y_lower);
     const y_upper = forecast.map(d => d.y_upper);
+    const y_true = forecast.map(d => d.y_true);  // ✅ 実測値追加
 
     new Chart(document.getElementById("forecastChart"), {
       type: 'line',
@@ -167,6 +168,16 @@
             pointRadius: 0,
             fill: '-1',
             tension: 0.3
+          },
+          {
+            label: "実測値（y_true）",  // ✅ 追加線
+            data: y_true,
+            borderColor: "orange",
+            backgroundColor: "rgba(255, 165, 0, 0.2)",
+            borderWidth: 2,
+            pointRadius: 3,
+            tension: 0.2,
+            fill: false
           }
         ]
       },
@@ -176,7 +187,7 @@
           legend: { display: true },
           title: {
             display: true,
-            text: "🔮 市場予測と信頼区間",
+            text: "🔮 市場予測・信頼区間・実測値",
             color: "#7dd3fc"
           }
         },
