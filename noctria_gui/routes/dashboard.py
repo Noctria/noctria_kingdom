@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR, STRATEGIES_DIR, ORACLE_FORECAST_JSON
 from strategies.prometheus_oracle import PrometheusOracle
+from core.king_noctria import KingNoctria  # 👑 中央統治AIをインポート
 
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +19,6 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
-# 🔍 日付パース
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     try:
         if not date_str:
@@ -28,7 +28,6 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
         return None
 
 
-# 📊 HUDカード用統計集計
 def aggregate_dashboard_stats() -> Dict[str, Any]:
     stats = {
         "promoted_count": 0,
@@ -66,7 +65,6 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
 
     stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
 
-    # 🔮 Oracle評価指標
     try:
         oracle = PrometheusOracle()
         metrics = oracle.evaluate_model()
@@ -81,16 +79,15 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
     return stats
 
 
-# 🌐 ダッシュボード表示
 @router.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard(request: Request):
+    # 🔮 Oracle予測
     try:
         oracle = PrometheusOracle()
         df = oracle.predict_with_confidence(n_days=14).rename(columns={
             "forecast": "y_pred",
             "lower": "y_lower",
             "upper": "y_upper"
-            # y_true はそのまま出力
         })
         forecast_data = df.to_dict(orient="records")
     except Exception as e:
@@ -100,15 +97,37 @@ async def show_dashboard(request: Request):
     stats = aggregate_dashboard_stats()
     message = request.query_params.get("message")
 
+    # 👑 評議会（五臣会議）開催（初期表示用）
+    try:
+        king = KingNoctria()
+        mock_market = {
+            "price": 1.2530,
+            "previous_price": 1.2510,
+            "volume": 160,
+            "spread": 0.012,
+            "order_block": 0.4,
+            "volatility": 0.18,
+            "trend_prediction": "bullish",
+            "sentiment": 0.7,
+            "trend_strength": 0.6,
+            "liquidity_ratio": 1.1,
+            "momentum": 0.8,
+            "short_interest": 0.3
+        }
+        council_result = king.hold_council(mock_market)
+    except Exception as e:
+        print("🔴 評議会開催エラー:", e)
+        council_result = {}
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "forecast": forecast_data,
         "stats": stats,
         "message": message,
+        "council": council_result  # 👑 結果を渡す
     })
 
 
-# 🔄 Oracle再予測トリガー（期間指定対応）
 @router.post("/oracle/predict")
 async def trigger_oracle_prediction(
     from_date: Optional[str] = Form(None),
@@ -121,7 +140,6 @@ async def trigger_oracle_prediction(
             "forecast": "y_pred",
             "lower": "y_lower",
             "upper": "y_upper"
-            # y_true はそのまま含める
         })
 
         ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -133,7 +151,6 @@ async def trigger_oracle_prediction(
         return RedirectResponse(url="/dashboard?message=error", status_code=303)
 
 
-# 📥 予測結果のCSVダウンロード
 @router.get("/oracle/export")
 async def export_oracle_csv():
     try:
