@@ -53,7 +53,7 @@
     </div>
   {% endif %}
 
-  <!-- 🧊 サマリーカード（昇格 / Push / PDCA / 勝率） -->
+  <!-- 🧊 サマリーカード -->
   <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="hud-card p-5 text-center">
       <h2 class="text-lg font-semibold">📈 昇格戦略数</h2>
@@ -91,8 +91,16 @@
   <section class="hud-card p-6 mb-8">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold">🔮 市場予測チャート（PrometheusOracle）</h2>
-      <div class="flex gap-3">
-        <form method="post" action="/oracle/predict">
+      <div class="flex gap-3 items-end">
+        <form method="post" action="/oracle/predict" class="flex gap-2 items-end">
+          <div>
+            <label class="text-sm block text-gray-300">From</label>
+            <input type="date" name="from_date" class="bg-gray-800 text-white p-1 rounded border border-gray-600">
+          </div>
+          <div>
+            <label class="text-sm block text-gray-300">To</label>
+            <input type="date" name="to_date" class="bg-gray-800 text-white p-1 rounded border border-gray-600">
+          </div>
           <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
             🔄 再予測
           </button>
