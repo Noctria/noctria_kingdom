@@ -4,10 +4,6 @@
 """
 📊 /pdca/summary - PDCA再評価の統計サマリ画面
 - 再評価結果ログを集計し、改善率や採用数を表示
-- 📅 期間指定（from～to）によるフィルタに対応
-- 📌 モード切替（戦略別 / タグ別）
-- 🧮 平均勝率差分で降順ソート
-- ✂️ 表示件数制限（limit）
 """
 
 from fastapi import APIRouter, Request, Query
@@ -23,11 +19,13 @@ from core.path_config import PDCA_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 def parse_date_safe(date_str: str) -> datetime | None:
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
+
 
 @router.get("/pdca/summary", response_class=HTMLResponse)
 async def pdca_summary(
@@ -35,7 +33,7 @@ async def pdca_summary(
     from_: str = Query(default=None, alias="from"),
     to: str = Query(default=None),
     mode: str = Query(default="strategy"),  # "strategy" or "tag"
-    limit: int = Query(default=20),         # 表示件数制限
+    limit: int = Query(default=20),
 ):
     from_date = parse_date_safe(from_)
     to_date = parse_date_safe(to)
@@ -50,45 +48,57 @@ async def pdca_summary(
             if not recheck_ts:
                 continue
 
-            ts = datetime.strptime(recheck_ts, "%Y-%m-%dT%H:%M:%S")
+            try:
+                ts = datetime.strptime(recheck_ts, "%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                continue
+
             if from_date and ts < from_date:
                 continue
             if to_date and ts > to_date:
                 continue
 
+            win_before = float(data.get("win_rate_before", 0.0))
+            win_after = float(data.get("win_rate_after", 0.0))
+            dd_before = float(data.get("max_dd_before", 0.0))
+            dd_after = float(data.get("max_dd_after", 0.0))
+
             raw_results.append({
                 "strategy": data.get("strategy"),
                 "tag": data.get("tag", "unknown"),
-                "win_rate_before": data.get("win_rate_before"),
-                "win_rate_after": data.get("win_rate_after"),
-                "diff": round(data.get("win_rate_after", 0) - data.get("win_rate_before", 0), 2),
-                "max_dd_before": data.get("max_dd_before"),
-                "max_dd_after": data.get("max_dd_after"),
-                "dd_diff": round(data.get("max_dd_before", 0) - data.get("max_dd_after", 0), 2),
+                "win_rate_before": win_before,
+                "win_rate_after": win_after,
+                "diff": round(win_after - win_before, 2),
+                "max_dd_before": dd_before,
+                "max_dd_after": dd_after,
+                "dd_diff": round(dd_before - dd_after, 2),
                 "status": data.get("status", "unknown")
             })
         except Exception:
             continue
 
-    # 📊 モード（strategy or tag）ごとの集計
     group_key = "strategy" if mode == "strategy" else "tag"
     grouped = defaultdict(list)
     for r in raw_results:
         key = r.get(group_key) or "unknown"
         grouped[key].append(r)
 
-    # 📈 平均計算 + 採用判定
     detail_rows = []
     for key, group in grouped.items():
-        avg_win_rate_before = sum(g["win_rate_before"] for g in group) / len(group)
-        avg_win_rate_after = sum(g["win_rate_after"] for g in group) / len(group)
+        win_before_vals = [float(g.get("win_rate_before", 0.0)) for g in group]
+        win_after_vals = [float(g.get("win_rate_after", 0.0)) for g in group]
+        dd_before_vals = [float(g.get("max_dd_before", 0.0)) for g in group]
+        dd_after_vals = [float(g.get("max_dd_after", 0.0)) for g in group]
+
+        avg_win_rate_before = sum(win_before_vals) / len(group)
+        avg_win_rate_after = sum(win_after_vals) / len(group)
         avg_diff = round(avg_win_rate_after - avg_win_rate_before, 2)
 
-        avg_dd_before = sum(g["max_dd_before"] for g in group) / len(group)
-        avg_dd_after = sum(g["max_dd_after"] for g in group) / len(group)
+        avg_dd_before = sum(dd_before_vals) / len(group)
+        avg_dd_after = sum(dd_after_vals) / len(group)
         dd_diff = round(avg_dd_before - avg_dd_after, 2)
 
-        adopted = any(g["status"] == "adopted" for g in group)
+        adopted = any(g.get("status") == "adopted" for g in group)
 
         detail_rows.append({
             "strategy": key,
@@ -100,16 +110,16 @@ async def pdca_summary(
             "status": "adopted" if adopted else "pending",
         })
 
-    # 🔽 勝率差分で降順ソート → ✂️ 上位N件に制限
     detail_rows.sort(key=lambda x: x["diff"], reverse=True)
     limited_rows = detail_rows[:limit]
 
-    # 📊 グラフデータの構築（limit後の順序で）
     chart_labels = [r["strategy"] for r in limited_rows]
     chart_data = [r["diff"] for r in limited_rows]
-    chart_dd_data = [r["max_dd_before"] - r["max_dd_after"] for r in limited_rows]
+    chart_dd_data = [
+        round(r["max_dd_before"] - r["max_dd_after"], 2)
+        for r in limited_rows
+    ]
 
-    # 📊 サマリー統計（全体）
     all_diffs = [r["diff"] for r in raw_results]
     all_dd_diffs = [r["dd_diff"] for r in raw_results]
 
@@ -126,7 +136,7 @@ async def pdca_summary(
         "request": request,
         "stats": stats,
         "mode": mode,
-        "limit": limit,  # ✅ これが必要
+        "limit": limit,
         "chart": {
             "labels": chart_labels,
             "data": chart_data,
