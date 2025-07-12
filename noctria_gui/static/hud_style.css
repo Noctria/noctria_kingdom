@@ -1,27 +1,21 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.7
-   (グローエフェクト調整版)
+   🏰 Noctria Kingdom - HUD Interface Style v1.8
+   (アップロードページスタイルを追加)
    ============================================ */
 
 /* --- Root Variables: ブルーグローテーマ --- */
 :root {
-    --bg-color: #0a192f; /* 背景色 (変更なし) */
-    
-    /* 色の定義: 濃い青 -> 明るい水色へ */
-    --glow-primary: #7DF9FF;      /* 最も明るい輝き (Aqua/Cyan) */
-    --glow-secondary: #00e5ff;    /* 2番目に明るい輝き */
-    --accent-color-1: #7DF9FF;    /* 強調色1 (勝率などポジティブな指標) */
-    --accent-color-2: #4b90ff;    /* 強調色2 (中間的な指標) */
-    --accent-color-3: #2c6cb5;    /* 強調色3 (DDなどネガティブな指標) */
-
-    --panel-bg: rgba(17, 34, 64, 0.6); /* パネル背景を少し青みがける */
+    --bg-color: #0a192f;
+    --glow-primary: #7DF9FF;
+    --glow-secondary: #00e5ff;
+    --accent-color-1: #7DF9FF;
+    --accent-color-2: #4b90ff;
+    --accent-color-3: #2c6cb5;
+    --panel-bg: rgba(17, 34, 64, 0.6);
     --panel-border: rgba(0, 229, 255, 0.3);
     --panel-shadow: rgba(0, 229, 255, 0.4);
-
-    --text-color-base: #a8b2d1;   /* 基本テキスト色 (ライトスレートブルー) */
-    --text-color-title: #e6f1ff; /* タイトル色 (ごく薄い青) */
-    
-    /* 修正点: 発光エフェクトのぼかしを6pxから4pxに弱める */
+    --text-color-base: #a8b2d1;
+    --text-color-title: #e6f1ff;
     --glow-effect: 0 0 4px var(--glow-primary);
 }
 
@@ -37,6 +31,14 @@ body {
         linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
     background-size: 20px 20px;
+}
+
+/* --- HUD Layouts --- */
+.hud-container-simple {
+    display: grid;
+    height: calc(100vh - 2rem);
+    grid-template-rows: auto auto 1fr; /* header, upload, result */
+    gap: 1rem;
 }
 
 /* --- Panel Styling --- */
@@ -63,17 +65,12 @@ body {
     border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem;
     flex-shrink: 0;
 }
-.panel-title i {
-    text-shadow: var(--glow-effect);
-    margin-right: 0.5em;
-}
+.panel-title i { text-shadow: var(--glow-effect); margin-right: 0.5em; }
 
 /* --- Header & Navigation --- */
 .header { flex-direction: row; justify-content: space-between; align-items: center; }
-/* 修正点: タイトルのぼかしを8pxから6pxに */
 .hud-title { font-size: 1.5rem; color: var(--text-color-title); text-shadow: 0 0 6px var(--glow-secondary); margin: 0; border: none; }
 .hud-title i { text-shadow: 0 0 6px var(--glow-secondary); }
-.system-time { font-size: 1rem; color: var(--glow-primary); text-shadow: var(--glow-effect); }
 .nav-item-back {
     background: transparent; border: 1px solid var(--panel-border); color: var(--text-color-base);
     text-decoration: none; padding: 0.5rem 1rem; transition: all 0.2s ease;
@@ -82,39 +79,60 @@ body {
 .nav-item-back:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 10px var(--glow-primary); }
 .nav-item-back:hover span, .nav-item-back:hover i { text-shadow: none; }
 
-/* --- Metrics & Colored Text --- */
-.metric-value { font-size: 1.75rem; font-weight: 700; margin: 0; }
-/* 修正点: 各強調色のぼかしを5pxから4pxに */
+
+/* ======================================== */
+/* 新規追加: アップロードページスタイル */
+/* ======================================== */
+.upload-form {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+input[type="file"] {
+    display: none; /* 元のファイル入力を隠す */
+}
+.custom-file-upload {
+    border: 1px dashed var(--panel-border);
+    background: rgba(0,0,0,0.2);
+    display: inline-block;
+    padding: 1rem;
+    cursor: pointer;
+    flex-grow: 1;
+    text-align: center;
+    transition: all 0.2s ease;
+    color: var(--text-color-base);
+}
+.custom-file-upload:hover {
+    border-color: var(--glow-primary);
+    color: var(--glow-primary);
+}
+.custom-file-upload i {
+    margin-right: 0.75rem;
+}
+.upload-form .hud-btn {
+    width: auto; /* ボタン幅をコンテンツに合わせる */
+    flex-shrink: 0;
+}
+.result-panel {
+    flex-grow: 1;
+}
+.result-pre {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-y: auto;
+    flex-grow: 1;
+    font-size: 0.9rem;
+    color: var(--text-color-base);
+    border: 1px solid var(--panel-border);
+}
+
+
+/* (以下、既存のスタイル) */
 .text-green, .text-cyan { color: var(--accent-color-1); text-shadow: 0 0 4px var(--accent-color-1); }
 .text-magenta { color: var(--accent-color-2); text-shadow: 0 0 4px var(--accent-color-2); }
 .text-yellow { color: var(--accent-color-3); text-shadow: 0 0 4px var(--accent-color-3); }
-.metric-item h3 i { text-shadow: var(--glow-effect); }
-
-/* --- Buttons --- */
-.hud-btn {
-    background: transparent; border: 1px solid var(--glow-primary); color: var(--glow-primary);
-    padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700;
-    cursor: pointer; transition: all 0.2s ease; width: 100%; text-shadow: var(--glow-effect);
-}
+.hud-btn { background: transparent; border: 1px solid var(--glow-primary); color: var(--glow-primary); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; text-shadow: var(--glow-effect); }
 .hud-btn:hover { background: var(--glow-primary); color: var(--bg-color); box-shadow: 0 0 15px var(--glow-primary); text-shadow: none; }
-.hud-btn i { margin-right: 0.5em; }
-
-/* (以下、既存のスタイルとの統合と微調整) */
-.hud-container-simple { display: grid; height: calc(100vh - 2rem); grid-template-rows: auto 1fr; gap: 1rem; }
-.chart-wrapper { position: relative; flex-grow: 1; min-height: 0; }
-.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; flex-grow: 1; }
-.metric-item { background: rgba(0,0,0,0.2); padding: 0.75rem; border-left: 3px solid var(--glow-primary); }
-.metric-item h3 { font-size: 0.9rem; margin: 0 0 0.5rem 0; color: var(--text-color-base); font-weight: 400; }
-.nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; flex-grow: 1; }
-.nav-item { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-color-base); text-decoration: none; padding: 1rem; text-align: center; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
-.nav-item:hover { background: var(--glow-primary); color: var(--bg-color); text-shadow: none; box-shadow: 0 0 15px var(--glow-primary); }
-.nav-item span { text-shadow: var(--glow-effect); }
-.nav-item i { font-size: 1.5rem; text-shadow: var(--glow-effect); }
-.nav-item:hover span, .nav-item:hover i { text-shadow: none; }
-.council-form input { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); color: var(--text-color-base); padding: 0.75rem; font-family: var(--font-family); font-size: 1rem; }
-.chart-display-panel { padding: 0; }
-.chart-controls { padding: 1rem; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-.hud-btn-group { display: flex; border: 1px solid var(--panel-border); border-radius: 4px; overflow: hidden; }
-.hud-btn-group .hud-btn { border: none; border-left: 1px solid var(--panel-border); border-radius: 0; width: auto; padding: 0.5rem 1rem; }
-.hud-btn-group .hud-btn:first-child { border-left: none; }
-.hud-btn-group .hud-btn.active { background: var(--glow-primary); color: var(--bg-color); text-shadow: none; box-shadow: 0 0 15px var(--glow-primary); }
