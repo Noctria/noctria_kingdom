@@ -61,7 +61,7 @@ def aurus_strategy_task(**kwargs):
         ]}
 
     try:
-        from strategies.aurus.aurus_singularis import AurusSingularis  # src/strategies/aurus/
+        from strategies.aurus_singularis import AurusSingularis
         aurus = AurusSingularis()
         decision = aurus.process(input_data)
         ti.xcom_push(key='aurus_decision', value=decision)
