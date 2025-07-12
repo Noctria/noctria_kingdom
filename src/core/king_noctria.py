@@ -1,10 +1,10 @@
-# src/core/king_noctria.py
-
 from veritas.veritas_ai import VeritasStrategist
 from strategies.prometheus_oracle import PrometheusOracle
 from strategies.aurus_singularis import AurusSingularis
 from strategies.levia_tempest import LeviaTempest
 from strategies.noctus_sentinella import NoctusSentinella
+
+import requests
 
 class KingNoctria:
     """
@@ -14,26 +14,31 @@ class KingNoctria:
 
     def __init__(self):
         self.veritas = VeritasStrategist()
-        self.prometheus = PrometheusOracle()
         self.aurus = AurusSingularis()
         self.levia = LeviaTempest()
         self.noctus = NoctusSentinella()
 
+    def get_prometheus_forecast_via_api(self, base_url="http://localhost:8000/prometheus/predict"):
+        try:
+            response = requests.get(base_url)
+            response.raise_for_status()
+            data = response.json()
+            if "predictions" in data and len(data["predictions"]) > 0:
+                return data["predictions"][0]  # 最新予測1件を返す
+            return {}
+        except Exception as e:
+            print(f"⚠️ Prometheus API呼び出し失敗: {e}")
+            return {}
+
     def hold_council(self, market_data: dict) -> dict:
-        """
-        📜 五臣会議を開催し、統合的判断を下す。
-        - 各臣下の知見＋王の意思決定ロジック（暫定）
-        """
         print("📣 五臣会議を開催します…")
 
-        # 各臣下からの知見
         veritas_result = self.veritas.propose()
-        prometheus_forecast = self.prometheus.predict_with_confidence(n_days=1).to_dict("records")[0]
+        prometheus_forecast = self.get_prometheus_forecast_via_api()
         aurus_decision = self.aurus.process(market_data)
         levia_decision = self.levia.process(market_data)
         noctus_decision = self.noctus.process(market_data)
 
-        # 王による統合判断（仮：Aurus優先）
         decision = aurus_decision if aurus_decision != "HOLD" else levia_decision
 
         return {
@@ -45,7 +50,8 @@ class KingNoctria:
             "noctus": noctus_decision,
         }
 
-# ✅ 単体テスト（簡易マーケットデータを与える）
+
+# 単体テスト（簡易マーケットデータを与える）
 if __name__ == "__main__":
     king = KingNoctria()
     mock_market = {
