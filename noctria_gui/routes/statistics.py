@@ -16,14 +16,20 @@ from pathlib import Path
 from core.path_config import TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import statistics_service
 
-router = APIRouter(tags=["statistics"])
+router = APIRouter(
+    prefix="/statistics",
+    tags=["statistics"]
+)
+
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 
-@router.get("/statistics", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+@router.get("/dashboard", response_class=HTMLResponse)
 async def show_statistics(request: Request):
     """
     📈 統計スコアダッシュボードを表示（フィルタ付き）
+    - /statistics または /statistics/dashboard どちらでもアクセス可能
     """
     strategy = request.query_params.get("strategy", "").strip() or None
     symbol = request.query_params.get("symbol", "").strip() or None
@@ -61,7 +67,7 @@ async def show_statistics(request: Request):
     })
 
 
-@router.get("/statistics/export")
+@router.get("/export")
 async def export_statistics_csv():
     """
     📤 統計スコア一覧をCSVでエクスポート
