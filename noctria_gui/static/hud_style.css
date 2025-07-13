@@ -1,6 +1,5 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.11
-   (統計DBページスタイルを追加)
+   🏰 Noctria Kingdom - HUD Interface Style v1.12
    ============================================ */
 
 /* --- Root Variables --- */
@@ -23,7 +22,7 @@
 body {
     background-color: var(--bg-color);
     color: var(--text-color-base);
-    font-family: var(--font-family, 'Roboto Mono', monospace);
+    font-family: 'Roboto Mono', Consolas, 'Courier New', monospace;
     margin: 0;
     padding: 1rem;
     overflow: hidden;
@@ -39,51 +38,103 @@ body {
     height: calc(100vh - 2rem);
     grid-template-rows: auto auto 1fr;
     gap: 1rem;
+    min-width: 300px;
 }
 
 /* --- Panel Styling --- */
 .hud-panel {
-    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
     box-shadow: 0 0 15px var(--panel-shadow), inset 0 0 10px rgba(0, 30, 60, 0.5);
-    backdrop-filter: blur(5px); padding: 1rem; position: relative;
-    border-radius: 4px; display: flex; flex-direction: column;
+    backdrop-filter: blur(5px);
+    padding: 1rem;
+    position: relative;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
 }
 .panel-title {
-    color: var(--text-color-title); font-size: 1.1rem; font-weight: 700;
-    margin: 0 0 1rem 0; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--text-color-title);
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 1rem 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
     text-shadow: var(--glow-effect);
-    border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 0.5rem;
     flex-shrink: 0;
 }
 
 /* --- Header & Navigation --- */
-.header { flex-direction: row; justify-content: space-between; align-items: center; }
-.hud-title { font-size: 1.5rem; color: var(--text-color-title); text-shadow: 0 0 6px var(--glow-secondary); margin: 0; border: none; }
-.nav-item-back {
-    background: transparent; border: 1px solid var(--panel-border); color: var(--text-color-base);
-    text-decoration: none; padding: 0.5rem 1rem; transition: all 0.2s ease;
-    display: flex; align-items: center; gap: 0.5rem; border-radius: 4px;
+.header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
 }
-.nav-item-back:hover { background: var(--glow-primary); color: var(--bg-color); }
+.hud-title {
+    font-size: 1.5rem;
+    color: var(--text-color-title);
+    text-shadow: 0 0 6px var(--glow-secondary);
+    margin: 0;
+    border: none;
+}
+.nav-item-back {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text-color-base);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 4px;
+}
+.nav-item-back:hover {
+    background: var(--glow-primary);
+    color: var(--bg-color);
+}
 
 /* --- Forms & Buttons --- */
-.filter-form { display: flex; gap: 1rem; align-items: center; flex-grow: 1; }
+.filter-form {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-grow: 1;
+}
 .filter-form input {
-    background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border);
-    color: var(--text-color-base); padding: 0.75rem;
-    font-family: var(--font-family); font-size: 1rem;
-    border-radius: 4px; flex-grow: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--panel-border);
+    color: var(--text-color-base);
+    padding: 0.75rem;
+    font-family: var(--font-family);
+    font-size: 1rem;
+    border-radius: 4px;
+    flex-grow: 1;
 }
 .hud-btn {
-    background: transparent; border: 1px solid var(--glow-primary); color: var(--glow-primary);
-    padding: 0.75rem 1.5rem; font-family: var(--font-family); font-size: 1rem; font-weight: 700;
-    cursor: pointer; transition: all 0.2s ease; text-shadow: var(--glow-effect);
-    display: flex; align-items: center; gap: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--glow-primary);
+    color: var(--glow-primary);
+    padding: 0.75rem 1.5rem;
+    font-family: var(--font-family);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-shadow: var(--glow-effect);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
-.hud-btn:hover { background: var(--glow-primary); color: var(--bg-color); }
+.hud-btn:hover {
+    background: var(--glow-primary);
+    color: var(--bg-color);
+}
 
 /* ======================================== */
-/* 新規追加: 統計DBページ専用スタイル */
+/* 統計DBページ用スタイル */
 /* ======================================== */
 .controls-panel {
     flex-direction: row;
@@ -101,6 +152,7 @@ body {
 }
 .chart-container-half {
     height: 40%;
+    width: 100%;
     min-height: 200px;
     position: relative;
     flex-shrink: 0;
@@ -112,15 +164,22 @@ body {
     overflow-y: auto;
     flex-grow: 1;
 }
-.hud-table { width: 100%; border-collapse: collapse; }
+.hud-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 .hud-table th, .hud-table td {
-    padding: 0.75rem 1rem; text-align: center;
+    padding: 0.75rem 1rem;
+    text-align: center;
     border-bottom: 1px solid var(--panel-border);
     white-space: nowrap;
 }
 .hud-table th {
-    color: var(--text-color-title); text-transform: uppercase;
-    font-weight: 700; position: sticky; top: 0;
+    color: var(--text-color-title);
+    text-transform: uppercase;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
     background: var(--bg-color);
 }
 .hud-table th.sortable { cursor: pointer; }
@@ -131,10 +190,13 @@ body {
 .hud-table tbody tr:hover { background-color: var(--panel-bg); }
 .hud-table .tag-name-cell { text-align: left; font-weight: 700; }
 .hud-tag {
-    display: inline-block; padding: 0.2em 0.6em;
+    display: inline-block;
+    padding: 0.2em 0.6em;
     background-color: rgba(0, 229, 255, 0.15);
     border: 1px solid rgba(0, 229, 255, 0.3);
-    border-radius: 4px; font-size: 0.8em; margin: 0.1em;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin: 0.1em;
 }
 .action-links a {
     color: var(--glow-primary);
@@ -150,21 +212,35 @@ body {
 }
 .strategy-item-checkbox input[type="checkbox"] { display: none; }
 .custom-checkbox {
-    display: inline-block; width: 20px; height: 20px;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
     border: 2px solid var(--panel-border);
-    position: relative; transition: all 0.2s;
+    position: relative;
+    transition: all 0.2s;
 }
 .custom-checkbox::after {
-    content: ''; position: absolute; top: 2px; left: 6px;
-    width: 6px; height: 12px; border: solid var(--glow-primary);
-    border-width: 0 3px 3px 0; transform: rotate(45deg);
-    opacity: 0; transition: opacity 0.2s;
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 6px;
+    width: 6px;
+    height: 12px;
+    border: solid var(--glow-primary);
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.2s;
 }
 .strategy-item-checkbox input:checked ~ .custom-checkbox {
     background-color: var(--glow-primary);
     border-color: var(--glow-primary);
 }
-.strategy-item-checkbox input:checked ~ .custom-checkbox::after { opacity: 1; }
+.strategy-item-checkbox input:checked ~ .custom-checkbox::after {
+    opacity: 1;
+}
+
+/* --- Extra Utility Colors --- */
 .text-green { color: var(--accent-color-1); }
 .text-magenta { color: var(--accent-color-2); }
 .text-yellow { color: var(--accent-color-3); }
