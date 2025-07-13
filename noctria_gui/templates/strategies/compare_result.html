@@ -1,154 +1,171 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>📈 Strategy Comparison - Noctria Kingdom HUD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- noctria_gui/templates/strategies/compare_result.html -->
+{% extends "base_hud.html" %}
 
-    <!-- Google Fonts & Font Awesome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% block title %}📈 Strategy Comparison - Noctria Kingdom HUD{% endblock %}
+{% block header_icon %}<i class="fas fa-chart-bar"></i>{% endblock %}
+{% block header_title %}STRATEGY SHOWDOWN{% endblock %}
+{% block header_nav %}
+<a href="/statistics/compare/form?mode=strategy" class="nav-item-back"><i class="fas fa-arrow-left"></i><span>BACK TO SELECTION</span></a>
+{% endblock %}
 
-    <!-- 専用CSSファイル -->
-    <link rel="stylesheet" href="/static/hud_style.css" />
-
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-
-    <div class="hud-container-simple">
-        <!-- Header -->
-        <header class="hud-panel header">
-            <h1 class="hud-title"><i class="fas fa-chart-bar"></i> STRATEGY SHOWDOWN</h1>
-            <a href="/strategy/compare" class="nav-item-back"><i class="fas fa-arrow-left"></i><span>BACK TO SELECTION</span></a>
-        </header>
-
-        <!-- Chart Panel -->
-        <main class="hud-panel chart-display-panel">
-            <div class="chart-controls">
-                <h2 class="panel-title">ANALYSIS VIEW</h2>
-                <div class="hud-btn-group" id="chart-controls">
-                    <button class="hud-btn active" onclick="showChart('win')">勝率</button>
-                    <button class="hud-btn" onclick="showChart('dd')">最大DD</button>
-                    <button class="hud-btn" onclick="showChart('trades')">取引数</button>
-                    <button class="hud-btn" onclick="showRadar()">🧩 レーダーチャート</button>
-                </div>
-            </div>
-            <div class="chart-wrapper">
-                <canvas id="comparisonChart"></canvas>
-            </div>
-        </main>
+{% block content %}
+<section class="hud-panel chart-display-panel">
+  <div class="chart-controls">
+    <h2 class="panel-title">ANALYSIS VIEW</h2>
+    <div class="hud-btn-group" id="chart-controls">
+      <button class="hud-btn active" onclick="showChart('win')">勝率</button>
+      <button class="hud-btn" onclick="showChart('dd')">最大DD</button>
+      <button class="hud-btn" onclick="showChart('trades')">取引数</button>
+      <button class="hud-btn" onclick="showRadar()">🧩 レーダーチャート</button>
     </div>
+  </div>
+  <div class="chart-wrapper">
+    <canvas id="comparisonChart"></canvas>
+  </div>
+</section>
+{% endblock %}
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- 修正点 ---
-            // サーバーからのデータ受け渡し問題を切り分けるため、一時的にダミーデータを使用します。
-            // これで表示が正常になれば、問題はPython側にあることが確定します。
-            const strategies = [
-                { "strategy": "Alpha-01", "win_rate": 75.5, "max_drawdown": 12.3, "num_trades": 150, "tags": ["High-Freq", "USD"] },
-                { "strategy": "Beta-07", "win_rate": 62.1, "max_drawdown": 8.5, "num_trades": 210, "tags": ["Mid-Freq", "EUR"] },
-                { "strategy": "Gamma-03", "win_rate": 58.9, "max_drawdown": 15.8, "num_trades": 95, "tags": ["Low-Freq", "Swing"] }
-            ];
-            // --- ここまでがダミーデータです ---
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ✅ Jinja2から受け取ったJSONデータ
+    const strategies = {{ strategies | tojson }};
 
-            if (!Array.isArray(strategies) || strategies.length === 0) {
-                console.error("比較対象の戦略データが見つからないか、空です。");
-                const ctx = document.getElementById("comparisonChart").getContext("2d");
-                ctx.font = "16px 'Roboto Mono', monospace";
-                ctx.fillStyle = "#ff79c6"; // magenta
-                ctx.fillText("No comparable strategy data found.", 20, 50);
-                document.querySelectorAll('#chart-controls .hud-btn').forEach(btn => btn.disabled = true);
-                return;
+    if (!Array.isArray(strategies) || strategies.length === 0) {
+        console.error("比較対象の戦略データが見つかりません。");
+        const ctx = document.getElementById("comparisonChart").getContext("2d");
+        ctx.font = "16px 'Roboto Mono', monospace";
+        ctx.fillStyle = "#ff79c6";
+        ctx.fillText("No strategy data found.", 20, 50);
+        document.querySelectorAll('#chart-controls .hud-btn').forEach(btn => btn.disabled = true);
+        return;
+    }
+
+    const labels = strategies.map(s => s.strategy);
+
+    const hudColors = {
+        win: 'rgba(0, 255, 155, 0.7)', dd: 'rgba(255, 121, 198, 0.7)', trades: 'rgba(125, 249, 255, 0.7)'
+    };
+    const hudBorderColors = {
+        win: 'rgb(0, 255, 155)', dd: 'rgb(255, 121, 198)', trades: 'rgb(125, 249, 255)'
+    };
+    const radarColors = [
+        { bg: 'rgba(0, 255, 155, 0.2)', border: 'rgb(0, 255, 155)' },
+        { bg: 'rgba(125, 249, 255, 0.2)', border: 'rgb(125, 249, 255)' },
+        { bg: 'rgba(255, 121, 198, 0.2)', border: 'rgb(255, 121, 198)' },
+        { bg: 'rgba(241, 250, 140, 0.2)', border: 'rgb(241, 250, 140)' },
+    ];
+
+    const datasets = {
+        win: {
+            label: "勝率 (%)",
+            data: strategies.map(s => s.win_rate),
+            backgroundColor: hudColors.win,
+            borderColor: hudBorderColors.win,
+            borderWidth: 1
+        },
+        dd: {
+            label: "最大DD (%)",
+            data: strategies.map(s => s.max_drawdown),
+            backgroundColor: hudColors.dd,
+            borderColor: hudBorderColors.dd,
+            borderWidth: 1
+        },
+        trades: {
+            label: "取引数",
+            data: strategies.map(s => s.num_trades),
+            backgroundColor: hudColors.trades,
+            borderColor: hudBorderColors.trades,
+            borderWidth: 1
+        }
+    };
+
+    const chartCanvas = document.getElementById("comparisonChart");
+    let chart;
+
+    const baseOptions = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(0, 30, 60, 0.8)',
+                titleFont: { family: "'Roboto Mono', monospace" },
+                bodyFont: { family: "'Roboto Mono', monospace" },
+                borderColor: '#00e5ff',
+                borderWidth: 1
             }
-            
-            const labels = strategies.map(s => s.strategy);
-
-            const hudColors = {
-                win: 'rgba(0, 255, 155, 0.7)', dd: 'rgba(255, 121, 198, 0.7)', trades: 'rgba(125, 249, 255, 0.7)'
-            };
-            const hudBorderColors = {
-                win: 'rgb(0, 255, 155)', dd: 'rgb(255, 121, 198)', trades: 'rgb(125, 249, 255)'
-            };
-            const radarColors = [
-                { bg: 'rgba(0, 255, 155, 0.2)', border: 'rgb(0, 255, 155)' },
-                { bg: 'rgba(125, 249, 255, 0.2)', border: 'rgb(125, 249, 255)' },
-                { bg: 'rgba(255, 121, 198, 0.2)', border: 'rgb(255, 121, 198)' },
-                { bg: 'rgba(241, 250, 140, 0.2)', border: 'rgb(241, 250, 140)' },
-            ];
-
-            const datasets = {
-                win: { label: "勝率 (%)", data: strategies.map(s => s.win_rate), backgroundColor: hudColors.win, borderColor: hudBorderColors.win, borderWidth: 1 },
-                dd: { label: "最大DD (%)", data: strategies.map(s => s.max_drawdown), backgroundColor: hudColors.dd, borderColor: hudBorderColors.dd, borderWidth: 1 },
-                trades: { label: "取引数", data: strategies.map(s => s.num_trades), backgroundColor: hudColors.trades, borderColor: hudBorderColors.trades, borderWidth: 1 }
-            };
-            
-            const chartCanvas = document.getElementById("comparisonChart");
-            let chart;
-
-            const baseOptions = {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 30, 60, 0.8)', titleFont: { family: "'Roboto Mono', monospace" },
-                        bodyFont: { family: "'Roboto Mono', monospace" }, borderColor: '#00e5ff', borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: { ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } }, grid: { color: 'rgba(0, 229, 255, 0.2)' } },
-                    y: { beginAtZero: true, ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } }, grid: { color: 'rgba(0, 229, 255, 0.2)' } }
-                }
-            };
-
-            window.showChart = function(type) {
-                if (chart) chart.destroy();
-                chart = new Chart(chartCanvas, {
-                    type: "bar", data: { labels: labels, datasets: [datasets[type]] }, options: { ...baseOptions }
-                });
-                updateActiveButton(type);
+        },
+        scales: {
+            x: {
+                ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                grid: { color: 'rgba(0, 229, 255, 0.2)' }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                grid: { color: 'rgba(0, 229, 255, 0.2)' }
             }
+        }
+    };
 
-            window.showRadar = function() {
-                if (chart) chart.destroy();
-                const radarData = {
-                    labels: ["勝率", "最大DD", "取引数"],
-                    datasets: strategies.map((s, i) => ({
-                        label: s.strategy, data: [ s.win_rate || 0, s.max_drawdown || 0, s.num_trades || 0 ],
-                        fill: true, backgroundColor: radarColors[i % radarColors.length].bg,
-                        borderColor: radarColors[i % radarColors.length].border, pointBackgroundColor: radarColors[i % radarColors.length].border,
-                        pointBorderColor: '#fff', pointHoverBackgroundColor: '#fff', pointHoverBorderColor: radarColors[i % radarColors.length].border
-                    }))
-                };
-                const radarOptions = { ...baseOptions, plugins: { legend: { display: true, labels: { color: '#00e5ff' } } },
-                    scales: {
-                        r: {
-                            angleLines: { color: 'rgba(204, 214, 246, 0.2)' }, grid: { color: 'rgba(204, 214, 246, 0.2)' },
-                            pointLabels: { font: { size: 12, family: "'Roboto Mono', monospace" }, color: '#ccd6f6' },
-                            ticks: { display: false }
-                        }
-                    }
-                };
-                chart = new Chart(chartCanvas, { type: 'radar', data: radarData, options: radarOptions });
-                updateActiveButton('radar');
-            }
-
-            function updateActiveButton(type) {
-                const buttons = document.querySelectorAll('#chart-controls .hud-btn');
-                buttons.forEach(btn => {
-                    btn.classList.remove('active');
-                    const btnText = btn.textContent;
-                    if (btnText.includes(type) || (type === 'radar' && btnText.includes('レーダー'))) {
-                        btn.classList.add('active');
-                    }
-                });
-            }
-
-            showChart('win');
+    window.showChart = function(type) {
+        if (chart) chart.destroy();
+        chart = new Chart(chartCanvas, {
+            type: "bar",
+            data: { labels: labels, datasets: [datasets[type]] },
+            options: { ...baseOptions }
         });
-    </script>
-</body>
-</html>
+        updateActiveButton(type);
+    };
+
+    window.showRadar = function() {
+        if (chart) chart.destroy();
+        const radarData = {
+            labels: ["勝率", "最大DD", "取引数"],
+            datasets: strategies.map((s, i) => ({
+                label: s.strategy,
+                data: [s.win_rate || 0, s.max_drawdown || 0, s.num_trades || 0],
+                fill: true,
+                backgroundColor: radarColors[i % radarColors.length].bg,
+                borderColor: radarColors[i % radarColors.length].border,
+                pointBackgroundColor: radarColors[i % radarColors.length].border,
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: radarColors[i % radarColors.length].border
+            }))
+        };
+        const radarOptions = {
+            ...baseOptions,
+            plugins: { legend: { display: true, labels: { color: '#00e5ff' } } },
+            scales: {
+                r: {
+                    angleLines: { color: 'rgba(204, 214, 246, 0.2)' },
+                    grid: { color: 'rgba(204, 214, 246, 0.2)' },
+                    pointLabels: {
+                        font: { size: 12, family: "'Roboto Mono', monospace" },
+                        color: '#ccd6f6'
+                    },
+                    ticks: { display: false }
+                }
+            }
+        };
+        chart = new Chart(chartCanvas, { type: 'radar', data: radarData, options: radarOptions });
+        updateActiveButton('radar');
+    };
+
+    function updateActiveButton(type) {
+        const buttons = document.querySelectorAll('#chart-controls .hud-btn');
+        buttons.forEach(btn => {
+            btn.classList.remove('active');
+            const btnText = btn.textContent;
+            if (btnText.includes(type) || (type === 'radar' && btnText.includes('レーダー'))) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    showChart('win');
+});
+</script>
+{% endblock %}
