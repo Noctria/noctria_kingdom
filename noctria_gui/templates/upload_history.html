@@ -1,53 +1,45 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>🗂 アップロード戦略履歴</title>
-    <style>
-        body { font-family: sans-serif; }
-        .block {
-            border: 1px solid #ccc;
-            margin: 10px;
-            padding: 10px;
-            background: #f9f9f9;
-        }
-        pre {
-            background: #eee;
-            padding: 10px;
-            overflow-x: auto;
-        }
-        .actions {
-            margin-top: 10px;
-        }
-        .actions form {
-            display: inline-block;
-            margin-right: 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>🗂 アップロード戦略履歴一覧</h1>
-    <a href="/pdca">← ダッシュボードに戻る</a>
-    <hr>
+{% extends "base_hud.html" %}
 
-    {% for record in histories %}
-        <div class="block">
-            <h2>📁 {{ record.id }}</h2>
-            <div class="actions">
-                <form method="post" action="/upload-history/re-evaluate">
-                    <input type="hidden" name="strategy_id" value="{{ record.id }}">
-                    <button type="submit">🔁 再評価</button>
-                </form>
-                <form method="post" action="/upload-history/delete" onsubmit="return confirm('本当に削除しますか？');">
-                    <input type="hidden" name="strategy_id" value="{{ record.id }}">
-                    <button type="submit">🗑 削除</button>
-                </form>
-            </div>
+{% block title %}🗂 アップロード戦略履歴 - Noctria Kingdom{% endblock %}
 
-            {% for f in record.files %}
-                <p><strong>📄 {{ f.name }}</strong></p>
-                <pre>{{ f.content }}</pre>
-            {% endfor %}
-        </div>
+{% block header_icon %}<i class="fas fa-upload"></i>{% endblock %}
+{% block header_title %}アップロード戦略履歴{% endblock %}
+{% block header_nav %}
+<a href="/pdca" class="nav-item-back">
+  <i class="fas fa-undo-alt"></i><span>PDCAへ戻る</span>
+</a>
+{% endblock %}
+
+{% block content %}
+  {% for record in histories %}
+  <section class="hud-panel" style="margin-bottom: 2rem;">
+    <h2 class="panel-title">📁 {{ record.id }}</h2>
+
+    <div class="actions" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+      <form method="post" action="/upload-history/re-evaluate">
+        <input type="hidden" name="strategy_id" value="{{ record.id }}">
+        <button type="submit" class="hud-btn">🔁 再評価</button>
+      </form>
+      <form method="post" action="/upload-history/delete" onsubmit="return confirm('本当に削除しますか？');">
+        <input type="hidden" name="strategy_id" value="{{ record.id }}">
+        <button type="submit" class="hud-btn">🗑 削除</button>
+      </form>
+    </div>
+
+    {% for f in record.files %}
+      <p style="color: var(--text-color-title); font-weight: bold;">📄 {{ f.name }}</p>
+      <div class="description-box" style="
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--panel-border);
+        padding: 1rem;
+        border-radius: 6px;
+        font-family: var(--font-family);
+        font-size: 0.9rem;
+        white-space: pre-wrap;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+      ">{{ f.content }}</div>
     {% endfor %}
-</body>
-</html>
+  </section>
+  {% endfor %}
+{% endblock %}
