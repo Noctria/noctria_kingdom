@@ -1,57 +1,43 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>📤 Strategy Upload - Noctria Kingdom HUD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+{% extends "base_hud.html" %}
 
-    <!-- Google Fonts & Font Awesome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% block title %}📤 Strategy Upload - Noctria Kingdom HUD{% endblock %}
 
-    <!-- 専用CSSファイル -->
-    <link rel="stylesheet" href="/static/hud_style.css" />
-</head>
-<body>
+{% block header_icon %}<i class="fas fa-upload"></i>{% endblock %}
+{% block header_title %}UPLOAD & EVALUATE STRATEGY{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+{% endblock %}
 
-    <div class="hud-container-simple">
-        <!-- Header -->
-        <header class="hud-panel header">
-            <h1 class="hud-title"><i class="fas fa-upload"></i> UPLOAD & EVALUATE STRATEGY</h1>
-            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
-        </header>
+{% block content %}
 
-        <!-- Upload Panel -->
-        <main class="hud-panel upload-panel">
-            <h2 class="panel-title">STRATEGY FILE UPLOAD (.py)</h2>
-            <form method="post" action="/upload-strategy" enctype="multipart/form-data" class="upload-form">
-                <label for="file-upload" class="custom-file-upload">
-                    <i class="fas fa-file-import"></i>
-                    <span id="file-name">CHOOSE FILE...</span>
-                </label>
-                <input id="file-upload" type="file" name="file" accept=".py" required>
-                <button type="submit" class="hud-btn"><i class="fas fa-cogs"></i> UPLOAD & EVALUATE</button>
-            </form>
-        </main>
+<!-- ✅ アップロードフォーム -->
+<div class="hud-panel">
+    <h2 class="panel-title">STRATEGY FILE UPLOAD (.py)</h2>
 
-        <!-- Result Panel (conditionally shown) -->
-        {% if result %}
-        <section class="hud-panel result-panel">
-            <h2 class="panel-title">EVALUATION RESULT</h2>
-            <pre class="result-pre">{{ result }}</pre>
-        </section>
-        {% endif %}
+    <form method="post" action="/upload-strategy" enctype="multipart/form-data" class="upload-form" style="display: flex; flex-direction: column; gap: 1rem;">
+        <label for="file-upload" class="hud-btn" style="cursor: pointer;">
+            <i class="fas fa-file-import"></i>
+            <span id="file-name">CHOOSE FILE...</span>
+        </label>
+        <input id="file-upload" type="file" name="file" accept=".py" required style="display: none;">
+        
+        <button type="submit" class="hud-btn"><i class="fas fa-cogs"></i> UPLOAD & EVALUATE</button>
+    </form>
+</div>
 
-    </div>
+<!-- ✅ 結果パネル（条件付き表示） -->
+{% if result %}
+<div class="hud-panel" style="margin-top: 1rem;">
+    <h2 class="panel-title">EVALUATION RESULT</h2>
+    <pre class="result-pre" style="background: rgba(0,0,0,0.3); padding: 1rem; overflow-x: auto; color: var(--text-color-base); border: 1px solid var(--panel-border); border-radius: 4px;">{{ result }}</pre>
+</div>
+{% endif %}
 
-    <script>
-        document.getElementById('file-upload').addEventListener('change', function() {
-            var fileName = this.files[0] ? this.files[0].name : 'CHOOSE FILE...';
-            document.getElementById('file-name').textContent = fileName;
-        });
-    </script>
+<script>
+    document.getElementById('file-upload').addEventListener('change', function() {
+        var fileName = this.files[0] ? this.files[0].name : 'CHOOSE FILE...';
+        document.getElementById('file-name').textContent = fileName;
+    });
+</script>
 
-</body>
-</html>
+{% endblock %}
