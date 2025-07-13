@@ -47,9 +47,9 @@
                 <div class="metric-item">
                     <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
                     {% if stats.oracle_metrics %}
-                    <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
+                        <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
                     {% else %}
-                    <p class="metric-value text-yellow">—</p>
+                        <p class="metric-value text-yellow">—</p>
                     {% endif %}
                 </div>
             </div>
@@ -117,65 +117,58 @@
             updateTime();
 
             // Chart.js
+            const forecastDataElement = document.getElementById('forecast-data');
+            const rawData = forecastDataElement ? forecastDataElement.textContent.trim() : null;
+            let forecastData = [];
             try {
-                const forecastDataElement = document.getElementById('forecast-data');
-                const rawData = forecastDataElement ? forecastDataElement.textContent.trim() : null;
-
                 if (!rawData || rawData.startsWith('{{') || rawData === "null") {
                     throw new Error("サーバーからグラフデータが提供されませんでした。");
                 }
-                
-                const forecastData = JSON.parse(rawData);
-
+                forecastData = JSON.parse(rawData);
                 if (!Array.isArray(forecastData) || forecastData.length === 0) {
                     throw new Error("グラフデータが空または不正な形式です。");
                 }
+            } catch (e) {
+                console.error("グラフデータの読み込みに失敗しました:", e);
+            }
 
-                const ctx = document.getElementById("forecastChart").getContext("2d");
-                const hudChartOptions = {
-                    responsive: true, maintainAspectRatio: false,
-                    chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
-                    scales: {
-                        x: {
-                            type: 'time', time: { unit: 'day' },
-                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
-                            grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
-                        },
-                        y: {
-                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
-                            grid: { color: 'rgba(0, 229, 255, 0.2)' }
-                        }
+            // Chart options (raw to avoid Jinja parsing)
+            {% raw %}
+            const hudChartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
+                scales: {
+                    x: {
+                        type: 'time', time: { unit: 'day' },
+                        ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
+                        grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
                     },
-                    plugins: {
-                        legend: { labels: { color: '#e6f1ff', font: { family: "'Roboto Mono', monospace" } } },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 30, 60, 0.8)', titleFont: { family: "'Roboto Mono', monospace" },
-                            bodyFont: { family: "'Roboto Mono', monospace" }, borderColor: '#00e5ff', borderWidth: 1
-                        }
+                    y: {
+                        ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
+                        grid: { color: 'rgba(0, 229, 255, 0.2)' }
                     }
-                };
+                },
+                plugins: {
+                    legend: { labels: { color: '#e6f1ff', font: { family: "'Roboto Mono', monospace" } } },
+                    tooltip: { backgroundColor: 'rgba(0, 30, 60, 0.8)', borderColor: '#00e5ff', borderWidth: 1 }
+                }
+            };
+
+            if (forecastData.length) {
+                const ctx = document.getElementById("forecastChart").getContext("2d");
                 new Chart(ctx, {
                     type: "line",
                     data: {
                         datasets: [
-                            { label: "実績", data: forecastData.map(d => ({x: d.date, y: d.y_true})), borderWidth: 2, tension: 0.3, pointRadius: 2 },
-                            { label: "予測", data: forecastData.map(d => ({x: d.date, y: d.forecast || d.y_pred})), borderWidth: 2, tension: 0.3, pointRadius: 2 },
+                            { label: "実績", data: forecastData.map(d => ({ x: d.date, y: d.y_true })), tension: 0.3, pointRadius: 2 },
+                            { label: "予測", data: forecastData.map(d => ({ x: d.date, y: d.forecast || d.y_pred })), tension: 0.3, pointRadius: 2 }
                         ]
                     },
                     options: hudChartOptions
                 });
-
-            } catch (e) {
-                console.error("Chart.jsの描画に失敗しました:", e);
-                const chartCanvas = document.getElementById("forecastChart");
-                if(chartCanvas) {
-                    const ctx = chartCanvas.getContext("2d");
-                    ctx.font = "16px 'Roboto Mono', monospace";
-                    ctx.fillStyle = "#ff79c6"; // magenta
-                    ctx.textAlign = "center";
-                    ctx.fillText(e.message, chartCanvas.width / 2, 50);
-                }
             }
+            {% endraw %}
 
             // Council Form
             const councilForm = document.getElementById("councilForm");
