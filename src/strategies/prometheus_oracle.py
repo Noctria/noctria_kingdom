@@ -1,5 +1,3 @@
-# src/strategies/prometheus_oracle.py
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -82,6 +80,30 @@ class PrometheusOracle:
 
         except Exception as e:
             print(f"🔴 日付指定付き予測エラー: {e}")
+            raise
+
+    def evaluate_model(self, data: pd.DataFrame) -> dict:
+        """
+        モデルの予測結果を評価するメソッド
+        ここでは、RMSE（平均二乗誤差平方根）とMSEを計算します。
+        """
+        try:
+            y_true = data['y_true']
+            # predict_with_confidenceを使う場合は 'forecast' キーを利用
+            y_pred = data.get('y_pred') if 'y_pred' in data else data.get('forecast')
+
+            if y_pred is None:
+                raise KeyError("データフレームに 'y_pred' または 'forecast' 列がありません")
+
+            mse = np.mean((y_true - y_pred) ** 2)
+            rmse = np.sqrt(mse)
+
+            return {
+                'MSE': mse,
+                'RMSE': rmse
+            }
+        except Exception as e:
+            print(f"🔴 モデル評価エラー: {e}")
             raise
 
 
