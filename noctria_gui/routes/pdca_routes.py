@@ -1,57 +1,67 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+"""
+📊 /pdca-dashboard - PDCAダッシュボードの画面表示ルート
+- クエリパラメータからフィルタを受け取り、テンプレートに渡す
+- 現時点ではダミーデータだが、今後の拡張でDBやログから取得可能
+"""
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-# プロジェクトのコアモジュールをインポート
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 
 # ========================================
-# ⚙️ ルーターとテンプレートのセットアップ
+# ⚙️ ルーター設定
 # ========================================
 router = APIRouter(
-    prefix="/pdca-dashboard", # このルーターの全パスは /pdca-dashboard から始まる
-    tags=["PDCA"]           # FastAPIのドキュメント用のタグ
+    prefix="/pdca-dashboard",     # すべてのルートはこの接頭辞を持つ
+    tags=["PDCA"]                 # FastAPI Swagger用タグ
 )
 
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # ========================================
-# 🔀 ルートハンドラー
+# 🔍 ダッシュボード表示ルート
 # ========================================
-
 @router.get("/", response_class=HTMLResponse)
 async def show_pdca_dashboard(request: Request):
     """
-    PDCAダッシュボードページを表示します。
-    テンプレートが必要とする `filters` 変数を渡します。
+    PDCAダッシュボードのメインビュー。
+    クエリパラメータからフィルターを取得し、テンプレートに渡す。
     """
-    # 修正点: テンプレートが必要とする 'filters' 変数を生成
     filters = {
         "strategy": request.query_params.get("strategy", ""),
-        # 他にフィルター項目があれば、同様にクエリパラメータから取得
-        # "status": request.query_params.get("status", "all"),
+        # 必要に応じて他のフィルター項目も追加可能
+        # "symbol": request.query_params.get("symbol", ""),
+        # "date_from": request.query_params.get("date_from", ""),
+        # "date_to": request.query_params.get("date_to", ""),
     }
 
-    # PDCAダッシュボードに必要なデータをここで取得・処理する
-    # (例: pdca_logs = get_pdca_logs(filters))
+    # 📦 PDCAデータ取得（現時点ではダミーデータ）
     pdca_data = [
-        # ... (データベースなどから取得したデータ) ...
+        # ここに実データ取得処理を記述予定（e.g., from DB or log parser）
+        # 例:
+        # {
+        #     "strategy": "mean_revert_001",
+        #     "win_rate": 72.5,
+        #     "max_dd": 12.4,
+        #     "timestamp": "2025-07-13T12:34:56",
+        # },
     ]
 
-    context = {
+    return templates.TemplateResponse("pdca_dashboard.html", {
         "request": request,
-        "filters": filters, # 生成したfiltersをテンプレートに渡す
-        "pdca_logs": pdca_data, # 実際のデータも渡す
-    }
-    
-    return templates.TemplateResponse("pdca_dashboard.html", context)
+        "filters": filters,
+        "pdca_logs": pdca_data,
+    })
 
-# 他のPDCA関連のルート（例: /history, /summary）もこのファイルに追加できます
+# ========================================
+# 🧩 他ルート追加のためのテンプレ
+# ========================================
 # @router.get("/history", response_class=HTMLResponse)
 # async def show_pdca_history(request: Request):
 #     # ...
 #     return templates.TemplateResponse("pdca_history.html", {"request": request})
-
