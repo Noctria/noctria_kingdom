@@ -8,7 +8,7 @@
 """
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
@@ -49,18 +49,24 @@ async def export_tag_summary_csv():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = TOOLS_DIR / f"tag_summary_{timestamp}.csv"
 
-    with open(output_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["タグ", "戦略数", "平均勝率", "平均取引数", "平均最大DD", "戦略例"])
-        for item in summary_data:
-            writer.writerow([
-                item["tag"],
-                item["strategy_count"],
-                item["average_win_rate"],
-                item["average_trade_count"],
-                item["average_max_drawdown"],
-                ", ".join(item["sample_strategies"])
-            ])
+    try:
+        with open(output_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["タグ", "戦略数", "平均勝率", "平均取引数", "平均最大DD", "戦略例"])
+            for item in summary_data:
+                writer.writerow([
+                    item.get("tag", "N/A"),
+                    item.get("strategy_count", 0),
+                    item.get("average_win_rate", "-"),
+                    item.get("average_trade_count", "-"),
+                    item.get("average_max_drawdown", "-"),
+                    ", ".join(item.get("sample_strategies", []))
+                ])
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"CSV出力に失敗しました: {e}"}
+        )
 
     return FileResponse(
         output_path,
