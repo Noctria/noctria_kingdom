@@ -26,13 +26,15 @@
 </section>
 
 <section class="hud-panel">
-  <h2 class="panel-title">タグ別分布</h2>
+  <h2 class="panel-title"><i class="fas fa-tags"></i> タグ別分布</h2>
   <canvas id="tagPieChart" width="400" height="300"></canvas>
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
   const ctx = document.getElementById('tagPieChart').getContext('2d');
+
   const tagPieChart = new Chart(ctx, {
     type: 'pie',
     data: {
@@ -40,15 +42,40 @@
       datasets: [{
         label: '戦略数',
         data: {{ stats.tag_distribution.values() | list | tojson }},
+        backgroundColor: [
+          'rgba(0, 229, 255, 0.6)',
+          'rgba(0, 153, 255, 0.6)',
+          'rgba(0, 102, 204, 0.6)',
+          'rgba(0, 204, 153, 0.6)',
+          'rgba(255, 204, 102, 0.6)',
+          'rgba(255, 102, 153, 0.6)',
+          'rgba(153, 102, 255, 0.6)'
+        ],
+        borderColor: 'rgba(0, 229, 255, 1)',
         borderWidth: 1
       }]
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { position: 'right' }
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#cceeff',
+            font: {
+              family: 'Roboto Mono',
+              size: 14
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 30, 60, 0.8)',
+          borderColor: '#00e5ff',
+          borderWidth: 1
+        }
       }
     }
   });
+});
 </script>
 {% endblock %}
