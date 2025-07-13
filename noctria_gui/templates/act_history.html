@@ -1,115 +1,93 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>📜 Act History - Noctria Kingdom HUD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+{% extends "base_hud.html" %}
 
-    <!-- Google Fonts & Font Awesome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% block title %}📜 Act History - Noctria Kingdom HUD{% endblock %}
 
-    <!-- 専用CSSファイル -->
-    <link rel="stylesheet" href="/static/hud_style.css" />
-</head>
-<body>
+{% block header_icon %}<i class="fas fa-scroll"></i>{% endblock %}
+{% block header_title %}VERITAS ADOPTION LOG{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
 
-<div class="hud-container-simple">
-    <!-- Header -->
-    <header class="hud-panel header">
-        <h1 class="hud-title"><i class="fas fa-scroll"></i> VERITAS ADOPTION LOG</h1>
-        <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
-    </header>
+{% block content %}
+<!-- Filter Panel -->
+<section class="hud-panel filter-panel">
+    <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
+    <form method="get" action="/act-history" class="filter-form">
+        <input type="text" name="strategy_name" placeholder="Strategy Name..." value="{{ request.query_params.get('strategy_name', '') }}">
 
-    <!-- Filter Panel -->
-    <section class="hud-panel filter-panel">
-        <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
-        <form method="get" action="/act-history" class="filter-form">
-            <input type="text" name="strategy_name" placeholder="Strategy Name..." value="{{ request.query_params.get('strategy_name', '') }}">
-            
-            <select name="pushed">
-                <option value="">Push Status...</option>
-                <option value="true" {{ 'selected' if request.query_params.get('pushed') == 'true' }}>Pushed</option>
-                <option value="false" {{ 'selected' if request.query_params.get('pushed') == 'false' }}>Not Pushed</option>
-            </select>
-            
-            <button type="submit" class="hud-btn"><i class="fas fa-search"></i> APPLY</button>
-        </form>
-    </section>
+        <select name="pushed">
+            <option value="">Push Status...</option>
+            <option value="true" {{ 'selected' if request.query_params.get('pushed') == 'true' }}>Pushed</option>
+            <option value="false" {{ 'selected' if request.query_params.get('pushed') == 'false' }}>Not Pushed</option>
+        </select>
 
-    <!-- History Log Panel -->
-    <main class="hud-panel log-panel">
-        <h2 class="panel-title">SYSTEM ACTIVITY LOGS</h2>
-        <div class="table-wrapper">
-            <table class="hud-table" id="log-table">
-                <thead>
-                    <tr>
-                        <th onclick="sortTable(0)">戦略名 <i class="fas fa-sort"></i></th>
-                        <th>通貨ペア</th>
-                        <th onclick="sortTable(2)">昇格日時 <i class="fas fa-sort"></i></th>
-                        <th onclick="sortTable(3)">平均スコア <i class="fas fa-sort"></i></th>
-                        <th onclick="sortTable(4)">勝率 <i class="fas fa-sort"></i></th>
-                        <th onclick="sortTable(5)">最大DD <i class="fas fa-sort"></i></th>
-                        <th>タグ</th>
-                        <th>Push済</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.strategy }}</td>
-                        <td>{{ log.symbol }}</td>
-                        <td>{{ log.promoted_at or log.timestamp }}</td>
+        <button type="submit" class="hud-btn"><i class="fas fa-search"></i> APPLY</button>
+    </form>
+</section>
 
-                        <td class="text-cyan">{{ "%.2f"|format(log.score_mean) if log.score_mean is not none else '-' }}</td>
+<!-- History Log Panel -->
+<main class="hud-panel log-panel">
+    <h2 class="panel-title">SYSTEM ACTIVITY LOGS</h2>
+    <div class="table-wrapper">
+        <table class="hud-table" id="log-table">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">戦略名 <i class="fas fa-sort"></i></th>
+                    <th>通貨ペア</th>
+                    <th onclick="sortTable(2)">昇格日時 <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(3)">平均スコア <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(4)">勝率 <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(5)">最大DD <i class="fas fa-sort"></i></th>
+                    <th>タグ</th>
+                    <th>Push済</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.strategy }}</td>
+                    <td>{{ log.symbol }}</td>
+                    <td>{{ log.promoted_at or log.timestamp }}</td>
+                    <td class="text-cyan">{{ "%.2f"|format(log.score_mean) if log.score_mean is not none else '-' }}</td>
+                    <td>
+                        {% if log.win_rate is not none %}
+                            <span class="{{ 'text-green' if log.win_rate > 70 else 'text-magenta' if log.win_rate < 50 else 'text-yellow' }}">
+                                {{ "%.1f"|format(log.win_rate) }}%
+                            </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ "%.2f"|format(log.max_drawdown) if log.max_drawdown is not none else '-' }}%</td>
+                    <td>
+                        {% if log.tags %}
+                            {% for tag in log.tags %}
+                                <span class="hud-tag">{{ tag }}</span>
+                            {% endfor %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
+                    </td>
+                    <td class="action-buttons">
+                        <form method="post" action="/act-history/repush" class="action-form">
+                            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+                            <button type="submit" class="hud-btn-small"><i class="fas fa-redo"></i>再Push可に</button>
+                        </form>
+                        <form method="post" action="/act-history/reevaluate" class="action-form">
+                            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+                            <button type="submit" class="hud-btn-small"><i class="fas fa-cogs"></i>再評価</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" style="text-align: center;">No activity logs found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
+{% endblock %}
 
-                        <td>
-                            {% if log.win_rate is not none %}
-                                <span class="{{ 'text-green' if log.win_rate > 70 else 'text-magenta' if log.win_rate < 50 else 'text-yellow' }}">
-                                    {{ "%.1f"|format(log.win_rate) }}%
-                                </span>
-                            {% else %}-{% endif %}
-                        </td>
-
-                        <td>{{ "%.2f"|format(log.max_drawdown) if log.max_drawdown is not none else '-' }}%</td>
-
-                        <td>
-                            {% if log.tags %}
-                                {% for tag in log.tags %}
-                                    <span class="hud-tag">{{ tag }}</span>
-                                {% endfor %}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
-                        </td>
-                        <td class="action-buttons">
-                            <form method="post" action="/act-history/repush" class="action-form">
-                                <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                                <button type="submit" class="hud-btn-small"><i class="fas fa-redo"></i>再Push可に</button>
-                            </form>
-                            <form method="post" action="/act-history/reevaluate" class="action-form">
-                                <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                                <button type="submit" class="hud-btn-small"><i class="fas fa-cogs"></i>再評価</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="9" style="text-align: center;">No activity logs found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </main>
-</div>
-
+{% block scripts %}
 <script>
     function sortTable(colIndex) {
         const table = document.getElementById("log-table");
@@ -126,23 +104,14 @@
         const sortedRows = rows.sort((a, b) => {
             const valA = a.cells[colIndex].innerText.trim().replace(/%|,/g, '');
             const valB = b.cells[colIndex].innerText.trim().replace(/%|,/g, '');
-
             if (valA === '-' || valB === '-') return valA === '-' ? 1 : -1;
-
             const numA = isNumeric ? parseFloat(valA) : valA;
             const numB = isNumeric ? parseFloat(valB) : valB;
-
-            if (numA < numB) return newDir === 'asc' ? -1 : 1;
-            if (numA > numB) return newDir === 'asc' ? 1 : -1;
-            return 0;
+            return newDir === 'asc' ? (numA < numB ? -1 : 1) : (numA > numB ? -1 : 1);
         });
 
-        while (tbody.firstChild) {
-            tbody.removeChild(tbody.firstChild);
-        }
+        while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
         tbody.append(...sortedRows);
     }
 </script>
-
-</body>
-</html>
+{% endblock %}
