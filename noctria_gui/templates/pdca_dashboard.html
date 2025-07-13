@@ -1,19 +1,24 @@
-{% extends "base_layout.html" %}
+{% extends "base_hud.html" %}
+
+{% block title %}📜 PDCA 実行履歴 - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-clipboard-list"></i>{% endblock %}
+{% block header_title %}PDCA 実行履歴{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
 
 {% block content %}
-<h1>📜 PDCA 実行履歴（Veritas Kingdom）</h1>
 
-<!-- ✅ フラッシュ表示（再評価結果） -->
+<!-- ✅ 再評価結果メッセージ -->
 {% if recheck_success is not none or recheck_fail is not none %}
-  <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
+  <div class="hud-panel" style="border: 1px solid #00cc66; background: #e6ffe6; color: #003300; margin-bottom: 1rem;">
     ✅ 一括再評価 実行結果：
     {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
     {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
   </div>
 {% endif %}
 
-<!-- 🔍 フィルターUI -->
-<form class="filter-form" method="get" action="/pdca">
+<!-- 🔍 フィルター UI -->
+<form class="hud-form" method="get" action="/pdca">
   <input type="text" name="strategy" placeholder="戦略名" value="{{ filters.strategy or '' }}">
   <input type="text" name="symbol" placeholder="通貨 (例: USDJPY)" value="{{ filters.symbol or '' }}">
   <select name="signal">
@@ -40,71 +45,74 @@
     <option value="timestamp_dt" {% if sort == 'timestamp_dt' %}selected{% endif %}>📅 時刻 昇順</option>
     <option value="-timestamp_dt" {% if sort == '-timestamp_dt' %}selected{% endif %}>📅 時刻 降順</option>
   </select>
-  <button type="submit">検索</button>
+  <button type="submit" class="hud-btn"><i class="fas fa-search"></i> 検索</button>
 </form>
 
-<!-- 🔁 一括再評価ボタン -->
+<!-- 🔁 一括再評価 -->
 <form method="post" action="/pdca/recheck_all" style="margin: 1rem 0;">
-  <button type="submit" onclick="return confirm('⚠️ 全戦略を一括で再評価します。続行しますか？');">
+  <button class="hud-btn" type="submit" onclick="return confirm('⚠️ 全戦略を一括で再評価します。続行しますか？');">
     🔁 一括再評価（全 Veritas 戦略）
   </button>
 </form>
 
-<table>
-  <thead>
-    <tr>
-      <th>📅 時刻</th>
-      <th>🧠 戦略</th>
-      <th>🏷️ タグ</th>
-      <th>💡 シグナル</th>
-      <th>💱 通貨</th>
-      <th>🎯 ロット</th>
-      <th>🎯 TP/SL</th>
-      <th>📈 勝率</th>
-      <th>📉 DD</th>
-      <th>🔁 回数</th>
-      <th>操作</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for log in logs %}
-    <tr>
-      <td>{{ log.timestamp }}</td>
-      <td>{{ log.strategy }}</td>
-      <td>{{ log.tags | join(", ") }}</td>
-      <td>{{ log.signal }}</td>
-      <td>{{ log.symbol }}</td>
-      <td>{{ log.lot }}</td>
-      <td>{{ log.tp }}/{{ log.sl }}</td>
-      <td>
-        {% if log.win_rate is defined and log.win_rate is not none %}
-          {{ '%.1f' | format(log.win_rate * 100) }}%
-        {% else %}-{% endif %}
-      </td>
-      <td>
-        {% if log.max_dd is defined and log.max_dd is not none %}
-          {{ '%.1f' | format(log.max_dd * 100) }}%
-        {% else %}-{% endif %}
-      </td>
-      <td>{{ log.trades or "-" }}</td>
-      <td>
-        <button onclick="showModal('modal_{{ loop.index }}')">詳細</button>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<!-- 📋 履歴テーブル -->
+<div class="hud-panel table-wrapper">
+  <table class="hud-table">
+    <thead>
+      <tr>
+        <th>📅 時刻</th>
+        <th>🧠 戦略</th>
+        <th>🏷️ タグ</th>
+        <th>💡 シグナル</th>
+        <th>💱 通貨</th>
+        <th>🎯 ロット</th>
+        <th>🎯 TP/SL</th>
+        <th>📈 勝率</th>
+        <th>📉 DD</th>
+        <th>🔁 回数</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.timestamp }}</td>
+        <td>{{ log.strategy }}</td>
+        <td>{{ log.tags | join(", ") }}</td>
+        <td>{{ log.signal }}</td>
+        <td>{{ log.symbol }}</td>
+        <td>{{ log.lot }}</td>
+        <td>{{ log.tp }}/{{ log.sl }}</td>
+        <td>
+          {% if log.win_rate is defined and log.win_rate is not none %}
+            {{ '%.1f' | format(log.win_rate * 100) }}%
+          {% else %}-{% endif %}
+        </td>
+        <td>
+          {% if log.max_dd is defined and log.max_dd is not none %}
+            {{ '%.1f' | format(log.max_dd * 100) }}%
+          {% else %}-{% endif %}
+        </td>
+        <td>{{ log.trades or "-" }}</td>
+        <td>
+          <button class="hud-btn-small" onclick="showModal('modal_{{ loop.index }}')">詳細</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
-<!-- 🔎 モーダル群 -->
+<!-- 🔍 モーダルログ表示 -->
 {% for log in logs %}
-<dialog id="modal_{{ loop.index }}">
+<dialog id="modal_{{ loop.index }}" class="hud-modal">
   <h3>📄 詳細ログ（{{ log.filename }})</h3>
-  <pre>{{ log.json_text }}</pre>
+  <pre class="hud-log">{{ log.json_text }}</pre>
   <form method="post" action="/pdca/replay">
     <input type="hidden" name="log_path" value="{{ log.path }}">
-    <button type="submit">この命令で再実行</button>
+    <button class="hud-btn" type="submit">この命令で再実行</button>
   </form>
-  <button onclick="closeModal('modal_{{ loop.index }}')">閉じる</button>
+  <button class="hud-btn" onclick="closeModal('modal_{{ loop.index }}')">閉じる</button>
 </dialog>
 {% endfor %}
 
@@ -118,4 +126,5 @@
     if (el) el.close();
   }
 </script>
+
 {% endblock %}
