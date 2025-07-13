@@ -3,7 +3,8 @@
 
 """
 📊 統計比較ページルート
-- 勝率・最大DDの平均を戦略名またはタグ単位で比較
+- 戦略 or タグ別に、勝率・最大DDを比較表示
+- HUDフォーム + グラフ付き統計ページで構成
 """
 
 from fastapi import APIRouter, Request
@@ -22,6 +23,9 @@ router = APIRouter(prefix="/statistics", tags=["statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
+# ─────────────────────────────
+# 🔧 補助関数群
+# ─────────────────────────────
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     if not date_str:
         return None
@@ -43,6 +47,18 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
             except Exception:
                 continue
     return data
+
+
+def extract_all_keys(data: List[Dict[str, Any]], mode: str) -> List[str]:
+    key_set = set()
+    for record in data:
+        if mode == "tag":
+            key_set.update(record.get("tags", []))
+        else:
+            name = record.get("strategy_name")
+            if name:
+                key_set.add(name)
+    return sorted(key_set)
 
 
 def compute_comparison(
@@ -108,18 +124,25 @@ def compute_comparison(
     return final
 
 
-def extract_all_keys(data: List[Dict[str, Any]], mode: str) -> List[str]:
-    key_set = set()
-    for record in data:
-        if mode == "tag":
-            key_set.update(record.get("tags", []))
-        else:
-            name = record.get("strategy_name")
-            if name:
-                key_set.add(name)
-    return sorted(key_set)
+# ─────────────────────────────
+# 📄 フォーム画面（compare_form.html）
+# ─────────────────────────────
+@router.get("/compare/form", response_class=HTMLResponse)
+async def show_compare_form(request: Request) -> HTMLResponse:
+    mode = request.query_params.get("mode", "strategy")
+    all_data = load_strategy_logs()
+    all_keys = extract_all_keys(all_data, mode)
+
+    return templates.TemplateResponse("compare_form.html", {
+        "request": request,
+        "mode": mode,
+        "all_keys": all_keys,
+    })
 
 
+# ─────────────────────────────
+# 📊 結果表示（statistics_compare.html）
+# ─────────────────────────────
 @router.get("/compare", response_class=HTMLResponse)
 async def compare_statistics(request: Request) -> HTMLResponse:
     params = request.query_params
@@ -134,12 +157,24 @@ async def compare_statistics(request: Request) -> HTMLResponse:
     result = compute_comparison(all_data, mode, keys, from_date, to_date, sort)
     all_keys = extract_all_keys(all_data, mode)
 
-    return templates.TemplateResponse("statistics/statistics_compare.html", {
+    # 統計サマリ（平均・中央値）
+    avg_win_list = [r["avg_win"] for r in result]
+    avg_dd_list = [r["avg_dd"] for r in result]
+    summary = {
+        "avg_win_mean": round(sum(avg_win_list) / len(avg_win_list), 1) if avg_win_list else 0,
+        "avg_win_median": sorted(avg_win_list)[len(avg_win_list)//2] if avg_win_list else 0,
+        "avg_dd_mean": round(sum(avg_dd_list) / len(avg_dd_list), 1) if avg_dd_list else 0,
+        "avg_dd_median": sorted(avg_dd_list)[len(avg_dd_list)//2] if avg_dd_list else 0,
+        "total_count": sum(r["count"] for r in result)
+    }
+
+    return templates.TemplateResponse("statistics_compare.html", {
         "request": request,
         "mode": mode,
         "keys": keys,
         "all_keys": all_keys,
         "results": result,
+        "summary": summary,
         "sort": sort,
         "filter": {
             "mode": mode,
@@ -149,7 +184,9 @@ async def compare_statistics(request: Request) -> HTMLResponse:
     })
 
 
-# --- 古いルート対策のリダイレクト ---
+# ─────────────────────────────
+# ♻️ 古いルートのリダイレクト
+# ─────────────────────────────
 @router.get("/../strategy/compare")
 async def redirect_old_strategy_compare():
-    return RedirectResponse(url="/statistics/compare")
+    return RedirectResponse(url="/statistics/compare/form")
