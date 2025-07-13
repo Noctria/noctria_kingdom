@@ -1,28 +1,20 @@
-from fastapi import APIRouter, Request, Form, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import APIRouter, Request, Query
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 import os
 import json
-import requests
-from urllib.parse import urlencode
+from dotenv import load_dotenv
 
 from core.path_config import (
     PDCA_LOG_DIR,
     NOCTRIA_GUI_TEMPLATES_DIR,
-    STRATEGIES_VERITAS_GENERATED_DIR,
 )
 
-from dotenv import load_dotenv
 load_dotenv()
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
-
-AIRFLOW_API_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
-AIRFLOW_API_USER = os.getenv("AIRFLOW_API_USER", "admin")
-AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "admin")
-
 
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
@@ -50,9 +42,9 @@ async def show_pdca_dashboard(
             print(f"⚠️ ログ読み込み失敗: {log_file} -> {e}")
             continue
 
-        ts = data.get("timestamp", "")
+        ts_str = data.get("timestamp", "")
         try:
-            ts_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
+            ts_dt = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S")
         except Exception:
             ts_dt = None
 
@@ -65,7 +57,7 @@ async def show_pdca_dashboard(
             "filename": log_file.name,
             "path": str(log_file),
             "strategy": data.get("strategy", "N/A"),
-            "timestamp": ts,
+            "timestamp": ts_str,
             "timestamp_dt": ts_dt,
             "signal": data.get("signal", "N/A"),
             "symbol": data.get("symbol", "N/A"),
@@ -83,63 +75,58 @@ async def show_pdca_dashboard(
         })
 
     def matches(log):
-        if strategy and strategy.lower() not in log["strategy"].lower():
-            return False
-        if symbol and symbol != log["symbol"]:
-            return False
-        if signal and signal != log["signal"]:
-            return False
-        if tag and tag not in log["tags"]:
-            return False
-        if date_from:
-            try:
+        try:
+            if strategy and strategy.lower() not in log["strategy"].lower():
+                return False
+            if symbol and symbol != log["symbol"]:
+                return False
+            if signal and signal != log["signal"]:
+                return False
+            if tag and tag not in log["tags"]:
+                return False
+            if date_from:
                 from_dt = datetime.strptime(date_from, "%Y-%m-%d")
                 if log["timestamp_dt"] and log["timestamp_dt"] < from_dt:
                     return False
-            except Exception:
-                pass
-        if date_to:
-            try:
+            if date_to:
                 to_dt = datetime.strptime(date_to, "%Y-%m-%d")
                 if log["timestamp_dt"] and log["timestamp_dt"] > to_dt:
                     return False
-            except Exception:
-                pass
 
-        # 差分フィルター
-        try:
             if diff_filter == "win_rate_up":
-                if log["win_rate_after"] is None or log["win_rate_before"] is None:
+                before = log.get("win_rate_before")
+                after = log.get("win_rate_after")
+                if before is None or after is None or after <= before:
                     return False
-                if log["win_rate_after"] <= log["win_rate_before"]:
+
+            if diff_filter == "max_dd_down":
+                before = log.get("max_dd_before")
+                after = log.get("max_dd_after")
+                if before is None or after is None or after >= before:
                     return False
-            elif diff_filter == "max_dd_down":
-                if log["max_dd_after"] is None or log["max_dd_before"] is None:
+
+            if win_rate_min_diff is not None:
+                before = log.get("win_rate_before")
+                after = log.get("win_rate_after")
+                if before is None or after is None or (after - before) < win_rate_min_diff:
                     return False
-                if log["max_dd_after"] >= log["max_dd_before"]:
-                    return False
+
         except Exception:
             return False
-
-        # しきい値フィルター
-        if win_rate_min_diff is not None:
-            try:
-                wr_b = log.get("win_rate_before")
-                wr_a = log.get("win_rate_after")
-                if wr_b is None or wr_a is None or (wr_a - wr_b) < win_rate_min_diff:
-                    return False
-            except Exception:
-                return False
 
         return True
 
     filtered_logs = [log for log in logs if matches(log)]
 
+    # ソート処理
     if sort:
         reverse = sort.startswith("-")
-        key = sort.lstrip("-")
-        if key in ["win_rate", "max_dd", "trades", "timestamp_dt"]:
-            filtered_logs.sort(key=lambda x: x.get(key) or 0, reverse=reverse)
+        sort_key = sort.lstrip("-")
+        if sort_key in ["timestamp_dt", "win_rate", "max_dd"]:
+            filtered_logs.sort(
+                key=lambda x: x.get(sort_key) if x.get(sort_key) is not None else 0,
+                reverse=reverse
+            )
 
     return templates.TemplateResponse("pdca_history.html", {
         "request": request,
