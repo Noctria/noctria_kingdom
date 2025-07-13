@@ -1,3 +1,37 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
+import json
+from typing import Any
+
+# --- プロジェクトのコアモジュール ---
+from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+
+# ========================================
+# 🚀 FastAPI GUI アプリケーション構成
+# ========================================
+app = FastAPI(
+    title="Noctria Kingdom GUI",
+    description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
+    version="1.4.0",
+)
+
+# ✅ 静的ファイルとテンプレートの登録
+app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
+# ✅ Jinja2 カスタムフィルタ (アプリケーション全体で利用可能)
+def from_json(value: str) -> Any:
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+templates.env.filters["from_json"] = from_json
+
 # ========================================
 # ルーターのインポート
 # ========================================
@@ -31,7 +65,14 @@ from noctria_gui.routes import (
     upload_history,
 )
 
-# ...（中略）
+# ========================================
+# 🔁 ルーター登録
+# ========================================
+print("Integrating all routers into the main application...")
+
+# プレフィックスが異なるものを先に登録
+app.include_router(dashboard.router)
+app.include_router(home_routes.router)
 
 # 各機能ページのルーター
 app.include_router(act_history.router)
@@ -59,3 +100,12 @@ app.include_router(tag_heatmap.router)
 app.include_router(tag_summary.router)
 app.include_router(upload.router)
 app.include_router(upload_history.router)
+
+print("✅ All routers have been integrated successfully.")
+
+# ========================================
+# 🔀 トップページリダイレクト（必要なければ無効化）
+# ========================================
+# @app.get("/", include_in_schema=False)
+# async def root() -> RedirectResponse:
+#     return RedirectResponse(url="/dashboard")
