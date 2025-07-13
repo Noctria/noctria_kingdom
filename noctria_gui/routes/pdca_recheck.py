@@ -12,11 +12,11 @@ from pathlib import Path
 import urllib.parse
 
 # ========================================
-# 修正点: ファイルツリーに基づき、正しい場所から読み込むように修正
+# 修正点: 循環インポートを解消するための正しいインポート
 # ========================================
-# このファイル(pdca_recheck.py)から見て、一つ上の階層(noctria_gui)にある
-# backend/app/ ディレクトリの中の veritas_trigger_api.py を読み込みます。
-from ..backend.app.veritas_trigger_api import trigger_recheck_dag
+# PYTHONPATHが 'src' に通っているため、'core'パッケージから直接インポートします。
+# これにより、'backend'ディレクトリへの逆流がなくなり、循環参照が解決されます。
+from core.veritas_trigger_api import trigger_recheck_dag
 
 
 router = APIRouter()
