@@ -12,10 +12,11 @@ from pathlib import Path
 import urllib.parse
 
 # ========================================
-# 修正点: 実際のファイル名に合わせてインポート文を修正
+# 修正点: servicesディレクトリから読み込むようにインポート文を修正
 # ========================================
-# 'core'ディレクトリに移動した実際のファイル名 'veritas_trigger_api.py' からインポートします
-from core.veritas_trigger_api import trigger_recheck_dag
+# このファイル(pdca_recheck.py)から見て、一つ上の階層(noctria_gui)にある
+# servicesディレクトリの中のveritas_trigger_api.pyを読み込みます。
+from ..services.veritas_trigger_api import trigger_recheck_dag
 
 
 router = APIRouter()
