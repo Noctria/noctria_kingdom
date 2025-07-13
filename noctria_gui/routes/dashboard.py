@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+"""
+📊 /dashboard - 中央統治ダッシュボード
+- 各種統計と予測分析を統合表示
+"""
+
 import json
 import os
 import random
@@ -9,11 +14,9 @@ from pathlib import Path
 from typing import Any, Dict
 import pprint
 
-import httpx
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 
 from core.king_noctria import KingNoctria
 from core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR, PUSH_LOG_DIR
@@ -58,7 +61,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
 
     try:
         oracle = PrometheusOracle()
-        metrics = oracle.evaluate_oracle_model()  # ← 正しいメソッド名
+        metrics = oracle.evaluate_oracle_model()
         stats["oracle_metrics"] = {
             "RMSE": metrics.get("RMSE", 0.0),
             "MAE": metrics.get("MAE", 0.0),
@@ -68,7 +71,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
         print(f"Warning: Failed to get Oracle metrics. Error: {e}")
         stats["oracle_metrics"] = {"RMSE": 0.0, "MAE": 0.0, "MAPE": 0.0, "error": "N/A"}
 
-    stats["pushed_count"] = aggregate_push_stats()  # ← 修正
+    stats["pushed_count"] = aggregate_push_stats()
 
     return stats
 
@@ -102,7 +105,7 @@ async def show_dashboard(request: Request):
         print(f"🔴 Error generating forecast data: {e}")
 
     stats = aggregate_dashboard_stats()
-    pprint.pprint(stats)  # ← 型確認用のログ出力
+    pprint.pprint(stats)
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
