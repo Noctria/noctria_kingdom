@@ -8,8 +8,7 @@
 
 import json
 import os
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 import pprint
@@ -87,22 +86,24 @@ def aggregate_push_stats() -> int:
 async def show_dashboard(request: Request):
     forecast_data = []
     try:
-        today = datetime.now()
-        price = 150.0
-        for i in range(14):
-            date = today - timedelta(days=(13 - i))
-            actual_price = price + (random.random() - 0.5) * 3
-            pred_price = actual_price + (random.random() - 0.5) * 1
-            forecast_data.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "y_true": round(actual_price, 2),
-                "forecast": round(pred_price, 2),
-                "y_lower": round(pred_price - 1.5, 2),
-                "y_upper": round(pred_price + 1.5, 2),
-            })
-            price = actual_price
+        oracle = PrometheusOracle()
+        prediction = oracle.predict_market()
+        forecast_data = [
+            {
+                "date": d,
+                "forecast": f,
+                "y_lower": lb,
+                "y_upper": ub
+            }
+            for d, f, lb, ub in zip(
+                prediction["dates"],
+                prediction["forecast"],
+                prediction["lower_bound"],
+                prediction["upper_bound"]
+            )
+        ]
     except Exception as e:
-        print(f"🔴 Error generating forecast data: {e}")
+        print(f"🔴 Error generating forecast data from Oracle: {e}")
 
     stats = aggregate_dashboard_stats()
     pprint.pprint(stats)
