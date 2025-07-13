@@ -16,13 +16,14 @@
     --text-color-base: #a8b2d1;
     --text-color-title: #e6f1ff;
     --glow-effect: 0 0 4px var(--glow-primary);
+    --font-family: 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 /* --- Base & Body --- */
 body {
     background-color: var(--bg-color);
     color: var(--text-color-base);
-    font-family: 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-family: var(--font-family);
     margin: 0;
     padding: 1rem;
     overflow: hidden;
@@ -133,9 +134,9 @@ body {
     color: var(--bg-color);
 }
 
-/* ======================================== */
-/* 統計DBページ用スタイル */
-/* ======================================== */
+/* ========================================
+   統計DBページ用スタイル
+   ======================================== */
 .controls-panel {
     flex-direction: row;
     align-items: center;
@@ -240,7 +241,7 @@ body {
     opacity: 1;
 }
 
-/* --- Extra Utility Colors --- */
+/* --- Utility Colors --- */
 .text-green { color: var(--accent-color-1); }
 .text-magenta { color: var(--accent-color-2); }
 .text-yellow { color: var(--accent-color-3); }
