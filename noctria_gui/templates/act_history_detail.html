@@ -1,110 +1,90 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>📄 Strategy Detail - Noctria Kingdom HUD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+{% extends "base_hud.html" %}
 
-    <!-- Google Fonts & Font Awesome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% block title %}📄 Strategy Detail - Noctria Kingdom HUD{% endblock %}
 
-    <!-- HUD用スタイル -->
-    <link rel="stylesheet" href="/static/hud_style.css" />
-</head>
-<body>
+{% block header_icon %}<i class="fas fa-file-invoice"></i>{% endblock %}
+{% block header_title %}STRATEGY DETAIL{% endblock %}
+{% block header_nav_href %}/act-history{% endblock %}
+{% block header_nav_text %}BACK TO LOGS{% endblock %}
 
-<div class="hud-container-simple">
-    <!-- Header -->
-    <header class="hud-panel header">
-        <h1 class="hud-title"><i class="fas fa-file-invoice"></i> STRATEGY DETAIL</h1>
-        <a href="/act-history" class="nav-item-back"><i class="fas fa-arrow-left"></i><span>BACK TO LOGS</span></a>
-    </header>
+{% block content %}
+<!-- Main Detail Panel -->
+<main class="hud-panel detail-panel">
+    <h2 class="panel-title">STRATEGY: {{ log.strategy }}</h2>
 
-    <!-- Main Detail Panel -->
-    <main class="hud-panel detail-panel">
-        <h2 class="panel-title">STRATEGY: {{ log.strategy }}</h2>
-        
-        <div class="detail-grid">
-            <!-- Left Column -->
-            <div class="detail-info">
-                <dl class="hud-dl">
-                    <div>
-                        <dt>Symbol</dt>
-                        <dd>{{ log.symbol }}</dd>
-                    </div>
-                    <div>
-                        <dt>Promoted At</dt>
-                        <dd>{{ log.promoted_at or log.timestamp }}</dd>
-                    </div>
-                    <div>
-                        <dt>Win Rate</dt>
-                        <dd class="text-green">
-                            {{ '%.2f'|format(log.win_rate) if log.win_rate is not none else '-' }}%
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>Max Drawdown</dt>
-                        <dd class="text-magenta">
-                            {{ '%.2f'|format(log.max_drawdown) if log.max_drawdown is not none else '-' }}%
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>Score</dt>
-                        <dd class="text-cyan">
-                            {{ '%.2f'|format(log.score_mean) if log.score_mean is not none else '-' }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>Pushed</dt>
-                        <dd>{{ '✅ Pushed' if log.pushed else '❌ Not Pushed' }}</dd>
-                    </div>
-                    <div>
-                        <dt>Filename</dt>
-                        <dd>{{ log.filename }}</dd>
-                    </div>
-                    <div>
-                        <dt>Tags</dt>
-                        <dd>
-                            {% if log.tags %}
-                                {% for t in log.tags %}
-                                    <span class="hud-tag">{{ t }}</span>
-                                {% endfor %}
-                            {% else %}
-                                <span>-</span>
-                            {% endif %}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
-
-            <!-- Right Column -->
-            <div class="detail-actions">
-                <h3 class="actions-title">OPERATIONS</h3>
-                <form method="post" action="/act-history/repush">
-                    <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                    <button class="hud-btn" type="submit">
-                        <i class="fas fa-redo"></i> 再Push可にする
-                    </button>
-                </form>
-                <form method="post" action="/act-history/reevaluate">
-                    <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                    <button class="hud-btn" type="submit">
-                        <i class="fas fa-cogs"></i> 再評価する
-                    </button>
-                </form>
-            </div>
+    <div class="detail-grid">
+        <!-- Left Column -->
+        <div class="detail-info">
+            <dl class="hud-dl">
+                <div>
+                    <dt>Symbol</dt>
+                    <dd>{{ log.symbol }}</dd>
+                </div>
+                <div>
+                    <dt>Promoted At</dt>
+                    <dd>{{ log.promoted_at or log.timestamp }}</dd>
+                </div>
+                <div>
+                    <dt>Win Rate</dt>
+                    <dd class="text-green">
+                        {{ '%.2f'|format(log.win_rate) if log.win_rate is not none else '-' }}%
+                    </dd>
+                </div>
+                <div>
+                    <dt>Max Drawdown</dt>
+                    <dd class="text-magenta">
+                        {{ '%.2f'|format(log.max_drawdown) if log.max_drawdown is not none else '-' }}%
+                    </dd>
+                </div>
+                <div>
+                    <dt>Score</dt>
+                    <dd class="text-cyan">
+                        {{ '%.2f'|format(log.score_mean) if log.score_mean is not none else '-' }}
+                    </dd>
+                </div>
+                <div>
+                    <dt>Pushed</dt>
+                    <dd>{{ '✅ Pushed' if log.pushed else '❌ Not Pushed' }}</dd>
+                </div>
+                <div>
+                    <dt>Filename</dt>
+                    <dd>{{ log.filename }}</dd>
+                </div>
+                <div>
+                    <dt>Tags</dt>
+                    <dd>
+                        {% if log.tags %}
+                            {% for t in log.tags %}
+                                <span class="hud-tag">{{ t }}</span>
+                            {% endfor %}
+                        {% else %}<span>-</span>{% endif %}
+                    </dd>
+                </div>
+            </dl>
         </div>
-    </main>
 
-    <!-- Raw JSON Section -->
-    <section class="hud-panel log-content-panel">
-        <h2 class="panel-title"><i class="fas fa-code"></i> RAW LOG DATA</h2>
-        <pre class="log-json">{{ log.json_text }}</pre>
-    </section>
-</div>
+        <!-- Right Column -->
+        <div class="detail-actions">
+            <h3 class="actions-title">OPERATIONS</h3>
+            <form method="post" action="/act-history/repush">
+                <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+                <button class="hud-btn" type="submit">
+                    <i class="fas fa-redo"></i> 再Push可にする
+                </button>
+            </form>
+            <form method="post" action="/act-history/reevaluate">
+                <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
+                <button class="hud-btn" type="submit">
+                    <i class="fas fa-cogs"></i> 再評価する
+                </button>
+            </form>
+        </div>
+    </div>
+</main>
 
-</body>
-</html>
+<!-- Raw JSON Section -->
+<section class="hud-panel log-content-panel">
+    <h2 class="panel-title"><i class="fas fa-code"></i> RAW LOG DATA</h2>
+    <pre class="log-json">{{ log.json_text }}</pre>
+</section>
+{% endblock %}
