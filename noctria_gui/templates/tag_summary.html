@@ -40,6 +40,7 @@
         </tr>
       </thead>
       <tbody>
+        {% if summary_data %}
         {% for item in summary_data %}
         <tr>
           <td>
@@ -48,18 +49,27 @@
             </a>
           </td>
           <td>{{ item.strategy_count }}</td>
-          <td>{{ item.average_win_rate }}%</td>
-          <td>{{ item.average_trade_count }}</td>
-          <td>{{ item.average_max_drawdown }}</td>
+          <td>{{ "%.2f"|format(item.average_win_rate) }}%</td>
+          <td>{{ "%.2f"|format(item.average_trade_count) }}</td>
+          <td>{{ "%.2f"|format(item.average_max_drawdown) }}</td>
           <td>
-            {% for strategy in item.sample_strategies %}
-              <a class="strategy-link" href="/strategy/detail?name={{ strategy }}" style="color: var(--text-color-base); text-decoration: none;">
-                {{ strategy }}
-              </a>{% if not loop.last %}, {% endif %}
-            {% endfor %}
+            {% if item.sample_strategies %}
+              {% for strategy in item.sample_strategies %}
+                <a class="strategy-link" href="/strategy/detail?name={{ strategy }}" style="color: var(--text-color-base); text-decoration: none;">
+                  {{ strategy }}
+                </a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% else %}
+              <span style="color: #888;">-</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align: center; color: #888;">📭 データがありません</td>
+        </tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
