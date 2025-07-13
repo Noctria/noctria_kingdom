@@ -8,7 +8,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from services.statistics_service import get_strategy_statistics
+from noctria_gui.services.statistics_service import get_strategy_statistics
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 
 router = APIRouter()
