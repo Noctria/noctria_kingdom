@@ -46,7 +46,11 @@
                 </div>
                 <div class="metric-item">
                     <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
+                    {% if stats.oracle_metrics %}
                     <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
+                    {% else %}
+                    <p class="metric-value text-yellow">—</p>
+                    {% endif %}
                 </div>
             </div>
         </section>
@@ -67,7 +71,7 @@
                 <a href="/strategy/compare" class="nav-item"><i class="fas fa-balance-scale"></i><span>戦略比較</span></a>
                 <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
                 <a href="/upload-strategy" class="nav-item"><i class="fas fa-upload"></i><span>アップロード</span></a>
-                <a href="/pdca-dashboard" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
+                <a href="/pdca/summary" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
                 <a href="/trigger" class="nav-item"><i class="fas fa-bullhorn"></i><span>王命発令</span></a>
             </div>
         </section>
@@ -117,7 +121,7 @@
                 const forecastDataElement = document.getElementById('forecast-data');
                 const rawData = forecastDataElement ? forecastDataElement.textContent.trim() : null;
 
-                if (!rawData || rawData.startsWith('{'+'{') || rawData === "null") {
+                if (!rawData || rawData.startsWith('{{') || rawData === "null") {
                     throw new Error("サーバーからグラフデータが提供されませんでした。");
                 }
                 
@@ -154,8 +158,8 @@
                     type: "line",
                     data: {
                         datasets: [
-                            { label: "実績", data: forecastData.map(d => ({x: d.date, y: d.y_actual})), borderColor: '#00ff9b', backgroundColor: 'rgba(0, 255, 155, 0.2)', borderWidth: 2, tension: 0.3, pointRadius: 2 },
-                            { label: "予測", data: forecastData.map(d => ({x: d.date, y: d.y_pred})), borderColor: '#7DF9FF', backgroundColor: 'rgba(125, 249, 255, 0.2)', borderWidth: 2, tension: 0.3, pointRadius: 2 },
+                            { label: "実績", data: forecastData.map(d => ({x: d.date, y: d.y_true})), borderWidth: 2, tension: 0.3, pointRadius: 2 },
+                            { label: "予測", data: forecastData.map(d => ({x: d.date, y: d.forecast || d.y_pred})), borderWidth: 2, tension: 0.3, pointRadius: 2 },
                         ]
                     },
                     options: hudChartOptions
