@@ -1,59 +1,37 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>📑 戦略比較選択</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      padding: 2rem;
-      background: #f9f9f9;
-    }
-    form {
-      background: #fff;
-      padding: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      max-width: 600px;
-      margin-top: 1rem;
-    }
-    .strategy-item {
-      margin-bottom: 0.5rem;
-    }
-    .submit-btn {
-      margin-top: 1rem;
-      padding: 8px 16px;
-      background: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .submit-btn:hover {
-      background: #005f99;
-    }
-  </style>
-</head>
-<body>
-  <h1>📑 比較する戦略を選択</h1>
+{% extends "base_hud.html" %}
 
-  <form method="post" action="/strategies/compare/result">
+{% block title %}📑 戦略比較選択{% endblock %}
+{% block header_icon %}<i class="fas fa-code-branch"></i>{% endblock %}
+{% block header_title %}戦略比較選択{% endblock %}
+{% block header_nav %}
+<a href="/" class="nav-item-back"><i class="fas fa-home"></i><span>HOME</span></a>
+{% endblock %}
+
+{% block content %}
+
+<div class="hud-panel">
+  <h2 class="panel-title">比較する戦略を選択</h2>
+
+  <form method="post" action="/strategies/compare/result" class="strategy-compare-form" style="display: flex; flex-direction: column; gap: 1rem;">
     {% if strategies %}
       {% for s in strategies %}
-        <div class="strategy-item">
+        <div class="strategy-item-checkbox">
           <label>
             <input type="checkbox" name="strategies" value="{{ s }}">
-            {{ s }}
+            <span class="hud-tag">{{ s }}</span>
           </label>
         </div>
       {% endfor %}
-      <button type="submit" class="submit-btn">📈 比較グラフを表示</button>
+
+      <button type="submit" class="hud-btn"><i class="fas fa-chart-line"></i> 比較グラフを表示</button>
     {% else %}
       <p>⚠️ 表示可能な戦略が存在しません。</p>
     {% endif %}
   </form>
 
-  <p style="margin-top: 1rem;"><a href="/">← トップへ戻る</a></p>
-</body>
-</html>
+  <div style="margin-top: 1rem;">
+    <a href="/" class="nav-item-back"><i class="fas fa-arrow-left"></i> トップへ戻る</a>
+  </div>
+</div>
+
+{% endblock %}
