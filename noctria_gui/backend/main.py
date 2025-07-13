@@ -12,10 +12,8 @@ from typing import Any
 from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 # ========================================
-# 修正点: 実行されているファイルに必要な全てのルーターをインポート
+# ルーターのインポート
 # ========================================
-# routesディレクトリ内の各機能（ページ）のロジックを読み込みます
-# 以前のログで読み込みが確認されたものを全て含めます
 from noctria_gui.routes import (
     dashboard, 
     home_routes,
@@ -43,8 +41,10 @@ from noctria_gui.routes import (
     tag_summary,
     upload,
     upload_history,
-    # trigger.pyはroutesディレクトリ外なので、別途対応が必要な場合があります
 )
+
+# ✅ このファイルがある場合に限り追加（存在しない場合はこの行を削除してください）
+from noctria_gui.routes import statistics_dashboard
 
 
 # ========================================
@@ -68,14 +68,12 @@ def from_json(value: str) -> Any:
         return {}
 templates.env.filters["from_json"] = from_json
 
-
 # ========================================
-# 🔁 ルーターの自動登録
+# 🔁 ルーター登録
 # ========================================
-# 読み込んだ全てのルーターをアプリケーションに登録します
 print("Integrating all routers into the main application...")
 
-# プレフィックスが異なる、あるいは無い可能性のあるものを先に登録
+# プレフィックスが異なるものを先に登録
 app.include_router(dashboard.router)
 app.include_router(home_routes.router)
 
@@ -93,7 +91,7 @@ app.include_router(push.router)
 app.include_router(statistics.router)
 app.include_router(statistics_compare.router)
 app.include_router(statistics_detail.router)
-app.include_router(statistics_dashboard.router)
+app.include_router(statistics_dashboard.router)  # ← ✅ 今回の修正点
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
 app.include_router(statistics_tag_ranking.router)
@@ -108,12 +106,9 @@ app.include_router(upload_history.router)
 
 print("✅ All routers have been integrated successfully.")
 
-
 # ========================================
-# 🔀 ルートハンドラー (トップページリダイレクト)
+# 🔀 トップページリダイレクト（必要なければ無効化）
 # ========================================
-# home_routes.py で処理されるため、通常は不要です。
 # @app.get("/", include_in_schema=False)
 # async def root() -> RedirectResponse:
 #     return RedirectResponse(url="/dashboard")
-
