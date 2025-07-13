@@ -88,6 +88,8 @@ async def show_dashboard(request: Request):
     try:
         oracle = PrometheusOracle()
         prediction = oracle.predict_market()
+        print("🔍 Oracle予測出力:", prediction)
+
         if prediction:
             dates = prediction.get("dates", [])
             forecast = prediction.get("forecast", [])
@@ -110,6 +112,6 @@ async def show_dashboard(request: Request):
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "forecast": forecast_data or [],  # None防止
+        "forecast": forecast_data or [],
         "stats": stats
     })
