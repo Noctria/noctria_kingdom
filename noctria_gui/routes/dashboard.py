@@ -62,9 +62,9 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
         oracle = PrometheusOracle()
         metrics = oracle.evaluate_oracle_model()
         stats["oracle_metrics"] = {
-            "RMSE": metrics.get("RMSE", 0.0),
-            "MAE": metrics.get("MAE", 0.0),
-            "MAPE": metrics.get("MAPE", 0.0),
+            "RMSE": round(metrics.get("RMSE", 0.0), 4),
+            "MAE": round(metrics.get("MAE", 0.0), 4),
+            "MAPE": round(metrics.get("MAPE", 0.0), 4),
         }
     except Exception as e:
         print(f"Warning: Failed to get Oracle metrics. Error: {e}")
@@ -88,20 +88,20 @@ async def show_dashboard(request: Request):
     try:
         oracle = PrometheusOracle()
         prediction = oracle.predict_market()
-        forecast_data = [
-            {
-                "date": d,
-                "forecast": f,
-                "y_lower": lb,
-                "y_upper": ub
-            }
-            for d, f, lb, ub in zip(
-                prediction["dates"],
-                prediction["forecast"],
-                prediction["lower_bound"],
-                prediction["upper_bound"]
-            )
-        ]
+        if prediction:
+            dates = prediction.get("dates", [])
+            forecast = prediction.get("forecast", [])
+            lower = prediction.get("lower_bound", [])
+            upper = prediction.get("upper_bound", [])
+
+            if all([dates, forecast, lower, upper]) and len(dates) == len(forecast) == len(lower) == len(upper):
+                forecast_data = [
+                    {"date": d, "forecast": f, "y_lower": lb, "y_upper": ub}
+                    for d, f, lb, ub in zip(dates, forecast, lower, upper)
+                ]
+            else:
+                print("🔶 Oracleデータの形式が不正です。")
+
     except Exception as e:
         print(f"🔴 Error generating forecast data from Oracle: {e}")
 
@@ -110,6 +110,6 @@ async def show_dashboard(request: Request):
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "forecast": forecast_data,
+        "forecast": forecast_data or [],  # None防止
         "stats": stats
     })
