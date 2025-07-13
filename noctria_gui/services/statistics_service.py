@@ -18,9 +18,6 @@ from core.path_config import PDCA_LOG_DIR
 
 
 def load_all_logs() -> List[Dict]:
-    """
-    📁 PDCAログディレクトリから全ログを読み込む
-    """
     logs = []
     for file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
@@ -40,9 +37,6 @@ def filter_logs(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ) -> List[Dict]:
-    """
-    🔍 ログにフィルタを適用する
-    """
     filtered = []
 
     for log in logs:
@@ -67,9 +61,6 @@ def filter_logs(
 
 
 def sort_logs(logs: List[Dict], sort_key: str, descending: bool = True) -> List[Dict]:
-    """
-    ↕️ 指定キーでソート（例：win_rate, max_drawdown）
-    """
     return sorted(
         logs,
         key=lambda x: x.get(sort_key, 0.0),
@@ -78,27 +69,18 @@ def sort_logs(logs: List[Dict], sort_key: str, descending: bool = True) -> List[
 
 
 def get_available_strategies(logs: List[Dict]) -> List[str]:
-    """
-    🗂 使用された戦略名一覧を返す（重複排除）
-    """
     return sorted(set(
         log["strategy"] for log in logs if "strategy" in log and log["strategy"]
     ))
 
 
 def get_available_symbols(logs: List[Dict]) -> List[str]:
-    """
-    💱 使用された通貨ペア一覧を返す（重複排除）
-    """
     return sorted(set(
         log["symbol"] for log in logs if "symbol" in log and log["symbol"]
     ))
 
 
 def load_all_statistics() -> List[Dict]:
-    """
-    📊 統計対象として有効なPDCAログを抽出する
-    """
     logs = load_all_logs()
     return [
         log for log in logs
@@ -112,18 +94,12 @@ def filter_statistics(
     strategy: Optional[str] = None,
     symbol: Optional[str] = None
 ) -> List[Dict]:
-    """
-    🔍 統計データにフィルタ・ソートを適用
-    """
     logs = load_all_statistics()
     filtered = filter_logs(logs, strategy=strategy, symbol=symbol)
     return sort_logs(filtered, sort_key=sort_by, descending=descending)
 
 
 def export_statistics_to_csv(logs: List[Dict], output_path: Path):
-    """
-    📤 Veritas戦略の統計ログをCSV形式で出力する
-    """
     if not logs:
         print("⚠️ 書き出すログが存在しません")
         return
@@ -151,9 +127,6 @@ def export_statistics_to_csv(logs: List[Dict], output_path: Path):
 
 
 def aggregate_by_tag(logs: List[Dict]) -> List[Dict]:
-    """
-    🔥 タグ別に勝率・最大DD・取引数・昇格率を平均化・集計する
-    """
     tag_groups = defaultdict(list)
 
     for log in logs:
@@ -184,6 +157,38 @@ def aggregate_by_tag(logs: List[Dict]) -> List[Dict]:
             "count": total_count
         })
 
-    # デフォルトは勝率降順でソート
     tag_stats.sort(key=lambda x: (x["win_rate"] is not None, x["win_rate"]), reverse=True)
     return tag_stats
+
+
+# ✅ ✅ ✅ 追加：統計ダッシュボード用集計関数
+def get_strategy_statistics() -> Dict:
+    """
+    📊 /statistics/dashboard 用の集計関数
+    - 平均勝率、平均DD、戦略数、タグ分布を返す
+    """
+    logs = load_all_statistics()
+
+    if not logs:
+        return {
+            "avg_win_rate": 0.0,
+            "avg_drawdown": 0.0,
+            "strategy_count": 0,
+            "tag_distribution": {}
+        }
+
+    win_rates = [log["win_rate"] for log in logs if isinstance(log.get("win_rate"), (int, float))]
+    drawdowns = [log["max_drawdown"] for log in logs if isinstance(log.get("max_drawdown"), (int, float))]
+    strategy_count = len(logs)
+
+    tag_counts = defaultdict(int)
+    for log in logs:
+        tag = log.get("tag", "その他")
+        tag_counts[tag] += 1
+
+    return {
+        "avg_win_rate": round(sum(win_rates) / len(win_rates), 2) if win_rates else 0.0,
+        "avg_drawdown": round(sum(drawdowns) / len(drawdowns), 2) if drawdowns else 0.0,
+        "strategy_count": strategy_count,
+        "tag_distribution": dict(tag_counts)
+    }
