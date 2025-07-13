@@ -1,0 +1,45 @@
+<!-- noctria_gui/templates/base_hud.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}📊 Noctria HUD{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- HUDスタイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
+</head>
+<body>
+
+    <div class="hud-container-simple">
+        <!-- ✅ 共通ヘッダー（必要に応じて各ページで上書き） -->
+        <header class="hud-panel header">
+            <h1 class="hud-title">
+                {% block header_icon %}<i class="fas fa-terminal"></i>{% endblock %}
+                {% block header_title %}NOCTRIA HUD{% endblock %}
+            </h1>
+            {% block header_nav %}
+            <a href="/" class="nav-item-back"><i class="fas fa-home"></i><span>HOME</span></a>
+            {% endblock %}
+        </header>
+
+        <!-- ✅ コンテンツ -->
+        <main class="hud-panel">
+            {% block content %}
+            <p>ここにコンテンツを追加してください。</p>
+            {% endblock %}
+        </main>
+
+        <!-- ✅ フッターや追加セクションが必要であれば拡張可能 -->
+        {% block extra %}
+        {% endblock %}
+    </div>
+
+</body>
+</html>
