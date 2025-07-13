@@ -1,43 +1,45 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🔁 PDCA履歴 - Noctria Kingdom</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <style>
-    .row-success { background-color: #e6ffe6; }
-    .row-fail { background-color: #ffe6e6; }
-    .row-pending { background-color: #f2f2f2; }
-    button.loading {
-      pointer-events: none;
-      opacity: 0.6;
-    }
-  </style>
-  <script defer>
-    function showLoading(btn) {
-      btn.classList.add('loading');
-      btn.innerText = '⏳ 再評価中...';
-    }
-  </script>
-</head>
-<body>
-  <h1>🔁 Veritas PDCA実行履歴</h1>
+{% extends "base_hud.html" %}
 
-  {% if recheck_success is not none or recheck_fail is not none %}
-    <div style="padding: 1rem; background-color: #e6ffe6; border: 1px solid #99cc99; margin-bottom: 1rem;">
-      ✅ 一括再評価 実行結果：
-      {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
-      {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
-    </div>
-  {% endif %}
+{% block title %}🔁 PDCA履歴 - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-history"></i>{% endblock %}
+{% block header_title %}PDCA履歴{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
 
-  <form method="get" action="/pdca" style="margin-bottom: 1rem;">
-    <!-- フィルター項目 -->
-    <!-- ...（ここは変更なし）... -->
-  </form>
+{% block extra %}
+<style>
+  .row-success { background-color: #e6ffe6; }
+  .row-fail { background-color: #ffe6e6; }
+  .row-pending { background-color: #f2f2f2; }
+  button.loading {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+</style>
+<script defer>
+  function showLoading(btn) {
+    btn.classList.add('loading');
+    btn.innerText = '⏳ 再評価中...';
+  }
+</script>
+{% endblock %}
 
-  <table class="table">
+{% block content %}
+
+<!-- ✅ 再評価結果メッセージ -->
+{% if recheck_success is not none or recheck_fail is not none %}
+  <div class="hud-panel" style="border: 1px solid #00cc66; background: #e6ffe6; color: #003300; margin-bottom: 1rem;">
+    ✅ 一括再評価 実行結果：
+    {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
+    {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
+  </div>
+{% endif %}
+
+<!-- （フィルターUIが必要ならここに追加可能） -->
+
+<!-- 📋 PDCA履歴テーブル -->
+<div class="hud-panel table-wrapper">
+  <table class="hud-table">
     <thead>
       <tr>
         <th>🕒 実行日時</th>
@@ -58,17 +60,25 @@
           <td>{{ log.strategy }}</td>
           <td>{{ log.signal }}</td>
           <td>{{ log.symbol }}</td>
-          <td>{{ log.win_rate if log.win_rate is not none else "-" }}</td>
-          <td>{{ log.max_dd if log.max_dd is not none else "-" }}</td>
+          <td>
+            {% if log.win_rate is not none %}
+              {{ '%.2f' | format(log.win_rate * 100) }}%
+            {% else %}-{% endif %}
+          </td>
+          <td>
+            {% if log.max_dd is not none %}
+              {{ '%.2f' | format(log.max_dd * 100) }}%
+            {% else %}-{% endif %}
+          </td>
           <td>
             {% if log.win_rate_before is not none and log.win_rate_after is not none %}
-              📈 {{ '%+.2f' | format(log.win_rate_after - log.win_rate_before) }}
+              📈 {{ '%+.2f' | format((log.win_rate_after - log.win_rate_before) * 100) }}%
             {% else %}
               📈 -
             {% endif %}
             <br>
             {% if log.max_dd_before is not none and log.max_dd_after is not none %}
-              📉 {{ '%+.3f' | format(log.max_dd_after - log.max_dd_before) }}
+              📉 {{ '%+.2f' | format((log.max_dd_after - log.max_dd_before) * 100) }}%
             {% else %}
               📉 -
             {% endif %}
@@ -82,12 +92,13 @@
           <td>
             <form method="post" action="/pdca/recheck" onsubmit="showLoading(this.querySelector('button'));">
               <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-              <button type="submit">再評価</button>
+              <button class="hud-btn-small" type="submit">再評価</button>
             </form>
           </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
-</body>
-</html>
+</div>
+
+{% endblock %}
