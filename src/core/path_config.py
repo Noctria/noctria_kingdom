@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-📌 Noctria Kingdom Path Config (v4.0)
+📌 Noctria Kingdom Path Config (v4.1)
 - 王国全体のパス構造を一元管理
 - Docker/WSL/ローカルの差異を吸収し、自動で切り替える
 - src/ 配下に統合された構成を前提とする
@@ -84,6 +84,9 @@ PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
 PUSH_LOG_DIR = DATA_DIR / "push_logs"
 
+# ✅ Veritas評価ログの読み取りパス（PDCAで使用）
+VERITAS_EVAL_LOG_DIR = PDCA_LOG_DIR
+
 # ========================================
 # 🔮 Oracle予測結果保存先（将来活用用）
 # ========================================
@@ -122,6 +125,11 @@ def _lint_path_config():
     return {k: v.exists() for k, v in globals().items() if isinstance(v, Path)}
 
 # ========================================
+# 🧠 Veritas戦略保存ディレクトリ設定
+# ========================================
+STRATEGIES_VERITAS_GENERATED_DIR = BASE_DIR / "strategies" / "veritas_generated"
+
+# ========================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
 # ========================================
 __all__ = [
@@ -135,16 +143,10 @@ __all__ = [
     "GUI_TEMPLATES_DIR", "GUI_STATIC_DIR", "GUI_ROUTES_DIR", "GUI_SERVICES_DIR",
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     "VERITAS_EVAL_LOG", "USDJPY_CSV", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
-    "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR",
+    "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR", "VERITAS_EVAL_LOG_DIR",
     "ORACLE_FORECAST_JSON",
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GENERATE_ORDER_SCRIPT",
     "GITHUB_PUSH_SCRIPT", "GITHUB_REPO_URL", "CATEGORY_MAP",
     "_lint_path_config",
-    # 追加した項目
     "STRATEGIES_VERITAS_GENERATED_DIR"
 ]
-
-# ========================================
-# 🧠 Veritas戦略保存ディレクトリ設定
-# ========================================
-STRATEGIES_VERITAS_GENERATED_DIR = BASE_DIR / "strategies" / "veritas_generated"
