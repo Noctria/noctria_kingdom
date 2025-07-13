@@ -7,11 +7,14 @@
 """
 
 from fastapi import APIRouter
+
+# 📊 各サブルートをインポート
 from . import statistics_ranking
 from . import statistics_detail
-from ..strategy_compare import router as strategy_compare_router  # ← 追加ポイント
+from . import strategy_compare  # ✅ 統計比較フォーム & 結果（/compare/form, /compare/render）
 
+# 🔗 統合ルーターを作成
 router = APIRouter()
-router.include_router(statistics_ranking.router)
-router.include_router(statistics_detail.router)
-router.include_router(strategy_compare_router)  # ✅ 統計比較ルートを統合
+router.include_router(statistics_ranking.router)      # 🥇 タグ別ランキング
+router.include_router(statistics_detail.router)       # 📋 個別詳細分析
+router.include_router(strategy_compare.router)        # ⚔️ 戦略比較フォーム＋結果
