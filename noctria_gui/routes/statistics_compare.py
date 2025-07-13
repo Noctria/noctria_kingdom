@@ -18,7 +18,6 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
-    """文字列を日付(datetime)に変換。失敗時はNone。"""
     if not date_str:
         return None
     try:
@@ -28,7 +27,6 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
 
 
 def load_strategy_logs() -> List[Dict[str, Any]]:
-    """ACT_LOG_DIR配下の全JSONをロード。辞書型のみ抽出。"""
     data: List[Dict[str, Any]] = []
     log_dir = Path(ACT_LOG_DIR)
     for file in os.listdir(log_dir):
@@ -44,12 +42,7 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
     return data
 
 
-def filter_by_date(
-    records: List[Dict[str, Any]],
-    from_date: Optional[datetime],
-    to_date: Optional[datetime]
-) -> List[Dict[str, Any]]:
-    """timestampフィールドの日付で範囲フィルタ"""
+def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]) -> List[Dict[str, Any]]:
     filtered = []
     for d in records:
         ts_str = d.get("timestamp", "")[:10]
@@ -62,14 +55,7 @@ def filter_by_date(
     return filtered
 
 
-def compute_statistics_grouped(
-    data: List[Dict[str, Any]],
-    mode: str
-) -> Dict[str, Dict[str, List[float]]]:
-    """
-    mode="strategy"なら戦略ごと、mode="tag"ならタグごとに
-    各指標ごとのスコア配列を構築。
-    """
+def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[str, Dict[str, List[float]]]:
     stat_map: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
     for entry in data:
         keys = [entry.get("strategy_name")] if mode == "strategy" else entry.get("tags", [])
@@ -89,6 +75,8 @@ async def compare(request: Request) -> HTMLResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
     to_date = parse_date(request.query_params.get("to"))
+    sort = request.query_params.get("sort", "score")
+    keys = request.query_params.getlist(f"{mode}s")
 
     all_data = load_strategy_logs()
     filtered = filter_by_date(all_data, from_date, to_date)
@@ -96,24 +84,45 @@ async def compare(request: Request) -> HTMLResponse:
 
     results = []
     for key, scores in stat_map.items():
-        row = {"name": key}
-        for metric, values in scores.items():
-            if values:
-                row[f"{metric}_mean"] = round(mean(values), 3)
-                row[f"{metric}_median"] = round(median(values), 3)
-            else:
-                row[f"{metric}_mean"] = ""
-                row[f"{metric}_median"] = ""
+        if keys and key not in keys:
+            continue
+        row = {
+            "key": key,
+            "avg_win": round(mean(scores["win_rate"]), 2) if scores["win_rate"] else 0,
+            "avg_dd": round(mean(scores["max_drawdown"]), 2) if scores["max_drawdown"] else 0,
+            "count": len(scores["win_rate"])
+        }
         results.append(row)
 
-    return templates.TemplateResponse("statistics_compare.html", {
+    # 並び替え
+    if sort == "check":
+        results.sort(key=lambda x: keys.index(x["key"]) if x["key"] in keys else 9999)
+    else:  # "score"
+        results.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
+
+    # summary（平均・中央値）
+    summary = {
+        "avg_win_mean": round(mean([r["avg_win"] for r in results]), 2) if results else 0,
+        "avg_win_median": round(median([r["avg_win"] for r in results]), 2) if results else 0,
+        "avg_dd_mean": round(mean([r["avg_dd"] for r in results]), 2) if results else 0,
+        "avg_dd_median": round(median([r["avg_dd"] for r in results]), 2) if results else 0,
+        "total_count": sum(r["count"] for r in results)
+    }
+
+    all_keys = sorted(stat_map.keys())
+
+    return templates.TemplateResponse("statistics/statistics_compare.html", {
         "request": request,
         "mode": mode,
-        "data": results,
+        "sort": sort,
+        "keys": keys,
+        "all_keys": all_keys,
+        "results": results,
+        "summary": summary,
         "filter": {
             "from": request.query_params.get("from", ""),
             "to": request.query_params.get("to", ""),
-        },
+        }
     })
 
 
@@ -122,39 +131,26 @@ async def export_csv(request: Request) -> StreamingResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
     to_date = parse_date(request.query_params.get("to"))
+    keys = request.query_params.getlist(f"{mode}s")
 
     all_data = load_strategy_logs()
     filtered = filter_by_date(all_data, from_date, to_date)
     stat_map = compute_statistics_grouped(filtered, mode)
 
     rows = []
-    headers = ["name"]
-    metric_names = set()
-
     for key, scores in stat_map.items():
-        row = {"name": key}
-        for metric, values in scores.items():
-            m = round(mean(values), 3) if values else ""
-            med = round(median(values), 3) if values else ""
-            row[f"{metric}_mean"] = m
-            row[f"{metric}_median"] = med
-            metric_names.update([f"{metric}_mean", f"{metric}_median"])
+        if keys and key not in keys:
+            continue
+        row = {
+            "key": key,
+            "avg_win": round(mean(scores["win_rate"]), 2) if scores["win_rate"] else "",
+            "avg_dd": round(mean(scores["max_drawdown"]), 2) if scores["max_drawdown"] else "",
+            "count": len(scores["win_rate"])
+        }
         rows.append(row)
 
-    headers.extend(sorted(metric_names))
-
-    # 📊 統計サマリ行追加
-    summary_mean = {"name": "📊 平均"}
-    summary_median = {"name": "📊 中央値"}
-    for metric in metric_names:
-        values = [row.get(metric) for row in rows if isinstance(row.get(metric), (int, float))]
-        summary_mean[metric] = round(mean(values), 3) if values else ""
-        summary_median[metric] = round(median(values), 3) if values else ""
-
-    rows.extend([summary_mean, summary_median])
-
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=headers)
+    writer = csv.DictWriter(output, fieldnames=["key", "avg_win", "avg_dd", "count"])
     writer.writeheader()
     writer.writerows(rows)
     output.seek(0)
