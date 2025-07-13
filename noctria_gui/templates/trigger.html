@@ -11,26 +11,28 @@
 {% endblock %}
 
 {% block content %}
-  <section class="hud-panel">
-    <h2 class="panel-title">ISSUE A ROYAL COMMAND (INITIATE PDCA)</h2>
-    <form method="post" action="/trigger" class="filter-form" style="gap: 1rem;">
-      <label for="manual_reason" style="color: var(--text-color-base); font-weight: 600;">
-        📜 REASON FOR DECREE:
-      </label>
-      <input type="text" id="manual_reason" name="manual_reason" value="GUIからの命令" required
-             style="flex-grow: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 4px; color: var(--text-color-base); font-family: var(--font-family);">
-      <button type="submit" class="hud-btn">
-        <i class="fas fa-play-circle"></i> 発令する
-      </button>
-    </form>
-  </section>
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-gavel"></i> ISSUE A ROYAL COMMAND (INITIATE PDCA)</h2>
+  <form method="post" action="/trigger" class="filter-form" style="gap: 1rem;">
+    <label for="manual_reason" class="hud-label">
+      📜 REASON FOR DECREE:
+    </label>
+    <input type="text" id="manual_reason" name="manual_reason" value="GUIからの命令" required
+           class="hud-input" />
+    <button type="submit" class="hud-btn">
+      <i class="fas fa-play-circle"></i> 発令する
+    </button>
+  </form>
+</section>
 
-  {% if result %}
-  <section class="hud-panel" style="margin-top: 1.5rem;">
-    <h2 class="panel-title">EXECUTION RESULT</h2>
-    <div class="result-content" style="white-space: pre-wrap; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); padding: 1rem; border-radius: 4px; font-family: var(--font-family); color: var(--text-color-base);">
-      {{ result }}
-    </div>
-  </section>
-  {% endif %}
+{% if result %}
+<section class="hud-panel" style="margin-top: 1.5rem;">
+  <h2 class="panel-title"><i class="fas fa-scroll"></i> EXECUTION RESULT</h2>
+  <div class="result-content"
+       style="white-space: pre-wrap; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border);
+              padding: 1rem; border-radius: 4px; font-family: var(--font-family); color: var(--text-color-base);">
+    {{ result }}
+  </div>
+</section>
+{% endif %}
 {% endblock %}
