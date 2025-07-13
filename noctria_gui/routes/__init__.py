@@ -8,36 +8,42 @@
 """
 
 import sys
-from pathlib import Path
-
-# ────────────────────────────────────────────────────────
-# 🛠️ 最初に一度だけ src/ をモジュール検索パスに追加
-# このファイルが project_root/src/noctria_gui/__init__.py 配下
-# であることを利用し、parents[2] (= .../src) を追加します
-# ────────────────────────────────────────────────────────
-src_dir = Path(__file__).resolve().parents[2] / "src"  # src/を明示的に設定
-if str(src_dir) not in sys.path:
-    sys.path.insert(0, str(src_dir))
-
 import importlib
 import pkgutil
+import traceback
+from pathlib import Path
 from fastapi import APIRouter
 from typing import List
 
-# ✅ router 一覧（FastAPI本体に登録されるルーター群）
+# ───────────────────────────────────────────────
+# 🛠️ モジュール検索パスに src/ を明示追加
+# ───────────────────────────────────────────────
+src_dir = Path(__file__).resolve().parents[2] / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# ✅ 収集されたルーターを保持
 routers: List[APIRouter] = []
 
-# ✅ この __init__.py 自身の __path__ を起点にサブモジュールを探索
-__path__ = __path__  # pkgutil.iter_modules のために必要
+# ✅ 自身のパスをルート探索用にセット
+__path__ = __path__  # required for pkgutil.iter_modules
 
-# 🔍 統治ルーター探索処理
+# ========================================
+# 🔍 統治ルーター探索処理（自動登録）
+# ========================================
 for finder, module_name, ispkg in pkgutil.iter_modules(__path__):
     if module_name.startswith("_"):
-        continue  # __init__.py や _private.py などは除外
+        continue  # __init__.py や _hidden.py などはスキップ
+
     full_module_name = f"{__name__}.{module_name}"
-    module = importlib.import_module(full_module_name)
-    # 各モジュールが `router: APIRouter` を持っていれば登録
-    router = getattr(module, "router", None)
-    if isinstance(router, APIRouter):
-        routers.append(router)
-        print(f"🔍 loaded router from {full_module_name}")
+    try:
+        module = importlib.import_module(full_module_name)
+        router = getattr(module, "router", None)
+        if isinstance(router, APIRouter):
+            routers.append(router)
+            print(f"✅ Loaded router from {full_module_name}")
+        else:
+            print(f"⚠️  No router found in {full_module_name}")
+    except Exception:
+        print(f"❌ Failed to load router from {full_module_name}")
+        traceback.print_exc()
