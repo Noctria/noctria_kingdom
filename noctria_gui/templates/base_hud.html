@@ -18,15 +18,24 @@
 <body>
 
     <div class="hud-container-simple">
-        <!-- ✅ 共通ヘッダー（必要に応じて各ページで上書き） -->
+        <!-- ✅ 共通ヘッダー -->
         <header class="hud-panel header">
             <h1 class="hud-title">
                 {% block header_icon %}<i class="fas fa-terminal"></i>{% endblock %}
                 {% block header_title %}NOCTRIA HUD{% endblock %}
             </h1>
-            {% block header_nav %}
-            <a href="/" class="nav-item-back"><i class="fas fa-home"></i><span>HOME</span></a>
-            {% endblock %}
+
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <!-- 🕒 現在時刻 -->
+                <span style="font-family: monospace; color: var(--glow-primary);">
+                    🕒 <span id="current-time">--:--:--</span>
+                </span>
+
+                <!-- 🧭 ナビゲーション -->
+                {% block header_nav %}
+                <a href="/" class="nav-item-back"><i class="fas fa-home"></i><span>HOME</span></a>
+                {% endblock %}
+            </div>
         </header>
 
         <!-- ✅ コンテンツ -->
@@ -36,10 +45,23 @@
             {% endblock %}
         </main>
 
-        <!-- ✅ フッターや追加セクションが必要であれば拡張可能 -->
+        <!-- ✅ フッターや追加セクション -->
         {% block extra %}
         {% endblock %}
     </div>
+
+    <!-- ✅ 共通スクリプト -->
+    <script>
+        function updateTime() {
+            const elem = document.getElementById("current-time");
+            if (elem) {
+                const now = new Date();
+                elem.textContent = now.toLocaleTimeString();
+            }
+        }
+        setInterval(updateTime, 1000);
+        updateTime(); // 初回即時実行
+    </script>
 
 </body>
 </html>
