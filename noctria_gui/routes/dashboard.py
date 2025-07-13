@@ -8,6 +8,7 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict
+import pprint # デバッグ表示用にインポート
 
 # --- Third-party Imports ---
 import httpx
@@ -17,7 +18,6 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 # --- Local Application Imports ---
-# 注意: 以下のモジュールが正しく存在し、インポート可能であることを確認してください
 from core.king_noctria import KingNoctria
 from core.path_config import (ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR,
                               PUSH_LOG_DIR)
@@ -75,6 +75,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
         }
     except Exception as e:
         print(f"Warning: Failed to get Oracle metrics. Error: {e}")
+        # エラーが発生しても、必ずキーを含む辞書を生成する
         stats["oracle_metrics"] = { "RMSE": 0.0, "MAE": 0.0, "MAPE": 0.0, "error": "N/A" }
     return stats
 
@@ -95,14 +96,12 @@ async def show_dashboard(request: Request):
     """
     統計情報と予測データを集計し、メインのダッシュボードページをレンダリングします。
     """
-    # ★★★★★ ここからが重要です ★★★★★
-    # forecast_dataを初期化し、データを生成します。
     forecast_data = []
     try:
         today = datetime.now()
         price = 150.0
         for i in range(14):
-            date = today - timedelta(days=(13 - i)) # 過去14日間のデータを生成
+            date = today - timedelta(days=(13 - i))
             actual_price = price + (random.random() - 0.5) * 3
             pred_price = actual_price + (random.random() - 0.5) * 1
             forecast_data.append({
@@ -119,13 +118,19 @@ async def show_dashboard(request: Request):
     stats = aggregate_dashboard_stats()
     stats["pushed_count"] = aggregate_push_stats()
     
-    # context辞書に、キー"forecast"で生成したデータを格納します。
     context = {
         "request": request,
         "stats": stats,
-        "forecast": forecast_data  # この行が最も重要です！
+        "forecast": forecast_data
     }
-    # ★★★★★ ここまでが重要です ★★★★★
+    
+    # --- ★★★ デバッグ機能 ★★★ ---
+    # ターミナルに、テンプレートに渡される直前のデータ内容を詳しく出力します。
+    # これで 'oracle_metrics' が正しく含まれているか確認できます。
+    print("\n--- Context passed to dashboard.html ---")
+    pprint.pprint(context)
+    print("------------------------------------\n")
+    # --- ★★★ デバッグここまで ★★★ ---
     
     return templates.TemplateResponse("dashboard.html", context)
 
