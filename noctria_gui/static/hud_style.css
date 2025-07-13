@@ -1,5 +1,5 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.12
+   🏰 Noctria Kingdom - HUD Interface Style v1.13
    ============================================ */
 
 /* --- Root Variables --- */
@@ -134,9 +134,19 @@ body {
     color: var(--bg-color);
 }
 
-/* ========================================
-   統計DBページ用スタイル
-   ======================================== */
+/* --- Description Box --- */
+.description-box {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-size: 1rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    color: var(--text-color-base);
+}
+
+/* --- HUD Table / Charts / Metrics --- */
 .controls-panel {
     flex-direction: row;
     align-items: center;
@@ -205,6 +215,8 @@ body {
     margin: 0 0.5rem;
 }
 .action-links a:hover { text-decoration: underline; }
+
+/* --- Custom Checkbox --- */
 .strategy-item-checkbox {
     display: flex;
     justify-content: center;
