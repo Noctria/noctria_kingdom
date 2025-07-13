@@ -1,34 +1,47 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>📑 比較条件選択</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-  <h1>📑 比較する{{ "戦略" if mode == "strategy" else "タグ" }}を選択</h1>
+{% extends "base_hud.html" %}
+
+{% block title %}📑 比較条件選択{% endblock %}
+
+{% block header_icon %}<i class="fas fa-sliders-h"></i>{% endblock %}
+{% block header_title %}比較条件の選択{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back">
+  <i class="fas fa-chart-line"></i><span>ダッシュボードへ</span>
+</a>
+{% endblock %}
+
+{% block content %}
   <form method="get" action="/statistics/compare" onsubmit="return setKeys()">
     <input type="hidden" name="mode" value="{{ mode }}">
     <input type="hidden" name="sort" value="check">
     <input type="hidden" id="keys" name="{{ mode }}s" value="">
-    <div id="options">
+
+    <div id="options" class="table-wrapper" style="max-height: 60vh; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
       {% for k in all_keys %}
-        <label style="display:block;">
+        <label class="strategy-item-checkbox">
           <input type="checkbox" value="{{ k }}">
-          {{ k }}
+          <span class="custom-checkbox"></span>
+          <span style="margin-left: 0.5rem;">{{ k }}</span>
         </label>
       {% endfor %}
     </div>
-    <button type="submit">📈 比較する</button>
+
+    <div style="margin-top: 2rem;">
+      <button type="submit" class="hud-btn">📈 比較する</button>
+    </div>
   </form>
-  <script>
-    function setKeys() {
-      const boxes = document.querySelectorAll('#options input[type=checkbox]');
-      const selected = [];
-      boxes.forEach(box => { if (box.checked) selected.push(box.value); });
-      document.getElementById('keys').value = selected.join(',');
-      return true;
-    }
-  </script>
-</body>
-</html>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function setKeys() {
+    const boxes = document.querySelectorAll('#options input[type=checkbox]');
+    const selected = [];
+    boxes.forEach(box => {
+      if (box.checked) selected.push(box.value);
+    });
+    document.getElementById('keys').value = selected.join(',');
+    return true;
+  }
+</script>
+{% endblock %}
