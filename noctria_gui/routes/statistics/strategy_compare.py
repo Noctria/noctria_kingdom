@@ -22,13 +22,14 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 def load_strategy_logs() -> List[Dict[str, Any]]:
     logs = []
-    if not Path(ACT_LOG_DIR).exists():
+    act_dir = Path(ACT_LOG_DIR)
+    if not act_dir.exists():
         return logs
 
-    for f in os.listdir(ACT_LOG_DIR):
+    for f in os.listdir(act_dir):
         if f.endswith(".json"):
             try:
-                with open(Path(ACT_LOG_DIR) / f, "r", encoding="utf-8") as file:
+                with open(act_dir / f, "r", encoding="utf-8") as file:
                     log = json.load(file)
                 logs.append(log)
             except Exception:
@@ -42,20 +43,18 @@ async def compare_form(request: Request):
     strategies = []
 
     for log in logs:
-        try:
-            strategies.append({
-                "strategy": log.get("strategy_name"),
-                "win_rate": log.get("score", {}).get("win_rate", 0),
-                "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
-                "num_trades": log.get("score", {}).get("num_trades", 0)
-            })
-        except Exception:
+        name = log.get("strategy_name")
+        if not name:
             continue
+        strategies.append({
+            "strategy": name,
+            "win_rate": log.get("score", {}).get("win_rate", 0),
+            "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
+            "num_trades": log.get("score", {}).get("num_trades", 0)
+        })
 
-    # 重複戦略名の除外
-    unique = {}
-    for s in strategies:
-        unique[s["strategy"]] = s
+    # 重複除去（戦略名で一意化）
+    unique = {s["strategy"]: s for s in strategies}
     strategies = list(unique.values())
 
     return templates.TemplateResponse("strategies/compare_form.html", {
@@ -67,15 +66,16 @@ async def compare_form(request: Request):
 @router.post("/compare/render", response_class=HTMLResponse)
 async def render_comparison(request: Request, selected: List[str] = Form(...)):
     if not selected or len(selected) < 2:
-        return RedirectResponse("/statistics/compare/form", status_code=302)
+        return RedirectResponse(url="/statistics/compare/form", status_code=302)
 
     logs = load_strategy_logs()
     filtered = []
 
     for log in logs:
-        if log.get("strategy_name") in selected:
+        name = log.get("strategy_name")
+        if name in selected:
             filtered.append({
-                "strategy": log.get("strategy_name"),
+                "strategy": name,
                 "win_rate": log.get("score", {}).get("win_rate", 0),
                 "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
                 "num_trades": log.get("score", {}).get("num_trades", 0)
@@ -90,4 +90,4 @@ async def render_comparison(request: Request, selected: List[str] = Form(...)):
 # ✅ 古いURLの互換リダイレクト（例: /strategy/compare）
 @router.get("/../strategy/compare")
 async def legacy_redirect():
-    return RedirectResponse("/statistics/compare/form")
+    return RedirectResponse(url="/statistics/compare/form", status_code=307)
