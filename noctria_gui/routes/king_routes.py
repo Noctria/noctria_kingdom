@@ -21,7 +21,7 @@ import json
 # ──────────────────────────────
 # 📁 ルーターとテンプレート初期化
 # ──────────────────────────────
-router = APIRouter()
+router = APIRouter(prefix="/king", tags=["King"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # 📌 評議会ログファイルの保存先
@@ -33,23 +33,30 @@ KING_LOG_PATH = LOGS_DIR / "king_log.json"
 
 def load_logs() -> list:
     """📖 評議会ログを読み込む"""
-    if KING_LOG_PATH.exists():
-        with open(KING_LOG_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    try:
+        if KING_LOG_PATH.exists():
+            with open(KING_LOG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"🔴 load_logs失敗: {e}")
+        return []
 
 def save_log(entry: dict):
     """📚 評議会ログを追記保存"""
-    logs = load_logs()
-    logs.append(entry)
-    with open(KING_LOG_PATH, "w", encoding="utf-8") as f:
-        json.dump(logs, f, ensure_ascii=False, indent=2)
+    try:
+        logs = load_logs()
+        logs.append(entry)
+        with open(KING_LOG_PATH, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"🔴 save_log失敗: {e}")
 
 # ──────────────────────────────
 # 👑 評議会APIエンドポイント
 # ──────────────────────────────
 
-@router.post("/king/hold-council")
+@router.post("/hold-council")
 async def hold_council_api(request: Request):
     """
     🧠 KingNoctriaによる評議会の開催（外部データを元に意思決定）
@@ -72,13 +79,16 @@ async def hold_council_api(request: Request):
         return JSONResponse(content=result)
 
     except Exception as e:
-        return JSONResponse(content={"error": f"Council failed: {str(e)}"}, status_code=500)
+        return JSONResponse(
+            content={"error": f"Council failed: {str(e)}"},
+            status_code=500
+        )
 
 # ──────────────────────────────
 # 📜 評議会履歴表示ページ
 # ──────────────────────────────
 
-@router.get("/king/history", response_class=HTMLResponse)
+@router.get("/history", response_class=HTMLResponse)
 async def show_king_history(request: Request):
     """
     📜 KingNoctriaによる過去の評議会履歴をGUIで表示
