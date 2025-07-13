@@ -1,0 +1,54 @@
+{% extends "base_hud.html" %}
+
+{% block title %}📊 統計ダッシュボード{% endblock %}
+{% block header_icon %}<i class="fas fa-database"></i>{% endblock %}
+{% block header_title %}STRATEGY STATISTICS{% endblock %}
+{% block header_nav_href %}/statistics{% endblock %}
+{% block header_nav_text %}統計一覧{% endblock %}
+
+{% block content %}
+<section class="hud-panel metrics">
+  <h2 class="panel-title">統計概要</h2>
+  <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+    <div class="metric-item">
+      <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+      <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-bolt"></i> 平均DD</h3>
+      <p class="metric-value text-red">{{ stats.avg_drawdown | round(2) }}%</p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-layer-group"></i> 戦略数</h3>
+      <p class="metric-value">{{ stats.strategy_count }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title">タグ別分布</h2>
+  <canvas id="tagPieChart" width="400" height="300"></canvas>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('tagPieChart').getContext('2d');
+  const tagPieChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: {{ stats.tag_distribution.keys() | list | tojson }},
+      datasets: [{
+        label: '戦略数',
+        data: {{ stats.tag_distribution.values() | list | tojson }},
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'right' }
+      }
+    }
+  });
+</script>
+{% endblock %}
