@@ -20,8 +20,8 @@
 
 <!-- 📅 期間・モード・件数フォーム -->
 <form method="get" action="/pdca/summary" class="hud-panel filter-form">
-  <label>📅 開始日: <input type="date" name="from" value="{{ filter.from }}"></label>
-  <label>📅 終了日: <input type="date" name="to" value="{{ filter.to }}"></label>
+  <label>📅 開始日: <input type="date" name="from" value="{{ filter.from | default('') }}"></label>
+  <label>📅 終了日: <input type="date" name="to" value="{{ filter.to | default('') }}"></label>
   <label>📊 表示モード:
     <select name="mode">
       <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
@@ -40,11 +40,11 @@
 
 <!-- ✅ サマリー統計 -->
 <div class="hud-panel summary-card">
-  <p>📈 勝率平均改善: <strong>{{ stats.avg_win_rate_diff }}%</strong></p>
-  <p>📉 最大DD平均改善: <strong>{{ stats.avg_dd_diff }}</strong></p>
-  <p>🎯 勝率改善戦略数: <strong>{{ stats.win_rate_improved }}</strong></p>
-  <p>🛡 DD改善戦略数: <strong>{{ stats.dd_improved }}</strong></p>
-  <p>🔰 採用戦略数: <strong>{{ stats.adopted }}</strong></p>
+  <p>📈 勝率平均改善: <strong>{{ summary.avg_win_rate_diff }}%</strong></p>
+  <p>📉 最大DD平均改善: <strong>{{ summary.avg_dd_diff }}</strong></p>
+  <p>🎯 勝率改善戦略数: <strong>{{ summary.win_rate_improved }}</strong></p>
+  <p>🛡 DD改善戦略数: <strong>{{ summary.dd_improved }}</strong></p>
+  <p>🔰 採用戦略数: <strong>{{ summary.adopted }}</strong></p>
 </div>
 
 <!-- 📈 勝率改善グラフ -->
@@ -131,7 +131,7 @@
     </tr>
   </thead>
   <tbody>
-    {% for row in stats.detail %}
+    {% for row in summary.detail %}
     <tr>
       <td>{{ row.strategy }}</td>
       <td>{{ row.win_rate_before }}</td>
