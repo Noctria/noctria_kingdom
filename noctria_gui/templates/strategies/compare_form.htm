@@ -1,52 +1,50 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>⚔️ Strategy Comparison - Noctria Kingdom HUD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- noctria_gui/templates/compare_form.html -->
+{% extends "base_hud.html" %}
 
-    <!-- Google Fonts & Font Awesome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% block title %}⚔️ Strategy Comparison - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-balance-scale"></i>{% endblock %}
+{% block header_title %}STRATEGY COMPARISON{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+{% endblock %}
 
-    <!-- 専用CSSファイル -->
-    <link rel="stylesheet" href="/static/hud_style.css" />
-</head>
-<body>
+{% block content %}
+<div class="hud-panel selection-panel">
+  <h2 class="panel-title">SELECT STRATEGIES TO COMPARE</h2>
+  <form method="get" action="/statistics/compare" onsubmit="return setKeys()">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <input type="hidden" name="sort" value="check">
+    <input type="hidden" id="keys" name="{{ mode }}s" value="">
 
-    <div class="hud-container-simple">
-        <!-- Header -->
-        <header class="hud-panel header">
-            <h1 class="hud-title"><i class="fas fa-balance-scale"></i> STRATEGY COMPARISON</h1>
-            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
-        </header>
-
-        <!-- Selection Panel -->
-        <main class="hud-panel selection-panel">
-            <h2 class="panel-title">SELECT STRATEGIES TO COMPARE (CHOOSE 2 OR MORE)</h2>
-            <form method="post" action="/strategies/compare/render" class="selection-form">
-                <div class="strategy-list-wrapper">
-                    <div class="strategy-list">
-                        {% for s in strategies %}
-                        <label class="strategy-item">
-                            <input type="checkbox" name="selected" value="{{ s.strategy }}">
-                            <span class="custom-checkbox"></span>
-                            <span class="strategy-name">{{ s.strategy }}</span>
-                            <span class="strategy-stats">
-                                (Win: <span class="text-green">{{ s.win_rate }}%</span>, DD: <span class="text-magenta">{{ s.max_drawdown }}%</span>)
-                            </span>
-                        </label>
-                        {% else %}
-                        <p style="text-align: center; padding: 2rem;">No strategies available for comparison.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-                <button type="submit" class="hud-btn"><i class="fas fa-chart-bar"></i> 比較する</button>
-            </form>
-        </main>
+    <div id="options" class="strategy-list" style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+      {% for s in all_keys %}
+        <label class="strategy-item-checkbox">
+          <input type="checkbox" value="{{ s }}">
+          <span class="custom-checkbox"></span>
+          <span style="margin-left: 0.5rem;">{{ s }}</span>
+        </label>
+      {% else %}
+        <p style="padding: 2rem; text-align: center;">No strategies found for this mode.</p>
+      {% endfor %}
     </div>
 
-</body>
-</html>
+    <div style="margin-top: 2rem;">
+      <button type="submit" class="hud-btn"><i class="fas fa-chart-bar"></i> 比較する</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function setKeys() {
+    const boxes = document.querySelectorAll('#options input[type=checkbox]');
+    const selected = [];
+    boxes.forEach(box => {
+      if (box.checked) selected.push(box.value);
+    });
+    document.getElementById('keys').value = selected.join(',');
+    return true;
+  }
+</script>
+{% endblock %}
