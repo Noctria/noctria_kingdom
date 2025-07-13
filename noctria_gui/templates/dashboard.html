@@ -17,7 +17,6 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-
 </head>
 <body>
 
@@ -90,18 +89,17 @@
             </form>
             <div id="councilResult" class="council-result">Awaiting command...</div>
         </section>
-
     </div>
 
-    <!-- データを安全に埋め込むための専用scriptタグ -->
+    <!-- 予測データを埋め込む -->
     <script type="application/json" id="forecast-data">
         {{ forecast | tojson | safe }}
     </script>
 
-    <!-- Main Logic Script -->
+    <!-- Chart.js & System Logic -->
     <script>
+        {% raw %}
         document.addEventListener('DOMContentLoaded', () => {
-            // System Time
             const timeElement = document.getElementById('system-time');
             function updateTime() {
                 const now = new Date();
@@ -120,6 +118,7 @@
             const forecastDataElement = document.getElementById('forecast-data');
             const rawData = forecastDataElement ? forecastDataElement.textContent.trim() : null;
             let forecastData = [];
+
             try {
                 if (!rawData || rawData.startsWith('{{') || rawData === "null") {
                     throw new Error("サーバーからグラフデータが提供されませんでした。");
@@ -132,31 +131,33 @@
                 console.error("グラフデータの読み込みに失敗しました:", e);
             }
 
-            // Chart options (raw to avoid Jinja parsing)
-            {% raw %}
-            const hudChartOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
-                scales: {
-                    x: {
-                        type: 'time', time: { unit: 'day' },
-                        ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
-                        grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
-                    },
-                    y: {
-                        ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
-                        grid: { color: 'rgba(0, 229, 255, 0.2)' }
-                    }
-                },
-                plugins: {
-                    legend: { labels: { color: '#e6f1ff', font: { family: "'Roboto Mono', monospace" } } },
-                    tooltip: { backgroundColor: 'rgba(0, 30, 60, 0.8)', borderColor: '#00e5ff', borderWidth: 1 }
-                }
-            };
-
             if (forecastData.length) {
                 const ctx = document.getElementById("forecastChart").getContext("2d");
+                const hudChartOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
+                    scales: {
+                        x: {
+                            type: 'time', time: { unit: 'day' },
+                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
+                            grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
+                        },
+                        y: {
+                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
+                            grid: { color: 'rgba(0, 229, 255, 0.2)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e6f1ff', font: { family: "'Roboto Mono', monospace" } } },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 30, 60, 0.8)',
+                            borderColor: '#00e5ff',
+                            borderWidth: 1
+                        }
+                    }
+                };
+
                 new Chart(ctx, {
                     type: "line",
                     data: {
@@ -168,9 +169,8 @@
                     options: hudChartOptions
                 });
             }
-            {% endraw %}
 
-            // Council Form
+            // Council Form Submit
             const councilForm = document.getElementById("councilForm");
             const resultDiv = document.getElementById("councilResult");
             councilForm.addEventListener("submit", async (e) => {
@@ -185,7 +185,9 @@
                 resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Council...';
                 try {
                     const res = await fetch("/dashboard/king/hold-council", {
-                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(marketData)
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(marketData)
                     });
                     const data = await res.json();
                     if (res.ok) {
@@ -198,6 +200,7 @@
                 }
             });
         });
+        {% endraw %}
     </script>
 </body>
 </html>
