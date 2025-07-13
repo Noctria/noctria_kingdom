@@ -1,84 +1,51 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>📂 {{ tag }} に属する戦略一覧 - Noctria Kingdom</title>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      padding: 2rem;
-      background-color: #f4f4f4;
-    }
-    h1 {
-      color: #222;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .export-button {
-      padding: 0.5rem 1rem;
-      background-color: #007acc;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
-    }
-    .export-button:hover {
-      background-color: #005fa3;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: white;
-      margin-top: 1rem;
-    }
-    th, td {
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    th {
-      background-color: #e0e0e0;
-    }
-    .strategy-link {
-      color: #007acc;
-      text-decoration: none;
-    }
-    .strategy-link:hover {
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>📂 タグ「{{ tag }}」に属する戦略一覧</h1>
-    <a href="/tag-summary/detail/export?tag={{ tag }}" class="export-button">CSVエクスポート</a>
+{% extends "base_hud.html" %}
+
+{% block title %}📂 {{ tag }} に属する戦略一覧 - Noctria Kingdom{% endblock %}
+
+{% block header_icon %}<i class="fas fa-folder-open"></i>{% endblock %}
+{% block header_title %}タグ「{{ tag }}」の戦略一覧{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back">
+  <i class="fas fa-chart-line"></i><span>ダッシュボードへ</span>
+</a>
+{% endblock %}
+
+{% block content %}
+  <div class="controls-panel" style="justify-content: space-between;">
+    <div><h2 class="panel-title">📊 該当戦略一覧</h2></div>
+    <div>
+      <a href="/tag-summary/detail/export?tag={{ tag }}" class="hud-btn">📁 CSVエクスポート</a>
+    </div>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>戦略名</th>
-        <th>通貨ペア</th>
-        <th>勝率</th>
-        <th>最大DD</th>
-        <th>取引回数</th>
-        <th>評価日時</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for strategy in strategies %}
-      <tr>
-        <td><a class="strategy-link" href="/strategy/detail?name={{ strategy.strategy }}">{{ strategy.strategy }}</a></td>
-        <td>{{ strategy.symbol }}</td>
-        <td>{{ "%.2f"|format(strategy.win_rate * 100) }}%</td>
-        <td>{{ "%.2f"|format(strategy.max_drawdown * 100) }}%</td>
-        <td>{{ strategy.num_trades }}</td>
-        <td>{{ strategy.timestamp }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</body>
-</html>
+  <div class="table-wrapper" style="margin-top: 1rem;">
+    <table class="hud-table">
+      <thead>
+        <tr>
+          <th>戦略名</th>
+          <th>通貨ペア</th>
+          <th>勝率</th>
+          <th>最大DD</th>
+          <th>取引回数</th>
+          <th>評価日時</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for strategy in strategies %}
+        <tr>
+          <td>
+            <a class="strategy-link" href="/strategy/detail?name={{ strategy.strategy }}">
+              {{ strategy.strategy }}
+            </a>
+          </td>
+          <td>{{ strategy.symbol }}</td>
+          <td>{{ "%.2f"|format(strategy.win_rate * 100) }}%</td>
+          <td>{{ "%.2f"|format(strategy.max_drawdown * 100) }}%</td>
+          <td>{{ strategy.num_trades }}</td>
+          <td>{{ strategy.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
