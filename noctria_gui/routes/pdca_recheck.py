@@ -14,8 +14,8 @@ import urllib.parse
 # ========================================
 # 修正点: 実際のファイル名に合わせてインポート文を修正
 # ========================================
-# 'core'ディレクトリに移動した実際のファイル名が 'trigger_pdca_api.py' であると仮定
-from core.trigger_pdca_api import trigger_recheck_dag
+# 'core'ディレクトリに移動した実際のファイル名 'veritas_trigger_api.py' からインポートします
+from core.veritas_trigger_api import trigger_recheck_dag
 
 
 router = APIRouter()
