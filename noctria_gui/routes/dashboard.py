@@ -58,7 +58,7 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
 
     try:
         oracle = PrometheusOracle()
-        metrics = oracle.evaluate_oracle_model()  # ← メソッド名を修正
+        metrics = oracle.evaluate_oracle_model()  # ← 正しいメソッド名
         stats["oracle_metrics"] = {
             "RMSE": metrics.get("RMSE", 0.0),
             "MAE": metrics.get("MAE", 0.0),
@@ -67,6 +67,8 @@ def aggregate_dashboard_stats() -> Dict[str, Any]:
     except Exception as e:
         print(f"Warning: Failed to get Oracle metrics. Error: {e}")
         stats["oracle_metrics"] = {"RMSE": 0.0, "MAE": 0.0, "MAPE": 0.0, "error": "N/A"}
+
+    stats["pushed_count"] = aggregate_push_stats()  # ← 修正
 
     return stats
 
@@ -100,4 +102,10 @@ async def show_dashboard(request: Request):
         print(f"🔴 Error generating forecast data: {e}")
 
     stats = aggregate_dashboard_stats()
-    stats["pushed_count"]_]()
+    pprint.pprint(stats)  # ← 型確認用のログ出力
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "forecast": forecast_data,
+        "stats": stats
+    })
