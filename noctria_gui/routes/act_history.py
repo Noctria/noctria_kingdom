@@ -16,7 +16,7 @@ from typing import Optional
 from core.path_config import ACT_LOG_DIR, TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import act_log_service
 
-router = APIRouter()
+router = APIRouter(prefix="/act-history", tags=["act-history"])
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 
@@ -34,28 +34,24 @@ def parse_bool(s):
 
 
 def normalize_score(log: dict) -> dict:
-    """
-    scoreがdictの場合は各評価指標に分解してテンプレートで扱いやすくする
-    """
     score = log.get("score")
     if isinstance(score, dict):
-        log["score_mean"] = score.get("mean", None)
-        log["rmse"] = score.get("RMSE", None)
-        log["mae"] = score.get("MAE", None)
-        log["mape"] = score.get("MAPE", None)
-        log["win_rate"] = score.get("win_rate", None)
-        log["max_drawdown"] = score.get("max_drawdown", None)
+        log["score_mean"] = score.get("mean")
+        log["rmse"] = score.get("RMSE")
+        log["mae"] = score.get("MAE")
+        log["mape"] = score.get("MAPE")
+        log["win_rate"] = score.get("win_rate")
+        log["max_drawdown"] = score.get("max_drawdown")
     else:
         log["score_mean"] = score
 
-    # タグフィールドがない場合に備えて補完
     if "tags" not in log or not isinstance(log["tags"], list):
         log["tags"] = []
 
     return log
 
 
-@router.get("/act-history", response_class=HTMLResponse)
+@router.get("", response_class=HTMLResponse)
 async def show_act_history(
     request: Request,
     strategy_name: Optional[str] = Query(None),
@@ -97,7 +93,6 @@ async def show_act_history(
 
     logs = [normalize_score(log) for log in logs]
 
-    # 全ログからタグ一覧を抽出してソート
     tag_set = set()
     for log in logs:
         tag_set.update(log.get("tags", []))
@@ -119,7 +114,7 @@ async def show_act_history(
     })
 
 
-@router.get("/act-history/detail", response_class=HTMLResponse)
+@router.get("/detail", response_class=HTMLResponse)
 async def show_act_detail(request: Request, strategy_name: str = Query(...)):
     log = act_log_service.get_log_by_strategy(strategy_name)
     if not log:
@@ -130,19 +125,25 @@ async def show_act_detail(request: Request, strategy_name: str = Query(...)):
     })
 
 
-@router.post("/act-history/repush")
+@router.post("/repush")
 async def repush_strategy(strategy_name: str = Form(...)):
-    act_log_service.reset_push_flag(strategy_name)
-    return RedirectResponse(url="/act-history", status_code=303)
+    try:
+        act_log_service.reset_push_flag(strategy_name)
+        return RedirectResponse(url="/act-history", status_code=303)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"再Push処理中にエラー: {e}"})
 
 
-@router.post("/act-history/reevaluate")
+@router.post("/reevaluate")
 async def reevaluate_strategy(strategy_name: str = Form(...)):
-    act_log_service.mark_for_reevaluation(strategy_name)
-    return RedirectResponse(url="/act-history", status_code=303)
+    try:
+        act_log_service.mark_for_reevaluation(strategy_name)
+        return RedirectResponse(url="/act-history", status_code=303)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"再評価マーク処理中にエラー: {e}"})
 
 
-@router.get("/act-history/export")
+@router.get("/export")
 async def export_act_log_csv(
     strategy_name: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
