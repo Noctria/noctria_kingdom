@@ -4,38 +4,91 @@
   <meta charset="UTF-8">
   <title>📌 タグ × 指標ランキング</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
   <style>
+    /* --- Root Variables --- */
+    :root {
+        --bg-color: #0a192f;
+        --glow-primary: #7DF9FF;
+        --glow-secondary: #00e5ff;
+        --accent-color-1: #7DF9FF;
+        --accent-color-2: #4b90ff;
+        --accent-color-3: #2c6cb5;
+        --panel-bg: rgba(17, 34, 64, 0.6);
+        --panel-border: rgba(0, 229, 255, 0.3);
+        --panel-shadow: rgba(0, 229, 255, 0.4);
+        --text-color-base: #a8b2d1;
+        --text-color-title: #e6f1ff;
+        --glow-effect: 0 0 4px var(--glow-primary);
+        --font-family: 'Roboto Mono', Consolas, 'Courier New', monospace;
+    }
+
+    /* --- Base & Body --- */
     body {
-      font-family: "Segoe UI", sans-serif;
-      background: #f4f4f4;
-      padding: 2rem;
+        background-color: var(--bg-color);
+        color: var(--text-color-base);
+        font-family: var(--font-family);
+        margin: 0;
+        padding: 2rem;
+        overflow: hidden;
     }
+
     h1 {
-      color: #222;
-      margin-bottom: 1.5rem;
+        color: var(--text-color-title);
+        margin-bottom: 1.5rem;
+        text-shadow: var(--glow-effect);
     }
+
     .select-container {
-      margin-bottom: 2rem;
+        margin-bottom: 2rem;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        padding: 1rem;
+        border-radius: 4px;
     }
+
     canvas {
-      max-width: 800px;
-      margin: 0 auto;
-      display: block;
+        max-width: 800px;
+        margin: 0 auto;
+        display: block;
     }
+
     a {
-      display: inline-block;
-      margin-top: 2rem;
-      text-decoration: none;
-      color: #007acc;
+        display: inline-block;
+        margin-top: 2rem;
+        text-decoration: none;
+        color: var(--glow-primary);
     }
+
+    .hud-btn {
+        background: transparent;
+        border: 1px solid var(--glow-primary);
+        color: var(--glow-primary);
+        padding: 0.75rem 1.5rem;
+        font-family: var(--font-family);
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-shadow: var(--glow-effect);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .hud-btn:hover {
+        background: var(--glow-primary);
+        color: var(--bg-color);
+    }
+
   </style>
 </head>
 <body>
   <h1>📌 タグ × 指標ランキング</h1>
 
   <div class="select-container">
-    <label for="metricSelect">📊 指標を選択：</label>
-    <select id="metricSelect">
+    <label for="metricSelect" class="hud-btn">📊 指標を選択：</label>
+    <select id="metricSelect" class="hud-btn">
       <option value="win_rate">勝率（%）</option>
       <option value="max_drawdown">最大ドローダウン（%）</option>
       <option value="num_trades">取引回数</option>
@@ -45,7 +98,7 @@
 
   <canvas id="rankingChart"></canvas>
 
-  <p><a href="/dashboard">← ダッシュボードへ戻る</a></p>
+  <p><a href="/dashboard" class="hud-btn">← ダッシュボードへ戻る</a></p>
 
   <script>
     const rawData = {{ tag_stats | tojson }};
