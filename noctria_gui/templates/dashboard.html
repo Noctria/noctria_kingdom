@@ -26,7 +26,7 @@
         </div>
         <div class="metric-item">
             <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
-            {% if stats.oracle_metrics %}
+            {% if stats.oracle_metrics and stats.oracle_metrics.RMSE is defined %}
                 <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
             {% else %}
                 <p class="metric-value text-yellow">—</p>
@@ -110,7 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("グラフデータの読み込みに失敗:", e);
     }
 
-    if (forecastData.length) {
+    if (!forecastData.length) {
+        const canvasContainer = document.getElementById("forecastChart").parentElement;
+        canvasContainer.innerHTML = "<p style='color: red;'>⚠️ 予測データが取得できませんでした。</p>";
+    } else {
         const ctx = document.getElementById("forecastChart").getContext("2d");
         const labels = forecastData.map(d => d.date);
         const forecast = forecastData.map(d => d.forecast);
