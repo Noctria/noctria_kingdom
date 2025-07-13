@@ -1,78 +1,62 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>👑 評議会ログ履歴 - Noctria Kingdom HUD</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+{% extends "base_hud.html" %}
 
-  <!-- Google Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% block title %}👑 評議会ログ履歴 - Noctria Kingdom HUD{% endblock %}
 
-  <!-- HUD専用CSS -->
-  <link rel="stylesheet" href="/static/hud_style.css" />
-</head>
-<body>
+{% block header_icon %}<i class="fas fa-crown"></i>{% endblock %}
+{% block header_title %}評議会ログ履歴{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
 
-  <div class="hud-container-simple">
-    <!-- Header -->
-    <header class="hud-panel header">
-      <h1 class="hud-title"><i class="fas fa-crown"></i> 評議会ログ履歴</h1>
-      <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
-    </header>
+{% block content %}
 
-    <!-- エラー表示 -->
-    {% if error %}
-      <div class="hud-panel" style="border: 1px solid red; background: #ffe6e6; color: darkred;">
-        ⚠️ 読み込みエラー: {{ error }}
-      </div>
-    {% endif %}
-
-    <!-- ログ表示 -->
-    <main class="hud-panel log-panel">
-      {% if logs %}
-        <div class="table-wrapper">
-          <table class="hud-table">
-            <thead>
-              <tr>
-                <th>🕒 日時</th>
-                <th>📜 最終判断</th>
-                <th>📘 Veritas</th>
-                <th>📈 Prometheus</th>
-                <th>🗡️ Aurus</th>
-                <th>🌊 Levia</th>
-                <th>🛡️ Noctus</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for log in logs %}
-              <tr>
-                <td>{{ log.timestamp }}</td>
-                <td><strong>{{ log.result.final_decision or log.decision.final_decision or "-" }}</strong></td>
-                <td>{{ log.result.veritas or log.decision.veritas or "-" }}</td>
-                <td>
-                  {% set pf = log.result.prometheus_forecast or log.decision.prometheus_forecast %}
-                  {% if pf and pf.forecast is defined %}
-                    {{ pf.forecast }}
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-                <td>{{ log.result.aurus or log.decision.aurus or "-" }}</td>
-                <td>{{ log.result.levia or log.decision.levia or "-" }}</td>
-                <td>{{ log.result.noctus or log.decision.noctus or "-" }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <p style="text-align: center;">📭 評議会の履歴はまだ存在しません。</p>
-      {% endif %}
-    </main>
+<!-- ⚠️ エラー表示 -->
+{% if error %}
+  <div class="hud-panel" style="border: 1px solid red; background: #ffe6e6; color: darkred;">
+    ⚠️ 読み込みエラー: {{ error }}
   </div>
+{% endif %}
 
-</body>
-</html>
+<!-- 📜 ログ表示 -->
+<section class="hud-panel log-panel">
+  {% if logs %}
+    <div class="table-wrapper">
+      <table class="hud-table">
+        <thead>
+          <tr>
+            <th>🕒 日時</th>
+            <th>📜 最終判断</th>
+            <th>📘 Veritas</th>
+            <th>📈 Prometheus</th>
+            <th>🗡️ Aurus</th>
+            <th>🌊 Levia</th>
+            <th>🛡️ Noctus</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td>{{ log.timestamp }}</td>
+            <td><strong>{{ log.result.final_decision or log.decision.final_decision or "-" }}</strong></td>
+            <td>{{ log.result.veritas or log.decision.veritas or "-" }}</td>
+            <td>
+              {% set pf = log.result.prometheus_forecast or log.decision.prometheus_forecast %}
+              {% if pf and pf.forecast is defined %}
+                {{ pf.forecast }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>{{ log.result.aurus or log.decision.aurus or "-" }}</td>
+            <td>{{ log.result.levia or log.decision.levia or "-" }}</td>
+            <td>{{ log.result.noctus or log.decision.noctus or "-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="text-align: center;">📭 評議会の履歴はまだ存在しません。</p>
+  {% endif %}
+</section>
+
+{% endblock %}
