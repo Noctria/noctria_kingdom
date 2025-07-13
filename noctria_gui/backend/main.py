@@ -43,10 +43,6 @@ from noctria_gui.routes import (
     upload_history,
 )
 
-# ✅ このファイルがある場合に限り追加（存在しない場合はこの行を削除してください）
-from noctria_gui.routes import statistics_dashboard
-
-
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
 # ========================================
@@ -91,7 +87,6 @@ app.include_router(push.router)
 app.include_router(statistics.router)
 app.include_router(statistics_compare.router)
 app.include_router(statistics_detail.router)
-app.include_router(statistics_dashboard.router)  # ← ✅ 今回の修正点
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
 app.include_router(statistics_tag_ranking.router)
