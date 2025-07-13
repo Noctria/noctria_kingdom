@@ -1,203 +1,191 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>👑 Noctria Kingdom - Central Governance HUD</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/hud_style.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-</head>
-<body>
-    <div class="hud-container-simple">
-        <!-- Header -->
-        <header class="hud-panel header">
-            <h1 class="hud-title"><i class="fas fa-chess-king"></i> NOCTRIA KINGDOM - CENTRAL GOVERNANCE HUD</h1>
-            <div id="system-time" class="system-time"></div>
-        </header>
+{% extends "base_hud.html" %}
 
-        <!-- Key Metrics -->
-        <section class="hud-panel metrics">
-            <h2 class="panel-title">KEY METRICS</h2>
-            <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-                <div class="metric-item">
-                    <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
-                    <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
-                </div>
-                <div class="metric-item">
-                    <h3><i class="fas fa-check-double"></i> 採用戦略数</h3>
-                    <p class="metric-value text-green">{{ stats.promoted_count }}</p>
-                </div>
-                <div class="metric-item">
-                    <h3><i class="fas fa-rocket"></i> PUSH実行数</h3>
-                    <p class="metric-value text-magenta">{{ stats.pushed_count }}</p>
-                </div>
-                <div class="metric-item">
-                    <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
-                    {% if stats.oracle_metrics %}
-                        <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
-                    {% else %}
-                        <p class="metric-value text-yellow">—</p>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
+{% block title %}👑 Noctria Kingdom - Central Governance HUD{% endblock %}
 
-        <!-- Oracle Forecast Chart -->
-        <section class="hud-panel chart-panel">
-            <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
-            <div style="height: 300px;">
-                <canvas id="forecastChart"></canvas>
-            </div>
-        </section>
+{% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
+{% block header_title %}CENTRAL GOVERNANCE HUD{% endblock %}
+{% block header_nav_href %}#{% endblock %}
+{% block header_nav_text %}—{% endblock %}
 
-        <!-- Navigation -->
-        <section class="hud-panel navigation">
-            <h2 class="panel-title"><i class="fas fa-compass"></i> NAVIGATION</h2>
-            <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
-                <a href="/statistics/dashboard" class="nav-item"><i class="fas fa-chart-pie"></i><span>統計DB</span></a>
-                <a href="/strategy/compare" class="nav-item"><i class="fas fa-balance-scale"></i><span>戦略比較</span></a>
-                <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
-                <a href="/upload-strategy" class="nav-item"><i class="fas fa-upload"></i><span>アップロード</span></a>
-                <a href="/pdca/summary" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
-                <a href="/trigger" class="nav-item"><i class="fas fa-bullhorn"></i><span>王命発令</span></a>
-            </div>
-        </section>
-
-        <!-- Council Form -->
-        <section class="hud-panel council-form">
-            <h2 class="panel-title"><i class="fas fa-gavel"></i> HOLD COUNCIL</h2>
-            <form id="councilForm">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
-                    <input type="number" name="price" placeholder="PRICE" required step="any" />
-                    <input type="number" name="volume" placeholder="VOLUME" step="any" />
-                    <input type="number" name="volatility" placeholder="VOLATILITY" step="0.01" />
-                    <input type="text" name="trend_prediction" placeholder="TREND (bull/bear)" />
-                </div>
-                <button type="submit" class="hud-btn">EXECUTE</button>
-            </form>
-            <div id="councilResult" class="council-result">Awaiting command...</div>
-        </section>
+{% block content %}
+<!-- Key Metrics -->
+<section class="hud-panel metrics">
+    <h2 class="panel-title">KEY METRICS</h2>
+    <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+        <div class="metric-item">
+            <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+            <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-check-double"></i> 採用戦略数</h3>
+            <p class="metric-value text-green">{{ stats.promoted_count }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-rocket"></i> PUSH実行数</h3>
+            <p class="metric-value text-magenta">{{ stats.pushed_count }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
+            {% if stats.oracle_metrics %}
+                <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
+            {% else %}
+                <p class="metric-value text-yellow">—</p>
+            {% endif %}
+        </div>
     </div>
+</section>
 
-    <!-- Forecast Data -->
-    <script type="application/json" id="forecast-data">
-        {{ forecast | tojson | safe }}
-    </script>
+<!-- Oracle Forecast Chart -->
+<section class="hud-panel chart-panel">
+    <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
+    <div style="height: 300px;">
+        <canvas id="forecastChart"></canvas>
+    </div>
+</section>
 
-    <!-- JS -->
-    <script>
-    {% raw %}
-    document.addEventListener('DOMContentLoaded', () => {
-        const timeElement = document.getElementById('system-time');
-        function updateTime() {
-            const now = new Date();
-            const options = {
-                timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-            };
-            const formatter = new Intl.DateTimeFormat('en-CA', options);
-            const jstString = formatter.format(now).replace(', ', ' ');
-            timeElement.textContent = `${jstString} JST`;
+<!-- Navigation -->
+<section class="hud-panel navigation">
+    <h2 class="panel-title"><i class="fas fa-compass"></i> NAVIGATION</h2>
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+        <a href="/statistics/dashboard" class="nav-item"><i class="fas fa-chart-pie"></i><span>統計DB</span></a>
+        <a href="/strategy/compare" class="nav-item"><i class="fas fa-balance-scale"></i><span>戦略比較</span></a>
+        <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
+        <a href="/upload-strategy" class="nav-item"><i class="fas fa-upload"></i><span>アップロード</span></a>
+        <a href="/pdca/summary" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
+        <a href="/trigger" class="nav-item"><i class="fas fa-bullhorn"></i><span>王命発令</span></a>
+    </div>
+</section>
+
+<!-- Council Form -->
+<section class="hud-panel council-form">
+    <h2 class="panel-title"><i class="fas fa-gavel"></i> HOLD COUNCIL</h2>
+    <form id="councilForm">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+            <input type="number" name="price" placeholder="PRICE" required step="any" />
+            <input type="number" name="volume" placeholder="VOLUME" step="any" />
+            <input type="number" name="volatility" placeholder="VOLATILITY" step="0.01" />
+            <input type="text" name="trend_prediction" placeholder="TREND (bull/bear)" />
+        </div>
+        <button type="submit" class="hud-btn">EXECUTE</button>
+    </form>
+    <div id="councilResult" class="council-result">Awaiting command...</div>
+</section>
+
+<!-- Forecast Data JSON -->
+<script type="application/json" id="forecast-data">
+    {{ forecast | tojson | safe }}
+</script>
+
+<!-- JS Logic -->
+<script>
+{% raw %}
+document.addEventListener('DOMContentLoaded', () => {
+    const timeElement = document.getElementById('system-time');
+    function updateTime() {
+        const now = new Date();
+        const options = {
+            timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        };
+        const formatter = new Intl.DateTimeFormat('en-CA', options);
+        const jstString = formatter.format(now).replace(', ', ' ');
+        timeElement.textContent = `${jstString} JST`;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // Forecast Chart
+    const rawData = document.getElementById("forecast-data")?.textContent.trim();
+    let forecastData = [];
+    try {
+        if (!rawData || rawData.startsWith('{{') || rawData === "null") {
+            throw new Error("サーバーからグラフデータが提供されませんでした。");
         }
-        setInterval(updateTime, 1000);
-        updateTime();
-
-        const rawData = document.getElementById("forecast-data")?.textContent.trim();
-        let forecastData = [];
-        try {
-            if (!rawData || rawData.startsWith('{{') || rawData === "null") {
-                throw new Error("サーバーからグラフデータが提供されませんでした。");
-            }
-            forecastData = JSON.parse(rawData);
-            if (!Array.isArray(forecastData) || forecastData.length === 0) {
-                throw new Error("グラフデータが空または不正な形式です。");
-            }
-        } catch (e) {
-            console.error("グラフデータの読み込みに失敗:", e);
+        forecastData = JSON.parse(rawData);
+        if (!Array.isArray(forecastData) || forecastData.length === 0) {
+            throw new Error("グラフデータが空または不正な形式です。");
         }
+    } catch (e) {
+        console.error("グラフデータの読み込みに失敗:", e);
+    }
 
-        if (forecastData.length) {
-            const ctx = document.getElementById("forecastChart").getContext("2d");
-            new Chart(ctx, {
-                type: "line",
-                data: {
-                    datasets: [
-                        {
-                            label: "実績",
-                            data: forecastData.map(d => ({ x: d.date, y: d.y_true })),
-                            tension: 0.3,
-                            pointRadius: 2
-                        },
-                        {
-                            label: "予測",
-                            data: forecastData.map(d => ({ x: d.date, y: d.forecast || d.y_pred })),
-                            tension: 0.3,
-                            pointRadius: 2
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            type: 'time',
-                            time: { unit: 'day' },
-                            ticks: { color: '#a8b2d1' },
-                            grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
-                        },
-                        y: {
-                            ticks: { color: '#a8b2d1' },
-                            grid: { color: 'rgba(0, 229, 255, 0.2)' }
-                        }
+    if (forecastData.length) {
+        const ctx = document.getElementById("forecastChart").getContext("2d");
+        new Chart(ctx, {
+            type: "line",
+            data: {
+                datasets: [
+                    {
+                        label: "実績",
+                        data: forecastData.map(d => ({ x: d.date, y: d.y_true })),
+                        tension: 0.3,
+                        pointRadius: 2
                     },
-                    plugins: {
-                        legend: {
-                            labels: { color: '#e6f1ff' }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 30, 60, 0.8)',
-                            borderColor: '#00e5ff',
-                            borderWidth: 1
-                        }
+                    {
+                        label: "予測",
+                        data: forecastData.map(d => ({ x: d.date, y: d.forecast || d.y_pred })),
+                        tension: 0.3,
+                        pointRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'day' },
+                        ticks: { color: '#a8b2d1' },
+                        grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
+                    },
+                    y: {
+                        ticks: { color: '#a8b2d1' },
+                        grid: { color: 'rgba(0, 229, 255, 0.2)' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#e6f1ff' }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 30, 60, 0.8)',
+                        borderColor: '#00e5ff',
+                        borderWidth: 1
                     }
                 }
-            });
-        }
-
-        const form = document.getElementById("councilForm");
-        const resultDiv = document.getElementById("councilResult");
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const formData = new FormData(form);
-            const payload = {};
-            formData.forEach((v, k) => {
-                if (v === "") return;
-                const num = Number(v);
-                payload[k] = isNaN(num) ? v : num;
-            });
-            resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Council...';
-            try {
-                const res = await fetch("/dashboard/king/hold-council", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                resultDiv.textContent = res.ok
-                    ? `Decision: ${data.final_decision}`
-                    : `Error: ${data.detail || 'Unknown'}`;
-            } catch (err) {
-                resultDiv.textContent = `Communication Error: ${err.message}`;
             }
         });
+    }
+
+    // Council Submission
+    const form = document.getElementById("councilForm");
+    const resultDiv = document.getElementById("councilResult");
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const payload = {};
+        formData.forEach((v, k) => {
+            if (v === "") return;
+            const num = Number(v);
+            payload[k] = isNaN(num) ? v : num;
+        });
+        resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Council...';
+        try {
+            const res = await fetch("/dashboard/king/hold-council", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            resultDiv.textContent = res.ok
+                ? `Decision: ${data.final_decision}`
+                : `Error: ${data.detail || 'Unknown'}`;
+        } catch (err) {
+            resultDiv.textContent = `Communication Error: ${err.message}`;
+        }
     });
-    {% endraw %}
-    </script>
-</body>
-</html>
+});
+{% endraw %}
+</script>
+{% endblock %}
