@@ -36,7 +36,7 @@ templates.env.filters["from_json"] = from_json
 # ルーターのインポート
 # ========================================
 from noctria_gui.routes import (
-    dashboard, 
+    dashboard,
     home_routes,
     act_history,
     act_history_detail,
@@ -46,7 +46,7 @@ from noctria_gui.routes import (
     pdca,
     pdca_recheck,
     pdca_routes,
-    pdca_summary,               # ✅ ← これを追加
+    pdca_summary,
     prometheus_routes,
     push,
     statistics,
@@ -64,6 +64,7 @@ from noctria_gui.routes import (
     tag_summary,
     upload,
     upload_history,
+    trigger,  # ✅ 新たに追加
 )
 
 # ========================================
@@ -84,7 +85,7 @@ app.include_router(path_checker.router)
 app.include_router(pdca.router)
 app.include_router(pdca_recheck.router)
 app.include_router(pdca_routes.router)
-app.include_router(pdca_summary.router)      # ✅ ← これを追加
+app.include_router(pdca_summary.router)
 app.include_router(prometheus_routes.router)
 app.include_router(push.router)
 app.include_router(statistics.router)
@@ -102,6 +103,7 @@ app.include_router(tag_heatmap.router)
 app.include_router(tag_summary.router)
 app.include_router(upload.router)
 app.include_router(upload_history.router)
+app.include_router(trigger.router)  # ✅ 最後に追加
 
 print("✅ All routers have been integrated successfully.")
 
