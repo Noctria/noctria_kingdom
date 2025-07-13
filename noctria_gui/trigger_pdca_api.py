@@ -2,44 +2,52 @@
 # coding: utf-8
 
 """
-🚀 FastAPI GUI → Airflow DAG Trigger
-- トリガーフォームからAirflowにDAGを起動する
+🚀 /trigger - FastAPI GUI → Airflow DAG Triggerルート
+- 王命（DAGトリガー）をGUIフォームから発令
 """
 
-from fastapi import FastAPI, Request, Form
+from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
+from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from dotenv import load_dotenv
 from datetime import datetime
+from pathlib import Path
 import requests
 import os
 
 # =========================
-# ✅ 環境変数読み込み
+# ✅ 環境変数読み込み（Airflowと共有）
 # =========================
-load_dotenv(dotenv_path="/opt/airflow/.env")
+dotenv_path = Path("/opt/airflow/.env")
+if dotenv_path.exists():
+    load_dotenv(dotenv_path=dotenv_path)
 
 AIRFLOW_API_URL = "http://airflow-webserver:8080/api/v1/dags/noctria_kingdom_pdca_dag/dagRuns"
 AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
 
 # =========================
-# ✅ FastAPI初期化
+# ✅ FastAPI Router 初期化
 # =========================
-app = FastAPI(title="Noctria GUI Trigger")
-templates = Jinja2Templates(directory="noctria_gui/templates")
+router = APIRouter(prefix="/trigger", tags=["Trigger"])
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # =========================
 # 📄 トリガーフォーム表示
 # =========================
-@app.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 async def render_trigger_form(request: Request):
-    return templates.TemplateResponse("trigger.html", {"request": request, "result": None})
+    return templates.TemplateResponse("trigger.html", {
+        "request": request,
+        "result": None
+    })
 
 # =========================
-# 🚀 DAGトリガーPOST
+# 🚀 DAGトリガー実行
 # =========================
-@app.post("/trigger", response_class=HTMLResponse)
+@router.post("/", response_class=HTMLResponse)
 async def trigger_pdca_from_gui(
     request: Request,
     manual_reason: str = Form(...)
