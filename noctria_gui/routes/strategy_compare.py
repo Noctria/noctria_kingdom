@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📊 統計比較ページルート
+- 勝率・最大DDの平均を戦略名またはタグ単位で比較
+"""
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -10,8 +18,9 @@ from datetime import datetime
 from collections import defaultdict
 from typing import List, Dict, Any, Optional
 
-router = APIRouter()
+router = APIRouter(prefix="/statistics", tags=["statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
 
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     if not date_str:
@@ -20,6 +29,7 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
+
 
 def load_strategy_logs() -> List[Dict[str, Any]]:
     data = []
@@ -33,6 +43,7 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
             except Exception:
                 continue
     return data
+
 
 def compute_comparison(
     data: List[Dict[str, Any]],
@@ -96,6 +107,7 @@ def compute_comparison(
 
     return final
 
+
 def extract_all_keys(data: List[Dict[str, Any]], mode: str) -> List[str]:
     key_set = set()
     for record in data:
@@ -107,7 +119,8 @@ def extract_all_keys(data: List[Dict[str, Any]], mode: str) -> List[str]:
                 key_set.add(name)
     return sorted(key_set)
 
-@router.get("/statistics/compare", response_class=HTMLResponse)
+
+@router.get("/compare", response_class=HTMLResponse)
 async def compare_statistics(request: Request) -> HTMLResponse:
     params = request.query_params
     mode = params.get("mode", "tag")  # "strategy" or "tag"
@@ -121,7 +134,7 @@ async def compare_statistics(request: Request) -> HTMLResponse:
     result = compute_comparison(all_data, mode, keys, from_date, to_date, sort)
     all_keys = extract_all_keys(all_data, mode)
 
-    return templates.TemplateResponse("statistics_compare.html", {
+    return templates.TemplateResponse("statistics/statistics_compare.html", {
         "request": request,
         "mode": mode,
         "keys": keys,
@@ -135,8 +148,8 @@ async def compare_statistics(request: Request) -> HTMLResponse:
         }
     })
 
-# --- 404対策用リダイレクト（必要なら追加！） ---
-@router.get("/strategies/compare")
-async def redirect_strategies_compare():
-    """旧パスから新パスへリダイレクト"""
+
+# --- 古いルート対策のリダイレクト ---
+@router.get("/../strategy/compare")
+async def redirect_old_strategy_compare():
     return RedirectResponse(url="/statistics/compare")
