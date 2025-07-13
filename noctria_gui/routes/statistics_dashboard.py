@@ -19,9 +19,9 @@ async def statistics_dashboard(request: Request):
     """
     HUDスタイル統計ダッシュボード画面を表示
     """
-    # 📊 統計データ取得（例：平均勝率・DD・戦略数・タグ分布など）
     stats = get_strategy_statistics()
 
+    # ✅ テンプレートパスは templates/statistics_dashboard.html に一致させる
     return templates.TemplateResponse("statistics_dashboard.html", {
         "request": request,
         "stats": stats,
