@@ -46,6 +46,7 @@ from noctria_gui.routes import (
     pdca,
     pdca_recheck,
     pdca_routes,
+    pdca_summary,               # ✅ ← これを追加
     prometheus_routes,
     push,
     statistics,
@@ -54,7 +55,7 @@ from noctria_gui.routes import (
     statistics_ranking,
     statistics_scoreboard,
     statistics_tag_ranking,
-    statistics_dashboard,  # ← ✅ 追加ここ！
+    statistics_dashboard,
     strategy_compare,
     strategy_detail,
     strategy_heatmap,
@@ -83,6 +84,7 @@ app.include_router(path_checker.router)
 app.include_router(pdca.router)
 app.include_router(pdca_recheck.router)
 app.include_router(pdca_routes.router)
+app.include_router(pdca_summary.router)      # ✅ ← これを追加
 app.include_router(prometheus_routes.router)
 app.include_router(push.router)
 app.include_router(statistics.router)
@@ -91,7 +93,7 @@ app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
 app.include_router(statistics_tag_ranking.router)
-app.include_router(statistics_dashboard.router)  # ← ✅ 追加ここ！
+app.include_router(statistics_dashboard.router)
 app.include_router(strategy_compare.router)
 app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
