@@ -24,7 +24,7 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ Jinja2 カスタムフィルタ (アプリケーション全体で利用可能)
+# ✅ Jinja2 カスタムフィルタ
 def from_json(value: str) -> Any:
     try:
         return json.loads(value)
@@ -50,13 +50,13 @@ from noctria_gui.routes import (
     prometheus_routes,
     push,
     statistics,
-    statistics_compare,
     statistics_detail,
     statistics_ranking,
     statistics_scoreboard,
     statistics_tag_ranking,
-    statistics_dashboard,
-    strategy_compare,
+    # statistics_compare,  # ✅ 統合済みのため不要
+    # statistics_dashboard,  # ❌ 使用終了のため不要
+    # strategy_compare,  # ✅ /statistics に統合されたため削除
     strategy_detail,
     strategy_heatmap,
     strategy_routes,
@@ -64,7 +64,7 @@ from noctria_gui.routes import (
     tag_summary,
     upload,
     upload_history,
-    trigger,  # ✅ 新たに追加
+    trigger,
 )
 
 # ========================================
@@ -72,11 +72,11 @@ from noctria_gui.routes import (
 # ========================================
 print("Integrating all routers into the main application...")
 
-# プレフィックスが異なるものを先に登録
+# 優先ルート
 app.include_router(dashboard.router)
 app.include_router(home_routes.router)
 
-# 各機能ページのルーター
+# 各機能ルーター
 app.include_router(act_history.router)
 app.include_router(act_history_detail.router)
 app.include_router(king_routes.router)
@@ -88,14 +88,11 @@ app.include_router(pdca_routes.router)
 app.include_router(pdca_summary.router)
 app.include_router(prometheus_routes.router)
 app.include_router(push.router)
-app.include_router(statistics.router)
-app.include_router(statistics_compare.router)
+app.include_router(statistics.router)  # ✅ 統合済みルート
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
 app.include_router(statistics_tag_ranking.router)
-app.include_router(statistics_dashboard.router)
-app.include_router(strategy_compare.router)
 app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
 app.include_router(strategy_routes.router)
@@ -103,12 +100,12 @@ app.include_router(tag_heatmap.router)
 app.include_router(tag_summary.router)
 app.include_router(upload.router)
 app.include_router(upload_history.router)
-app.include_router(trigger.router)  # ✅ 最後に追加
+app.include_router(trigger.router)
 
 print("✅ All routers have been integrated successfully.")
 
 # ========================================
-# 🔀 トップページリダイレクト（必要なければ無効化）
+# 🔀 トップページリダイレクト（必要に応じて有効化）
 # ========================================
 # @app.get("/", include_in_schema=False)
 # async def root() -> RedirectResponse:
