@@ -11,41 +11,41 @@
 {% endblock %}
 
 {% block content %}
-  <section class="hud-panel">
-    <h2 class="panel-title">📊 概要</h2>
-    <table class="hud-table">
-      <tr><th>勝率</th><td>{{ strategy.win_rate or "―" }}%</td></tr>
-      <tr><th>取引数</th><td>{{ strategy.num_trades or "―" }}</td></tr>
-      <tr><th>最大ドローダウン</th><td>{{ strategy.max_drawdown or "―" }}</td></tr>
-      <tr>
-        <th>タグ</th>
-        <td>
-          {% for tag in strategy.tags %}
-            <span class="hud-tag">{{ tag }}</span>
-          {% endfor %}
-        </td>
-      </tr>
-    </table>
-  </section>
+<section class="hud-panel">
+  <h2 class="panel-title">📊 概要</h2>
+  <table class="hud-table">
+    <tr><th>勝率</th><td>{{ strategy.win_rate or "―" }}%</td></tr>
+    <tr><th>取引数</th><td>{{ strategy.num_trades or "―" }}</td></tr>
+    <tr><th>最大ドローダウン</th><td>{{ strategy.max_drawdown or "―" }}</td></tr>
+    <tr>
+      <th>タグ</th>
+      <td>
+        {% for tag in strategy.tags %}
+          <span class="hud-tag">{{ tag }}</span>
+        {% endfor %}
+      </td>
+    </tr>
+  </table>
+</section>
 
-  <section class="hud-panel">
-    <h2 class="panel-title">📈 評価グラフ（他戦略と比較）</h2>
-    <div class="chart-container-half">
-      <canvas id="comparisonChart"></canvas>
-    </div>
-  </section>
-
-  <section class="hud-panel">
-    <h2 class="panel-title">🧠 ロジック説明</h2>
-    <div class="description-box" style="background: rgba(0,0,0,0.2); padding: 1rem; border: 1px solid var(--panel-border); border-radius: 6px; font-size: 1rem; line-height: 1.6; white-space: pre-wrap;">
-      {{ strategy.description or "説明がありません。" }}
-    </div>
-  </section>
-
-  <div style="margin-top: 2rem; display: flex; gap: 1rem;">
-    <a class="hud-btn" href="/strategies/view?name={{ strategy.strategy }}.py">📜 コードを見る</a>
-    <a class="hud-btn" href="/strategies">← 戦略一覧に戻る</a>
+<section class="hud-panel">
+  <h2 class="panel-title">📈 評価グラフ（他戦略と比較）</h2>
+  <div class="chart-container-half">
+    <canvas id="comparisonChart"></canvas>
   </div>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title">🧠 ロジック説明</h2>
+  <div class="description-box">
+    {{ strategy.description or "説明がありません。" }}
+  </div>
+</section>
+
+<div style="margin-top: 2rem; display: flex; gap: 1rem;">
+  <a class="hud-btn" href="/strategies/view?name={{ strategy.strategy }}.py">📜 コードを見る</a>
+  <a class="hud-btn" href="/strategies">← 戦略一覧に戻る</a>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -60,7 +60,7 @@
         {{ strategy.num_trades or 0 }},
         {{ strategy.max_drawdown or 0 }}
       ],
-      backgroundColor: "rgba(54, 162, 235, 0.6)"
+      backgroundColor: "rgba(0, 229, 255, 0.6)"
     },
     {% for s in related_strategies %}
     {
@@ -70,7 +70,7 @@
         {{ s.num_trades or 0 }},
         {{ s.max_drawdown or 0 }}
       ],
-      backgroundColor: "rgba({{ 100 + loop.index0 * 30 }}, 200, 100, 0.4)"
+      backgroundColor: "rgba({{ 60 + loop.index0 * 30 }}, 150, 255, 0.4)"
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ];
@@ -81,8 +81,32 @@
     data: { labels, datasets },
     options: {
       responsive: true,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#cceeff',
+            font: {
+              family: 'Roboto Mono',
+              size: 14
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 30, 60, 0.8)',
+          borderColor: '#00e5ff',
+          borderWidth: 1
+        }
+      },
       scales: {
-        y: { beginAtZero: true }
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#a8b2d1' },
+          grid: { color: 'rgba(0, 229, 255, 0.2)' }
+        },
+        x: {
+          ticks: { color: '#a8b2d1' },
+          grid: { color: 'rgba(0, 229, 255, 0.05)' }
+        }
       }
     }
   });
