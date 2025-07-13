@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- 専用CSSファイル -->
+    <!-- HUD スタイル -->
     <link rel="stylesheet" href="/static/hud_style.css" />
 
     <!-- Chart.js CDN -->
@@ -20,24 +20,24 @@
 </head>
 <body>
 
-    <div class="hud-container">
+    <div class="hud-container-simple">
         <!-- Header -->
         <header class="hud-panel header">
             <h1 class="hud-title"><i class="fas fa-chess-king"></i> NOCTRIA KINGDOM - CENTRAL GOVERNANCE HUD</h1>
             <div id="system-time" class="system-time"></div>
         </header>
 
-        <!-- Key Metrics Panel -->
+        <!-- Key Metrics -->
         <section class="hud-panel metrics">
             <h2 class="panel-title">KEY METRICS</h2>
-            <div class="metrics-grid">
+            <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
                 <div class="metric-item">
                     <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
                     <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
                 </div>
                 <div class="metric-item">
                     <h3><i class="fas fa-check-double"></i> 採用戦略数</h3>
-                    <p class="metric-value text-cyan">{{ stats.promoted_count }}</p>
+                    <p class="metric-value text-green">{{ stats.promoted_count }}</p>
                 </div>
                 <div class="metric-item">
                     <h3><i class="fas fa-rocket"></i> PUSH実行数</h3>
@@ -57,15 +57,15 @@
         <!-- Oracle Forecast Chart -->
         <section class="hud-panel chart-panel">
             <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
-            <div class="chart-wrapper">
+            <div style="height: 300px;">
                 <canvas id="forecastChart"></canvas>
             </div>
         </section>
-        
-        <!-- Navigation Panel -->
+
+        <!-- Navigation -->
         <section class="hud-panel navigation">
             <h2 class="panel-title"><i class="fas fa-compass"></i> NAVIGATION</h2>
-            <div class="nav-grid">
+            <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
                 <a href="/statistics/dashboard" class="nav-item"><i class="fas fa-chart-pie"></i><span>統計DB</span></a>
                 <a href="/strategy/compare" class="nav-item"><i class="fas fa-balance-scale"></i><span>戦略比較</span></a>
                 <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
@@ -75,11 +75,11 @@
             </div>
         </section>
 
-        <!-- Council Form Panel -->
+        <!-- Council Form -->
         <section class="hud-panel council-form">
             <h2 class="panel-title"><i class="fas fa-gavel"></i> HOLD COUNCIL</h2>
             <form id="councilForm">
-                <div class="form-grid">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
                     <input type="number" name="price" placeholder="PRICE" required step="any" />
                     <input type="number" name="volume" placeholder="VOLUME" step="any" />
                     <input type="number" name="volatility" placeholder="VOLATILITY" step="0.01" />
@@ -91,12 +91,12 @@
         </section>
     </div>
 
-    <!-- 予測データを埋め込む -->
+    <!-- 予測データ -->
     <script type="application/json" id="forecast-data">
         {{ forecast | tojson | safe }}
     </script>
 
-    <!-- Chart.js & System Logic -->
+    <!-- Chart.js + Clock + Council Form Logic -->
     <script>
         {% raw %}
         document.addEventListener('DOMContentLoaded', () => {
@@ -114,9 +114,8 @@
             setInterval(updateTime, 1000);
             updateTime();
 
-            // Chart.js
-            const forecastDataElement = document.getElementById('forecast-data');
-            const rawData = forecastDataElement ? forecastDataElement.textContent.trim() : null;
+            // Forecast Chart
+            const rawData = document.getElementById("forecast-data")?.textContent.trim();
             let forecastData = [];
 
             try {
@@ -128,36 +127,11 @@
                     throw new Error("グラフデータが空または不正な形式です。");
                 }
             } catch (e) {
-                console.error("グラフデータの読み込みに失敗しました:", e);
+                console.error("グラフデータの読み込みに失敗:", e);
             }
 
             if (forecastData.length) {
                 const ctx = document.getElementById("forecastChart").getContext("2d");
-                const hudChartOptions = {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    chartArea: { backgroundColor: 'rgba(0, 30, 60, 0.4)' },
-                    scales: {
-                        x: {
-                            type: 'time', time: { unit: 'day' },
-                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
-                            grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
-                        },
-                        y: {
-                            ticks: { color: '#a8b2d1', font: { family: "'Roboto Mono', monospace" } },
-                            grid: { color: 'rgba(0, 229, 255, 0.2)' }
-                        }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#e6f1ff', font: { family: "'Roboto Mono', monospace" } } },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 30, 60, 0.8)',
-                            borderColor: '#00e5ff',
-                            borderWidth: 1
-                        }
-                    }
-                };
-
                 new Chart(ctx, {
                     type: "line",
                     data: {
@@ -166,37 +140,56 @@
                             { label: "予測", data: forecastData.map(d => ({ x: d.date, y: d.forecast || d.y_pred })), tension: 0.3, pointRadius: 2 }
                         ]
                     },
-                    options: hudChartOptions
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'day' },
+                                ticks: { color: '#a8b2d1' },
+                                grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
+                            },
+                            y: {
+                                ticks: { color: '#a8b2d1' },
+                                grid: { color: 'rgba(0, 229, 255, 0.2)' }
+                            }
+                        },
+                        plugins: {
+                            legend: { labels: { color: '#e6f1ff' } },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 30, 60, 0.8)',
+                                borderColor: '#00e5ff',
+                                borderWidth: 1
+                            }
+                        }
+                    }
                 });
             }
 
-            // Council Form Submit
-            const councilForm = document.getElementById("councilForm");
+            // Council Form
+            const form = document.getElementById("councilForm");
             const resultDiv = document.getElementById("councilResult");
-            councilForm.addEventListener("submit", async (e) => {
+            form.addEventListener("submit", async (e) => {
                 e.preventDefault();
-                const formData = new FormData(councilForm);
-                const marketData = {};
-                formData.forEach((value, key) => {
-                    if (value === null || value === "") return;
-                    const num = Number(value);
-                    marketData[key] = isNaN(num) ? value : num;
+                const formData = new FormData(form);
+                const payload = {};
+                formData.forEach((v, k) => {
+                    if (v === "") return;
+                    const num = Number(v);
+                    payload[k] = isNaN(num) ? v : num;
                 });
                 resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Council...';
                 try {
                     const res = await fetch("/dashboard/king/hold-council", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(marketData)
+                        body: JSON.stringify(payload)
                     });
                     const data = await res.json();
-                    if (res.ok) {
-                        resultDiv.textContent = `Decision: ${data.final_decision}`;
-                    } else {
-                        resultDiv.textContent = `Error: ${data.detail || 'Unknown'}`;
-                    }
-                } catch (error) {
-                    resultDiv.textContent = `Communication Error: ${error.message}`;
+                    resultDiv.textContent = res.ok ? `Decision: ${data.final_decision}` : `Error: ${data.detail || 'Unknown'}`;
+                } catch (err) {
+                    resultDiv.textContent = `Communication Error: ${err.message}`;
                 }
             });
         });
