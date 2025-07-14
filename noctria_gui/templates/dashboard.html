@@ -73,7 +73,7 @@
 
 <!-- Forecast Data JSON -->
 <script type="application/json" id="forecast-data">
-    {{ forecast | tojson | safe }}
+    {{ forecast | default([]) | tojson | safe }}
 </script>
 
 <!-- JS Logic -->
