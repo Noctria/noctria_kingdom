@@ -87,23 +87,14 @@ async def show_dashboard(request: Request):
     forecast_data = []
     try:
         oracle = PrometheusOracle()
-        prediction = oracle.predict_market()
-        print("🔍 Oracle予測出力:", prediction)
-
-        if prediction:
-            dates = prediction.get("dates", [])
-            forecast = prediction.get("forecast", [])
-            lower = prediction.get("lower_bound", [])
-            upper = prediction.get("upper_bound", [])
-
-            if all([dates, forecast, lower, upper]) and len(dates) == len(forecast) == len(lower) == len(upper):
-                forecast_data = [
-                    {"date": d, "forecast": f, "y_lower": lb, "y_upper": ub}
-                    for d, f, lb, ub in zip(dates, forecast, lower, upper)
-                ]
-            else:
-                print("🔶 Oracleデータの形式が不正です。")
-
+        predicted_price = oracle.predict_market()
+        forecast_data = [{
+            "date": datetime.today().strftime("%Y-%m-%d"),
+            "forecast": round(predicted_price, 2),
+            "y_lower": round(predicted_price * 0.98, 2),  # 仮の信頼区間
+            "y_upper": round(predicted_price * 1.02, 2),
+        }]
+        print("🔍 Oracle予測出力:", forecast_data[0])
     except Exception as e:
         print(f"🔴 Error generating forecast data from Oracle: {e}")
 
