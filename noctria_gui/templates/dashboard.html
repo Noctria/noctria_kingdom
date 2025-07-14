@@ -8,7 +8,6 @@
 {% block header_nav_text %}—{% endblock %}
 
 {% block content %}
-<!-- Key Metrics -->
 <section class="hud-panel metrics">
     <h2 class="panel-title">KEY METRICS</h2>
     <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
@@ -35,7 +34,6 @@
     </div>
 </section>
 
-<!-- Oracle Forecast Chart -->
 <section class="hud-panel chart-panel">
     <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE PREDICTION ANALYSIS</h2>
     <div style="height: 300px;">
@@ -43,7 +41,6 @@
     </div>
 </section>
 
-<!-- Navigation -->
 <section class="hud-panel navigation">
     <h2 class="panel-title"><i class="fas fa-compass"></i> NAVIGATION</h2>
     <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
@@ -56,7 +53,6 @@
     </div>
 </section>
 
-<!-- Council Form -->
 <section class="hud-panel council-form">
     <h2 class="panel-title"><i class="fas fa-gavel"></i> HOLD COUNCIL</h2>
     <form id="councilForm">
@@ -71,12 +67,10 @@
     <div id="councilResult" class="council-result">Awaiting command...</div>
 </section>
 
-<!-- Forecast Data JSON -->
 <script type="application/json" id="forecast-data">
     {{ forecast | default([]) | tojson | safe }}
 </script>
 
-<!-- JS Logic -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <script>
@@ -99,25 +93,18 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateTime, 1000);
     updateTime();
 
-    // Forecast Chart
-    const rawData = document.getElementById("forecast-data")?.textContent.trim();
-    let forecastData = [];
+    // ✅ 修正: Forecast Chart のロジックを単一の try...catch に集約
+    const chartContainer = document.getElementById("forecastChart").parentElement;
     try {
-        if (!rawData || rawData.startsWith('{{') || rawData === "null") {
-            throw new Error("サーバーからグラフデータが提供されませんでした。");
-        }
-        forecastData = JSON.parse(rawData);
-        if (!Array.isArray(forecastData) || forecastData.length === 0) {
-            throw new Error("グラフデータが空または不正な形式です。");
-        }
-    } catch (e) {
-        console.error("グラフデータの読み込みに失敗:", e);
-    }
+        const rawData = document.getElementById("forecast-data")?.textContent;
+        const forecastData = JSON.parse(rawData);
 
-    if (!forecastData.length) {
-        const canvasContainer = document.getElementById("forecastChart").parentElement;
-        canvasContainer.innerHTML = "<p style='color: red;'>⚠️ 予測データが取得できませんでした。</p>";
-    } else {
+        // データが配列でない、または空の場合はエラーを発生させる
+        if (!Array.isArray(forecastData) || forecastData.length === 0) {
+            throw new Error("グラフデータが空、または不正な形式です。");
+        }
+
+        // グラフ描画
         const ctx = document.getElementById("forecastChart").getContext("2d");
         const labels = forecastData.map(d => d.date);
         const forecast = forecastData.map(d => d.forecast);
@@ -139,19 +126,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         tension: 0.3,
                     },
                     {
-                        label: "信頼区間（上限）",
-                        data: upper,
+                        label: "信頼区間", // 凡例を一つにまとめる
+                        data: upper, // 上限データを代表として使用
                         borderColor: "rgba(0, 153, 255, 0.0)",
                         backgroundColor: "rgba(0, 153, 255, 0.15)",
-                        fill: '-1',
+                        fill: '+1', // ✅ 修正: 正しくは `+1` ではなく、次のデータセットのインデックスか、特定の境界を指定
                         pointRadius: 0,
-                        tension: 0.3,
                     },
                     {
                         label: "信頼区間（下限）",
                         data: lower,
                         borderColor: "rgba(0, 153, 255, 0.0)",
                         backgroundColor: "rgba(0, 153, 255, 0.15)",
+                        fill: '-1', // このデータセットから一つ前のデータセットまでの間を埋める
                         pointRadius: 0,
                         tension: 0.3,
                     }
@@ -184,6 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+    } catch (e) {
+        // JSONのパース失敗、データが空、その他のエラーをすべてここで捕捉
+        console.error("グラフの描画に失敗:", e);
+        chartContainer.innerHTML = `<p style='color: #ff4d4d; font-weight: bold; text-align: center;'>⚠️ 予測データが取得できませんでした。</p><p style='color: #a8b2d1; font-size: 0.8em; text-align: center;'>(${e.message})</p>`;
     }
 
     // Council Submission
