@@ -1,108 +1,178 @@
-#!/usr/bin/env python3
-# coding: utf-8
+{% extends "base_hud.html" %}
 
-"""
-📊 /dashboard - 中央統治ダッシュボード
-- 各種統計と予測分析を統合表示
-"""
+{% block title %}📈 Strategy Comparison - Noctria Kingdom HUD{% endblock %}
+{% block header_icon %}<i class="fas fa-chart-bar"></i>{% endblock %}
+{% block header_title %}STRATEGY SHOWDOWN{% endblock %}
+{% block header_nav %}
+<a href="/statistics/compare/form" class="nav-item-back">
+  <i class="fas fa-arrow-left"></i><span>BACK TO SELECTION</span>
+</a>
+{% endblock %}
 
-import json
-import os
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict
-import pprint
+{% block content %}
+<section class="hud-panel chart-display-panel">
+  <div class="chart-controls">
+    <h2 class="panel-title">ANALYSIS VIEW</h2>
+    <div class="hud-btn-group" id="chart-controls">
+      <button class="hud-btn active" onclick="showChart('win')">勝率</button>
+      <button class="hud-btn" onclick="showChart('dd')">最大DD</button>
+      <button class="hud-btn" onclick="showChart('trades')">取引数</button>
+      <button class="hud-btn" onclick="showRadar()">🧩 レーダーチャート</button>
+    </div>
+  </div>
+  <div class="chart-wrapper">
+    <canvas id="comparisonChart"></canvas>
+  </div>
+</section>
+{% endblock %}
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const strategies = {{ strategies | tojson | safe }};
 
-from core.king_noctria import KingNoctria
-from core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR, PUSH_LOG_DIR
-from strategies.prometheus_oracle import PrometheusOracle
-
-router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
-
-
-def aggregate_dashboard_stats() -> Dict[str, Any]:
-    stats = {
-        "promoted_count": 0,
-        "pushed_count": 0,
-        "pdca_count": 0,
-        "avg_win_rate": 0.0,
-        "oracle_metrics": {},
-        "recheck_success": 0,
-        "recheck_fail": 0,
+    const canvas = document.getElementById("comparisonChart");
+    if (!canvas) {
+        console.error("📉 Canvas element not found.");
+        return;
     }
 
-    act_dir = Path(ACT_LOG_DIR)
-    win_rates = []
-
-    if act_dir.exists():
-        for file_name in os.listdir(act_dir):
-            if not file_name.endswith(".json"):
-                continue
-            try:
-                with open(act_dir / file_name, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if data.get("status") == "promoted":
-                    stats["promoted_count"] += 1
-                if "pdca_cycle" in data:
-                    stats["pdca_count"] += 1
-                win = data.get("score", {}).get("win_rate")
-                if isinstance(win, (int, float)):
-                    win_rates.append(win)
-            except Exception as e:
-                print(f"Warning: Failed to process log file {file_name}. Error: {e}")
-
-    stats["avg_win_rate"] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
-
-    try:
-        oracle = PrometheusOracle()
-        metrics = oracle.evaluate_oracle_model()
-        stats["oracle_metrics"] = {
-            "RMSE": round(metrics.get("RMSE", 0.0), 4),
-            "MAE": round(metrics.get("MAE", 0.0), 4),
-            "MAPE": round(metrics.get("MAPE", 0.0), 4),
+    const ctx = canvas.getContext("2d");
+    if (!Array.isArray(strategies) || strategies.length === 0 || !ctx) {
+        console.error("⚠️ No valid strategy data or canvas context.");
+        if (ctx) {
+            ctx.font = "16px 'Roboto Mono', monospace";
+            ctx.fillStyle = "#ff79c6";
+            ctx.fillText("No strategy data found.", 20, 50);
         }
-    except Exception as e:
-        print(f"Warning: Failed to get Oracle metrics. Error: {e}")
-        stats["oracle_metrics"] = {"RMSE": 0.0, "MAE": 0.0, "MAPE": 0.0, "error": "N/A"}
+        document.querySelectorAll('#chart-controls .hud-btn').forEach(btn => btn.disabled = true);
+        return;
+    }
 
-    stats["pushed_count"] = aggregate_push_stats()
+    const labels = strategies.map(s => s.strategy);
 
-    return stats
+    const hudColors = {
+        win: 'rgba(0, 255, 155, 0.7)', dd: 'rgba(255, 121, 198, 0.7)', trades: 'rgba(125, 249, 255, 0.7)'
+    };
+    const hudBorderColors = {
+        win: 'rgb(0, 255, 155)', dd: 'rgb(255, 121, 198)', trades: 'rgb(125, 249, 255)'
+    };
+    const radarColors = [
+        { bg: 'rgba(0, 255, 155, 0.2)', border: 'rgb(0, 255, 155)' },
+        { bg: 'rgba(125, 249, 255, 0.2)', border: 'rgb(125, 249, 255)' },
+        { bg: 'rgba(255, 121, 198, 0.2)', border: 'rgb(255, 121, 198)' },
+        { bg: 'rgba(241, 250, 140, 0.2)', border: 'rgb(241, 250, 140)' },
+    ];
 
+    const datasets = {
+        win: {
+            label: "勝率 (%)",
+            data: strategies.map(s => s.win_rate),
+            backgroundColor: hudColors.win,
+            borderColor: hudBorderColors.win,
+            borderWidth: 1
+        },
+        dd: {
+            label: "最大DD (%)",
+            data: strategies.map(s => s.max_drawdown),
+            backgroundColor: hudColors.dd,
+            borderColor: hudBorderColors.dd,
+            borderWidth: 1
+        },
+        trades: {
+            label: "取引数",
+            data: strategies.map(s => s.num_trades),
+            backgroundColor: hudColors.trades,
+            borderColor: hudBorderColors.trades,
+            borderWidth: 1
+        }
+    };
 
-def aggregate_push_stats() -> int:
-    push_dir = Path(PUSH_LOG_DIR)
-    if not push_dir.exists():
-        return 0
-    return len([name for name in os.listdir(push_dir) if name.endswith(".json")])
+    let chart;
 
+    const baseOptions = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(0, 30, 60, 0.8)',
+                titleFont: { family: "'Roboto Mono', monospace" },
+                bodyFont: { family: "'Roboto Mono', monospace" },
+                borderColor: '#00e5ff',
+                borderWidth: 1
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                grid: { color: 'rgba(0, 229, 255, 0.2)' }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: { color: '#7DF9FF', font: { family: "'Roboto Mono', monospace" } },
+                grid: { color: 'rgba(0, 229, 255, 0.2)' }
+            }
+        }
+    };
 
-@router.get("/", response_class=HTMLResponse)
-async def show_dashboard(request: Request):
-    forecast_data = []
-    try:
-        oracle = PrometheusOracle()
-        predicted_price = oracle.predict_market()
-        forecast_data = [{
-            "date": datetime.today().strftime("%Y-%m-%d"),
-            "forecast": round(predicted_price, 2),
-            "y_lower": round(predicted_price * 0.98, 2),  # 仮の信頼区間
-            "y_upper": round(predicted_price * 1.02, 2),
-        }]
-        print("🔍 Oracle予測出力:", forecast_data[0])
-    except Exception as e:
-        print(f"🔴 Error generating forecast data from Oracle: {e}")
+    window.showChart = function(type) {
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+            type: "bar",
+            data: { labels: labels, datasets: [datasets[type]] },
+            options: baseOptions
+        });
+        updateActiveButton(type);
+    };
 
-    stats = aggregate_dashboard_stats()
-    pprint.pprint(stats)
+    window.showRadar = function() {
+        if (chart) chart.destroy();
+        const radarData = {
+            labels: ["勝率", "最大DD", "取引数"],
+            datasets: strategies.map((s, i) => ({
+                label: s.strategy,
+                data: [s.win_rate || 0, s.max_drawdown || 0, s.num_trades || 0],
+                fill: true,
+                backgroundColor: radarColors[i % radarColors.length].bg,
+                borderColor: radarColors[i % radarColors.length].border,
+                pointBackgroundColor: radarColors[i % radarColors.length].border,
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: radarColors[i % radarColors.length].border
+            }))
+        };
+        const radarOptions = {
+            ...baseOptions,
+            plugins: { legend: { display: true, labels: { color: '#00e5ff' } } },
+            scales: {
+                r: {
+                    angleLines: { color: 'rgba(204, 214, 246, 0.2)' },
+                    grid: { color: 'rgba(204, 214, 246, 0.2)' },
+                    pointLabels: {
+                        font: { size: 12, family: "'Roboto Mono', monospace" },
+                        color: '#ccd6f6'
+                    },
+                    ticks: { display: false }
+                }
+            }
+        };
+        chart = new Chart(ctx, { type: 'radar', data: radarData, options: radarOptions });
+        updateActiveButton('radar');
+    };
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "forecast": forecast_data or [],
-        "stats": stats
-    })
+    function updateActiveButton(type) {
+        const buttons = document.querySelectorAll('#chart-controls .hud-btn');
+        buttons.forEach(btn => {
+            btn.classList.remove('active');
+            const btnText = btn.textContent;
+            if (btnText.includes(type) || (type === 'radar' && btnText.includes('レーダー'))) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    showChart('win');
+});
+</script>
+{% endblock %}
