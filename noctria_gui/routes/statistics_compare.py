@@ -25,7 +25,6 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     except Exception:
         return None
 
-
 def load_strategy_logs() -> List[Dict[str, Any]]:
     data: List[Dict[str, Any]] = []
     log_dir = Path(ACT_LOG_DIR)
@@ -41,7 +40,6 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
                 continue
     return data
 
-
 def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]) -> List[Dict[str, Any]]:
     filtered = []
     for d in records:
@@ -53,7 +51,6 @@ def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime],
             continue
         filtered.append(d)
     return filtered
-
 
 def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[str, Dict[str, List[float]]]:
     stat_map: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
@@ -70,16 +67,29 @@ def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[st
     return stat_map
 
 # ==============================
-# 404防止: /strategies/compare の互換リダイレクト
+# 互換リダイレクト: /statistics/compare → /strategies/compare
 # ==============================
-@router.get("/strategies/compare", include_in_schema=False)
-async def legacy_compare_redirect():
-    return RedirectResponse(url="/statistics/compare", status_code=307)
+@router.get("/statistics/compare", include_in_schema=False)
+async def legacy_statistics_compare_redirect(request: Request):
+    # クエリパラメータも引き継ぎ
+    query = request.url.query
+    url = "/strategies/compare"
+    if query:
+        url += f"?{query}"
+    return RedirectResponse(url=url, status_code=307)
+
+@router.get("/statistics/compare/export", include_in_schema=False)
+async def legacy_statistics_export_redirect(request: Request):
+    query = request.url.query
+    url = "/strategies/compare/export"
+    if query:
+        url += f"?{query}"
+    return RedirectResponse(url=url, status_code=307)
 
 # ==============================
-# メイン比較画面
+# メイン: 戦略比較画面
 # ==============================
-@router.get("/statistics/compare", response_class=HTMLResponse)
+@router.get("/strategies/compare", response_class=HTMLResponse)
 async def compare(request: Request) -> HTMLResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
@@ -103,13 +113,11 @@ async def compare(request: Request) -> HTMLResponse:
         }
         results.append(row)
 
-    # 並び替え
     if sort == "check":
         results.sort(key=lambda x: keys.index(x["key"]) if x["key"] in keys else 9999)
-    else:  # "score"
+    else:
         results.sort(key=lambda x: (-x["avg_win"], x["avg_dd"]))
 
-    # summary（平均・中央値）
     summary = {
         "avg_win_mean": round(mean([r["avg_win"] for r in results]), 2) if results else 0,
         "avg_win_median": round(median([r["avg_win"] for r in results]), 2) if results else 0,
@@ -134,8 +142,7 @@ async def compare(request: Request) -> HTMLResponse:
         }
     })
 
-
-@router.get("/statistics/compare/export")
+@router.get("/strategies/compare/export")
 async def export_csv(request: Request) -> StreamingResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
