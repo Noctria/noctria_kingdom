@@ -12,9 +12,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from typing import List, Dict, Any
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 import json
 import os
+
+from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -31,8 +32,9 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
             try:
                 with open(act_dir / f, "r", encoding="utf-8") as file:
                     log = json.load(file)
-                logs.append(log)
-            except Exception:
+                    logs.append(log)
+            except Exception as e:
+                print(f"⚠️ Failed to load {f}: {e}")
                 continue
     return logs
 
@@ -87,7 +89,7 @@ async def render_comparison(request: Request, selected: List[str] = Form(...)):
     })
 
 
-# ✅ 古いURLの互換リダイレクト（例: /strategy/compare）
-@router.get("/../strategy/compare")
+# ✅ 古いURLの互換リダイレクト（例: /strategy/compare → /statistics/compare/form）
+@router.get("/strategy/compare")
 async def legacy_redirect():
     return RedirectResponse(url="/statistics/compare/form", status_code=307)
