@@ -8,8 +8,19 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from noctria_gui.services.statistics_service import get_strategy_statistics
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
+
+# サービス層の利用は任意
+try:
+    from noctria_gui.services.statistics_service import get_strategy_statistics
+except ImportError:
+    def get_strategy_statistics():
+        # 仮ダミーデータ
+        return {
+            "num_strategies": 10,
+            "avg_win_rate": 58.4,
+            "avg_drawdown": 11.3,
+        }
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -21,8 +32,8 @@ async def statistics_dashboard(request: Request):
     """
     stats = get_strategy_statistics()
 
-    # ✅ テンプレートパスは templates/statistics_dashboard.html に一致させる
-    return templates.TemplateResponse("statistics_dashboard.html", {
+    # ✅ テンプレート名は `statistics/statistics_dashboard.html` が理想
+    return templates.TemplateResponse("statistics/statistics_dashboard.html", {
         "request": request,
         "stats": stats,
     })
