@@ -29,13 +29,6 @@ def load_and_aggregate_pdca_logs(
 ) -> Dict[str, Any]:
     """
     再評価ログ（JSON群）を読み取り、改善率・DD改善などを集計
-
-    Returns:
-        {
-            stats: {...},
-            chart: {...},
-            filter: {...}
-        }
     """
     raw_results = []
     for file in sorted(log_dir.glob("*.json")):
@@ -62,6 +55,8 @@ def load_and_aggregate_pdca_logs(
             dd_before = float(data.get("max_dd_before", 0.0))
             dd_after = float(data.get("max_dd_after", 0.0))
 
+            status = data.get("status") or "unknown"
+
             raw_results.append({
                 "strategy": data.get("strategy"),
                 "tag": data.get("tag", "unknown"),
@@ -71,7 +66,7 @@ def load_and_aggregate_pdca_logs(
                 "max_dd_before": dd_before,
                 "max_dd_after": dd_after,
                 "dd_diff": round(dd_before - dd_after, 2),
-                "status": data.get("status", "unknown")
+                "status": status
             })
         except Exception:
             continue
