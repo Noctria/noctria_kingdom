@@ -68,19 +68,17 @@
                         <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
                     </td>
                     <td class="action-buttons">
-                        <!-- ✅ 修正: モダンなボタンスタイルを適用 -->
+                        <!-- ✅ 修正: ボタンのクラスを 'hud-btn' に統一 -->
                         <form method="post" action="/act-history/repush" class="action-form">
                             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                            <button type="submit" class="btn-modern btn-modern-push">
-                                <i class="fas fa-rocket"></i>
-                                <span>再Push可に</span>
+                            <button type="submit" class="hud-btn">
+                                <i class="fas fa-rocket"></i> 再Push可に
                             </button>
                         </form>
                         <form method="post" action="/act-history/reevaluate" class="action-form">
                             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                            <button type="submit" class="btn-modern btn-modern-eval">
-                                <i class="fas fa-sync-alt"></i>
-                                <span>再評価</span>
+                            <button type="submit" class="hud-btn">
+                                <i class="fas fa-sync-alt"></i> 再評価
                             </button>
                         </form>
                     </td>
@@ -93,7 +91,7 @@
     </div>
 </main>
 
-<!-- ✅ 追加: モダンなボタンスタイルのためのCSS -->
+<!-- ✅ 修正: ボタンのレイアウトを整えるためのCSSのみ残す -->
 <style>
     .action-buttons {
         display: flex;
@@ -103,35 +101,8 @@
     .action-form {
         margin: 0;
     }
-    .btn-modern {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        border: 1px solid transparent;
-        border-radius: 0.5rem;
-        color: #e6f1ff;
-        font-weight: bold;
-        font-size: 0.875rem;
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
-        white-space: nowrap;
-    }
-    .btn-modern:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 15px var(--glow-color, #fff);
-    }
-    .btn-modern-push {
-        background: linear-gradient(145deg, #00aaff, #0077cc);
-        border-color: #00c3ff;
-        --glow-color: rgba(0, 195, 255, 0.7);
-    }
-    .btn-modern-eval {
-        background: linear-gradient(145deg, #8a2be2, #6a1a9f);
-        border-color: #aa55ff;
-        --glow-color: rgba(170, 85, 255, 0.7);
+    .action-buttons .hud-btn {
+        white-space: nowrap; /* ボタン内のテキストが改行しないようにする */
     }
 </style>
 {% endblock %}
@@ -164,3 +135,15 @@
     }
 </script>
 {% endblock %}
+```
+
+### 修正点の解説
+
+* **ボタンのクラス変更:**
+    「再Push可に」と「再評価」のボタンに適用されていた`btn-modern`クラスを、`APPLY`ボタンと同じ`hud-btn`クラスに変更しました。
+* **CSSの簡略化:**
+    前回のグラデーションデザインのために追加した`<style>`ブロックから、不要になった`.btn-modern`関連のスタイルを削除しました。ボタンを横並びにするためのレイアウト用スタイル（`.action-buttons`など）は残してあります。
+* **HTML構造の整理:**
+    ボタン内のアイコンとテキストを`<span>`タグで囲んでいましたが、APPLYボタンの構造に合わせてよりシンプルな形にしました。
+
+サービスを再起動してページを更新すると、ボタンが統一感のあるデザインに変わっているはず
