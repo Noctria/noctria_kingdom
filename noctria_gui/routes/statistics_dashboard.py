@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr//bin/env python3
 # coding: utf-8
 
 """
 📊 /statistics/dashboard - 戦略統計HUDダッシュボード画面
 """
-
+import logging  # ✅ 修正: ロギング機能をインポート
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -31,9 +31,15 @@ async def statistics_dashboard(request: Request):
     """
     HUDスタイル統計ダッシュボード画面を表示
     """
-    stats = get_strategy_statistics()
+    # ✅ 修正: try...exceptブロックで囲み、エラーを確実にログに出力
+    try:
+        stats = get_strategy_statistics()
+    except Exception as e:
+        # エラーが発生した場合は、詳細をログに出力
+        logging.error(f"Failed to get strategy statistics: {e}", exc_info=True)
+        # テンプレート側でエラーにならないよう、空の辞書を渡す
+        stats = {}
 
-    # ✅ 修正: エラーログに基づき、正しいテンプレートファイル名を指定
     return templates.TemplateResponse("statistics_dashboard.html", {
         "request": request,
         "stats": stats,
