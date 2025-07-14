@@ -2,165 +2,221 @@
 
 {% block title %}📊 PDCA サマリー - Noctria Kingdom{% endblock %}
 {% block header_icon %}<i class="fas fa-sync-alt"></i>{% endblock %}
-{% block header_title %}PDCA サマリー{% endblock %}
+{% block header_title %}PDCA SUMMARY{% endblock %}
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
 {% block content %}
-<h1>📊 PDCA 再評価サマリー</h1>
-
 <!-- ✅ フラッシュ表示（再評価結果） -->
 {% if recheck_success is not none or recheck_fail is not none %}
-  <div class="hud-panel" style="border: 1px solid #00cc66; background: #e6ffe6; color: #003300; margin-bottom: 1rem;">
-    ✅ 一括再評価 実行結果：
-    {% if recheck_success %} 🎯 成功 {{ recheck_success }}件 {% endif %}
-    {% if recheck_fail %} ❌ 失敗 {{ recheck_fail }}件 {% endif %}
+  <div class="hud-panel" style="border: 1px solid #00cc66; background: rgba(0, 204, 102, 0.1); color: #e6f1ff; margin-bottom: 1rem; text-align: center;">
+    <i class="fas fa-check-circle"></i> 一括再評価 実行結果：
+    {% if recheck_success %} <strong><span class="text-green">成功 {{ recheck_success }}件</span></strong> {% endif %}
+    {% if recheck_fail %} <strong><span class="text-magenta">失敗 {{ recheck_fail }}件</span></strong> {% endif %}
   </div>
 {% endif %}
 
 <!-- 📅 期間・モード・件数フォーム -->
-<form method="get" action="/pdca/summary" class="hud-panel filter-form">
-  <label>📅 開始日: <input type="date" name="from" value="{{ filter.from | default('') }}"></label>
-  <label>📅 終了日: <input type="date" name="to" value="{{ filter.to | default('') }}"></label>
-  <label>📊 表示モード:
-    <select name="mode">
-      <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
-      <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
-    </select>
-  </label>
-  <label>🔢 表示件数:
-    <select name="limit">
-      <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
-      <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
-      <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
-    </select>
-  </label>
-  <button type="submit" class="hud-btn">🔍 絞り込む</button>
-</form>
+<section class="hud-panel filter-panel">
+    <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
+    <form method="get" action="/pdca/summary" class="filter-form">
+        <label for="from-date"><i class="fas fa-calendar-alt"></i> 開始日</label>
+        <input id="from-date" type="date" name="from" value="{{ filter.from | default('') }}">
+        
+        <label for="to-date"><i class="fas fa-calendar-alt"></i> 終了日</label>
+        <input id="to-date" type="date" name="to" value="{{ filter.to | default('') }}">
+        
+        <label for="mode-select"><i class="fas fa-eye"></i> 表示モード</label>
+        <select id="mode-select" name="mode">
+            <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
+            <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
+        </select>
+        
+        <label for="limit-select"><i class="fas fa-list-ol"></i> 表示件数</label>
+        <select id="limit-select" name="limit">
+            <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
+            <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
+            <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
+        </select>
+        
+        <button type="submit" class="hud-btn"><i class="fas fa-search"></i> 絞り込む</button>
+    </form>
+</section>
 
 <!-- ✅ サマリー統計 -->
-<div class="hud-panel summary-card">
-  <p>📈 勝率平均改善: <strong>{{ summary.avg_win_rate_diff }}%</strong></p>
-  <p>📉 最大DD平均改善: <strong>{{ summary.avg_dd_diff }}</strong></p>
-  <p>🎯 勝率改善戦略数: <strong>{{ summary.win_rate_improved }}</strong></p>
-  <p>🛡 DD改善戦略数: <strong>{{ summary.dd_improved }}</strong></p>
-  <p>🔰 採用戦略数: <strong>{{ summary.adopted }}</strong></p>
+<section class="hud-panel metrics">
+    <h2 class="panel-title"><i class="fas fa-calculator"></i> OVERALL IMPROVEMENT</h2>
+    <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;">
+        <div class="metric-item">
+            <h3><i class="fas fa-chart-line"></i> 勝率平均改善</h3>
+            <p class="metric-value text-green">{{ summary.avg_win_rate_diff | round(2) }}%</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-shield-alt"></i> DD平均改善</h3>
+            <p class="metric-value text-green">{{ summary.avg_dd_diff | round(2) }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-arrow-up"></i> 勝率改善数</h3>
+            <p class="metric-value text-cyan">{{ summary.win_rate_improved }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-arrow-down"></i> DD改善数</h3>
+            <p class="metric-value text-cyan">{{ summary.dd_improved }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-check-double"></i> 採用戦略数</h3>
+            <p class="metric-value text-yellow">{{ summary.adopted }}</p>
+        </div>
+    </div>
+</section>
+
+<!-- グラフエリア -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem;">
+    <section class="hud-panel chart-panel">
+        <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 勝率改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
+        <div style="height: 300px;"><canvas id="winRateChart"></canvas></div>
+    </section>
+    <section class="hud-panel chart-panel">
+        <h2 class="panel-title"><i class="fas fa-chart-area"></i> 最大DD改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
+        <div style="height: 300px;"><canvas id="ddChart"></canvas></div>
+    </section>
 </div>
 
-<!-- 📈 勝率改善グラフ -->
-<h2>📈 勝率改善（{{ "戦略別" if mode == "strategy" else "タグ別" }})</h2>
-<canvas id="winRateChart" width="600" height="300"></canvas>
+<!-- 評価詳細テーブル -->
+<section class="hud-panel log-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 class="panel-title" style="margin: 0;"><i class="fas fa-table"></i> 評価詳細（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
+        <button class="hud-btn download-btn" id="downloadCsvBtn"><i class="fas fa-download"></i> CSVダウンロード</button>
+    </div>
+    <div class="table-wrapper">
+        <table id="summary-table" class="hud-table">
+          <thead>
+            <tr>
+              <th>{{ "戦略名" if mode == "strategy" else "タグ" }}</th>
+              <th>勝率 (Before)</th>
+              <th>勝率 (After)</th>
+              <th>差分 (%)</th>
+              <th>最大DD (Before)</th>
+              <th>最大DD (After)</th>
+              <th>採用</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in summary.detail %}
+            <tr>
+              <td>{{ row.strategy }}</td>
+              <td>{{ row.win_rate_before }}</td>
+              <td>{{ row.win_rate_after }}</td>
+              <td>{{ row.diff }}</td>
+              <td>{{ row.max_dd_before }}</td>
+              <td>{{ row.max_dd_after }}</td>
+              <td>{{ row.status }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    </div>
+</section>
 
-<!-- 📉 最大DD改善グラフ -->
-<h2>📉 最大DD改善（{{ "戦略別" if mode == "strategy" else "タグ別" }})</h2>
-<canvas id="ddChart" width="600" height="300"></canvas>
+<!-- グラフ描画とCSVダウンロード用のデータとスクリプト -->
+<!-- ✅ 修正: データが存在しない場合に備え、defaultフィルタを追加。属性をダブルクォートで囲む -->
+<div id="chart-data-holder" 
+     data-labels="{{ chart.labels | default([]) | tojson }}"
+     data-win-rate-data="{{ chart.data | default([]) | tojson }}"
+     data-dd-data="{{ chart.dd_data | default([]) | tojson }}"
+     style="display: none;">
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const winCtx = document.getElementById('winRateChart').getContext('2d');
-  new Chart(winCtx, {
-    type: 'bar',
-    data: {
-      labels: {{ chart.labels | safe }},
-      datasets: [{
-        label: '勝率改善率 (%)',
-        backgroundColor: '#2ecc71',
-        data: {{ chart.data | safe }}
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: '勝率改善（After - Before）'
+document.addEventListener('DOMContentLoaded', () => {
+    const dataHolder = document.getElementById('chart-data-holder');
+    
+    // --- チャート描画 ---
+    try {
+        const labels = JSON.parse(dataHolder.dataset.labels);
+        const winRateData = JSON.parse(dataHolder.dataset.winRateData);
+        const ddData = JSON.parse(dataHolder.dataset.ddData);
+
+        const chartOptions = (titleText, yAxisLabel) => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: titleText, color: '#e6f1ff' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#a8b2d1', callback: yAxisLabel ? (value => value + yAxisLabel) : undefined },
+                    grid: { color: 'rgba(0, 229, 255, 0.2)' }
+                },
+                x: {
+                    ticks: { color: '#a8b2d1' },
+                    grid: { color: 'rgba(0, 229, 255, 0.1)' }
+                }
+            }
+        });
+
+        if (document.getElementById('winRateChart') && winRateData.length > 0) {
+            const winCtx = document.getElementById('winRateChart').getContext('2d');
+            new Chart(winCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '勝率改善率 (%)',
+                        backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                        borderColor: '#2ecc71',
+                        borderWidth: 1,
+                        data: winRateData
+                    }]
+                },
+                options: chartOptions('勝率改善（After - Before）', '%')
+            });
         }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: value => value + "%"
-          }
+
+        if (document.getElementById('ddChart') && ddData.length > 0) {
+            const ddCtx = document.getElementById('ddChart').getContext('2d');
+            new Chart(ddCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '最大DD改善 (Before - After)',
+                        backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                        borderColor: '#e74c3c',
+                        borderWidth: 1,
+                        data: ddData
+                    }]
+                },
+                options: chartOptions('最大DD改善（Before - After）')
+            });
         }
-      }
+    } catch (e) {
+        console.error("チャートデータの描画に失敗しました:", e);
     }
-  });
 
-  const ddCtx = document.getElementById('ddChart').getContext('2d');
-  new Chart(ddCtx, {
-    type: 'bar',
-    data: {
-      labels: {{ chart.labels | safe }},
-      datasets: [{
-        label: '最大DD改善 (Before - After)',
-        backgroundColor: '#e74c3c',
-        data: {{ chart.dd_data | safe }}
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: '最大DD改善（Before - After）'
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
+    // --- CSVダウンロード ---
+    const downloadBtn = document.getElementById('downloadCsvBtn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => {
+            let csv = "{{ '戦略名' if mode == 'strategy' else 'タグ' }},勝率(Before),勝率(After),差分(%),最大DD(Before),最大DD(After),採用\n";
+            const rows = document.querySelectorAll("#summary-table tbody tr");
+            rows.forEach(row => {
+                const cols = row.querySelectorAll("td");
+                const rowData = Array.from(cols).map(td => `"${td.innerText.replace(/"/g, '""')}"`).join(",");
+                csv += rowData + "\n";
+            });
+
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "pdca_summary.csv";
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
     }
-  });
+});
 </script>
-
-<!-- 🧮 評価詳細テーブル -->
-<h2>🧮 評価詳細（{{ "戦略別" if mode == "strategy" else "タグ別" }})</h2>
-<button class="hud-btn download-btn" onclick="downloadCSV()">📥 CSVダウンロード</button>
-
-<table id="summary-table" class="hud-table">
-  <thead>
-    <tr>
-      <th>{{ "戦略名" if mode == "strategy" else "タグ" }}</th>
-      <th>勝率 (Before)</th>
-      <th>勝率 (After)</th>
-      <th>差分 (%)</th>
-      <th>最大DD (Before)</th>
-      <th>最大DD (After)</th>
-      <th>採用</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in summary.detail %}
-    <tr>
-      <td>{{ row.strategy }}</td>
-      <td>{{ row.win_rate_before }}</td>
-      <td>{{ row.win_rate_after }}</td>
-      <td>{{ row.diff }}</td>
-      <td>{{ row.max_dd_before }}</td>
-      <td>{{ row.max_dd_after }}</td>
-      <td>{{ row.status }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<script>
-  function downloadCSV() {
-    let csv = "{{ '戦略名' if mode == 'strategy' else 'タグ' }},勝率(Before),勝率(After),差分(%),最大DD(Before),最大DD(After),採用\n";
-    const rows = document.querySelectorAll("#summary-table tbody tr");
-    rows.forEach(row => {
-      const cols = row.querySelectorAll("td");
-      const rowData = Array.from(cols).map(td => `"${td.innerText}"`).join(",");
-      csv += rowData + "\n";
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "pdca_summary.csv";
-    link.click();
-  }
-</script>
-
 {% endblock %}
