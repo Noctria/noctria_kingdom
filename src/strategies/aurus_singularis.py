@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-🎯 Aurus Singularis (v2.2)
+🎯 Aurus Singularis (v2.3)
 - 総合市場分析AI (CPUベース)
-- テクニカル指標に加え、ファンダメンタルズ（経済指標）も分析に統合
+- 複数の主要テクニカル指標とファンダメンタルズを統合分析
 - 学習済みモデルの保存・読み込みに対応
 """
 
@@ -17,7 +17,7 @@ import logging
 
 # --- 王国の基盤モジュールをインポート ---
 from src.core.path_config import MODELS_DIR
-from src.core.settings import ALPHAVANTAGE_API_KEY, FRED_API_KEY # ✅ FREDのAPIキーもインポート
+from src.core.settings import ALPHAVANTAGE_API_KEY, FRED_API_KEY
 from src.core.data_loader import MarketDataFetcher
 
 # ロガーの設定
@@ -31,9 +31,8 @@ class AurusSingularis:
         """
         コンストラクタ。学習済みモデルを読み込む。
         """
-        self.model_path = model_path or (MODELS_DIR / "aurus_singularis_v2.keras") # モデルバージョンアップ
+        self.model_path = model_path or (MODELS_DIR / "aurus_singularis_v2.3.keras") # モデルバージョンアップ
         self.model = self._load_or_build_model()
-        # ✅ MarketDataFetcherに複数のAPIキーを渡すように変更
         self.market_fetcher = MarketDataFetcher(
             alphavantage_api_key=ALPHAVANTAGE_API_KEY,
             fred_api_key=FRED_API_KEY
@@ -49,9 +48,9 @@ class AurusSingularis:
                 logging.error(f"知性の読み込みに失敗しました: {e}")
         
         logging.info("新たな分析モデルの構築を開始します。")
-        # ✅ 修正: ファンダメンタルズ特徴量追加に伴い、入力次元を15に変更
+        # ✅ 修正: テクニカル指標追加に伴い、入力次元を19に変更
         model = tf.keras.Sequential([
-            tf.keras.layers.Input(shape=(15,)), # 15個の市場特徴量を入力
+            tf.keras.layers.Input(shape=(19,)), # 19個の市場特徴量を入力
             tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(64, activation='relu'),
@@ -76,33 +75,46 @@ class AurusSingularis:
         trend_map = {"bullish": 1.0, "neutral": 0.5, "bearish": 0.0}
         trend_score = trend_map.get(market_data.get("trend_prediction", "neutral"), 0.5)
 
-        # ✅ 修正: ファンダメンタルズ特徴量を追加
+        # ✅ 修正: テクニカル指標を拡充
         features = [
-            # --- テクニカル指標 (12) ---
+            # --- 基本情報 (4) ---
             market_data.get("price", 0.0),
-            market_data.get("volume", 0.0),
-            market_data.get("sentiment", 0.5),
-            market_data.get("trend_strength", 0.5),
-            market_data.get("volatility", 0.0),
-            market_data.get("order_block", 0.0),
-            market_data.get("institutional_flow", 0.0),
-            market_data.get("short_interest", 0.0),
-            market_data.get("momentum", 0.5),
-            trend_score,
-            market_data.get("liquidity_ratio", 1.0),
             market_data.get("previous_price", market_data.get("price", 0.0)),
+            market_data.get("volume", 0.0),
+            market_data.get("volatility", 0.0),
+            
+            # --- トレンド系 (4) ---
+            market_data.get("sma_5_vs_20_diff", 0.0), # 5日移動平均と20日移動平均の差
+            market_data.get("macd_signal_diff", 0.0), # MACDとシグナル線の差
+            market_data.get("trend_strength", 0.5),
+            trend_score,
+            
+            # --- オシレーター系 (3) ---
+            market_data.get("rsi_14", 50.0), # 14期間RSI
+            market_data.get("stoch_k", 50.0), # ストキャスティクス %K
+            market_data.get("momentum", 0.5),
+
+            # --- ボラティリティ系 (2) ---
+            market_data.get("bollinger_upper_dist", 0.0), # 現在価格とボリンジャーバンド上限の距離
+            market_data.get("bollinger_lower_dist", 0.0), # 現在価格とボリンジャーバンド下限の距離
+
+            # --- その他市場情報 (3) ---
+            market_data.get("sentiment", 0.5),
+            market_data.get("order_block", 0.0),
+            market_data.get("liquidity_ratio", 1.0),
+            
             # --- ファンダメンタルズ指標 (3) ---
-            market_data.get("interest_rate_diff", 0.0), # e.g., 日米金利差
-            market_data.get("cpi_change_rate", 0.0),    # e.g., 消費者物価指数の変化率
-            market_data.get("news_sentiment_score", 0.5) # e.g., yfinance等から取得したニュースセンチメント
+            market_data.get("interest_rate_diff", 0.0),
+            market_data.get("cpi_change_rate", 0.0),
+            market_data.get("news_sentiment_score", 0.5)
         ]
         return np.array(features).reshape(1, -1)
 
     def train(self, data: pd.DataFrame, epochs: int = 10, batch_size: int = 32):
         """与えられたデータでモデルを学習させる"""
         logging.info("分析官の能力向上のため、総合的な市場分析の訓練を開始します…")
-        # ✅ 修正: 入力次元を15に変更
-        X_train = np.random.rand(100, 15)
+        # ✅ 修正: 入力次元を19に変更
+        X_train = np.random.rand(100, 19)
         y_train = np.random.randint(0, 3, 100) # 0:SELL, 1:HOLD, 2:BUY
         
         self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
@@ -144,17 +156,20 @@ if __name__ == "__main__":
     logging.info("\n--- 封印されし知性の解読を試みます ---")
     aurus_loaded = AurusSingularis()
     
-    # ✅ 修正: ファンダメンタルズデータをモックに追加
+    # ✅ 修正: テクニカル指標のモックデータを追加
     mock_market_data = {
-        # テクニカル
-        "price": 1.2345, "previous_price": 1.2340, "volume": 1000, "sentiment": 0.8, 
-        "trend_strength": 0.7, "volatility": 0.15, "order_block": 0.6, 
-        "institutional_flow": 0.8, "short_interest": 0.5, "momentum": 0.9, 
-        "trend_prediction": "bullish", "liquidity_ratio": 1.2, "symbol": "USDJPY",
+        # 基本情報
+        "price": 1.2345, "previous_price": 1.2340, "volume": 1000, "volatility": 0.15,
+        # トレンド系
+        "sma_5_vs_20_diff": 0.001, "macd_signal_diff": 0.0005, "trend_strength": 0.7, "trend_prediction": "bullish",
+        # オシレーター系
+        "rsi_14": 65.0, "stoch_k": 75.0, "momentum": 0.9,
+        # ボラティリティ系
+        "bollinger_upper_dist": -0.002, "bollinger_lower_dist": 0.008,
+        # その他市場情報
+        "sentiment": 0.8, "order_block": 0.6, "liquidity_ratio": 1.2, "symbol": "USDJPY",
         # ファンダメンタルズ
-        "interest_rate_diff": 0.05, # 5%の金利差
-        "cpi_change_rate": 0.03,    # 3%のCPI上昇率
-        "news_sentiment_score": 0.75 # ポジティブなニュースが多い
+        "interest_rate_diff": 0.05, "cpi_change_rate": 0.03, "news_sentiment_score": 0.75
     }
     
     proposal = aurus_loaded.propose(mock_market_data)
