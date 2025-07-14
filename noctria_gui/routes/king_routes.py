@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-👑 /king - 中央統治AI NoctriaのAPIルート群
-- 評議会の開催（/king/hold-council）
-- 評議会ログの保存・取得（/king/history）
+👑 /dashboard/king - 中央統治AI NoctriaのAPIルート群
+- 評議会の開催（/dashboard/king/hold-council）
+- 評議会ログの保存・取得（/dashboard/king/history）
 """
 
 from fastapi import APIRouter, Request
@@ -21,7 +21,7 @@ import json
 # ──────────────────────────────
 # 📁 ルーターとテンプレート初期化
 # ──────────────────────────────
-router = APIRouter(prefix="/king", tags=["King"])
+router = APIRouter(prefix="/dashboard/king", tags=["King"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # 📌 評議会ログファイルの保存先
