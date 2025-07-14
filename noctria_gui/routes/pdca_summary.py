@@ -20,7 +20,9 @@ templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 async def show_pdca_summary(
     request: Request,
     from_date: str = Query(default=""),
-    to_date: str = Query(default="")
+    to_date: str = Query(default=""),
+    mode: str = Query(default="strategy"),
+    limit: int = Query(default=20)
 ):
     # 🔍 日付フィルター用のISO日付オブジェクトに変換（空ならNone）
     try:
@@ -33,11 +35,11 @@ async def show_pdca_summary(
     except ValueError:
         to_dt = None
 
-    # 📥 ログファイルを読み込んで統計を生成（期間指定あり）
+    # 📥 ログファイルを読み込んで統計を生成（期間・モード指定あり）
     result = load_and_aggregate_pdca_logs(
         log_dir=VERITAS_EVAL_LOG_DIR,
-        mode="strategy",  # または "tag"
-        limit=20,
+        mode=mode,
+        limit=limit,
         from_date=from_dt,
         to_date=to_dt
     )
@@ -50,5 +52,7 @@ async def show_pdca_summary(
         "filter": {
             "from": from_date,
             "to": to_date
-        }
+        },
+        "mode": mode,
+        "limit": limit
     })
