@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-  <form method="get" action="/statistics/compare" onsubmit="return setKeys()">
+  <form method="get" action="/strategies/compare" onsubmit="return setKeys()">
     <input type="hidden" name="mode" value="{{ mode }}">
     <input type="hidden" name="sort" value="check">
     <input type="hidden" id="keys" name="{{ mode }}s" value="">
