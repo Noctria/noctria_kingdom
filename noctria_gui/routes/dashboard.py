@@ -14,7 +14,7 @@ from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# 両方のURLで呼び出せるようにデコレーターを2つ付ける
+# 両方のURL（/dashboard, /dashboard/）で呼び出せるようにする
 @router.get("/", response_class=HTMLResponse)
 @router.get("", response_class=HTMLResponse)
 async def dashboard_view(request: Request):
@@ -31,17 +31,16 @@ async def dashboard_view(request: Request):
             "MAPE": 2.81,
         },
     }
-    # 予測データ（実装例）
+    # 予測データ（2件以上、必ず日付・値・上下限つき）
     forecast = [
         {"date": "2025-07-15", "forecast": 150.12, "y_lower": 149.5, "y_upper": 150.9},
         {"date": "2025-07-16", "forecast": 150.38, "y_lower": 149.8, "y_upper": 151.1},
-        # ... 必要なら追加
+        # 必要ならさらに追加
     ]
-    # データが無い場合でも空リストで渡す
-    # forecast = []
+    # 念のため型保証（本番はAPIやDBから取得して加工推奨）
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
-        "forecast": forecast,
+        "forecast": forecast if forecast is not None else [],
     })
