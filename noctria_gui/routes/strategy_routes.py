@@ -22,7 +22,8 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 veritas_dir = STRATEGIES_DIR / "veritas_generated"
 
 
-@router.get("/strategies", response_class=HTMLResponse)
+# ✅ 修正: main.pyのprefixと組み合わせるため、パスを "/" に変更
+@router.get("/", response_class=HTMLResponse)
 async def list_strategies(request: Request):
     """
     📋 戦略ファイル一覧表示（.pyファイルのみ）
@@ -39,7 +40,8 @@ async def list_strategies(request: Request):
     })
 
 
-@router.get("/strategies/view", response_class=HTMLResponse)
+# ✅ 修正: パスを "/view" に変更
+@router.get("/view", response_class=HTMLResponse)
 async def view_strategy(request: Request, name: str):
     """
     🔍 指定戦略ファイルの内容を表示（.py）
@@ -64,7 +66,8 @@ async def view_strategy(request: Request, name: str):
     })
 
 
-@router.get("/strategies/overview", response_class=HTMLResponse)
+# ✅ 修正: パスを "/overview" に変更
+@router.get("/overview", response_class=HTMLResponse)
 async def strategy_overview(request: Request):
     """
     📊 メタ情報付きの戦略一覧表示
@@ -91,7 +94,8 @@ async def strategy_overview(request: Request):
     })
 
 
-@router.get("/strategies/search", response_class=HTMLResponse)
+# ✅ 修正: パスを "/search" に変更
+@router.get("/search", response_class=HTMLResponse)
 async def strategy_search(request: Request, keyword: str = Query(default="")):
     """
     🔍 戦略のキーワード検索（戦略名 or タグ名にマッチ）
@@ -122,7 +126,8 @@ async def strategy_search(request: Request, keyword: str = Query(default="")):
     })
 
 
-@router.get("/strategies/export", response_class=FileResponse)
+# ✅ 修正: パスを "/export" に変更
+@router.get("/export", response_class=FileResponse)
 async def export_strategy(name: str):
     """
     📤 Python または JSON 戦略ファイルのダウンロード
@@ -141,3 +146,14 @@ async def export_strategy(name: str):
         filename=target.name,
         media_type=media_type
     )
+
+
+# ✅ 追加: /strategies/compare に対応するルートを追加
+@router.get("/compare", response_class=HTMLResponse)
+async def get_strategy_compare_page(request: Request):
+    """
+    ⚖️ 戦略比較ページを表示
+    """
+    # ここでは単純にテンプレートを返すだけの仮実装です。
+    # 必要に応じて、比較対象の戦略リストなどを渡す処理を追加してください。
+    return templates.TemplateResponse("strategy_compare.html", {"request": request})
