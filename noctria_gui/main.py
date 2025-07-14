@@ -49,7 +49,7 @@ from noctria_gui.routes import (
     pdca_summary,
     prometheus_routes,
     push,
-    statistics,
+    # statistics, ← ❌ 循環インポートの原因なので削除
     statistics_detail,
     statistics_ranking,
     statistics_scoreboard,
@@ -88,7 +88,7 @@ app.include_router(pdca_routes.router)
 app.include_router(pdca_summary.router)
 app.include_router(prometheus_routes.router)
 app.include_router(push.router)
-app.include_router(statistics.router)  # ✅ 統合済みルート
+# app.include_router(statistics.router) ← ❌ 削除！
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
