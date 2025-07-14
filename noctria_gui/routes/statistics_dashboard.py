@@ -25,7 +25,9 @@ except ImportError:
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-@router.get("/statistics/dashboard", response_class=HTMLResponse)
+
+# ✅ 修正: main.py の prefix="/statistics" と組み合わせるため、パスを "/dashboard" に変更
+@router.get("/dashboard", response_class=HTMLResponse)
 async def statistics_dashboard(request: Request):
     """
     HUDスタイル統計ダッシュボード画面を表示
