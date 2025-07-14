@@ -11,7 +11,8 @@
 {% endblock %}
 
 {% block content %}
-  <form method="get" action="/strategies/compare" onsubmit="return setKeys()">
+  <!-- ✅ 修正: onsubmit属性を削除 -->
+  <form id="compareForm" method="get" action="/strategies/compare">
     <input type="hidden" name="mode" value="{{ mode }}">
     <input type="hidden" name="sort" value="check">
     <input type="hidden" id="keys" name="{{ mode }}s" value="">
@@ -33,15 +34,44 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- ✅ 修正: よりモダンで確実なaddEventListener方式に変更 -->
 <script>
-  function setKeys() {
-    const boxes = document.querySelectorAll('#options input[type=checkbox]');
-    const selected = [];
-    boxes.forEach(box => {
-      if (box.checked) selected.push(box.value);
+document.addEventListener('DOMContentLoaded', () => {
+  const compareForm = document.getElementById('compareForm');
+  
+  if (compareForm) {
+    compareForm.addEventListener('submit', (event) => {
+      // フォームが送信される直前に、チェックされた項目の値を取得する
+      const checkedBoxes = document.querySelectorAll('#options input[type=checkbox]:checked');
+      
+      // 取得した値をカンマ区切りの文字列に変換
+      const selectedValues = Array.from(checkedBoxes).map(box => box.value);
+      
+      // 隠しフィールド（id="keys"）に値を設定
+      const keysInput = document.getElementById('keys');
+      if (keysInput) {
+        keysInput.value = selectedValues.join(',');
+      }
+      
+      // この後、フォームは通常通り送信される
     });
-    document.getElementById('keys').value = selected.join(',');
-    return true;
   }
+
+  // 「ダッシュボードへ」のBackボタンは、特別なJavaScriptがなくても
+  // <a>タグのhref属性によって正常に動作するはずです。
+  // もし動作しない場合、他のJavaScriptエラーが影響していることが多いですが、
+  // 上記の修正でその問題も解消される可能性があります。
+});
 </script>
 {% endblock %}
+```
+
+### 修正点の解説
+
+* **HTMLの修正:**
+    * `<form>`タグから`onsubmit="return setKeys()"`という属性を削除し、代わりに`id="compareForm"`を追加して、JavaScriptからフォームを特定しやすくしました。
+* **JavaScriptの修正:**
+    * 古い`setKeys`関数を削除し、`DOMContentLoaded`（ページの読み込み完了後）のタイミングで処理を開始するようにしました。
+    * `compareForm`の`submit`イベント（送信ボタンが押された時）を監視し、イベントが発生したらチェックボックスの値をまとめて隠しフィールドに設定する、というロジックに変更しました。
+
+この修正により、ボタンが正しく反応するようになるはずです。サービスを再起動して、動作を確認してみてくだ
