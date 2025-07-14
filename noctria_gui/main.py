@@ -49,14 +49,11 @@ from noctria_gui.routes import (
     pdca_summary,
     prometheus_routes,
     push,
-    # statistics, ← ❌ 循環インポートの原因なので削除
+    statistics_dashboard, # ✅ 修正: コメントアウトを解除してインポート
     statistics_detail,
     statistics_ranking,
     statistics_scoreboard,
     statistics_tag_ranking,
-    # statistics_compare,  # ✅ 統合済みのため不要
-    # statistics_dashboard,  # ❌ 使用終了のため不要
-    # strategy_compare,  # ✅ /statistics に統合されたため削除
     strategy_detail,
     strategy_heatmap,
     strategy_routes,
@@ -88,11 +85,20 @@ app.include_router(pdca_routes.router)
 app.include_router(pdca_summary.router)
 app.include_router(prometheus_routes.router)
 app.include_router(push.router)
-# app.include_router(statistics.router) ← ❌ 削除！
+
+# --- Statistics関連のルーター ---
+# ✅ 修正: statistics_dashboard.router を登録し、URLの接頭辞として "/statistics" を設定
+app.include_router(
+    statistics_dashboard.router,
+    prefix="/statistics",
+    tags=["statistics"]
+)
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
 app.include_router(statistics_tag_ranking.router)
+# --------------------------------
+
 app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
 app.include_router(strategy_routes.router)
