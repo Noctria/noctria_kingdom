@@ -26,7 +26,6 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
-# ✅ 修正: main.py の prefix="/statistics" と組み合わせるため、パスを "/dashboard" に変更
 @router.get("/dashboard", response_class=HTMLResponse)
 async def statistics_dashboard(request: Request):
     """
@@ -34,8 +33,8 @@ async def statistics_dashboard(request: Request):
     """
     stats = get_strategy_statistics()
 
-    # ✅ テンプレート名は `statistics/statistics_dashboard.html` が理想
-    return templates.TemplateResponse("statistics/statistics_dashboard.html", {
+    # ✅ 修正: エラーログに基づき、正しいテンプレートファイル名を指定
+    return templates.TemplateResponse("statistics_dashboard.html", {
         "request": request,
         "stats": stats,
     })
