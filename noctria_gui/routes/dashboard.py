@@ -5,7 +5,7 @@
 📊 /dashboard - 中央統治ダッシュボード
 - 各種統計と予測分析を統合表示
 """
-
+import logging  # ✅ 修正: ロギング機能をインポート
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -18,6 +18,9 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 @router.get("/", response_class=HTMLResponse)
 @router.get("", response_class=HTMLResponse)
 async def dashboard_view(request: Request):
+    # ✅ 修正: この関数が実行されたことをログに出力
+    logging.info("--- dashboard_view is being executed ---")
+
     # 必要な統計データ
     stats = {
         "avg_win_rate": 57.1,
@@ -31,16 +34,18 @@ async def dashboard_view(request: Request):
             "MAPE": 2.81,
         },
     }
-    # 予測データ（2件以上、必ず日付・値・上下限つき）
+    # 予測データ
     forecast = [
         {"date": "2025-07-15", "forecast": 150.12, "y_lower": 149.5, "y_upper": 150.9},
         {"date": "2025-07-16", "forecast": 150.38, "y_lower": 149.8, "y_upper": 151.1},
-        # 必要ならさらに追加
     ]
-    # 念のため型保証（本番はAPIやDBから取得して加工推奨）
 
-    return templates.TemplateResponse("dashboard.html", {
+    # ✅ 修正: テンプレートに渡す直前のデータ（コンテキスト）をログに出力
+    context = {
         "request": request,
         "stats": stats,
         "forecast": forecast if forecast is not None else [],
-    })
+    }
+    logging.info(f"Context being passed to template: {context}")
+
+    return templates.TemplateResponse("dashboard.html", context)
