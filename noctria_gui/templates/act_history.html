@@ -45,7 +45,7 @@
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td>{{ log.strategy }}</td>
+                    <td><a href="/act-history/detail/{{ log.id }}" class="link-cyan">{{ log.strategy }}</a></td>
                     <td>{{ log.symbol }}</td>
                     <td>{{ log.promoted_at or log.timestamp }}</td>
                     <td class="text-cyan">{{ "%.2f"|format(log.score_mean) if log.score_mean is not none else '-' }}</td>
@@ -68,13 +68,20 @@
                         <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
                     </td>
                     <td class="action-buttons">
+                        <!-- ✅ 修正: モダンなボタンスタイルを適用 -->
                         <form method="post" action="/act-history/repush" class="action-form">
                             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                            <button type="submit" class="hud-btn-small"><i class="fas fa-redo"></i>再Push可に</button>
+                            <button type="submit" class="btn-modern btn-modern-push">
+                                <i class="fas fa-rocket"></i>
+                                <span>再Push可に</span>
+                            </button>
                         </form>
                         <form method="post" action="/act-history/reevaluate" class="action-form">
                             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                            <button type="submit" class="hud-btn-small"><i class="fas fa-cogs"></i>再評価</button>
+                            <button type="submit" class="btn-modern btn-modern-eval">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>再評価</span>
+                            </button>
                         </form>
                     </td>
                 </tr>
@@ -85,6 +92,48 @@
         </table>
     </div>
 </main>
+
+<!-- ✅ 追加: モダンなボタンスタイルのためのCSS -->
+<style>
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem; /* 8px */
+        align-items: center;
+    }
+    .action-form {
+        margin: 0;
+    }
+    .btn-modern {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid transparent;
+        border-radius: 0.5rem;
+        color: #e6f1ff;
+        font-weight: bold;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+        white-space: nowrap;
+    }
+    .btn-modern:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px var(--glow-color, #fff);
+    }
+    .btn-modern-push {
+        background: linear-gradient(145deg, #00aaff, #0077cc);
+        border-color: #00c3ff;
+        --glow-color: rgba(0, 195, 255, 0.7);
+    }
+    .btn-modern-eval {
+        background: linear-gradient(145deg, #8a2be2, #6a1a9f);
+        border-color: #aa55ff;
+        --glow-color: rgba(170, 85, 255, 0.7);
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
