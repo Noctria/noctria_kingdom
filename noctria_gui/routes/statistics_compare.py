@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
@@ -69,7 +69,16 @@ def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[st
                     stat_map[key][k].append(v)
     return stat_map
 
+# ==============================
+# 404防止: /strategies/compare の互換リダイレクト
+# ==============================
+@router.get("/strategies/compare", include_in_schema=False)
+async def legacy_compare_redirect():
+    return RedirectResponse(url="/statistics/compare", status_code=307)
 
+# ==============================
+# メイン比較画面
+# ==============================
 @router.get("/statistics/compare", response_class=HTMLResponse)
 async def compare(request: Request) -> HTMLResponse:
     mode = request.query_params.get("mode", "strategy")
