@@ -44,12 +44,12 @@
 <section class="hud-panel navigation">
     <h2 class="panel-title"><i class="fas fa-compass"></i> NAVIGATION</h2>
     <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
-        <a href="/statistics/dashboard" class="nav-item"><i class="fas fa-chart-pie"></i><span>統計DB</span></a>
-        <a href="/strategies/compare" class="nav-item"><i class="fas fa-balance-scale"></i><span>戦略比較</span></a>
-        <a href="/act-history" class="nav-item"><i class="fas fa-history"></i><span>Act履歴</span></a>
-        <a href="/upload-strategy" class="nav-item"><i class="fas fa-upload"></i><span>アップロード</span></a>
-        <a href="/pdca/summary" class="nav-item"><i class="fas fa-sync-alt"></i><span>PDCA</span></a>
-        <a href="/trigger" class="nav-item"><i class="fas fa-bullhorn"></i><span>王命発令</span></a>
+        <a href="/statistics/dashboard" class="hud-btn"><i class="fas fa-chart-pie"></i> 統計DB</a>
+        <a href="/strategies/compare" class="hud-btn"><i class="fas fa-balance-scale"></i> 戦略比較</a>
+        <a href="/act-history" class="hud-btn"><i class="fas fa-history"></i> Act履歴</a>
+        <a href="/upload-strategy" class="hud-btn"><i class="fas fa-upload"></i> アップロード</a>
+        <a href="/pdca/summary" class="hud-btn"><i class="fas fa-sync-alt"></i> PDCA</a>
+        <a href="/trigger" class="hud-btn"><i class="fas fa-bullhorn"></i> 王命発令</a>
     </div>
 </section>
 
@@ -67,145 +67,40 @@
     <div id="councilResult" class="council-result">Awaiting command...</div>
 </section>
 
-<script type="application/json" id="forecast-data">
-    {{ forecast | default([]) | tojson | safe }}
-</script>
+<div id="forecast-data-holder" data-forecast="{{ forecast | default([]) | tojson }}" style="display: none;"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+<!-- ✅ 修正: デバッグ用のコードに一時的に変更 -->
 <script>
-{% raw %}
 document.addEventListener('DOMContentLoaded', () => {
-    // ✅ system-time に null チェック付きで対応
-    const timeElement = document.getElementById('system-time');
-    function updateTime() {
-        if (timeElement) {
-            const now = new Date();
-            const options = {
-                timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-            };
-            const formatter = new Intl.DateTimeFormat('en-CA', options);
-            const jstString = formatter.format(now).replace(', ', ' ');
-            timeElement.textContent = `${jstString} JST`;
-        }
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
+    console.log("--- グラフデータ デバッグ開始 ---");
+    const dataHolder = document.getElementById('forecast-data-holder');
+    
+    // サーバーから渡された生の文字列を取得
+    const rawDataString = dataHolder.getAttribute('data-forecast');
 
-    // ✅ 修正: Forecast Chart のロジックを単一の try...catch に集約
-    const chartContainer = document.getElementById("forecastChart").parentElement;
+    // 取得した文字列をコンソールに出力して確認
+    console.log("サーバーから受け取った生の文字列:", rawDataString);
+
+    // その文字列でJSON.parseを試す
     try {
-        const rawData = document.getElementById("forecast-data")?.textContent;
-        const forecastData = JSON.parse(rawData);
-
-        // データが配列でない、または空の場合はエラーを発生させる
-        if (!Array.isArray(forecastData) || forecastData.length === 0) {
-            throw new Error("グラフデータが空、または不正な形式です。");
-        }
-
-        // グラフ描画
-        const ctx = document.getElementById("forecastChart").getContext("2d");
-        const labels = forecastData.map(d => d.date);
-        const forecast = forecastData.map(d => d.forecast);
-        const lower = forecastData.map(d => d.y_lower);
-        const upper = forecastData.map(d => d.y_upper);
-
-        new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: "予測値",
-                        data: forecast,
-                        borderColor: "rgba(0, 153, 255, 1)",
-                        backgroundColor: "rgba(0, 153, 255, 0.2)",
-                        pointRadius: 2,
-                        fill: false,
-                        tension: 0.3,
-                    },
-                    {
-                        label: "信頼区間", // 凡例を一つにまとめる
-                        data: upper, // 上限データを代表として使用
-                        borderColor: "rgba(0, 153, 255, 0.0)",
-                        backgroundColor: "rgba(0, 153, 255, 0.15)",
-                        fill: '+1', // ✅ 修正: 正しくは `+1` ではなく、次のデータセットのインデックスか、特定の境界を指定
-                        pointRadius: 0,
-                    },
-                    {
-                        label: "信頼区間（下限）",
-                        data: lower,
-                        borderColor: "rgba(0, 153, 255, 0.0)",
-                        backgroundColor: "rgba(0, 153, 255, 0.15)",
-                        fill: '-1', // このデータセットから一つ前のデータセットまでの間を埋める
-                        pointRadius: 0,
-                        tension: 0.3,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: { unit: 'day' },
-                        ticks: { color: '#a8b2d1' },
-                        grid: { color: 'rgba(0, 229, 255, 0.2)', borderDash: [2, 4] }
-                    },
-                    y: {
-                        ticks: { color: '#a8b2d1' },
-                        grid: { color: 'rgba(0, 229, 255, 0.2)' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: { color: '#e6f1ff' }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 30, 60, 0.8)',
-                        borderColor: '#00e5ff',
-                        borderWidth: 1
-                    }
-                }
-            }
-        });
-
+        JSON.parse(rawDataString);
+        console.log("✅ JSON.parse に成功しました！");
     } catch (e) {
-        // JSONのパース失敗、データが空、その他のエラーをすべてここで捕捉
-        console.error("グラフの描画に失敗:", e);
-        chartContainer.innerHTML = `<p style='color: #ff4d4d; font-weight: bold; text-align: center;'>⚠️ 予測データが取得できませんでした。</p><p style='color: #a8b2d1; font-size: 0.8em; text-align: center;'>(${e.message})</p>`;
+        console.error("❌ JSON.parse に失敗しました。エラー:", e);
     }
+    console.log("--- グラフデータ デバッグ終了 ---");
 
-    // Council Submission
+    // ページの他の機能は、デバッグ中は一時的にコメントアウトしておきます
+    /*
+    const timeElement = document.getElementById('system-time');
+    function updateTime() { ... }
+    ...
     const form = document.getElementById("councilForm");
-    const resultDiv = document.getElementById("councilResult");
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const formData = new FormData(form);
-        const payload = {};
-        formData.forEach((v, k) => {
-            if (v === "") return;
-            const num = Number(v);
-            payload[k] = isNaN(num) ? v : num;
-        });
-        resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Council...';
-        try {
-            const res = await fetch("/dashboard/king/hold-council", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            resultDiv.textContent = res.ok
-                ? `Decision: ${data.final_decision}`
-                : `Error: ${data.detail || 'Unknown'}`;
-        } catch (err) {
-            resultDiv.textContent = `Communication Error: ${err.message}`;
-        }
-    });
+    ...
+    */
 });
-{% endraw %}
 </script>
 {% endblock %}
