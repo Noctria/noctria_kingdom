@@ -1,5 +1,5 @@
 /* ============================================
-   🏰 Noctria Kingdom - HUD Interface Style v1.13
+   🏰 Noctria Kingdom - HUD Interface Style v1.14
    ============================================ */
 
 /* --- Root Variables --- */
@@ -19,6 +19,11 @@
     --font-family: 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
+/* --- Global --- */
+html, body {
+    height: 100%;
+}
+
 /* --- Base & Body --- */
 body {
     background-color: var(--bg-color);
@@ -26,7 +31,7 @@ body {
     font-family: var(--font-family);
     margin: 0;
     padding: 1rem;
-    overflow: hidden;
+    overflow: auto;
     background-image: 
         linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
@@ -36,7 +41,6 @@ body {
 /* --- HUD Layouts --- */
 .hud-container-simple {
     display: grid;
-    height: calc(100vh - 2rem);
     grid-template-rows: auto auto 1fr;
     gap: 1rem;
     min-width: 300px;
