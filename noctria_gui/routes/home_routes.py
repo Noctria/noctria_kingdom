@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from subprocess import run, PIPE
-from core.path_config import CATEGORY_MAP, NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import CATEGORY_MAP, NOCTRIA_GUI_TEMPLATES_DIR
 
 import json
 from typing import Any
