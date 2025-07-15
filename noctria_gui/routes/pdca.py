@@ -6,7 +6,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-from core.path_config import (
+from src.core.path_config import (
     PDCA_LOG_DIR,
     NOCTRIA_GUI_TEMPLATES_DIR,
 )
