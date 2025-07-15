@@ -14,7 +14,7 @@ from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 
-from core.path_config import ACT_LOG_DIR, VERITAS_EVAL_LOG
+from src.core.path_config import ACT_LOG_DIR, VERITAS_EVAL_LOG
 
 
 def normalize_tag(tag: Optional[str]) -> str:
