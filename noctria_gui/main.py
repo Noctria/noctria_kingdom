@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+import json
+from typing import Any
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
-import json
-from typing import Any
+from fastapi.responses import Response
 
-# --- プロジェクトのコアモジュール ---
-from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: 正しいインポートパスに修正
+from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 # ========================================
 # 🚀 FastAPI GUI アプリケーション構成
@@ -17,10 +18,12 @@ from core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="1.4.0",
+    version="2.0.0",
 )
 
-# ✅ 静的ファイルとテンプレートの登録
+# ========================================
+# 📁 静的ファイルとテンプレートの登録
+# ========================================
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
@@ -33,93 +36,72 @@ def from_json(value: str) -> Any:
 templates.env.filters["from_json"] = from_json
 
 # ========================================
-# ルーターのインポート
+# 🏛️ 全ルート（機能）のインポート
 # ========================================
 from noctria_gui.routes import (
-    dashboard,
-    home_routes,
-    act_history,
-    act_history_detail,
-    king_routes,
-    logs_routes,
-    path_checker,
-    pdca,
-    pdca_recheck,
-    pdca_routes,
-    pdca_summary,
-    prometheus_routes,
-    push,
-    statistics_dashboard,
-    statistics_detail,
-    statistics_ranking,
-    statistics_scoreboard,
-    statistics_tag_ranking,
-    strategy_detail,
-    strategy_heatmap,
-    strategy_routes,
-    tag_heatmap,
-    tag_summary,
-    upload,
-    upload_history,
-    trigger,
+    dashboard, home_routes, king_routes, logs_routes,
+    path_checker, trigger, upload, upload_history,
+    act_history, act_history_detail,
+    pdca, pdca_recheck, pdca_routes, pdca_summary,
+    prometheus_routes, push,
+    statistics_dashboard, statistics_detail, statistics_ranking,
+    statistics_scoreboard, statistics_tag_ranking, statistics_compare,
+    strategy_detail, strategy_heatmap, strategy_routes,
+    tag_heatmap, tag_summary, tag_summary_detail
 )
 
 # ========================================
-# 🔁 ルーター登録
+# 🔁 ルーター登録（機能ごとのグループ化）
 # ========================================
 print("Integrating all routers into the main application...")
 
-# 優先ルート
-app.include_router(dashboard.router)
+# --- 基本ルート ---
 app.include_router(home_routes.router)
+app.include_router(dashboard.router)
+app.include_router(king_routes.router)
+app.include_router(trigger.router)
 
-# 各機能ルーター
+# --- ログ・履歴関連 ---
 app.include_router(act_history.router)
 app.include_router(act_history_detail.router)
-app.include_router(king_routes.router)
 app.include_router(logs_routes.router)
-app.include_router(path_checker.router)
+app.include_router(upload_history.router)
+
+# --- PDCA・Push関連 ---
 app.include_router(pdca.router)
 app.include_router(pdca_recheck.router)
 app.include_router(pdca_routes.router)
 app.include_router(pdca_summary.router)
-app.include_router(prometheus_routes.router)
 app.include_router(push.router)
 
-# --- Statistics関連のルーター ---
-app.include_router(
-    statistics_dashboard.router,
-    prefix="/statistics",
-    tags=["statistics"]
-)
+# --- 戦略(Strategy)関連 ---
+app.include_router(strategy_routes.router, prefix="/strategies", tags=["strategies"])
+app.include_router(strategy_detail.router)
+app.include_router(strategy_heatmap.router)
+
+# --- 統計(Statistics)・サマリー関連 ---
+app.include_router(statistics_dashboard.router, prefix="/statistics", tags=["statistics"])
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
 app.include_router(statistics_tag_ranking.router)
-# --------------------------------
-
-# --- Strategy関連のルーター ---
-# ✅ 修正: strategy_routes.router に prefix="/strategies" を追加
-app.include_router(
-    strategy_routes.router,
-    prefix="/strategies",
-    tags=["strategies"]
-)
-app.include_router(strategy_detail.router)
-app.include_router(strategy_heatmap.router)
-# --------------------------------
-
-app.include_router(tag_heatmap.router)
+app.include_router(statistics_compare.router)
 app.include_router(tag_summary.router)
+app.include_router(tag_summary_detail.router)
+app.include_router(tag_heatmap.router)
+
+# --- その他 ---
+app.include_router(path_checker.router)
+app.include_router(prometheus_routes.router)
 app.include_router(upload.router)
-app.include_router(upload_history.router)
-app.include_router(trigger.router)
 
 print("✅ All routers have been integrated successfully.")
 
 # ========================================
-# 🔀 トップページリダイレクト（必要に応じて有効化）
+# ✨ 便利機能
 # ========================================
-# @app.get("/", include_in_schema=False)
-# async def root() -> RedirectResponse:
-#     return RedirectResponse(url="/dashboard")
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """ブラウザのfavicon.icoリクエストに対する404エラーを抑制するための空のレスポンス"""
+    return Response(status_code=204)
+
