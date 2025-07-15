@@ -2,197 +2,142 @@
 # coding: utf-8
 
 """
-📜 Veritas戦略の昇格記録ダッシュボードルート
-- 採用ログの一覧表示、検索フィルタ、詳細表示、再評価、Push、CSV出力対応
+📜 Veritas Adoption Log Route (v2.0)
+- 採用ログの一覧表示、フィルタリング、詳細表示、非同期でのアクション実行に対応
 """
 
-from fastapi import APIRouter, Request, Form, Query
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
+import logging
+from fastapi import APIRouter, Request, Form, Query, Depends, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from core.path_config import ACT_LOG_DIR, TOOLS_DIR, GUI_TEMPLATES_DIR
-from noctria_gui.services import act_log_service
+# --- 王国の基盤モジュールをインポート ---
+from src.core.path_config import TOOLS_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from src.noctria_gui.services import act_log_service
+
+# ロガーの設定
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 router = APIRouter(prefix="/act-history", tags=["act-history"])
-templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
-def parse_float(s):
+# --- 依存性注入（DI）によるフィルタリングロジックの共通化 ---
+def get_filtered_logs(
+    strategy_name: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    pushed: Optional[bool] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+) -> List[Dict[str, Any]]:
+    """
+    クエリパラメータに基づいてログをフィルタリングする共通関数。
+    """
     try:
-        return float(s)
-    except (TypeError, ValueError):
-        return None
+        logs = act_log_service.load_all_act_logs()
+        
+        date_range = None
+        if start_date and end_date:
+            date_range = (
+                datetime.strptime(start_date, "%Y-%m-%d"),
+                datetime.strptime(end_date, "%Y-%m-%d"),
+            )
+
+        filtered = act_log_service.filter_act_logs(
+            logs,
+            strategy_name=strategy_name,
+            tag=act_log_service.normalize_tag(tag),
+            date_range=date_range,
+            pushed=pushed,
+        )
+        return [act_log_service.normalize_score(log) for log in filtered]
+    except Exception as e:
+        logging.error(f"ログのフィルタリング中にエラーが発生しました: {e}", exc_info=True)
+        return []
 
 
-def parse_bool(s):
-    if isinstance(s, str):
-        return s.lower() in ["true", "1", "on"]
-    return None
-
-
-def normalize_score(log: dict) -> dict:
-    score = log.get("score")
-    if isinstance(score, dict):
-        log["score_mean"] = score.get("mean")
-        log["rmse"] = score.get("RMSE")
-        log["mae"] = score.get("MAE")
-        log["mape"] = score.get("MAPE")
-        log["win_rate"] = score.get("win_rate")
-        log["max_drawdown"] = score.get("max_drawdown")
-    else:
-        log["score_mean"] = score
-
-    if "tags" not in log or not isinstance(log["tags"], list):
-        log["tags"] = []
-
-    return log
-
+# --- ルート定義 ---
 
 @router.get("", response_class=HTMLResponse)
 async def show_act_history(
     request: Request,
-    strategy_name: Optional[str] = Query(None),
-    tag: Optional[str] = Query(None),
-    min_score: Optional[str] = Query(None),
-    max_score: Optional[str] = Query(None),
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
-    pushed: Optional[str] = Query(None),
+    logs: List[Dict[str, Any]] = Depends(get_filtered_logs)
 ):
-    min_score_val = parse_float(min_score)
-    max_score_val = parse_float(max_score)
-    pushed_val = parse_bool(pushed)
-    strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
-    tag_val_raw = tag if tag and tag not in ["", "None"] else None
-    tag_val = act_log_service.normalize_tag(tag_val_raw)
-    start_date_val = start_date if start_date and start_date not in ["", "None"] else None
-    end_date_val = end_date if end_date and end_date not in ["", "None"] else None
-
-    logs = act_log_service.load_all_act_logs()
-
-    try:
-        score_range = (min_score_val, max_score_val) if min_score_val is not None and max_score_val is not None else None
-        date_range = (
-            datetime.strptime(start_date_val, "%Y-%m-%d"),
-            datetime.strptime(end_date_val, "%Y-%m-%d"),
-        ) if start_date_val and end_date_val else None
-
-        logs = act_log_service.filter_act_logs(
-            logs,
-            strategy_name=strategy_name_val,
-            tag=tag_val,
-            score_range=score_range,
-            date_range=date_range,
-            pushed=pushed_val,
-        )
-    except Exception as e:
-        print(f"[act_history] ⚠️ フィルターエラー: {e}")
-
-    logs = [normalize_score(log) for log in logs]
-
+    """
+    GET /act-history - フィルタリングされた採用ログの一覧をHTMLで表示する。
+    """
     tag_set = set()
     for log in logs:
         tag_set.update(log.get("tags", []))
-    tag_list = sorted(tag_set)
-
+    
     return templates.TemplateResponse("act_history.html", {
         "request": request,
         "logs": logs,
-        "tag_list": tag_list,
-        "filters": {
-            "strategy_name": strategy_name_val,
-            "tag": tag_val,
-            "min_score": min_score_val,
-            "max_score": max_score_val,
-            "start_date": start_date_val,
-            "end_date": end_date_val,
-            "pushed": pushed_val,
-        }
+        "tag_list": sorted(list(tag_set)),
     })
 
 
-@router.get("/detail", response_class=HTMLResponse)
-async def show_act_detail(request: Request, strategy_name: str = Query(...)):
-    log = act_log_service.get_log_by_strategy(strategy_name)
+@router.get("/detail/{log_id}", response_class=HTMLResponse)
+async def show_act_detail(request: Request, log_id: str):
+    """
+    GET /act-history/detail/{log_id} - 特定のログの詳細を表示する。
+    """
+    log = act_log_service.get_log_by_id(log_id)
     if not log:
-        return HTMLResponse(content="指定された戦略ログが見つかりませんでした。", status_code=404)
+        raise HTTPException(status_code=404, detail="指定された戦略ログが見つかりませんでした。")
+    
     return templates.TemplateResponse("act_history_detail.html", {
         "request": request,
-        "log": normalize_score(log)
+        "log": act_log_service.normalize_score(log)
     })
 
 
-@router.post("/repush")
+@router.post("/repush", response_class=JSONResponse)
 async def repush_strategy(strategy_name: str = Form(...)):
+    """
+    POST /act-history/repush - 指定された戦略のPushフラグをリセットする（非同期）。
+    """
+    logging.info(f"戦略『{strategy_name}』の再Push命令を受理しました。")
     try:
         act_log_service.reset_push_flag(strategy_name)
-        return RedirectResponse(url="/act-history", status_code=303)
+        return {"status": "success", "message": f"戦略『{strategy_name}』を再Push可能にしました。"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": f"再Push処理中にエラー: {e}"})
+        logging.error(f"再Push処理中にエラーが発生しました: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"再Push処理中にエラー: {e}")
 
 
-@router.post("/reevaluate")
+@router.post("/reevaluate", response_class=JSONResponse)
 async def reevaluate_strategy(strategy_name: str = Form(...)):
+    """
+    POST /act-history/reevaluate - 指定された戦略に再評価マークを付ける（非同期）。
+    """
+    logging.info(f"戦略『{strategy_name}』の再評価命令を受理しました。")
     try:
         act_log_service.mark_for_reevaluation(strategy_name)
-        return RedirectResponse(url="/act-history", status_code=303)
+        return {"status": "success", "message": f"戦略『{strategy_name}』に再評価マークを付けました。"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": f"再評価マーク処理中にエラー: {e}"})
+        logging.error(f"再評価マーク処理中にエラーが発生しました: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"再評価マーク処理中にエラー: {e}")
 
 
-@router.get("/export")
+@router.get("/export", response_class=FileResponse)
 async def export_act_log_csv(
-    strategy_name: Optional[str] = Query(None),
-    tag: Optional[str] = Query(None),
-    min_score: Optional[str] = Query(None),
-    max_score: Optional[str] = Query(None),
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
-    pushed: Optional[str] = Query(None),
+    logs: List[Dict[str, Any]] = Depends(get_filtered_logs)
 ):
-    min_score_val = parse_float(min_score)
-    max_score_val = parse_float(max_score)
-    pushed_val = parse_bool(pushed)
-    strategy_name_val = strategy_name if strategy_name and strategy_name not in ["", "None"] else None
-    tag_val_raw = tag if tag and tag not in ["", "None"] else None
-    tag_val = act_log_service.normalize_tag(tag_val_raw)
-    start_date_val = start_date if start_date and start_date not in ["", "None"] else None
-    end_date_val = end_date if end_date and end_date not in ["", "None"] else None
-
-    logs = act_log_service.load_all_act_logs()
-
-    try:
-        score_range = (min_score_val, max_score_val) if min_score_val is not None and max_score_val is not None else None
-        date_range = (
-            datetime.strptime(start_date_val, "%Y-%m-%d"),
-            datetime.strptime(end_date_val, "%Y-%m-%d"),
-        ) if start_date_val and end_date_val else None
-
-        logs = act_log_service.filter_act_logs(
-            logs,
-            strategy_name=strategy_name_val,
-            tag=tag_val,
-            score_range=score_range,
-            date_range=date_range,
-            pushed=pushed_val,
-        )
-    except Exception as e:
-        print(f"[act_history/export] ⚠️ フィルターエラー: {e}")
-
-    logs = [normalize_score(log) for log in logs]
-
+    """
+    GET /act-history/export - 現在のフィルタ条件でログをCSV形式でエクスポートする。
+    """
     if not logs:
-        return JSONResponse(status_code=404, content={"detail": "出力可能なログがありません"})
+        raise HTTPException(status_code=404, detail="エクスポート対象のログが見つかりません。")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = TOOLS_DIR / f"veritas_adoptions_{timestamp}.csv"
 
     success = act_log_service.export_logs_to_csv(logs, output_path)
     if not success:
-        return JSONResponse(status_code=500, content={"detail": "CSV出力に失敗しました"})
+        raise HTTPException(status_code=500, detail="CSVファイルのエクスポートに失敗しました。")
 
     return FileResponse(
         output_path,
