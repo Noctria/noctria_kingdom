@@ -3,7 +3,7 @@ import shutil
 import datetime
 import subprocess
 
-from core.path_config import STRATEGIES_DIR
+from src.core.path_config import STRATEGIES_DIR
 
 # ディレクトリ定義
 UPLOADED_DIR = STRATEGIES_DIR / "uploaded"
