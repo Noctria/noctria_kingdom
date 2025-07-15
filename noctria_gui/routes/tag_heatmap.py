@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from noctria_gui.services import statistics_service
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 
 router = APIRouter(tags=["tag-heatmap"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
