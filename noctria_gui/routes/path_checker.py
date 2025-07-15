@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from subprocess import run, PIPE
 import json
-from core.path_config import CATEGORY_MAP
+from src.core.path_config import CATEGORY_MAP
 
 router = APIRouter()
 templates = Jinja2Templates(directory="noctria_gui/templates")
