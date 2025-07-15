@@ -1,13 +1,43 @@
+# docker-compose.gpu.yaml (v2.0)
+# Veritas LLMサーバーをGPU付きで起動するためのDocker Compose設定
 version: "3.8"
+
 services:
+  # サービス名を「veritas-llm」と定義
   veritas-llm:
+    # コンテナに固有の名前を付け、管理しやすくする
+    container_name: veritas_llm_server_gpu
+
+    # ビルド設定: どのDockerfileを使ってイメージを構築するかを指定
     build:
+      # このファイルがあるディレクトリをビルドの基準点（コンテキスト）とする
       context: .
+      # 使用するDockerfileを指定
       dockerfile: Dockerfile_GPU
+
+    # ポート設定: ホストOSとコンテナのポートを接続する
+    # 書式: "ホスト側ポート:コンテナ側ポート"
+    # これにより、ホストの8080番ポートへのアクセスが、コンテナの8000番ポートに転送される
+    ports:
+      - "8080:8000"
+
+    # ボリューム設定: ホストOSのファイルをコンテナ内に同期させる
+    # プロジェクト全体のディレクトリをコンテナ内の/opt/airflowにマウントする
+    # これにより、Pythonがsrc以下のモジュールを正しく見つけられるようになる
     volumes:
-      - .:/opt/airflow
+      - ../:/opt/airflow
+
+    # 環境変数設定
+    # .envファイルから環境変数を読み込む（APIキーやモデルパスの管理に便利）
+    env_file:
+      - .env
+    # コンテナ内でのPythonのモジュール検索パスを設定
     environment:
       - PYTHONPATH=/opt/airflow
+
+    # GPUリソースの割り当て設定
+    # この設定により、コンテナはホストマシンのNVIDIA GPUを利用できる
+    # (ホストにNVIDIA Container Toolkitのインストールが必要)
     deploy:
       resources:
         reservations:
@@ -15,3 +45,12 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+    # 再起動ポリシー
+    # コンテナがエラーで停止した場合などに、自動で再起動する（手動で停止した場合を除く）
+    restart: unless-stopped
+    
+    # 実行コマンド
+    # コンテナ起動時に、このコマンドでFastAPIサーバーを起動する
+    command: ["uvicorn", "llm_server.veritas_llm_server:app", "--host", "0.0.0.0", "--port", "8000"]
+
