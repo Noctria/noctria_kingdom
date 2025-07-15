@@ -7,7 +7,7 @@
 
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse, RedirectResponse
-from core.path_config import STRATEGIES_DIR
+from src.core.path_config import STRATEGIES_DIR
 from pathlib import Path
 import urllib.parse
 
