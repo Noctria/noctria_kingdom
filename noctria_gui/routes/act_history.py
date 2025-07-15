@@ -15,7 +15,7 @@ from typing import Optional, List, Dict, Any
 
 # --- 王国の基盤モジュールをインポート ---
 from src.core.path_config import TOOLS_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-from src.noctria_gui.services import act_log_service
+from noctria_gui.services import act_log_service
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
