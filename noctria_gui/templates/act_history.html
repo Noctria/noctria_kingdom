@@ -31,12 +31,13 @@
         <table class="hud-table" id="log-table">
             <thead>
                 <tr>
-                    <th onclick="sortTable(0)">戦略名 <i class="fas fa-sort"></i></th>
+                    <!-- ✅ 修正: onclick属性を削除し、data属性でソート対象を指定 -->
+                    <th data-sort-col="0">戦略名 <i class="fas fa-sort"></i></th>
                     <th>通貨ペア</th>
-                    <th onclick="sortTable(2)">昇格日時 <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable(3)">平均スコア <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable(4)">勝率 <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable(5)">最大DD <i class="fas fa-sort"></i></th>
+                    <th data-sort-col="2">昇格日時 <i class="fas fa-sort"></i></th>
+                    <th data-sort-col="3">平均スコア <i class="fas fa-sort"></i></th>
+                    <th data-sort-col="4">勝率 <i class="fas fa-sort"></i></th>
+                    <th data-sort-col="5">最大DD <i class="fas fa-sort"></i></th>
                     <th>タグ</th>
                     <th>Push済</th>
                     <th>操作</th>
@@ -68,7 +69,6 @@
                         <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
                     </td>
                     <td class="action-buttons">
-                        <!-- ✅ 修正: ボタンのクラスを 'hud-btn' に統一 -->
                         <form method="post" action="/act-history/repush" class="action-form">
                             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
                             <button type="submit" class="hud-btn">
@@ -91,7 +91,6 @@
     </div>
 </main>
 
-<!-- ✅ 修正: ボタンのレイアウトを整えるためのCSSのみ残す -->
 <style>
     .action-buttons {
         display: flex;
@@ -102,48 +101,66 @@
         margin: 0;
     }
     .action-buttons .hud-btn {
-        white-space: nowrap; /* ボタン内のテキストが改行しないようにする */
+        white-space: nowrap;
+    }
+    /* ソート可能なヘッダーにカーソルを合わせるとポインターを表示 */
+    th[data-sort-col] {
+        cursor: pointer;
     }
 </style>
 {% endblock %}
 
 {% block scripts %}
+<!-- ✅ 修正: JavaScriptをよりモダンなaddEventListener方式にリファクタリング -->
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    const table = document.getElementById("log-table");
+    if (!table) return;
+
+    const headers = table.querySelectorAll("th[data-sort-col]");
+
+    headers.forEach(header => {
+        header.addEventListener('click', () => {
+            const colIndex = parseInt(header.dataset.sortCol, 10);
+            sortTable(colIndex);
+        });
+    });
+
     function sortTable(colIndex) {
-        const table = document.getElementById("log-table");
         const tbody = table.tBodies[0];
         const rows = Array.from(tbody.rows);
         const isNumeric = [3, 4, 5].includes(colIndex);
+        const header = table.querySelector(`th[data-sort-col="${colIndex}"]`);
 
-        const currentDir = table.querySelectorAll('th')[colIndex].dataset.sortDir || 'desc';
+        const currentDir = header.dataset.sortDir || 'desc';
         const newDir = currentDir === 'asc' ? 'desc' : 'asc';
 
+        // 他のヘッダーのソート方向をリセット
         table.querySelectorAll('th').forEach(th => th.dataset.sortDir = '');
-        table.querySelectorAll('th')[colIndex].dataset.sortDir = newDir;
+        header.dataset.sortDir = newDir;
 
         const sortedRows = rows.sort((a, b) => {
             const valA = a.cells[colIndex].innerText.trim().replace(/%|,/g, '');
             const valB = b.cells[colIndex].innerText.trim().replace(/%|,/g, '');
-            if (valA === '-' || valB === '-') return valA === '-' ? 1 : -1;
-            const numA = isNumeric ? parseFloat(valA) : valA;
-            const numB = isNumeric ? parseFloat(valB) : valB;
-            return newDir === 'asc' ? (numA < numB ? -1 : 1) : (numA > numB ? -1 : 1);
+
+            if (valA === '-' && valB === '-') return 0;
+            if (valA === '-') return 1;
+            if (valB === '-') return -1;
+            
+            const numA = isNumeric ? parseFloat(valA) : valA.toLowerCase();
+            const numB = isNumeric ? parseFloat(valB) : valB.toLowerCase();
+            
+            if (numA < numB) return newDir === 'asc' ? -1 : 1;
+            if (numA > numB) return newDir === 'asc' ? 1 : -1;
+            return 0;
         });
 
-        while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
-        tbody.append(...sortedRows);
+        // DOMの操作を効率化
+        const fragment = document.createDocumentFragment();
+        sortedRows.forEach(row => fragment.appendChild(row));
+        tbody.innerHTML = '';
+        tbody.appendChild(fragment);
     }
+});
 </script>
 {% endblock %}
-```
-
-### 修正点の解説
-
-* **ボタンのクラス変更:**
-    「再Push可に」と「再評価」のボタンに適用されていた`btn-modern`クラスを、`APPLY`ボタンと同じ`hud-btn`クラスに変更しました。
-* **CSSの簡略化:**
-    前回のグラデーションデザインのために追加した`<style>`ブロックから、不要になった`.btn-modern`関連のスタイルを削除しました。ボタンを横並びにするためのレイアウト用スタイル（`.action-buttons`など）は残してあります。
-* **HTML構造の整理:**
-    ボタン内のアイコンとテキストを`<span>`タグで囲んでいましたが、APPLYボタンの構造に合わせてよりシンプルな形にしました。
-
-サービスを再起動してページを更新すると、ボタンが統一感のあるデザインに変わっているはず
