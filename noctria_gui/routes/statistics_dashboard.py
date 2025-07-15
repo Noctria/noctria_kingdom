@@ -8,7 +8,7 @@ import logging  # ✅ 修正: ロギング機能をインポート
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 
 # サービス層の利用は任意
 try:
