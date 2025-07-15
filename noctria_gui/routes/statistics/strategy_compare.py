@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 import json
 import os
 
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
