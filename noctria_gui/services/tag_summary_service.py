@@ -12,7 +12,7 @@ from statistics import mean
 from pathlib import Path
 from typing import List, Dict
 
-from core.path_config import STRATEGIES_DIR
+from src.core.path_config import STRATEGIES_DIR
 
 
 def load_all_statistics() -> List[Dict]:
