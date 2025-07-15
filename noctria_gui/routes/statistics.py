@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
 
-from core.path_config import TOOLS_DIR, GUI_TEMPLATES_DIR
+from src.core.path_config import TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import statistics_service
 
 router = APIRouter(
