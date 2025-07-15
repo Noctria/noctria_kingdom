@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
 from core.king_noctria import KingNoctria
 
 from datetime import datetime
