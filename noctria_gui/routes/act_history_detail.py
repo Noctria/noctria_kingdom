@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from core.path_config import GUI_TEMPLATES_DIR
+from src.core.path_config import GUI_TEMPLATES_DIR
 from noctria_gui.services import act_log_service
 
 router = APIRouter()
