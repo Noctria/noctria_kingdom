@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json
 
-from core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 router = APIRouter(tags=["strategy"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
