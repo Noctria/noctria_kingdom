@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 import subprocess
 
-from core.path_config import TOOLS_DIR
+from src.core.path_config import TOOLS_DIR
 from fastapi.templating import Jinja2Templates
 
 # 📁 テンプレート（logs_dashboard.html）読み込み用
