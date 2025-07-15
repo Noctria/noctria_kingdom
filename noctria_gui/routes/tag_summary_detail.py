@@ -15,7 +15,7 @@ from pathlib import Path
 import csv
 
 from noctria_gui.services import tag_summary_service
-from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
