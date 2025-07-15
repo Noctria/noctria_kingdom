@@ -14,7 +14,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from collections import defaultdict
 
-from core.path_config import PDCA_LOG_DIR
+from src.core.path_config import PDCA_LOG_DIR
 
 
 def load_all_logs() -> List[Dict]:
