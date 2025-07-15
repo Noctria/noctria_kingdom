@@ -7,7 +7,7 @@
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
 {% block content %}
-<!-- ✅ フラッシュ表示（再評価結果） -->
+<!-- フラッシュ表示（再評価結果） -->
 {% if recheck_success is not none or recheck_fail is not none %}
   <div class="hud-panel" style="border: 1px solid #00cc66; background: rgba(0, 204, 102, 0.1); color: #e6f1ff; margin-bottom: 1rem; text-align: center;">
     <i class="fas fa-check-circle"></i> 一括再評価 実行結果：
@@ -16,7 +16,7 @@
   </div>
 {% endif %}
 
-<!-- 📅 期間・モード・件数フォーム -->
+<!-- 期間・モード・件数フォーム -->
 <section class="hud-panel filter-panel">
     <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
     <form method="get" action="/pdca/summary" class="filter-form">
@@ -43,7 +43,7 @@
     </form>
 </section>
 
-<!-- ✅ サマリー統計 -->
+<!-- サマリー統計 -->
 <section class="hud-panel metrics">
     <h2 class="panel-title"><i class="fas fa-calculator"></i> OVERALL IMPROVEMENT</h2>
     <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;">
@@ -118,83 +118,89 @@
     </div>
 </section>
 
-<!-- グラフ描画とCSVダウンロード用のデータとスクリプト -->
-<!-- ✅ 修正: データが存在しない場合に備え、defaultフィルタを追加。属性をダブルクォートで囲む -->
+<!-- ✅ 修正: グラフ描画用のデータをこのdivに集約 -->
 <div id="chart-data-holder" 
-     data-labels="{{ chart.labels | default([]) | tojson }}"
-     data-win-rate-data="{{ chart.data | default([]) | tojson }}"
-     data-dd-data="{{ chart.dd_data | default([]) | tojson }}"
+     data-labels="{{ chart.labels | default([]) | tojson | safe }}"
+     data-win-rate-data="{{ chart.data | default([]) | tojson | safe }}"
+     data-dd-data="{{ chart.dd_data | default([]) | tojson | safe }}"
      style="display: none;">
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// ✅ 修正: 全てのJavaScriptを単一のイベントリスナーに集約し、エラーハンドリングを強化
 document.addEventListener('DOMContentLoaded', () => {
     const dataHolder = document.getElementById('chart-data-holder');
     
     // --- チャート描画 ---
-    try {
-        const labels = JSON.parse(dataHolder.dataset.labels);
-        const winRateData = JSON.parse(dataHolder.dataset.winRateData);
-        const ddData = JSON.parse(dataHolder.dataset.ddData);
+    if (dataHolder) {
+        try {
+            const labels = JSON.parse(dataHolder.dataset.labels || '[]');
+            const winRateData = JSON.parse(dataHolder.dataset.winRateData || '[]');
+            const ddData = JSON.parse(dataHolder.dataset.ddData || '[]');
 
-        const chartOptions = (titleText, yAxisLabel) => ({
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: titleText, color: '#e6f1ff' }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { color: '#a8b2d1', callback: yAxisLabel ? (value => value + yAxisLabel) : undefined },
-                    grid: { color: 'rgba(0, 229, 255, 0.2)' }
+            const chartOptions = (titleText, yAxisLabel) => ({
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: titleText, color: '#e6f1ff', font: { size: 16 } }
                 },
-                x: {
-                    ticks: { color: '#a8b2d1' },
-                    grid: { color: 'rgba(0, 229, 255, 0.1)' }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a8b2d1', callback: yAxisLabel ? (value => value + yAxisLabel) : undefined },
+                        grid: { color: 'rgba(0, 229, 255, 0.2)' }
+                    },
+                    x: {
+                        ticks: { color: '#a8b2d1' },
+                        grid: { color: 'rgba(0, 229, 255, 0.1)' }
+                    }
                 }
+            });
+
+            const winRateChartEl = document.getElementById('winRateChart');
+            if (winRateChartEl && winRateData.length > 0) {
+                new Chart(winRateChartEl.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '勝率改善率 (%)',
+                            backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                            borderColor: '#2ecc71',
+                            borderWidth: 1,
+                            data: winRateData
+                        }]
+                    },
+                    options: chartOptions('勝率改善（After - Before）', '%')
+                });
             }
-        });
 
-        if (document.getElementById('winRateChart') && winRateData.length > 0) {
-            const winCtx = document.getElementById('winRateChart').getContext('2d');
-            new Chart(winCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '勝率改善率 (%)',
-                        backgroundColor: 'rgba(46, 204, 113, 0.6)',
-                        borderColor: '#2ecc71',
-                        borderWidth: 1,
-                        data: winRateData
-                    }]
-                },
-                options: chartOptions('勝率改善（After - Before）', '%')
-            });
+            const ddChartEl = document.getElementById('ddChart');
+            if (ddChartEl && ddData.length > 0) {
+                new Chart(ddChartEl.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '最大DD改善 (Before - After)',
+                            backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                            borderColor: '#e74c3c',
+                            borderWidth: 1,
+                            data: ddData
+                        }]
+                    },
+                    options: chartOptions('最大DD改善（Before - After）')
+                });
+            }
+        } catch (e) {
+            console.error("チャートデータの描画に失敗しました:", e);
+            const chartArea = document.querySelector('.chart-panel');
+            if(chartArea) chartArea.innerHTML = `<p style='color: #ff4d4d; text-align: center;'>⚠️ グラフデータの表示に失敗しました。</p>`;
         }
-
-        if (document.getElementById('ddChart') && ddData.length > 0) {
-            const ddCtx = document.getElementById('ddChart').getContext('2d');
-            new Chart(ddCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '最大DD改善 (Before - After)',
-                        backgroundColor: 'rgba(231, 76, 60, 0.6)',
-                        borderColor: '#e74c3c',
-                        borderWidth: 1,
-                        data: ddData
-                    }]
-                },
-                options: chartOptions('最大DD改善（Before - After）')
-            });
-        }
-    } catch (e) {
-        console.error("チャートデータの描画に失敗しました:", e);
     }
 
     // --- CSVダウンロード ---
