@@ -31,7 +31,6 @@
         <table class="hud-table" id="log-table">
             <thead>
                 <tr>
-                    <!-- ✅ 修正: onclick属性を削除し、data属性でソート対象を指定 -->
                     <th data-sort-col="0">戦略名 <i class="fas fa-sort"></i></th>
                     <th>通貨ペア</th>
                     <th data-sort-col="2">昇格日時 <i class="fas fa-sort"></i></th>
@@ -69,6 +68,7 @@
                         <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
                     </td>
                     <td class="action-buttons">
+                        <!-- ✅ 修正: 非同期処理用のクラスを追加 -->
                         <form method="post" action="/act-history/repush" class="action-form">
                             <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
                             <button type="submit" class="hud-btn">
@@ -94,7 +94,7 @@
 <style>
     .action-buttons {
         display: flex;
-        gap: 0.5rem; /* 8px */
+        gap: 0.5rem;
         align-items: center;
     }
     .action-form {
@@ -103,64 +103,100 @@
     .action-buttons .hud-btn {
         white-space: nowrap;
     }
-    /* ソート可能なヘッダーにカーソルを合わせるとポインターを表示 */
     th[data-sort-col] {
         cursor: pointer;
     }
+    /* ボタンの成功・失敗時のスタイル */
+    .hud-btn.is-success { background: #2ecc71; border-color: #2ecc71; }
+    .hud-btn.is-error { background: #e74c3c; border-color: #e74c3c; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<!-- ✅ 修正: JavaScriptをよりモダンなaddEventListener方式にリファクタリング -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // --- テーブルソート機能 ---
     const table = document.getElementById("log-table");
-    if (!table) return;
-
-    const headers = table.querySelectorAll("th[data-sort-col]");
-
-    headers.forEach(header => {
-        header.addEventListener('click', () => {
-            const colIndex = parseInt(header.dataset.sortCol, 10);
-            sortTable(colIndex);
+    if (table) {
+        const headers = table.querySelectorAll("th[data-sort-col]");
+        headers.forEach(header => {
+            header.addEventListener('click', () => {
+                const colIndex = parseInt(header.dataset.sortCol, 10);
+                sortTable(colIndex);
+            });
         });
-    });
+    }
 
     function sortTable(colIndex) {
         const tbody = table.tBodies[0];
         const rows = Array.from(tbody.rows);
         const isNumeric = [3, 4, 5].includes(colIndex);
         const header = table.querySelector(`th[data-sort-col="${colIndex}"]`);
-
         const currentDir = header.dataset.sortDir || 'desc';
         const newDir = currentDir === 'asc' ? 'desc' : 'asc';
-
-        // 他のヘッダーのソート方向をリセット
         table.querySelectorAll('th').forEach(th => th.dataset.sortDir = '');
         header.dataset.sortDir = newDir;
 
         const sortedRows = rows.sort((a, b) => {
             const valA = a.cells[colIndex].innerText.trim().replace(/%|,/g, '');
             const valB = b.cells[colIndex].innerText.trim().replace(/%|,/g, '');
-
             if (valA === '-' && valB === '-') return 0;
             if (valA === '-') return 1;
             if (valB === '-') return -1;
-            
             const numA = isNumeric ? parseFloat(valA) : valA.toLowerCase();
             const numB = isNumeric ? parseFloat(valB) : valB.toLowerCase();
-            
             if (numA < numB) return newDir === 'asc' ? -1 : 1;
             if (numA > numB) return newDir === 'asc' ? 1 : -1;
             return 0;
         });
 
-        // DOMの操作を効率化
         const fragment = document.createDocumentFragment();
         sortedRows.forEach(row => fragment.appendChild(row));
         tbody.innerHTML = '';
         tbody.appendChild(fragment);
     }
+
+    // --- ✅ 追加: 非同期アクションボタン機能 ---
+    const actionForms = document.querySelectorAll('.action-form');
+    actionForms.forEach(form => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const button = form.querySelector('button');
+            const originalHtml = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    button.innerHTML = '✅ 成功';
+                    button.classList.add('is-success');
+                } else {
+                    button.innerHTML = '❌ 失敗';
+                    button.classList.add('is-error');
+                    console.error('Action failed:', data.detail);
+                }
+            } catch (error) {
+                button.innerHTML = '❌ 通信エラー';
+                button.classList.add('is-error');
+                console.error('Network error:', error);
+            } finally {
+                // 2秒後に元の状態に戻す
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml;
+                    button.classList.remove('is-success', 'is-error');
+                }, 2000);
+            }
+        });
+    });
 });
 </script>
 {% endblock %}
