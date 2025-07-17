@@ -1,86 +1,96 @@
+# docker-compose.yaml (v2.0)
+# Noctria KingdomのAirflow環境を定義する
 version: "3.8"
+
+# ----------------------------------------
+# 共通設定（x-airflow-common）
+# Airflowのwebserverとschedulerで共通する設定を定義し、コードの重複を避ける
+# ----------------------------------------
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: ./docker/Dockerfile
+  image: noctria-airflow:latest
+  env_file: .env
+  environment:
+    # 実行環境をLocalExecutorに設定
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    # Pythonがモジュールを探すパスに/opt/airflow/srcを追加
+    # これにより、DAGファイルから `from src.core...` のようにインポートが可能になる
+    - PYTHONPATH=/opt/airflow
+  volumes:
+    # ホストマシンの各ディレクトリをコンテナ内の/opt/airflow配下に同期（マウント）する
+    - ../dags:/opt/airflow/dags
+    - ../logs:/opt/airflow/logs
+    - ../plugins:/opt/airflow/plugins
+    - ../src:/opt/airflow/src
+    - ../data:/opt/airflow/data
+  depends_on:
+    - postgres
+    - redis
+  restart: always
 
 services:
   # ======================================
-  # 🐘 PostgreSQL データベース
+  # 🐘 PostgreSQL データベース (Airflowメタデータ & Optuna学習履歴用)
   # ======================================
   postgres:
     image: postgres:13
-    container_name: postgres
+    container_name: noctria_postgres
     env_file: .env
     environment:
+      # .envファイルから読み込んだ変数を使って、DBユーザー、パスワード、DB名を設定
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      # ✅ 修正: POSTGRES_DBを明確に指定。これによりコンテナ初回起動時にDBが自動作成される
+      # .envファイルに `POSTGRES_DB=optuna_db` のように記述する必要がある
+      - POSTGRES_DB=${POSTGRES_DB:-airflow} # .envにない場合は'airflow'をデフォルト値とする
     volumes:
+      # DBデータを永続化するためのボリューム
       - postgres-db-volume:/var/lib/postgresql/data
-      - ./docker:/docker-entrypoint-initdb.d  # ✅ 初期化SQL（init_optuna.sql）を実行
+      # コンテナ初回起動時に実行される初期化スクリプトを配置するディレクトリ
+      # ./docker/init_optuna.sqlなどを置くことで、テーブル作成などを自動化できる
+      - ./docker/init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-airflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: always
 
   # ======================================
-  # 🔁 Redis（Celery Broker）
+  # 🔁 Redis（Celery Broker - 将来的な拡張用）
   # ======================================
   redis:
     image: redis:latest
-    container_name: redis
+    container_name: noctria_redis
     restart: always
 
   # ======================================
   # 🌐 Airflow Web UI
   # ======================================
   airflow-webserver:
-    build:
-      context: .  # ビルドコンテキスト
-      dockerfile: ./docker/Dockerfile
-    image: noctria-airflow
-    container_name: airflow-webserver
-    depends_on:
-      - postgres
-      - redis
-    env_file: .env
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - PYTHONPATH=/opt/airflow/src
+    # 共通設定を読み込む
+    <<: *airflow-common
+    container_name: noctria_airflow_webserver
+    command: webserver
     ports:
       - "8080:8080"
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ../logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ../src:/opt/airflow/src
-      - ../data:/opt/airflow/data
-    command: webserver
-    restart: always
 
   # ======================================
   # 🕓 Airflow Scheduler
-  # ======================================
+  # ========================================
   airflow-scheduler:
-    build:
-      context: .  # ビルドコンテキスト
-      dockerfile: ./docker/Dockerfile
-    image: noctria-airflow
-    container_name: airflow-scheduler
-    depends_on:
-      - postgres
-      - redis
-    env_file: .env
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - PYTHONPATH=/opt/airflow/src
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ../logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ../src:/opt/airflow/src
-      - ../data:/opt/airflow/data
+    # 共通設定を読み込む
+    <<: *airflow-common
+    container_name: noctria_airflow_scheduler
     command: scheduler
-    restart: always
 
 # ======================================
-# 🗃 永続ボリューム定義（PostgreSQL用）
+# 🗃 永続ボリューム定義
 # ======================================
 volumes:
   postgres-db-volume:
+    driver: local
