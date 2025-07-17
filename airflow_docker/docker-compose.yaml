@@ -1,4 +1,4 @@
-# docker-compose.yaml (v3.3)
+# docker-compose.yaml (v3.4)
 # Noctria KingdomのAirflow環境を定義する
 
 # ----------------------------------------
@@ -14,8 +14,8 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - PYTHONPATH=/opt/airflow
     - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
-    # ✅ 最終修正: Webサーバーのセッションバックエンドを、最も安定した'secure_cookie'に変更
-    - AIRFLOW__WEBSERVER__SESSION_BACKEND=secure_cookie
+    # ✅ 最終修正: Webサーバーのセッションバックエンドを、エラーメッセージで推奨されている'securecookie'（アンダースコアなし）に変更
+    - AIRFLOW__WEBSERVER__SESSION_BACKEND=securecookie
     # ✅ 追加: secure_cookie方式で必須となる、セッション暗号化用の秘密鍵
     - AIRFLOW__WEBSERVER__SECRET_KEY=NoctriaKingdomSecretKey_ChangeThisInProduction
   volumes:
