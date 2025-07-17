@@ -1,81 +1,101 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+🛡️ Noctus Sentinella Risk Assessment DAG (v2.0)
+- リスク管理官ノクトゥスを起動し、特定の状況下でのリスクを評価する。
+- このDAGは主にテストや、特定のシナリオを検証するために手動で実行されることを想定。
+"""
+
+import logging
 import sys
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+import os
+from datetime import datetime
+from typing import Dict, Any
+import pandas as pd
+import numpy as np
 
-# ✅ パス集中管理（Noctria Kingdom v2.0設計原則）
-from core.path_config import STRATEGIES_DIR
+from airflow.decorators import dag, task
 
-# ✅ PythonPath に戦略ディレクトリを追加（Airflow Worker対応）
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# ✅ Noctus戦略クラスの読み込み
-from strategies.noctus_sentinella import NoctusSentinella
+from src.strategies.noctus_sentinella import NoctusSentinella
 
-# === DAG共通設定 ===
+# === DAG基本設定 ===
 default_args = {
-    'owner': 'Noctria',
+    'owner': 'Noctus',
     'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'start_date': datetime(2025, 7, 1),
+    'retries': 0,
 }
 
-# === DAG定義 ===
-dag = DAG(
-    dag_id='noctus_strategy_dag',
+@dag(
+    dag_id='noctus_risk_assessment_dag',
     default_args=default_args,
-    description='🛡️ Noctria Kingdomの守護者Noctusによるリスク管理戦略DAG',
+    description='守護者ノクトゥスによるリスク評価シミュレーション',
     schedule_interval=None,
-    start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=['noctria', 'risk_management'],
+    tags=['noctria', 'risk_management', 'noctus'],
 )
+def noctus_risk_assessment_pipeline():
+    """
+    リスク管理官ノクトゥスが、与えられた市場データと提案アクションに基づき、
+    リスク評価を行うパイプライン。
+    """
 
-# === Veritas（外部知性）からの市場データ注入 ===
-def veritas_trigger_task(ti, **kwargs):
-    mock_market_data = {
-        "price": 1.2530,
-        "price_history": [1.2500, 1.2525, 1.2550, 1.2510, 1.2540],
-        "spread": 0.015,
-        "volume": 120,
-        "order_block": 0.5,
-        "volatility": 0.22
-    }
-    ti.xcom_push(key='market_data', value=mock_market_data)
+    @task
+    def simulate_market_and_proposal() -> Dict[str, Any]:
+        """
+        テストのために、市場の状況と、他の臣下からの提案（例: BUY）を模擬的に生成する。
+        """
+        logger = logging.getLogger("ScenarioSimulator")
+        logger.info("リスク評価のための模擬シナリオを生成します…")
+        
+        # テスト用のダミーヒストリカルデータを作成
+        dummy_hist_data = pd.DataFrame({
+            'Close': np.random.normal(loc=150, scale=2, size=100)
+        })
+        dummy_hist_data['returns'] = dummy_hist_data['Close'].pct_change().dropna()
 
-# === Noctusによるリスク評価タスク ===
-def noctus_strategy_task(ti, **kwargs):
-    input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
-
-    if input_data is None:
-        print("⚠️ Veritasからのデータが無かったため、デフォルトで実行します")
-        input_data = {
-            "price": 1.0,
-            "price_history": [1.0] * 5,
-            "spread": 0.01,
-            "volume": 100,
-            "order_block": 0.0,
-            "volatility": 0.1
+        market_data = {
+            "price": 152.5, "volume": 150, "spread": 0.012, 
+            "volatility": 0.15, "historical_data": dummy_hist_data
         }
+        
+        proposed_action = "BUY"
+        logger.info(f"模擬シナリオ完了。提案アクション: 『{proposed_action}』")
+        
+        # DataFrameはJSONに変換してXComsで渡す
+        market_data['historical_data'] = market_data['historical_data'].to_json()
+        
+        return {"market_data": market_data, "proposed_action": proposed_action}
 
-    noctus = NoctusSentinella()
-    decision = noctus.process(input_data)
+    @task
+    def assess_risk_task(scenario: Dict[str, Any]):
+        """
+        Noctusを召喚し、シナリオに基づきリスクを評価させる。
+        """
+        logger = logging.getLogger("NoctusAssessmentTask")
+        
+        market_data = scenario['market_data']
+        proposed_action = scenario['proposed_action']
+        
+        # XComから受け取ったJSON文字列をDataFrameに戻す
+        market_data['historical_data'] = pd.read_json(market_data['historical_data'])
+        
+        noctus = NoctusSentinella()
+        assessment = noctus.assess(market_data, proposed_action)
+        
+        logger.info(f"🛡️ ノクトゥスの最終判断: {assessment['decision']} (理由: {assessment['reason']})")
+        return assessment
 
-    ti.xcom_push(key='noctus_decision', value=decision)
-    print(f"🛡️ Noctusの判断: {decision}")
+    # --- パイプラインの定義 ---
+    scenario_data = simulate_market_and_proposal()
+    assess_risk_task(scenario=scenario_data)
 
-# === DAGにタスク登録（指揮官としてのAirflow）
-with dag:
-    veritas_task = PythonOperator(
-        task_id='veritas_trigger_task',
-        python_callable=veritas_trigger_task,
-    )
-
-    noctus_task = PythonOperator(
-        task_id='noctus_risk_management_task',
-        python_callable=noctus_strategy_task,
-    )
-
-    veritas_task >> noctus_task
+# DAGのインスタンス化
+noctus_risk_assessment_pipeline()
