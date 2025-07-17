@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-🔁 Veritas PDCA Loop DAG (v2.0)
+🔁 Veritas PDCA Loop DAG (v2.1)
 - 戦略の「生成(Plan)」「評価(Do/Check)」「採用戦略のPush(Act)」という
 - PDCAサイクルを自動で実行するためのマスターDAG。
 """
@@ -20,11 +20,15 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# ✅ 修正: スクリプトから直接関数をインポートする方式に変更
+# ✅ 修正: 各スクリプトからメインの処理関数をインポート
 from src.veritas.veritas_generate_strategy import main as generate_main
 from src.veritas.evaluate_veritas import main as evaluate_main
 from src.scripts.github_push_adopted_strategies import main as push_main
-from src.scripts.log_pdca_result import log_pdca_step
+
+# === DAG内ヘルパー関数 ===
+def log_pdca_step(phase: str, status: str, message: str):
+    """PDCAの各ステップの状況をログに出力する"""
+    logging.info(f"PDCA LOG - [{phase}] [{status}] :: {message}")
 
 # === DAG基本設定 ===
 default_args = {
