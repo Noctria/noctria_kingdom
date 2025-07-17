@@ -1,4 +1,4 @@
-# docker-compose.yaml (v2.1)
+# docker-compose.yaml (v2.2)
 # Noctria KingdomのAirflow環境を定義する
 version: "3.8"
 
@@ -12,9 +12,15 @@ x-airflow-common: &airflow-common
   image: noctria-airflow:latest
   env_file: .env
   environment:
+    # 実行環境をLocalExecutorに設定
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    # Pythonがモジュールを探すためのパスに/opt/airflow/srcを追加
+    # これにより、DAGファイルから `from src.core...` のようにインポートが可能になる
     - PYTHONPATH=/opt/airflow
+    # ✅ 追加: Web UIでの初回ユーザー作成を不要にする
+    - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
   volumes:
+    # ホストマシンの各ディレクトリをコンテナ内の/opt/airflow配下に同期（マウント）する
     - ../dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
     - ../plugins:/opt/airflow/plugins
@@ -22,25 +28,29 @@ x-airflow-common: &airflow-common
     - ../data:/opt/airflow/data
   depends_on:
     postgres:
-      condition: service_healthy # ✅ 修正: DBが完全に準備できてから起動するように変更
+      condition: service_healthy # DBが完全に準備できてから起動するように変更
     redis:
       condition: service_started
   restart: always
 
 services:
   # ======================================
-  # 🐘 PostgreSQL データベース
+  # 🐘 PostgreSQL データベース (Airflowメタデータ & Optuna学習履歴用)
   # ======================================
   postgres:
     image: postgres:13
     container_name: noctria_postgres
     env_file: .env
     environment:
+      # .envファイルから読み込んだ変数を使って、DBユーザー、パスワード、DB名を設定
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-airflow}
+      # .envファイルに `POSTGRES_DB=airflow` のように記述する必要がある
+      - POSTGRES_DB=${POSTGRES_DB:-airflow} # .envにない場合は'airflow'をデフォルト値とする
     volumes:
+      # DBデータを永続化するためのボリューム
       - postgres-db-volume:/var/lib/postgresql/data
+      # コンテナ初回起動時に実行される初期化スクリプトを配置するディレクトリ
       - ./docker/init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
@@ -65,8 +75,19 @@ services:
   airflow-webserver:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_webserver
-    # ✅ 修正: webserverを起動する前に、データベースを初期化(upgrade)するコマンドを追加
-    command: bash -c "airflow db upgrade && airflow webserver"
+    # ✅ 修正: DB初期化後に、管理者ユーザーを作成してからwebserverを起動する
+    command: >
+      bash -c "
+        airflow db upgrade &&
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Noctria \
+          --lastname King \
+          --role Admin \
+          --email admin@noctria.com &&
+        airflow webserver
+      "
     ports:
       - "8080:8080"
 
