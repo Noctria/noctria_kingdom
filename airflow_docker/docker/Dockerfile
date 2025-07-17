@@ -1,12 +1,12 @@
-# Noctria Kingdom Airflow Image (v2.4)
-FROM apache/airflow:2.8.1-python3.10
+# Noctria Kingdom Airflow Image (v2.5)
+# ✅ 修正: ベースイメージをPython 3.11対応のバージョンに変更
+FROM apache/airflow:2.9.2-python3.11
 
 # rootユーザーに切り替えて、ファイルのコピーと権限設定を行う
 USER root
 
 COPY ./airflow_docker/docker/entrypoint-webserver.sh /entrypoint-webserver.sh
 RUN chmod +x /entrypoint-webserver.sh
-# ✅ 修正: 所有者の指定をユーザー名のみに変更
 RUN chown airflow /entrypoint-webserver.sh
 
 # 再びairflowユーザーに戻して、以降の処理を続ける
