@@ -1,15 +1,8 @@
-# Noctria Kingdom Airflow Image (v2.5)
+# Noctria Kingdom Airflow Image (v2.6)
 # ✅ 修正: ベースイメージをPython 3.11対応のバージョンに変更
 FROM apache/airflow:2.9.2-python3.11
 
-# rootユーザーに切り替えて、ファイルのコピーと権限設定を行う
-USER root
-
-COPY ./airflow_docker/docker/entrypoint-webserver.sh /entrypoint-webserver.sh
-RUN chmod +x /entrypoint-webserver.sh
-RUN chown airflow /entrypoint-webserver.sh
-
-# 再びairflowユーザーに戻して、以降の処理を続ける
+# airflowユーザーで以降の処理を実行
 USER airflow
 
 # Pythonの依存関係をインストール
