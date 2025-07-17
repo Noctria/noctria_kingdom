@@ -1,22 +1,36 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-from core.path_config import *
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+✒️ Veritas Strategy Generator (v2.0)
+- LLMからの指示に基づき、新しい戦略のPythonファイルを生成する。
+- 現在は固定テンプレートを使用するが、将来的にはLLMがコード自体を生成することを想定。
+"""
+
 import os
+import logging
 from datetime import datetime
+from pathlib import Path
 
-# 保存先ディレクトリ
-OUTPUT_DIR = str(GENERATED_STRATEGIES_DIR)
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: path_configから必要な変数を正しくインポート
+from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR
 
-# Veritasが生成した戦略テンプレート（simulate関数付き・dict対応）
+# ロガーの設定
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+
+# Veritasが生成した戦略テンプレート
+# NOTE: 将来的には、このテンプレート自体をLLMが動的に生成する
 STRATEGY_TEMPLATE = """\
 import pandas as pd
 import numpy as np
 
 def simulate(data: pd.DataFrame) -> dict:
-    \"""
+    \"\"\"
     RSIとspreadに基づいたシンプルな戦略
     BUY: RSI > 50 and spread < 2
     SELL: RSI < 50 or spread > 2
-    \"""
+    \"\"\"
     capital = 1_000_000  # 初期資本
     position = 0
     entry_price = 0
@@ -69,18 +83,32 @@ def simulate(data: pd.DataFrame) -> dict:
     }
 """
 
-def generate_strategy_file(strategy_name: str):
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    filename = f"{strategy_name}_{timestamp}.py"
-    filepath = os.path.join(OUTPUT_DIR, filename)
+def generate_strategy_file(strategy_name: str) -> str:
+    """
+    指定された戦略名で、新しい戦略ファイルを生成する。
+    """
+    try:
+        # ✅ 修正: 正しい変数名を使用
+        output_dir = STRATEGIES_VERITAS_GENERATED_DIR
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"{strategy_name}_{timestamp}.py"
+        filepath = output_dir / filename
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    with open(filepath, "w") as f:
-        f.write(STRATEGY_TEMPLATE)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(STRATEGY_TEMPLATE)
 
-    print(f"✅ 戦略ファイルを生成しました: {filepath}")
-    return filepath
+        logging.info(f"✅ 新たな戦略の羊皮紙を生成しました: {filepath}")
+        return str(filepath)
+    except Exception as e:
+        logging.error(f"❌ 戦略ファイルの生成中にエラーが発生しました: {e}", exc_info=True)
+        raise
+
+def main():
+    """スクリプトとして直接実行された際のメイン関数"""
+    logging.info("--- 戦略生成スクリプトを開始します ---")
+    generate_strategy_file("veritas_strategy")
+    logging.info("--- 戦略生成スクリプトを完了しました ---")
 
 if __name__ == "__main__":
-    # 実行時に "veritas_strategy_yyyymmdd_HHMMSS.py" を生成
-    generate_strategy_file("veritas_strategy")
+    main()
