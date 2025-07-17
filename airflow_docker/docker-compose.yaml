@@ -1,4 +1,4 @@
-# docker-compose.yaml (v3.4)
+# docker-compose.yaml (v3.5)
 # Noctria KingdomのAirflow環境を定義する
 
 # ----------------------------------------
@@ -14,9 +14,7 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - PYTHONPATH=/opt/airflow
     - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
-    # ✅ 最終修正: Webサーバーのセッションバックエンドを、エラーメッセージで推奨されている'securecookie'（アンダースコアなし）に変更
     - AIRFLOW__WEBSERVER__SESSION_BACKEND=securecookie
-    # ✅ 追加: secure_cookie方式で必須となる、セッション暗号化用の秘密鍵
     - AIRFLOW__WEBSERVER__SECRET_KEY=NoctriaKingdomSecretKey_ChangeThisInProduction
   volumes:
     - ../dags:/opt/airflow/dags
@@ -91,7 +89,11 @@ services:
   airflow-scheduler:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_scheduler
-    command: scheduler
+    # ✅ 最終修正: schedulerも起動前にDB初期化を実行するように変更
+    entrypoint: bash
+    command:
+      - -c
+      - "airflow db upgrade && exec airflow scheduler"
 
 # ======================================
 # 🗃 永続ボリューム定義
