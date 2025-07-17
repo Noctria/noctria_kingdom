@@ -1,142 +1,92 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+👑 Veritas Master DAG (v2.0)
+- Veritasによる「戦略生成」「評価」「Push」の一連のプロセスを統括するマスターDAG。
+- 王国の自己進化サイクルそのものを司る。
+"""
+
+import logging
+import sys
 import os
-import json
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.decorators import dag, task
 
-# =====================================
-# ★ 修正: 新しいimportルールを適用
-# =====================================
-# `PYTHONPATH`が設定されたため、sys.pathハックは不要。
-# 全てのモジュールは、srcを起点とした絶対パスでインポートする。
-from core.path_config import STRATEGIES_DIR, LOGS_DIR
-from strategies.prometheus_oracle import PrometheusOracle
-from strategies.aurus_singularis import AurusSingularis
-from strategies.noctus_sentinella import NoctusSentinella
-from strategies.levia_tempest import LeviaTempest
-from scripts.push_generated_strategy import push_generated_strategies
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# =====================================
-# DAG設定
-# =====================================
+# ✅ 修正: 各スクリプトからメインの処理関数をインポート
+from src.veritas.veritas_generate_strategy import main as generate_main
+from src.veritas.evaluate_veritas import main as evaluate_main
+from src.scripts.github_push_adopted_strategies import main as push_main
+from src.scripts.log_pdca_result import log_pdca_step
+
+# === DAG基本設定 ===
 default_args = {
-    'owner': 'Noctria',
+    'owner': 'VeritasCouncil',
     'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
+    'start_date': datetime(2025, 7, 1),
     'retries': 0,
-    'retry_delay': timedelta(minutes=2),
 }
 
-with DAG(
-    dag_id='veritas_master_dag',
+@dag(
+    dag_id="veritas_master_pipeline",
     default_args=default_args,
-    description='🧠 Veritasが生成した市場データを四臣に渡し、採用戦略をGitHubにPush',
-    schedule_interval=None,
-    start_date=datetime(2025, 6, 1),
+    description="Veritasによる戦略の生成・評価・Pushを統括するマスターパイプライン",
+    schedule_interval=None,  # 手動実行を基本とする
     catchup=False,
-    tags=['noctria', 'veritas', 'hub'],
-) as dag:
+    tags=['veritas', 'master', 'pipeline'],
+)
+def veritas_master_pipeline():
+    """
+    Veritasの戦略創出から公式記録までの全プロセスを管理する。
+    """
 
-    # =====================================
-    # 1. 市場データ生成タスク（Veritas）
-    # =====================================
-    def generate_market_data(**kwargs):
-        ti = kwargs['ti']
-        market_data = {
-            "price": round(random.uniform(1.2, 1.3), 4),
-            "volume": random.randint(100, 1000),
-            "sentiment": round(random.uniform(0.0, 1.0), 2),
-            "trend_strength": round(random.uniform(0.0, 1.0), 2),
-            "volatility": round(random.uniform(0.05, 0.3), 2),
-            "order_block": round(random.uniform(0.0, 1.0), 2),
-            "institutional_flow": round(random.uniform(0.0, 1.0), 2),
-            "short_interest": round(random.uniform(0.0, 1.0), 2),
-            "momentum": round(random.uniform(0.0, 1.0), 2),
-            "trend_prediction": round(random.uniform(0.0, 1.0), 2),
-            "liquidity_ratio": round(random.uniform(0.5, 2.0), 2),
-            "spread": round(random.uniform(0.01, 0.05), 3),
-            "previous_price": round(random.uniform(1.2, 1.3), 4),
-            "price_history": [1.25, 1.255, 1.26, 1.252],
-        }
+    @task
+    def generate_strategy_task():
+        """Plan: 新たな戦略を生成する"""
+        log_pdca_step("Master-Plan", "Start", "マスターパイプラインより、戦略生成の儀を開始します。")
+        try:
+            generate_main()
+            log_pdca_step("Master-Plan", "Success", "新たな戦略の創出に成功しました。")
+        except Exception as e:
+            log_pdca_step("Master-Plan", "Failure", f"戦略生成に失敗しました: {e}")
+            raise
 
-        ti.xcom_push(key='market_data', value=market_data)
-        print(f"🧠 Veritasが生成した市場データ: {market_data}")
+    @task
+    def evaluate_strategy_task():
+        """Do & Check: 生成された戦略を評価する"""
+        log_pdca_step("Master-Check", "Start", "戦略評価の儀を開始します。")
+        try:
+            evaluate_main()
+            log_pdca_step("Master-Check", "Success", "戦略の真価を見極めました。")
+        except Exception as e:
+            log_pdca_step("Master-Check", "Failure", f"戦略評価に失敗しました: {e}")
+            raise
 
-        # ✅ ログとして保存
-        LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        log_path = LOGS_DIR / "veritas_market_data.json"
-        with open(log_path, "w") as f:
-            json.dump(market_data, f, indent=2)
+    @task
+    def push_strategy_task():
+        """Act: 採用基準を満たした戦略を正式に記録（Push）する"""
+        log_pdca_step("Master-Act", "Start", "採用されし戦略の公式記録を開始します。")
+        try:
+            # このスクリプトは、評価ログを読み、採用されたものだけをPushするロジックを持つ
+            push_main()
+            log_pdca_step("Master-Act", "Success", "採用戦略の記録が完了しました。")
+        except Exception as e:
+            log_pdca_step("Master-Act", "Failure", f"採用戦略の記録に失敗しました: {e}")
+            raise
 
-    generate_data_task = PythonOperator(
-        task_id='veritas_generate_market_data_task',
-        python_callable=generate_market_data,
-    )
+    # --- パイプラインの定義 (生成 → 評価 → Push) ---
+    generate_task = generate_strategy_task()
+    evaluate_task = evaluate_generated_strategy()
+    push_task = push_adopted_strategy()
 
-    # =====================================
-    # 2. 各AIによる戦略処理
-    # =====================================
-    def run_prometheus(**kwargs):
-        market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
-        oracle = PrometheusOracle()
-        result = oracle.process(market_data)
-        print(f"🔮 Prometheusの戦略判断: {result}")
+    generate_task >> evaluate_task >> push_task
 
-    def run_aurus(**kwargs):
-        market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
-        aurus = AurusSingularis()
-        result = aurus.process(market_data)
-        print(f"⚔️ Aurusの戦略判断: {result}")
-
-    def run_noctus(**kwargs):
-        market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
-        noctus = NoctusSentinella()
-        result = noctus.process(market_data)
-        print(f"🛡️ Noctusのリスク判断: {result}")
-
-    def run_levia(**kwargs):
-        market_data = kwargs['ti'].xcom_pull(task_ids='veritas_generate_market_data_task', key='market_data')
-        levia = LeviaTempest()
-        result = levia.process(market_data)
-        print(f"⚡ Leviaのスキャル判断: {result}")
-
-    prometheus_task = PythonOperator(
-        task_id='run_prometheus',
-        python_callable=run_prometheus,
-    )
-
-    aurus_task = PythonOperator(
-        task_id='run_aurus',
-        python_callable=run_aurus,
-    )
-
-    noctus_task = PythonOperator(
-        task_id='run_noctus',
-        python_callable=run_noctus,
-    )
-
-    levia_task = PythonOperator(
-        task_id='run_levia',
-        python_callable=run_levia,
-    )
-
-    # =====================================
-    # 3. GitHub Pushタスク（採用戦略）
-    # =====================================
-    def push_to_github(**kwargs):
-        # 注意: このスクリプトも src/scripts/ にある必要があります
-        push_generated_strategies()
-        print("📤 採用された戦略をGitHubにpushしました")
-
-    push_strategy_task = PythonOperator(
-        task_id='push_generated_strategy_to_github',
-        python_callable=push_to_github,
-    )
-
-    # =====================================
-    # DAG依存関係定義
-    # =====================================
-    generate_data_task >> [prometheus_task, aurus_task, noctus_task, levia_task] >> push_strategy_task
+# DAGのインスタンス化
+veritas_master_pipeline()
