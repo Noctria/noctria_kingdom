@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-📌 Noctria Kingdom Path Config (v4.3)
+📌 Noctria Kingdom Path Config (v4.4)
 - 王国全体のパス構造を一元管理します。
 - Docker/WSL/ローカル環境の差異を吸収し、自動で切り替えます。
 - プロジェクトルート直下の `src` ディレクトリ構成を前提とします。
@@ -78,11 +78,13 @@ else:
 
 # ========================================
 # 🤖 主要スクリプトパス
-# ✅ 修正: 削除されていたVeritas関連のスクリプトパスを再追加
 # ========================================
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "veritas_generate_strategy.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
+
+# ✅ 修正: 削除されていたGITHUB_REPO_URLの定義を再追加
+GITHUB_REPO_URL = "https://github.com/Noctria/noctria_kingdom"
 
 # ========================================
 # 🗂 戦略カテゴリ分類マップ（GUI用）
@@ -105,7 +107,6 @@ def _lint_path_config():
 
 # ========================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
-# ✅ 修正: __all__ に再追加した変数を追記
 # ========================================
 __all__ = [
     "PROJECT_ROOT", "SRC_DIR",
