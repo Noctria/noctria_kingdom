@@ -1,4 +1,4 @@
-# docker-compose.yaml (v2.9)
+# docker-compose.yaml (v3.0)
 # Noctria KingdomのAirflow環境を定義する
 version: "3.8"
 
@@ -15,6 +15,10 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - PYTHONPATH=/opt/airflow
     - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+    # ✅ 追加: Webサーバーのセッション管理にRedisを使用するよう明示的に設定
+    - AIRFLOW__WEBSERVER__SESSION_BACKEND=airflow.www.session.RedisSessionInterface
+    # ✅ 追加: セッション用Redisの接続先を指定
+    - AIRFLOW__WEBSERVER__SESSION_REDIS_URL=redis://redis:6379/1
   volumes:
     - ../dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
@@ -66,7 +70,6 @@ services:
   airflow-webserver:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_webserver
-    # ✅ 修正: 外部スクリプトを使わず、entrypointとcommandに直接命令を記述
     entrypoint: bash
     command:
       - -c
