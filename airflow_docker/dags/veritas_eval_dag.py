@@ -1,35 +1,43 @@
-# dags/veritas_eval_dag.py
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+✅ Veritas Evaluation Pipeline DAG (v2.0)
+- Veritasが生成した戦略を動的に評価し、採用/不採用を判断し、その結果を記録する。
+- 動的タスクマッピング（.expand）を用いて、複数の戦略を並列で効率的に評価する。
+"""
 
 import os
+import sys
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from airflow.decorators import dag, task
 
-# --- 王国の中枢モジュールをインポート ---
-from core.path_config import STRATEGIES_DIR, LOGS_DIR, MARKET_DATA_CSV
-from core.logger import setup_logger
-from core.strategy_evaluator import evaluate_strategy, is_strategy_adopted
-from core.market_loader import load_market_data
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# --- 登用試験の記録係をセットアップ ---
-dag_log_path = LOGS_DIR / "dags" / "veritas_eval_dag.log"
-logger = setup_logger("VeritasEvalDAG", dag_log_path)
+from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR, ACT_LOG_DIR
+# ✅ 修正: リファクタリング後のモジュールを正しくインポート
+from src.core.strategy_evaluator import evaluate_strategy, log_evaluation_result
 
 # === DAG基本設定 ===
 default_args = {
-    'owner': 'Veritas',
+    'owner': 'VeritasCouncil',
     'depends_on_past': False,
-    'start_date': datetime(2025, 6, 1),
+    'start_date': datetime(2025, 7, 1),
     'retries': 0,
 }
 
 @dag(
-    dag_id='veritas_eval_dag',
+    dag_id='veritas_evaluation_pipeline',
     default_args=default_args,
-    description='✅ Veritas生成戦略の評価・採用判定DAG（動的タスク・並列処理最適化版）',
+    description='Veritas生成戦略の評価・採用判定DAG（動的タスク・並列処理最適化版）',
     schedule_interval=None,
     catchup=False,
     tags=['veritas', 'evaluation', 'pdca'],
@@ -41,108 +49,57 @@ def veritas_evaluation_pipeline():
 
     @task
     def get_strategies_to_evaluate() -> List[str]:
-        """`veritas_generated`ディレクトリから評価対象の戦略ファイルリストを取得する"""
-        generated_dir = STRATEGIES_DIR / "veritas_generated"
-        if not generated_dir.exists():
-            logger.warning(f"⚠️ 戦略生成ディレクトリが存在しません: {generated_dir}")
+        """`veritas_generated`ディレクトリから評価対象の戦略ファイル名（ID）のリストを取得する"""
+        if not STRATEGIES_VERITAS_GENERATED_DIR.exists():
+            logging.warning(f"⚠️ 戦略生成ディレクトリが存在しません: {STRATEGIES_VERITAS_GENERATED_DIR}")
             return []
         
+        # .pyで終わり、__で始まらないファイル名（拡張子なし）をリスト化
         new_strategies = [
-            str(generated_dir / fname)
-            for fname in os.listdir(generated_dir)
-            if fname.endswith(".py") and not fname.startswith("__")
+            f.stem for f in STRATEGIES_VERITAS_GENERATED_DIR.iterdir()
+            if f.is_file() and f.suffix == '.py' and not f.name.startswith('__')
         ]
-        logger.info(f"🔍 {len(new_strategies)}件の新しい戦略を評価対象として発見しました。")
+        logging.info(f"🔍 {len(new_strategies)}件の新しい戦略を評価対象として発見しました。")
         return new_strategies
 
     @task
-    def load_evaluation_data() -> str:
-        """
-        ★改善点: 評価用の市場データを一度だけロードし、内容をJSON文字列で返す
-        (Pandas DataFrameはXComsのサイズ制限を超える可能性があるため、JSON化が安全)
-        """
-        logger.info(f"💾 市場データをロード中: {MARKET_DATA_CSV}")
-        market_data = load_market_data(str(MARKET_DATA_CSV))
-        return market_data.to_json(orient='split')
-
-    @task
-    def evaluate_one_strategy(strategy_path: str, market_data_json: str) -> Dict:
-        """単一の戦略ファイルを評価し、結果を辞書として返す"""
-        filename = os.path.basename(strategy_path)
-        logger.info(f"📊 評価開始: {filename}")
-        
-        market_data = pd.read_json(market_data_json, orient='split')
-        
+    def evaluate_one_strategy(strategy_id: str) -> Dict[str, Any]:
+        """単一の戦略を評価し、結果を辞書として返す"""
+        import logging
+        logging.info(f"📊 評価開始: {strategy_id}")
         try:
-            result = evaluate_strategy(strategy_path, market_data)
+            # ✅ 修正: リファクタリング後のevaluate_strategyを呼び出す
+            result = evaluate_strategy(strategy_id)
             result["status"] = "ok"
         except Exception as e:
-            logger.error(f"🚫 評価エラー: {filename} ➜ {e}", exc_info=True)
-            result = {"status": "error", "error_message": str(e)}
+            logging.error(f"🚫 評価エラー: {strategy_id} ➜ {e}", exc_info=True)
+            result = {"strategy": strategy_id, "status": "error", "error_message": str(e)}
             
-        result["timestamp"] = datetime.utcnow().isoformat()
-        result["filename"] = filename
-        result["original_path"] = strategy_path
-        
         return result
 
     @task
-    def decide_and_promote_strategy(eval_result: Dict) -> Dict:
-        """評価結果に基づき、戦略の採用を決定し、ファイルを移動する。最終的な結果を返す。"""
-        filename = eval_result.get("filename")
-        if eval_result.get("status") != "ok":
-            logger.warning(f"⚠️ 評価がエラーのため、{filename}の採用判断をスキップします。")
-            return eval_result
+    def log_all_results(evaluation_results: List[Dict]):
+        """全ての評価結果をループして、個別のログファイルとして保存する"""
+        import logging
+        if not evaluation_results:
+            logging.info("評価対象の戦略がなかったため、ログ記録をスキップします。")
+            return
 
-        if is_strategy_adopted(eval_result):
-            official_dir = STRATEGIES_DIR / "official"
-            official_dir.mkdir(parents=True, exist_ok=True)
-            
-            source_path = Path(eval_result["original_path"])
-            destination_path = official_dir / filename
-            
-            try:
-                source_path.rename(destination_path)
-                logger.info(f"✅ 採用・昇格: {filename} -> {destination_path}")
-                eval_result["status"] = "adopted"
-            except Exception as e:
-                logger.error(f"❌ ファイル移動エラー: {filename}, エラー: {e}", exc_info=True)
-                eval_result["status"] = "promotion_failed"
-        else:
-            logger.info(f"❌ 不採用: {filename}")
-            eval_result["status"] = "rejected"
-        
-        return eval_result
-
-    @task
-    def aggregate_and_log_results(all_results: List[Dict]):
-        """★改善点: 全てのタスク結果を集約し、一度に安全にログファイルへ書き込む"""
-        log_path = LOGS_DIR / "veritas_eval_result.json"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"📝 {len(all_results)}件の評価結果を最終ログに記録します: {log_path}")
-        
-        # 既存のログを読み込み、新しい結果をマージすることも可能だが、ここでは上書きする
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(all_results, f, indent=2, ensure_ascii=False)
-        
-        logger.info("✅ 最終ログの記録が完了しました。")
-
+        logging.info(f"📝 {len(evaluation_results)}件の評価結果を王国の書庫に記録します…")
+        for result in evaluation_results:
+            if result.get("status") == "ok":
+                # ✅ 修正: リファクタリング後のlog_evaluation_resultを呼び出す
+                log_evaluation_result(result)
+        logging.info("✅ 全ての評価記録の保存が完了しました。")
 
     # --- パイプラインの定義 ---
-    strategy_list = get_strategies_to_evaluate()
-    market_data = load_evaluation_data()
+    strategy_ids = get_strategies_to_evaluate()
     
-    evaluated_results = evaluate_one_strategy.expand(
-        strategy_path=strategy_list,
-        market_data_json=market_data # market_dataの結果が各タスクにブロードキャストされる
-    )
+    # 動的タスクマッピング: 戦略IDのリストを元に、並列で評価タスクを生成
+    evaluated_results = evaluate_one_strategy.expand(strategy_id=strategy_ids)
     
-    promoted_results = decide_and_promote_strategy.expand(eval_result=evaluated_results)
-    
-    # 全ての採用判断が終わってから、結果を集約してログに記録
-    aggregate_and_log_results(all_results=promoted_results)
-
+    # 全ての評価が終わってから、結果を集約してログに記録
+    log_all_results(evaluation_results=evaluated_results)
 
 # DAGのインスタンス化
 veritas_evaluation_pipeline()
