@@ -1,4 +1,4 @@
-# docker-compose.yaml (v2.7)
+# docker-compose.yaml (v2.9)
 # Noctria KingdomのAirflow環境を定義する
 version: "3.8"
 
@@ -10,7 +10,6 @@ x-airflow-common: &airflow-common
     context: ..
     dockerfile: ./airflow_docker/docker/Dockerfile
   image: noctria-airflow:latest
-  # ✅ 修正: .envファイルのパスをプロジェクトルートからの相対パスに修正
   env_file: ../.env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
@@ -36,7 +35,6 @@ services:
   postgres:
     image: postgres:13
     container_name: noctria_postgres
-    # ✅ 修正: .envファイルのパスをプロジェクトルートからの相対パスに修正
     env_file: ../.env
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -68,7 +66,20 @@ services:
   airflow-webserver:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_webserver
-    entrypoint: ["/entrypoint-webserver.sh"]
+    # ✅ 修正: 外部スクリプトを使わず、entrypointとcommandに直接命令を記述
+    entrypoint: bash
+    command:
+      - -c
+      - |
+        airflow db upgrade
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Noctria \
+          --lastname King \
+          --role Admin \
+          --email admin@noctria.com || true
+        exec airflow webserver
     ports:
       - "8080:8080"
 
