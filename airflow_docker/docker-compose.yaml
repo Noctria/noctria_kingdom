@@ -1,90 +1,17 @@
-# docker-compose.yaml (v2.4)
-# Noctria KingdomのAirflow環境を定義する
-version: "3.8"
+# Noctria Kingdom Airflow Image (v2.0)
+FROM apache/airflow:2.8.1-python3.10
 
-# ----------------------------------------
-# 共通設定（x-airflow-common）
-# ----------------------------------------
-x-airflow-common: &airflow-common
-  build:
-    context: .
-    dockerfile: ./docker/Dockerfile
-  image: noctria-airflow:latest
-  env_file: .env
-  environment:
-    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    - PYTHONPATH=/opt/airflow
-    - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
-  volumes:
-    - ../dags:/opt/airflow/dags
-    - ../logs:/opt/airflow/logs
-    - ../plugins:/opt/airflow/plugins
-    - ../src:/opt/airflow/src
-    - ../data:/opt/airflow/data
-    - ./docker/entrypoint-webserver.sh:/entrypoint-webserver.sh
-  depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_started
-  restart: always
+USER root
+# 必要なシステムライブラリなどをインストール
+# RUN apt-get update && apt-get install -y ...
 
-services:
-  # ======================================
-  # 🐘 PostgreSQL データベース
-  # ======================================
-  postgres:
-    image: postgres:13
-    container_name: noctria_postgres
-    env_file: .env
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-airflow}
-    volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
-      - ./docker/init:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-airflow}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: always
+USER airflow
 
-  # ======================================
-  # 🔁 Redis
-  # ======================================
-  redis:
-    image: redis:latest
-    container_name: noctria_redis
-    restart: always
+# Pythonの依存関係をインストール
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 
-  # ======================================
-  # 🌐 Airflow Web UI
-  # ======================================
-  airflow-webserver:
-    <<: *airflow-common # 共通設定を読み込む
-    container_name: noctria_airflow_webserver
-    # ✅ 修正: `command`を`entrypoint`に変更。これにより、コンテナ起動時に
-    # Airflowのデフォルトコマンドではなく、このスクリプトが直接実行される。
-    entrypoint: ["/entrypoint-webserver.sh"]
-    ports:
-      - "8080:8080"
-
-  # ======================================
-  # 🕓 Airflow Scheduler
-  # ======================================
-  airflow-scheduler:
-    <<: *airflow-common # 共通設定を読み込む
-    container_name: noctria_airflow_scheduler
-    # こちらは単純なコマンドなので、デフォルトのentrypointで問題ない
-    command: scheduler
-
-# ======================================
-# 🗃 永続ボリューム定義
-# ======================================
-volumes:
-  postgres-db-volume:
-    driver: local
+# ✅ 追加: Webサーバー用の起動スクリプトをコンテナ内にコピー
+COPY ./docker/entrypoint-webserver.sh /entrypoint-webserver.sh
+# ✅ 追加: コピーしたスクリプトに実行権限を付与
+RUN chmod +x /entrypoint-webserver.sh
