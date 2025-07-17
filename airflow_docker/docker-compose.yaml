@@ -1,4 +1,4 @@
-# docker-compose.yaml (v3.5)
+# docker-compose.yaml (v3.6)
 # Noctria KingdomのAirflow環境を定義する
 
 # ----------------------------------------
@@ -17,9 +17,10 @@ x-airflow-common: &airflow-common
     - AIRFLOW__WEBSERVER__SESSION_BACKEND=securecookie
     - AIRFLOW__WEBSERVER__SECRET_KEY=NoctriaKingdomSecretKey_ChangeThisInProduction
   volumes:
-    - ../dags:/opt/airflow/dags
+    # ✅ 修正: DAGとプラグインのパスを、このファイルからの相対パスに修正
+    - ./dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
-    - ../plugins:/opt/airflow/plugins
+    - ./plugins:/opt/airflow/plugins
     - ../src:/opt/airflow/src
     - ../data:/opt/airflow/data
   depends_on:
@@ -89,11 +90,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_scheduler
-    # ✅ 最終修正: schedulerも起動前にDB初期化を実行するように変更
-    entrypoint: bash
-    command:
-      - -c
-      - "airflow db upgrade && exec airflow scheduler"
+    command: scheduler
 
 # ======================================
 # 🗃 永続ボリューム定義
