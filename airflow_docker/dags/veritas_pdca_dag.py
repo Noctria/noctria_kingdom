@@ -1,45 +1,91 @@
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from core.path_config import VERITAS_GENERATE_SCRIPT, VERITAS_EVALUATE_SCRIPT, GITHUB_PUSH_SCRIPT
-import runpy
+#!/usr/bin/env python3
+# coding: utf-8
 
-# ✅ ログユーティリティ
-from scripts.log_pdca_result import log_pdca_step
+"""
+🔁 Veritas PDCA Loop DAG (v2.0)
+- 戦略の「生成(Plan)」「評価(Do/Check)」「採用戦略のPush(Act)」という
+- PDCAサイクルを自動で実行するためのマスターDAG。
+"""
 
+import logging
+import sys
+import os
+from datetime import datetime
+
+from airflow.decorators import dag, task
+
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# ✅ 修正: スクリプトから直接関数をインポートする方式に変更
+from src.veritas.veritas_generate_strategy import main as generate_main
+from src.veritas.evaluate_veritas import main as evaluate_main
+from src.scripts.github_push_adopted_strategies import main as push_main
+from src.scripts.log_pdca_result import log_pdca_step
+
+# === DAG基本設定 ===
 default_args = {
-    'owner': 'Veritas',
+    'owner': 'VeritasCouncil',
     'depends_on_past': False,
-    'start_date': datetime(2025, 6, 1),
+    'start_date': datetime(2025, 7, 1),
     'retries': 0,
 }
 
-dag = DAG(
-    dag_id="veritas_pdca_dag",
-    description="🔁 Veritas自動戦略PDCAループ",
+@dag(
+    dag_id="veritas_pdca_loop",
     default_args=default_args,
+    description="Veritasによる自動戦略PDCAループ",
     schedule_interval=None,
     catchup=False,
+    tags=['veritas', 'pdca', 'master'],
 )
+def veritas_pdca_pipeline():
+    """
+    Veritasの戦略生成からPushまでの一連のPDCAプロセスを管理するパイプライン。
+    """
 
-def run_generate():
-    log_pdca_step("Plan", "Start", "戦略生成開始")
-    runpy.run_path(VERITAS_GENERATE_SCRIPT)
-    log_pdca_step("Plan", "Success", "戦略生成完了")
+    @task
+    def generate_strategy():
+        """Plan: 新たな戦略を生成する"""
+        log_pdca_step("Plan", "Start", "戦略生成の儀を開始します。")
+        try:
+            generate_main()
+            log_pdca_step("Plan", "Success", "新たな戦略の創出に成功しました。")
+        except Exception as e:
+            log_pdca_step("Plan", "Failure", f"戦略生成に失敗しました: {e}")
+            raise
 
-def run_evaluate():
-    log_pdca_step("Check", "Start", "評価開始")
-    runpy.run_path(VERITAS_EVALUATE_SCRIPT)
-    log_pdca_step("Check", "Success", "評価完了")
+    @task
+    def evaluate_generated_strategy():
+        """Do & Check: 生成された戦略を評価する"""
+        log_pdca_step("Check", "Start", "戦略評価の儀を開始します。")
+        try:
+            evaluate_main()
+            log_pdca_step("Check", "Success", "戦略の真価を見極めました。")
+        except Exception as e:
+            log_pdca_step("Check", "Failure", f"戦略評価に失敗しました: {e}")
+            raise
 
-def run_push():
-    log_pdca_step("Act", "Start", "採用戦略Push")
-    runpy.run_path(GITHUB_PUSH_SCRIPT)
-    log_pdca_step("Act", "Success", "Push完了")
+    @task
+    def push_adopted_strategy():
+        """Act: 採用基準を満たした戦略を正式に記録（Push）する"""
+        log_pdca_step("Act", "Start", "採用されし戦略の公式記録を開始します。")
+        try:
+            push_main()
+            log_pdca_step("Act", "Success", "採用戦略の記録が完了しました。")
+        except Exception as e:
+            log_pdca_step("Act", "Failure", f"採用戦略の記録に失敗しました: {e}")
+            raise
 
-with dag:
-    generate_task = PythonOperator(task_id="generate", python_callable=run_generate)
-    evaluate_task = PythonOperator(task_id="evaluate", python_callable=run_evaluate)
-    push_task = PythonOperator(task_id="push", python_callable=run_push)
+    # --- パイプラインの定義 (PDCAのワークフロー) ---
+    generate_task = generate_strategy()
+    evaluate_task = evaluate_generated_strategy()
+    push_task = push_adopted_strategy()
 
     generate_task >> evaluate_task >> push_task
+
+# DAGのインスタンス化
+veritas_pdca_pipeline()
