@@ -1,92 +1,75 @@
-from core.path_config import (
-    CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR,
-    MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR,
-    TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-)
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+🔮 Prometheus Oracle Forecast DAG (v2.0)
+- 定期的に未来予測官プロメテウスを起動し、未来予測を生成・保存する。
+"""
+
+import logging
 import sys
+import os
 from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
 
-# ✅ Prometheus予測AIの正しいインポート（strategies配下）
-from strategies.prometheus_oracle import PrometheusOracle
+from airflow.decorators import dag, task
 
-# === DAG共通設定 ===
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.strategies.prometheus_oracle import PrometheusOracle
+from src.core.path_config import ORACLE_FORECAST_JSON
+
+# === DAG基本設定 ===
 default_args = {
-    'owner': 'Noctria',
+    'owner': 'Prometheus',
     'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
+    'start_date': datetime(2025, 7, 1),
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
 
-# === DAG定義 ===
-dag = DAG(
-    dag_id='prometheus_strategy_dag',
+@dag(
+    dag_id='prometheus_oracle_forecast',
     default_args=default_args,
-    description='🔮 Noctria Kingdomの臣下Prometheusによる未来予測戦略DAG',
-    schedule_interval=None,
-    start_date=datetime(2025, 6, 1),
+    description='未来予測官プロメテウスによる定期的な未来予測の儀',
+    schedule_interval=timedelta(days=1),  # 1日1回、神託を授かる
     catchup=False,
-    tags=['noctria', 'forecasting'],
+    tags=['noctria', 'forecasting', 'prometheus'],
 )
+def prometheus_forecasting_pipeline():
+    """
+    未来予測官プロメテウスが神託（未来予測）を生成し、王国の書庫に記録するパイプライン。
+    """
 
-# === Veritas等からのデータ注入（模擬）
-def veritas_trigger_task(ti, **kwargs):
-    mock_market_data = {
-        "price": 1.2345,
-        "volume": 1000,
-        "sentiment": 0.8,
-        "trend_strength": 0.7,
-        "volatility": 0.15,
-        "order_block": 0.6,
-        "institutional_flow": 0.8,
-        "short_interest": 0.5,
-        "momentum": 0.9,
-        "trend_prediction": 0.6,
-        "liquidity_ratio": 1.2
-    }
-    ti.xcom_push(key='market_data', value=mock_market_data)
+    @task
+    def generate_forecast():
+        """未来予測を生成し、JSONファイルとして保存する"""
+        logger = logging.getLogger("PrometheusForecastTask")
+        logger.info("神託の儀を開始します。未来のビジョンを観測中…")
+        
+        try:
+            oracle = PrometheusOracle()
+            # 30日間の未来を予測
+            predictions_df = oracle.predict_with_confidence(n_days=30)
 
-# === Prometheus戦略による未来予測
-def prometheus_strategy_task(ti, **kwargs):
-    input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
+            if predictions_df.empty:
+                logger.warning("未来のビジョンが不明瞭です。神託は得られませんでした。")
+                return
 
-    if input_data is None:
-        print("⚠️ Veritasからのmarket_dataが見つかりません。デフォルト値で実行します")
-        input_data = {
-            "price": 1.0, "volume": 0.0, "sentiment": 0.5, "trend_strength": 0.5,
-            "volatility": 0.1, "order_block": 0.5, "institutional_flow": 0.5,
-            "short_interest": 0.5, "momentum": 0.5, "trend_prediction": 0.5,
-            "liquidity_ratio": 1.0
-        }
+            # 予測結果をファイルに保存
+            ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
+            predictions_df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
+            logger.info(f"神託を羊皮紙に記し、封印しました: {ORACLE_FORECAST_JSON}")
 
-    prometheus = PrometheusOracle()
-    forecast = prometheus.predict_market(input_data)
+        except Exception as e:
+            logger.error(f"神託の儀の最中に、予期せぬ闇が発生しました: {e}", exc_info=True)
+            raise
 
-    ti.xcom_push(key='forecast_result', value=forecast)
+    # --- パイプラインの定義 ---
+    generate_forecast()
 
-    # ログ出力
-    if forecast > 0.6:
-        decision = "BUY"
-    elif forecast < 0.4:
-        decision = "SELL"
-    else:
-        decision = "HOLD"
-
-    print(f"🔮 Prometheus: score = {forecast:.4f} → decision = {decision}")
-
-# === DAGにタスク登録 ===
-with dag:
-    veritas_task = PythonOperator(
-        task_id='veritas_trigger_task',
-        python_callable=veritas_trigger_task,
-    )
-
-    prometheus_task = PythonOperator(
-        task_id='prometheus_forecast_task',
-        python_callable=prometheus_strategy_task,
-    )
-
-    veritas_task >> prometheus_task
+# DAGのインスタンス化
+prometheus_forecasting_pipeline()
