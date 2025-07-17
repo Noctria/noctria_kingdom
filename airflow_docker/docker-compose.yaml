@@ -1,4 +1,4 @@
-# docker-compose.yaml (v2.6)
+# docker-compose.yaml (v2.7)
 # Noctria KingdomのAirflow環境を定義する
 version: "3.8"
 
@@ -7,23 +7,21 @@ version: "3.8"
 # ----------------------------------------
 x-airflow-common: &airflow-common
   build:
-    # ✅ 修正: ビルドの基準点をプロジェクトルートに変更 (..)
     context: ..
-    # ✅ 修正: Dockerfileのパスを新しい基準点からの相対パスに修正
     dockerfile: ./airflow_docker/docker/Dockerfile
   image: noctria-airflow:latest
-  env_file: ./airflow_docker/.env # .envファイルのパスも修正
+  # ✅ 修正: .envファイルのパスをプロジェクトルートからの相対パスに修正
+  env_file: ../.env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - PYTHONPATH=/opt/airflow
     - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
   volumes:
-    # ✅ 修正: 各ボリュームのパスを新しい基準点からの相対パスに修正
-    - ./dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
-    - ./plugins:/opt/airflow/plugins
-    - ./src:/opt/airflow/src
-    - ./data:/opt/airflow/data
+    - ../dags:/opt/airflow/dags
+    - ../logs:/opt/airflow/logs
+    - ../plugins:/opt/airflow/plugins
+    - ../src:/opt/airflow/src
+    - ../data:/opt/airflow/data
   depends_on:
     postgres:
       condition: service_healthy
@@ -38,14 +36,15 @@ services:
   postgres:
     image: postgres:13
     container_name: noctria_postgres
-    env_file: ./airflow_docker/.env # .envファイルのパスも修正
+    # ✅ 修正: .envファイルのパスをプロジェクトルートからの相対パスに修正
+    env_file: ../.env
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB:-airflow}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ./airflow_docker/docker/init:/docker-entrypoint-initdb.d # initスクリプトのパスも修正
+      - ./init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
