@@ -1,4 +1,4 @@
-# docker-compose.yaml (v2.3)
+# docker-compose.yaml (v2.4)
 # Noctria KingdomのAirflow環境を定義する
 version: "3.8"
 
@@ -21,7 +21,6 @@ x-airflow-common: &airflow-common
     - ../plugins:/opt/airflow/plugins
     - ../src:/opt/airflow/src
     - ../data:/opt/airflow/data
-    # ✅ 追加: 新しく作成した起動スクリプトをコンテナ内にマウント
     - ./docker/entrypoint-webserver.sh:/entrypoint-webserver.sh
   depends_on:
     postgres:
@@ -68,8 +67,9 @@ services:
   airflow-webserver:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_webserver
-    # ✅ 修正: 起動コマンドを、専用のスクリプトファイルを実行するように変更
-    command: ["/entrypoint-webserver.sh"]
+    # ✅ 修正: `command`を`entrypoint`に変更。これにより、コンテナ起動時に
+    # Airflowのデフォルトコマンドではなく、このスクリプトが直接実行される。
+    entrypoint: ["/entrypoint-webserver.sh"]
     ports:
       - "8080:8080"
 
@@ -79,6 +79,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common # 共通設定を読み込む
     container_name: noctria_airflow_scheduler
+    # こちらは単純なコマンドなので、デフォルトのentrypointで問題ない
     command: scheduler
 
 # ======================================
@@ -87,4 +88,3 @@ services:
 volumes:
   postgres-db-volume:
     driver: local
-
