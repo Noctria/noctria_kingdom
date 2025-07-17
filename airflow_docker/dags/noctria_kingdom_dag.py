@@ -2,19 +2,27 @@
 # coding: utf-8
 
 """
-👑 Noctria Kingdom Royal Council DAG (v2.0)
+👑 Noctria Kingdom Royal Council DAG (v2.1)
 - 定期的に御前会議を自動開催し、王国の最終的な意思決定を行うための統合DAG。
 - 市場データの観測から、王命の下達までを一気通貫で実行する。
 """
 
 import logging
 import json
+import sys
+import os
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
+
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+# このDAGファイルが置かれているディレクトリの2階層上がプロジェクトルート（/opt/airflow）になる
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # --- 王国の基盤モジュールをインポート ---
 from src.core.path_config import LOGS_DIR
@@ -136,7 +144,7 @@ with DAG(
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
         
         # DataFrameはJSONにできないため、シリアライズ可能な形式に変換
-        if 'noctus_assessment' in report['assessments']:
+        if 'assessments' in report and 'noctus_assessment' in report['assessments']:
             if 'historical_data' in report['assessments']['noctus_assessment']:
                 del report['assessments']['noctus_assessment']['historical_data']
 
@@ -163,4 +171,3 @@ with DAG(
 
     # --- 依存関係の定義 (王国の統治フロー) ---
     task_fetch_data >> task_hold_council >> task_log_decision
-
