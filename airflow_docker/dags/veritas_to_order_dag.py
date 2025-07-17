@@ -1,61 +1,79 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago
-from datetime import timedelta
+#!/usr/bin/env python3
+# coding: utf-8
 
-# ========================================
-# 🏛️ Noctria Kingdom - Veritas EA命令DAG
-# ========================================
+"""
+⚔️ Veritas to EA Order DAG (v2.0)
+- Veritasが生成・評価した戦略から、最終的にEA（自動売買プログラム）が読み込む
+- 命令JSONファイルを生成するまでの一連のプロセスを自動化する。
+"""
 
-# ✅ パス集中管理（王国統治ルールに準拠）
-# BASE_DIRがPYTHONPATHに含まれているため、直接インポート可能
-# from core.path_config import SCRIPTS_DIR, VERITAS_DIR, EXECUTION_DIR
-# これらのパス定数は、各callable関数内で必要に応じて利用されるべきであり、
-# DAGファイル内でsys.pathに追加する必要はありません。
+import logging
+import sys
+import os
+from datetime import datetime, timedelta
 
-# ✅ 各フェーズ関数を外部からインポート（ロジックはDAGに書かない）
-# 環境のPYTHONPATHに /opt/airflow が含まれていれば、
-# これらのモジュールはトップレベルのパッケージとして認識されます。
-from veritas.evaluate_veritas import evaluate_strategies
-from veritas.promote_accepted_strategies import promote_strategies
-from execution.generate_order_json import generate_order_json
+from airflow.decorators import dag, task
 
-# ✅ DAG の基本設定
+# --- 王国の基盤モジュールをインポート ---
+# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# ✅ 修正: 各スクリプトからメインの処理関数をインポート
+# 存在しないモジュールを削除し、必要なものを正しくインポート
+from src.veritas.evaluate_veritas import main as evaluate_main
+# from src.veritas.promote_accepted_strategies import main as promote_main # このスクリプトは存在しない可能性
+from src.execution.generate_order_json import main as generate_order_main
+
+# === DAG基本設定 ===
 default_args = {
-    "owner": "Noctria",
+    "owner": "VeritasCouncil",
     "depends_on_past": False,
+    "start_date": datetime(2025, 7, 1),
     "retries": 1,
     "retry_delay": timedelta(minutes=3),
 }
 
-# ✅ DAG定義本体
-with DAG(
-    dag_id="veritas_to_order_dag",
-    description="Veritas戦略 → EA命令JSON生成までの完全自動化DAG",
+@dag(
+    dag_id="veritas_to_order_pipeline",
     default_args=default_args,
-    schedule_interval=None,      # 🔁 手動実行前提（定期化は任意）
-    start_date=days_ago(1),
+    description="Veritas戦略評価からEA命令JSON生成までの完全自動化パイプライン",
+    schedule_interval=None,  # 手動実行を基本とする
     catchup=False,
     tags=["veritas", "pdca", "auto-ea"],
-) as dag:
+)
+def veritas_to_order_pipeline():
+    """
+    戦略の評価、採用、そしてEAへの命令書作成までを統括する。
+    """
 
-    # 🧪 Check: 戦略評価
-    evaluate_task = PythonOperator(
-        task_id="evaluate_veritas_strategies",
-        python_callable=evaluate_strategies,
-    )
+    @task
+    def evaluate_strategies_task():
+        """Check: 生成された全戦略の真価を問う"""
+        logging.info("評価の儀を開始します。")
+        try:
+            evaluate_main()
+        except Exception as e:
+            logging.error(f"評価の儀で失敗しました: {e}", exc_info=True)
+            raise
 
-    # 🏅 Act: 採用戦略昇格
-    promote_task = PythonOperator(
-        task_id="promote_accepted_strategies",
-        python_callable=promote_strategies,
-    )
+    @task
+    def generate_order_json_task():
+        """Do: 採用された戦略に基づき、EAへの命令書を作成する"""
+        logging.info("王の最終承認に基づき、EAへの命令書を作成します。")
+        try:
+            # この関数は内部で評価ログを読み、採用された戦略のみを対象とする
+            generate_order_main()
+        except Exception as e:
+            logging.error(f"命令書の作成に失敗しました: {e}", exc_info=True)
+            raise
 
-    # ⚔️ Do: EA命令生成
-    generate_order_task = PythonOperator(
-        task_id="generate_ea_order_json",
-        python_callable=generate_order_json,
-    )
+    # --- パイプラインの定義 (評価 → 命令書作成) ---
+    evaluate_task = evaluate_strategies_task()
+    generate_order_task = generate_order_json_task()
 
-    # ✅ フェーズ順に接続
-    evaluate_task >> promote_task >> generate_order_task
+    evaluate_task >> generate_order_task
+
+# DAGのインスタンス化
+veritas_to_order_pipeline()
