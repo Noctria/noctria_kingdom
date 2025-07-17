@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Veritas Master DAG (v2.0)
+👑 Veritas Master DAG (v2.1)
 - Veritasによる「戦略生成」「評価」「Push」の一連のプロセスを統括するマスターDAG。
 - 王国の自己進化サイクルそのものを司る。
 """
@@ -24,7 +24,12 @@ if project_root not in sys.path:
 from src.veritas.veritas_generate_strategy import main as generate_main
 from src.veritas.evaluate_veritas import main as evaluate_main
 from src.scripts.github_push_adopted_strategies import main as push_main
-from src.scripts.log_pdca_result import log_pdca_step
+
+# === DAG内ヘルパー関数 ===
+# ✅ 修正: 存在しないモジュールの代わりに、DAG内に直接関数を定義
+def log_pdca_step(phase: str, status: str, message: str):
+    """PDCAの各ステップの状況をログに出力する"""
+    logging.info(f"MASTER DAG LOG - [{phase}] [{status}] :: {message}")
 
 # === DAG基本設定 ===
 default_args = {
@@ -83,8 +88,8 @@ def veritas_master_pipeline():
 
     # --- パイプラインの定義 (生成 → 評価 → Push) ---
     generate_task = generate_strategy_task()
-    evaluate_task = evaluate_generated_strategy()
-    push_task = push_adopted_strategy()
+    evaluate_task = evaluate_strategy_task()
+    push_task = push_strategy_task()
 
     generate_task >> evaluate_task >> push_task
 
