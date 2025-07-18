@@ -6,8 +6,7 @@ FROM apache/airflow:2.9.2-python3.11
 # airflowユーザーで以降の処理を実行
 USER airflow
 
-# 依存パッケージをコピーしてインストール
-# ※ build.context が airflow_docker/ なので、1階層上が ./
-COPY ../requirements_extra.txt /requirements_extra.txt
+# airflow_docker/ 内に requirements_extra.txt を置くこと
+COPY requirements_extra.txt /requirements_extra.txt
 
 RUN pip install --no-cache-dir -r /requirements_extra.txt
