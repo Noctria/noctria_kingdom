@@ -1,5 +1,4 @@
-# docker-compose.yaml (v3.6)
-# Noctria KingdomのAirflow環境を定義する
+version: "3.6"  # 👈 これを最初に必ず
 
 # ----------------------------------------
 # 共通設定（x-airflow-common）
@@ -17,7 +16,6 @@ x-airflow-common: &airflow-common
     - AIRFLOW__WEBSERVER__SESSION_BACKEND=securecookie
     - AIRFLOW__WEBSERVER__SECRET_KEY=NoctriaKingdomSecretKey_ChangeThisInProduction
   volumes:
-    # ✅ DAGとプラグインのパスを、このファイルからの相対パスに修正
     - ./dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
@@ -66,7 +64,7 @@ services:
   # 🌐 Airflow Web UI
   # ======================================
   airflow-webserver:
-    <<: *airflow-common # 共通設定を読み込む
+    <<: *airflow-common
     container_name: noctria_airflow_webserver
     entrypoint: bash
     command:
@@ -88,7 +86,7 @@ services:
   # 🕓 Airflow Scheduler
   # ======================================
   airflow-scheduler:
-    <<: *airflow-common # 共通設定を読み込む
+    <<: *airflow-common
     container_name: noctria_airflow_scheduler
     command: scheduler
 
