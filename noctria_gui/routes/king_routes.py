@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-👑 /dashboard/king - 中央統治AI NoctriaのAPIルート群
-- 評議会の開催（/dashboard/king/hold-council）
-- 評議会ログの保存・取得（/dashboard/king/history）
+👑 /api/king - 中央統治AI NoctriaのAPIルート
+- 評議会の開催（/api/king/council）
+- 評議会ログの保存・取得（/api/king/history）
 """
 
 from fastapi import APIRouter, Request
@@ -12,27 +12,18 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
-from core.king_noctria import KingNoctria
+from src.core.king_noctria import KingNoctria
 
 from datetime import datetime
 from pathlib import Path
 import json
 
-# ──────────────────────────────
-# 📁 ルーターとテンプレート初期化
-# ──────────────────────────────
-router = APIRouter(prefix="/dashboard/king", tags=["King"])
+router = APIRouter(prefix="/api/king", tags=["King"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# 📌 評議会ログファイルの保存先
 KING_LOG_PATH = LOGS_DIR / "king_log.json"
 
-# ──────────────────────────────
-# 🧩 ユーティリティ関数
-# ──────────────────────────────
-
 def load_logs() -> list:
-    """📖 評議会ログを読み込む"""
     try:
         if KING_LOG_PATH.exists():
             with open(KING_LOG_PATH, "r", encoding="utf-8") as f:
@@ -43,7 +34,6 @@ def load_logs() -> list:
         return []
 
 def save_log(entry: dict):
-    """📚 評議会ログを追記保存"""
     try:
         logs = load_logs()
         logs.append(entry)
@@ -52,23 +42,19 @@ def save_log(entry: dict):
     except Exception as e:
         print(f"🔴 save_log失敗: {e}")
 
-# ──────────────────────────────
-# 👑 評議会APIエンドポイント
-# ──────────────────────────────
-
-@router.post("/hold-council")
+@router.post("/council")
 async def hold_council_api(request: Request):
     """
-    🧠 KingNoctriaによる評議会の開催（外部データを元に意思決定）
-    - POSTされたmarket_dataを元にhold_council()を実行
-    - 結果をJSONで返却し、ログにも保存
+    🧠 KingNoctriaによる評議会の開催（POSTされたmarket_dataでhold_council）
     """
     try:
         data = await request.json()
+        if not isinstance(data, dict):
+            return JSONResponse(content={"error": "market_dataが不正です"}, status_code=400)
+
         king = KingNoctria()
         result = king.hold_council(data)
 
-        # ⏺️ 評議会ログの保存
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "market_data": data,
@@ -84,14 +70,10 @@ async def hold_council_api(request: Request):
             status_code=500
         )
 
-# ──────────────────────────────
-# 📜 評議会履歴表示ページ
-# ──────────────────────────────
-
 @router.get("/history", response_class=HTMLResponse)
 async def show_king_history(request: Request):
     """
-    📜 KingNoctriaによる過去の評議会履歴をGUIで表示
+    📜 KingNoctriaによる過去の評議会履歴GUI
     """
     try:
         logs = load_logs()
