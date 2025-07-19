@@ -12,15 +12,25 @@
   <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
     <div class="metric-item">
       <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
-      <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
+      <p class="metric-value text-green">
+        {% if stats.get("avg_win_rate") is not none %}
+          {{ "%.2f"|format(stats.get("avg_win_rate")) }}%
+        {% else %}-{% endif %}
+      </p>
     </div>
     <div class="metric-item">
       <h3><i class="fas fa-bolt"></i> 平均DD</h3>
-      <p class="metric-value text-red">{{ stats.avg_drawdown | round(2) }}%</p>
+      <p class="metric-value text-red">
+        {% if stats.get("avg_drawdown") is not none %}
+          {{ "%.2f"|format(stats.get("avg_drawdown")) }}%
+        {% else %}-{% endif %}
+      </p>
     </div>
     <div class="metric-item">
       <h3><i class="fas fa-layer-group"></i> 戦略数</h3>
-      <p class="metric-value">{{ stats.num_strategies }}</p>
+      <p class="metric-value">
+        {{ stats.get("num_strategies", "-") }}
+      </p>
     </div>
   </div>
 </section>
@@ -33,7 +43,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const tagDist = {{ stats.tag_distribution | default({}) | tojson }};
+  const tagDist = {{ stats.get("tag_distribution", {}) | tojson }};
   const ctx = document.getElementById('tagPieChart').getContext('2d');
   const labels = Object.keys(tagDist);
   const data = Object.values(tagDist);
