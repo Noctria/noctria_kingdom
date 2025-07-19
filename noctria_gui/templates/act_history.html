@@ -19,12 +19,12 @@
     <tbody>
       {% for log in logs %}
       <tr>
-        <td>{{ log.timestamp }}</td>
-        <td>{{ log.action_type }}</td>
-        <td>{{ log.strategy_id }}</td>
+        <td>{{ log.get("timestamp", "-") }}</td>
+        <td>{{ log.get("action_type", "-") }}</td>
+        <td>{{ log.get("strategy_id", "-") }}</td>
         <td class="text-cyan">
-          {% if log.score_mean is not none and log.score_mean|float(default=None) is not none %}
-            {{ "%.2f"|format(log.score_mean|float) }}
+          {% if log.get("score_mean") is not none %}
+            {{ "%.2f"|format(log["score_mean"]) }}
           {% else %}
             -
           {% endif %}
