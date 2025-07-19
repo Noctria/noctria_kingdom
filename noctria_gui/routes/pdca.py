@@ -1,20 +1,23 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+📦 /pdca - PDCAサイクルログ管理ルート
+- 戦略の再評価ログをフィルター・ソートして履歴画面に表示
+"""
+
+import logging
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
-import os
 import json
-from dotenv import load_dotenv
-
-from src.core.path_config import (
-    PDCA_LOG_DIR,
-    NOCTRIA_GUI_TEMPLATES_DIR,
-)
-
-load_dotenv()
+from src.core.path_config import PDCA_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
@@ -31,15 +34,20 @@ async def show_pdca_dashboard(
     recheck_success: int = Query(default=None),
     recheck_fail: int = Query(default=None),
 ):
+    """
+    PDCA再評価ログの一覧を表示する。
+    各種フィルターやソート条件に対応。
+    """
     logs = []
     tag_set = set()
 
+    # ログファイルを時系列降順で読み込む
     for log_file in sorted(PDCA_LOG_DIR.glob("*.json"), reverse=True):
         try:
             with open(log_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:
-            print(f"⚠️ ログ読み込み失敗: {log_file} -> {e}")
+            logging.warning(f"ログファイル読み込み失敗: {log_file} → {e}")
             continue
 
         ts_str = data.get("timestamp", "")
@@ -51,7 +59,8 @@ async def show_pdca_dashboard(
         tags = data.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
-        tag_set.update(tags)
+        if tags:
+            tag_set.update(tags)
 
         logs.append({
             "filename": log_file.name,
@@ -76,7 +85,7 @@ async def show_pdca_dashboard(
 
     def matches(log):
         try:
-            if strategy and strategy.lower() not in log["strategy"].lower():
+            if strategy and strategy.lower() not in (log["strategy"] or "").lower():
                 return False
             if symbol and symbol != log["symbol"]:
                 return False
@@ -111,7 +120,8 @@ async def show_pdca_dashboard(
                 if before is None or after is None or (after - before) < win_rate_min_diff:
                     return False
 
-        except Exception:
+        except Exception as e:
+            logging.warning(f"フィルター判定中にエラー: {e}")
             return False
 
         return True
