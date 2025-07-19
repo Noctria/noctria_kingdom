@@ -34,7 +34,11 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
-    from sb3_contrib.common.optuna_callback import TrialEvalCallback
+    # ❗️ Optuna公式のPrunerを使用 (旧TrialEvalCallbackは非推奨)
+    from optuna.integration.skopt import SkoptSampler
+    from optuna.pruners import MedianPruner
+    from optuna.integration import OptunaPruner
+
 
     # ハイパーパラメータ空間の定義
     params = {
@@ -54,6 +58,8 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
         logger.error(f"❌ モデル初期化失敗: {e}", exc_info=True)
         raise optuna.exceptions.TrialPruned()
 
+    # ✅ OptunaPruner: 途中経過をOptunaに報告し、見込みのない試行を打ち切る(Pruning)
+    pruner_callback = OptunaPruner(trial, eval_env, n_eval_episodes=n_eval_episodes)
     eval_callback = EvalCallback(
         eval_env,
         best_model_save_path=None,
@@ -61,7 +67,8 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
         eval_freq=max(total_timesteps // 5, 1),
         deterministic=True,
         render=False,
-        callback_after_eval=TrialEvalCallback(trial, eval_env, n_eval_episodes, deterministic=True)
+        # 評価が良い結果だった場合に、Prunerを呼び出す
+        callback_on_new_best=pruner_callback
     )
 
     try:
@@ -85,7 +92,13 @@ def optimize_main(n_trials: int = 20, total_timesteps: int = 20000, n_eval_episo
     from optuna.pruners import MedianPruner
 
     study_name = "noctria_meta_ai_ppo"
-    storage = os.getenv("OPTUNA_DB_URL", f"sqlite:///{DATA_DIR / 'optuna_studies.db'}")
+    # 環境変数からDBのURLを取得。なければローカルのSQLiteを使用
+    storage = os.getenv("OPTUNA_DB_URL")
+    if not storage:
+        db_path = DATA_DIR / 'optuna_studies.db'
+        storage = f"sqlite:///{db_path}"
+        logger.warning(f"⚠️ OPTUNA_DB_URLが未設定です。ローカルDBを使用します: {storage}")
+
 
     logger.info(f"📚 Optuna Study開始: {study_name}")
     logger.info(f"🔌 Storage: {storage}")
@@ -116,9 +129,9 @@ def optimize_main(n_trials: int = 20, total_timesteps: int = 20000, n_eval_episo
         return None
 
     logger.info("👑 最適化完了！")
-    logger.info(f"   - Trial: {study.best_trial.number}")
-    logger.info(f"   - Score: {study.best_value:.4f}")
-    logger.info(f"   - Params: {study.best_params}")
+    logger.info(f"  - Trial: {study.best_trial.number}")
+    logger.info(f"  - Score: {study.best_value:.4f}")
+    logger.info(f"  - Params: {json.dumps(study.best_params, indent=2)}")
     return study.best_params
 
 
