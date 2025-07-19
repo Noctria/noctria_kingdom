@@ -23,7 +23,6 @@ except ImportError:
 # ✅ ロガー定義（共通）
 logger = setup_logger("optimize_script", LOGS_DIR / "pdca" / "optimize.log")
 
-
 # ================================================
 # 🎯 Optuna 目的関数（重い import はここで）
 # ================================================
@@ -34,8 +33,8 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
-    # ❗️【修正点】正しいimportパスに修正
-    from sb3_contrib.optuna import OptunaPruner
+    # ❗️【修正点】正しいimportパス
+    from sb3_contrib.common.optuna import OptunaPruner
 
     # ハイパーパラメータ空間の定義
     params = {
@@ -77,7 +76,6 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
     except Exception as e:
         logger.error(f"❌ 学習・評価中の致命的エラー: {e}", exc_info=True)
         raise
-
 
 # ================================================
 # 🚀 DAG / CLI 用メイン関数
@@ -126,7 +124,6 @@ def optimize_main(n_trials: int = 10, total_timesteps: int = 20000, n_eval_episo
     logger.info(f"  - Score: {study.best_value:.4f}")
     logger.info(f"  - Params: {json.dumps(study.best_params, indent=2)}")
     return study.best_params
-
 
 # ================================================
 # 🧪 CLI デバッグ用
