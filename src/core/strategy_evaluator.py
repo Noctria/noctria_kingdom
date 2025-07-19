@@ -21,8 +21,8 @@ from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR, ACT_LOG_DIR
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 # --- 王国の戦略採用基準 ---
-WIN_RATE_THRESHOLD = 60.0  # 最低勝率
-MAX_DRAWDOWN_THRESHOLD = 20.0 # 最大許容ドローダウン
+WIN_RATE_THRESHOLD = 60.0  # 最低勝率（%）
+MAX_DRAWDOWN_THRESHOLD = 20.0  # 最大許容ドローダウン（%）
 
 
 def is_strategy_adopted(evaluation_result: Dict[str, Any]) -> bool:
@@ -55,8 +55,8 @@ def evaluate_strategy(strategy_id: str) -> Dict[str, Any]:
     # (現在はダミーの評価結果を生成)
     seed_value = sum(ord(c) for c in strategy_id)
     random.seed(seed_value)
-    win_rate = round(random.uniform(50, 75), 2)
-    max_drawdown = round(random.uniform(5, 30), 2)
+    win_rate = round(random.uniform(50, 75), 2)          # 50～75%の間でランダム
+    max_drawdown = round(random.uniform(5, 30), 2)       # 5～30%の間でランダム
     # --- ここまでダミー処理 ---
 
     result = {
