@@ -1,8 +1,5 @@
 version: "3.6"  # 👈 これを最初に必ず
 
-# ----------------------------------------
-# 共通設定（x-airflow-common）
-# ----------------------------------------
 x-airflow-common: &airflow-common
   build:
     context: ..
@@ -29,9 +26,6 @@ x-airflow-common: &airflow-common
   restart: always
 
 services:
-  # ======================================
-  # 🐘 PostgreSQL データベース
-  # ======================================
   postgres:
     image: postgres:13
     container_name: noctria_postgres
@@ -42,7 +36,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-airflow}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d
+      - ./init:/docker-entrypoint-initdb.d  # ここ重要
     ports:
       - "5432:5432"
     healthcheck:
@@ -52,17 +46,11 @@ services:
       retries: 5
     restart: always
 
-  # ======================================
-  # 🔁 Redis (Celery Executor用として残す)
-  # ======================================
   redis:
     image: redis:latest
     container_name: noctria_redis
     restart: always
 
-  # ======================================
-  # 🌐 Airflow Web UI
-  # ======================================
   airflow-webserver:
     <<: *airflow-common
     container_name: noctria_airflow_webserver
@@ -82,17 +70,11 @@ services:
     ports:
       - "8080:8080"
 
-  # ======================================
-  # 🕓 Airflow Scheduler
-  # ======================================
   airflow-scheduler:
     <<: *airflow-common
     container_name: noctria_airflow_scheduler
     command: scheduler
 
-# ======================================
-# 🗃 永続ボリューム定義
-# ======================================
 volumes:
   postgres-db-volume:
     driver: local
