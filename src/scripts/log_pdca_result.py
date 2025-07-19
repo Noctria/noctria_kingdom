@@ -4,8 +4,8 @@
 """
 📜 PDCA履歴記録スクリプト
 - PDCAサイクルの各段階で発生したイベントをログ(JSON)に追記する
-- 各フェーズ: "generate"（戦略生成）, "evaluate"（評価）, "adopt"（採用）, "replay"（再送）, "recheck"（再評価）, "push"（GitHub保存）
-- Airflow DAGや戦略コア、GUIからも呼び出せる
+- 各フェーズ: "generate"（戦略生成）, "evaluate"（評価）, "adopt"（採用）, "replay"（再送）, "recheck"（再評価）, "push"（GitHub保存）など
+- Airflow DAGや戦略コア、GUIからも呼び出せるユーティリティ
 """
 
 import json
@@ -18,11 +18,13 @@ PDCA_HISTORY_PATH = PDCA_LOG_DIR / "pdca_history.json"
 def log_pdca_event(phase: str, status: str, detail: str = "", strategy_id: str = "", meta: dict = None):
     """
     PDCAサイクルのイベントをログに追記
-    - phase: フェーズ名（"generate", "evaluate", "adopt", "replay", "recheck", "push" など）
-    - status: 状態（"success", "fail" など）
-    - detail: 詳細説明やエラー内容
-    - strategy_id: 関連する戦略ID（省略可）
-    - meta: 任意の追加情報(dict)
+
+    Args:
+        phase (str): フェーズ名（"generate", "evaluate", "adopt", "replay", "recheck", "push" など）
+        status (str): 状態（"success", "fail" など）
+        detail (str): 詳細説明やエラー内容
+        strategy_id (str): 関連する戦略ID（省略可）
+        meta (dict): 任意の追加情報
     """
     event = {
         "timestamp": datetime.now().isoformat(),
@@ -35,17 +37,17 @@ def log_pdca_event(phase: str, status: str, detail: str = "", strategy_id: str =
 
     # 既存ログの読み込み
     if PDCA_HISTORY_PATH.exists():
-        with open(PDCA_HISTORY_PATH, "r", encoding="utf-8") as f:
-            try:
+        try:
+            with open(PDCA_HISTORY_PATH, "r", encoding="utf-8") as f:
                 history = json.load(f)
-            except Exception:
-                history = []
+        except Exception:
+            history = []
     else:
         history = []
 
     history.append(event)
 
-    # 保存
+    # 保存（ディレクトリがなければ作成）
     PDCA_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(PDCA_HISTORY_PATH, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
