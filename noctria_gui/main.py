@@ -2,6 +2,8 @@
 # coding: utf-8
 
 import json
+import sys
+import logging
 from typing import Any
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -9,6 +11,14 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import Response
 
 from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+
+# --- ロギング設定 ---
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Noctria Kingdom GUI",
@@ -41,7 +51,7 @@ from noctria_gui.routes import (
     tag_heatmap, tag_summary, tag_summary_detail
 )
 
-print("Integrating all routers into the main application...")
+logger.info("Integrating all routers into the main application...")
 
 # --- 主要機能 ---
 app.include_router(home_routes.router)
@@ -83,7 +93,7 @@ app.include_router(path_checker.router)
 app.include_router(prometheus_routes.router)
 app.include_router(upload.router)
 
-print("✅ All routers have been integrated successfully.")
+logger.info("✅ All routers have been integrated successfully.")
 
 # --- favicon対策（404抑止）---
 @app.get("/favicon.ico", include_in_schema=False)
