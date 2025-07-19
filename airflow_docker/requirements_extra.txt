@@ -17,9 +17,9 @@ transformers==4.40.2
 optuna==3.5.0
 scikit-optimize==0.10.2
 
-# ✅ SB3 & 拡張（GitHub版ではなくPyPI経由で統一）
+# ✅ SB3 & 拡張（GitHub版へ変更！）
 stable-baselines3==2.2.1
-sb3-contrib==2.2.1
+git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib.git@v2.2.1
 
 # ===============================
 # 🎮 強化学習 環境・依存パッケージ
