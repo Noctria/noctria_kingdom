@@ -1,4 +1,4 @@
-version: "3.6"  # 👈 これを最初に必ず
+version: "3.6"
 
 x-airflow-common: &airflow-common
   build:
@@ -8,10 +8,9 @@ x-airflow-common: &airflow-common
   env_file: ../.env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/optuna_db
+    - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-NoctriaKingdomSecretKey_ChangeThisForProduction}
     - PYTHONPATH=/opt/airflow:/opt/airflow/src
-    - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
-    - AIRFLOW__WEBSERVER__SESSION_BACKEND=securecookie
-    - AIRFLOW__WEBSERVER__SECRET_KEY=NoctriaKingdomSecretKey_ChangeThisInProduction
   volumes:
     - ./dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
@@ -21,8 +20,6 @@ x-airflow-common: &airflow-common
   depends_on:
     postgres:
       condition: service_healthy
-    redis:
-      condition: service_started
   restart: always
 
 services:
@@ -36,7 +33,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-airflow}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d  # ここ重要
+      - ./init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
@@ -46,34 +43,38 @@ services:
       retries: 5
     restart: always
 
-  redis:
-    image: redis:latest
-    container_name: noctria_redis
-    restart: always
-
   airflow-webserver:
     <<: *airflow-common
     container_name: noctria_airflow_webserver
-    entrypoint: bash
-    command:
-      - -c
-      - |
-        airflow db upgrade
+    command: >
+      bash -c "
+        airflow db upgrade;
         airflow users create \
           --username admin \
           --password admin \
           --firstname Noctria \
           --lastname King \
           --role Admin \
-          --email admin@noctria.com || true
+          --email admin@noctria.com || true;
         exec airflow webserver
+      "
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   airflow-scheduler:
     <<: *airflow-common
     container_name: noctria_airflow_scheduler
     command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 volumes:
   postgres-db-volume:
