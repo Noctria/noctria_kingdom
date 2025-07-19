@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v2.4)
+👑 Central Governance Dashboard Route (v2.5)
 - 王国の主要な統計情報と予測分析を統合表示する。
 """
 
@@ -48,11 +48,12 @@ async def dashboard_view(request: Request):
             logging.warning("⚠️ oracle.predict() の結果がリストではありません。空として処理します。")
             forecast_data = []
 
-        # ✅ メトリクス取得（存在する場合のみ）
+        # ✅ メトリクス取得
         if hasattr(oracle, "get_metrics"):
             stats_data["oracle_metrics"] = oracle.get_metrics()
 
         logging.info(f"✅ 予測データ件数: {len(forecast_data)}")
+        logging.debug(f"📊 forecast_data preview: {forecast_data[:2]}")
         logging.info(f"✅ oracle_metrics: {stats_data['oracle_metrics']}")
 
     except Exception as e:
