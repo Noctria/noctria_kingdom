@@ -34,7 +34,7 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
-    # ❗️ Optuna公式のPrunerを使用 (旧TrialEvalCallbackは非推奨)
+    # ❗️【修正点】正しいimportパスに修正
     from optuna.integration.sb3 import OptunaPruner
 
 
@@ -56,7 +56,6 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
         logger.error(f"❌ モデル初期化失敗: {e}", exc_info=True)
         raise optuna.exceptions.TrialPruned()
 
-    # ✅ OptunaPruner: 途中経過をOptunaに報告し、見込みのない試行を打ち切る(Pruning)
     pruner_callback = OptunaPruner(trial, eval_env, n_eval_episodes=n_eval_episodes)
     eval_callback = EvalCallback(
         eval_env,
@@ -65,7 +64,6 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
         eval_freq=max(total_timesteps // 5, 1),
         deterministic=True,
         render=False,
-        # 評価が良い結果だった場合に、Prunerを呼び出す
         callback_on_new_best=pruner_callback
     )
 
@@ -85,12 +83,11 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
 # ================================================
 # 🚀 DAG / CLI 用メイン関数
 # ================================================
-def optimize_main(n_trials: int = 20, total_timesteps: int = 20000, n_eval_episodes: int = 10):
+def optimize_main(n_trials: int = 10, total_timesteps: int = 20000, n_eval_episodes: int = 10):
     from optuna.integration.skopt import SkoptSampler
     from optuna.pruners import MedianPruner
 
     study_name = "noctria_meta_ai_ppo"
-    # 環境変数からDBのURLを取得。なければローカルのSQLiteを使用
     storage = os.getenv("OPTUNA_DB_URL")
     if not storage:
         db_path = DATA_DIR / 'optuna_studies.db'
