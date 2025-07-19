@@ -63,7 +63,7 @@ def aurus_strategy_task(**kwargs):
     try:
         from strategies.aurus_singularis import AurusSingularis
         aurus = AurusSingularis()
-        decision = aurus.process(input_data)
+        decision = aurus.propose(input_data)
         ti.xcom_push(key='aurus_decision', value=decision)
         print(f"🔮 Aurusの戦略判断: {decision}")
     except Exception as e:
