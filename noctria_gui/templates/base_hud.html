@@ -26,21 +26,23 @@
             {% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
             {% block header_title %}NOCTRIA HUD{% endblock %}
         </div>
-        <a href="{% block header_nav_href %}#{% endblock %}" class="nav-item-back">
+        <a href="{% block header_nav_href %}#{% endblock %}" class="nav-item-back hud-btn">
             <i class="fas fa-arrow-left"></i>
             <span>{% block header_nav_text %}Back{% endblock %}</span>
         </a>
     </header>
 
     <!-- 🕒 JST時計表示（右上） -->
-    <div style="text-align: right; font-size: 0.9rem; color: #7DF9FF; margin-bottom: -0.5rem;">
+    <div style="text-align: right; font-size: 0.9rem; color: #7DF9FF; margin-top: 0.5rem;">
         <span id="current-time"></span>
     </div>
 
     <!-- 🧱 ページコンテンツ -->
     <main>
+
         {% block content %}
         {% endblock %}
+
     </main>
 
 </div>
@@ -54,10 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (timeElement) {
             const now = new Date();
             const options = {
-                timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                timeZone: 'Asia/Tokyo',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
             };
-            const formatter = new Intl.DateTimeFormat('en-CA', options);
+            const formatter = new Intl.DateTimeFormat('ja-JP', options);
             const jstString = formatter.format(now).replace(', ', ' ');
             timeElement.textContent = `${jstString} JST`;
         }
