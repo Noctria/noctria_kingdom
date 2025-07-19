@@ -24,7 +24,7 @@ logger = setup_logger("optimize_script", LOGS_DIR / "pdca" / "optimize.log")
 
 
 # ======================================================
-# 🎯 Optuna用のカスタムEvalCallback（新方式！）
+# 🎯 Optuna用のカスタムEvalCallback（修正版！）
 # ======================================================
 from stable_baselines3.common.callbacks import EvalCallback
 
@@ -46,23 +46,18 @@ class OptunaPruningCallback(EvalCallback):
 
     def _on_step(self) -> bool:
         result = super()._on_step()
-        # プルーニング判定は評価時のみ実行
-        if self.n_calls % self.eval_freq == 0:
-            self.last_mean_reward = self.last_mean_reward or self._last_mean_reward
-            if self._is_pruning_step():
-                self.last_mean_reward = self._last_mean_reward
-                # Optunaにプルーニング判定を投げる
-                intermediate_value = self._last_mean_reward
-                self.trial.report(intermediate_value, self.n_calls)
-                if self.trial.should_prune():
-                    logger.info(f"⏩ Trial pruned at step {self.n_calls} with reward={intermediate_value:.4f}")
-                    self.is_pruned = True
-                    return False  # ここでFalseを返すと学習も中断される
+        # 評価タイミングのみprune判定
+        if self.n_calls % self.eval_freq == 0 and self.last_mean_reward is not None:
+            intermediate_value = self.last_mean_reward  # 直近の評価報酬
+            self.trial.report(intermediate_value, self.n_calls)
+            if self.trial.should_prune():
+                logger.info(f"⏩ Trial pruned at step {self.n_calls} with reward={intermediate_value:.4f}")
+                self.is_pruned = True
+                return False  # prune
         return result
 
-    def _is_pruning_step(self) -> bool:
-        # 評価ステップでのみ判定
-        return self._eval_env is not None and self._n_calls > 0 and self.n_calls % self.eval_freq == 0
+    def _on_evaluate_end(self, mean_reward, std_reward):
+        self.last_mean_reward = mean_reward
 
 
 # ======================================================
