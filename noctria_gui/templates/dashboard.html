@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (forecast.length > 0 && document.getElementById('forecastChart')) {
             const ctx = document.getElementById('forecastChart').getContext('2d');
             const labels = forecast.map(d => d.date || d.timestamp || "");
-            const data = forecast.map(d => d.forecast || null);
+            const data = forecast.map(d => d.value ?? d.forecast ?? null);
 
             new Chart(ctx, {
                 type: 'line',
