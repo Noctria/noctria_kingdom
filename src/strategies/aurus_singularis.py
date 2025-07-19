@@ -33,10 +33,8 @@ class AurusSingularis:
         """
         self.model_path = model_path or (MODELS_DIR / "aurus_singularis_v2.3.keras") # モデルバージョンアップ
         self.model = self._load_or_build_model()
-        self.market_fetcher = MarketDataFetcher(
-            alphavantage_api_key=ALPHAVANTAGE_API_KEY,
-            fred_api_key=FRED_API_KEY
-        )
+        # ❗️【修正点】MarketDataFetcherの定義に合わせて、不要なAPIキーの引数を削除
+        self.market_fetcher = MarketDataFetcher()
 
     def _load_or_build_model(self) -> tf.keras.Model:
         """モデルの読み込み、または新規構築を行う"""
