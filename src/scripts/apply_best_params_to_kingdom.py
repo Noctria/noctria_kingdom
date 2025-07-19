@@ -19,15 +19,13 @@ except ImportError:
     from core.path_config import *
     from core.logger import setup_logger
 
-# ✅ ロガー設定
 logger = setup_logger("kingdom_apply_script", LOGS_DIR / "pdca" / "kingdom_apply.log")
-
 
 # ================================================
 # 🎯 DAG から呼び出される昇格関数
 # ================================================
 def apply_best_params_to_kingdom(
-    new_model_info: Dict[str, Any],
+    model_info: Dict[str, Any],
     min_improvement_threshold: float = 0.01
 ) -> None:
     """
@@ -35,12 +33,12 @@ def apply_best_params_to_kingdom(
     """
     from datetime import datetime  # ✅ 遅延インポート（Airflow対策）
 
-    if not new_model_info or "model_path" not in new_model_info or "evaluation_score" not in new_model_info:
-        logger.error(f"❌ 無効なモデル情報が提供されました: {new_model_info}")
+    if not model_info or "model_path" not in model_info or "evaluation_score" not in model_info:
+        logger.error(f"❌ 無効なモデル情報が提供されました: {model_info}")
         raise ValueError("Invalid model_info provided.")
 
-    new_model_path = Path(new_model_info["model_path"])
-    new_model_score = new_model_info["evaluation_score"]
+    new_model_path = Path(model_info["model_path"])
+    new_model_score = model_info["evaluation_score"]
 
     logger.info("👑 王命: 最適戦略の王国昇格プロセスを開始する")
     logger.info(f"   - 新モデル候補: {new_model_path.name}")
@@ -51,6 +49,7 @@ def apply_best_params_to_kingdom(
     current_production_score = float('-inf')
 
     # 🔍 現行モデルスコアの取得
+    registry = {}
     if model_registry_path.exists():
         try:
             with open(model_registry_path, "r") as f:
@@ -82,9 +81,9 @@ def apply_best_params_to_kingdom(
                 "evaluation_score": new_model_score,
                 "promoted_at": datetime.now().isoformat()
             },
-            "history": registry.get("history", []) if 'registry' in locals() else []
+            "history": registry.get("history", []) if registry else []
         }
-        if 'registry' in locals() and "production" in registry:
+        if registry and "production" in registry:
             registry_data["history"].insert(0, registry["production"])
             registry_data["history"] = registry_data["history"][:10]
 
@@ -113,5 +112,5 @@ if __name__ == "__main__":
     if not Path(mock_model_info["model_path"]).exists():
         Path(mock_model_info["model_path"]).touch()
 
-    apply_best_params_to_kingdom(new_model_info=mock_model_info)
+    apply_best_params_to_kingdom(model_info=mock_model_info)
     logger.info("🌟 テスト完了: 王国戦略の昇格処理が終了しました")
