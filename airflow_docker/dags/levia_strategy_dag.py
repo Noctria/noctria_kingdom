@@ -57,7 +57,7 @@ def levia_strategy_task(ti, **kwargs):
         }
 
     try:
-        from levia_tempest import LeviaTempest  # STRATEGIES_DIR に配置されている前提
+        from strategies.levia_tempest import LeviaTempest  # STRATEGIES_DIR に配置されている前提
         levia = LeviaTempest()
         decision = levia.process(input_data)
 
