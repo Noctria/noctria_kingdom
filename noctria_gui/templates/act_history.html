@@ -1,202 +1,37 @@
 {% extends "base_hud.html" %}
 
-{% block title %}📜 Act History - Noctria Kingdom HUD{% endblock %}
-
-{% block header_icon %}<i class="fas fa-scroll"></i>{% endblock %}
-{% block header_title %}VERITAS ADOPTION LOG{% endblock %}
-{% block header_nav_href %}/dashboard{% endblock %}
-{% block header_nav_text %}DASHBOARD{% endblock %}
+{% block title %}📝 Action History{% endblock %}
+{% block header_icon %}<i class="fas fa-history"></i>{% endblock %}
+{% block header_title %}Action History{% endblock %}
 
 {% block content %}
-<!-- Filter Panel -->
-<section class="hud-panel filter-panel">
-    <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
-    <form method="get" action="/act-history" class="filter-form">
-        <input type="text" name="strategy_name" placeholder="Strategy Name..." value="{{ request.query_params.get('strategy_name', '') }}">
-
-        <select name="pushed">
-            <option value="">Push Status...</option>
-            <option value="true" {{ 'selected' if request.query_params.get('pushed') == 'true' }}>Pushed</option>
-            <option value="false" {{ 'selected' if request.query_params.get('pushed') == 'false' }}>Not Pushed</option>
-        </select>
-
-        <button type="submit" class="hud-btn"><i class="fas fa-search"></i> APPLY</button>
-    </form>
-</section>
-
-<!-- History Log Panel -->
-<main class="hud-panel log-panel">
-    <h2 class="panel-title">SYSTEM ACTIVITY LOGS</h2>
-    <div class="table-wrapper">
-        <table class="hud-table" id="log-table">
-            <thead>
-                <tr>
-                    <th data-sort-col="0">戦略名 <i class="fas fa-sort"></i></th>
-                    <th>通貨ペア</th>
-                    <th data-sort-col="2">昇格日時 <i class="fas fa-sort"></i></th>
-                    <th data-sort-col="3">平均スコア <i class="fas fa-sort"></i></th>
-                    <th data-sort-col="4">勝率 <i class="fas fa-sort"></i></th>
-                    <th data-sort-col="5">最大DD <i class="fas fa-sort"></i></th>
-                    <th>タグ</th>
-                    <th>Push済</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for log in logs %}
-                <tr>
-                    <td><a href="/act-history/detail/{{ log.id }}" class="link-cyan">{{ log.strategy }}</a></td>
-                    <td>{{ log.symbol }}</td>
-                    <td>{{ log.promoted_at or log.timestamp }}</td>
-                    <td class="text-cyan">{{ "%.2f"|format(log.score_mean) if log.score_mean is not none else '-' }}</td>
-                    <td>
-                        {% if log.win_rate is not none %}
-                            <span class="{{ 'text-green' if log.win_rate > 70 else 'text-magenta' if log.win_rate < 50 else 'text-yellow' }}">
-                                {{ "%.1f"|format(log.win_rate) }}%
-                            </span>
-                        {% else %}-{% endif %}
-                    </td>
-                    <td>{{ "%.2f"|format(log.max_drawdown) if log.max_drawdown is not none else '-' }}%</td>
-                    <td>
-                        {% if log.tags %}
-                            {% for tag in log.tags %}
-                                <span class="hud-tag">{{ tag }}</span>
-                            {% endfor %}
-                        {% else %}-{% endif %}
-                    </td>
-                    <td>
-                        <span class="status-icon">{{ "✅" if log.pushed else "❌" }}</span>
-                    </td>
-                    <td class="action-buttons">
-                        <!-- ✅ 修正: 非同期処理用のクラスを追加 -->
-                        <form method="post" action="/act-history/repush" class="action-form">
-                            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                            <button type="submit" class="hud-btn">
-                                <i class="fas fa-rocket"></i> 再Push可に
-                            </button>
-                        </form>
-                        <form method="post" action="/act-history/reevaluate" class="action-form">
-                            <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                            <button type="submit" class="hud-btn">
-                                <i class="fas fa-sync-alt"></i> 再評価
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="9" style="text-align: center;">No activity logs found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</main>
-
-<style>
-    .action-buttons {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
-    .action-form {
-        margin: 0;
-    }
-    .action-buttons .hud-btn {
-        white-space: nowrap;
-    }
-    th[data-sort-col] {
-        cursor: pointer;
-    }
-    /* ボタンの成功・失敗時のスタイル */
-    .hud-btn.is-success { background: #2ecc71; border-color: #2ecc71; }
-    .hud-btn.is-error { background: #e74c3c; border-color: #e74c3c; }
-</style>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // --- テーブルソート機能 ---
-    const table = document.getElementById("log-table");
-    if (table) {
-        const headers = table.querySelectorAll("th[data-sort-col]");
-        headers.forEach(header => {
-            header.addEventListener('click', () => {
-                const colIndex = parseInt(header.dataset.sortCol, 10);
-                sortTable(colIndex);
-            });
-        });
-    }
-
-    function sortTable(colIndex) {
-        const tbody = table.tBodies[0];
-        const rows = Array.from(tbody.rows);
-        const isNumeric = [3, 4, 5].includes(colIndex);
-        const header = table.querySelector(`th[data-sort-col="${colIndex}"]`);
-        const currentDir = header.dataset.sortDir || 'desc';
-        const newDir = currentDir === 'asc' ? 'desc' : 'asc';
-        table.querySelectorAll('th').forEach(th => th.dataset.sortDir = '');
-        header.dataset.sortDir = newDir;
-
-        const sortedRows = rows.sort((a, b) => {
-            const valA = a.cells[colIndex].innerText.trim().replace(/%|,/g, '');
-            const valB = b.cells[colIndex].innerText.trim().replace(/%|,/g, '');
-            if (valA === '-' && valB === '-') return 0;
-            if (valA === '-') return 1;
-            if (valB === '-') return -1;
-            const numA = isNumeric ? parseFloat(valA) : valA.toLowerCase();
-            const numB = isNumeric ? parseFloat(valB) : valB.toLowerCase();
-            if (numA < numB) return newDir === 'asc' ? -1 : 1;
-            if (numA > numB) return newDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-        const fragment = document.createDocumentFragment();
-        sortedRows.forEach(row => fragment.appendChild(row));
-        tbody.innerHTML = '';
-        tbody.appendChild(fragment);
-    }
-
-    // --- ✅ 追加: 非同期アクションボタン機能 ---
-    const actionForms = document.querySelectorAll('.action-form');
-    actionForms.forEach(form => {
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const button = form.querySelector('button');
-            const originalHtml = button.innerHTML;
-            
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-            try {
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    body: new FormData(form)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    button.innerHTML = '✅ 成功';
-                    button.classList.add('is-success');
-                } else {
-                    button.innerHTML = '❌ 失敗';
-                    button.classList.add('is-error');
-                    console.error('Action failed:', data.detail);
-                }
-            } catch (error) {
-                button.innerHTML = '❌ 通信エラー';
-                button.classList.add('is-error');
-                console.error('Network error:', error);
-            } finally {
-                // 2秒後に元の状態に戻す
-                setTimeout(() => {
-                    button.disabled = false;
-                    button.innerHTML = originalHtml;
-                    button.classList.remove('is-success', 'is-error');
-                }, 2000);
-            }
-        });
-    });
-});
-</script>
+<div class="hud-panel">
+  <h2 class="panel-title">📜 Action Logs</h2>
+  <table class="hud-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Action Type</th>
+        <th>Strategy</th>
+        <th>Score Mean</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.timestamp }}</td>
+        <td>{{ log.action_type }}</td>
+        <td>{{ log.strategy_id }}</td>
+        <td class="text-cyan">
+          {% if log.score_mean is not none and log.score_mean|float(default=None) is not none %}
+            {{ "%.2f"|format(log.score_mean|float) }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}
