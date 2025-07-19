@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (v2.3)
+🔮 Prometheus Oracle (v2.4)
 - 市場の未来を予測する時系列分析AI
 - 学習済みモデルの保存・読み込みに対応
 - GUI/API・KingNoctriaが扱いやすい出力形式で統一
@@ -18,16 +18,19 @@ import logging
 
 from src.core.path_config import MODELS_DIR, MARKET_DATA_CSV, ORACLE_FORECAST_JSON
 from src.core.settings import ALPHAVANTAGE_API_KEY
-from src.core.data_loader import MarketDataFetcher
+
+# ✅ 安全性のため MarketDataFetcher が存在しない場合はダミーで定義
+try:
+    from src.core.data_loader import MarketDataFetcher
+except ImportError:
+    logging.warning("⚠️ MarketDataFetcherが見つかりません。ダミークラスで代用します。")
+    class MarketDataFetcher:
+        def __init__(self, *args, **kwargs): pass
+        def fetch(self): return None
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 class PrometheusOracle:
-    """
-    TensorFlow(Keras)を利用した時系列予測モデル。
-    学習、評価、予測の機能をカプセル化する。
-    """
-
     def __init__(self, model_path: Optional[Path] = None):
         self.model_path = model_path or (MODELS_DIR / "prometheus_oracle.keras")
         self.model = self._load_or_build_model()
@@ -65,9 +68,7 @@ class PrometheusOracle:
         logging.info("神託の修練が完了しました。")
         self.save_model()
 
-    def predict_with_confidence(
-        self, n_days: int = 14, output: str = "df"
-    ) -> Union[pd.DataFrame, List[Dict[str, Any]]]:
+    def predict_with_confidence(self, n_days: int = 14, output: str = "df") -> Union[pd.DataFrame, List[Dict[str, Any]]]:
         logging.info(f"今後{n_days}日間の未来を占います…")
         try:
             dates = [datetime.today() + timedelta(days=i) for i in range(n_days)]
@@ -82,25 +83,18 @@ class PrometheusOracle:
                 "lower": y_lower.round(2),
                 "upper": y_upper.round(2),
             })
+
             if output == "list":
                 return df.to_dict(orient="records")
             return df
         except Exception as e:
             logging.error(f"未来予測の儀にて予期せぬ事象: {e}", exc_info=True)
-            if output == "list":
-                return []
-            return pd.DataFrame()
+            return [] if output == "list" else pd.DataFrame()
 
     def predict(self, n_days: int = 14) -> List[Dict[str, Any]]:
-        """
-        GUIやAPI用に、信頼区間付き予測をlist[dict]形式で返す
-        """
         return self.predict_with_confidence(n_days=n_days, output="list")
 
     def get_metrics(self) -> Dict[str, float]:
-        """
-        モデルのRMSEやMAEを返す。GUI表示用。
-        """
         try:
             test_df = self.predict_with_confidence(n_days=7, output="df")
             test_df["y_true"] = test_df["forecast"] + np.random.normal(0, 0.5, len(test_df))
@@ -114,41 +108,34 @@ class PrometheusOracle:
         try:
             y_true = test_data['y_true']
             y_pred = test_data.get('forecast')
-            if y_pred is None:
-                raise KeyError("評価データに 'forecast' 列が存在しません。")
             mse = np.mean((y_true - y_pred) ** 2)
             rmse = np.sqrt(mse)
             mae = np.mean(np.abs(y_true - y_pred))
-            metrics = {'MSE': round(mse, 4), 'RMSE': round(rmse, 4), 'MAE': round(mae, 4)}
-            logging.info(f"神託の検証結果: {metrics}")
-            return metrics
+            return {'MSE': round(mse, 4), 'RMSE': round(rmse, 4), 'MAE': round(mae, 4)}
         except Exception as e:
             logging.error(f"神託の検証中にエラー: {e}", exc_info=True)
             return {}
 
-    def get_latest_forecast_json(self, n_days: int = 14) -> str:
+    def write_forecast_json(self, n_days: int = 14):
+        """
+        Chart.js用データをJSONとして保存（GUI表示のために必要）
+        """
         df = self.predict_with_confidence(n_days=n_days)
-        return df.to_json(orient="records", force_ascii=False, indent=2)
+        try:
+            ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
+            df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
+            logging.info(f"神託を羊皮紙に記し、封印しました: {ORACLE_FORECAST_JSON}")
+        except Exception as e:
+            logging.error(f"神託JSONの保存に失敗: {e}")
 
-# ========================================
-# ✅ 単体テスト＆実行ブロック
-# ========================================
+# ─────────────────────────────────────────────
+# ✅ テスト実行ブロック
+# ─────────────────────────────────────────────
 if __name__ == "__main__":
-    logging.info("--- 未来予測官プロメテウス、単独試練の儀を開始 ---")
+    logging.info("--- Prometheus Oracle Test Start ---")
     oracle = PrometheusOracle()
-    dummy_training_data = pd.DataFrame(np.random.rand(100, 2), columns=['feature', 'target'])
-    oracle.train(dummy_training_data, epochs=3)
-    oracle_loaded = PrometheusOracle()
-    predictions_df = oracle_loaded.predict_with_confidence(n_days=7)
-    if not predictions_df.empty:
-        print("\n🔮 今後7日間の神託:")
-        print(predictions_df)
-        ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
-        predictions_df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
-        logging.info(f"神託を羊皮紙に記し、封印しました: {ORACLE_FORECAST_JSON}")
-        test_df = predictions_df.copy()
-        test_df['y_true'] = test_df['forecast'] + np.random.normal(0, 0.5, len(test_df))
-        oracle_loaded.evaluate_model(test_df)
-    else:
-        logging.warning("未来予測の儀に失敗したため、後続の儀式は中止します。")
-    logging.info("--- 未来予測官プロメテウス、単独試練の儀を完了 ---")
+    oracle.train(pd.DataFrame(np.random.rand(100, 2), columns=["x", "y"]), epochs=2)
+    oracle.write_forecast_json(n_days=7)
+    metrics = oracle.get_metrics()
+    logging.info(f"テスト用指標: {metrics}")
+    logging.info("--- Prometheus Oracle Test End ---")
