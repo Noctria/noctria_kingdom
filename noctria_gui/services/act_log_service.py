@@ -51,6 +51,12 @@ def _normalize_score(log: Dict) -> Dict:
     return log
 
 
+# 追加部分: 公開用ラッパーとして normalize_score を定義
+def normalize_score(log: Dict) -> Dict:
+    """公開用 normalize_score関数"""
+    return _normalize_score(log)
+
+
 def filter_act_logs(
     logs: List[Dict],
     strategy_name: Optional[str] = None,
