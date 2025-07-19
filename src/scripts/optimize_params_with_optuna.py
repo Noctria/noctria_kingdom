@@ -35,7 +35,7 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
     from stable_baselines3.common.callbacks import EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
     # ❗️ Optuna公式のPrunerを使用 (旧TrialEvalCallbackは非推奨)
-    from optuna.integration import OptunaPruner
+    from optuna.integration.sb3 import OptunaPruner
 
 
     # ハイパーパラメータ空間の定義
