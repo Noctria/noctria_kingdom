@@ -78,7 +78,7 @@ app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
 
 # --- 統計 ---
-app.include_router(statistics_dashboard.router, prefix="/statistics", tags=["statistics"])
+app.include_router(statistics_dashboard.router)
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
