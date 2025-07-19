@@ -35,8 +35,7 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
     from stable_baselines3.common.callbacks import EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
     # ❗️【修正点】正しいimportパスに修正
-    from optuna.integration.sb3 import OptunaPruner
-
+    from sb3_contrib.optuna import OptunaPruner
 
     # ハイパーパラメータ空間の定義
     params = {
@@ -93,7 +92,6 @@ def optimize_main(n_trials: int = 10, total_timesteps: int = 20000, n_eval_episo
         db_path = DATA_DIR / 'optuna_studies.db'
         storage = f"sqlite:///{db_path}"
         logger.warning(f"⚠️ OPTUNA_DB_URLが未設定です。ローカルDBを使用します: {storage}")
-
 
     logger.info(f"📚 Optuna Study開始: {study_name}")
     logger.info(f"🔌 Storage: {storage}")
