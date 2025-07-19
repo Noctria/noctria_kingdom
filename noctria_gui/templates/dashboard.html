@@ -67,40 +67,80 @@
     <div id="councilResult" class="council-result">Awaiting command...</div>
 </section>
 
-<div id="forecast-data-holder" data-forecast="{{ forecast | default([]) | tojson }}" style="display: none;"></div>
+<div id="forecast-data-holder" data-forecast="{{ forecast | default([]) | tojson | safe }}" style="display: none;"></div>
+{% endblock %}
 
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-
-<!-- ✅ 修正: デバッグ用のコードに一時的に変更 -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("--- グラフデータ デバッグ開始 ---");
+    // --- ORACLE予測グラフ描画 ---
     const dataHolder = document.getElementById('forecast-data-holder');
-    
-    // サーバーから渡された生の文字列を取得
-    const rawDataString = dataHolder.getAttribute('data-forecast');
+    if (dataHolder) {
+        let forecast = [];
+        try {
+            forecast = JSON.parse(dataHolder.getAttribute('data-forecast') || "[]");
+        } catch (e) {
+            console.error("ORACLE予測データのパースに失敗", e);
+        }
+        if (forecast.length > 0 && document.getElementById('forecastChart')) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            const labels = forecast.map(d => d.date || d.timestamp || "");
+            const data = forecast.map(d => d.value || d.forecast || null);
 
-    // 取得した文字列をコンソールに出力して確認
-    console.log("サーバーから受け取った生の文字列:", rawDataString);
-
-    // その文字列でJSON.parseを試す
-    try {
-        JSON.parse(rawDataString);
-        console.log("✅ JSON.parse に成功しました！");
-    } catch (e) {
-        console.error("❌ JSON.parse に失敗しました。エラー:", e);
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '予測値',
+                        data: data,
+                        borderColor: '#00e5ff',
+                        backgroundColor: 'rgba(0,229,255,0.15)',
+                        pointRadius: 1,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Oracle予測時系列', color: '#e6f1ff' }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#a8b2d1' } },
+                        y: { ticks: { color: '#a8b2d1' } }
+                    }
+                }
+            });
+        }
     }
-    console.log("--- グラフデータ デバッグ終了 ---");
 
-    // ページの他の機能は、デバッグ中は一時的にコメントアウトしておきます
-    /*
-    const timeElement = document.getElementById('system-time');
-    function updateTime() { ... }
-    ...
+    // --- 会議フォーム → 中央AIへAPI POST ---
     const form = document.getElementById("councilForm");
-    ...
-    */
+    const resultDiv = document.getElementById("councilResult");
+    if (form && resultDiv) {
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            resultDiv.textContent = "⏳ 集計中...";
+            const formData = new FormData(form);
+            const market = {};
+            for (const [k, v] of formData.entries()) market[k] = v;
+            try {
+                // ※ルート例：/api/king/council（FastAPI側で設計に合わせてください）
+                const resp = await fetch("/api/king/council", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(market)
+                });
+                if (!resp.ok) throw new Error("APIエラー " + resp.status);
+                const data = await resp.json();
+                resultDiv.innerHTML = `<b>王命: ${data.final_decision}</b><br><pre>${JSON.stringify(data.assessments, null, 2)}</pre>`;
+            } catch (err) {
+                resultDiv.innerHTML = `<span style="color:#ff4d4d">API呼び出しエラー: ${err}</span>`;
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
