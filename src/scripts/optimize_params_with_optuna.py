@@ -20,21 +20,59 @@ except ImportError:
     from core.logger import setup_logger
     from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 
-# ✅ ロガー定義（共通）
 logger = setup_logger("optimize_script", LOGS_DIR / "pdca" / "optimize.log")
 
-# ================================================
-# 🎯 Optuna 目的関数（重い import はここで）
-# ================================================
+
+# ======================================================
+# 🎯 Optuna用のカスタムEvalCallback（新方式！）
+# ======================================================
+from stable_baselines3.common.callbacks import EvalCallback
+
+class OptunaPruningCallback(EvalCallback):
+    def __init__(self, eval_env, trial, n_eval_episodes=5, eval_freq=1000, verbose=0):
+        super().__init__(
+            eval_env,
+            best_model_save_path=None,
+            log_path=None,
+            eval_freq=eval_freq,
+            n_eval_episodes=n_eval_episodes,
+            deterministic=True,
+            render=False,
+            verbose=verbose,
+        )
+        self.trial = trial
+        self.is_pruned = False
+        self.last_mean_reward = None
+
+    def _on_step(self) -> bool:
+        result = super()._on_step()
+        # プルーニング判定は評価時のみ実行
+        if self.n_calls % self.eval_freq == 0:
+            self.last_mean_reward = self.last_mean_reward or self._last_mean_reward
+            if self._is_pruning_step():
+                self.last_mean_reward = self._last_mean_reward
+                # Optunaにプルーニング判定を投げる
+                intermediate_value = self._last_mean_reward
+                self.trial.report(intermediate_value, self.n_calls)
+                if self.trial.should_prune():
+                    logger.info(f"⏩ Trial pruned at step {self.n_calls} with reward={intermediate_value:.4f}")
+                    self.is_pruned = True
+                    return False  # ここでFalseを返すと学習も中断される
+        return result
+
+    def _is_pruning_step(self) -> bool:
+        # 評価ステップでのみ判定
+        return self._eval_env is not None and self._n_calls > 0 and self.n_calls % self.eval_freq == 0
+
+
+# ======================================================
+# 🎯 Optuna 目的関数
+# ======================================================
 def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -> float:
     logger.info(f"🎯 試行 {trial.number} を開始")
 
-    # ✅ 遅延 import（Airflow DAGスキャン対策）
     from stable_baselines3 import PPO
-    from stable_baselines3.common.callbacks import EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
-    # ❗️【修正点】正しいimportパス
-    from sb3_contrib.common.optuna import OptunaPruner
 
     # ハイパーパラメータ空間の定義
     params = {
@@ -52,34 +90,39 @@ def objective(trial: optuna.Trial, total_timesteps: int, n_eval_episodes: int) -
         model = PPO("MlpPolicy", env, **params, verbose=0)
     except Exception as e:
         logger.error(f"❌ モデル初期化失敗: {e}", exc_info=True)
-        raise optuna.exceptions.TrialPruned()
+        raise optuna.TrialPruned()
 
-    pruner_callback = OptunaPruner(trial, eval_env, n_eval_episodes=n_eval_episodes)
-    eval_callback = EvalCallback(
+    eval_freq = max(total_timesteps // 5, 1)
+    pruning_callback = OptunaPruningCallback(
         eval_env,
-        best_model_save_path=None,
-        log_path=None,
-        eval_freq=max(total_timesteps // 5, 1),
-        deterministic=True,
-        render=False,
-        callback_on_new_best=pruner_callback
+        trial=trial,
+        n_eval_episodes=n_eval_episodes,
+        eval_freq=eval_freq,
+        verbose=0,
     )
 
     try:
-        model.learn(total_timesteps=total_timesteps, callback=eval_callback)
+        model.learn(total_timesteps=total_timesteps, callback=pruning_callback)
+        if pruning_callback.is_pruned:
+            raise optuna.TrialPruned()
+
         mean_reward, _ = evaluate_policy(model, eval_env, n_eval_episodes=n_eval_episodes)
         logger.info(f"✅ 最終評価: 平均報酬 = {mean_reward:.2f}")
         return mean_reward
     except (AssertionError, ValueError) as e:
         logger.warning(f"⚠️ 学習中のエラーでプルーニング: {e}")
-        raise optuna.exceptions.TrialPruned()
+        raise optuna.TrialPruned()
+    except optuna.TrialPruned:
+        logger.info("⏩ プルーニング判定により中断")
+        raise
     except Exception as e:
         logger.error(f"❌ 学習・評価中の致命的エラー: {e}", exc_info=True)
         raise
 
-# ================================================
+
+# ======================================================
 # 🚀 DAG / CLI 用メイン関数
-# ================================================
+# ======================================================
 def optimize_main(n_trials: int = 10, total_timesteps: int = 20000, n_eval_episodes: int = 10):
     from optuna.integration.skopt import SkoptSampler
     from optuna.pruners import MedianPruner
@@ -125,9 +168,10 @@ def optimize_main(n_trials: int = 10, total_timesteps: int = 20000, n_eval_episo
     logger.info(f"  - Params: {json.dumps(study.best_params, indent=2)}")
     return study.best_params
 
-# ================================================
+
+# ======================================================
 # 🧪 CLI デバッグ用
-# ================================================
+# ======================================================
 if __name__ == "__main__":
     logger.info("🧪 CLI: テスト実行中")
     best_params = optimize_main(n_trials=5, total_timesteps=1000, n_eval_episodes=2)
