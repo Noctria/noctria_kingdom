@@ -9,7 +9,8 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 class MarketDataFetcher:
     """市場データをAPI経由で取得し、トレンドを解析する"""
 
-    def __init__(self, api_key):
+    # ❗️【修正点】api_keyを必須引数からオプション引数に変更 (api_key=None を追加)
+    def __init__(self, api_key=None):
         self.api_key = api_key
         self.base_url = "https://www.alphavantage.co/query"
         self.logger = logging.getLogger("MarketDataFetcher")
@@ -17,6 +18,10 @@ class MarketDataFetcher:
         self.price_history = []
 
     def fetch_data(self, symbol="USDJPY"):
+        if not self.api_key:
+            self.logger.error("APIキーが設定されていません。")
+            return None
+
         params = {
             "function": "FX_INTRADAY",
             "from_symbol": "USD",
@@ -75,6 +80,10 @@ class MarketDataFetcher:
         :param max_days: 取得する最大日数（新しい順）
         :return: DataFrame（date, close）
         """
+        if not self.api_key:
+            self.logger.error("APIキーが設定されていません。")
+            return pd.DataFrame()
+
         params = {
             "function": "FX_DAILY",
             "from_symbol": from_symbol,
