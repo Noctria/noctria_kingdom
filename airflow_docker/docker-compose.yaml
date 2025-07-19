@@ -8,8 +8,8 @@ x-airflow-common: &airflow-common
   env_file: ../.env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/optuna_db
-    - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-NoctriaKingdomSecretKey_ChangeThisForProduction}
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-YourSecretKeyForWebServerSession} 
     - PYTHONPATH=/opt/airflow:/opt/airflow/src
   volumes:
     - ./dags:/opt/airflow/dags
