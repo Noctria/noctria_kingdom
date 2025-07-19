@@ -1,35 +1,37 @@
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from scipy.stats import norm
 
 class RiskManager:
     """Noctria Kingdom のリスク管理モジュール"""
 
-    # ❗️【修正点】historical_dataを必須引数からオプション引数に変更 (historical_data=None を追加)
     def __init__(self, historical_data=None):
         """
         初期化：リスク評価に使用する市場データをロード
-        :param historical_data: pd.DataFrame (価格データ)
+        :param historical_data: pd.DataFrame (価格データ, 'Close'列が必要)
         """
         self.data = historical_data
 
-        # ❗️【改善点】データが存在しない場合のエラーを防ぐ
         if self.data is None or self.data.empty or 'Close' not in self.data.columns:
             self.volatility = 0
-            self.value_at_risk = np.inf # リスク無限大として扱う
+            self.value_at_risk = np.inf
         else:
             self.volatility = self.calculate_volatility()
             self.value_at_risk = self.calculate_var()
 
     def calculate_volatility(self):
-        """市場ボラティリティの算出 (標準偏差ベース)"""
-        if self.data is None or self.data.empty:
+        """市場ボラティリティの算出 (標準偏差ベース, 対数リターン)"""
+        if self.data is None or self.data.empty or 'Close' not in self.data.columns:
             return 0
-        returns = np.log(self.data['Close'] / self.data['Close'].shift(1))
+        returns = np.log(self.data['Close'] / self.data['Close'].shift(1)).dropna()
         return returns.std()
 
     def calculate_var(self, confidence_level=0.95):
-        """VaR (Value at Risk) を計算"""
+        """
+        VaR (Value at Risk) を正規分布前提で計算
+        (パーセント点: zスコア × σ)
+        """
         if self.data is None or self.data.empty or len(self.data) < 2:
             return np.inf
         pct_changes = self.data['Close'].pct_change().dropna()
@@ -37,42 +39,59 @@ class RiskManager:
             return np.inf
         mean_return = np.mean(pct_changes)
         std_dev = np.std(pct_changes)
-        # 修正: パーセンタイルは (1 - confidence_level) * 100 で計算
-        return abs(mean_return - std_dev * np.percentile(pct_changes, (1 - confidence_level) * 100))
+        z_score = norm.ppf(1 - confidence_level)
+        var = abs(mean_return + z_score * std_dev)
+        return var
+
+    def calculate_var_ratio(self, price, confidence_level=0.95):
+        """
+        VaRリスク値を「現価格比」で返す（Noctus等で使う）
+        """
+        var = self.calculate_var(confidence_level)
+        if price == 0 or np.isinf(var):
+            return 1.0
+        return var / price
 
     def adjust_stop_loss(self, current_price):
-        """市場のボラティリティに基づいてダイナミックにストップロスを調整"""
+        """市場ボラティリティに応じてストップロス値を調整"""
         if self.volatility == 0:
-            return current_price * 0.95 # ボラティリティが計算できない場合は固定値
+            return current_price * 0.95
         stop_loss_level = current_price - (self.volatility * 2)
-        return max(stop_loss_level, current_price * 0.95)  # 最低保証 5% 下限
+        return max(stop_loss_level, current_price * 0.95)
 
     def detect_anomalies(self):
-        """異常検知 (価格変動の異常を Holt-Winters モデルで確認)"""
-        if self.data is None or len(self.data) < 20: # Holt-Wintersにはある程度のデータ点が必要
-            return False
+        """
+        異常検知 (Holt-Winters平滑法)
+        戻り値: (異常あり: bool, 異常リスト: list)
+        """
+        if self.data is None or len(self.data) < 20 or 'Close' not in self.data.columns:
+            return False, []
         model = ExponentialSmoothing(self.data['Close'], trend="add", seasonal=None)
         fitted_model = model.fit()
         residuals = self.data['Close'] - fitted_model.fittedvalues
-        return residuals.abs().mean() > (2 * self.volatility)  # 2σ以上の異常値
+        anomalies = self.data[residuals.abs() > (2 * self.volatility)]
+        is_anomaly = len(anomalies) > 0
+        return is_anomaly, anomalies.index.tolist()
 
     def optimal_position_size(self, capital, risk_per_trade=0.02):
-        """ポジションサイズを最適化 (資本とリスク許容度に基づく)"""
+        """ポジションサイズ最適化（資本とリスク許容度）"""
         if self.value_at_risk is None or self.value_at_risk == 0 or np.isinf(self.value_at_risk):
-            return 0 # リスクが計算できない場合はポジションを取らない
+            return 0
         return capital * risk_per_trade / self.value_at_risk
 
-# ✅ テスト例（直接実行時）
+# ✅ テスト例
 if __name__ == "__main__":
     sample_data = pd.DataFrame({'Close': np.random.normal(loc=100, scale=5, size=100)})
     risk_manager = RiskManager(sample_data)
 
     print("📊 市場ボラティリティ:", risk_manager.volatility)
     print("📉 VaR:", risk_manager.value_at_risk)
+    print("📉 VaR比率:", risk_manager.calculate_var_ratio(102))
     print("🛡️ ダイナミック・ストップロス:", risk_manager.adjust_stop_loss(102))
-    print("🚨 異常検知:", risk_manager.detect_anomalies())
+    is_anom, anom_idx = risk_manager.detect_anomalies()
+    print("🚨 異常検知:", is_anom, "異常index:", anom_idx)
     print("📐 推奨ポジションサイズ（資本10000）:", risk_manager.optimal_position_size(10000))
-    
+
     print("\n--- データなしで初期化テスト ---")
     risk_manager_no_data = RiskManager()
     print("📊 市場ボラティリティ (データなし):", risk_manager_no_data.volatility)
