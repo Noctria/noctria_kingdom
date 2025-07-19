@@ -16,12 +16,12 @@ from typing import Dict, Any
 from airflow.decorators import dag, task
 
 # --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+# ✅ Airflowが'src'モジュールを見つけられるように、プロジェクトルートをsys.pathに追加
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# ✅ 修正: 評価とログ保存の関数を正しくインポート
+# ✅ 評価とログ保存の関数を正しくインポート
 from src.core.strategy_evaluator import evaluate_strategy, log_evaluation_result
 
 # === DAG基本設定 ===
@@ -52,7 +52,7 @@ def veritas_recheck_pipeline():
         """
         logger = logging.getLogger("VeritasRecheckTask")
         dag_run = context.get("dag_run")
-        
+
         # DAG実行時に`conf`で戦略名が渡されているかチェック
         if not dag_run or not dag_run.conf or "strategy_name" not in dag_run.conf:
             error_msg = "このDAGは手動実行専用です。'strategy_name'をJSON形式で指定してください。"
@@ -65,10 +65,10 @@ def veritas_recheck_pipeline():
         try:
             # 1. 戦略を評価
             evaluation_result = evaluate_strategy(strategy_name)
-            
+
             # 2. 評価結果をログに記録
             log_evaluation_result(evaluation_result)
-            
+
             logger.info(f"戦略『{strategy_name}』の再評価と記録が完了しました。")
             return evaluation_result
 
