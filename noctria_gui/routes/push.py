@@ -13,22 +13,19 @@ import csv
 import io
 import os
 from fastapi import APIRouter, Request, Query, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 # --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: path_config.pyのリファクタリングに合わせて、正しい変数名をインポート
 from src.core.path_config import PUSH_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
-# from src.noctria_gui.services import push_service # 将来的にロジックをサービス層に分離する想定
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 router = APIRouter(prefix="/push", tags=["Push"])
-# ✅ 修正: 正しい変数名を使用
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # --- Pydanticモデル定義 ---
@@ -55,20 +52,25 @@ def get_filtered_push_logs(
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 log = json.load(f)
-            
+
             # フィルタリングロジック
-            if strategy and strategy.lower() not in log.get("strategy", "").lower(): continue
-            if tag and tag != log.get("tag", ""): continue
-            if keyword and keyword.lower() not in log.get("message", "").lower(): continue
-            
+            if strategy and strategy.lower() not in log.get("strategy", "").lower():
+                continue
+            if tag and tag != log.get("tag", ""):
+                continue
+            if keyword and keyword.lower() not in log.get("message", "").lower():
+                continue
+
             log_date_str = log.get("timestamp", "")[:10]
-            if start_date and log_date_str < start_date: continue
-            if end_date and log_date_str > end_date: continue
-            
+            if start_date and log_date_str < start_date:
+                continue
+            if end_date and log_date_str > end_date:
+                continue
+
             logs.append(log)
         except Exception as e:
             logging.error(f"Pushログファイルの読み込みに失敗しました: {file_path}, エラー: {e}")
-            
+
     return logs
 
 # --- ルート定義 ---
@@ -84,13 +86,12 @@ async def trigger_push_dag(strategy_name: str = Form(...)):
     dag_run_id = f"manual_push__{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     airflow_url = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080")
     dag_trigger_url = f"{airflow_url}/api/v1/dags/{dag_id}/dagRuns"
-    
+
     logging.info(f"DAG『{dag_id}』の起動を試みます。対象戦略: {strategy_name}")
 
     payload = {"dag_run_id": dag_run_id, "conf": {"strategy_name": strategy_name}}
 
     try:
-        # 実際のAirflow API呼び出し（requestsは非同期でないため、本番ではhttpxの非同期クライアントを推奨）
         import httpx
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -99,8 +100,8 @@ async def trigger_push_dag(strategy_name: str = Form(...)):
                 json=payload,
                 timeout=15
             )
-            response.raise_for_status() # HTTPエラーがあれば例外を発生させる
-        
+            response.raise_for_status()
+
         logging.info(f"DAGトリガー成功。Run ID: {dag_run_id}")
         return {"detail": f"✅ DAGトリガー成功 (Run ID: {dag_run_id})", "dag_run_id": dag_run_id}
 
@@ -120,7 +121,7 @@ def view_push_history(
 ):
     """フィルタリングされたPush履歴を表示する"""
     logs.sort(key=lambda x: x.get("timestamp", ""), reverse=(sort != "asc"))
-    
+
     tag_list = sorted({log.get("tag") for log in logs if log.get("tag")})
 
     total_count = len(logs)
@@ -128,7 +129,7 @@ def view_push_history(
     total_pages = max((total_count + page_size - 1) // page_size, 1)
     page = min(page, total_pages)
     start_idx = (page - 1) * page_size
-    
+
     return templates.TemplateResponse("push_history.html", {
         "request": request,
         "logs": logs[start_idx : start_idx + page_size],
