@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v2.2)
+👑 Central Governance Dashboard Route (v2.3)
 - 王国の主要な統計情報と予測分析を統合表示する。
 """
 
@@ -28,31 +28,25 @@ async def dashboard_view(request: Request):
     """
     logging.info("中央統治ダッシュボードの表示要求を受理しました。")
 
+    stats_data = {
+        "avg_win_rate": 57.1,       # 🧪 ダミーデータ（将来的に動的に差し替え）
+        "promoted_count": 8,
+        "pushed_count": 15,
+        "oracle_metrics": {}
+    }
+    forecast_data = []
+
     try:
-        # ✅ PrometheusOracle による市場予測を実行
         oracle = PrometheusOracle()
         forecast_data = oracle.predict()
-        metrics = oracle.get_metrics() if hasattr(oracle, "get_metrics") else {}
-
-        stats_data = {
-            "avg_win_rate": 57.1,  # 他のデータも将来的には動的にする
-            "promoted_count": 8,
-            "pushed_count": 15,
-            "oracle_metrics": metrics
-        }
-
-        dashboard_data = {"stats": stats_data, "forecast": forecast_data}
-        logging.info("✅ ダッシュボード用のデータ集計が完了しました。")
+        stats_data["oracle_metrics"] = oracle.get_metrics()
+        logging.info("✅ PrometheusOracle からのデータ取得に成功しました。")
 
     except Exception as e:
-        logging.error(f"ダッシュボードデータの取得中にエラーが発生: {e}", exc_info=True)
-        dashboard_data = {
-            "stats": {"oracle_metrics": {}},
-            "forecast": []
-        }
+        logging.error(f"PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "stats": dashboard_data.get("stats", {}),
-        "forecast": dashboard_data.get("forecast", [])
+        "stats": stats_data,
+        "forecast": forecast_data
     })
