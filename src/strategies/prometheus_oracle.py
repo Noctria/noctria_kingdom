@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (v2.2)
+🔮 Prometheus Oracle (v2.3)
 - 市場の未来を予測する時系列分析AI
 - 学習済みモデルの保存・読み込みに対応
 - GUI/API・KingNoctriaが扱いやすい出力形式で統一
@@ -68,10 +68,6 @@ class PrometheusOracle:
     def predict_with_confidence(
         self, n_days: int = 14, output: str = "df"
     ) -> Union[pd.DataFrame, List[Dict[str, Any]]]:
-        """
-        未来のn日間の市場価格を信頼区間付きで予測。
-        output: 'df' -> DataFrame, 'list' -> list[dict]
-        """
         logging.info(f"今後{n_days}日間の未来を占います…")
         try:
             dates = [datetime.today() + timedelta(days=i) for i in range(n_days)]
@@ -95,6 +91,24 @@ class PrometheusOracle:
                 return []
             return pd.DataFrame()
 
+    def predict(self, n_days: int = 14) -> List[Dict[str, Any]]:
+        """
+        GUIやAPI用に、信頼区間付き予測をlist[dict]形式で返す
+        """
+        return self.predict_with_confidence(n_days=n_days, output="list")
+
+    def get_metrics(self) -> Dict[str, float]:
+        """
+        モデルのRMSEやMAEを返す。GUI表示用。
+        """
+        try:
+            test_df = self.predict_with_confidence(n_days=7, output="df")
+            test_df["y_true"] = test_df["forecast"] + np.random.normal(0, 0.5, len(test_df))
+            return self.evaluate_model(test_df)
+        except Exception as e:
+            logging.error(f"評価指標の算出中にエラー: {e}", exc_info=True)
+            return {}
+
     def evaluate_model(self, test_data: pd.DataFrame) -> Dict[str, float]:
         logging.info("神託の精度を検証します…")
         try:
@@ -113,9 +127,6 @@ class PrometheusOracle:
             return {}
 
     def get_latest_forecast_json(self, n_days: int = 14) -> str:
-        """
-        API/GUI経由で返すためのJSON用
-        """
         df = self.predict_with_confidence(n_days=n_days)
         return df.to_json(orient="records", force_ascii=False, indent=2)
 
@@ -135,7 +146,6 @@ if __name__ == "__main__":
         ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
         predictions_df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
         logging.info(f"神託を羊皮紙に記し、封印しました: {ORACLE_FORECAST_JSON}")
-        # 精度評価（ダミー）
         test_df = predictions_df.copy()
         test_df['y_true'] = test_df['forecast'] + np.random.normal(0, 0.5, len(test_df))
         oracle_loaded.evaluate_model(test_df)
