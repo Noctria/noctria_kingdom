@@ -8,26 +8,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import Response
 
-# --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: 正しいインポートパスに修正
 from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ========================================
-# 🚀 FastAPI GUI アプリケーション構成
-# ========================================
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
     version="2.0.0",
 )
 
-# ========================================
-# 📁 静的ファイルとテンプレートの登録
-# ========================================
+# 静的ファイルとテンプレート
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# ✅ Jinja2 カスタムフィルタ
+# Jinja2カスタムフィルタ
 def from_json(value: str) -> Any:
     try:
         return json.loads(value)
@@ -35,9 +28,7 @@ def from_json(value: str) -> Any:
         return {}
 templates.env.filters["from_json"] = from_json
 
-# ========================================
-# 🏛️ 全ルート（機能）のインポート
-# ========================================
+# --- 機能別ルーターを全て登録 ---
 from noctria_gui.routes import (
     dashboard, home_routes, king_routes, logs_routes,
     path_checker, trigger, upload, upload_history,
@@ -50,36 +41,33 @@ from noctria_gui.routes import (
     tag_heatmap, tag_summary, tag_summary_detail
 )
 
-# ========================================
-# 🔁 ルーター登録（機能ごとのグループ化）
-# ========================================
 print("Integrating all routers into the main application...")
 
-# --- 基本ルート ---
+# --- 主要機能 ---
 app.include_router(home_routes.router)
 app.include_router(dashboard.router)
 app.include_router(king_routes.router)
 app.include_router(trigger.router)
 
-# --- ログ・履歴関連 ---
+# --- ログ・履歴 ---
 app.include_router(act_history.router)
 app.include_router(act_history_detail.router)
 app.include_router(logs_routes.router)
 app.include_router(upload_history.router)
 
-# --- PDCA・Push関連 ---
+# --- PDCA・Push ---
 app.include_router(pdca.router)
 app.include_router(pdca_recheck.router)
 app.include_router(pdca_routes.router)
 app.include_router(pdca_summary.router)
 app.include_router(push.router)
 
-# --- 戦略(Strategy)関連 ---
+# --- 戦略 ---
 app.include_router(strategy_routes.router, prefix="/strategies", tags=["strategies"])
 app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
 
-# --- 統計(Statistics)・サマリー関連 ---
+# --- 統計 ---
 app.include_router(statistics_dashboard.router, prefix="/statistics", tags=["statistics"])
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
@@ -97,11 +85,7 @@ app.include_router(upload.router)
 
 print("✅ All routers have been integrated successfully.")
 
-# ========================================
-# ✨ 便利機能
-# ========================================
+# --- favicon対策（404抑止）---
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    """ブラウザのfavicon.icoリクエストに対する404エラーを抑制するための空のレスポンス"""
     return Response(status_code=204)
-
