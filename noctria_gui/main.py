@@ -78,7 +78,7 @@ app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
 
 # --- 統計 ---
-app.include_router(statistics_dashboard.router)
+app.include_router(statistics_dashboard.router)  # ✅ prefixは各ルーター内で定義済
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
