@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v2.3)
+👑 Central Governance Dashboard Route (v2.4)
 - 王国の主要な統計情報と予測分析を統合表示する。
 """
 
@@ -26,10 +26,11 @@ async def dashboard_view(request: Request):
     """
     GET /dashboard - 中央統治ダッシュボードを表示する。
     """
-    logging.info("中央統治ダッシュボードの表示要求を受理しました。")
+    logging.info("📥 ダッシュボード表示要求を受理しました")
 
+    # ✅ 初期統計データ（将来はDB/ログ解析ベースに移行）
     stats_data = {
-        "avg_win_rate": 57.1,       # 🧪 ダミーデータ（将来的に動的に差し替え）
+        "avg_win_rate": 57.1,
         "promoted_count": 8,
         "pushed_count": 15,
         "oracle_metrics": {}
@@ -38,12 +39,24 @@ async def dashboard_view(request: Request):
 
     try:
         oracle = PrometheusOracle()
-        forecast_data = oracle.predict()
-        stats_data["oracle_metrics"] = oracle.get_metrics()
-        logging.info("✅ PrometheusOracle からのデータ取得に成功しました。")
+
+        # ✅ 予測データ取得
+        prediction = oracle.predict()
+        if isinstance(prediction, list):
+            forecast_data = prediction
+        else:
+            logging.warning("⚠️ oracle.predict() の結果がリストではありません。空として処理します。")
+            forecast_data = []
+
+        # ✅ メトリクス取得（存在する場合のみ）
+        if hasattr(oracle, "get_metrics"):
+            stats_data["oracle_metrics"] = oracle.get_metrics()
+
+        logging.info(f"✅ 予測データ件数: {len(forecast_data)}")
+        logging.info(f"✅ oracle_metrics: {stats_data['oracle_metrics']}")
 
     except Exception as e:
-        logging.error(f"PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
+        logging.error(f"❌ PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
