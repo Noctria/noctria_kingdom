@@ -18,7 +18,6 @@ import urllib.parse
 # これにより、'backend'ディレクトリへの逆流がなくなり、循環参照が解決されます。
 from core.veritas_trigger_api import trigger_recheck_dag
 
-
 router = APIRouter()
 
 @router.post("/pdca/recheck")
