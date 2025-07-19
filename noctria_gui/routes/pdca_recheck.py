@@ -47,4 +47,3 @@ async def recheck_strategy(strategy_name: str = Form(...)):
 
     query = urllib.parse.urlencode({"mode": "strategy", "key": strategy_name})
     return RedirectResponse(url=f"/statistics/detail?{query}", status_code=303)
-
