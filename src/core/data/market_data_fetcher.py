@@ -7,8 +7,10 @@ class MarketDataFetcher:
     """
     📡 Noctria Kingdomの市場情報通信塔：Yahoo Finance経由でUSDJPYの市場情報を取得。
     """
-    def __init__(self, retries=3, wait_sec=2):
+    # ❗️【修正点】'alphavantage_api_key'を引数として受け取れるように追加
+    def __init__(self, alphavantage_api_key=None, retries=3, wait_sec=2):
         self.logger = setup_logger("MarketDataFetcher")
+        self.alphavantage_api_key = alphavantage_api_key # APIキーをインスタンス変数として保持
         self.retries = retries
         self.wait_sec = wait_sec
 
