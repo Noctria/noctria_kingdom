@@ -1,22 +1,18 @@
 {% extends "base_hud.html" %}
 
 {% block title %}👑 評議会ログ履歴 - Noctria Kingdom HUD{% endblock %}
-
 {% block header_icon %}<i class="fas fa-crown"></i>{% endblock %}
 {% block header_title %}評議会ログ履歴{% endblock %}
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
 {% block content %}
-
-<!-- ⚠️ エラー表示 -->
 {% if error %}
   <div class="hud-panel" style="border: 1px solid red; background: #ffe6e6; color: darkred;">
     ⚠️ 読み込みエラー: {{ error }}
   </div>
 {% endif %}
 
-<!-- 📜 ログ表示 -->
 <section class="hud-panel log-panel">
   {% if logs %}
     <div class="table-wrapper" style="max-height: 600px; overflow-y: auto;">
@@ -24,12 +20,11 @@
         <thead>
           <tr>
             <th>🕒 日時</th>
-            <th>📜 最終判断</th>
-            <th>📘 Veritas</th>
-            <th>📈 Prometheus</th>
+            <th>👑 王命</th>
             <th>🗡️ Aurus</th>
             <th>🌊 Levia</th>
             <th>🛡️ Noctus</th>
+            <th>📝 詳細</th>
           </tr>
         </thead>
         <tbody>
@@ -38,18 +33,33 @@
           <tr>
             <td>{{ log.timestamp | default("-") }}</td>
             <td><strong>{{ r.final_decision | default("-") }}</strong></td>
-            <td>{{ r.veritas | default("-") }}</td>
             <td>
-              {% set pf = r.prometheus_forecast %}
-              {% if pf and pf.forecast is defined %}
-                {{ pf.forecast }}
+              {% if r.assessments and r.assessments.aurus_proposal %}
+                {{ r.assessments.aurus_proposal.signal | default("-") }}
               {% else %}
                 -
               {% endif %}
             </td>
-            <td>{{ r.aurus | default("-") }}</td>
-            <td>{{ r.levia | default("-") }}</td>
-            <td>{{ r.noctus | default("-") }}</td>
+            <td>
+              {% if r.assessments and r.assessments.levia_proposal %}
+                {{ r.assessments.levia_proposal.signal | default("-") }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if r.assessments and r.assessments.noctus_assessment %}
+                {{ r.assessments.noctus_assessment.decision | default("-") }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              <details>
+                <summary>全文</summary>
+                <pre style="font-size: 11px;">{{ r | tojson(indent=2) }}</pre>
+              </details>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -59,5 +69,4 @@
     <p style="text-align: center;">📭 評議会の履歴はまだ存在しません。</p>
   {% endif %}
 </section>
-
 {% endblock %}
