@@ -1,0 +1,64 @@
+flowchart TD
+
+  %% --- Veritas PDCA/マスター/再評価/再送DAG群 ---
+  subgraph Veritas_Master[Veritas Master/PDCA/Replayライン]
+    VGM["veritas_master_dag.py<br>👑 Master統括DAG"]
+    VPDCA["veritas_pdca_dag.py<br>🔁 PDCA自動ループ"]
+    VG["veritas_generate_dag.py<br>🔨 戦略生成"]
+    VE["veritas_eval_dag.py<br>📝 戦略一括評価"]
+    VA["veritas_act_record_dag.py<br>🗒️ Act（採用）記録"]
+    VS["veritas_eval_single_dag.py<br>🕹️ 単体再評価"]
+    VR["veritas_recheck_dag.py<br>🔎 戦略再評価"]
+    VPUSH["veritas_push_dag.py<br>⬆️ 戦略Push"]
+    VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
+  end
+
+  %% --- Kingdom AI層 ---
+  subgraph Kingdom統治AI[Noctria Kingdom 統治層]
+    RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
+    KING["king_noctria.py<br>統合AI"]
+  end
+
+  %% --- ストラテジAI/DAG群 ---
+  subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
+    PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
+    AA["aurus_strategy_dag.py<br>🎯 総合分析"]
+    LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
+    NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
+  end
+
+  %% --- Master/PDCA/Replayフロー ---
+  VGM -- "戦略生成" --> VG
+  VGM -- "評価" --> VE
+  VGM -- "採用記録" --> VA
+  VGM -- "GitHubPush" --> VPUSH
+  VPDCA -- "戦略生成" --> VG
+  VPDCA -- "評価" --> VE
+  VPDCA -- "採用記録" --> VA
+  VPDCA -- "GitHubPush" --> VPUSH
+
+  %% --- Veritas評価後の流れ ---
+  VG -- "戦略ファイル" --> VE
+  VE -- "評価済戦略" --> VA
+  VA -- "採用戦略情報" --> RC
+  VA -- "Push要求" --> VPUSH
+  VPUSH -- "採用戦略のGitHub記録" --> RC
+
+  %% --- Actログ/PDCA履歴も御前会議へ -->
+  VS -- "再評価情報" --> RC
+  VR -- "再評価情報" --> RC
+
+  %% --- 再送DAGの流れ（Replay） ---
+  VREPLAY -- "PDCAログから再送命令" --> RC
+
+  %% --- 御前会議/統合AIフロー ---
+  RC --> KING
+
+  %% --- 戦略AI群と統合AIの連携イメージ ---
+  KING -- "戦略判断/最終意思決定" --> PA
+  KING -- "戦略判断/最終意思決定" --> AA
+  KING -- "戦略判断/最終意思決定" --> LA
+  KING -- "戦略判断/最終意思決定" --> NA
+
+  classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
+  class VPDCA,VGM,VPUSH,VR,VREPLAY pdca;
