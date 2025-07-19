@@ -25,8 +25,8 @@
         </div>
         <div class="metric-item">
             <h3><i class="fas fa-brain"></i> ORACLE RMSE</h3>
-            {% if stats.oracle_metrics and stats.oracle_metrics.RMSE is defined %}
-                <p class="metric-value text-yellow">{{ stats.oracle_metrics.RMSE | round(4) }}</p>
+            {% if stats.oracle_metrics and 'RMSE' in stats.oracle_metrics %}
+                <p class="metric-value text-yellow">{{ stats.oracle_metrics['RMSE'] | round(4) }}</p>
             {% else %}
                 <p class="metric-value text-yellow">—</p>
             {% endif %}
@@ -60,7 +60,7 @@
             <input type="number" name="price" placeholder="PRICE" required step="any" />
             <input type="number" name="volume" placeholder="VOLUME" step="any" />
             <input type="number" name="volatility" placeholder="VOLATILITY" step="0.01" />
-            <input type="text" name="trend_prediction" placeholder="TREND (bull/bear)" />
+            <input type="text" name="trend_prediction" placeholder="TREND (bull or bear)" />
         </div>
         <button type="submit" class="hud-btn">EXECUTE</button>
     </form>
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (forecast.length > 0 && document.getElementById('forecastChart')) {
             const ctx = document.getElementById('forecastChart').getContext('2d');
             const labels = forecast.map(d => d.date || d.timestamp || "");
-            const data = forecast.map(d => d.value || d.forecast || null);
+            const data = forecast.map(d => d.forecast || null);
 
             new Chart(ctx, {
                 type: 'line',
@@ -127,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const market = {};
             for (const [k, v] of formData.entries()) market[k] = v;
             try {
-                // ※ルート例：/api/king/council（FastAPI側で設計に合わせてください）
                 const resp = await fetch("/api/king/council", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
