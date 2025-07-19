@@ -1,10 +1,11 @@
-#!/usr//bin/env python3
+#!/usr/bin/env python3
 # coding: utf-8
 
 """
 📊 /statistics/dashboard - 戦略統計HUDダッシュボード画面
 """
-import logging  # ✅ 修正: ロギング機能をインポート
+
+import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -20,9 +21,15 @@ except ImportError:
             "num_strategies": 10,
             "avg_win_rate": 58.4,
             "avg_drawdown": 11.3,
+            "tag_distribution": {
+                "Trend": 4,
+                "Reversal": 3,
+                "Breakout": 3
+            }
         }
 
-router = APIRouter()
+# ✅ 修正: prefixを追加して /statistics/dashboard に対応
+router = APIRouter(prefix="/statistics", tags=["Statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
@@ -31,13 +38,10 @@ async def statistics_dashboard(request: Request):
     """
     HUDスタイル統計ダッシュボード画面を表示
     """
-    # ✅ 修正: try...exceptブロックで囲み、エラーを確実にログに出力
     try:
         stats = get_strategy_statistics()
     except Exception as e:
-        # エラーが発生した場合は、詳細をログに出力
         logging.error(f"Failed to get strategy statistics: {e}", exc_info=True)
-        # テンプレート側でエラーにならないよう、空の辞書を渡す
         stats = {}
 
     return templates.TemplateResponse("statistics_dashboard.html", {
