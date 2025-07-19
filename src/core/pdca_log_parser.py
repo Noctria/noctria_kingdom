@@ -3,8 +3,8 @@
 
 """
 📦 core/pdca_log_parser.py
-- PDCA再評価ログ（veritas_eval_*.json）を集計・統計処理するユーティリティ
-- GUIや分析スクリプトから呼び出して再利用可能
+- PDCA再評価/採用ログ(JSON)を集計・統計処理するユーティリティ
+- GUIや分析スクリプトから再利用可能
 """
 
 from datetime import datetime
@@ -12,13 +12,13 @@ from pathlib import Path
 from collections import defaultdict
 from typing import List, Optional, Literal, Dict, Any
 import json
+import logging
 
 def parse_date_safe(date_str: str) -> Optional[datetime]:
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
-
 
 def load_and_aggregate_pdca_logs(
     log_dir: Path,
@@ -28,23 +28,21 @@ def load_and_aggregate_pdca_logs(
     limit: int = 20
 ) -> Dict[str, Any]:
     """
-    再評価ログ（JSON群）を読み取り、改善率・DD改善などを集計
+    再評価/採用ログ(JSON群)を集計。改善率・DD改善などを計算。
     """
     raw_results = []
     for file in sorted(log_dir.glob("*.json")):
         try:
             with open(file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-
             recheck_ts = data.get("recheck_timestamp")
             if not recheck_ts:
                 continue
-
             try:
                 ts = datetime.strptime(recheck_ts, "%Y-%m-%dT%H:%M:%S")
-            except Exception:
+            except Exception as e:
+                logging.warning(f"[PDCA_LOG] タイムスタンプ不正: {file} {e}")
                 continue
-
             if from_date and ts < from_date:
                 continue
             if to_date and ts > to_date:
@@ -68,7 +66,8 @@ def load_and_aggregate_pdca_logs(
                 "dd_diff": round(dd_before - dd_after, 2),
                 "status": status
             })
-        except Exception:
+        except Exception as e:
+            logging.warning(f"[PDCA_LOG] ログ読み込み失敗: {file} {e}")
             continue
 
     group_key = "strategy" if mode == "strategy" else "tag"
@@ -79,17 +78,19 @@ def load_and_aggregate_pdca_logs(
 
     detail_rows = []
     for key, group in grouped.items():
+        if not group:
+            continue
         win_before_vals = [g["win_rate_before"] for g in group]
         win_after_vals = [g["win_rate_after"] for g in group]
         dd_before_vals = [g["max_dd_before"] for g in group]
         dd_after_vals = [g["max_dd_after"] for g in group]
 
-        avg_win_rate_before = sum(win_before_vals) / len(group)
-        avg_win_rate_after = sum(win_after_vals) / len(group)
+        avg_win_rate_before = sum(win_before_vals) / len(group) if group else 0.0
+        avg_win_rate_after = sum(win_after_vals) / len(group) if group else 0.0
         avg_diff = round(avg_win_rate_after - avg_win_rate_before, 2)
 
-        avg_dd_before = sum(dd_before_vals) / len(group)
-        avg_dd_after = sum(dd_after_vals) / len(group)
+        avg_dd_before = sum(dd_before_vals) / len(group) if group else 0.0
+        avg_dd_after = sum(dd_after_vals) / len(group) if group else 0.0
         dd_diff = round(avg_dd_before - avg_dd_after, 2)
 
         adopted = any(g["status"] == "adopted" for g in group)
