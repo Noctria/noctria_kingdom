@@ -102,23 +102,27 @@
             </tr>
           </thead>
           <tbody>
-            {% for row in summary.detail %}
-            <tr>
-              <td>{{ row.strategy }}</td>
-              <td>{{ row.win_rate_before }}</td>
-              <td>{{ row.win_rate_after }}</td>
-              <td>{{ row.diff }}</td>
-              <td>{{ row.max_dd_before }}</td>
-              <td>{{ row.max_dd_after }}</td>
-              <td>{{ row.status }}</td>
-            </tr>
-            {% endfor %}
+            {% if summary.detail|length == 0 %}
+              <tr><td colspan="7" style="text-align:center; color:#888;">データがありません</td></tr>
+            {% else %}
+              {% for row in summary.detail %}
+              <tr>
+                <td>{{ row.strategy }}</td>
+                <td>{{ row.win_rate_before }}</td>
+                <td>{{ row.win_rate_after }}</td>
+                <td>{{ row.diff }}</td>
+                <td>{{ row.max_dd_before }}</td>
+                <td>{{ row.max_dd_after }}</td>
+                <td>{{ row.status }}</td>
+              </tr>
+              {% endfor %}
+            {% endif %}
           </tbody>
         </table>
     </div>
 </section>
 
-<!-- ✅ 修正: グラフ描画用のデータをこのdivに集約 -->
+<!-- ✅ グラフ描画用のデータ保持 -->
 <div id="chart-data-holder" 
      data-labels="{{ chart.labels | default([]) | tojson | safe }}"
      data-win-rate-data="{{ chart.data | default([]) | tojson | safe }}"
@@ -130,10 +134,8 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// ✅ 修正: 全てのJavaScriptを単一のイベントリスナーに集約し、エラーハンドリングを強化
 document.addEventListener('DOMContentLoaded', () => {
     const dataHolder = document.getElementById('chart-data-holder');
-    
     // --- チャート描画 ---
     if (dataHolder) {
         try {
