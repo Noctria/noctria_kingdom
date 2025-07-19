@@ -3,6 +3,7 @@
 from datetime import datetime
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
+import os
 
 # ================================================
 # ★ 修正: 新しいimportルールを適用
