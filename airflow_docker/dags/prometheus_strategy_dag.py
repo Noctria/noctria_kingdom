@@ -3,73 +3,79 @@
 
 """
 🔮 Prometheus Oracle Forecast DAG (v2.0)
-- 定期的に未来予測官プロメテウスを起動し、未来予測を生成・保存する。
+- 未来予測官プロメテウスによる定期的な未来予測DAG（テンプレ化・統一スタイル）
 """
 
-import logging
-import sys
-import os
 from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from core.path_config import ORACLE_FORECAST_JSON
 
-from airflow.decorators import dag, task
+import logging
 
-# --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-from src.strategies.prometheus_oracle import PrometheusOracle
-from src.core.path_config import ORACLE_FORECAST_JSON
-
-# === DAG基本設定 ===
+# ===============================
+# DAG共通設定
+# ===============================
 default_args = {
     'owner': 'Prometheus',
     'depends_on_past': False,
-    'start_date': datetime(2025, 7, 1),
+    'email_on_failure': False,
+    'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
 
-@dag(
-    dag_id='prometheus_oracle_forecast',
+dag = DAG(
+    dag_id='prometheus_strategy_dag',
     default_args=default_args,
-    description='未来予測官プロメテウスによる定期的な未来予測の儀',
-    schedule_interval=timedelta(days=1),  # 1日1回、神託を授かる
+    description='🔮 Noctria Kingdomの未来予測官Prometheusによる予測DAG',
+    schedule_interval=None,   # 任意実行。定期化する場合は"@daily"など
+    start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'forecasting', 'prometheus'],
 )
-def prometheus_forecasting_pipeline():
-    """
-    未来予測官プロメテウスが神託（未来予測）を生成し、王国の書庫に記録するパイプライン。
-    """
 
-    @task
-    def generate_forecast():
-        """未来予測を生成し、JSONファイルとして保存する"""
-        logger = logging.getLogger("PrometheusForecastTask")
-        logger.info("神託の儀を開始します。未来のビジョンを観測中…")
-        
-        try:
-            oracle = PrometheusOracle()
-            # 30日間の未来を予測
-            predictions_df = oracle.predict_with_confidence(n_days=30)
+# ===============================
+# Veritasデータ注入タスク（不要なら省略可）
+# ===============================
+def veritas_trigger_task(ti, **kwargs):
+    # 必要に応じて外部入力やXComで他AIと連携したい場合のみ
+    pass
 
-            if predictions_df.empty:
-                logger.warning("未来のビジョンが不明瞭です。神託は得られませんでした。")
-                return
+# ===============================
+# Prometheus予測タスク
+# ===============================
+def prometheus_forecast_task(ti, **kwargs):
+    try:
+        from strategies.prometheus_oracle import PrometheusOracle
+        import pandas as pd
 
-            # 予測結果をファイルに保存
-            ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
-            predictions_df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
-            logger.info(f"神託を羊皮紙に記し、封印しました: {ORACLE_FORECAST_JSON}")
+        logger = logging.getLogger("PrometheusForecast")
+        logger.info("神託の儀を開始します…")
 
-        except Exception as e:
-            logger.error(f"神託の儀の最中に、予期せぬ闇が発生しました: {e}", exc_info=True)
-            raise
+        oracle = PrometheusOracle()
+        predictions_df = oracle.predict_with_confidence(n_days=30)
+        if predictions_df is None or (hasattr(predictions_df, "empty") and predictions_df.empty):
+            logger.warning("神託が得られませんでした。")
+            return
 
-    # --- パイプラインの定義 ---
-    generate_forecast()
+        ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
+        predictions_df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
+        logger.info(f"神託を保存: {ORACLE_FORECAST_JSON}")
 
-# DAGのインスタンス化
-prometheus_forecasting_pipeline()
+        ti.xcom_push(key='prometheus_forecast', value=predictions_df.head(1).to_dict("records"))  # サンプルXCom
+    except Exception as e:
+        logger.error(f"神託タスク中にエラー: {e}", exc_info=True)
+        raise
+
+# ===============================
+# DAGタスク定義
+# ===============================
+with dag:
+    forecast_task = PythonOperator(
+        task_id='prometheus_oracle_forecast_task',
+        python_callable=prometheus_forecast_task,
+    )
+
+    # 必要ならveritas_task >> forecast_task
+    forecast_task
