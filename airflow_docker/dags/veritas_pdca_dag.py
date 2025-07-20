@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-🔁 Veritas PDCA Loop DAG (v2.1)
-- 戦略の「生成(Plan)」「評価(Do/Check)」「採用戦略のPush(Act)」という
-- PDCAサイクルを自動で実行するためのマスターDAG。
+🔁 Veritas PDCA Loop DAG (v2.2/統合版)
+- Veritasによる「戦略生成」「評価」「Push」のPDCAサイクルを自動化
+- マスターDAG機能（master_dagの意図も包含）一本化
 """
 
 import logging
@@ -14,20 +14,19 @@ from datetime import datetime
 
 from airflow.decorators import dag, task
 
-# --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+# --- Airflowが'src'モジュールを見つけられるようにプロジェクトルートをパス追加 ---
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# ✅ 修正: 各スクリプトからメインの処理関数をインポート
+# --- Veritas戦略関連スクリプトのインポート ---
 from src.veritas.veritas_generate_strategy import main as generate_main
 from src.veritas.evaluate_veritas import main as evaluate_main
 from src.scripts.github_push_adopted_strategies import main as push_main
 
 # === DAG内ヘルパー関数 ===
 def log_pdca_step(phase: str, status: str, message: str):
-    """PDCAの各ステップの状況をログに出力する"""
+    """PDCAの各ステップの状況をAirflowログに出力"""
     logging.info(f"PDCA LOG - [{phase}] [{status}] :: {message}")
 
 # === DAG基本設定 ===
@@ -41,14 +40,15 @@ default_args = {
 @dag(
     dag_id="veritas_pdca_loop",
     default_args=default_args,
-    description="Veritasによる自動戦略PDCAループ",
-    schedule_interval=None,
+    description="Veritasによる戦略生成・評価・Push一貫PDCAマスターDAG",
+    schedule_interval=None,  # 手動実行 or 外部トリガのみ
     catchup=False,
     tags=['veritas', 'pdca', 'master'],
 )
 def veritas_pdca_pipeline():
     """
-    Veritasの戦略生成からPushまでの一連のPDCAプロセスを管理するパイプライン。
+    Veritasの戦略創出から公式記録（Push）までのPDCA全体を統合管理。
+    今後「詳細ログ化」「フェーズ分岐」「複数戦略バッチ」等の拡張もこのDAGに集約可能。
     """
 
     @task
@@ -64,7 +64,7 @@ def veritas_pdca_pipeline():
 
     @task
     def evaluate_generated_strategy():
-        """Do & Check: 生成された戦略を評価する"""
+        """Do/Check: 生成された戦略を評価する"""
         log_pdca_step("Check", "Start", "戦略評価の儀を開始します。")
         try:
             evaluate_main()
@@ -75,8 +75,8 @@ def veritas_pdca_pipeline():
 
     @task
     def push_adopted_strategy():
-        """Act: 採用基準を満たした戦略を正式に記録（Push）する"""
-        log_pdca_step("Act", "Start", "採用されし戦略の公式記録を開始します。")
+        """Act: 採用基準を満たした戦略を公式記録（Push）"""
+        log_pdca_step("Act", "Start", "採用戦略の公式記録（Push）を開始します。")
         try:
             push_main()
             log_pdca_step("Act", "Success", "採用戦略の記録が完了しました。")
@@ -84,12 +84,12 @@ def veritas_pdca_pipeline():
             log_pdca_step("Act", "Failure", f"採用戦略の記録に失敗しました: {e}")
             raise
 
-    # --- パイプラインの定義 (PDCAのワークフロー) ---
-    generate_task = generate_strategy()
-    evaluate_task = evaluate_generated_strategy()
-    push_task = push_adopted_strategy()
+    # --- PDCAワークフロー定義 ---
+    g = generate_strategy()
+    e = evaluate_generated_strategy()
+    p = push_adopted_strategy()
 
-    generate_task >> evaluate_task >> push_task
+    g >> e >> p
 
-# DAGのインスタンス化
+# DAGのインスタンス化（Airflowが認識）
 veritas_pdca_pipeline()
