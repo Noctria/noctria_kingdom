@@ -1,0 +1,87 @@
+flowchart TD
+  subgraph GUI_Main["Noctria Kingdom GUI - main.py"]
+    direction TB
+    HomeRoutes[home_routes.py]
+    Dashboard[dashboard.py]
+    KingRoutes[king_routes.py]
+    Trigger[trigger.py]
+    Upload[upload.py]
+    UploadHistory[upload_history.py]
+    ActHistory[act_history.py]
+    ActHistoryDetail[act_history_detail.py]
+    LogsRoutes[logs_routes.py]
+    PDCA[ pdca.py & pdca_recheck.py & pdca_routes.py & pdca_summary.py ]
+    Push[push.py]
+    StrategyRoutes[strategy_routes.py]
+    StrategyDetail[strategy_detail.py]
+    StrategyHeatmap[strategy_heatmap.py]
+    Statistics[statistics_detail.py & statistics_ranking.py & statistics_scoreboard.py & statistics_tag_ranking.py & statistics_compare.py]
+    TagSummary[tag_summary.py & tag_summary_detail.py]
+    TagHeatmap[tag_heatmap.py]
+    PathChecker[path_checker.py]
+    Prometheus[prometheus_routes.py]
+  end
+
+  subgraph GUI_Flow["ルーティング構成"]
+    HomeRoutes --> Dashboard
+    Dashboard --> KingRoutes
+    KingRoutes --> Trigger
+    Trigger --> Upload
+    Upload --> UploadHistory
+    UploadHistory --> ActHistory
+    ActHistory --> ActHistoryDetail
+    ActHistoryDetail --> LogsRoutes
+    LogsRoutes --> PDCA
+    PDCA --> Push
+    Push --> StrategyRoutes
+    StrategyRoutes --> StrategyDetail
+    StrategyRoutes --> StrategyHeatmap
+    StrategyRoutes --> Statistics
+    Statistics --> TagSummary
+    TagSummary --> TagHeatmap
+    TagHeatmap --> PathChecker
+    PathChecker --> Prometheus
+  end
+
+  subgraph PDCA_Cluster["PDCA 関連ファイル群"]
+    direction TB
+    pdca[ pdca.py ]
+    pdca_recheck[ pdca_recheck.py ]
+    pdca_routes[ pdca_routes.py ]
+    pdca_summary[ pdca_summary.py ]
+  end
+
+  subgraph Statistics_Cluster["Statistics Cluster"]
+    direction TB
+    statistics_detail[ statistics_detail.py ]
+    statistics_ranking[ statistics_ranking.py ]
+    statistics_scoreboard[ statistics_scoreboard.py ]
+    statistics_tag_ranking[ statistics_tag_ranking.py ]
+    statistics_compare[ statistics_compare.py ]
+  end
+
+  subgraph Tag_Cluster["Tag統計関連"]
+    direction TB
+    tag_summary[ tag_summary.py ]
+    tag_summary_detail[ tag_summary_detail.py ]
+    tag_heatmap[ tag_heatmap.py ]
+  end
+
+  subgraph Strategy_Cluster["Strategy関連"]
+    direction TB
+    strategy_routes[strategy_routes.py]
+    strategy_detail[strategy_detail.py]
+    strategy_heatmap[strategy_heatmap.py]
+  end
+
+  %% 関連性の矢印例（主要な依存関係や流れ）
+  Dashboard --> Prometheus
+  Push --> LogsRoutes
+  StrategyRoutes --> StrategyDetail
+  Statistics --> Statistics_Cluster
+  TagSummary --> Tag_Cluster
+  StrategyHeatmap --> Strategy_Cluster
+
+  %% コメントや補足
+  classDef mainRouter fill:#223355,stroke:#66ffff,color:#cceeff,font-weight:bold
+  class GUI_Main mainRouter
