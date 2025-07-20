@@ -1,15 +1,14 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-import sys
+#!/usr/bin/env python3
+# coding: utf-8
+
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-# ✅ Noctria Kingdom v2.0 パス管理
 from core.path_config import STRATEGIES_DIR
 
-# ✅ コンテナ環境用PYTHONPATHに追加（Airflow Worker用）
-
-# ✅ DAG共通設定
+# ===============================
+# DAG共通設定
+# ===============================
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -22,14 +21,16 @@ default_args = {
 dag = DAG(
     dag_id='levia_strategy_dag',
     default_args=default_args,
-    description='⚔️ Noctria Kingdomの風刃Leviaによるスキャルピング戦略DAG（XCom対応）',
+    description='⚡ Noctria KingdomのLeviaによるスキャルピング戦略DAG',
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'scalping'],
 )
 
-# === Veritasからのデータ注入（模擬） ===
+# ===============================
+# Veritasデータ注入タスク（模擬）
+# ===============================
 def veritas_trigger_task(ti, **kwargs):
     mock_market_data = {
         "price": 1.2050,
@@ -41,10 +42,11 @@ def veritas_trigger_task(ti, **kwargs):
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
-# === Leviaによるスキャルピング判断 ===
+# ===============================
+# Leviaスキャルピング戦略タスク
+# ===============================
 def levia_strategy_task(ti, **kwargs):
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
-
     if input_data is None:
         print("⚠️ market_dataが存在しません。デフォルトデータを使用します。")
         input_data = {
@@ -55,20 +57,19 @@ def levia_strategy_task(ti, **kwargs):
             "order_block": 0.0,
             "volatility": 0.1
         }
-
     try:
-        from strategies.levia_tempest import LeviaTempest  # STRATEGIES_DIR に配置されている前提
+        from strategies.levia_tempest import LeviaTempest  # STRATEGIES_DIR 配下
         levia = LeviaTempest()
-        decision = levia.process(input_data)
-
+        decision = levia.propose(input_data)   # ← `process` ではなく `propose` で統一！（Aurusと揃える）
         ti.xcom_push(key='levia_decision', value=decision)
-        print(f"⚔️ Levia: 『王よ、我が刃はこの刻、{decision}に振るうと見定めました。』")
-
+        print(f"⚡ Levia: 『王よ、我が刃はこの刻、{decision}に振るうと見定めました。』")
     except Exception as e:
         print(f"❌ Levia戦略中にエラー発生: {e}")
         raise
 
-# === DAGタスク構成（Airflow司令官） ===
+# ===============================
+# DAGタスク定義
+# ===============================
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
