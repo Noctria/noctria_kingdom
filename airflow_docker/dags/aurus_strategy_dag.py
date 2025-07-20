@@ -1,11 +1,15 @@
+# airflow_docker/dags/aurus_strategy_dag.py
+
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from core.path_config import STRATEGIES_DIR  # 絶対パスで統一
 
-# ===============================
-# DAG共通設定
-# ===============================
+# --- 各戦略AIのPythonモジュール名とクラス名をここで指定！ ---
+STRATEGY_MODULE = "strategies.aurus_singularis"
+STRATEGY_CLASS = "AurusSingularis"
+DAG_ID = "aurus_strategy_dag"
+DESCRIPTION = "⚔️ Noctria Kingdomの戦術官Aurusによるトレンド解析DAG"
+
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -16,20 +20,18 @@ default_args = {
 }
 
 dag = DAG(
-    dag_id='aurus_strategy_dag',
+    dag_id=DAG_ID,
     default_args=default_args,
-    description='⚔️ Noctria Kingdomの戦術官Aurusによるトレンド解析DAG',
+    description=DESCRIPTION,
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=['noctria', 'trend-analysis'],
 )
 
-# ===============================
-# Veritas模擬データ生成タスク
-# ===============================
-def veritas_trigger_task(**kwargs):
+def trigger_task(**kwargs):
     ti = kwargs['ti']
+    # --- テスト用ダミーデータ、用途に応じて修正可 ---
     mock_market_data = {
         "price": 1.2345,
         "volume": 500,
@@ -37,51 +39,40 @@ def veritas_trigger_task(**kwargs):
         "trend_strength": 0.5,
         "volatility": 0.12,
         "order_block": 0.3,
-        "institutional_flow": 0.6,
-        "short_interest": 0.4,
         "momentum": 0.8,
-        "trend_prediction": 0.65,
+        "trend_prediction": "bullish",
         "liquidity_ratio": 1.1,
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
-# ===============================
-# Aurus戦略解析タスク
-# ===============================
-def aurus_strategy_task(**kwargs):
+def strategy_task(**kwargs):
     ti = kwargs['ti']
-    input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
+    input_data = ti.xcom_pull(task_ids='trigger_task', key='market_data')
 
-    if input_data is None:
-        print("⚠️ Veritasからのデータが無かったため、デフォルトデータを使用します")
-        input_data = {key: 0.0 for key in [
+    if not input_data:
+        input_data = {k: 0.0 for k in [
             "price", "volume", "sentiment", "trend_strength", "volatility",
-            "order_block", "institutional_flow", "short_interest", "momentum",
-            "trend_prediction", "liquidity_ratio"
+            "order_block", "momentum", "trend_prediction", "liquidity_ratio"
         ]}
-
     try:
-        from strategies.aurus_singularis import AurusSingularis
-        aurus = AurusSingularis()
-        decision = aurus.propose(input_data)
-        ti.xcom_push(key='aurus_decision', value=decision)
-        print(f"🔮 Aurusの戦略判断: {decision}")
+        # --- モジュール・クラスを変数から動的import ---
+        import importlib
+        strategy_module = importlib.import_module(STRATEGY_MODULE)
+        StrategyClass = getattr(strategy_module, STRATEGY_CLASS)
+        strategy = StrategyClass()
+        decision = strategy.propose(input_data)
+        ti.xcom_push(key='strategy_decision', value=decision)
+        print(f"🔮 {STRATEGY_CLASS}の戦略判断: {decision}")
     except Exception as e:
-        print(f"❌ Aurus戦略中にエラー発生: {e}")
-        raise
+        print(f"❌ {STRATEGY_CLASS}戦略中にエラー発生: {e}")
 
-# ===============================
-# DAGタスク定義
-# ===============================
 with dag:
-    veritas_task = PythonOperator(
-        task_id='veritas_trigger_task',
-        python_callable=veritas_trigger_task,
+    t1 = PythonOperator(
+        task_id='trigger_task',
+        python_callable=trigger_task,
     )
-
-    aurus_task = PythonOperator(
-        task_id='aurus_trend_analysis_task',
-        python_callable=aurus_strategy_task,
+    t2 = PythonOperator(
+        task_id='strategy_analysis_task',
+        python_callable=strategy_task,
     )
-
-    veritas_task >> aurus_task
+    t1 >> t2
