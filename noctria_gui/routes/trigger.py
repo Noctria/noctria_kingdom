@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 # --- 王国の基盤モジュールをインポート ---
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
-# from src.core.dag_trigger import trigger_dag # 将来的にDAG実行モジュールをインポートする想定
+from airflow.api.common.experimental import trigger_dag  # Airflow APIでDAGをトリガー
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
@@ -21,6 +21,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+# DAGをトリガーする関数
+def trigger_airflow_dag(dag_id: str, reason: str):
+    try:
+        # 実際にAirflow DAGをトリガーする
+        trigger_dag(dag_id=dag_id, run_id=f"{dag_id}_manual_{reason}", conf={"reason": reason})
+        logging.info(f"DAG『{dag_id}』の起動に成功しました。")
+        return {"status": "success", "message": f"DAG『{dag_id}』の起動に成功しました。"}
+    except Exception as e:
+        logging.error(f"DAG『{dag_id}』の起動に失敗しました: {str(e)}")
+        return {"status": "error", "message": f"DAG『{dag_id}』の起動に失敗しました: {str(e)}"}
 
 @router.get("/trigger", response_class=HTMLResponse)
 async def get_trigger_page(request: Request):
@@ -28,7 +38,6 @@ async def get_trigger_page(request: Request):
     GET /trigger - 王命を発令するためのフォーム画面を表示する。
     """
     return templates.TemplateResponse("trigger.html", {"request": request})
-
 
 @router.post("/trigger")
 async def handle_trigger_command(manual_reason: str = Form(...)):
@@ -40,25 +49,13 @@ async def handle_trigger_command(manual_reason: str = Form(...)):
     logging.info(f"王命を受理しました。DAG『{dag_id_to_trigger}』の起動を試みます。理由: {manual_reason}")
 
     try:
-        # 実際のAirflow DAGトリガー処理（将来的に有効化）
-        # from src.core.dag_trigger import trigger_dag
-        # result = trigger_dag(dag_id=dag_id_to_trigger, reason=manual_reason)
+        # 実際のAirflow DAGトリガー処理
+        result = trigger_airflow_dag(dag_id=dag_id_to_trigger, reason=manual_reason)
         
-        # ダミー処理
-        import time
-        import random
-        time.sleep(2)  # 処理にかかる時間をシミュレート
-        if random.random() < 0.9:  # 90%の確率で成功
-            result = {
-                "status": "success",
-                "message": f"王命は滞りなく発令されました。DAG『{dag_id_to_trigger}』が起動しました。",
-                "dag_id": dag_id_to_trigger,
-                "reason": manual_reason
-            }
-            logging.info(f"DAG『{dag_id_to_trigger}』の起動に成功しました。")
+        if result['status'] == 'success':
             return JSONResponse(content=result)
         else:
-            raise Exception("Airflowスケジューラへの接続に失敗しました。")
+            raise Exception(result['message'])
 
     except Exception as e:
         error_message = f"王命の発令に失敗しました。詳細: {e}"
