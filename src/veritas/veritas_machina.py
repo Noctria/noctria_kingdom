@@ -2,10 +2,10 @@
 # coding: utf-8
 
 """
-🧠 Veritas Strategist (v2.3)
+🧠 Veritas Strategist (v2.4)
 - LLM等を用いて新たな取引戦略を自動生成し、評価・選定まで担うAI
-- 生成/評価の標準出力・エラーを必ずファイルに記録
-- 合格戦略ランキング（topN）も返却対応
+- 生成/評価の標準出力・エラーをファイル保存
+- パラメータ柔軟渡し対応
 """
 
 import subprocess
@@ -44,16 +44,29 @@ class VeritasStrategist:
         except Exception as e:
             logging.error(f"{desc}ログ保存時にエラー: {e}")
 
-    def propose(self, top_n: int = 5) -> Dict[str, Any]:
+    def _build_cli_args(self, param_dict: Dict[str, Any]) -> List[str]:
+        """パラメータdictを ['--key', 'value', ...] のCLIリストに変換"""
+        args = []
+        for k, v in param_dict.items():
+            args.append(f"--{k}")
+            # True/Falseはstr化
+            if isinstance(v, bool):
+                v = str(v).lower()
+            args.append(str(v))
+        return args
+
+    def propose(self, top_n: int = 5, **params) -> Dict[str, Any]:
         """
         新たな戦略を生成・評価し、最良と判断したものを王に提案する。
-        top_n: ランキング返却件数（合格戦略が少なければ全件）
+        top_n: ランキング返却件数
+        **params: サブプロセス（生成・評価）にそのままCLIで渡す柔軟パラメータ群
         """
         # 1. 戦略生成
         try:
-            logging.info("新たな戦略の創出を開始します…")
+            logging.info(f"新たな戦略の創出を開始します…（パラメータ: {params}）")
+            cli_args = self._build_cli_args(params)
             res = subprocess.run(
-                ["python", str(VERITAS_GENERATE_SCRIPT)],
+                ["python", str(VERITAS_GENERATE_SCRIPT)] + cli_args,
                 check=True, capture_output=True, text=True
             )
             self._save_subprocess_output(res, self.generate_log_path, "VERITAS GENERATE")
@@ -66,9 +79,10 @@ class VeritasStrategist:
 
         # 2. 評価
         try:
-            logging.info("生成された戦略の評価の儀を開始します…")
+            logging.info(f"生成された戦略の評価の儀を開始します…（パラメータ: {params}）")
+            cli_args = self._build_cli_args(params)
             res = subprocess.run(
-                ["python", str(VERITAS_EVALUATE_SCRIPT)],
+                ["python", str(VERITAS_EVALUATE_SCRIPT)] + cli_args,
                 check=True, capture_output=True, text=True
             )
             self._save_subprocess_output(res, self.evaluate_log_path, "VERITAS EVALUATE")
@@ -89,7 +103,6 @@ class VeritasStrategist:
                 msg = "全ての戦略が評価基準を満たしませんでした。"
                 logging.warning(msg)
                 return {"type": "strategy_proposal", "status": "REJECTED", "detail": msg, "strategy_rankings": []}
-            # ランキング生成（final_capital降順, 最大top_n件）
             rankings: List[dict] = sorted(
                 passed_strategies,
                 key=lambda r: r.get("final_capital", 0),
@@ -102,7 +115,8 @@ class VeritasStrategist:
                 "type": "strategy_proposal",
                 "status": "PROPOSED",
                 "strategy_details": best_strategy,
-                "strategy_rankings": rankings
+                "strategy_rankings": rankings,
+                "params": params
             }
         except FileNotFoundError:
             msg = f"評価の記録（{VERITAS_EVAL_LOG}）が見つかりません。"
@@ -119,7 +133,7 @@ class VeritasStrategist:
 if __name__ == "__main__":
     logging.info("--- 戦略立案官ヴェリタス、単独試練の儀を開始 ---")
     strategist = VeritasStrategist()
-    proposal = strategist.propose(top_n=5)
+    proposal = strategist.propose(top_n=5, risk=0.01, symbol="USDJPY", lookback=180)
     print("\n👑 王への進言（Veritas）:")
     print(json.dumps(proposal, indent=4, ensure_ascii=False))
     logging.info("\n--- 戦略立案官ヴェリタス、単独試練の儀を完了 ---")
