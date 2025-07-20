@@ -40,16 +40,15 @@ async def handle_trigger_command(manual_reason: str = Form(...)):
     logging.info(f"王命を受理しました。DAG『{dag_id_to_trigger}』の起動を試みます。理由: {manual_reason}")
 
     try:
-        # --- ここで実際のAirflow DAGトリガー処理を呼び出す ---
+        # 実際のAirflow DAGトリガー処理（将来的に有効化）
         # from src.core.dag_trigger import trigger_dag
         # result = trigger_dag(dag_id=dag_id_to_trigger, reason=manual_reason)
-        # ----------------------------------------------------
-
-        # (ダミー処理)
+        
+        # ダミー処理
         import time
         import random
-        time.sleep(2) # 処理にかかる時間をシミュレート
-        if random.random() < 0.9: # 90%の確率で成功
+        time.sleep(2)  # 処理にかかる時間をシミュレート
+        if random.random() < 0.9:  # 90%の確率で成功
             result = {
                 "status": "success",
                 "message": f"王命は滞りなく発令されました。DAG『{dag_id_to_trigger}』が起動しました。",
@@ -73,4 +72,3 @@ async def handle_trigger_command(manual_reason: str = Form(...)):
                 "error_details": str(e)
             }
         )
-
