@@ -5,7 +5,7 @@ flowchart LR
     HOME["home_routes (noctria_gui/routes/home.py) -> home.html"]
     DASHBOARD["dashboard (noctria_gui/routes/dashboard.py) -> dashboard.html"]
     KING["king_routes (noctria_gui/routes/king_routes.py) -> king_history.html"]
-    TRIGGER["trigger (noctria_gui/routes/trigger.py) -> trigger.html"]
+    TRIGGER["trigger (noctria_gui/routes/trigger.py) -> trigger.html<br><u>src/core/dag_trigger.py経由でAirflow DAGトリガー処理</u>"]
     UPLOAD["upload (noctria_gui/routes/upload.py) -> upload_strategy.html"]
     UPLOAD_HISTORY["upload_history (noctria_gui/routes/upload_history.py) -> upload_history.html"]
     ACT_HISTORY["act_history (noctria_gui/routes/act_history.py) -> act_history.html"]
@@ -99,3 +99,7 @@ flowchart LR
   %% 戦略関連 Routes
   STRATEGY_ROUTES --> STRATEGY_DETAIL
   STRATEGY_ROUTES --> STRATEGY_HEATMAP
+
+  %% GUIのDAGトリガー連携（src/core/dag_trigger.py経由）
+  TRIGGER -.->|trigger_dag()| src_core_dag_trigger["src/core/dag_trigger.py<br>Airflow DAGトリガー連携"]
+  src_core_dag_trigger --> PDCA
