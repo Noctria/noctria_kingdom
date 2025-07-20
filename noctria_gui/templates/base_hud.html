@@ -26,7 +26,7 @@
             {% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
             {% block header_title %}NOCTRIA HUD{% endblock %}
         </div>
-        <a href="{% block header_nav_href %}#{% endblock %}" class="nav-item-back hud-btn">
+        <a href="{% block header_nav_href %}{% endblock %}" class="nav-item-back hud-btn">
             <i class="fas fa-arrow-left"></i>
             <span>{% block header_nav_text %}Back{% endblock %}</span>
         </a>
@@ -38,11 +38,9 @@
     </div>
 
     <!-- 🧱 ページコンテンツ -->
-    <main>
-
+    <main style="min-height: 300px; padding: 1rem;">
         {% block content %}
         {% endblock %}
-
     </main>
 
 </div>
