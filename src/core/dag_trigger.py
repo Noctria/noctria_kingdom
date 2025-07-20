@@ -12,6 +12,7 @@ Airflow REST API を使った DAG トリガー処理モジュール
 import os
 import requests
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 # Airflow Webserver のベースURL（例: "http://localhost:8080/api/v1"）
 AIRFLOW_API_BASE_URL = os.getenv("AIRFLOW_API_BASE_URL", "http://localhost:8080/api/v1")
@@ -59,8 +60,6 @@ class AirflowDagTrigger:
 
         if execution_date is not None:
             # Airflow APIではISO8601フォーマットが必要
-            from datetime import datetime
-
             dt = datetime.fromisoformat(execution_date)
             if replace_microseconds:
                 dt = dt.replace(microsecond=0)
