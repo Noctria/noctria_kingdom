@@ -1,4 +1,5 @@
-flowchart TD
+flowchart LR
+  %% メインGUI部分を1つのサブグラフとして整理
   subgraph GUI_Main["noctria_gui/main.py"]
     direction TB
     HOME["home_routes (noctria_gui/routes/home.py) -> home.html"]
@@ -30,7 +31,9 @@ flowchart TD
     PROMETHEUS_ROUTES["prometheus_routes (noctria_gui/routes/prometheus_routes.py)"]
   end
 
+  %% サービス部分を別サブグラフに分ける
   subgraph Services["noctria_gui/services"]
+    direction TB
     ACT_LOG_SERVICE["act_log_service (noctria_gui/services/act_log_service.py)"]
     DASHBOARD_SERVICE["dashboard_service (noctria_gui/services/dashboard_service.py)"]
     PUSH_HISTORY_SERVICE["push_history_service (noctria_gui/services/push_history_service.py)"]
