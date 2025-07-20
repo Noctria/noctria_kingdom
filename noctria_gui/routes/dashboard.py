@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v2.5)
+👑 Central Governance Dashboard Route (v2.6)
 - 王国の主要な統計情報と予測分析を統合表示する。
 """
 
@@ -28,7 +28,6 @@ async def dashboard_view(request: Request):
     """
     logging.info("📥 ダッシュボード表示要求を受理しました")
 
-    # ✅ 初期統計データ（将来はDB/ログ解析ベースに移行）
     stats_data = {
         "avg_win_rate": 57.1,
         "promoted_count": 8,
@@ -42,19 +41,28 @@ async def dashboard_view(request: Request):
 
         # ✅ 予測データ取得
         prediction = oracle.predict()
-        if isinstance(prediction, list):
+        if isinstance(prediction, list) and all(isinstance(p, dict) for p in prediction):
             forecast_data = prediction
         else:
-            logging.warning("⚠️ oracle.predict() の結果がリストではありません。空として処理します。")
+            logging.warning("⚠️ oracle.predict() の結果形式が不正です。")
             forecast_data = []
+
+        # ✅ 空リスト対策ログ
+        if not forecast_data:
+            logging.warning("⚠️ 予測データが空です。Chart.js が描画をスキップする可能性があります。")
 
         # ✅ メトリクス取得
         if hasattr(oracle, "get_metrics"):
             stats_data["oracle_metrics"] = oracle.get_metrics()
 
+        # ✅ ダッシュボードログ出力
         logging.info(f"✅ 予測データ件数: {len(forecast_data)}")
-        logging.debug(f"📊 forecast_data preview: {forecast_data[:2]}")
+        if forecast_data:
+            logging.debug(f"📊 forecast_data preview: {forecast_data[:2]}")
         logging.info(f"✅ oracle_metrics: {stats_data['oracle_metrics']}")
+
+        # ✅ オプション：JSON出力してChart.js側で読み込めるようにする（必要なら）
+        # oracle.write_forecast_json(n_days=14)
 
     except Exception as e:
         logging.error(f"❌ PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
