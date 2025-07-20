@@ -17,6 +17,7 @@ class RiskManager:
         self.data = historical_data
 
         if self.data is None or self.data.empty or 'Close' not in self.data.columns:
+            logging.warning("【RiskManager初期化】リスク計算に必要なデータ（'Close'列）が欠損しています。")
             self.volatility = 0
             self.value_at_risk = np.inf
         else:
@@ -26,7 +27,7 @@ class RiskManager:
     def calculate_volatility(self):
         """市場ボラティリティの算出 (標準偏差ベース, 対数リターン)"""
         if self.data is None or self.data.empty or 'Close' not in self.data.columns:
-            logging.warning("リスク計算に必要なデータが欠損しています（ボラティリティ）")
+            logging.warning("【RiskManager】ボラティリティ算出時にデータが欠損しています。")
             return 0
         returns = np.log(self.data['Close'] / self.data['Close'].shift(1)).dropna()
         return returns.std()
@@ -40,16 +41,20 @@ class RiskManager:
         - VaRは損失額として正値のみ返す
         """
         if self.data is None or self.data.empty or len(self.data) < 2:
-            logging.warning("リスク計算に必要なデータが欠損しています（VaR）")
+            logging.warning("【RiskManager】VaR算出時に十分なデータがありません。")
+            return np.inf
+        if 'Close' not in self.data.columns:
+            logging.warning("【RiskManager】VaR算出時に必要な'Close'カラムがありません。")
             return np.inf
         pct_changes = self.data['Close'].pct_change().dropna()
         if pct_changes.empty:
+            logging.warning("【RiskManager】VaR算出時、リターン系列が空です。")
             return np.inf
         mean_return = np.mean(pct_changes)
         std_dev = np.std(pct_changes)
-        z_score = norm.ppf(confidence_level)  # ←ここが修正版
-        var = -(mean_return + z_score * std_dev)  # 負値が損失側
-        return max(var, 0.0)  # 損失額は0未満にはならない
+        z_score = norm.ppf(confidence_level)
+        var = -(mean_return + z_score * std_dev)
+        return max(var, 0.0)
 
     def calculate_var_ratio(self, price, confidence_level=0.95):
         """
@@ -73,6 +78,7 @@ class RiskManager:
         戻り値: (異常あり: bool, 異常リスト: list)
         """
         if self.data is None or len(self.data) < 20 or 'Close' not in self.data.columns:
+            logging.warning("【RiskManager】異常検知に必要なデータが不足しています。")
             return False, []
         try:
             model = ExponentialSmoothing(self.data['Close'], trend="add", seasonal=None)
@@ -88,6 +94,7 @@ class RiskManager:
     def optimal_position_size(self, capital, risk_per_trade=0.02):
         """ポジションサイズ最適化（資本とリスク許容度）"""
         if self.value_at_risk is None or self.value_at_risk == 0 or np.isinf(self.value_at_risk):
+            logging.warning("【RiskManager】ポジションサイズ計算時、VaR値が無効です。")
             return 0
         return capital * risk_per_trade / self.value_at_risk
 
