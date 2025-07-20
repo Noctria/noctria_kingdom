@@ -1,64 +1,122 @@
 flowchart TD
 
-  %% --- Veritas PDCA/マスター/再評価/再送DAG群 ---
-  subgraph Veritas_Master[Veritas Master/PDCA/Replayライン]
-    VGM["veritas_master_dag.py<br>👑 Master統括DAG"]
-    VPDCA["veritas_pdca_dag.py<br>🔁 PDCA自動ループ"]
-    VG["veritas_generate_dag.py<br>🔨 戦略生成"]
-    VE["veritas_eval_dag.py<br>📝 戦略一括評価"]
-    VA["veritas_act_record_dag.py<br>🗒️ Act（採用）記録"]
-    VS["veritas_eval_single_dag.py<br>🕹️ 単体再評価"]
-    VR["veritas_recheck_dag.py<br>🔎 戦略再評価"]
-    VPUSH["veritas_push_dag.py<br>⬆️ 戦略Push"]
-    VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
-  end
+%% --- Veritas PDCA/マスター/再評価/再送DAG群 ---
+subgraph Veritas_Master[Veritas Master/PDCA/Replayライン]
+  VGM["veritas_master_dag.py<br>👑 Master統括DAG"]
+  VPDCA["veritas_pdca_dag.py<br>🔁 PDCA自動ループ"]
+  VG["veritas_generate_dag.py<br>🔨 戦略生成"]
+  VE["veritas_eval_dag.py<br>📝 戦略一括評価"]
+  VA["veritas_act_record_dag.py<br>🗒️ Act（採用）記録"]
+  VS["veritas_eval_single_dag.py<br>🕹️ 単体再評価"]
+  VR["veritas_recheck_dag.py<br>🔎 戦略再評価"]
+  VPUSH["veritas_push_dag.py<br>⬆️ 戦略Push"]
+  VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
+end
 
-  %% --- Kingdom AI層 ---
-  subgraph Kingdom統治AI[Noctria Kingdom 統治層]
-    RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
-    KING["king_noctria.py<br>統合AI"]
-  end
+%% --- Kingdom AI層 ---
+subgraph Kingdom統治AI[Noctria Kingdom 統治層]
+  RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
+  KING["king_noctria.py<br>統合AI"]
+end
 
-  %% --- ストラテジAI/DAG群 ---
-  subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
-    PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
-    AA["aurus_strategy_dag.py<br>🎯 総合分析"]
-    LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
-    NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
-  end
+%% --- ストラテジAI/DAG群 ---
+subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
+  PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
+  AA["aurus_strategy_dag.py<br>🎯 総合分析"]
+  LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
+  NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
+end
 
-  %% --- Master/PDCA/Replayフロー ---
-  VGM -- "戦略生成" --> VG
-  VGM -- "評価" --> VE
-  VGM -- "採用記録" --> VA
-  VGM -- "GitHubPush" --> VPUSH
-  VPDCA -- "戦略生成" --> VG
-  VPDCA -- "評価" --> VE
-  VPDCA -- "採用記録" --> VA
-  VPDCA -- "GitHubPush" --> VPUSH
+%% --- LLM層 ---
+subgraph LLM層[Noctria LLM層]
+  LLM_MAIN["main.py<br>🚪 LLMサーバ（評価API）"]
+  LLM_SERVER["veritas_llm_server.py<br>🧠 LLM生成サーバ"]
+  LLM_PROMPT["llm_prompt_builder.py<br>📜 プロンプトビルダー"]
+  LLM_EVALAPI["veritas_eval_api.py<br>📄 評価ログAPI"]
+end
 
-  %% --- Veritas評価後の流れ ---
-  VG -- "戦略ファイル" --> VE
-  VE -- "評価済戦略" --> VA
-  VA -- "採用戦略情報" --> RC
-  VA -- "Push要求" --> VPUSH
-  VPUSH -- "採用戦略のGitHub記録" --> RC
+%% --- GUI/API層 ---
+subgraph GUI_API[GUI・API・外部連携]
+  GUI["FastAPI/Streamlit<br>🖥️ GUI・REST API"]
+  API["外部APIトリガー<br>🔗 API Endpoint"]
+end
 
-  %% --- Actログ/PDCA履歴も御前会議へ -->
-  VS -- "再評価情報" --> RC
-  VR -- "再評価情報" --> RC
+%% --- データ・ファイル層 ---
+subgraph DATA["データ/成果物ストア"]
+  GIT["GitHub<br>📦 戦略リポジトリ"]
+  ACTLOG["PDCA/Actログ<br>📜"]
+  STRATJSON["戦略ファイル群<br>🗂️"]
+  EVALRES["評価結果<br>📊"]
+end
 
-  %% --- 再送DAGの流れ（Replay） ---
-  VREPLAY -- "PDCAログから再送命令" --> RC
+%% --- Master/PDCA/Replayフロー ---
+VGM -- "戦略生成" --> VG
+VGM -- "評価" --> VE
+VGM -- "採用記録" --> VA
+VGM -- "GitHubPush" --> VPUSH
+VPDCA -- "戦略生成" --> VG
+VPDCA -- "評価" --> VE
+VPDCA -- "採用記録" --> VA
+VPDCA -- "GitHubPush" --> VPUSH
 
-  %% --- 御前会議/統合AIフロー ---
-  RC --> KING
+%% --- Veritas評価後の流れ ---
+VG -- "戦略ファイル" --> STRATJSON
+STRATJSON -- "評価対象" --> VE
+VE -- "評価済戦略" --> EVALRES
+EVALRES -- "評価結果" --> VA
+VA -- "採用戦略情報" --> ACTLOG
+ACTLOG -- "Act/履歴" --> RC
+VA -- "Push要求" --> VPUSH
+VPUSH -- "GitHubコミット" --> GIT
+GIT -- "リポジトリ状態" --> RC
 
-  %% --- 戦略AI群と統合AIの連携イメージ ---
-  KING -- "戦略判断/最終意思決定" --> PA
-  KING -- "戦略判断/最終意思決定" --> AA
-  KING -- "戦略判断/最終意思決定" --> LA
-  KING -- "戦略判断/最終意思決定" --> NA
+%% --- Actログ/PDCA履歴も御前会議へ -->
+VS -- "再評価情報" --> ACTLOG
+VR -- "再評価情報" --> ACTLOG
 
-  classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
-  class VPDCA,VGM,VPUSH,VR,VREPLAY pdca;
+%% --- 再送DAGの流れ（Replay） ---
+VREPLAY -- "PDCAログから再送命令" --> ACTLOG
+
+%% --- 御前会議/統合AIフロー ---
+RC --> KING
+
+%% --- 戦略AI群と統合AIの連携イメージ ---
+KING -- "戦略判断/最終意思決定" --> PA
+KING -- "戦略判断/最終意思決定" --> AA
+KING -- "戦略判断/最終意思決定" --> LA
+KING -- "戦略判断/最終意思決定" --> NA
+
+%% --- GUI⇔PDCA連携 ---
+GUI -- "DAGトリガ/可視化" --> VPDCA
+GUI -- "レポート/戦略表示" --> RC
+API -- "パラメータ入力" --> VPDCA
+
+%% --- GUI・API⇔成果物 ---
+GUI -- "履歴DL/CSV" --> ACTLOG
+GUI -- "評価データ閲覧" --> EVALRES
+
+%% --- LLM層連携 ---
+%% --- LLM生成サーバとプロンプト ---
+LLM_SERVER -- "テンプレ読込" --> LLM_PROMPT
+%% --- LLM生成API（戦略生成）---
+VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
+GUI -- "戦略自動生成<br>/generate" --> LLM_SERVER
+LLM_SERVER -- "生成結果" --> VG
+%% --- LLM評価API（評価ログ取得）---
+LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_MAIN
+LLM_MAIN -- "評価ログ取得" --> GUI
+%% --- LLMサーバ：評価データへの依存 ---
+LLM_MAIN -- "veritas_eval_result.json" --- EVALRES
+LLM_EVALAPI -- "veritas_eval_result.json" --- EVALRES
+
+%% --- 依存（点線） ---
+LLM_SERVER -.-> LLM_PROMPT
+
+classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
+class VPDCA,VGM,VPUSH,VR,VREPLAY pdca;
+classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
+class GUI,API gui;
+classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
+class GIT,ACTLOG,STRATJSON,EVALRES data;
+classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
+class LLM_MAIN,LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
