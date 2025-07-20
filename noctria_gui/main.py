@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import Response
+from fastapi.responses import Response, RedirectResponse
 from starlette.responses import FileResponse
 
 from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
@@ -105,6 +105,13 @@ app.include_router(prometheus_routes.router)
 app.include_router(upload.router)
 
 logger.info("✅ All routers have been integrated successfully.")
+
+# ─────────────────────────────
+# 🏰 トップページからダッシュボードへリダイレクト
+# ─────────────────────────────
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    return RedirectResponse(url="/dashboard")
 
 # ─────────────────────────────
 # 🖼 favicon.ico対策（404抑止）
