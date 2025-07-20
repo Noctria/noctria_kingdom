@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# --- 各戦略AIのPythonモジュール名とクラス名をここで指定！ ---
 STRATEGY_MODULE = "strategies.aurus_singularis"
 STRATEGY_CLASS = "AurusSingularis"
 DAG_ID = "aurus_strategy_dag"
@@ -31,7 +30,10 @@ dag = DAG(
 
 def trigger_task(**kwargs):
     ti = kwargs['ti']
-    # --- テスト用ダミーデータ、用途に応じて修正可 ---
+    conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+    reason = conf.get("reason", "理由未指定")
+    print(f"【Aurusトリガータスク・発令理由】{reason}")
+
     mock_market_data = {
         "price": 1.2345,
         "volume": 500,
@@ -42,11 +44,16 @@ def trigger_task(**kwargs):
         "momentum": 0.8,
         "trend_prediction": "bullish",
         "liquidity_ratio": 1.1,
+        "trigger_reason": reason,  # 理由もデータに記録
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
 
 def strategy_task(**kwargs):
     ti = kwargs['ti']
+    conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+    reason = conf.get("reason", "理由未指定")
+    print(f"【Aurus解析タスク・発令理由】{reason}")
+
     input_data = ti.xcom_pull(task_ids='trigger_task', key='market_data')
 
     if not input_data:
@@ -55,14 +62,15 @@ def strategy_task(**kwargs):
             "order_block", "momentum", "trend_prediction", "liquidity_ratio"
         ]}
     try:
-        # --- モジュール・クラスを変数から動的import ---
         import importlib
         strategy_module = importlib.import_module(STRATEGY_MODULE)
         StrategyClass = getattr(strategy_module, STRATEGY_CLASS)
         strategy = StrategyClass()
         decision = strategy.propose(input_data)
-        ti.xcom_push(key='strategy_decision', value=decision)
-        print(f"🔮 {STRATEGY_CLASS}の戦略判断: {decision}")
+        # 発令理由も決定内容に残す
+        result = {"decision": decision, "reason": reason}
+        ti.xcom_push(key='strategy_decision', value=result)
+        print(f"🔮 {STRATEGY_CLASS}の戦略判断: {result}")
     except Exception as e:
         print(f"❌ {STRATEGY_CLASS}戦略中にエラー発生: {e}")
 
@@ -70,9 +78,11 @@ with dag:
     t1 = PythonOperator(
         task_id='trigger_task',
         python_callable=trigger_task,
+        provide_context=True
     )
     t2 = PythonOperator(
         task_id='strategy_analysis_task',
         python_callable=strategy_task,
+        provide_context=True
     )
     t1 >> t2
