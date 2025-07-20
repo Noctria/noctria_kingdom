@@ -8,7 +8,8 @@ from src.core.path_config import CATEGORY_MAP
 router = APIRouter()
 templates = Jinja2Templates(directory="noctria_gui/templates")
 
-@router.get("/path-check", response_class=HTMLResponse)
+# 📄 フォーム表示
+@router.get("/path-check", response_class=HTMLResponse, name="path_check_form")
 async def path_check_form(request: Request):
     categories = list(CATEGORY_MAP.keys())
     return templates.TemplateResponse("path_checker.html", {
@@ -17,7 +18,8 @@ async def path_check_form(request: Request):
         "result": None
     })
 
-@router.get("/path-check/run", response_class=HTMLResponse)
+# 🚀 実行結果表示（HTML）
+@router.get("/path-check/run", response_class=HTMLResponse, name="run_check_path_checker")
 async def run_check(request: Request, category: str = "all", strict: bool = False):
     command = ["python3", "tools/verify_path_config.py", "--json"]
     if category != "all":
@@ -44,7 +46,8 @@ async def run_check(request: Request, category: str = "all", strict: bool = Fals
         "result": result_json
     })
 
-@router.get("/api/check-paths")
+# 🧪 APIエンドポイント（JSON）
+@router.get("/api/check-paths", name="check_paths_api_unique")
 async def check_paths_api(category: str = "all", strict: bool = False):
     command = ["python3", "tools/verify_path_config.py", "--json"]
     if category != "all":
