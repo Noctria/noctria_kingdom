@@ -2,17 +2,10 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import sys
-
-# ========================================
-# 🔁 DAG構成：Actフェーズ記録ログを保存
-# ========================================
-
-# ✅ パス管理モジュールの追加（Noctria Kingdom標準構成）
-from core.path_config import VERITAS_DIR
 import os
-sys.path.append(str(VERITAS_DIR))
 
-# ✅ 実行対象スクリプト
+from core.path_config import VERITAS_DIR
+
 SCRIPT_PATH = VERITAS_DIR / "record_act_log.py"
 
 default_args = {
@@ -21,6 +14,17 @@ default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=1),
 }
+
+def run_record_act_log(**kwargs):
+    # Airflowのconf（理由等）受信
+    conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+    reason = conf.get("reason", "理由未指定")
+    print(f"⚙️ 実行中: {SCRIPT_PATH}｜理由: {reason}")
+
+    # record_act_log.pyへ理由も引数で渡す
+    exit_code = os.system(f"python {SCRIPT_PATH} \"{reason}\"")
+    if exit_code != 0:
+        raise RuntimeError(f"record_act_log.py 実行失敗: exit code {exit_code}")
 
 with DAG(
     dag_id="veritas_act_record_dag",
@@ -32,13 +36,10 @@ with DAG(
     tags=["veritas", "act", "pdca"],
 ) as dag:
 
-    def run_record_act_log():
-        print(f"⚙️ 実行中: {SCRIPT_PATH}")
-        os.system(f"python {SCRIPT_PATH}")
-
     record_act = PythonOperator(
         task_id="record_act_log",
         python_callable=run_record_act_log,
+        provide_context=True
     )
 
     record_act
