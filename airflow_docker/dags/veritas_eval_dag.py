@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-✅ Veritas Evaluation Pipeline DAG (v2.0)
+✅ Veritas Evaluation Pipeline DAG (v2.1 conf対応)
 - Veritasが生成した戦略を動的に評価し、採用/不採用を判断し、その結果を記録する。
-- 動的タスクマッピング（.expand）を用いて、複数の戦略を並列で効率的に評価する。
+- conf（理由等）を全タスクで受信・記録可能
 """
 
 import os
@@ -13,20 +13,18 @@ import json
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any
+import logging
 
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, get_current_context
 
-# --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
+# --- パス調整
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR, ACT_LOG_DIR
-# ✅ 修正: リファクタリング後のモジュールを正しくインポート
 from src.core.strategy_evaluator import evaluate_strategy, log_evaluation_result
 
-# === DAG基本設定 ===
 default_args = {
     'owner': 'VeritasCouncil',
     'depends_on_past': False,
@@ -45,16 +43,19 @@ default_args = {
 def veritas_evaluation_pipeline():
     """
     Veritasが生成した戦略を動的に評価し、採用するパイプライン
+    conf（理由等）も全タスクで受信・記録可能
     """
 
     @task
     def get_strategies_to_evaluate() -> List[str]:
-        """`veritas_generated`ディレクトリから評価対象の戦略ファイル名（ID）のリストを取得する"""
+        ctx = get_current_context()
+        conf = ctx["dag_run"].conf if ctx.get("dag_run") and ctx["dag_run"].conf else {}
+        reason = conf.get("reason", "理由未指定")
+        logging.info(f"【Veritas評価タスク開始・発令理由】{reason}")
+
         if not STRATEGIES_VERITAS_GENERATED_DIR.exists():
             logging.warning(f"⚠️ 戦略生成ディレクトリが存在しません: {STRATEGIES_VERITAS_GENERATED_DIR}")
             return []
-        
-        # .pyで終わり、__で始まらないファイル名（拡張子なし）をリスト化
         new_strategies = [
             f.stem for f in STRATEGIES_VERITAS_GENERATED_DIR.iterdir()
             if f.is_file() and f.suffix == '.py' and not f.name.startswith('__')
@@ -64,41 +65,42 @@ def veritas_evaluation_pipeline():
 
     @task
     def evaluate_one_strategy(strategy_id: str) -> Dict[str, Any]:
-        """単一の戦略を評価し、結果を辞書として返す"""
-        import logging
-        logging.info(f"📊 評価開始: {strategy_id}")
+        ctx = get_current_context()
+        conf = ctx["dag_run"].conf if ctx.get("dag_run") and ctx["dag_run"].conf else {}
+        reason = conf.get("reason", "理由未指定")
+        logging.info(f"📊 評価開始: {strategy_id}【発令理由】{reason}")
         try:
-            # ✅ 修正: リファクタリング後のevaluate_strategyを呼び出す
             result = evaluate_strategy(strategy_id)
             result["status"] = "ok"
+            result["trigger_reason"] = reason  # 結果にも理由記録
         except Exception as e:
             logging.error(f"🚫 評価エラー: {strategy_id} ➜ {e}", exc_info=True)
-            result = {"strategy": strategy_id, "status": "error", "error_message": str(e)}
-            
+            result = {
+                "strategy": strategy_id,
+                "status": "error",
+                "error_message": str(e),
+                "trigger_reason": reason
+            }
         return result
 
     @task
     def log_all_results(evaluation_results: List[Dict]):
-        """全ての評価結果をループして、個別のログファイルとして保存する"""
-        import logging
+        ctx = get_current_context()
+        conf = ctx["dag_run"].conf if ctx.get("dag_run") and ctx["dag_run"].conf else {}
+        reason = conf.get("reason", "理由未指定")
+        logging.info(f"📝 {len(evaluation_results) if evaluation_results else 0}件の評価結果を王国の書庫に記録します…【発令理由】{reason}")
         if not evaluation_results:
             logging.info("評価対象の戦略がなかったため、ログ記録をスキップします。")
             return
 
-        logging.info(f"📝 {len(evaluation_results)}件の評価結果を王国の書庫に記録します…")
         for result in evaluation_results:
             if result.get("status") == "ok":
-                # ✅ 修正: リファクタリング後のlog_evaluation_resultを呼び出す
                 log_evaluation_result(result)
         logging.info("✅ 全ての評価記録の保存が完了しました。")
 
     # --- パイプラインの定義 ---
     strategy_ids = get_strategies_to_evaluate()
-    
-    # 動的タスクマッピング: 戦略IDのリストを元に、並列で評価タスクを生成
     evaluated_results = evaluate_one_strategy.expand(strategy_id=strategy_ids)
-    
-    # 全ての評価が終わってから、結果を集約してログに記録
     log_all_results(evaluation_results=evaluated_results)
 
 # DAGのインスタンス化
