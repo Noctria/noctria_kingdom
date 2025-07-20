@@ -74,21 +74,26 @@ class RiskManager:
 
     def detect_anomalies(self):
         """
-        異常検知 (Holt-Winters平滑法)
+        異常検知 (Holt-Winters平滑法, 例外ラップ付)
         戻り値: (異常あり: bool, 異常リスト: list)
         """
         if self.data is None or len(self.data) < 20 or 'Close' not in self.data.columns:
             logging.warning("【RiskManager】異常検知に必要なデータが不足しています。")
             return False, []
         try:
-            model = ExponentialSmoothing(self.data['Close'], trend="add", seasonal=None)
-            fitted_model = model.fit()
-            residuals = self.data['Close'] - fitted_model.fittedvalues
-            anomalies = self.data[residuals.abs() > (2 * self.volatility)]
-            is_anomaly = len(anomalies) > 0
-            return is_anomaly, anomalies.index.tolist()
-        except Exception as e:
-            logging.error(f"異常検知中にエラー: {e}")
+            # 例外ラップをfit含めた全体に適用
+            try:
+                model = ExponentialSmoothing(self.data['Close'], trend="add", seasonal=None)
+                fitted_model = model.fit()
+                residuals = self.data['Close'] - fitted_model.fittedvalues
+                anomalies = self.data[residuals.abs() > (2 * self.volatility)]
+                is_anomaly = len(anomalies) > 0
+                return is_anomaly, anomalies.index.tolist()
+            except Exception as e_inner:
+                logging.error(f"【RiskManager】異常検知モデル構築/予測エラー: {e_inner}")
+                return False, []
+        except Exception as e_outer:
+            logging.error(f"【RiskManager】異常検知全体の予期せぬエラー: {e_outer}")
             return False, []
 
     def optimal_position_size(self, capital, risk_per_trade=0.02):
