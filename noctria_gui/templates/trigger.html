@@ -14,10 +14,21 @@
 <section class="hud-panel">
   <h2 class="panel-title"><i class="fas fa-gavel"></i> ISSUE A ROYAL COMMAND (INITIATE PDCA)</h2>
   <p class="panel-description">
-    ここで王命を発令すると、王国の中枢であるPDCA最適化プロセス（noctria_kingdom_pdca_optimization_loop）が手動で起動されます。
+    ここで王命を発令すると、王国の中枢であるPDCA最適化プロセス（Airflow DAG）が手動で起動されます。
   </p>
-  <!-- ✅ 修正: JavaScriptで処理するため、formタグにIDを付与 -->
   <form id="triggerForm" class="filter-form" style="gap: 1rem;">
+    <label for="dag_id" class="hud-label">
+      🗂️ DAGを選択:
+    </label>
+    <select id="dag_id" name="dag_id" class="hud-input" required>
+      {% if dag_list %}
+        {% for dag in dag_list %}
+          <option value="{{ dag }}">{{ dag }}</option>
+        {% endfor %}
+      {% else %}
+        <option value="">-- DAGが取得できません --</option>
+      {% endif %}
+    </select>
     <label for="manual_reason" class="hud-label">
       📜 REASON FOR DECREE:
     </label>
@@ -29,7 +40,6 @@
   </form>
 </section>
 
-<!-- ✅ 修正: 結果表示エリアを初期状態で用意 -->
 <section id="resultPanel" class="hud-panel" style="margin-top: 1.5rem; display: none;">
   <h2 class="panel-title"><i class="fas fa-scroll"></i> EXECUTION RESULT</h2>
   <div id="resultContent" class="result-content"
@@ -41,7 +51,6 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- ✅ 追加: 非同期でフォームを送信し、結果を動的に表示するJavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const triggerForm = document.getElementById('triggerForm');
@@ -49,10 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultPanel = document.getElementById('resultPanel');
   const resultContent = document.getElementById('resultContent');
   const reasonInput = document.getElementById('manual_reason');
+  const dagSelect = document.getElementById('dag_id');
 
   if (triggerForm) {
     triggerForm.addEventListener('submit', async (event) => {
-      event.preventDefault(); // デフォルトのフォーム送信（ページリロード）をキャンセル
+      event.preventDefault();
 
       // ボタンを無効化し、ローディング表示に変更
       submitBtn.disabled = true;
@@ -67,17 +77,17 @@ document.addEventListener('DOMContentLoaded', () => {
           },
           // フォームデータをURLエンコード形式で送信
           body: new URLSearchParams({
+            'dag_id': dagSelect.value,
             'manual_reason': reasonInput.value
           })
         });
-        
+
         const data = await response.json();
 
         // 結果を表示
         resultPanel.style.display = 'block';
         if (response.ok) {
           resultContent.style.color = 'var(--cyan)';
-          // JSONを整形して表示
           resultContent.textContent = JSON.stringify(data, null, 2);
         } else {
           resultContent.style.color = 'var(--magenta)';
@@ -85,13 +95,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
       } catch (error) {
-        // ネットワークエラーなど
         resultPanel.style.display = 'block';
         resultContent.style.color = 'var(--magenta)';
         resultContent.textContent = `通信エラーが発生しました: ${error.message}`;
         console.error('Trigger Error:', error);
       } finally {
-        // ボタンの状態を元に戻す
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-play-circle"></i> 発令する';
       }
