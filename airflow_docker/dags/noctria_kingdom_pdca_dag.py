@@ -5,6 +5,7 @@
 🏰 Noctria Kingdom PDCA + Royal Decision 統合DAG
 - Optunaによる複数ワーカーのパラメータ探索＆MetaAI/Kingdom昇格＋王の最終意思決定まで一貫自動化
 - paramsでworker数/試行回数/スケジュール/王決断時追加処理も柔軟制御
+- GUI経由トリガー時のconf（reason等）も完全受け取り
 """
 
 import logging
@@ -71,6 +72,11 @@ with DAG(
 
     # --- 1. 並列Optuna最適化タスク ---
     def optimize_worker_task(worker_id: int, **kwargs):
+        # 【conf取得】GUIからの理由等
+        conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+        reason = conf.get("reason", "理由未指定")
+        logger.info(f"【実行理由】worker_{worker_id}: {reason}")
+
         n_trials = kwargs["params"].get("n_trials", 100)
         logger.info(f"🎯 学者{worker_id}が叡智を探求中（試行: {n_trials}）")
         best_params = optimize_main(n_trials=n_trials)
@@ -84,6 +90,10 @@ with DAG(
     def select_best_params_task(**kwargs):
         ti = kwargs["ti"]
         worker_count = kwargs["params"].get("worker_count", 3)
+        conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+        reason = conf.get("reason", "理由未指定")
+        logger.info(f"【選定理由】{reason}")
+
         results = []
         for i in range(1, worker_count+1):
             params = ti.xcom_pull(task_ids=f"optimize_worker_{i}", key="return_value")
@@ -102,6 +112,10 @@ with DAG(
     def apply_metaai_task(**kwargs):
         ti = kwargs["ti"]
         best_params = ti.xcom_pull(key="best_params", task_ids="select_best_params")
+        conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+        reason = conf.get("reason", "理由未指定")
+        logger.info(f"【MetaAI適用理由】{reason}")
+
         if not best_params:
             logger.warning("MetaAI適用に使えるベストパラメータがありません")
             return None
@@ -114,6 +128,10 @@ with DAG(
     def apply_kingdom_task(**kwargs):
         ti = kwargs["ti"]
         model_info = ti.xcom_pull(task_ids="apply_best_params_to_metaai", key="return_value")
+        conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+        reason = conf.get("reason", "理由未指定")
+        logger.info(f"【Kingdom昇格理由】{reason}")
+
         if not model_info:
             logger.warning("王国昇格用のモデル情報がありません")
             return None
@@ -124,8 +142,10 @@ with DAG(
 
     # --- 5. 王の最終判断タスク（Royal Decision） ---
     def royal_decision_task(**kwargs):
+        conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+        reason = conf.get("reason", "理由未指定")
+        logger.info(f"【王決断理由】{reason}")
         logger.info("👑 王Noctria: 四臣の報を受け取り、最終決断の儀を執り行います。")
-        # ↓ここで本番運用なら遅延import推奨（重い場合）
         try:
             from noctria_ai.noctria import Noctria
             king = Noctria()
@@ -142,27 +162,32 @@ with DAG(
             task_id=f"optimize_worker_{i}",
             python_callable=optimize_worker_task,
             op_kwargs={"worker_id": i},
+            provide_context=True
         ) for i in range(1, dag.params["worker_count"]+1)
     ]
 
     select_best = PythonOperator(
         task_id="select_best_params",
         python_callable=select_best_params_task,
+        provide_context=True
     )
 
     apply_metaai = PythonOperator(
         task_id="apply_best_params_to_metaai",
         python_callable=apply_metaai_task,
+        provide_context=True
     )
 
     apply_kingdom = PythonOperator(
         task_id="apply_best_params_to_kingdom",
         python_callable=apply_kingdom_task,
+        provide_context=True
     )
 
     royal_decision = PythonOperator(
         task_id="royal_decision",
         python_callable=royal_decision_task,
+        provide_context=True
     )
 
     # --- 依存関係 ---
