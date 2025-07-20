@@ -41,6 +41,12 @@ class MarketDataFetcher:
                 return None
 
             data = response.json()
+
+            # --- レートリミット（APIリミット）判定 ---
+            if "Note" in data:
+                self.logger.warning(f"Alpha Vantage APIリミット制限に到達: {data['Note']}")
+                return None
+
             time_series = data.get("Time Series FX (5min)")
             if not time_series:
                 self.logger.error("APIレスポンスに 'Time Series FX (5min)' がありません。")
@@ -107,6 +113,11 @@ class MarketDataFetcher:
             response = requests.get(self.base_url, params=params, timeout=10)
             data = response.json()
 
+            # --- レートリミット（APIリミット）判定 ---
+            if "Note" in data:
+                self.logger.warning(f"Alpha Vantage APIリミット制限に到達: {data['Note']}")
+                return pd.DataFrame()
+
             if "Time Series FX (Daily)" not in data:
                 self.logger.warning("為替日次データが見つかりません")
                 return pd.DataFrame()
@@ -124,4 +135,3 @@ class MarketDataFetcher:
         except Exception as e:
             self.logger.error(f"日次データ取得エラー: {e}")
             return pd.DataFrame()
-
