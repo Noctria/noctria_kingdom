@@ -2,8 +2,9 @@
 # coding: utf-8
 
 """
-🛡️ Noctus Sentinella Risk Assessment DAG (v2.0)
+🛡️ Noctus Sentinella Risk Assessment DAG (v2.1 conf対応)
 - 守護者ノクトゥスによる市場リスク評価の自動化DAG
+- GUI/RESTからのトリガー理由（conf["reason"]）も全タスクで記録・活用可
 """
 
 from datetime import datetime, timedelta
@@ -14,9 +15,6 @@ from core.path_config import STRATEGIES_DIR
 import pandas as pd
 import numpy as np
 
-# ===============================
-# DAG共通設定
-# ===============================
 default_args = {
     'owner': 'Noctria',
     'depends_on_past': False,
@@ -36,11 +34,12 @@ dag = DAG(
     tags=['noctria', 'risk_management', 'noctus'],
 )
 
-# ===============================
-# Veritasデータ注入タスク（模擬）
-# ===============================
-def veritas_trigger_task(ti, **kwargs):
-    # テスト用のダミーヒストリカルデータ
+def veritas_trigger_task(**kwargs):
+    ti = kwargs['ti']
+    conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+    reason = conf.get("reason", "理由未指定")
+    print(f"【Noctusトリガータスク・発令理由】{reason}")
+
     dummy_hist_data = pd.DataFrame({
         'Close': np.random.normal(loc=150, scale=2, size=100)
     })
@@ -51,15 +50,18 @@ def veritas_trigger_task(ti, **kwargs):
         "volume": 150,
         "spread": 0.012,
         "volatility": 0.15,
-        "historical_data": dummy_hist_data.to_json()
+        "historical_data": dummy_hist_data.to_json(),
+        "trigger_reason": reason,
     }
     ti.xcom_push(key='market_data', value=mock_market_data)
     ti.xcom_push(key='proposed_action', value="BUY")  # 他臣下の提案（例：BUY）
 
-# ===============================
-# Noctusリスク評価タスク
-# ===============================
-def noctus_strategy_task(ti, **kwargs):
+def noctus_strategy_task(**kwargs):
+    ti = kwargs['ti']
+    conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+    reason = conf.get("reason", "理由未指定")
+    print(f"【Noctusリスク評価タスク・発令理由】{reason}")
+
     input_data = ti.xcom_pull(task_ids='veritas_trigger_task', key='market_data')
     proposed_action = ti.xcom_pull(task_ids='veritas_trigger_task', key='proposed_action')
 
@@ -73,34 +75,34 @@ def noctus_strategy_task(ti, **kwargs):
             "volume": 100,
             "spread": 0.01,
             "volatility": 0.10,
-            "historical_data": dummy_hist_data.to_json()
+            "historical_data": dummy_hist_data.to_json(),
+            "trigger_reason": reason,
         }
         proposed_action = "HOLD"
 
     try:
-        from strategies.noctus_sentinella import NoctusSentinella  # STRATEGIES_DIR 配下
-        # JSON→DataFrame復元
+        from strategies.noctus_sentinella import NoctusSentinella
         input_data['historical_data'] = pd.read_json(input_data['historical_data'])
         noctus = NoctusSentinella()
         decision = noctus.assess(input_data, proposed_action)
-        ti.xcom_push(key='noctus_assessment', value=decision)
-        print(f"🛡️ Noctus: 『王よ、この状況のリスク評価は{decision}です。』")
+        result = {"assessment": decision, "reason": reason}
+        ti.xcom_push(key='noctus_assessment', value=result)
+        print(f"🛡️ Noctus: 『王よ、この状況のリスク評価は{decision}です。』【発令理由】{reason}")
     except Exception as e:
         print(f"❌ Noctus戦略中にエラー発生: {e}")
         raise
 
-# ===============================
-# DAGタスク定義
-# ===============================
 with dag:
     veritas_task = PythonOperator(
         task_id='veritas_trigger_task',
         python_callable=veritas_trigger_task,
+        provide_context=True
     )
 
     noctus_task = PythonOperator(
         task_id='noctus_risk_assessment_task',
         python_callable=noctus_strategy_task,
+        provide_context=True
     )
 
     veritas_task >> noctus_task
