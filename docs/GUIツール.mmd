@@ -101,5 +101,5 @@ flowchart LR
   STRATEGY_ROUTES --> STRATEGY_HEATMAP
 
   %% GUIのDAGトリガー連携（src/core/dag_trigger.py経由）
-  TRIGGER -.->|trigger_dag()| src_core_dag_trigger["src/core/dag_trigger.py\nAirflow DAGトリガー連携"]
+  TRIGGER -.-> src_core_dag_trigger["src/core/dag_trigger.py\nAirflow DAGトリガー連携"]
   src_core_dag_trigger --> PDCA
