@@ -1,2 +1,3 @@
 noctria_kingdom_pdca.pyをnoctria_kingdom_pdca_dag.pyに統合
 noctria_royal_dag.pyをnoctria_kingdom_pdca_dag.pyに統合
+veritas_master_dag.pyをveritas_pdca_dag.pyに統合
