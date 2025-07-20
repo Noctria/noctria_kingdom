@@ -39,6 +39,7 @@ end
 subgraph PlanData["src/plan_data（PDCA-Plan根拠/分析クラスタ）"]
   PLAN_COLLECT["collector.py<br>ログ収集・統合"]
   PLAN_STAT["statistics.py<br>指標/集計"]
+  PLAN_ANALYZER["analyzer.py<br>要因分析・特徴量抽出"]
   PLAN_PROMPT["llm_plan_prompt.py<br>LLM用プロンプト生成"]
   PLAN_ANOMALY["anomaly_detector.py<br>異常検知"]
 end
@@ -114,8 +115,8 @@ LLM_EVALAPI -- "veritas_eval_result.json" --- EVALRES
 
 %% --- PlanData層連携 ---
 PLAN_COLLECT -- "データ/ログ収集" --> PLAN_STAT
-PLAN_STAT -- "分析結果" --> PLAN_PROMPT
-PLAN_PROMPT -- "PDCAプロンプト" --> LLM_MAIN
+PLAN_STAT -- "分析結果" --> PLAN_ANALYZER
+PLAN_ANALYZER -- "要因抽出/特徴分析" --> PLAN_PROMPT
 PLAN_STAT -- "異常値・ドリフト分析" --> PLAN_ANOMALY
 PLAN_ANOMALY -- "異常/逸脱情報" --> PLAN_PROMPT
 
