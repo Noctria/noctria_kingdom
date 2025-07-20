@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from scipy.stats import norm
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 class RiskManager:
     """Noctria Kingdom のリスク管理モジュール"""
@@ -23,6 +26,7 @@ class RiskManager:
     def calculate_volatility(self):
         """市場ボラティリティの算出 (標準偏差ベース, 対数リターン)"""
         if self.data is None or self.data.empty or 'Close' not in self.data.columns:
+            logging.warning("リスク計算に必要なデータが欠損しています（ボラティリティ）")
             return 0
         returns = np.log(self.data['Close'] / self.data['Close'].shift(1)).dropna()
         return returns.std()
@@ -30,18 +34,22 @@ class RiskManager:
     def calculate_var(self, confidence_level=0.95):
         """
         VaR (Value at Risk) を正規分布前提で計算
-        (パーセント点: zスコア × σ)
+        金融実務でよく使われる「右側信頼区間」基準。
+        - z_score = norm.ppf(confidence_level)
+        - 損失側リスクは負方向なので -(mean + z*std)
+        - VaRは損失額として正値のみ返す
         """
         if self.data is None or self.data.empty or len(self.data) < 2:
+            logging.warning("リスク計算に必要なデータが欠損しています（VaR）")
             return np.inf
         pct_changes = self.data['Close'].pct_change().dropna()
         if pct_changes.empty:
             return np.inf
         mean_return = np.mean(pct_changes)
         std_dev = np.std(pct_changes)
-        z_score = norm.ppf(1 - confidence_level)
-        var = abs(mean_return + z_score * std_dev)
-        return var
+        z_score = norm.ppf(confidence_level)  # ←ここが修正版
+        var = -(mean_return + z_score * std_dev)  # 負値が損失側
+        return max(var, 0.0)  # 損失額は0未満にはならない
 
     def calculate_var_ratio(self, price, confidence_level=0.95):
         """
@@ -66,12 +74,16 @@ class RiskManager:
         """
         if self.data is None or len(self.data) < 20 or 'Close' not in self.data.columns:
             return False, []
-        model = ExponentialSmoothing(self.data['Close'], trend="add", seasonal=None)
-        fitted_model = model.fit()
-        residuals = self.data['Close'] - fitted_model.fittedvalues
-        anomalies = self.data[residuals.abs() > (2 * self.volatility)]
-        is_anomaly = len(anomalies) > 0
-        return is_anomaly, anomalies.index.tolist()
+        try:
+            model = ExponentialSmoothing(self.data['Close'], trend="add", seasonal=None)
+            fitted_model = model.fit()
+            residuals = self.data['Close'] - fitted_model.fittedvalues
+            anomalies = self.data[residuals.abs() > (2 * self.volatility)]
+            is_anomaly = len(anomalies) > 0
+            return is_anomaly, anomalies.index.tolist()
+        except Exception as e:
+            logging.error(f"異常検知中にエラー: {e}")
+            return False, []
 
     def optimal_position_size(self, capital, risk_per_trade=0.02):
         """ポジションサイズ最適化（資本とリスク許容度）"""
