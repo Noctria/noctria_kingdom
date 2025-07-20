@@ -2,10 +2,7 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (v2.4)
-- 市場の未来を予測する時系列分析AI
-- 学習済みモデルの保存・読み込みに対応
-- GUI/API・KingNoctriaが扱いやすい出力形式で統一
+🔮 Prometheus Oracle (v2.5 - fixed)
 """
 
 import numpy as np
@@ -19,7 +16,7 @@ import logging
 from src.core.path_config import MODELS_DIR, MARKET_DATA_CSV, ORACLE_FORECAST_JSON
 from src.core.settings import ALPHAVANTAGE_API_KEY
 
-# ✅ 安全性のため MarketDataFetcher が存在しない場合はダミーで定義
+# ✅ ダミー MarketDataFetcher
 try:
     from src.core.data_loader import MarketDataFetcher
 except ImportError:
@@ -84,6 +81,8 @@ class PrometheusOracle:
                 "upper": y_upper.round(2),
             })
 
+            logging.debug("🔍 生成された予測データ:\n%s", df.head(2).to_string(index=False))
+
             if output == "list":
                 return df.to_dict(orient="records")
             return df
@@ -92,7 +91,10 @@ class PrometheusOracle:
             return [] if output == "list" else pd.DataFrame()
 
     def predict(self, n_days: int = 14) -> List[Dict[str, Any]]:
-        return self.predict_with_confidence(n_days=n_days, output="list")
+        result = self.predict_with_confidence(n_days=n_days, output="list")
+        if not result:
+            logging.warning("⚠️ ORACLEからの予測リストが空です。")
+        return result
 
     def get_metrics(self) -> Dict[str, float]:
         try:
@@ -117,9 +119,6 @@ class PrometheusOracle:
             return {}
 
     def write_forecast_json(self, n_days: int = 14):
-        """
-        Chart.js用データをJSONとして保存（GUI表示のために必要）
-        """
         df = self.predict_with_confidence(n_days=n_days)
         try:
             ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -128,9 +127,8 @@ class PrometheusOracle:
         except Exception as e:
             logging.error(f"神託JSONの保存に失敗: {e}")
 
-# ─────────────────────────────────────────────
-# ✅ テスト実行ブロック
-# ─────────────────────────────────────────────
+
+# ✅ テストブロック
 if __name__ == "__main__":
     logging.info("--- Prometheus Oracle Test Start ---")
     oracle = PrometheusOracle()
