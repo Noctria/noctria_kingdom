@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-🏰 Noctria Kingdom PDCA統合DAG (optuna並列最適化 + モデル適用)
-- Optunaによる複数ワーカーのパラメータ探索＆MetaAI/Kingdom昇格まで一貫自動化
-- paramsでworker数/試行回数/スケジュールを柔軟制御
+🏰 Noctria Kingdom PDCA + Royal Decision 統合DAG
+- Optunaによる複数ワーカーのパラメータ探索＆MetaAI/Kingdom昇格＋王の最終意思決定まで一貫自動化
+- paramsでworker数/試行回数/スケジュール/王決断時追加処理も柔軟制御
 """
 
 import logging
@@ -57,12 +57,12 @@ default_args = {
 
 with DAG(
     dag_id="noctria_kingdom_pdca_dag",
-    description="🏰 Noctria KingdomのPDCA統合DAG（Optuna最適化→MetaAI→Kingdom昇格）",
+    description="🏰 Noctria KingdomのPDCA統合DAG（Optuna最適化→MetaAI→Kingdom昇格→王の最終判断）",
     default_args=default_args,
     schedule_interval="@daily",   # paramsでNoneにもできる
     start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=["noctria", "kingdom", "pdca", "metaai"],
+    tags=["noctria", "kingdom", "pdca", "metaai", "royal"],
     params={
         "worker_count": 3,    # 並列ワーカー数
         "n_trials": 100       # Optuna試行回数
@@ -73,7 +73,6 @@ with DAG(
     def optimize_worker_task(worker_id: int, **kwargs):
         n_trials = kwargs["params"].get("n_trials", 100)
         logger.info(f"🎯 学者{worker_id}が叡智を探求中（試行: {n_trials}）")
-        # それぞれワーカー名をstudy_name等で識別しても良い
         best_params = optimize_main(n_trials=n_trials)
         if not best_params:
             logger.warning(f"worker_{worker_id}: 最適パラメータが得られませんでした")
@@ -93,7 +92,6 @@ with DAG(
         if not results:
             logger.warning("全ワーカーの結果が空です")
             return None
-        # スコアが含まれている前提で、最良のものを選ぶ（カスタマイズ可）
         def score_of(p): return p.get("score", 0)
         best = max(results, key=score_of)
         logger.info(f"選定された最良パラメータ: {best}")
@@ -124,6 +122,20 @@ with DAG(
         logger.info("王国戦略昇格完了")
         return result
 
+    # --- 5. 王の最終判断タスク（Royal Decision） ---
+    def royal_decision_task(**kwargs):
+        logger.info("👑 王Noctria: 四臣の報を受け取り、最終決断の儀を執り行います。")
+        # ↓ここで本番運用なら遅延import推奨（重い場合）
+        try:
+            from noctria_ai.noctria import Noctria
+            king = Noctria()
+            result = king.execute_trade()
+            logger.info(f"👑 王の御宣託：{result}")
+            return result
+        except Exception as e:
+            logger.error(f"王決断フェーズで例外発生: {e}")
+            return f"王の決断失敗: {e}"
+
     # --- タスク生成 ---
     workers = [
         PythonOperator(
@@ -148,6 +160,10 @@ with DAG(
         python_callable=apply_kingdom_task,
     )
 
-    # --- 依存関係 ---
-    workers >> select_best >> apply_metaai >> apply_kingdom
+    royal_decision = PythonOperator(
+        task_id="royal_decision",
+        python_callable=royal_decision_task,
+    )
 
+    # --- 依存関係 ---
+    workers >> select_best >> apply_metaai >> apply_kingdom >> royal_decision
