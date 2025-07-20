@@ -23,6 +23,10 @@ class MarketDataFetcher:
             self.logger.addHandler(handler)
 
     def fetch_data(self, symbol: str = "USDJPY") -> Optional[Dict[str, Any]]:
+        """
+        5分足データ1点＋直近10本のvolatility等を取得
+        正常時: Dict[str, Any] / エラー時: None
+        """
         if not self.api_key:
             self.logger.error("APIキーが設定されていません。")
             return None
@@ -93,13 +97,19 @@ class MarketDataFetcher:
             self.logger.warning(f"トレンド解析失敗: {e}")
             return "neutral"
 
-    def fetch_daily_data(self, from_symbol: str = "USD", to_symbol: str = "JPY", max_days: int = 90) -> pd.DataFrame:
+    def fetch_daily_data(
+        self, from_symbol: str = "USD", to_symbol: str = "JPY", max_days: int = 90
+    ) -> pd.DataFrame:
         """
         📅 Alpha Vantage から日次為替データ（終値）を取得
+        正常時: DataFrame(columns=["date", "close"])
+        異常時: columns=["date", "close"]の空DataFrame
         """
+        EMPTY_DF = pd.DataFrame(columns=["date", "close"])
+
         if not self.api_key:
             self.logger.error("APIキーが設定されていません。")
-            return pd.DataFrame()
+            return EMPTY_DF
 
         params = {
             "function": "FX_DAILY",
@@ -116,11 +126,11 @@ class MarketDataFetcher:
             # --- レートリミット（APIリミット）判定 ---
             if "Note" in data:
                 self.logger.warning(f"Alpha Vantage APIリミット制限に到達: {data['Note']}")
-                return pd.DataFrame()
+                return EMPTY_DF
 
             if "Time Series FX (Daily)" not in data:
                 self.logger.warning("為替日次データが見つかりません")
-                return pd.DataFrame()
+                return EMPTY_DF
 
             raw = data["Time Series FX (Daily)"]
             records = [
@@ -130,8 +140,8 @@ class MarketDataFetcher:
             df = pd.DataFrame(records)
             df["date"] = pd.to_datetime(df["date"])
             df = df.sort_values("date").reset_index(drop=True)
-            return df.tail(max_days)
+            return df.tail(max_days)[["date", "close"]]
 
         except Exception as e:
             self.logger.error(f"日次データ取得エラー: {e}")
-            return pd.DataFrame()
+            return EMPTY_DF
