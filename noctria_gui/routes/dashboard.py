@@ -2,8 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v2.7)
-- 王国の主要な統計情報と予測分析を統合表示する。
+👑 Central Governance Dashboard Route (v2.8)
 """
 
 import logging
@@ -36,15 +35,32 @@ async def dashboard_view(request: Request):
         oracle = PrometheusOracle()
         logging.info("📤 oracle.predict() 実行")
         prediction = oracle.predict()
-        logging.info(f"🧾 predict() 結果タイプ: {type(prediction)}, 内容例: {prediction[:1] if isinstance(prediction, list) else prediction}")
+        logging.info(f"🧾 predict() 結果タイプ: {type(prediction)}, 内容例: {str(prediction)[:120]}")
 
-        if isinstance(prediction, list) and all(isinstance(p, dict) for p in prediction):
-            forecast_data = prediction
+        # DataFrameの場合はdict(list)化する
+        if prediction is None:
+            logging.warning("⚠️ oracle.predict() が None を返しました。")
+            forecast_data = []
+        elif isinstance(prediction, list):
+            if all(isinstance(p, dict) for p in prediction):
+                forecast_data = prediction
+            else:
+                logging.warning("⚠️ list型だがdictでない要素が含まれています。")
+        elif hasattr(prediction, "to_dict"):  # DataFrameなど
+            try:
+                forecast_data = prediction.to_dict(orient="records")
+            except Exception as df_e:
+                logging.error(f"DataFrame->dict変換エラー: {df_e}")
         else:
-            logging.warning("⚠️ oracle.predict() の結果形式が不正です。")
+            logging.warning("⚠️ 予測値の型が想定外。")
 
         if not forecast_data:
-            logging.warning("⚠️ 予測データが空です。Chart.js が描画をスキップする可能性があります。")
+            logging.warning("⚠️ 予測データが空です。Chart.jsが描画をスキップします。")
+            # ダミーデータ例（開発時用、不要なら消す）
+            # forecast_data = [
+            #     {"date": "2025-07-21", "forecast": 108.3, "lower": 106.8, "upper": 109.7},
+            #     {"date": "2025-07-22", "forecast": 108.8, "lower": 107.2, "upper": 110.0}
+            # ]
             logging.warning(f"📭 予測データ詳細: {prediction}")
 
         if hasattr(oracle, "get_metrics"):
@@ -58,6 +74,11 @@ async def dashboard_view(request: Request):
 
     except Exception as e:
         logging.error(f"❌ PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
+        # ダミーデータ例（開発時用、不要なら消す）
+        # forecast_data = [
+        #     {"date": "2025-07-21", "forecast": 108.3, "lower": 106.8, "upper": 109.7},
+        #     {"date": "2025-07-22", "forecast": 108.8, "lower": 107.2, "upper": 110.0}
+        # ]
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
