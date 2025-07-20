@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v2.6)
+👑 Central Governance Dashboard Route (v2.7)
 - 王国の主要な統計情報と予測分析を統合表示する。
 """
 
@@ -12,9 +12,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
-from strategies.prometheus_oracle import PrometheusOracle  # ✅ 予測AIをインポート
+from strategies.prometheus_oracle import PrometheusOracle
 
-# ロガー設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -23,9 +22,6 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard_view(request: Request):
-    """
-    GET /dashboard - 中央統治ダッシュボードを表示する。
-    """
     logging.info("📥 ダッシュボード表示要求を受理しました")
 
     stats_data = {
@@ -38,31 +34,27 @@ async def dashboard_view(request: Request):
 
     try:
         oracle = PrometheusOracle()
-
-        # ✅ 予測データ取得
+        logging.info("📤 oracle.predict() 実行")
         prediction = oracle.predict()
+        logging.info(f"🧾 predict() 結果タイプ: {type(prediction)}, 内容例: {prediction[:1] if isinstance(prediction, list) else prediction}")
+
         if isinstance(prediction, list) and all(isinstance(p, dict) for p in prediction):
             forecast_data = prediction
         else:
             logging.warning("⚠️ oracle.predict() の結果形式が不正です。")
-            forecast_data = []
 
-        # ✅ 空リスト対策ログ
         if not forecast_data:
             logging.warning("⚠️ 予測データが空です。Chart.js が描画をスキップする可能性があります。")
+            logging.warning(f"📭 予測データ詳細: {prediction}")
 
-        # ✅ メトリクス取得
         if hasattr(oracle, "get_metrics"):
             stats_data["oracle_metrics"] = oracle.get_metrics()
 
-        # ✅ ダッシュボードログ出力
         logging.info(f"✅ 予測データ件数: {len(forecast_data)}")
-        if forecast_data:
-            logging.debug(f"📊 forecast_data preview: {forecast_data[:2]}")
+        logging.debug(f"📊 forecast_data preview: {forecast_data[:2]}")
         logging.info(f"✅ oracle_metrics: {stats_data['oracle_metrics']}")
 
-        # ✅ オプション：JSON出力してChart.js側で読み込めるようにする（必要なら）
-        # oracle.write_forecast_json(n_days=14)
+        # oracle.write_forecast_json(n_days=14)  # 必要に応じてファイル出力
 
     except Exception as e:
         logging.error(f"❌ PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
