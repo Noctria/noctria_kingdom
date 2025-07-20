@@ -1,87 +1,99 @@
 flowchart TD
-  subgraph GUI_Main["Noctria Kingdom GUI - main.py"]
+  subgraph GUI_Main["noctria_gui/main.py"]
     direction TB
-    HomeRoutes[home_routes.py]
-    Dashboard[dashboard.py]
-    KingRoutes[king_routes.py]
-    Trigger[trigger.py]
-    Upload[upload.py]
-    UploadHistory[upload_history.py]
-    ActHistory[act_history.py]
-    ActHistoryDetail[act_history_detail.py]
-    LogsRoutes[logs_routes.py]
-    PDCA[ pdca.py & pdca_recheck.py & pdca_routes.py & pdca_summary.py ]
-    Push[push.py]
-    StrategyRoutes[strategy_routes.py]
-    StrategyDetail[strategy_detail.py]
-    StrategyHeatmap[strategy_heatmap.py]
-    Statistics[statistics_detail.py & statistics_ranking.py & statistics_scoreboard.py & statistics_tag_ranking.py & statistics_compare.py]
-    TagSummary[tag_summary.py & tag_summary_detail.py]
-    TagHeatmap[tag_heatmap.py]
-    PathChecker[path_checker.py]
-    Prometheus[prometheus_routes.py]
+    HOME["home_routes"]
+    DASHBOARD["dashboard"]
+    KING["king_routes"]
+    TRIGGER["trigger"]
+    UPLOAD["upload"]
+    UPLOAD_HISTORY["upload_history"]
+    ACT_HISTORY["act_history"]
+    ACT_HISTORY_DETAIL["act_history_detail"]
+    LOGS["logs_routes"]
+    PDCA["pdca"]
+    PDCA_RECHECK["pdca_recheck"]
+    PDCA_ROUTES["pdca_routes"]
+    PDCA_SUMMARY["pdca_summary"]
+    PUSH["push"]
+    STRATEGY_ROUTES["strategy_routes"]
+    STRATEGY_DETAIL["strategy_detail"]
+    STRATEGY_HEATMAP["strategy_heatmap"]
+    STAT_DETAIL["statistics_detail"]
+    STAT_RANKING["statistics_ranking"]
+    STAT_SCOREBOARD["statistics_scoreboard"]
+    STAT_TAG_RANKING["statistics_tag_ranking"]
+    STAT_COMPARE["statistics_compare"]
+    TAG_SUMMARY["tag_summary"]
+    TAG_SUMMARY_DETAIL["tag_summary_detail"]
+    TAG_HEATMAP["tag_heatmap"]
+    PATH_CHECKER["path_checker"]
+    PROMETHEUS_ROUTES["prometheus_routes"]
   end
 
-  subgraph GUI_Flow["ルーティング構成"]
-    HomeRoutes --> Dashboard
-    Dashboard --> KingRoutes
-    KingRoutes --> Trigger
-    Trigger --> Upload
-    Upload --> UploadHistory
-    UploadHistory --> ActHistory
-    ActHistory --> ActHistoryDetail
-    ActHistoryDetail --> LogsRoutes
-    LogsRoutes --> PDCA
-    PDCA --> Push
-    Push --> StrategyRoutes
-    StrategyRoutes --> StrategyDetail
-    StrategyRoutes --> StrategyHeatmap
-    StrategyRoutes --> Statistics
-    Statistics --> TagSummary
-    TagSummary --> TagHeatmap
-    TagHeatmap --> PathChecker
-    PathChecker --> Prometheus
+  subgraph Services["noctria_gui/services"]
+    ACT_LOG_SERVICE["act_log_service"]
+    DASHBOARD_SERVICE["dashboard_service"]
+    PUSH_HISTORY_SERVICE["push_history_service"]
+    STATISTICS_SERVICE["statistics_service"]
+    STRATEGY_HANDLER["strategy_handler"]
+    TAG_SUMMARY_SERVICE["tag_summary_service"]
+    UPLOAD_ACTIONS["upload_actions"]
   end
 
-  subgraph PDCA_Cluster["PDCA 関連ファイル群"]
-    direction TB
-    pdca[ pdca.py ]
-    pdca_recheck[ pdca_recheck.py ]
-    pdca_routes[ pdca_routes.py ]
-    pdca_summary[ pdca_summary.py ]
-  end
+  %% GUI Mainから各Routesへのinclude
+  GUI_Main -->|include_router| HOME
+  GUI_Main --> DASHBOARD
+  GUI_Main --> KING
+  GUI_Main --> TRIGGER
+  GUI_Main --> UPLOAD
+  GUI_Main --> UPLOAD_HISTORY
+  GUI_Main --> ACT_HISTORY
+  GUI_Main --> ACT_HISTORY_DETAIL
+  GUI_Main --> LOGS
+  GUI_Main --> PDCA
+  GUI_Main --> PDCA_RECHECK
+  GUI_Main --> PDCA_ROUTES
+  GUI_Main --> PDCA_SUMMARY
+  GUI_Main --> PUSH
+  GUI_Main --> STRATEGY_ROUTES
+  GUI_Main --> STRATEGY_DETAIL
+  GUI_Main --> STRATEGY_HEATMAP
+  GUI_Main --> STAT_DETAIL
+  GUI_Main --> STAT_RANKING
+  GUI_Main --> STAT_SCOREBOARD
+  GUI_Main --> STAT_TAG_RANKING
+  GUI_Main --> STAT_COMPARE
+  GUI_Main --> TAG_SUMMARY
+  GUI_Main --> TAG_SUMMARY_DETAIL
+  GUI_Main --> TAG_HEATMAP
+  GUI_Main --> PATH_CHECKER
+  GUI_Main --> PROMETHEUS_ROUTES
 
-  subgraph Statistics_Cluster["Statistics Cluster"]
-    direction TB
-    statistics_detail[ statistics_detail.py ]
-    statistics_ranking[ statistics_ranking.py ]
-    statistics_scoreboard[ statistics_scoreboard.py ]
-    statistics_tag_ranking[ statistics_tag_ranking.py ]
-    statistics_compare[ statistics_compare.py ]
-  end
+  %% Routes が Service を利用
+  ACT_HISTORY --> ACT_LOG_SERVICE
+  ACT_HISTORY_DETAIL --> ACT_LOG_SERVICE
+  PDCA --> ACT_LOG_SERVICE
+  PDCA_RECHECK --> ACT_LOG_SERVICE
+  PDCA_ROUTES --> ACT_LOG_SERVICE
+  PDCA_SUMMARY --> ACT_LOG_SERVICE
 
-  subgraph Tag_Cluster["Tag統計関連"]
-    direction TB
-    tag_summary[ tag_summary.py ]
-    tag_summary_detail[ tag_summary_detail.py ]
-    tag_heatmap[ tag_heatmap.py ]
-  end
+  DASHBOARD --> DASHBOARD_SERVICE
+  PUSH --> PUSH_HISTORY_SERVICE
+  STAT_DETAIL --> STATISTICS_SERVICE
+  STAT_RANKING --> STATISTICS_SERVICE
+  STAT_SCOREBOARD --> STATISTICS_SERVICE
+  STAT_TAG_RANKING --> STATISTICS_SERVICE
+  STAT_COMPARE --> STATISTICS_SERVICE
+  TAG_SUMMARY --> TAG_SUMMARY_SERVICE
+  TAG_SUMMARY_DETAIL --> TAG_SUMMARY_SERVICE
+  TAG_HEATMAP --> TAG_SUMMARY_SERVICE
+  UPLOAD --> STRATEGY_HANDLER
+  UPLOAD_HISTORY --> UPLOAD_ACTIONS
+  STRATEGY_ROUTES --> STRATEGY_HANDLER
 
-  subgraph Strategy_Cluster["Strategy関連"]
-    direction TB
-    strategy_routes[strategy_routes.py]
-    strategy_detail[strategy_detail.py]
-    strategy_heatmap[strategy_heatmap.py]
-  end
+  PROMETHEUS_ROUTES --> PROMETHEUS_ROUTES
 
-  %% 関連性の矢印例（主要な依存関係や流れ）
-  Dashboard --> Prometheus
-  Push --> LogsRoutes
-  StrategyRoutes --> StrategyDetail
-  Statistics --> Statistics_Cluster
-  TagSummary --> Tag_Cluster
-  StrategyHeatmap --> Strategy_Cluster
+  %% 戦略関連 Routes
+  STRATEGY_ROUTES --> STRATEGY_DETAIL
+  STRATEGY_ROUTES --> STRATEGY_HEATMAP
 
-  %% コメントや補足
-  classDef mainRouter fill:#223355,stroke:#66ffff,color:#cceeff,font-weight:bold
-  class GUI_Main mainRouter
