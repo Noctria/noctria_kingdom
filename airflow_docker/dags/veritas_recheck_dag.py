@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-🔎 Veritas Re-check DAG (v2.0)
+🔎 Veritas Re-check DAG (v2.1 conf対応)
 - 特定の戦略を個別に再評価するためのDAG。
-- AirflowのUIから手動でトリガーし、`dag_run.conf`経由で戦略名を指定することを想定。
+- AirflowのUI/REST/GUIから手動でトリガーし、`dag_run.conf`経由で戦略名・理由を指定できる設計。
 """
 
 import logging
@@ -13,18 +13,15 @@ import os
 from datetime import datetime
 from typing import Dict, Any
 
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, get_current_context
 
-# --- 王国の基盤モジュールをインポート ---
-# ✅ Airflowが'src'モジュールを見つけられるように、プロジェクトルートをsys.pathに追加
+# --- パス調整
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# ✅ 評価とログ保存の関数を正しくインポート
 from src.core.strategy_evaluator import evaluate_strategy, log_evaluation_result
 
-# === DAG基本設定 ===
 default_args = {
     'owner': 'VeritasCouncil',
     'depends_on_past': False,
@@ -43,33 +40,38 @@ default_args = {
 def veritas_recheck_pipeline():
     """
     特定の戦略を指定して再評価し、その結果を記録するパイプライン。
+    発令理由（conf["reason"]）も記録
     """
 
     @task
     def recheck_and_log_strategy(**context) -> Dict[str, Any]:
-        """
-        DAG実行時に渡された戦略名を元に、再評価とログ記録を行う。
-        """
         logger = logging.getLogger("VeritasRecheckTask")
-        dag_run = context.get("dag_run")
+        # Airflow TaskFlowではget_current_context()が最も確実
+        from airflow.decorators import get_current_context
+        ctx = get_current_context()
+        dag_run = ctx.get("dag_run")
+        conf = dag_run.conf if dag_run and dag_run.conf else {}
 
-        # DAG実行時に`conf`で戦略名が渡されているかチェック
-        if not dag_run or not dag_run.conf or "strategy_name" not in dag_run.conf:
+        # 必須: 戦略名、任意: 理由
+        strategy_name = conf.get("strategy_name")
+        reason = conf.get("reason", "理由未指定")
+
+        if not strategy_name:
             error_msg = "このDAGは手動実行専用です。'strategy_name'をJSON形式で指定してください。"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        strategy_name = dag_run.conf.get("strategy_name")
-        logger.info(f"戦略『{strategy_name}』の再評価命令を受理しました。")
+        logger.info(f"戦略『{strategy_name}』の再評価命令を受理しました。（理由: {reason}）")
 
         try:
             # 1. 戦略を評価
             evaluation_result = evaluate_strategy(strategy_name)
+            evaluation_result["trigger_reason"] = reason  # 評価結果にも理由を追加
 
             # 2. 評価結果をログに記録
             log_evaluation_result(evaluation_result)
 
-            logger.info(f"戦略『{strategy_name}』の再評価と記録が完了しました。")
+            logger.info(f"戦略『{strategy_name}』の再評価と記録が完了しました。（理由: {reason}）")
             return evaluation_result
 
         except FileNotFoundError as e:
@@ -79,8 +81,6 @@ def veritas_recheck_pipeline():
             logger.error(f"再評価中に予期せぬエラーが発生しました: {e}", exc_info=True)
             raise
 
-    # --- パイプラインの定義 ---
     recheck_and_log_strategy()
 
-# DAGのインスタンス化
 veritas_recheck_pipeline()
