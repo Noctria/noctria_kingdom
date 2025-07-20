@@ -34,89 +34,94 @@
 <!-- 📈 Oracle予測グラフ -->
 <section class="hud-panel">
     <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
+    <!-- データ埋め込み -->
     <div id="forecast-data-holder" data-forecast='{{ forecast | tojson | safe }}'></div>
-    <canvas id="forecastChart" height="120" style="max-width:100%; background-color:#0a0a1a;"></canvas>
+    <!-- グラフ表示用canvas -->
+    <canvas id="forecastChart" width="900" height="300" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
+<!-- Chart.js CDN（最新版） -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     const dataHolder = document.getElementById('forecast-data-holder');
-    if (dataHolder) {
-        let forecast = [];
-        try {
-            const raw = dataHolder.getAttribute('data-forecast') || "[]";
-            forecast = JSON.parse(raw);
-            console.log("📊 ORACLEデータ", forecast);
-        } catch (e) {
-            console.error("ORACLE予測データのパースに失敗", e);
-        }
-
-        if (forecast.length > 0 && document.getElementById('forecastChart')) {
-            const ctx = document.getElementById('forecastChart').getContext('2d');
-            const labels = forecast.map(d => d.date);
-            const forecasts = forecast.map(d => d.forecast);
-            const lowers = forecast.map(d => d.lower);
-            const uppers = forecast.map(d => d.upper);
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [
-                        {
-                            label: '予測値',
-                            data: forecasts,
-                            borderColor: '#00e5ff',
-                            backgroundColor: 'rgba(0,229,255,0.15)',
-                            pointRadius: 2,
-                            tension: 0.25
-                        },
-                        {
-                            label: '下限',
-                            data: lowers,
-                            borderColor: 'rgba(255, 99, 132, 0.5)',
-                            borderDash: [5, 5],
-                            fill: false,
-                            pointRadius: 0,
-                            tension: 0.15
-                        },
-                        {
-                            label: '上限',
-                            data: uppers,
-                            borderColor: 'rgba(99, 255, 132, 0.5)',
-                            borderDash: [5, 5],
-                            fill: false,
-                            pointRadius: 0,
-                            tension: 0.15
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: true, labels: { color: '#e6f1ff' } },
-                        title: { display: true, text: 'Oracle予測時系列', color: '#e6f1ff' }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { color: '#a8b2d1' },
-                            title: { display: true, text: '日付', color: '#a8b2d1' }
-                        },
-                        y: {
-                            ticks: { color: '#a8b2d1' },
-                            title: { display: true, text: '価格', color: '#a8b2d1' }
-                        }
-                    }
-                }
-            });
-        } else {
-            console.warn("forecastChart が見つからない、または forecast データが空です");
-        }
+    const canvas = document.getElementById('forecastChart');
+    if (!dataHolder || !canvas) {
+        console.warn("必要な要素が見つかりません！");
+        return;
     }
+    let forecastData = [];
+    try {
+        forecastData = JSON.parse(dataHolder.dataset.forecast || "[]");
+        console.log("📊 ORACLEデータ", forecastData);
+    } catch (e) {
+        console.error("データのパース失敗", e);
+        return;
+    }
+    if (!Array.isArray(forecastData) || forecastData.length === 0) {
+        canvas.parentElement.innerHTML = "<div style='color:#fff'>No forecast data.</div>";
+        return;
+    }
+
+    const labels = forecastData.map(d => d.date);
+    const forecasts = forecastData.map(d => d.forecast);
+    const lowers = forecastData.map(d => d.lower);
+    const uppers = forecastData.map(d => d.upper);
+
+    new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '予測値',
+                    data: forecasts,
+                    borderColor: '#00e5ff',
+                    backgroundColor: 'rgba(0,229,255,0.12)',
+                    pointRadius: 3,
+                    tension: 0.25,
+                    fill: false,
+                },
+                {
+                    label: '下限',
+                    data: lowers,
+                    borderColor: 'rgba(255, 99, 132, 0.5)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0,
+                    tension: 0.2
+                },
+                {
+                    label: '上限',
+                    data: uppers,
+                    borderColor: 'rgba(99, 255, 132, 0.5)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0,
+                    tension: 0.2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true, labels: { color: '#e6f1ff' } },
+                title: { display: true, text: 'Oracle予測時系列', color: '#e6f1ff' }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#a8b2d1' },
+                    title: { display: true, text: '日付', color: '#a8b2d1' }
+                },
+                y: {
+                    ticks: { color: '#a8b2d1' },
+                    title: { display: true, text: '価格', color: '#a8b2d1' }
+                }
+            }
+        }
+    });
 });
 </script>
 {% endblock %}
