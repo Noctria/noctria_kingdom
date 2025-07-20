@@ -7,11 +7,12 @@ Airflow REST API を使った DAG トリガー処理モジュール
 - Airflow の Stable REST API を使い、外部から DAG の手動実行をトリガーする
 - トリガー時の理由（reason）などを DAG 実行コンテキストの conf に渡せる
 - Airflow Webserver の URL、Basic認証情報を環境変数で管理可能
+- 追加: Airflowに登録されているDAG一覧を取得する(list_dags)
 """
 
 import os
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 # Airflow Webserver のベースURL（例: "http://localhost:8080/api/v1"）
@@ -51,7 +52,6 @@ class AirflowDagTrigger:
         Returns:
             dict: Airflow API のレスポンス JSON を辞書で返す
         """
-
         url = f"{self.base_url}/dags/{dag_id}/dagRuns"
 
         payload = {}
@@ -74,6 +74,26 @@ class AirflowDagTrigger:
 
         return response.json()
 
+    def list_dags(self, limit: int = 1000) -> List[str]:
+        """
+        Airflow REST API からDAG一覧（dag_idのみのリスト）を取得
+
+        Args:
+            limit (int): 最大取得数
+
+        Returns:
+            List[str]: 登録されているDAGのIDリスト
+        """
+        url = f"{self.base_url}/dags?limit={limit}"
+        response = requests.get(url, auth=self.auth)
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            raise RuntimeError(f"Failed to list DAGs: {response.text}") from e
+
+        data = response.json()
+        return [d["dag_id"] for d in data.get("dags", [])]
+
 
 # シンプルなインスタンスをモジュール変数として用意
 default_trigger = AirflowDagTrigger()
@@ -95,3 +115,15 @@ def trigger_dag(
         dict: Airflow API レスポンス
     """
     return default_trigger.trigger_dag(dag_id=dag_id, conf=conf, execution_date=execution_date)
+
+def list_dags(limit: int = 1000) -> List[str]:
+    """
+    シンプルにDAG一覧（dag_idのみ）を取得する関数
+
+    Args:
+        limit (int): 最大取得数
+
+    Returns:
+        List[str]: 登録されているDAGのIDリスト
+    """
+    return default_trigger.list_dags(limit=limit)
