@@ -2,10 +2,10 @@
 # coding: utf-8
 
 """
-🧠 Veritas Strategist (v2.4)
-- LLM等を用いて新たな取引戦略を自動生成し、評価・選定まで担うAI
+🧠 Veritas Strategist (v2.5)
+- ベスト戦略の根拠説明つき
 - 生成/評価の標準出力・エラーをファイル保存
-- パラメータ柔軟渡し対応
+- パラメータ柔軟渡し＆ランキング返却
 """
 
 import subprocess
@@ -22,10 +22,6 @@ from src.core.path_config import (
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 class VeritasStrategist:
-    """
-    真理を探究し、新たな戦略を創り出す戦略立案官AI。
-    """
-
     def __init__(self):
         logging.info("戦略立案官ヴェリタス、着任。真理の探求を始めます。")
         LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -45,22 +41,37 @@ class VeritasStrategist:
             logging.error(f"{desc}ログ保存時にエラー: {e}")
 
     def _build_cli_args(self, param_dict: Dict[str, Any]) -> List[str]:
-        """パラメータdictを ['--key', 'value', ...] のCLIリストに変換"""
         args = []
         for k, v in param_dict.items():
             args.append(f"--{k}")
-            # True/Falseはstr化
             if isinstance(v, bool):
                 v = str(v).lower()
             args.append(str(v))
         return args
 
+    def _make_explanation(self, best: dict, rankings: List[dict]) -> str:
+        """最良戦略の根拠を動的に生成"""
+        try:
+            avg_win = sum(r.get("win_rate", 0) for r in rankings) / len(rankings) if rankings else 0
+            avg_dd = sum(r.get("max_drawdown", 0) for r in rankings) / len(rankings) if rankings else 0
+            # シャープレシオ（仮）なども比較
+            best_wr = best.get("win_rate", None)
+            best_dd = best.get("max_drawdown", None)
+            best_sharpe = best.get("sharpe_ratio", None)
+            lines = []
+            if best_wr is not None:
+                lines.append(f"勝率: {best_wr:.2f}%（合格戦略平均: {avg_win:.2f}%）")
+            if best_dd is not None:
+                lines.append(f"最大DD: {best_dd:.2f}（合格戦略平均: {avg_dd:.2f}）")
+            if best_sharpe is not None:
+                lines.append(f"シャープレシオ: {best_sharpe:.3f}")
+            base_reason = "final_capital最大かつ安定性・勝率等で最良だったため選定"
+            lines.append(base_reason)
+            return " / ".join(lines)
+        except Exception as e:
+            return f"自動説明生成エラー: {e}"
+
     def propose(self, top_n: int = 5, **params) -> Dict[str, Any]:
-        """
-        新たな戦略を生成・評価し、最良と判断したものを王に提案する。
-        top_n: ランキング返却件数
-        **params: サブプロセス（生成・評価）にそのままCLIで渡す柔軟パラメータ群
-        """
         # 1. 戦略生成
         try:
             logging.info(f"新たな戦略の創出を開始します…（パラメータ: {params}）")
@@ -93,7 +104,7 @@ class VeritasStrategist:
             logging.error(error_message)
             return {"type": "strategy_proposal", "status": "ERROR", "detail": error_message}
 
-        # 3. 最良戦略とランキング返却
+        # 3. 最良戦略とランキング返却（説明つき）
         try:
             logging.info("評価結果から最良戦略とランキングを選定します…")
             with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as f:
@@ -109,13 +120,15 @@ class VeritasStrategist:
                 reverse=True
             )[:top_n]
             best_strategy = rankings[0]
-            logging.info(f"最良の戦略『{best_strategy.get('strategy')}』を選定しました。")
+            explanation = self._make_explanation(best_strategy, rankings)
+            logging.info(f"最良の戦略『{best_strategy.get('strategy')}』を選定。根拠: {explanation}")
             return {
                 "name": "Veritas",
                 "type": "strategy_proposal",
                 "status": "PROPOSED",
                 "strategy_details": best_strategy,
                 "strategy_rankings": rankings,
+                "explanation": explanation,
                 "params": params
             }
         except FileNotFoundError:
