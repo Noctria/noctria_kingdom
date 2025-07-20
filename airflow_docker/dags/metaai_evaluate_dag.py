@@ -4,15 +4,23 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 
-# ✅ パス管理構成に準拠
 from core.path_config import SCRIPTS_DIR
 
-# ✅ コンテナ用PYTHONPATH
-
-# ✅ 外部スクリプト読み込み
 from scripts.evaluate_metaai_model import evaluate_metaai_model
 
-# ✅ DAG定義
+def evaluate_metaai_task(**kwargs):
+    # confから理由受信
+    conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
+    reason = conf.get("reason", "理由未指定")
+    print(f"【MetaAI評価タスク・発令理由】{reason}")
+
+    # 実際の評価タスク実行
+    result = evaluate_metaai_model()
+    # 理由付きでXComに記録
+    ti = kwargs["ti"]
+    ti.xcom_push(key="evaluation_result", value={"result": result, "trigger_reason": reason})
+    return result
+
 with DAG(
     dag_id="metaai_evaluate_dag",
     schedule_interval=None,
@@ -24,5 +32,6 @@ with DAG(
 
     evaluate_task = PythonOperator(
         task_id="evaluate_metaai_model",
-        python_callable=evaluate_metaai_model,
+        python_callable=evaluate_metaai_task,
+        provide_context=True,
     )
