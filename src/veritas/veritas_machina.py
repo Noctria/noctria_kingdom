@@ -2,18 +2,21 @@
 # coding: utf-8
 
 """
-🧠 Veritas Strategist (v2.1)
+🧠 Veritas Strategist (v2.2)
 - LLM等を用いて新たな取引戦略を自動生成し、評価・選定まで担うAI
 - KingNoctriaと明確なインターフェイス形式で連携
+- 生成/評価の標準出力・エラーを必ずファイルに記録
 """
 
 import subprocess
 import json
 import logging
 from typing import Dict, Any
+from datetime import datetime
+from pathlib import Path
 
 from src.core.path_config import (
-    VERITAS_GENERATE_SCRIPT, VERITAS_EVAL_LOG, VERITAS_EVALUATE_SCRIPT
+    VERITAS_GENERATE_SCRIPT, VERITAS_EVAL_LOG, VERITAS_EVALUATE_SCRIPT, LOGS_DIR
 )
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
@@ -25,6 +28,23 @@ class VeritasStrategist:
 
     def __init__(self):
         logging.info("戦略立案官ヴェリタス、着任。真理の探求を始めます。")
+        # ログ保存パスを事前生成
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        self.generate_log_path = LOGS_DIR / "veritas_generate.log"
+        self.evaluate_log_path = LOGS_DIR / "veritas_evaluate.log"
+
+    def _save_subprocess_output(self, proc: subprocess.CompletedProcess, log_path: Path, desc: str = ""):
+        """標準出力・標準エラーをログファイルに保存"""
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n--- {desc} [{datetime.now()}] ---\n")
+                f.write("STDOUT:\n")
+                f.write(proc.stdout if proc.stdout else "")
+                f.write("\nSTDERR:\n")
+                f.write(proc.stderr if proc.stderr else "")
+                f.write("\n")
+        except Exception as e:
+            logging.error(f"{desc}ログ保存時にエラー: {e}")
 
     def propose(self) -> Dict[str, Any]:
         """
@@ -38,8 +58,10 @@ class VeritasStrategist:
                 ["python", str(VERITAS_GENERATE_SCRIPT)],
                 check=True, capture_output=True, text=True
             )
+            self._save_subprocess_output(res, self.generate_log_path, "VERITAS GENERATE")
             logging.info("戦略の原石が生成されました。")
         except subprocess.CalledProcessError as e:
+            self._save_subprocess_output(e, self.generate_log_path, "VERITAS GENERATE (FAILED)")
             error_message = f"戦略生成の儀で失敗しました。詳細: {e.stderr or e}"
             logging.error(error_message)
             return {"type": "strategy_proposal", "status": "ERROR", "detail": error_message}
@@ -51,8 +73,10 @@ class VeritasStrategist:
                 ["python", str(VERITAS_EVALUATE_SCRIPT)],
                 check=True, capture_output=True, text=True
             )
+            self._save_subprocess_output(res, self.evaluate_log_path, "VERITAS EVALUATE")
             logging.info("評価の儀が完了しました。")
         except subprocess.CalledProcessError as e:
+            self._save_subprocess_output(e, self.evaluate_log_path, "VERITAS EVALUATE (FAILED)")
             error_message = f"戦略評価の儀で失敗しました。詳細: {e.stderr or e}"
             logging.error(error_message)
             return {"type": "strategy_proposal", "status": "ERROR", "detail": error_message}
