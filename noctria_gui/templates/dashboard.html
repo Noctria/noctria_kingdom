@@ -1,3 +1,49 @@
+{% extends "base_hud.html" %}
+
+{% block title %}👑 Noctria Kingdom - Central Governance HUD{% endblock %}
+
+{% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
+{% block header_title %}CENTRAL GOVERNANCE HUD{% endblock %}
+{% block header_nav_href %}#{% endblock %}
+{% block header_nav_text %}—{% endblock %}
+
+{% block content %}
+<!-- 🔢 Key Metrics -->
+<section class="hud-panel metrics">
+    <h2 class="panel-title">KEY METRICS</h2>
+    <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+        <div class="metric-item">
+            <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+            <p class="metric-value text-green">{{ stats.avg_win_rate | round(2) }}%</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-arrow-up"></i> 採用戦略数</h3>
+            <p class="metric-value">{{ stats.promoted_count }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-upload"></i> GitHubへPush済</h3>
+            <p class="metric-value text-blue">{{ stats.pushed_count }}</p>
+        </div>
+        <div class="metric-item">
+            <h3><i class="fas fa-history"></i> PDCA再評価数</h3>
+            <p class="metric-value text-yellow">{{ stats.pdca_count }}</p>
+        </div>
+    </div>
+</section>
+
+<!-- 📈 Oracle予測グラフ -->
+<section class="hud-panel">
+    <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
+    <div id="forecast-data-holder" data-forecast='{{ forecast | tojson }}'></div>
+    <canvas id="forecastChart" height="120"></canvas>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- ✅ Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // --- ORACLE予測グラフ描画 ---
@@ -73,3 +119,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
+{% endblock %}
