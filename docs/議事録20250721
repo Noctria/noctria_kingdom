@@ -1,0 +1,114 @@
+# Noctria Kingdom 全体連携・AI自律戦略生成アーキテクチャ議事録（2025-07-21）
+
+---
+
+## 概要
+
+Noctria Kingdomプロジェクトの**AI主導によるPDCA/戦略生成・自律化フロー**設計・統合・運用方針についての議論まとめ。  
+重点：  
+- 「何をするべきか」のAI自律判断（/plan/generate系）
+- その判断を**本物のPythonコードに自動変換するAI**（/veritas/generate系やllm_server API）
+- これらをGUI・DAG群・サービス層とどう連携させ、完全AI統治に向かうか
+
+---
+
+## 1. 全体システム連携の概念整理
+
+- **/plan/generate**
+    - **AIが「何をすべきか」「どんな戦略/アクションを取るべきか」を生成するためのエンドポイント**
+    - 人間の「計画会議」「方針決定」に相当
+    - ここでは“まだPythonコードは生まれていない”
+    - LLM（AI）が大局観・メタ認知的判断・中長期方針等を言語でアウトプット
+
+- **/veritas/generate** または **llm_serverの/generate API**
+    - 上記Plan（プロンプト/要望/仕様）を受け、**本物のPython戦略コードをAIで自動生成**するエンジン
+    - 実装例：`llm_server/veritas_llm_server.py`
+    - HuggingFace/transformers等で実現（モデルロード・GPU推論）
+
+- **veritas_generate_strategy.py**
+    - 固定テンプレを.pyファイルとして自動複製するスクリプト（AI不使用）
+    - 「サンプル」「テスト雛形」用
+    - 将来は完全にAI生成（上記/generate API）で代替
+
+---
+
+## 2. システム内で重要なログ・CSV・履歴ファイル
+
+- **PDCA/Act履歴ログ（act_log.json, PDCAログ一式）**
+- **各戦略生成/評価結果JSON**
+- **各DAG実行のXCom・中間ログ**
+- **最終王決断ログ（王命記録・council_report）**
+- **評価用CSV（win率、最大DD、取引数などの統計）**
+- **生成戦略ファイル（veritas_generated/配下）**
+- **MetaAIモデル適用・学習履歴**
+
+→ これらを**GUIから参照／ダウンロード／可視化**できるAPI/サービス層が必要  
+（services配下がこの橋渡しを担当）
+
+---
+
+## 3. services/配下によるデータ取得方針
+
+- **主にファイルシステム経由 or ディレクトリ走査 or DB/JSONファイル直接読み込み**
+- 戦略履歴、評価ログ、統計サマリーなどは  
+    - 例）services/act_log_service.py → act_logディレクトリ内JSON/CSVを集約・整形
+    - 例）services/statistics_service.py → 統計JSON/CSVを分析・返却
+    - 必要に応じてpandas/DataFrameで集約・分析→APIレスポンス整形
+- 外部API連携やAirflow REST API利用も今後拡張可
+
+---
+
+## 4. DAG・戦略AIとGUI/API層の橋渡し
+
+- **戦略生成・評価・履歴・統計すべてを“API”で一元管理**
+    - AirflowのDAGトリガもREST API経由で可能に（src/core/dag_trigger.pyなど）
+    - 生成戦略/評価結果/王命ログ→API経由でダウンロード・集計・グラフ表示
+- **PDCA実行・再評価・GitHubPushもGUIから制御**
+    - /trigger などGUIルートから直接Airflow DAG呼び出し・履歴参照
+
+---
+
+## 5. AI主導・完全自律PDCAデザイン指針
+
+- **P（Plan）: 「過去ログ・評価・現状」全てをAIで分析し、「今なすべき事」案をAIが自律生成**
+    - 各戦略・市況データの統計＋評価ログ＋“AI自らの反省”までフィードバック
+    - 将来的には「全てのPDCAサイクルをLLMで回す」自律化へ
+- **D（Do）: 戦略コードのAI自動生成と本番投入**
+    - Planで出た案→veritas_llm_server.py等で実際のPythonコードを自動生産
+- **C（Check）: 全履歴・ログ・結果をAIが定量評価＋自分でフィードバック収集**
+- **A（Act）: AIが自律的にパラメータやアルゴリズムを進化/再学習**
+    - 必要なら自動で/plan/generateやコード生成を再実行
+
+---
+
+## 6. LLMサーバ設計方針
+
+- **llm_server/main.py**
+    - 各種評価ログ・生成案・メタデータをAPI経由で提供（例：/veritas/eval_results, /plan/generate など）
+    - CORS等によりGUIや外部ツールから柔軟に参照可
+- **llm_server/veritas_llm_server.py**
+    - 「本物のAIによるコード自動生成サーバ」
+    - 推論時にGPU（特に大規模生成や高速応答を求める場合）
+    - 学習/ファインチューニングもここで担うならGPU必須
+- **veritas_generate_strategy.py**
+    - テンプレ雛形生成用（将来的には不要になる設計）
+
+---
+
+## 7. GPU利用方針
+
+- **Plan生成・戦略コード生成ともに、大規模LLMならGPU推論が推奨**
+- **PDCAのAI自己進化・ファインチューニングにもGPUが必要**
+- **将来的には「PlanもCodeもAI＋GPUで全自律」へ**
+
+---
+
+## 8. 今後の発展指針
+
+- **全体統治・自律最適化を実現するため、Plan生成・評価・実行・学習すべてをAI APIで完結**
+- **services/配下やllm_server/配下を更に拡張し、「戦略・履歴・評価・進化」をGUI/APIから完全操作可に**
+- **テンプレ型（非AI）処理は最終的に全廃、全てAI駆動へ移行**
+
+---
+
+### ※このまとめは議論を反映し随時更新できます。抜け・誤り・追加要望があれば遠慮なく！
