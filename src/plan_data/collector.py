@@ -1,3 +1,5 @@
+# src/plan_data/collector.py
+
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -12,9 +14,8 @@ except ImportError:
 from dotenv import load_dotenv
 load_dotenv()
 
-# 追加アセット（B系も網羅）
 ASSET_SYMBOLS = {
-    # --- 既存S・A ---
+    # --- 優先度S, A, Bアセット ---
     "USDJPY": "JPY=X",
     "SP500": "^GSPC",
     "N225": "^N225",
@@ -35,20 +36,19 @@ ASSET_SYMBOLS = {
     "XRPUSD": "XRP-USD",
     "SOLUSD": "SOL-USD",
     "DOGEUSD": "DOGE-USD",
-    # --- ここから優先度B ---
-    "HSI": "^HSI",             # 香港ハンセン
-    "SHANGHAI": "000001.SS",   # 上海総合
-    "KOSPI": "^KS11",          # 韓国
-    "QQQ": "QQQ",              # ナスダックETF
-    "TLT": "TLT",              # 米長期債ETF
-    "GLD": "GLD",              # 金ETF
-    "RUSSELL": "^RUT",         # ラッセル2000
+    "HSI": "^HSI",
+    "SHANGHAI": "000001.SS",
+    "KOSPI": "^KS11",
+    "QQQ": "QQQ",
+    "TLT": "TLT",
+    "GLD": "GLD",
+    "RUSSELL": "^RUT",
 }
 
 FRED_SERIES = {
-    "UNRATE": "UNRATE",         # 失業率
-    "FEDFUNDS": "FEDFUNDS",     # 政策金利
-    "CPI": "CPIAUCSL",          # CPI
+    "UNRATE": "UNRATE",
+    "FEDFUNDS": "FEDFUNDS",
+    "CPI": "CPIAUCSL",
 }
 
 class PlanDataCollector:
@@ -57,6 +57,9 @@ class PlanDataCollector:
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEYが未設定です")
         self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
+        self.newsapi_key = os.getenv("NEWSAPI_KEY")
+        if not self.newsapi_key:
+            print("[collector] ⚠️ NEWSAPI_KEYが未設定です")
 
     def fetch_multi_assets(self, start: str, end: str, interval: str = "1d", symbols: Optional[Dict] = None) -> pd.DataFrame:
         if symbols is None:
@@ -119,8 +122,7 @@ class PlanDataCollector:
 
     def fetch_event_calendar(self) -> pd.DataFrame:
         """
-        外部CSV（例: data/market/event_calendar.csv）を想定。
-        カラム例: Date（YYYY-MM-DD）, FOMC, CPI, NFP, ...（各イベント日: 1 or 0）
+        経済カレンダーCSV（カラム例: Date, FOMC, CPI, NFP, ...）
         """
         try:
             df = pd.read_csv(self.event_calendar_csv)
@@ -130,22 +132,71 @@ class PlanDataCollector:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
+    def fetch_newsapi_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
+        """
+        NewsAPIで日次ニュース件数＋ポジ/ネガワード件数を返す
+        """
+        api_key = self.newsapi_key
+        if not api_key:
+            print("[collector] NEWSAPI_KEYが未設定です")
+            return pd.DataFrame()
+        dfs = []
+        dt_start = datetime.strptime(start_date, "%Y-%m-%d")
+        dt_end = datetime.strptime(end_date, "%Y-%m-%d")
+        for d in pd.date_range(dt_start, dt_end):
+            day_str = d.strftime("%Y-%m-%d")
+            url = (
+                f"https://newsapi.org/v2/everything?"
+                f"q={query}&from={day_str}&to={day_str}&language=en&pageSize=100"
+                f"&apiKey={api_key}"
+            )
+            try:
+                r = requests.get(url, timeout=10)
+                r.raise_for_status()
+                data = r.json()
+                n_total = data.get("totalResults", 0)
+                articles = data.get("articles", [])
+                # ポジ/ネガワード例（必要に応じて拡張）
+                pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
+                neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
+                pos_count = sum(
+                    any(w in (a.get("title") or "").lower() for w in pos_words)
+                    for a in articles
+                )
+                neg_count = sum(
+                    any(w in (a.get("title") or "").lower() for w in neg_words)
+                    for a in articles
+                )
+                dfs.append(
+                    {"Date": pd.to_datetime(day_str), "News_Count": n_total,
+                     "News_Positive": pos_count, "News_Negative": neg_count}
+                )
+            except Exception as e:
+                print(f"[collector] NewsAPI {day_str}取得失敗: {e}")
+        if dfs:
+            return pd.DataFrame(dfs)
+        return pd.DataFrame()
+
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
         end = datetime.today()
         start = end - timedelta(days=lookback_days)
         start_str = start.strftime("%Y-%m-%d")
         end_str = end.strftime("%Y-%m-%d")
         df = self.fetch_multi_assets(start=start_str, end=end_str)
-        # FREDデータ統合
+        # FREDデータ
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and df is not None:
                 df = pd.merge(df, fred_df, on="Date", how="left")
                 df = df.sort_values("Date").fillna(method="ffill")
-        # イベントカレンダー統合（該当日フラグをマージ）
+        # イベントカレンダー
         event_df = self.fetch_event_calendar()
         if not event_df.empty and df is not None:
             df = pd.merge(df, event_df, on="Date", how="left")
+        # NewsAPI（日次ニュース件数・ポジネガ件数）
+        news_df = self.fetch_newsapi_counts(start_str, end_str)
+        if not news_df.empty and df is not None:
+            df = pd.merge(df, news_df, on="Date", how="left")
         if df is not None:
             df = df.reset_index(drop=True)
         return df
@@ -153,6 +204,5 @@ class PlanDataCollector:
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
-    df = collector.collect_all(lookback_days=180)
-    print(df.tail())
-    # HSI_Close, SHANGHAI_Close, QQQ_Close, TLT_Close, GLD_Close, RUSSELL_Close, CPIAUCSL_Value, ...イベントカレンダーも確認
+    df = collector.collect_all(lookback_days=7)
+    print(df[["Date", "News_Count", "News_Positive", "News_Negative"]].tail())
