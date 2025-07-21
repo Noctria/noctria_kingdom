@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 class PlanAnalyzer:
     """
     PDCA-Planの根拠となる要因分析・特徴量抽出・説明ラベル化・LLM連携用サマリー生成クラス
-    - 指標推移、戦略履歴、タグ別集計、異常/失敗事例など多角的に分析
+    + FRED経済指標を活用した分析をサポート
     """
 
     def __init__(
@@ -130,5 +130,48 @@ class PlanAnalyzer:
         anomaly_summary = anomaly_summary.sort_values("count", ascending=False)
         return anomaly_summary
 
-    # 必要に応じてさらに分析関数追加OK
+    # ▼▼▼ FREDデータ活用分析 ▼▼▼
 
+    def analyze_by_fred_condition(
+        self, 
+        merged_df: pd.DataFrame, 
+        fred_col: str, 
+        threshold: float = None
+    ) -> dict:
+        """
+        FRED経済指標（例:失業率や金利）水準ごとの市場指標サマリーを抽出
+        例: 失業率高/低, 金利高/低 の勝率・DD・取引数比較
+        """
+        if fred_col not in merged_df.columns:
+            return {}
+
+        # threshold指定がなければ中央値
+        th = threshold if threshold is not None else merged_df[fred_col].median()
+        high_cond = merged_df[fred_col] >= th
+        low_cond = merged_df[fred_col] < th
+
+        summary = {
+            f"{fred_col}_high": {
+                "count": int(high_cond.sum()),
+                "win_rate_mean": merged_df.loc[high_cond, "win_rate"].mean(),
+                "max_dd_mean": merged_df.loc[high_cond, "max_dd"].mean(),
+                "num_trades_mean": merged_df.loc[high_cond, "num_trades"].mean(),
+            },
+            f"{fred_col}_low": {
+                "count": int(low_cond.sum()),
+                "win_rate_mean": merged_df.loc[low_cond, "win_rate"].mean(),
+                "max_dd_mean": merged_df.loc[low_cond, "max_dd"].mean(),
+                "num_trades_mean": merged_df.loc[low_cond, "num_trades"].mean(),
+            }
+        }
+        return summary
+
+    def correlation_with_fred(self, merged_df: pd.DataFrame, fred_col: str) -> Optional[float]:
+        """
+        勝率などとFRED経済指標（例:失業率や金利）との相関係数
+        """
+        if fred_col not in merged_df.columns or "win_rate" not in merged_df.columns:
+            return None
+        return merged_df[["win_rate", fred_col]].corr().iloc[0, 1]
+
+    # 必要に応じてさらに分析関数追加OK
