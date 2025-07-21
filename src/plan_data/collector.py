@@ -1,108 +1,125 @@
 # src/plan_data/collector.py
 
 import os
-import json
-import requests
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
+from typing import List, Optional
 
 try:
     import yfinance as yf
 except ImportError:
-    yf = None
+    raise ImportError("yfinance が必要です: pip install yfinance")
+
+ASSET_SYMBOLS = {
+    "USDJPY": "JPY=X",
+    "SP500": "^GSPC",
+    "NASDAQ": "^IXIC",
+    "N225": "^N225",
+    "VIX": "^VIX",
+    "US10Y": "^TNX",
+    "WTI": "CL=F",
+    "GOLD": "GC=F",
+    "BTCUSD": "BTC-USD",
+    "ETHUSD": "ETH-USD",
+}
 
 class PlanDataCollector:
-    """
-    PDCA-Plan策定用 各種ログ・評価・市場データ・外部経済データの統合収集クラス
-    """
+    def __init__(self):
+        pass
 
-    def __init__(self, base_dir: Optional[str] = None, fred_api_key: Optional[str] = None):
-        self.base_dir = Path(base_dir or "data")
-        self.fred_api_key = fred_api_key or os.getenv("FRED_API_KEY")
+    def calc_rsi(self, series: pd.Series, window: int = 14) -> pd.Series:
+        """RSIのpandas実装"""
+        delta = series.diff()
+        gain = delta.where(delta > 0, 0.0)
+        loss = -delta.where(delta < 0, 0.0)
+        avg_gain = gain.rolling(window).mean()
+        avg_loss = loss.rolling(window).mean()
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
 
-    def collect_act_logs(self) -> List[Dict[str, Any]]:
-        # ... 省略（現状コードと同じ）
+    def fetch_multi_assets(self, start: str, end: str, interval: str = "1d", symbols: Optional[dict] = None) -> pd.DataFrame:
+        if symbols is None:
+            symbols = ASSET_SYMBOLS
+        dfs = []
+        for key, ticker in symbols.items():
+            df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
+            if df.empty:
+                print(f"[collector] {ticker} のデータなし")
+                continue
+            df = df.reset_index()
+            # 終値と出来高
+            cols = ["Date", "Close"]
+            if "Volume" in df.columns:
+                cols.append("Volume")
+            df = df[cols].rename(
+                columns={"Close": f"{key}_Close", "Volume": f"{key}_Volume"}
+            )
+            if "Date" not in df.columns:
+                df.rename(columns={"index": "Date"}, inplace=True)
+            dfs.append(df)
+        # 日付でマージ
+        merged = None
+        for df in dfs:
+            if merged is None:
+                merged = df
+            else:
+                merged = pd.merge(merged, df, on="Date", how="outer")
+        if merged is not None:
+            merged = merged.sort_values("Date")
+            merged = merged.fillna(method="ffill")
+            merged = merged.dropna(subset=[f"USDJPY_Close"])  # 主要アセットで揃え
+            merged = merged.reset_index(drop=True)
+            # --- 特徴量計算 ---
+            for key in symbols:
+                c = f"{key}_Close"
+                v = f"{key}_Volume"
+                # --- リターン・ボラ ---
+                if c in merged.columns:
+                    merged[f"{key}_Return"] = merged[c].pct_change()
+                    merged[f"{key}_Volatility_5d"] = merged[f"{key}_Return"].rolling(5).std()
+                    merged[f"{key}_Volatility_20d"] = merged[f"{key}_Return"].rolling(20).std()
+                    # --- RSI ---
+                    merged[f"{key}_RSI_14d"] = self.calc_rsi(merged[c], window=14)
+                    # --- ゴールデンクロス（短期5日と長期25日） ---
+                    ma_short = merged[c].rolling(5).mean()
+                    ma_long = merged[c].rolling(25).mean()
+                    gc_flag = (ma_short > ma_long) & (ma_short.shift(1) <= ma_long.shift(1))
+                    merged[f"{key}_GC_Flag"] = gc_flag.astype(int)
+                    # --- 3本MA: パーフェクトオーダー ---
+                    ma_mid = merged[c].rolling(25).mean()
+                    ma_longer = merged[c].rolling(75).mean()
+                    merged[f"{key}_MA5"] = ma_short
+                    merged[f"{key}_MA25"] = ma_mid
+                    merged[f"{key}_MA75"] = ma_longer
+                    po_up = ((ma_short > ma_mid) & (ma_mid > ma_longer)).astype(int)
+                    po_down = ((ma_short < ma_mid) & (ma_mid < ma_longer)).astype(int)
+                    merged[f"{key}_PO_UP"] = po_up
+                    merged[f"{key}_PO_DOWN"] = po_down
+                # --- 出来高関連 ---
+                if v in merged.columns:
+                    merged[f"{key}_Volume_MA5"] = merged[v].rolling(5).mean()
+                    merged[f"{key}_Volume_MA20"] = merged[v].rolling(20).mean()
+                    # --- 出来高急増フラグ（20日MAの2倍超でフラグ） ---
+                    avg20 = merged[f"{key}_Volume_MA20"]
+                    merged[f"{key}_Volume_Spike"] = ((merged[v] > avg20 * 2) & (avg20 > 0)).astype(int)
+        return merged
 
-        # [中略] 既存collect_act_logs/collect_eval_results/collect_market_dataはそのまま使える
-
-    # ▼▼▼ API直接取得：yfinanceの例 ▼▼▼
-    def fetch_yfinance_data(self, symbol: str, start: str, end: str, interval: str = "1d") -> pd.DataFrame:
-        if yf is None:
-            print("[collector] yfinance未インストール")
-            return pd.DataFrame()
-        df = yf.download(symbol, start=start, end=end, interval=interval)
-        if df.empty:
-            print("[collector] yfinanceデータなし")
-            return pd.DataFrame()
-        df = df.reset_index()
-        df.rename(columns={"Date": "date"}, inplace=True)
-        df["date"] = pd.to_datetime(df["date"])
+    def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
+        end = datetime.today()
+        start = end - timedelta(days=lookback_days)
+        start_str = start.strftime("%Y-%m-%d")
+        end_str = end.strftime("%Y-%m-%d")
+        df = self.fetch_multi_assets(start=start_str, end=end_str)
         return df
 
-    # ▼▼▼ FREDデータ直接取得 ▼▼▼
-    def fetch_fred_data(self, series_id: str, start_date: Optional[str], end_date: Optional[str]) -> pd.DataFrame:
-        if not self.fred_api_key:
-            print("[collector] FRED_API_KEY未設定")
-            return pd.DataFrame()
-        url = "https://api.stlouisfed.org/fred/series/observations"
-        params = {
-            "series_id": series_id,
-            "api_key": self.fred_api_key,
-            "file_type": "json",
-            "observation_start": start_date,
-            "observation_end": end_date,
-        }
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            r.raise_for_status()
-            obs = r.json()["observations"]
-            df = pd.DataFrame(obs)
-            df = df.rename(columns={"date": "fred_date", "value": series_id})
-            df[series_id] = pd.to_numeric(df[series_id], errors="coerce")
-            df["fred_date"] = pd.to_datetime(df["fred_date"])
-            return df[["fred_date", series_id]]
-        except Exception as e:
-            print(f"[collector] FREDデータ取得失敗: {e}")
-            return pd.DataFrame()
-
-    # ▼▼▼ データ統合（例） ▼▼▼
-    def collect_all(self, yf_symbol: Optional[str] = None, fred_series: Optional[List[str]] = None) -> pd.DataFrame:
-        """
-        yfinance, FRED, ログ類のデータを統合したマスターDFを返す
-        """
-        # 1. yfinance
-        start_date = (datetime.today() - timedelta(days=365)).strftime("%Y-%m-%d")
-        end_date = datetime.today().strftime("%Y-%m-%d")
-        if yf_symbol:
-            market_df = self.fetch_yfinance_data(yf_symbol, start=start_date, end=end_date)
-        else:
-            market_df = pd.DataFrame()
-
-        # 2. FRED
-        if fred_series and len(market_df) > 0:
-            for sid in fred_series:
-                fred_df = self.fetch_fred_data(sid, start_date, end_date)
-                if not fred_df.empty:
-                    fred_df = fred_df.set_index("fred_date")
-                    # 直近値をforward fill
-                    market_df[sid] = fred_df[sid].reindex(market_df["date"], method="ffill").values
-
-        # 3. ローカルJSONデータ（例: act_logs, eval_results）は別途メソッドで
-        # 必要に応じてmarket_dfにマージ（例: 戦略ログとの日付マージなど）
-
-        # 4. 追加特徴量
-        if not market_df.empty:
-            market_df["volatility"] = (market_df["High"] - market_df["Low"]) / market_df["Close"]
-
-        return market_df
-
-# スクリプト直接実行テスト
+# --- テスト実行例 ---
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-    load_dotenv()
     collector = PlanDataCollector()
-    df = collector.collect_all(yf_symbol="SPY", fred_series=["UNRATE", "FEDFUNDS"])
-    print(df.tail())
+    df = collector.collect_all(lookback_days=180)
+    # 主要な特徴量を10日分出力サンプル
+    print(df[[
+        "Date",
+        "USDJPY_Close", "USDJPY_RSI_14d", "USDJPY_GC_Flag", "USDJPY_PO_UP", "USDJPY_PO_DOWN", "USDJPY_Volume_Spike",
+        "SP500_Close", "SP500_RSI_14d", "SP500_GC_Flag", "SP500_PO_UP", "SP500_PO_DOWN", "SP500_Volume_Spike"
+    ]].tail(10))
