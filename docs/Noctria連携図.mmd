@@ -1,8 +1,7 @@
-flowchart TD
+flowchart TD 
 
-%% --- Veritas PDCA/マスター/再評価/再送DAG群 ---
-subgraph Veritas_Master[Veritas Master/PDCA/Replayライン]
-  VGM["veritas_master_dag.py<br>👑 Master統括DAG"]
+%% --- Veritas PDCA/Replayライン（Master DAG完全削除） ---
+subgraph Veritas_Master[Veritas PDCA/Replayライン]
   VPDCA["veritas_pdca_dag.py<br>🔁 PDCA自動ループ"]
   VG["veritas_generate_dag.py<br>🔨 戦略生成"]
   VE["veritas_eval_dag.py<br>📝 戦略一括評価"]
@@ -35,11 +34,12 @@ subgraph LLM層[Noctria LLM層]
   LLM_EVALAPI["veritas_eval_api.py<br>📄 評価ログAPI"]
 end
 
-%% --- Plan Data層 ---
+%% --- Plan Data層（分離構成反映）---
 subgraph PlanData["src/plan_data（PDCA-Plan根拠/分析クラスタ）"]
-  PLAN_COLLECT["collector.py<br>ログ収集・統合"]
+  PLAN_COLLECT["collector.py<br>データ収集・統合"]
+  PLAN_FEATURE["features.py<br>特徴量生成（テクニカル指標）"]
   PLAN_STAT["statistics.py<br>指標/集計"]
-  PLAN_ANALYZER["analyzer.py<br>要因分析・特徴量抽出"]
+  PLAN_ANALYZER["analyzer.py<br>要因分析・特徴抽出"]
   PLAN_PROMPT["llm_plan_prompt.py<br>LLM用プロンプト生成"]
   PLAN_ANOMALY["anomaly_detector.py<br>異常検知"]
 end
@@ -59,10 +59,6 @@ subgraph DATA["データ/成果物ストア"]
 end
 
 %% --- Master/PDCA/Replayフロー ---
-VGM -- "戦略生成" --> VG
-VGM -- "評価" --> VE
-VGM -- "採用記録" --> VA
-VGM -- "GitHubPush" --> VPUSH
 VPDCA -- "戦略生成" --> VG
 VPDCA -- "評価" --> VE
 VPDCA -- "採用記録" --> VA
@@ -113,8 +109,9 @@ LLM_MAIN -- "評価ログ取得" --> GUI
 LLM_MAIN -- "veritas_eval_result.json" --- EVALRES
 LLM_EVALAPI -- "veritas_eval_result.json" --- EVALRES
 
-%% --- PlanData層連携 ---
-PLAN_COLLECT -- "データ/ログ収集" --> PLAN_STAT
+%% --- PlanData層連携（分離構成）---
+PLAN_COLLECT -- "生データ（時系列DF）" --> PLAN_FEATURE
+PLAN_FEATURE -- "特徴量付与DF" --> PLAN_STAT
 PLAN_STAT -- "分析結果" --> PLAN_ANALYZER
 PLAN_ANALYZER -- "要因抽出/特徴分析" --> PLAN_PROMPT
 PLAN_STAT -- "異常値・ドリフト分析" --> PLAN_ANOMALY
@@ -124,7 +121,7 @@ PLAN_ANOMALY -- "異常/逸脱情報" --> PLAN_PROMPT
 LLM_SERVER -.-> LLM_PROMPT
 
 classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
-class VPDCA,VGM,VPUSH,VR,VREPLAY pdca;
+class VPDCA,VPUSH,VR,VREPLAY pdca;
 
 classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
 class GUI,API gui;
