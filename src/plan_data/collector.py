@@ -12,7 +12,9 @@ except ImportError:
 from dotenv import load_dotenv
 load_dotenv()
 
+# 追加アセット（B系も網羅）
 ASSET_SYMBOLS = {
+    # --- 既存S・A ---
     "USDJPY": "JPY=X",
     "SP500": "^GSPC",
     "N225": "^N225",
@@ -29,28 +31,34 @@ ASSET_SYMBOLS = {
     "GOLD": "GC=F",
     "WTI": "CL=F",
     "MOVE": "^MOVE",
-    # 優先度A：仮想通貨
     "ETHUSD": "ETH-USD",
     "XRPUSD": "XRP-USD",
     "SOLUSD": "SOL-USD",
     "DOGEUSD": "DOGE-USD",
+    # --- ここから優先度B ---
+    "HSI": "^HSI",             # 香港ハンセン
+    "SHANGHAI": "000001.SS",   # 上海総合
+    "KOSPI": "^KS11",          # 韓国
+    "QQQ": "QQQ",              # ナスダックETF
+    "TLT": "TLT",              # 米長期債ETF
+    "GLD": "GLD",              # 金ETF
+    "RUSSELL": "^RUT",         # ラッセル2000
 }
 
 FRED_SERIES = {
     "UNRATE": "UNRATE",         # 失業率
     "FEDFUNDS": "FEDFUNDS",     # 政策金利
-    "CPI": "CPIAUCSL",          # CPI（米消費者物価）
+    "CPI": "CPIAUCSL",          # CPI
 }
 
 class PlanDataCollector:
-    def __init__(self, fred_api_key: Optional[str] = None):
+    def __init__(self, fred_api_key: Optional[str] = None, event_calendar_csv: Optional[str] = None):
         self.fred_api_key = fred_api_key or os.getenv("FRED_API_KEY")
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEYが未設定です")
+        self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
 
-    def fetch_multi_assets(
-        self, start: str, end: str, interval: str = "1d", symbols: Optional[Dict] = None
-    ) -> pd.DataFrame:
+    def fetch_multi_assets(self, start: str, end: str, interval: str = "1d", symbols: Optional[Dict] = None) -> pd.DataFrame:
         if symbols is None:
             symbols = ASSET_SYMBOLS
         dfs = []
@@ -109,18 +117,35 @@ class PlanDataCollector:
             print(f"[collector] FREDデータ({series_id})取得失敗: {e}")
             return pd.DataFrame()
 
+    def fetch_event_calendar(self) -> pd.DataFrame:
+        """
+        外部CSV（例: data/market/event_calendar.csv）を想定。
+        カラム例: Date（YYYY-MM-DD）, FOMC, CPI, NFP, ...（各イベント日: 1 or 0）
+        """
+        try:
+            df = pd.read_csv(self.event_calendar_csv)
+            df["Date"] = pd.to_datetime(df["Date"])
+            return df
+        except Exception as e:
+            print(f"[collector] イベントカレンダー取得失敗: {e}")
+            return pd.DataFrame()
+
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
         end = datetime.today()
         start = end - timedelta(days=lookback_days)
         start_str = start.strftime("%Y-%m-%d")
         end_str = end.strftime("%Y-%m-%d")
         df = self.fetch_multi_assets(start=start_str, end=end_str)
-        # FREDデータを統合
+        # FREDデータ統合
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and df is not None:
                 df = pd.merge(df, fred_df, on="Date", how="left")
                 df = df.sort_values("Date").fillna(method="ffill")
+        # イベントカレンダー統合（該当日フラグをマージ）
+        event_df = self.fetch_event_calendar()
+        if not event_df.empty and df is not None:
+            df = pd.merge(df, event_df, on="Date", how="left")
         if df is not None:
             df = df.reset_index(drop=True)
         return df
@@ -130,4 +155,4 @@ if __name__ == "__main__":
     collector = PlanDataCollector()
     df = collector.collect_all(lookback_days=180)
     print(df.tail())
-    # "UNRATE_Value", "FEDFUNDS_Value", "CPIAUCSL_Value" などが付加されていることを確認
+    # HSI_Close, SHANGHAI_Close, QQQ_Close, TLT_Close, GLD_Close, RUSSELL_Close, CPIAUCSL_Value, ...イベントカレンダーも確認
