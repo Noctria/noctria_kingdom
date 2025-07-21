@@ -24,6 +24,7 @@ subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
   AA["aurus_strategy_dag.py<br>🎯 総合分析"]
   LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
   NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
+  HA["hermes_strategy_dag.py<br>🦉 LLM根拠説明"]  %% ← Hermes Cognitor DAG追加
 end
 
 %% --- LLM層 ---
@@ -93,6 +94,7 @@ KING -- "戦略判断/最終意思決定" --> PA
 KING -- "戦略判断/最終意思決定" --> AA
 KING -- "戦略判断/最終意思決定" --> LA
 KING -- "戦略判断/最終意思決定" --> NA
+KING -- "根拠説明/自然言語化" --> HA    %% ← Hermesとの連携も明示
 
 %% --- GUI⇔PDCA連携 --- 
 GUI -- "DAGトリガ/可視化" --> VPDCA
@@ -139,3 +141,6 @@ class GIT,ACTLOG,STRATJSON,EVALRES,PLAN_SUMMARY_JSON data;
 
 classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
 class LLM_MAIN,LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
+
+classDef hermes fill:#e1f4ff,stroke:#2d9fc2,stroke-width:2px;
+class HA hermes;
