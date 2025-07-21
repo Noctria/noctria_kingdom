@@ -2,8 +2,7 @@
 
 import pandas as pd
 import numpy as np
-import json
-from typing import List, Dict, Any, Optional
+from typing import Optional, Dict, Any
 
 class PlanAnalyzer:
     """
@@ -11,9 +10,10 @@ class PlanAnalyzer:
     - 指標推移、戦略履歴、タグ別集計、異常/失敗事例、ドリフト等をもとに
     - 「なぜ良かったか/悪かったか」「注目すべき特徴・傾向」などを抽出する
     """
+
     def __init__(
-        self, 
-        stats_df: pd.DataFrame, 
+        self,
+        stats_df: pd.DataFrame,
         actlog_df: Optional[pd.DataFrame] = None,
         anomaly_df: Optional[pd.DataFrame] = None
     ):
@@ -21,67 +21,53 @@ class PlanAnalyzer:
         self.actlog_df = actlog_df
         self.anomaly_df = anomaly_df
 
-    def feature_importance(self) -> Dict[str, float]:
-        """
-        シンプルな特徴量重要度の例（カテゴリごとの勝率平均/最大DDなど）
-        """
-        result = {}
-        if "tags" in self.stats_df.columns:
-            tag_win = self.stats_df.explode("tags").groupby("tags")["win_rate"].mean().sort_values(ascending=False)
-            result["tag_win_rate"] = tag_win.to_dict()
-        if "max_drawdown" in self.stats_df.columns:
-            result["mean_max_drawdown"] = float(self.stats_df["max_drawdown"].mean())
-        if "profit_factor" in self.stats_df.columns:
-            result["mean_profit_factor"] = float(self.stats_df["profit_factor"].mean())
-        return result
+    def extract_features(self) -> Dict[str, Any]:
+        """ 指標・傾向などの特徴量抽出 """
+        features = {}
 
-    def detect_declining_tags(self, window: int = 10) -> List[str]:
-        """
-        時系列的に勝率が低下しているタグを検出（最近10件の移動平均で判断）
-        """
-        if "tags" not in self.stats_df.columns or "win_rate" not in self.stats_df.columns:
-            return []
-        declining_tags = []
-        tag_df = self.stats_df.explode("tags")
-        for tag in tag_df["tags"].unique():
-            tag_hist = tag_df[tag_df["tags"] == tag].sort_values("evaluated_at")
-            if len(tag_hist) < window * 2:
-                continue
-            win_ma = tag_hist["win_rate"].rolling(window).mean()
-            if win_ma.iloc[-1] < win_ma.iloc[window-1]:
-                declining_tags.append(tag)
-        return declining_tags
+        # 勝率の基本統計
+        features["win_rate_mean"] = self.stats_df["win_rate"].mean()
+        features["win_rate_std"] = self.stats_df["win_rate"].std()
+        features["max_drawdown_mean"] = self.stats_df["max_dd"].mean()
+        features["num_trades_mean"] = self.stats_df["num_trades"].mean()
 
-    def summarize_failures(self, max_items: int = 5) -> List[Dict[str, Any]]:
-        """
-        採用されなかった or 大きなドローダウン/損失戦略の特徴例を抽出
-        """
-        if "result" not in self.stats_df.columns or "max_drawdown" not in self.stats_df.columns:
-            return []
-        failed = self.stats_df[(self.stats_df["result"] == "❌ 不採用") | (self.stats_df["max_drawdown"] > 20)]
-        samples = failed.head(max_items).to_dict(orient="records")
-        return samples
+        # 直近傾向
+        last = self.stats_df.iloc[-1]
+        features["last_win_rate"] = last["win_rate"]
+        features["last_max_dd"] = last["max_dd"]
 
-    def analyze(self) -> Dict[str, Any]:
-        """
-        総合要因分析のまとめ（Plan根拠のAI用プロンプトに渡す用）
-        """
-        return {
-            "feature_importance": self.feature_importance(),
-            "declining_tags": self.detect_declining_tags(),
-            "failure_examples": self.summarize_failures(),
-            "actlog_stats": self.actlog_df.describe().to_dict() if self.actlog_df is not None else {},
-            "anomalies": self.anomaly_df.to_dict(orient="records") if self.anomaly_df is not None else []
-        }
+        # 急変動検知
+        if len(self.stats_df) >= 2:
+            delta = self.stats_df["win_rate"].iloc[-1] - self.stats_df["win_rate"].iloc[-2]
+            features["win_rate_delta"] = delta
+            features["win_rate_trend"] = (
+                "上昇" if delta > 2 else "下降" if delta < -2 else "横ばい"
+            )
+        else:
+            features["win_rate_delta"] = None
+            features["win_rate_trend"] = "データ不足"
 
-# --- テスト例（データがある場合） ---
-if __name__ == "__main__":
-    # テストデータのロード
-    try:
-        stats = pd.read_json("data/stats/veritas_eval_result.json", lines=True)
-    except Exception:
-        stats = pd.DataFrame()
+        return features
 
-    analyzer = PlanAnalyzer(stats)
-    analysis = analyzer.analyze()
-    print(json.dumps(analysis, ensure_ascii=False, indent=2))
+    def summarize_tag_trends(self) -> pd.DataFrame:
+        """ タグ別の勝率・取引数など集計 """
+        if "tag" not in self.stats_df.columns:
+            return pd.DataFrame()
+        tag_stats = self.stats_df.groupby("tag").agg(
+            win_rate_mean=("win_rate", "mean"),
+            max_dd_mean=("max_dd", "mean"),
+            num_trades_sum=("num_trades", "sum"),
+            strategy_count=("strategy", "nunique"),
+        ).reset_index()
+        tag_stats = tag_stats.sort_values("win_rate_mean", ascending=False)
+        return tag_stats
+
+    def analyze_anomalies(self) -> pd.DataFrame:
+        """ 異常/失敗パターンの分析 """
+        if self.anomaly_df is None or self.anomaly_df.empty:
+            return pd.DataFrame()
+        anomaly_summary = self.anomaly_df.groupby("anomaly_type").size().reset_index(name="count")
+        anomaly_summary = anomaly_summary.sort_values("count", ascending=False)
+        return anomaly_summary
+
+    # 必要に応じてさらに分析関数追加OK
