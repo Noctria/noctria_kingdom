@@ -1,14 +1,23 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+🛠️ Veritas Machina 戦略テンプレ生成スクリプト（ML専用）
+- ML系シンプル戦略のテンプレートファイルを自動生成
+- LLM/自然言語要約は含まず
+"""
+
 import os
 from datetime import datetime, timezone
-from core.path_config import STRATEGIES_DIR
+from src.core.path_config import STRATEGIES_DIR  # ← パスは新設計に合わせて適宜調整
 
 # ========================================
-# 🛠 保存先ディレクトリ（Veritas戦略の出力）
+# 🛠 戦略保存先ディレクトリ
 # ========================================
 OUTPUT_DIR = STRATEGIES_DIR / "veritas_generated"
 
 # ========================================
-# 📜 Veritas戦略テンプレート（simulate関数）
+# 📜 Veritas ML戦略テンプレート（simulate関数）
 # ========================================
 STRATEGY_TEMPLATE = """\
 import pandas as pd
@@ -16,7 +25,7 @@ import numpy as np
 
 def simulate(data: pd.DataFrame) -> dict:
     \"""
-    RSIとspreadに基づいたシンプルな戦略
+    RSIとspreadに基づいたML的なシンプル戦略
     BUY: RSI > 50 and spread < 2
     SELL: RSI < 50 or spread > 2
     \"""
@@ -82,7 +91,7 @@ def generate_strategy_file(strategy_name: str):
     with open(filepath, "w") as f:
         f.write(STRATEGY_TEMPLATE)
 
-    print(f"👑 戦略ファイルを王国に記録しました：{filepath}")
+    print(f"👑 ML戦略ファイルを王国に記録しました：{filepath}")
     return filepath
 
 # ========================================
