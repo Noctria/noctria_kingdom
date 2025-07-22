@@ -85,6 +85,6 @@ async def dashboard_view(request: Request):
         "request": request,
         "stats": stats_data,
         "forecast": forecast_data,
-        "winrate_trend": winrate_trend,
+        "winrate_trend": [],
         "ai_progress": ai_progress,
     })
