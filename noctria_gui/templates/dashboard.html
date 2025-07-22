@@ -34,10 +34,32 @@
 <!-- 📈 Oracle予測グラフ -->
 <section class="hud-panel">
     <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
-    <!-- データ埋め込み -->
     <div id="forecast-data-holder" data-forecast='{{ forecast | tojson | safe }}'></div>
-    <!-- グラフ表示用canvas -->
     <canvas id="forecastChart" width="900" height="300" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+</section>
+
+<!-- 🟦 勝率推移グラフ -->
+<section class="hud-panel">
+    <h2 class="panel-title"><i class="fas fa-chart-line"></i> 勝率推移（AI別）</h2>
+    <div id="winrate-data-holder" data-winrate='{{ winrate_trend | tojson | safe }}'></div>
+    <canvas id="winrateTrendChart" width="900" height="260" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+</section>
+
+<!-- 🟧 AIごとの進捗率 -->
+<section class="hud-panel">
+    <h2 class="panel-title"><i class="fas fa-bolt"></i> AIごとの進捗率</h2>
+    <div class="panel-graph-row" style="display:flex;gap:2rem;flex-wrap:wrap;">
+      {% for ai in ai_progress %}
+      <div class="mini-panel" style="flex:1 1 220px;min-width:180px;max-width:240px; background:rgba(34,38,58,0.86); border-radius:1.2rem; padding:1rem 1.2rem; box-shadow:0 0 14px 0 #199bda38;">
+        <h3 style="font-size:1.1rem;color:#7eeafc;font-weight:600;">{{ ai.name }}</h3>
+        <canvas id="progress-{{ ai.id }}" width="120" height="120"></canvas>
+        <div class="progress-label" style="margin-top:.7em; color:#e6f1ff;font-weight:bold;">
+          {{ ai.progress }}%
+          <span style="margin-left:1em; color:#aac7ff;font-weight:normal;">{{ ai.phase }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
 </section>
 {% endblock %}
 
@@ -46,82 +68,108 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const dataHolder = document.getElementById('forecast-data-holder');
-    const canvas = document.getElementById('forecastChart');
-    if (!dataHolder || !canvas) {
-        console.warn("必要な要素が見つかりません！");
-        return;
-    }
-    let forecastData = [];
-    try {
-        forecastData = JSON.parse(dataHolder.dataset.forecast || "[]");
-        console.log("📊 ORACLEデータ", forecastData);
-    } catch (e) {
-        console.error("データのパース失敗", e);
-        return;
-    }
-    if (!Array.isArray(forecastData) || forecastData.length === 0) {
-        canvas.parentElement.innerHTML = "<div style='color:#fff'>No forecast data.</div>";
-        return;
-    }
-
-    const labels = forecastData.map(d => d.date);
-    const forecasts = forecastData.map(d => d.forecast);
-    const lowers = forecastData.map(d => d.lower);
-    const uppers = forecastData.map(d => d.upper);
-
-    new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '予測値',
-                    data: forecasts,
-                    borderColor: '#00e5ff',
-                    backgroundColor: 'rgba(0,229,255,0.12)',
-                    pointRadius: 3,
-                    tension: 0.25,
-                    fill: false,
-                },
-                {
-                    label: '下限',
-                    data: lowers,
-                    borderColor: 'rgba(255, 99, 132, 0.5)',
-                    borderDash: [5, 5],
-                    fill: false,
-                    pointRadius: 0,
-                    tension: 0.2
-                },
-                {
-                    label: '上限',
-                    data: uppers,
-                    borderColor: 'rgba(99, 255, 132, 0.5)',
-                    borderDash: [5, 5],
-                    fill: false,
-                    pointRadius: 0,
-                    tension: 0.2
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: true, labels: { color: '#e6f1ff' } },
-                title: { display: true, text: 'Oracle予測時系列', color: '#e6f1ff' }
-            },
-            scales: {
-                x: {
-                    ticks: { color: '#a8b2d1' },
-                    title: { display: true, text: '日付', color: '#a8b2d1' }
-                },
-                y: {
-                    ticks: { color: '#a8b2d1' },
-                    title: { display: true, text: '価格', color: '#a8b2d1' }
-                }
+    // --- Oracle予測グラフ（現状のまま） ---
+    {
+        const dataHolder = document.getElementById('forecast-data-holder');
+        const canvas = document.getElementById('forecastChart');
+        if (dataHolder && canvas) {
+            let forecastData = [];
+            try { forecastData = JSON.parse(dataHolder.dataset.forecast || "[]"); } catch (e) {}
+            if (Array.isArray(forecastData) && forecastData.length > 0) {
+                const labels = forecastData.map(d => d.date);
+                const forecasts = forecastData.map(d => d.forecast);
+                const lowers = forecastData.map(d => d.lower);
+                const uppers = forecastData.map(d => d.upper);
+                new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: '予測値', data: forecasts, borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.12)', pointRadius: 3, tension: 0.25, fill: false },
+                            { label: '下限', data: lowers, borderColor: 'rgba(255, 99, 132, 0.5)', borderDash: [5, 5], fill: false, pointRadius: 0, tension: 0.2 },
+                            { label: '上限', data: uppers, borderColor: 'rgba(99, 255, 132, 0.5)', borderDash: [5, 5], fill: false, pointRadius: 0, tension: 0.2 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: true, labels: { color: '#e6f1ff' } },
+                            title: { display: true, text: 'Oracle予測時系列', color: '#e6f1ff' }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#a8b2d1' }, title: { display: true, text: '日付', color: '#a8b2d1' } },
+                            y: { ticks: { color: '#a8b2d1' }, title: { display: true, text: '価格', color: '#a8b2d1' } }
+                        }
+                    }
+                });
             }
         }
-    });
+    }
+
+    // --- 勝率推移グラフ ---
+    {
+        const dataHolder = document.getElementById('winrate-data-holder');
+        const canvas = document.getElementById('winrateTrendChart');
+        if (dataHolder && canvas) {
+            let winrateData = [];
+            try { winrateData = JSON.parse(dataHolder.dataset.winrate || "[]"); } catch (e) {}
+            if (Array.isArray(winrateData) && winrateData.length > 0) {
+                const labels = winrateData.map(d => d.date);
+                const aiNames = Object.keys(winrateData[0]).filter(k => k !== "date");
+                const colors = ['#18e1ef','#f5c34e','#f55587','#68f5c3','#a18afc','#f79a7d'];
+                const datasets = aiNames.map((name, i) => ({
+                    label: name,
+                    data: winrateData.map(d => d[name]),
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: 'rgba(0,0,0,0)',
+                    tension: 0.22,
+                    pointRadius: 2 + (name === 'King' ? 2 : 0),
+                    fill: false
+                }));
+                new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: "#e6f1ff" } },
+                            title: { display: true, text: "勝率推移（AI別）", color: "#e6f1ff" }
+                        },
+                        scales: {
+                            x: { ticks: { color: "#a8b2d1" } },
+                            y: { ticks: { color: "#a8b2d1" }, min: 0, max: 100 }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    // --- AI進捗ゲージ（ドーナツ型） ---
+    {% for ai in ai_progress %}
+    (function() {
+        const ctx = document.getElementById('progress-{{ ai.id }}');
+        if (!ctx) return;
+        new Chart(ctx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['進捗', '残り'],
+                datasets: [{
+                    data: [{{ ai.progress }}, {{ 100 - ai.progress }}],
+                    backgroundColor: ['#31edc2', '#1b2233'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                cutout: "70%",
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+    })();
+    {% endfor %}
 });
 </script>
 {% endblock %}
