@@ -15,7 +15,7 @@ import numpy as np
 import requests
 from typing import Optional, Dict, Any
 
-from src.veritas.veritas_machina import VeritasStrategist
+from src.veritas.veritas_machina import VeritasMachina
 from src.strategies.prometheus_oracle import PrometheusOracle
 from src.strategies.aurus_singularis import AurusSingularis
 from src.strategies.levia_tempest import LeviaTempest
