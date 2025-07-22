@@ -60,7 +60,9 @@ from noctria_gui.routes import (
     statistics_detail, statistics_ranking,
     statistics_scoreboard, statistics_tag_ranking, statistics_compare,
     strategy_detail, strategy_heatmap, strategy_routes,
-    tag_heatmap, tag_summary, tag_summary_detail
+    tag_heatmap, tag_summary, tag_summary_detail,
+    # 追加↓
+    hermes
 )
 
 logger.info("Integrating all routers into the main application...")
@@ -70,6 +72,9 @@ app.include_router(home_routes.router)
 app.include_router(dashboard.router)
 app.include_router(king_routes.router)
 app.include_router(trigger.router)
+
+# --- Hermes LLM戦略生成 ---
+app.include_router(hermes.router)  # ⭐️追加！ここでHermesのAPIが使えるようになる
 
 # --- ログ・履歴 ---
 app.include_router(act_history.router)
