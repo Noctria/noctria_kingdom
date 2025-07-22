@@ -1,23 +1,6 @@
-flowchart TD
+flowchart TD 
 
-%% =======================
-%% Kingdom・AI・DAG全体層
-%% =======================
-
-subgraph Kingdom統治AI[Noctria Kingdom 統治層]
-  RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
-  KING["king_noctria.py<br>統合AI"]
-end
-
-subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
-  PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
-  AA["aurus_strategy_dag.py<br>🎯 総合分析"]
-  LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
-  NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
-  HA["hermes_strategy_dag.py<br>🦉 LLM根拠説明"]
-end
-
-%% -------- PDCA/Replay/Actライン --------
+%% --- Veritas PDCA/Replayライン（Master DAG完全削除） ---
 subgraph Veritas_Master[Veritas PDCA/Replayライン]
   VPDCA["veritas_pdca_dag.py<br>🔁 PDCA自動ループ"]
   VG["veritas_generate_dag.py<br>🔨 戦略生成"]
@@ -29,11 +12,27 @@ subgraph Veritas_Master[Veritas PDCA/Replayライン]
   VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
 end
 
-%% -------- Hermes LLM層 --------
-subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
-  HGEN["src/hermes/strategy_generator.py<br>🦉 LLM戦略コード生成"]
+%% --- Kingdom AI層 ---
+subgraph Kingdom統治AI[Noctria Kingdom 統治層]
+  RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
+  KING["king_noctria.py<br>統合AI"]
 end
 
+%% --- ストラテジAI/DAG群 ---
+subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
+  PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
+  AA["aurus_strategy_dag.py<br>🎯 総合分析"]
+  LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
+  NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
+  HA["hermes_strategy_dag.py<br>🦉 LLM根拠説明"]
+end
+
+%% --- Hermes LLM生成ノード（新設） ---
+subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
+  HGEN["strategy_generator.py<br>🦉 LLM戦略コード生成"]
+end
+
+%% --- LLM層 ---
 subgraph LLM層[Noctria LLM層]
   LLM_MAIN["main.py<br>🚪 LLMサーバ（評価API）"]
   LLM_SERVER["veritas_llm_server.py<br>🧠 LLM生成サーバ"]
@@ -41,7 +40,7 @@ subgraph LLM層[Noctria LLM層]
   LLM_EVALAPI["veritas_eval_api.py<br>📄 評価ログAPI"]
 end
 
-%% -------- PlanData層 --------
+%% --- Plan Data層（分離構成反映+Airflow定時バッチ追加）---
 subgraph PlanData["src/plan_data（PDCA-Plan根拠/分析クラスタ）"]
   PLAN_COLLECT["collector.py<br>データ収集・統合"]
   PLAN_FEATURE["features.py<br>特徴量生成"]
@@ -53,7 +52,13 @@ subgraph PlanData["src/plan_data（PDCA-Plan根拠/分析クラスタ）"]
   PLAN_PDCA_BATCH["run_pdca_plan_workflow.py<br>🛠️ サマリー自動生成バッチ"]
 end
 
-%% -------- データ/成果物層 --------
+%% --- GUI/API層 ---
+subgraph GUI_API[GUI・API・外部連携]
+  GUI["FastAPI/Streamlit<br>🖥️ GUI・REST API<br><u>src/core/dag_trigger.py<br>Airflow DAGトリガー連携</u>"]
+  API["外部APIトリガー<br>🔗 API Endpoint"]
+end
+
+%% --- データ・ファイル層 ---
 subgraph DATA["データ/成果物ストア"]
   GIT["GitHub<br>📦 戦略リポジトリ"]
   ACTLOG["PDCA/Actログ<br>📜"]
@@ -63,125 +68,13 @@ subgraph DATA["データ/成果物ストア"]
   PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>📝 Planサマリー"]
 end
 
-%% ========================
-%% GUI + API層 (FastAPI)
-%% ========================
-
-subgraph GUI_Main["noctria_gui/main.py<br>🖥️ 中枢GUIルート統合"]
-  direction TB
-  HOME["home_routes -> home.html"]
-  DASHBOARD["dashboard -> dashboard.html"]
-  KINGHIST["king_routes -> king_history.html"]
-  TRIGGER["trigger -> trigger.html"]
-  UPLOAD["upload -> upload_strategy.html"]
-  UPLOAD_HISTORY["upload_history -> upload_history.html"]
-  ACT_HISTORY["act_history -> act_history.html"]
-  ACT_HISTORY_DETAIL["act_history_detail -> act_history_detail.html"]
-  LOGS["logs_routes -> logs_dashboard.html"]
-  PDCA["pdca -> pdca_dashboard.html"]
-  PDCA_RECHECK["pdca_recheck -> pdca_history.html"]
-  PDCA_ROUTES["pdca_routes"]
-  PDCA_SUMMARY["pdca_summary"]
-  PUSH["push"]
-  STRATEGY_ROUTES["strategy_routes -> strategy_compare.html"]
-  STRATEGY_DETAIL["strategy_detail -> strategy_detail.html"]
-  STRATEGY_HEATMAP["strategy_heatmap -> strategy_heatmap.html"]
-  STAT_DETAIL["statistics_detail -> statistics_detail.html"]
-  STAT_RANKING["statistics_ranking -> statistics_ranking.html"]
-  STAT_SCOREBOARD["statistics_scoreboard -> statistics_scoreboard.html"]
-  STAT_TAG_RANKING["statistics_tag_ranking -> statistics_tag_ranking.html"]
-  STAT_COMPARE["statistics_compare -> statistics_compare.html"]
-  TAG_SUMMARY["tag_summary -> tag_summary.html"]
-  TAG_SUMMARY_DETAIL["tag_summary_detail -> tag_summary_detail.html"]
-  TAG_HEATMAP["tag_heatmap -> tag_heatmap.html"]
-  PATH_CHECKER["path_checker"]
-  PROMETHEUS_ROUTES["prometheus_routes"]
-  HERMES["hermes.py<br>Hermes LLM戦略API"]
-end
-
-subgraph Services["noctria_gui/services<br>各種サーバロジック"]
-  direction TB
-  ACT_LOG_SERVICE["act_log_service.py"]
-  DASHBOARD_SERVICE["dashboard_service.py"]
-  PUSH_HISTORY_SERVICE["push_history_service.py"]
-  STATISTICS_SERVICE["statistics_service.py"]
-  STRATEGY_HANDLER["strategy_handler.py"]
-  TAG_SUMMARY_SERVICE["tag_summary_service.py"]
-  UPLOAD_ACTIONS["upload_actions.py"]
-end
-
-%% ========================
-%% GUI Main <-> 各ルート連携
-%% ========================
-GUI_Main -->|include_router| HOME
-GUI_Main --> DASHBOARD
-GUI_Main --> KINGHIST
-GUI_Main --> TRIGGER
-GUI_Main --> UPLOAD
-GUI_Main --> UPLOAD_HISTORY
-GUI_Main --> ACT_HISTORY
-GUI_Main --> ACT_HISTORY_DETAIL
-GUI_Main --> LOGS
-GUI_Main --> PDCA
-GUI_Main --> PDCA_RECHECK
-GUI_Main --> PDCA_ROUTES
-GUI_Main --> PDCA_SUMMARY
-GUI_Main --> PUSH
-GUI_Main --> STRATEGY_ROUTES
-GUI_Main --> STRATEGY_DETAIL
-GUI_Main --> STRATEGY_HEATMAP
-GUI_Main --> STAT_DETAIL
-GUI_Main --> STAT_RANKING
-GUI_Main --> STAT_SCOREBOARD
-GUI_Main --> STAT_TAG_RANKING
-GUI_Main --> STAT_COMPARE
-GUI_Main --> TAG_SUMMARY
-GUI_Main --> TAG_SUMMARY_DETAIL
-GUI_Main --> TAG_HEATMAP
-GUI_Main --> PATH_CHECKER
-GUI_Main --> PROMETHEUS_ROUTES
-GUI_Main --> HERMES
-
-%% サービス利用関係
-ACT_HISTORY --> ACT_LOG_SERVICE
-ACT_HISTORY_DETAIL --> ACT_LOG_SERVICE
-PDCA --> ACT_LOG_SERVICE
-PDCA_RECHECK --> ACT_LOG_SERVICE
-PDCA_ROUTES --> ACT_LOG_SERVICE
-PDCA_SUMMARY --> ACT_LOG_SERVICE
-
-DASHBOARD --> DASHBOARD_SERVICE
-PUSH --> PUSH_HISTORY_SERVICE
-STAT_DETAIL --> STATISTICS_SERVICE
-STAT_RANKING --> STATISTICS_SERVICE
-STAT_SCOREBOARD --> STATISTICS_SERVICE
-STAT_TAG_RANKING --> STATISTICS_SERVICE
-STAT_COMPARE --> STATISTICS_SERVICE
-TAG_SUMMARY --> TAG_SUMMARY_SERVICE
-TAG_SUMMARY_DETAIL --> TAG_SUMMARY_SERVICE
-TAG_HEATMAP --> TAG_SUMMARY_SERVICE
-UPLOAD --> STRATEGY_HANDLER
-UPLOAD_HISTORY --> UPLOAD_ACTIONS
-STRATEGY_ROUTES --> STRATEGY_HANDLER
-
-%% 戦略関連 Routes
-STRATEGY_ROUTES --> STRATEGY_DETAIL
-STRATEGY_ROUTES --> STRATEGY_HEATMAP
-
-%% GUIのDAGトリガー連携
-TRIGGER -.-> src_core_dag_trigger["src/core/dag_trigger.py<br>Airflow DAG一覧取得・DAGトリガー連携"]
-src_core_dag_trigger --> PDCA
-
-%% ========================
-%% クロスレイヤー/連携ライン
-%% ========================
-
-%% Master/PDCA/Replayフロー
+%% --- Master/PDCA/Replayフロー ---
 VPDCA -- "戦略生成" --> VG
 VPDCA -- "評価" --> VE
 VPDCA -- "採用記録" --> VA
 VPDCA -- "GitHubPush" --> VPUSH
 
+%% --- Veritas評価後の流れ ---
 VG -- "戦略ファイル" --> STRATJSON
 STRATJSON -- "評価対象" --> VE
 VE -- "評価済戦略" --> EVALRES
@@ -192,43 +85,46 @@ VA -- "Push要求" --> VPUSH
 VPUSH -- "GitHubコミット" --> GIT
 GIT -- "リポジトリ状態" --> RC
 
+%% --- Actログ/PDCA履歴も御前会議へ -->
 VS -- "再評価情報" --> ACTLOG
 VR -- "再評価情報" --> ACTLOG
+
+%% --- 再送DAGの流れ（Replay） ---
 VREPLAY -- "PDCAログから再送命令" --> ACTLOG
 
+%% --- 御前会議/統合AIフロー ---
 RC --> KING
 
+%% --- ストラテジAI群と統合AIの連携イメージ ---
 KING -- "戦略判断/最終意思決定" --> PA
 KING -- "戦略判断/最終意思決定" --> AA
 KING -- "戦略判断/最終意思決定" --> LA
 KING -- "戦略判断/最終意思決定" --> NA
 KING -- "根拠説明/自然言語化" --> HA
 
+%% --- Hermes LLM生成フロー ---
 HGEN -- "生成戦略ファイル" --> HERMES_STRAT
 HGEN -- "説明/ナラティブ" --> HA
 
-HERMES -- "APIリクエスト" --> HGEN
+%% --- GUI⇔PDCA連携 --- 
+GUI -- "DAGトリガ/可視化" --> VPDCA
+API -- "パラメータ入力" --> VPDCA
 
-%% GUI⇔PDCA連携
-DASHBOARD -- "PDCA起動・結果表示" --> VPDCA
-TRIGGER -- "DAG選択/発令" --> VPDCA
-HERMES -- "戦略生成API" --> HGEN
+%% --- GUI・API⇔成果物 ---
+GUI -- "履歴DL/CSV" --> ACTLOG
+GUI -- "評価データ閲覧" --> EVALRES
 
-%% GUI・API⇔成果物
-DASHBOARD -- "履歴DL/CSV" --> ACTLOG
-DASHBOARD -- "評価データ閲覧" --> EVALRES
-
-%% LLM層連携
+%% --- LLM層連携 ---
 LLM_SERVER -- "テンプレ読込" --> LLM_PROMPT
 VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
-DASHBOARD -- "戦略自動生成<br>/generate" --> LLM_SERVER
+GUI -- "戦略自動生成<br>/generate" --> LLM_SERVER
 LLM_SERVER -- "生成結果" --> VG
 LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_MAIN
-LLM_MAIN -- "評価ログ取得" --> DASHBOARD
+LLM_MAIN -- "評価ログ取得" --> GUI
 LLM_MAIN -- "veritas_eval_result.json" --- EVALRES
 LLM_EVALAPI -- "veritas_eval_result.json" --- EVALRES
 
-%% PlanData層連携
+%% --- PlanData層連携（分離構成+Airflow定時バッチ）---
 PLAN_COLLECT -- "生データ（時系列DF）" --> PLAN_FEATURE
 PLAN_FEATURE -- "特徴量付与DF" --> PLAN_STAT
 PLAN_STAT -- "分析結果" --> PLAN_ANALYZER
@@ -236,22 +132,19 @@ PLAN_ANALYZER -- "要因抽出/特徴分析" --> PLAN_PROMPT
 PLAN_STAT -- "異常値・ドリフト分析" --> PLAN_ANOMALY
 PLAN_ANOMALY -- "異常/逸脱情報" --> PLAN_PROMPT
 
-%% PDCA-Planサマリー自動生成
+%% --- PDCA-Planサマリー自動生成（Airflow/バッチ） ---
 PLAN_PDCA_DAG -- "run_pdca_plan_workflow.py実行" --> PLAN_PDCA_BATCH
 PLAN_PDCA_BATCH -- "Planサマリー出力" --> PLAN_SUMMARY_JSON
-PLAN_SUMMARY_JSON -- "可視化/分析" --> DASHBOARD
+PLAN_SUMMARY_JSON -- "可視化/分析" --> GUI
 
-%% ========================
-%% クラス定義・色分け
-%% ========================
+%% --- 依存（点線） ---
+LLM_SERVER -.-> LLM_PROMPT
+
 classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
 class VPDCA,VPUSH,VR,VREPLAY pdca;
 
 classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
-class GUI_Main,HOME,DASHBOARD,KINGHIST,TRIGGER,UPLOAD,UPLOAD_HISTORY,ACT_HISTORY,ACT_HISTORY_DETAIL,LOGS,PDCA,PDCA_RECHECK,PDCA_ROUTES,PDCA_SUMMARY,PUSH,STRATEGY_ROUTES,STRATEGY_DETAIL,STRATEGY_HEATMAP,STAT_DETAIL,STAT_RANKING,STAT_SCOREBOARD,STAT_TAG_RANKING,STAT_COMPARE,TAG_SUMMARY,TAG_SUMMARY_DETAIL,TAG_HEATMAP,PATH_CHECKER,PROMETHEUS_ROUTES,HERMES gui;
-
-classDef services fill:#f6fff4,stroke:#49c972,stroke-width:1.5px;
-class ACT_LOG_SERVICE,DASHBOARD_SERVICE,PUSH_HISTORY_SERVICE,STATISTICS_SERVICE,STRATEGY_HANDLER,TAG_SUMMARY_SERVICE,UPLOAD_ACTIONS services;
+class GUI,API gui;
 
 classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
 class GIT,ACTLOG,STRATJSON,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON data;
@@ -260,5 +153,4 @@ classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
 class LLM_MAIN,LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
 
 classDef hermes fill:#e1f4ff,stroke:#2d9fc2,stroke-width:2px;
-class HA,HGEN,HERMES hermes;
-
+class HA,HGEN hermes;
