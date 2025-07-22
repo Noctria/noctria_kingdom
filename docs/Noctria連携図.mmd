@@ -27,6 +27,11 @@ subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
   HA["hermes_strategy_dag.py<br>🦉 LLM根拠説明"]
 end
 
+%% --- Hermes LLM生成ノード（新設） ---
+subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
+  HGEN["strategy_generator.py<br>🦉 LLM戦略コード生成"]
+end
+
 %% --- LLM層 ---
 subgraph LLM層[Noctria LLM層]
   LLM_MAIN["main.py<br>🚪 LLMサーバ（評価API）"]
@@ -58,6 +63,7 @@ subgraph DATA["データ/成果物ストア"]
   GIT["GitHub<br>📦 戦略リポジトリ"]
   ACTLOG["PDCA/Actログ<br>📜"]
   STRATJSON["戦略ファイル群<br>🗂️"]
+  HERMES_STRAT["hermes_generated<br>🦉 Hermes戦略群"]
   EVALRES["評価結果<br>📊"]
   PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>📝 Planサマリー"]
 end
@@ -95,6 +101,10 @@ KING -- "戦略判断/最終意思決定" --> AA
 KING -- "戦略判断/最終意思決定" --> LA
 KING -- "戦略判断/最終意思決定" --> NA
 KING -- "根拠説明/自然言語化" --> HA
+
+%% --- Hermes LLM生成フロー ---
+HGEN -- "生成戦略ファイル" --> HERMES_STRAT
+HGEN -- "説明/ナラティブ" --> HA
 
 %% --- GUI⇔PDCA連携 --- 
 GUI -- "DAGトリガ/可視化" --> VPDCA
@@ -137,10 +147,10 @@ classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
 class GUI,API gui;
 
 classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
-class GIT,ACTLOG,STRATJSON,EVALRES,PLAN_SUMMARY_JSON data;
+class GIT,ACTLOG,STRATJSON,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON data;
 
 classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
 class LLM_MAIN,LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
 
 classDef hermes fill:#e1f4ff,stroke:#2d9fc2,stroke-width:2px;
-class HA hermes;
+class HA,HGEN hermes;
