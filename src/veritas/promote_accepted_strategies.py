@@ -1,24 +1,28 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+⚔️ Veritas Machina - 戦略昇格スクリプト（ML/Act専用）
+- ML戦略評価ログ（JSON）から合格戦略ファイルのみ“公式ディレクトリ”へ昇格
+- Airflowワークフローにも対応
+"""
+
 import shutil
 import json
 from pathlib import Path
-from core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR
+from src.core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR
 
 # ========================================
-# ⚔️ Veritas戦略昇格スクリプト（Actフェーズ）
+# 🏅 Veritas ML戦略昇格パス
 # ========================================
-
 EVAL_LOG_PATH = VERITAS_EVAL_LOG
 SOURCE_DIR = STRATEGIES_DIR / "veritas_generated"
 DEST_DIR = STRATEGIES_DIR / "official"
 
-# ✅ Airflow対応関数（引数なし）
-def promote_strategies():
-    print("👑 [Veritas] 採用戦略の昇格フェーズを開始します…")
-
-    # 📁 昇格先ディレクトリを作成（存在しない場合）
+def promote_accepted_strategies():
+    print("👑 [Veritas Machina] 合格戦略の公式昇格処理を開始…")
     DEST_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 📖 評価ログの読み込み
     if not EVAL_LOG_PATH.exists():
         print("⚠️ 評価ログが存在しません:", EVAL_LOG_PATH)
         return
@@ -26,10 +30,9 @@ def promote_strategies():
     with open(EVAL_LOG_PATH, "r", encoding="utf-8") as f:
         evaluation_results = json.load(f)
 
-    # 🎯 採用戦略の昇格処理
     promoted = []
     for entry in evaluation_results:
-        if entry.get("passed"):  # ← Airflow評価結果では "passed" キー
+        if entry.get("passed"):  # ML評価フェーズで "passed" キー
             filename = entry.get("strategy") or entry.get("filename")
             src_path = SOURCE_DIR / filename
             dst_path = DEST_DIR / filename
@@ -41,16 +44,14 @@ def promote_strategies():
             else:
                 print(f"⚠️ 戦略ファイルが見つかりません: {filename}")
 
-    # 📜 結果ログ
     if promoted:
         print("\n🏰 王国訓示：")
         print("「選ばれし知性よ、いまこそ王国の剣として輝け。」\n")
-        print("✅ 昇格された戦略一覧:")
+        print("✅ 昇格されたML戦略一覧:")
         for f in promoted:
             print(" -", f)
     else:
         print("🚫 昇格対象の戦略はありません。")
 
-# ✅ 手動実行用
 if __name__ == "__main__":
-    promote_strategies()
+    promote_accepted_strategies()
