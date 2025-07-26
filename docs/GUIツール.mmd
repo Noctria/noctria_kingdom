@@ -4,7 +4,7 @@ flowchart LR
     direction TB
     HOME["home_routes (noctria_gui/routes/home.py) -> home.html"]
     DASHBOARD["dashboard (noctria_gui/routes/dashboard.py) -> dashboard.html"]
-    AI_DETAIL["ai_detail (noctria_gui/routes/ai_detail.py) -> ai_detail.html"]
+    AI_ROUTES["ai_routes (noctria_gui/routes/ai_routes.py) -> ai_list.html / ai_detail.html"]
     KING["king_routes (noctria_gui/routes/king_routes.py) -> king_history.html"]
     TRIGGER["trigger (noctria_gui/routes/trigger.py) -> trigger.html
       - Airflow DAG一覧取得 (list_dags)
@@ -52,7 +52,7 @@ flowchart LR
   %% GUI Mainから各Routesへのinclude
   GUI_Main -->|include_router| HOME
   GUI_Main --> DASHBOARD
-  GUI_Main --> AI_DETAIL
+  GUI_Main --> AI_ROUTES
   GUI_Main --> KING
   GUI_Main --> TRIGGER
   GUI_Main --> UPLOAD
@@ -84,7 +84,7 @@ flowchart LR
   %% ダッシュボードからアクセスリンク（追加）
   DASHBOARD --> STRATEGY_ROUTES
   DASHBOARD --> PDCA_SUMMARY
-  DASHBOARD --> AI_DETAIL
+  DASHBOARD --> AI_ROUTES
   DASHBOARD --> TRIGGER
   DASHBOARD --> ACT_HISTORY
   DASHBOARD --> PUSH
@@ -100,7 +100,7 @@ flowchart LR
   PDCA_SUMMARY --> ACT_LOG_SERVICE
 
   DASHBOARD --> DASHBOARD_SERVICE
-  AI_DETAIL --> DASHBOARD_SERVICE
+  AI_ROUTES --> DASHBOARD_SERVICE
   PUSH --> PUSH_HISTORY_SERVICE
   PUSH_HISTORY --> PUSH_HISTORY_SERVICE
   STAT_DETAIL --> STATISTICS_SERVICE
