@@ -16,6 +16,29 @@
 
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .hud-tag {
+            background-color: #0a74da;
+            color: #fff;
+            border-radius: 0.4rem;
+            padding: 0.1rem 0.5rem;
+            font-size: 0.85rem;
+            margin-right: 0.3rem;
+            display: inline-block;
+        }
+        .action-links a {
+            margin-right: 0.8rem;
+            color: #0cf;
+            text-decoration: none;
+        }
+        .action-links a:hover {
+            text-decoration: underline;
+        }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
 </head>
 <body>
 
@@ -33,12 +56,12 @@
                 <button type="submit" class="hud-btn"><i class="fas fa-search"></i> 検索</button>
             </form>
             <div class="separator"></div>
-            <button onclick="plotComparison()" class="hud-btn"><i class="fas fa-chart-bar"></i> 選択戦略を比較グラフで表示</button>
+            <button onclick="plotComparison()" class="hud-btn" title="選択した戦略をグラフで比較します"><i class="fas fa-chart-bar"></i> 選択戦略を比較グラフで表示</button>
         </section>
 
         <!-- Main Analysis Panel -->
         <main class="hud-panel analysis-panel">
-            <div class="chart-container-half">
+            <div class="chart-container-half" style="height: 320px;">
                 <canvas id="comparisonChart"></canvas>
             </div>
             <div class="table-wrapper">
@@ -68,7 +91,9 @@
                                     <span class="custom-checkbox"></span>
                                 </label>
                             </td>
-                            <td class="tag-name-cell">{{ s.strategy }}</td>
+                            <td class="tag-name-cell">
+                              <a href="/strategy/detail?name={{ s.strategy }}" title="戦略詳細を見る">{{ s.strategy }}</a>
+                            </td>
                             <td>{{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}</td>
                             <td>{{ s.trade_count if s.trade_count is not none else '―' }}</td>
                             <td>{{ s.max_drawdown if s.max_drawdown is not none else '―' }}</td>
