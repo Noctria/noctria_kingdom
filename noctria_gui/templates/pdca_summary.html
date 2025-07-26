@@ -6,6 +6,25 @@
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+<style>
+.flatpickr-calendar {
+  background: var(--bg-color);
+  border: 1px solid var(--glow-primary);
+  box-shadow: 0 0 10px var(--glow-primary);
+  color: var(--text-color);
+  font-family: monospace;
+}
+.flatpickr-day.selected,
+.flatpickr-day:hover {
+  background: var(--glow-primary);
+  color: var(--bg-color);
+  border-radius: 4px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- フラッシュ表示（再評価結果） -->
 {% if recheck_success is not none or recheck_fail is not none %}
@@ -21,10 +40,10 @@
     <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
     <form method="get" action="/pdca/summary" class="filter-form">
         <label for="from-date"><i class="fas fa-calendar-alt"></i> 開始日</label>
-        <input id="from-date" type="date" name="from" value="{{ filter.from | default('') }}">
+        <input id="from-date" type="text" name="from" value="{{ filter.from | default('') }}" autocomplete="off">
         
         <label for="to-date"><i class="fas fa-calendar-alt"></i> 終了日</label>
-        <input id="to-date" type="date" name="to" value="{{ filter.to | default('') }}">
+        <input id="to-date" type="text" name="to" value="{{ filter.to | default('') }}" autocomplete="off">
         
         <label for="mode-select"><i class="fas fa-eye"></i> 表示モード</label>
         <select id="mode-select" name="mode">
@@ -133,8 +152,13 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // Flatpickr初期化
+    flatpickr("#from-date", { dateFormat: "Y-m-d", allowInput: true });
+    flatpickr("#to-date", { dateFormat: "Y-m-d", allowInput: true });
+
     const dataHolder = document.getElementById('chart-data-holder');
     // --- チャート描画 ---
     if (dataHolder) {
