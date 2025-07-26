@@ -9,18 +9,24 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('Chart.js本体が読み込まれていません。dashboard.htmlの<script>タグを確認してください。');
     return;
   }
-  // プラグインのオブジェクト名を修正
-  const BoxPlotController = window['chartjs-chart-box-and-violin-plot']?.BoxPlotController;
-  const HistogramController = window['chartjs-chart-histogram']?.HistogramController;
+  
+  // ▼▼▼ 修正点: 正しいグローバル変数名から機能を取得 ▼▼▼
+  const { BoxPlotController, BoxAndWhiskers, Violin } = window.ChartjsChartBoxAndViolinPlot || {};
+  const { HistogramController, HistogramElement } = window.ChartjsChartHistogram || {};
 
   try {
+    // プラグインが正しく読み込まれたか最終チェック
+    if (!HistogramController || !HistogramElement || !BoxPlotController || !BoxAndWhiskers || !Violin) {
+      throw new Error('Chart.jsのプラグインコンポーネントが不足しています。');
+    }
+
     // 必須ライブラリを登録
     Chart.register(
       HistogramController,
-      window['chartjs-chart-histogram'].HistogramElement,
+      HistogramElement,
       BoxPlotController,
-      window['chartjs-chart-box-and-violin-plot'].BoxAndWhiskers,
-      window['chartjs-chart-box-and-violin-plot'].Violin
+      BoxAndWhiskers,
+      Violin
     );
   } catch (e) {
     console.error('Chart.jsのプラグイン登録に失敗しました。ライブラリが正しく読み込まれているか、CDNのURLを確認してください。', e);
@@ -41,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (dashboardMetrics.length === 0 || aiNames.length === 0) {
     console.warn("ダッシュボードの表示に必要なデータが不足しています。");
-    // データがなくてもエラーで停止しないようにする
   }
 
   // --- 状態管理 ---
@@ -121,8 +126,46 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const label = ai === 'overall' ? '全体' : ai;
 
-    histChart = new Chart(histCtx, { /* ... Chart.js options ... */ });
-    boxChart = new Chart(boxCtx, { /* ... Chart.js options ... */ });
+    // ヒストグラムと箱ひげ図の描画オプションを追加
+    histChart = new Chart(histCtx, { 
+      type: 'histogram',
+      data: {
+        datasets: [{
+          label: conf.label,
+          data: data,
+          backgroundColor: 'rgba(24,225,239,0.5)',
+          borderColor: '#18e1ef',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+          legend: { display: false },
+          title: { display: true, text: `${conf.label} 分布（${label}）`, color: "#e6f1ff" }
+        },
+        scales: { x: { ticks: { color: "#a8b2d1" } }, y: { ticks: { color: "#a8b2d1" } } }
+      }
+    });
+    boxChart = new Chart(boxCtx, { 
+      type: 'boxplot',
+      data: {
+        labels: [conf.label],
+        datasets: [{
+          label: conf.label,
+          data: [data],
+          backgroundColor: 'rgba(34,38,58,0.86)',
+          borderColor: '#7eeafc',
+          outlierColor: '#FF6384',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { color: "#a8b2d1" } } }
+      }
+    });
   }
 
   /**
@@ -137,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('metric-max').textContent = format(data.max);
     document.getElementById('metric-min').textContent = format(data.min);
     document.getElementById('metric-diff').textContent = data.diff != null ? (data.diff >= 0 ? `+${data.diff}` : data.diff) : "-";
-    document.querySelectorAll('#metric-unit, #metric-unit-max, #metric-unit-min, #metric-unit-diff').forEach(el => el.textContent = conf.unit);
+    document.querySelectorAll('#metric-unit, #metric-unit-max, #metric-unit-min, #metric-unit-diff').forEach(el => el.textContent = conf.unit || '');
   }
 
   /**
@@ -165,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.switchMetric = (metric, event) => {
     selectedMetric = metric;
     document.querySelectorAll('.metric-tab').forEach(btn => btn.classList.remove('active'));
-    if (event.currentTarget) {
+    if (event && event.currentTarget) {
       event.currentTarget.classList.add('active');
     }
     redrawCharts();
