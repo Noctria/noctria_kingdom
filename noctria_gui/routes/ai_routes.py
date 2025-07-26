@@ -99,6 +99,11 @@ def get_ai_detail(ai_name: str):
             "diff": round((vals[-1] - vals[-2]), m["dec"]) if len(vals) >= 2 else None
         }
 
+    # ■ 追加修正：valuesがメソッドになっていた場合の対応（安全策）
+    for k in trend_dict:
+        if callable(trend_dict[k].get("values")):
+            trend_dict[k]["values"] = list(trend_dict[k]["values"]())
+
     return ai_name, trend_dict, metric_dist, sorted(strategy_list, key=lambda x: x["evaluated_at"], reverse=True)
 
 # --- AI詳細ページ ---
