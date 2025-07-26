@@ -1,6 +1,6 @@
 /* =============================
-   Noctria Kingdom GUI HUD Style v1.0
-   Dark theme with glow effects
+   Noctria Kingdom GUI HUD Style v1.1
+   Dark theme with glow effects & refined colors
    ============================= */
 
 /* --- カラーバリアブル定義 --- */
@@ -8,9 +8,12 @@
   --bg-color: #0a0f2c;
   --glow-primary: #22d1ee;
   --text-color-base: #d0e9ff;
+  --text-color-light: #a0d8ff;   /* 薄い水色 */
+  --text-color-normal: #22d1ee;  /* 水色 (glow-primaryと同じ) */
+  --text-color-dark: #0a7cbc;    /* 青色 */
   --panel-bg: #131a4f;
   --panel-border: #22d1ee44;
-  --text-color-title: #a0d8ff;
+  --text-color-title: var(--text-color-light);
   --accent-color-1: #55c3ff;
   --font-family: 'Roboto Mono', monospace;
 }
@@ -78,7 +81,7 @@ html, body {
 .panel-title {
   font-weight: 700;
   font-size: 1.3rem;
-  color: var(--glow-primary);
+  color: var(--text-color-normal);
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -86,12 +89,25 @@ html, body {
   filter: drop-shadow(0 0 8px var(--glow-primary));
 }
 
+/* --- 文字色ユーティリティ --- */
+.text-light {
+  color: var(--text-color-light);
+}
+
+.text-normal {
+  color: var(--text-color-normal);
+}
+
+.text-dark {
+  color: var(--text-color-dark);
+}
+
 /* --- リンクスタイル --- */
 .hud-link {
   background: var(--bg-color);
   box-shadow: 0 0 12px var(--glow-primary);
   border-radius: 8px;
-  color: var(--text-color-base);
+  color: var(--text-color-light);
   text-decoration: none;
   padding: 1rem;
   display: flex;
@@ -99,12 +115,17 @@ html, body {
   gap: 0.75rem;
   font-weight: 700;
   justify-content: center;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  transition: 
+    background-color 0.3s ease, 
+    box-shadow 0.3s ease,
+    color 0.3s ease;
 }
 
-.hud-link:hover {
-  background: var(--panel-bg);
-  box-shadow: 0 0 18px var(--glow-primary);
+.hud-link:hover, .hud-link:focus {
+  background: var(--glow-primary);
+  box-shadow: 0 0 20px var(--glow-primary);
+  color: var(--bg-color);
+  cursor: pointer;
 }
 
 /* --- メトリックアイテム --- */
@@ -137,8 +158,6 @@ html, body {
   color: #f44336;
 }
 
-/* --- フォント・テーブル・フォーム系は別CSSで管理されている想定 --- */
-
 /* ========================
    Flatpickr HUDカスタムスタイル
    ======================== */
@@ -149,7 +168,7 @@ html, body {
   box-shadow: 0 0 10px var(--glow-primary);
   color: var(--text-color-base);
   font-family: var(--font-family);
-  z-index: 1000; /* カレンダーが他要素と重ならないように */
+  z-index: 1000;
 }
 
 .flatpickr-months, 
