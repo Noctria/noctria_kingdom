@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v3.3) - AI別勝率推移グラフ切替/サマリー強化対応
+👑 Central Governance Dashboard Route (v4.0) - 全指標（勝率・最大DD・取引数・PF）対応ダッシュボード
 """
 
 import logging
@@ -23,11 +23,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-def load_ai_winrate_trend():
+# ★ 各指標の定義・日本語名・小数点表示など（フロント連携でも使う）
+DASHBOARD_METRICS = [
+    {"key": "win_rate",       "label": "勝率",      "unit": "%",    "dec": 2},
+    {"key": "max_drawdown",   "label": "最大DD",    "unit": "%",    "dec": 2},
+    {"key": "trade_count",    "label": "取引数",    "unit": "回",   "dec": 0},
+    {"key": "profit_factor",  "label": "PF",        "unit": "",     "dec": 2},
+]
+
+def load_ai_metrics_trend():
     """
-    data/stats/*.json から日付×AI別の勝率を時系列化
+    data/stats/*.json から日付×AI別の複数指標（勝率/maxDD/取引数/PFなど）を時系列化
     """
-    date_ai_to_winrates = defaultdict(lambda: defaultdict(list))
+    date_ai_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     if not os.path.isdir(STATS_DIR):
         return [], []
 
@@ -38,26 +46,31 @@ def load_ai_winrate_trend():
         try:
             with open(path, "r", encoding="utf-8") as f:
                 d = json.load(f)
-            win_rate = d.get("win_rate")
             ai = d.get("ai") or "Unknown"
             date = d.get("evaluated_at", "")[:10]
-            if win_rate is not None and date:
-                if win_rate <= 1.0:
-                    win_rate = win_rate * 100
-                date_ai_to_winrates[date][ai].append(win_rate)
+            for m in DASHBOARD_METRICS:
+                k = m["key"]
+                v = d.get(k)
+                if v is not None and date:
+                    # %系は0-1なら100倍
+                    if k in ["win_rate", "max_drawdown"] and v <= 1.0:
+                        v = v * 100
+                    date_ai_metrics[date][ai][k].append(v)
         except Exception as e:
-            logging.warning(f"AI勝率ファイル読込失敗: {fname}, {e}")
+            logging.warning(f"AI指標ファイル読込失敗: {fname}, {e}")
 
     ai_names = set()
-    for d in date_ai_to_winrates.values():
+    for d in date_ai_metrics.values():
         ai_names.update(d.keys())
     ai_names = sorted(ai_names)
     trend = []
-    for date in sorted(date_ai_to_winrates.keys()):
+    for date in sorted(date_ai_metrics.keys()):
         entry = {"date": date}
         for ai in ai_names:
-            wrs = date_ai_to_winrates[date].get(ai, [])
-            entry[ai] = round(sum(wrs)/len(wrs), 2) if wrs else None
+            for m in DASHBOARD_METRICS:
+                k = m["key"]
+                vals = date_ai_metrics[date][ai][k]
+                entry[f"{ai}__{k}"] = round(sum(vals)/len(vals), m["dec"]) if vals else None
         trend.append(entry)
     return trend, ai_names
 
@@ -96,14 +109,8 @@ async def dashboard_view(request: Request):
     except Exception as e:
         logging.error(f"❌ PrometheusOracle のデータ取得中にエラーが発生: {e}", exc_info=True)
 
-    # --- 勝率推移グラフ（AI別） ---
-    winrate_trend, ai_names = load_ai_winrate_trend()
-    if winrate_trend:
-        # 全AI平均で最新勝率セット
-        last = winrate_trend[-1]
-        vals = [v for k, v in last.items() if k != "date" and v is not None]
-        if vals:
-            stats_data["avg_win_rate"] = round(sum(vals) / len(vals), 2)
+    # --- 全指標時系列トレンド ---（AI×指標ごと平均値入り）
+    metric_trend, ai_names = load_ai_metrics_trend()
 
     # --- AIごとの進捗（ダミー） ---
     ai_progress = [
@@ -114,27 +121,48 @@ async def dashboard_view(request: Request):
         {"id": "prometheus", "name": "Prometheus", "progress": 88, "phase": "予測完了"},
     ]
 
-    # --- AI別勝率時系列（辞書型）---
-    ai_winrate_dict = {}
-    for ai in ai_names:
-        values = [row.get(ai) for row in winrate_trend]
-        labels = [row["date"] for row in winrate_trend]
-        data = [v for v in values if v is not None]
-        ai_winrate_dict[ai] = {
-            "labels": labels,
-            "values": values,
-            "avg": round(sum(data) / len(data), 2) if data else None,
-            "max": max(data) if data else None,
-            "min": min(data) if data else None,
-            "diff": round((data[-1] - data[-2]), 2) if len(data) >= 2 else None
+    # --- 指標ごと・AIごとに時系列辞書を作成（ {metric_key: {AI: {labels, values, avg, max, min, diff}} } ）---
+    metrics_dict = {}
+    for m in DASHBOARD_METRICS:
+        k = m["key"]
+        metrics_dict[k] = {}
+        for ai in ai_names:
+            values = [row.get(f"{ai}__{k}") for row in metric_trend]
+            labels = [row["date"] for row in metric_trend]
+            data = [v for v in values if v is not None]
+            metrics_dict[k][ai] = {
+                "labels": labels,
+                "values": values,
+                "avg": round(sum(data) / len(data), m["dec"]) if data else None,
+                "max": round(max(data), m["dec"]) if data else None,
+                "min": round(min(data), m["dec"]) if data else None,
+                "diff": round((data[-1] - data[-2]), m["dec"]) if len(data) >= 2 else None
+            }
+
+    # --- 全体平均（各指標ごと）---
+    overall_metrics = {}
+    for m in DASHBOARD_METRICS:
+        k = m["key"]
+        vals = []
+        for row in metric_trend:
+            ai_vals = [row.get(f"{ai}__{k}") for ai in ai_names if row.get(f"{ai}__{k}") is not None]
+            vals.append(round(sum(ai_vals)/len(ai_vals), m["dec"]) if ai_vals else None)
+        overall_metrics[k] = {
+            "labels": [row["date"] for row in metric_trend],
+            "values": vals,
+            "avg": round(sum([v for v in vals if v is not None]) / len([v for v in vals if v is not None]), m["dec"]) if any(vals) else None,
+            "max": round(max([v for v in vals if v is not None]), m["dec"]) if any(vals) else None,
+            "min": round(min([v for v in vals if v is not None]), m["dec"]) if any(vals) else None,
+            "diff": round((vals[-1] - vals[-2]), m["dec"]) if len(vals) >= 2 else None
         }
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats_data,
         "forecast": forecast_data,
-        "winrate_trend": winrate_trend,
         "ai_progress": ai_progress,
         "ai_names": ai_names,
-        "ai_winrate_dict": ai_winrate_dict,
+        "dashboard_metrics": DASHBOARD_METRICS,
+        "metrics_dict": metrics_dict,
+        "overall_metrics": overall_metrics,
     })
