@@ -14,10 +14,11 @@ from pathlib import Path
 from typing import List, Dict, Any
 import json
 import os
+import logging
 
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
-router = APIRouter(prefix="/statistics", tags=["statistics"])
+router = APIRouter(tags=["statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
@@ -34,7 +35,7 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
                     log = json.load(file)
                     logs.append(log)
             except Exception as e:
-                print(f"⚠️ Failed to load {f}: {e}")
+                logging.warning(f"⚠️ Failed to load {f}: {e}")
                 continue
     return logs
 
