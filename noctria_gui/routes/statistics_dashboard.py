@@ -28,8 +28,8 @@ except ImportError:
             }
         }
 
-# ✅ 修正: prefixを追加して /statistics/dashboard に対応
-router = APIRouter(prefix="/statistics", tags=["Statistics"])
+# プレフィックスは外部の __init__.py で付与する想定なのでここはプレフィックスなしで定義
+router = APIRouter(tags=["Statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
