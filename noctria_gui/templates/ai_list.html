@@ -1,0 +1,20 @@
+{% extends "base_hud.html" %}
+
+{% block title %}🤖 AI一覧 - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-robot"></i>{% endblock %}
+{% block header_title %}AI一覧{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}← ダッシュボードへ戻る{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <h2 class="panel-title">AI一覧</h2>
+  <ul style="list-style:none; padding-left:0;">
+    {% for ai in ai_names %}
+      <li style="margin-bottom:0.5rem;">
+        <a class="hud-link" href="/ai/{{ ai }}">{{ ai }}</a>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}
