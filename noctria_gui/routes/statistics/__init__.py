@@ -1,10 +1,12 @@
 from fastapi import APIRouter
+from fastapi.responses import RedirectResponse
 
-# 親ルーター
 router = APIRouter(tags=["statistics"])
 
-# サブルーターのインポート
 from .strategy_compare import router as strategy_compare_router
-
-# サブルーターを /statistics/strategy_compare にマウント
 router.include_router(strategy_compare_router, prefix="/strategy_compare")
+
+@router.get("/", summary="Statistics Root")
+async def statistics_root():
+    # ここでは /statistics/strategy_compare へリダイレクト
+    return RedirectResponse(url="/statistics/strategy_compare")
