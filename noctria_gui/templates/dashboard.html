@@ -8,35 +8,57 @@
 
 {% block content %}
 
-<!-- 追加：主要ページへのナビゲーション -->
-<nav class="hud-nav" style="margin-bottom: 1rem; padding: 0.5rem 1rem; background:#22273c; border-radius: 0.5rem; font-size: 1.1em;">
-  <a href="/strategies" class="hud-nav-link" style="margin-right:1rem;">戦略一覧</a>
-  <a href="/strategies/compare" class="hud-nav-link" style="margin-right:1rem;">戦略比較</a>
-  <a href="/pdca/summary" class="hud-nav-link" style="margin-right:1rem;">PDCAサマリー</a>
-  <a href="/pdca/history" class="hud-nav-link" style="margin-right:1rem;">PDCA履歴</a>
-  <a href="/ai" class="hud-nav-link" style="margin-right:1rem;">AI管理</a>
-  <a href="/trigger" class="hud-nav-link" style="margin-right:1rem;">王命発令</a>
-  <a href="/act-history" class="hud-nav-link" style="margin-right:1rem;">Act履歴</a>
-  <a href="/push_history" class="hud-nav-link" style="margin-right:1rem;">Push履歴</a>
-  <a href="/statistics" class="hud-nav-link">統計ダッシュボード</a>
-</nav>
+<!-- 主要ページへのHUDカードナビゲーション -->
+<section class="hud-panel dashboard-nav" style="padding: 1rem; margin-bottom: 1rem;">
+  <h2 class="panel-title"><i class="fas fa-compass"></i> Navigation</h2>
+  <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+    {% set nav_items = [
+      {"href": "/strategies", "icon": "fas fa-scroll", "text": "戦略一覧"},
+      {"href": "/strategies/compare", "icon": "fas fa-balance-scale", "text": "戦略比較"},
+      {"href": "/pdca/summary", "icon": "fas fa-chart-pie", "text": "PDCAサマリー"},
+      {"href": "/pdca/history", "icon": "fas fa-history", "text": "PDCA履歴"},
+      {"href": "/ai", "icon": "fas fa-robot", "text": "AI管理"},
+      {"href": "/trigger", "icon": "fas fa-gavel", "text": "王命発令"},
+      {"href": "/act-history", "icon": "fas fa-file-alt", "text": "Act履歴"},
+      {"href": "/push_history", "icon": "fas fa-upload", "text": "Push履歴"},
+      {"href": "/statistics", "icon": "fas fa-chart-bar", "text": "統計ダッシュボード"}
+    ] %}
+    {% for item in nav_items %}
+      <a href="{{ item.href }}" class="hud-link" style="
+        flex: 1 0 180px;
+        background: var(--bg-color);
+        box-shadow: 0 0 12px var(--glow-primary);
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 700;
+        justify-content: center;
+        ">
+        <i class="{{ item.icon }}" style="font-size: 1.6rem; color: var(--glow-primary);"></i>
+        <span>{{ item.text }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
 
 <section class="hud-panel metrics">
   <!-- 既存のKEY METRICS -->
   <h2 class="panel-title">KEY METRICS</h2>
   <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-    <!-- 略：既存のメトリクスパネル -->
+    <!-- 例として一部のみ表示 -->
     <div class="metric-item">
       <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
       <p class="metric-value text-green">
         {{ overall_metrics['win_rate']['avg'] if overall_metrics['win_rate'] else '-' }}%
       </p>
     </div>
-    <!-- 以下同様 -->
+    <!-- 他のメトリクスも同様に -->
   </div>
 </section>
-
-<!-- 以下、元のdashboard.htmlの内容をそのまま -->
 
 <section class="hud-panel">
   <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
