@@ -265,9 +265,12 @@ window.switchChartMode = function(mode) {
   }
 }
 
-// 初期表示
-drawMetricChart(selectedMetric, selectedAI);
+// 初期表示はDOMContentLoadedで安全に呼び出し
+document.addEventListener('DOMContentLoaded', () => {
+  drawMetricChart(selectedMetric, selectedAI);
+});
 </script>
+
 <style>
 /* HUDスタイルUIのボタン・タブ類 */
 .ai-tab .ai-detail-link {
