@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from strategies.prometheus_oracle import PrometheusOracle
 
-STATS_DIR = "data/stats"
+STATS_DIR = "data/stats"  # 必要に応じて絶対パス化
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
@@ -39,7 +39,7 @@ def load_ai_winrate_trend():
             with open(path, "r", encoding="utf-8") as f:
                 d = json.load(f)
             win_rate = d.get("win_rate")
-            ai = d.get("ai") or "Unknown"  # "ai"フィールドがなければ"Unknown"
+            ai = d.get("ai") or "Unknown"
             date = d.get("evaluated_at", "")[:10]
             if win_rate is not None and date:
                 if win_rate <= 1.0:
