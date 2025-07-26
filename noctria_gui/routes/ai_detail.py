@@ -74,14 +74,19 @@ def get_ai_detail(ai_name):
         for date in dates:
             day_vals = trend[date][k]
             vals.append(round(sum(day_vals)/len(day_vals), m["dec"]) if day_vals else None)
+        # floatでラップしJSONシリアライズ可能にする
         trend_dict[k] = {
-            "labels": dates,
-            "values": vals,
-            "avg": round(sum([v for v in vals if v is not None]) / len([v for v in vals if v is not None]), m["dec"]) if any(vals) else None,
-            "max": round(max([v for v in vals if v is not None]), m["dec"]) if any(vals) else None,
-            "min": round(min([v for v in vals if v is not None]), m["dec"]) if any(vals) else None,
-            "diff": round((vals[-1] - vals[-2]), m["dec"]) if len(vals) >= 2 else None
+            "labels": list(dates),
+            "values": [float(v) if v is not None else None for v in vals],
+            "avg": float(round(sum([v for v in vals if v is not None]) / len([v for v in vals if v is not None]), m["dec"])) if any(vals) else None,
+            "max": float(round(max([v for v in vals if v is not None]), m["dec"])) if any(vals) else None,
+            "min": float(round(min([v for v in vals if v is not None]), m["dec"])) if any(vals) else None,
+            "diff": float(round((vals[-1] - vals[-2]), m["dec"])) if len(vals) >= 2 else None
         }
+
+    # metric_distもfloat化
+    for k in metric_dist:
+        metric_dist[k] = [float(v) for v in metric_dist[k]]
 
     return ai_name, trend_dict, metric_dist, sorted(strategy_list, key=lambda x: x["evaluated_at"], reverse=True)
 
