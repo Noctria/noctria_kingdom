@@ -111,24 +111,11 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- 
-  Chart.js本体とプラグインをCDNから読み込みます。
-  defer属性により、HTMLの解析後にスクリプトが記述順に実行されます。
--->
-<!-- ▼▼▼ 修正点: CDNをunpkg.comに変更 ▼▼▼ -->
-<script src="https://unpkg.com/chart.js@4.4.3/dist/chart.umd.js"></script>
+<!-- Chart.js本体とプラグインをunpkg.comからCDN読み込み -->
+<script src="https://unpkg.com/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/@sgratzl/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
 <script src="https://unpkg.com/@sgratzl/chartjs-chart-histogram@4.0.2/dist/chartjs-chart-histogram.umd.min.js"></script>
 
-<!-- ライブラリの読み込み状況を確認するためのデバッグコード -->
-<script defer>
-  console.log("--- ライブラリ読み込み状況チェック (unpkg.com) ---");
-  console.log("Chart.js本体:", typeof Chart);
-  console.log("BoxPlotプラグイン:", typeof window.ChartjsChartBoxAndViolinPlot);
-  console.log("Histogramプラグイン:", typeof window.ChartjsChartHistogram);
-  console.log("--- チェック完了 ---");
-</script>
-
-<!-- 最後に、カスタムスクリプトを読み込みます -->
+<!-- カスタムスクリプト -->
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}
