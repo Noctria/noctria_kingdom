@@ -45,13 +45,23 @@
     <canvas id="winrateTrendAvgChart" width="900" height="220" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
 </section>
 
-<!-- 🟩 勝率推移グラフ（AI別） -->
+<!-- 🟩 勝率推移グラフ（AI別：タブ切替＋サマリー付き） -->
 <section class="hud-panel">
     <h2 class="panel-title"><i class="fas fa-project-diagram"></i> 勝率推移（AI別）</h2>
-    <div id="winrate-ai-data-holder"
-         data-winrate='{{ winrate_trend | tojson | safe }}'
-         data-ainames='{{ ai_names | tojson | safe }}'></div>
-    <canvas id="winrateTrendAiChart" width="900" height="260" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+    <div class="ai-switcher" style="margin-bottom: 1rem;">
+      {% for ai in ai_names %}
+        <button class="ai-tab{% if loop.first %} active{% endif %}" onclick="switchAI('{{ ai }}')">
+            {{ ai }}
+        </button>
+      {% endfor %}
+    </div>
+    <canvas id="aiWinrateChart" width="900" height="230" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+    <div class="ai-summary" style="margin-top:1.5rem; color:#aee3fc; font-size:1.1em;">
+      平均: <span id="ai-avg-win-rate">-</span>%
+      ／ 最大: <span id="ai-max-win-rate">-</span>%
+      ／ 最小: <span id="ai-min-win-rate">-</span>%
+      ／ 前回差分: <span id="ai-diff-win-rate">-</span>%
+    </div>
 </section>
 
 <!-- 🟧 AIごとの進捗率 -->
@@ -123,7 +133,13 @@ document.addEventListener('DOMContentLoaded', function() {
             try { winrateData = JSON.parse(dataHolder.dataset.winrate || "[]"); } catch (e) {}
             if (Array.isArray(winrateData) && winrateData.length > 0) {
                 const labels = winrateData.map(d => d.date);
-                const winRates = winrateData.map(d => d.win_rate);
+                const winRates = winrateData.map(d => d.win_rate || (
+                  // win_rateカラムない場合、AI全部の平均を計算
+                  (() => {
+                      let vals = Object.entries(d).filter(([k, v]) => k !== "date" && typeof v === "number");
+                      return vals.length ? vals.map(([k, v]) => v).reduce((a, b) => a + b) / vals.length : null;
+                  })()
+                ));
                 new Chart(canvas.getContext('2d'), {
                     type: 'line',
                     data: {
@@ -154,45 +170,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- AI別グラフ ---
+    // --- AI別グラフ（切替/サマリー対応） ---
     {
-        const dataHolder = document.getElementById('winrate-ai-data-holder');
-        const canvas = document.getElementById('winrateTrendAiChart');
-        if (dataHolder && canvas) {
-            let winrateData = [];
-            let aiNames = [];
-            try { winrateData = JSON.parse(dataHolder.dataset.winrate || "[]"); } catch (e) {}
-            try { aiNames = JSON.parse(dataHolder.dataset.ainames || "[]"); } catch (e) {}
-            if (Array.isArray(winrateData) && winrateData.length > 0 && Array.isArray(aiNames) && aiNames.length > 0) {
-                const labels = winrateData.map(d => d.date);
-                const colors = ['#18e1ef','#f5c34e','#f55587','#68f5c3','#a18afc','#f79a7d','#e870e3','#43f57d'];
-                const datasets = aiNames.map((name, i) => ({
-                    label: name,
-                    data: winrateData.map(d => d[name] != null ? d[name] : null),
-                    borderColor: colors[i % colors.length],
-                    backgroundColor: 'rgba(0,0,0,0)',
-                    pointRadius: 3 + (name === 'King' ? 2 : 0),
-                    tension: 0.18,
-                    spanGaps: true,
-                    fill: false
-                }));
-                new Chart(canvas.getContext('2d'), {
-                    type: 'line',
-                    data: { labels: labels, datasets: datasets },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { labels: { color: "#e6f1ff" } },
-                            title: { display: true, text: "勝率推移（AI別）", color: "#e6f1ff" }
-                        },
-                        scales: {
-                            x: { ticks: { color: "#a8b2d1" } },
-                            y: { ticks: { color: "#a8b2d1" }, min: 0, max: 100 }
-                        }
+        const aiDataDict = {{ ai_winrate_dict | tojson | safe }};
+        const aiNames = Object.keys(aiDataDict);
+        let selectedAI = aiNames[0] || '';
+        function drawAIChart(ai) {
+            const data = aiDataDict[ai];
+            if (!data) return;
+            const ctx = document.getElementById('aiWinrateChart').getContext('2d');
+            if (window.aiChart) window.aiChart.destroy();
+            window.aiChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: ai,
+                        data: data.values,
+                        borderColor: '#18e1ef',
+                        backgroundColor: 'rgba(24,225,239,0.09)',
+                        pointRadius: 3,
+                        tension: 0.20,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: "#e6f1ff" } },
+                        title: { display: true, text: `勝率推移（${ai}）`, color: "#e6f1ff" }
+                    },
+                    scales: {
+                        x: { ticks: { color: "#a8b2d1" } },
+                        y: { ticks: { color: "#a8b2d1" }, min: 0, max: 100 }
                     }
-                });
-            }
+                }
+            });
+            document.getElementById('ai-avg-win-rate').textContent = data.avg ?? '-';
+            document.getElementById('ai-max-win-rate').textContent = data.max ?? '-';
+            document.getElementById('ai-min-win-rate').textContent = data.min ?? '-';
+            document.getElementById('ai-diff-win-rate').textContent = (data.diff >= 0 ? "+" : "") + (data.diff ?? '-');
         }
+        window.switchAI = function(ai) {
+            selectedAI = ai;
+            drawAIChart(ai);
+            // タブactive切替
+            document.querySelectorAll('.ai-tab').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.ai-tab[onclick*="${ai}"]`).classList.add('active');
+        };
+        drawAIChart(selectedAI);
     }
 
     // --- AI進捗ゲージ（ドーナツ型） ---
@@ -222,4 +248,34 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endfor %}
 });
 </script>
+<style>
+.ai-switcher {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+.ai-tab {
+    border: none;
+    background: var(--hud-btn-bg, #222);
+    color: #fff;
+    font-family: inherit;
+    font-size: 1.05rem;
+    border-radius: 0.9rem;
+    box-shadow: 0 0 8px var(--glow-primary, #09f9);
+    padding: 0.40rem 1.0rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    opacity: 0.83;
+}
+.ai-tab.active, .ai-tab:hover {
+    background: var(--glow-primary, #0976ff66);
+    opacity: 1;
+}
+.ai-summary span {
+    min-width: 2.5em;
+    display: inline-block;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+</style>
 {% endblock %}
