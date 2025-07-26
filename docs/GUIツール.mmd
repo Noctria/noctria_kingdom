@@ -20,6 +20,8 @@ flowchart LR
     PDCA_ROUTES["pdca_routes (noctria_gui/routes/pdca_routes.py)"]
     PDCA_SUMMARY["pdca_summary (noctria_gui/routes/pdca_summary.py)"]
     PUSH["push (noctria_gui/routes/push.py)"]
+    PUSH_HISTORY["push_history (noctria_gui/routes/push_history.py) -> push_history.html"]
+    HERMES["hermes (noctria_gui/routes/hermes.py) -> hermes.html"]
     STRATEGY_ROUTES["strategy_routes (noctria_gui/routes/strategy_routes.py) -> strategy_compare.html"]
     STRATEGY_DETAIL["strategy_detail (noctria_gui/routes/strategy_detail.py) -> strategy_detail.html"]
     STRATEGY_HEATMAP["strategy_heatmap (noctria_gui/routes/strategy_heatmap.py) -> strategy_heatmap.html"]
@@ -63,6 +65,8 @@ flowchart LR
   GUI_Main --> PDCA_ROUTES
   GUI_Main --> PDCA_SUMMARY
   GUI_Main --> PUSH
+  GUI_Main --> PUSH_HISTORY
+  GUI_Main --> HERMES
   GUI_Main --> STRATEGY_ROUTES
   GUI_Main --> STRATEGY_DETAIL
   GUI_Main --> STRATEGY_HEATMAP
@@ -84,6 +88,8 @@ flowchart LR
   DASHBOARD --> TRIGGER
   DASHBOARD --> ACT_HISTORY
   DASHBOARD --> PUSH
+  DASHBOARD --> PUSH_HISTORY
+  DASHBOARD --> HERMES
 
   %% Routes が Service を利用
   ACT_HISTORY --> ACT_LOG_SERVICE
@@ -96,6 +102,7 @@ flowchart LR
   DASHBOARD --> DASHBOARD_SERVICE
   AI_DETAIL --> DASHBOARD_SERVICE
   PUSH --> PUSH_HISTORY_SERVICE
+  PUSH_HISTORY --> PUSH_HISTORY_SERVICE
   STAT_DETAIL --> STATISTICS_SERVICE
   STAT_RANKING --> STATISTICS_SERVICE
   STAT_SCOREBOARD --> STATISTICS_SERVICE
