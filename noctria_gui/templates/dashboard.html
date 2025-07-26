@@ -42,22 +42,31 @@
 <!-- 🟦 指標×AI・分布ダッシュボード -->
 <section class="hud-panel">
   <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 全AI・全指標トレンド/分布可視化</h2>
-  <div class="chart-mode-switcher" style="display:flex; gap:1rem; margin-bottom:.7rem;">
-    <button id="tab-trend" class="mode-tab active" onclick="switchChartMode('trend')"><i class="fas fa-chart-line"></i> トレンド</button>
-    <button id="tab-dist" class="mode-tab" onclick="switchChartMode('dist')"><i class="fas fa-chart-area"></i> 分布</button>
+
+  <div class="chart-mode-switcher hud-btn-group" style="margin-bottom: 0.7rem;">
+    <button id="tab-trend" class="mode-tab active hud-btn" onclick="switchChartMode('trend')">
+      <i class="fas fa-chart-line"></i> トレンド
+    </button>
+    <button id="tab-dist" class="mode-tab hud-btn" onclick="switchChartMode('dist')">
+      <i class="fas fa-chart-area"></i> 分布
+    </button>
   </div>
-  <div class="metric-switcher" style="display:flex; gap:1.1rem; margin-bottom:.9rem;">
+
+  <div class="metric-switcher hud-btn-group" style="margin-bottom: 0.9rem;">
     {% for m in dashboard_metrics %}
-      <button class="metric-tab{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}')">{{ m.label }}</button>
+      <button class="metric-tab hud-btn{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}')">
+        {{ m.label }}
+      </button>
     {% endfor %}
-    <button class="metric-tab metric-tab-overall" onclick="switchAI('overall')" id="tab-overall" style="margin-left:2em;">
+    <button class="metric-tab hud-btn metric-tab-overall" onclick="switchAI('overall')" id="tab-overall" style="margin-left: 2em;">
       <i class="fas fa-globe"></i> 全体平均
     </button>
   </div>
-  <div class="ai-switcher" id="ai-switcher" style="margin-bottom: 1rem;">
+
+  <div class="ai-switcher hud-btn-group" id="ai-switcher" style="margin-bottom: 1rem;">
     {% for ai in ai_names %}
       <button
-        class="ai-tab{% if loop.first %} active{% endif %}"
+        class="ai-tab hud-btn{% if loop.first %} active{% endif %}"
         onclick="switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));"
       >
         {{ ai }}
@@ -67,20 +76,23 @@
           target="_blank"
           title="AI詳細ページを別タブで開く"
           onclick="event.stopPropagation();"
-          style="margin-left:0.25em;"
+          style="margin-left: 0.25em;"
         >
           <i class="fas fa-external-link-alt"></i>
         </a>
       </button>
     {% endfor %}
   </div>
+
   <div id="trend-canvas-box">
     <canvas id="metricChart" width="900" height="230" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
   </div>
+
   <div id="dist-canvas-box" style="display:none;">
     <canvas id="distHistogram" width="900" height="180" style="max-width:100%; background:#181c2b; margin:12px 0 0 0;"></canvas>
     <canvas id="distBoxplot" width="900" height="90" style="max-width:100%; background:#1a1f2f; margin:0;"></canvas>
   </div>
+
   <div class="metric-summary" style="margin-top:1.2rem; color:#aee3fc; font-size:1.05em;">
     <span id="metric-summary-label">平均</span>: <span id="metric-avg">-</span><span id="metric-unit"></span>
     ／ 最大: <span id="metric-max">-</span><span id="metric-unit-max"></span>
@@ -265,18 +277,4 @@ window.switchChartMode = function(mode) {
   }
 }
 
-// 初期表示はDOMContentLoadedで安全に呼び出し
-document.addEventListener('DOMContentLoaded', () => {
-  drawMetricChart(selectedMetric, selectedAI);
-});
-</script>
-
-<style>
-/* HUDスタイルUIのボタン・タブ類 */
-.ai-tab .ai-detail-link {
-  margin-left: 0.3em;
-  vertical-align: middle;
-  color: #19c0e9;
-}
-</style>
-{% endblock %}
+// 初期表示
