@@ -1,43 +1,24 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>📄 {{ filename }}</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        pre {
-            background: #f8f8f8;
-            padding: 1em;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        .export-buttons {
-            margin: 1rem 0;
-        }
-        .export-button {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            margin-right: 1rem;
-            background-color: #007acc;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-        }
-        .export-button:hover {
-            background-color: #005fa3;
-        }
-    </style>
-</head>
-<body>
-    <h1>📄 {{ filename }}</h1>
+{% extends "base_hud.html" %}
 
-    <div class="export-buttons">
-        <a class="export-button" href="/strategies/export?name={{ filename }}&format=py">Python ダウンロード</a>
-        <a class="export-button" href="/strategies/export?name={{ filename | replace('.py', '.json') }}&format=csv">CSV ダウンロード</a>
-    </div>
+{% block title %}📄 {{ filename }} - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-file-code"></i>{% endblock %}
+{% block header_title %}STRATEGY VIEW{% endblock %}
+{% block header_nav_href %}/strategies{% endblock %}
+{% block header_nav_text %}← 戦略一覧へ戻る{% endblock %}
 
-    <pre>{{ content }}</pre>
-    <a href="/strategies">← 戦略一覧に戻る</a>
-</body>
-</html>
+{% block content %}
+<section class="hud-panel">
+
+  <h2 class="panel-title">📄 {{ filename }}</h2>
+
+  <div class="export-buttons" style="margin-bottom:1rem;">
+    <a class="hud-btn" href="/strategies/export?name={{ filename }}&format=py">Python ダウンロード</a>
+    <a class="hud-btn" href="/strategies/export?name={{ filename | replace('.py', '.json') }}&format=csv">CSV ダウンロード</a>
+  </div>
+
+  <pre style="background: #111c3b; padding:1rem; border-radius:6px; overflow-x:auto; white-space: pre-wrap; font-family: 'Roboto Mono', monospace; color: var(--glow-primary);">
+{{ content }}
+  </pre>
+
+</section>
+{% endblock %}
