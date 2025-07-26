@@ -2,7 +2,7 @@
 
 {% block title %}👑 Noctria Kingdom - Central Governance HUD{% endblock %}
 {% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
-{% block header_title %}CENTRAL GOVERNANCE HUD{% endblock %}
+{% block header_title %}<span class="text-normal">CENTRAL GOVERNANCE HUD</span>{% endblock %}
 {% block header_nav_href %}#{% endblock %}
 {% block header_nav_text %}—{% endblock %}
 
@@ -10,7 +10,7 @@
 
 <!-- 主要ページへのHUDカードナビゲーション -->
 <section class="hud-panel dashboard-nav" style="padding: 1rem; margin-bottom: 1rem;">
-  <h2 class="panel-title"><i class="fas fa-compass"></i> Navigation</h2>
+  <h2 class="panel-title text-normal"><i class="fas fa-compass"></i> Navigation</h2>
   <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
     {% set nav_items = [
       {"href": "/strategies", "icon": "fas fa-scroll", "text": "戦略一覧"},
@@ -24,49 +24,33 @@
       {"href": "/statistics", "icon": "fas fa-chart-bar", "text": "統計ダッシュボード"}
     ] %}
     {% for item in nav_items %}
-      <a href="{{ item.href }}" class="hud-link" style="
-        flex: 1 0 180px;
-        background: var(--bg-color);
-        box-shadow: 0 0 12px var(--glow-primary);
-        border-radius: 8px;
-        color: inherit;
-        text-decoration: none;
-        padding: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        font-weight: 700;
-        justify-content: center;
-        ">
-        <i class="{{ item.icon }}" style="font-size: 1.6rem; color: var(--glow-primary);"></i>
-        <span>{{ item.text }}</span>
+      <a href="{{ item.href }}" class="hud-link">
+        <i class="{{ item.icon }}" style="font-size: 1.6rem; color: var(--text-color-normal);"></i>
+        <span class="text-light">{{ item.text }}</span>
       </a>
     {% endfor %}
   </div>
 </section>
 
 <section class="hud-panel metrics">
-  <!-- 既存のKEY METRICS -->
-  <h2 class="panel-title">KEY METRICS</h2>
+  <h2 class="panel-title text-normal">KEY METRICS</h2>
   <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-    <!-- 例として一部のみ表示 -->
     <div class="metric-item">
-      <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+      <h3 class="text-normal"><i class="fas fa-chart-line"></i> 平均勝率</h3>
       <p class="metric-value text-green">
         {{ overall_metrics['win_rate']['avg'] if overall_metrics['win_rate'] else '-' }}%
       </p>
     </div>
-    <!-- 他のメトリクスも同様に -->
   </div>
 </section>
 
 <section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
+  <h2 class="panel-title text-normal"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
   <!-- 省略 -->
 </section>
 
 <section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 全AI・全指標トレンド可視化</h2>
+  <h2 class="panel-title text-normal"><i class="fas fa-chart-bar"></i> 全AI・全指標トレンド可視化</h2>
   <!-- 省略 -->
 </section>
 
