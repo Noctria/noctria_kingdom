@@ -1,0 +1,11 @@
+{
+  "strategy": "noctus_strategy_20250707.py",
+  "win_rate": 0.59,
+  "max_drawdown": 0.10,
+  "trade_count": 27,
+  "profit_factor": 1.63,
+  "asset": "GBPJPY",
+  "type": "mean_revert",
+  "evaluated_at": "2025-07-07T15:46:00",
+  "ai": "Noctus"
+}
