@@ -9,13 +9,15 @@
 import os
 import json
 from collections import defaultdict
+from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, DATA_DIR
 
-STATS_DIR = "data/stats"
+# STATS_DIRを絶対パス化（dataディレクトリのstatsフォルダ）
+STATS_DIR = DATA_DIR / "stats"
 
 router = APIRouter(prefix="/ai", tags=["AI Detail"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -32,13 +34,14 @@ def get_ai_detail(ai_name):
     metric_dist = defaultdict(list)
     strategy_list = []
 
-    if not os.path.isdir(STATS_DIR):
+    if not STATS_DIR.exists():
+        print(f"Error: STATS_DIR does not exist: {STATS_DIR}")
         return [], {}, [], []
 
     for fname in os.listdir(STATS_DIR):
         if not fname.endswith(".json") or fname == "veritas_eval_result.json":
             continue
-        path = os.path.join(STATS_DIR, fname)
+        path = STATS_DIR / fname
         try:
             with open(path, "r", encoding="utf-8") as f:
                 d = json.load(f)
@@ -46,7 +49,6 @@ def get_ai_detail(ai_name):
                 continue
             date = d.get("evaluated_at", "")[:10]
             strat = d.get("strategy") or os.path.splitext(fname)[0]
-            # 指標値
             for m in DASHBOARD_METRICS:
                 k = m["key"]
                 v = d.get(k)
@@ -55,16 +57,15 @@ def get_ai_detail(ai_name):
                 if v is not None and date:
                     trend[date][k].append(v)
                     metric_dist[k].append(v)
-            # 戦略リスト
             strategy_list.append({
                 "strategy": strat,
                 "evaluated_at": d.get("evaluated_at", ""),
                 **{m["key"]: d.get(m["key"]) for m in DASHBOARD_METRICS}
             })
-        except Exception:
+        except Exception as e:
+            print(f"Failed to load {path}: {e}")
             continue
 
-    # トレンド
     dates = sorted(trend.keys())
     trend_dict = {}
     for m in DASHBOARD_METRICS:
