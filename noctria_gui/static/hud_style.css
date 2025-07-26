@@ -122,20 +122,70 @@ body {
     background: transparent;
     border: 1px solid var(--glow-primary);
     color: var(--glow-primary);
-    padding: 0.75rem 1.5rem;
+    padding: 0.5rem 1.2rem;
     font-family: var(--font-family);
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease;
     text-shadow: var(--glow-effect);
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    border-radius: 6px;
 }
-.hud-btn:hover {
+.hud-btn:hover, .hud-btn:focus {
     background: var(--glow-primary);
     color: var(--bg-color);
+    outline: none;
+    box-shadow: 0 0 8px var(--glow-primary);
+}
+.hud-btn.active {
+    background: var(--glow-primary);
+    color: var(--bg-color);
+    box-shadow: 0 0 10px var(--glow-primary);
+}
+
+/* ボタングループ用 */
+.hud-btn-group {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+/* AI切替用ボタン */
+.ai-tab.hud-btn {
+  min-width: 100px;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  padding: 0.4rem 1rem;
+}
+
+/* 指標切替ボタン */
+.metric-tab.hud-btn {
+  min-width: 70px;
+  font-size: 0.9rem;
+  padding: 0.4rem 1rem;
+}
+
+/* モード切替タブ */
+.mode-tab.hud-btn {
+  min-width: 90px;
+  font-size: 0.9rem;
+  padding: 0.4rem 1.2rem;
+}
+
+/* ボタン間の余白 */
+.hud-btn-group > .hud-btn:not(:last-child) {
+  margin-right: 0.5rem;
+}
+
+/* AI詳細リンクの色 */
+.ai-tab .ai-detail-link {
+  margin-left: 0.3em;
+  vertical-align: middle;
+  color: var(--glow-primary);
 }
 
 /* --- Description Box --- */
