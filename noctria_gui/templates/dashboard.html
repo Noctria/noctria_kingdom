@@ -58,7 +58,8 @@
     {% for ai in ai_names %}
       <button
         class="ai-tab{% if loop.first %} active{% endif %}"
-        onclick="switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));">
+        onclick="switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));"
+      >
         {{ ai }}
         <a
           href="/ai/{{ ai }}"
@@ -66,7 +67,8 @@
           target="_blank"
           title="AI詳細ページを別タブで開く"
           onclick="event.stopPropagation();"
-          style="margin-left:0.25em;">
+          style="margin-left:0.25em;"
+        >
           <i class="fas fa-external-link-alt"></i>
         </a>
       </button>
@@ -179,7 +181,8 @@ function drawMetricChart(metric, ai) {
   // AI tab active toggle
   if (showAI) {
     document.querySelectorAll('.ai-tab').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`.ai-tab[onclick*="${ai}"]`).classList.add('active');
+    const aiBtn = Array.from(document.querySelectorAll('.ai-tab')).find(btn => btn.getAttribute('onclick').includes(`'${ai}'`));
+    if (aiBtn) aiBtn.classList.add('active');
   }
 }
 
@@ -255,7 +258,6 @@ window.switchChartMode = function(mode) {
   selectedMode = mode;
   document.getElementById('trend-canvas-box').style.display = (mode === "trend") ? 'block' : 'none';
   document.getElementById('dist-canvas-box').style.display = (mode === "dist") ? 'block' : 'none';
-  // Re-draw chart on mode switch
   if (mode === "trend") {
     drawMetricChart(selectedMetric, selectedAI);
   } else {
