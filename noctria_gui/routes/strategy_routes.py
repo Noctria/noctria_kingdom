@@ -18,16 +18,10 @@ from src.core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 router = APIRouter(tags=["strategy"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# 共通の戦略ディレクトリパス
 veritas_dir = STRATEGIES_DIR / "veritas_generated"
 
-
-# ✅ 修正: main.pyのprefixと組み合わせるため、パスを "/" に変更
 @router.get("/", response_class=HTMLResponse)
 async def list_strategies(request: Request):
-    """
-    📋 戦略ファイル一覧表示（.pyファイルのみ）
-    """
     if not veritas_dir.exists():
         raise HTTPException(status_code=500, detail="戦略ディレクトリが存在しません")
 
@@ -39,13 +33,8 @@ async def list_strategies(request: Request):
         "strategies": strategy_names
     })
 
-
-# ✅ 修正: パスを "/view" に変更
 @router.get("/view", response_class=HTMLResponse)
 async def view_strategy(request: Request, name: str):
-    """
-    🔍 指定戦略ファイルの内容を表示（.py）
-    """
     if ".." in name or "/" in name or "\\" in name:
         raise HTTPException(status_code=400, detail="不正なファイル名です")
 
@@ -65,15 +54,9 @@ async def view_strategy(request: Request, name: str):
         "content": content
     })
 
-
-# ✅ 修正: パスを "/overview" に変更
 @router.get("/overview", response_class=HTMLResponse)
 async def strategy_overview(request: Request):
-    """
-    📊 メタ情報付きの戦略一覧表示
-    """
     data = []
-
     for file in veritas_dir.glob("*.json"):
         try:
             with open(file, encoding="utf-8") as f:
@@ -84,6 +67,7 @@ async def strategy_overview(request: Request):
                 j["win_rate"] = j.get("win_rate", None)
                 j["num_trades"] = j.get("num_trades", None)
                 j["max_drawdown"] = j.get("max_drawdown", None)
+                j["ai"] = j.get("ai", "")
                 data.append(j)
         except Exception as e:
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
@@ -93,45 +77,73 @@ async def strategy_overview(request: Request):
         "strategies": data
     })
 
-
-# ✅ 修正: パスを "/search" に変更
+# 拡張版：詳細検索パラメータ追加
 @router.get("/search", response_class=HTMLResponse)
-async def strategy_search(request: Request, keyword: str = Query(default="")):
-    """
-    🔍 戦略のキーワード検索（戦略名 or タグ名にマッチ）
-    """
+async def strategy_search(
+    request: Request,
+    keyword: str = Query(default=""),
+    min_win_rate: float = Query(default=None),
+    max_drawdown: float = Query(default=None),
+    tags: str = Query(default=""),
+    ai: str = Query(default=""),
+):
     matched = []
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
     for file in veritas_dir.glob("*.json"):
         try:
             with open(file, encoding="utf-8") as f:
                 j = json.load(f)
-                name = j.get("strategy", file.stem)
-                tags = j.get("tags", [])
-                if keyword.lower() in name.lower() or any(keyword.lower() in t.lower() for t in tags):
-                    j["strategy"] = name
-                    j["tags"] = tags
-                    j["json_name"] = file.name
-                    j["win_rate"] = j.get("win_rate", None)
-                    j["num_trades"] = j.get("num_trades", None)
-                    j["max_drawdown"] = j.get("max_drawdown", None)
-                    matched.append(j)
+            name = j.get("strategy", file.stem)
+            file_tags = j.get("tags", [])
+            file_ai = j.get("ai", "")
+
+            # キーワード検索 (戦略名 or タグ)
+            if keyword and keyword.lower() not in name.lower() and not any(keyword.lower() in t.lower() for t in file_tags):
+                continue
+
+            # 勝率フィルター
+            wr = j.get("win_rate")
+            if wr is not None and wr <= 1.0:
+                wr = wr * 100
+            if min_win_rate is not None and (wr is None or wr < min_win_rate):
+                continue
+
+            # 最大DDフィルター
+            max_dd = j.get("max_drawdown")
+            if max_dd is not None and max_drawdown is not None and max_dd > max_drawdown:
+                continue
+
+            # タグフィルター (AND条件)
+            if tag_list and not all(t in file_tags for t in tag_list):
+                continue
+
+            # AIフィルター
+            if ai and ai != file_ai:
+                continue
+
+            j["strategy"] = name
+            j["tags"] = file_tags
+            j["ai"] = file_ai
+            j["win_rate"] = wr
+            j["num_trades"] = j.get("num_trades", None)
+            j["max_drawdown"] = max_dd
+            matched.append(j)
         except Exception as e:
             print(f"⚠️ 検索読み込み失敗: {file.name} - {e}")
 
-    return templates.TemplateResponse("strategies/strategies_overview.html", {
+    return templates.TemplateResponse("strategies/search.html", {
         "request": request,
         "strategies": matched,
-        "keyword": keyword
+        "keyword": keyword,
+        "min_win_rate": min_win_rate,
+        "max_drawdown": max_drawdown,
+        "tags": tags,
+        "ai": ai,
     })
 
-
-# ✅ 修正: パスを "/export" に変更
 @router.get("/export", response_class=FileResponse)
 async def export_strategy(name: str):
-    """
-    📤 Python または JSON 戦略ファイルのダウンロード
-    """
     if ".." in name or "/" in name or "\\" in name:
         raise HTTPException(status_code=400, detail="不正なファイル名です")
 
@@ -147,13 +159,6 @@ async def export_strategy(name: str):
         media_type=media_type
     )
 
-
-# ✅ 追加: /strategies/compare に対応するルートを追加
 @router.get("/compare", response_class=HTMLResponse)
 async def get_strategy_compare_page(request: Request):
-    """
-    ⚖️ 戦略比較ページを表示
-    """
-    # ここでは単純にテンプレートを返すだけの仮実装です。
-    # 必要に応じて、比較対象の戦略リストなどを渡す処理を追加してください。
     return templates.TemplateResponse("strategy_compare.html", {"request": request})
