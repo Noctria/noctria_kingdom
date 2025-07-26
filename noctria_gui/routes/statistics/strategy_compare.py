@@ -90,7 +90,6 @@ async def render_comparison(request: Request, selected: List[str] = Form(...)):
     })
 
 
-# ✅ 古いURLの互換リダイレクト（例: /strategy/compare → /statistics/compare/form）
 @router.get("/strategy/compare")
 async def legacy_redirect():
     return RedirectResponse(url="/statistics/compare/form", status_code=307)
