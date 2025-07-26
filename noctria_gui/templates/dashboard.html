@@ -1,7 +1,6 @@
 {% extends "base_hud.html" %}
 
 {% block title %}👑 Noctria Kingdom - Central Governance HUD{% endblock %}
-
 {% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
 {% block header_title %}CENTRAL GOVERNANCE HUD{% endblock %}
 {% block header_nav_href %}#{% endblock %}
@@ -10,34 +9,34 @@
 {% block content %}
 <!-- 🔢 Key Metrics -->
 <section class="hud-panel metrics">
-    <h2 class="panel-title">KEY METRICS</h2>
-    <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-        <div class="metric-item">
-            <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
-            <p class="metric-value text-green">
-                {{ overall_metrics['win_rate']['avg'] if overall_metrics['win_rate'] else '-' }}%
-            </p>
-        </div>
-        <div class="metric-item">
-            <h3><i class="fas fa-arrow-up"></i> 採用戦略数</h3>
-            <p class="metric-value">{{ stats.promoted_count }}</p>
-        </div>
-        <div class="metric-item">
-            <h3><i class="fas fa-upload"></i> GitHubへPush済</h3>
-            <p class="metric-value text-blue">{{ stats.pushed_count }}</p>
-        </div>
-        <div class="metric-item">
-            <h3><i class="fas fa-history"></i> PDCA再評価数</h3>
-            <p class="metric-value text-yellow">{{ stats.pdca_count }}</p>
-        </div>
+  <h2 class="panel-title">KEY METRICS</h2>
+  <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+    <div class="metric-item">
+      <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+      <p class="metric-value text-green">
+        {{ overall_metrics['win_rate']['avg'] if overall_metrics['win_rate'] else '-' }}%
+      </p>
     </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-arrow-up"></i> 採用戦略数</h3>
+      <p class="metric-value">{{ stats.promoted_count }}</p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-upload"></i> GitHubへPush済</h3>
+      <p class="metric-value text-blue">{{ stats.pushed_count }}</p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-history"></i> PDCA再評価数</h3>
+      <p class="metric-value text-yellow">{{ stats.pdca_count }}</p>
+    </div>
+  </div>
 </section>
 
 <!-- 📈 Oracle予測グラフ -->
 <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
-    <div id="forecast-data-holder" data-forecast='{{ forecast | tojson | safe }}'></div>
-    <canvas id="forecastChart" width="900" height="300" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+  <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
+  <div id="forecast-data-holder" data-forecast='{{ forecast | tojson | safe }}'></div>
+  <canvas id="forecastChart" width="900" height="300" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
 </section>
 
 <!-- 🟦 指標×AI・分布ダッシュボード -->
@@ -57,15 +56,20 @@
   </div>
   <div class="ai-switcher" id="ai-switcher" style="margin-bottom: 1rem;">
     {% for ai in ai_names %}
-      <a
+      <button
         class="ai-tab{% if loop.first %} active{% endif %}"
-        href="/ai/{{ ai }}"
-        onclick="event.preventDefault();switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));">
+        onclick="switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));">
         {{ ai }}
-        <span class="ai-detail-link" style="font-size:0.92em; margin-left:0.25em; color:#19c0e9; text-decoration:underline; cursor:pointer;" title="AI詳細ページを開く">
+        <a
+          href="/ai/{{ ai }}"
+          class="ai-detail-link"
+          target="_blank"
+          title="AI詳細ページを別タブで開く"
+          onclick="event.stopPropagation();"
+          style="margin-left:0.25em;">
           <i class="fas fa-external-link-alt"></i>
-        </span>
-      </a>
+        </a>
+      </button>
     {% endfor %}
   </div>
   <div id="trend-canvas-box">
@@ -86,19 +90,19 @@
 
 <!-- 🟧 AIごとの進捗率 -->
 <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-bolt"></i> AIごとの進捗率</h2>
-    <div class="panel-graph-row" style="display:flex;gap:2rem;flex-wrap:wrap;">
-      {% for ai in ai_progress %}
-      <div class="mini-panel" style="flex:1 1 220px;min-width:180px;max-width:240px; background:rgba(34,38,58,0.86); border-radius:1.2rem; padding:1rem 1.2rem; box-shadow:0 0 14px 0 #199bda38;">
-        <h3 style="font-size:1.1rem;color:#7eeafc;font-weight:600;">{{ ai.name }}</h3>
-        <canvas id="progress-{{ ai.id }}" width="120" height="120"></canvas>
-        <div class="progress-label" style="margin-top:.7em; color:#e6f1ff;font-weight:bold;">
-          {{ ai.progress }}%
-          <span style="margin-left:1em; color:#aac7ff;font-weight:normal;">{{ ai.phase }}</span>
-        </div>
+  <h2 class="panel-title"><i class="fas fa-bolt"></i> AIごとの進捗率</h2>
+  <div class="panel-graph-row" style="display:flex;gap:2rem;flex-wrap:wrap;">
+    {% for ai in ai_progress %}
+    <div class="mini-panel" style="flex:1 1 220px;min-width:180px;max-width:240px; background:rgba(34,38,58,0.86); border-radius:1.2rem; padding:1rem 1.2rem; box-shadow:0 0 14px 0 #199bda38;">
+      <h3 style="font-size:1.1rem;color:#7eeafc;font-weight:600;">{{ ai.name }}</h3>
+      <canvas id="progress-{{ ai.id }}" width="120" height="120"></canvas>
+      <div class="progress-label" style="margin-top:.7em; color:#e6f1ff;font-weight:bold;">
+        {{ ai.progress }}%
+        <span style="margin-left:1em; color:#aac7ff;font-weight:normal;">{{ ai.phase }}</span>
       </div>
-      {% endfor %}
     </div>
+    {% endfor %}
+  </div>
 </section>
 {% endblock %}
 
@@ -116,16 +120,158 @@ let selectedMetric = dashboardMetrics[0].key;
 let selectedAI = aiNames[0];
 let selectedMode = "trend"; // or "dist"
 
-// ... Chart.jsグラフ描画・UI制御スクリプト（前述サンプルでOK） ...
-// drawMetricChart, drawDistCharts, switchMetric, switchAI, switchChartMode, showSummary など
+function drawMetricChart(metric, ai) {
+  const ctx = document.getElementById('metricChart').getContext('2d');
+  if (window.metricChartObj) window.metricChartObj.destroy();
+  let data, label, unit, dec;
+  let showAI = true;
+  if (ai === 'overall') {
+    data = overallMetrics[metric];
+    label = "全体平均";
+    showAI = false;
+  } else {
+    data = (metricsDict[metric] && metricsDict[metric][ai]) ? metricsDict[metric][ai] : null;
+    label = ai;
+  }
+  let conf = dashboardMetrics.find(m => m.key === metric);
+  unit = conf.unit;
+  dec = conf.dec;
+  window.metricChartObj = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: conf.label + (showAI ? `（${label}）` : "（全体平均）"),
+        data: data.values,
+        borderColor: '#18e1ef',
+        backgroundColor: 'rgba(24,225,239,0.10)',
+        pointRadius: 3,
+        tension: 0.20,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#e6f1ff" } },
+        title: { display: true, text: `${conf.label}トレンド（${label}）`, color: "#e6f1ff" }
+      },
+      scales: {
+        x: { ticks: { color: "#a8b2d1" } },
+        y: { ticks: { color: "#a8b2d1" } }
+      }
+    }
+  });
+  // Summary update
+  document.getElementById('metric-summary-label').textContent = conf.label;
+  document.getElementById('metric-avg').textContent = (data.avg != null) ? data.avg : "-";
+  document.getElementById('metric-max').textContent = (data.max != null) ? data.max : "-";
+  document.getElementById('metric-min').textContent = (data.min != null) ? data.min : "-";
+  document.getElementById('metric-diff').textContent = (data.diff != null ? (data.diff >= 0 ? "+" : "") + data.diff : "-");
+  document.getElementById('metric-unit').textContent = unit;
+  document.getElementById('metric-unit-max').textContent = unit;
+  document.getElementById('metric-unit-min').textContent = unit;
+  document.getElementById('metric-unit-diff').textContent = unit;
+  // AI switcher visibility
+  document.getElementById('ai-switcher').style.display = showAI ? 'flex' : 'none';
+  // Overall tab active toggle
+  document.getElementById('tab-overall').classList.toggle('active', !showAI);
+  // AI tab active toggle
+  if (showAI) {
+    document.querySelectorAll('.ai-tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.ai-tab[onclick*="${ai}"]`).classList.add('active');
+  }
+}
 
+function drawDistCharts(metric, ai) {
+  const histCtx = document.getElementById('distHistogram').getContext('2d');
+  const boxCtx = document.getElementById('distBoxplot').getContext('2d');
+  if (window.histChart) window.histChart.destroy();
+  if (window.boxChart) window.boxChart.destroy();
+
+  let data = [];
+  if (ai === 'overall') {
+    data = aiMetricDist[metric]?.flatMap(d => d.values) || [];
+  } else {
+    data = aiMetricDist[metric]?.find(d => d.ai === ai)?.values || [];
+  }
+
+  window.histChart = new Chart(histCtx, {
+    type: 'histogram',
+    data: {
+      datasets: [{
+        label: metric,
+        data: data
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a8b2d1" } },
+        y: { ticks: { color: "#a8b2d1" } }
+      }
+    }
+  });
+
+  window.boxChart = new Chart(boxCtx, {
+    type: 'boxplot',
+    data: {
+      labels: [metric],
+      datasets: [{
+        label: metric,
+        data: [data]
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: "#a8b2d1" } }
+      }
+    }
+  });
+}
+
+window.switchMetric = function(metric) {
+  selectedMetric = metric;
+  if (selectedMode === "trend") {
+    drawMetricChart(selectedMetric, selectedAI);
+  } else {
+    drawDistCharts(selectedMetric, selectedAI);
+  }
+}
+
+window.switchAI = function(ai) {
+  selectedAI = ai;
+  if (selectedMode === "trend") {
+    drawMetricChart(selectedMetric, selectedAI);
+  } else {
+    drawDistCharts(selectedMetric, selectedAI);
+  }
+}
+
+window.switchChartMode = function(mode) {
+  selectedMode = mode;
+  document.getElementById('trend-canvas-box').style.display = (mode === "trend") ? 'block' : 'none';
+  document.getElementById('dist-canvas-box').style.display = (mode === "dist") ? 'block' : 'none';
+  // Re-draw chart on mode switch
+  if (mode === "trend") {
+    drawMetricChart(selectedMetric, selectedAI);
+  } else {
+    drawDistCharts(selectedMetric, selectedAI);
+  }
+}
+
+// 初期表示
+drawMetricChart(selectedMetric, selectedAI);
 </script>
 <style>
-/* HUDスタイルUIのボタン・タブ類は前掲のstyleを使ってOKです */
+/* HUDスタイルUIのボタン・タブ類 */
 .ai-tab .ai-detail-link {
-    margin-left: 0.3em;
-    vertical-align: middle;
-    color: #19c0e9;
+  margin-left: 0.3em;
+  vertical-align: middle;
+  color: #19c0e9;
 }
 </style>
 {% endblock %}
