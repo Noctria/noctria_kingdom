@@ -62,7 +62,8 @@ from noctria_gui.routes import (
     strategy_detail, strategy_heatmap, strategy_routes,
     tag_heatmap, tag_summary, tag_summary_detail,
     # 追加↓
-    hermes
+    hermes,
+    ai_routes  # ここを追加
 )
 
 logger.info("Integrating all routers into the main application...")
@@ -103,6 +104,9 @@ app.include_router(statistics_compare.router)
 app.include_router(tag_summary.router)
 app.include_router(tag_summary_detail.router)
 app.include_router(tag_heatmap.router)
+
+# --- AI関連 ---
+app.include_router(ai_routes.router)
 
 # --- その他 ---
 app.include_router(path_checker.router)
