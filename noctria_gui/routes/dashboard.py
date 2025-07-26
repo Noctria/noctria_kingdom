@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v3.0) - 勝率推移グラフ実装
+👑 Central Governance Dashboard Route (v3.1) - 勝率推移グラフ本番データ
 """
 
 import logging
@@ -17,7 +17,7 @@ from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from strategies.prometheus_oracle import PrometheusOracle
 
 # --- 勝率推移用データパス
-STATS_DIR = "data/stats"  # パスはプロジェクト配置により調整
+STATS_DIR = "data/stats"  # 必要に応じて絶対パス化する
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
@@ -39,14 +39,14 @@ def load_winrate_trend():
             win_rate = d.get("win_rate")
             date = d.get("evaluated_at", "")[:10]
             if win_rate is not None and date:
-                if win_rate <= 1.0:  # 0.68形式なら%
+                if win_rate <= 1.0:  # 0.68型なら%に換算
                     win_rate = win_rate * 100
                 date_to_winrates[date].append(win_rate)
         except Exception as e:
             logging.warning(f"勝率ファイル読み込み失敗: {fname}, {e}")
     trend = [
         {"date": date, "win_rate": round(sum(wrs)/len(wrs), 2)}
-        for date, wrs in date_to_winrates.items()
+        for date, wrs in date_to_winrates.items() if wrs
     ]
     trend.sort(key=lambda x: x["date"])
     return trend
@@ -57,10 +57,10 @@ async def dashboard_view(request: Request):
 
     # --- ① 基本メトリクス ---
     stats_data = {
-        "avg_win_rate": 57.1,
-        "promoted_count": 8,
-        "pushed_count": 15,
-        "pdca_count": 7,
+        "avg_win_rate": 0.0,
+        "promoted_count": 0,
+        "pushed_count": 0,
+        "pdca_count": 0,
         "oracle_metrics": {}
     }
     forecast_data = []
@@ -72,7 +72,6 @@ async def dashboard_view(request: Request):
         prediction = oracle.predict()
         logging.info(f"🧾 predict() 結果タイプ: {type(prediction)}, 内容例: {str(prediction)[:120]}")
         if prediction is None:
-            logging.warning("⚠️ oracle.predict() が None を返しました。")
             forecast_data = []
         elif isinstance(prediction, list):
             if all(isinstance(p, dict) for p in prediction):
@@ -90,8 +89,10 @@ async def dashboard_view(request: Request):
 
     # --- ③ 勝率推移グラフ用データ ---
     winrate_trend = load_winrate_trend()
+    if winrate_trend:
+        stats_data["avg_win_rate"] = winrate_trend[-1]["win_rate"]
 
-    # --- ④ AIごとの進捗（ダミーデータ） ---
+    # --- ④ AIごとの進捗（ダミー） ---
     ai_progress = [
         {"id": "king", "name": "King", "progress": 80, "phase": "評価中"},
         {"id": "aurus", "name": "Aurus", "progress": 65, "phase": "再評価"},
