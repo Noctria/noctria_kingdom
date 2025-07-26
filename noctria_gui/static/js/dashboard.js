@@ -14,24 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof window.ChartjsChartHistogram === 'undefined') {
       throw new Error('Histogramプラグインが読み込まれていません。CDN URLを確認してください。');
     }
-    if (typeof window.ChartjsChartBoxAndViolinPlot === 'undefined') {
-      throw new Error('BoxPlotプラグインが読み込まれていません。CDN URLを確認してください。');
-    }
 
-    const { BoxPlotController, BoxAndWhiskers, Violin } = window.ChartjsChartBoxAndViolinPlot;
-    const { HistogramController, HistogramElement } = window.ChartjsChartHistogram;
+    // histogramプラグインの必要なコンポーネントがあればここで登録（なければ不要）
+    // Chart.register(...)  // histogramプラグインが自動登録されていれば省略可能
 
-    if (!HistogramController || !HistogramElement || !BoxPlotController || !BoxAndWhiskers || !Violin) {
-      throw new Error('プラグインは読み込まれましたが、必要なコンポーネントが不足しています。');
-    }
-
-    Chart.register(
-      HistogramController,
-      HistogramElement,
-      BoxPlotController,
-      BoxAndWhiskers,
-      Violin
-    );
   } catch (e) {
     console.error('Chart.jsのプラグイン登録に失敗しました。', e);
     return;
