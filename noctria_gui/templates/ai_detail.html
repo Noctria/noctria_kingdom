@@ -1,14 +1,34 @@
 {% extends "base_hud.html" %}
 
-{% block title %}🤖 AI Detail - {{ ai_name }}{% endblock %}
+{% block title %}🤖 AI詳細 - {{ ai_name }}{% endblock %}
 {% block header_icon %}<i class="fas fa-robot"></i>{% endblock %}
-{% block header_title %}AI DETAIL — {{ ai_name }}{% endblock %}
-{% block header_nav_href %}/dashboard{% endblock %}
-{% block header_nav_text %}DASHBOARD{% endblock %}
+{% block header_title %}AI詳細：{{ ai_name }}{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back">
+  <i class="fas fa-tachometer-alt"></i><span>ダッシュボード</span>
+</a>
+{% endblock %}
 
 {% block content %}
 <section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-info-circle"></i> {{ ai_name }} — 指標推移・分布</h2>
+  <h2 class="panel-title">📊 AI全体指標サマリー</h2>
+  <table class="hud-table">
+    {% for m in dashboard_metrics %}
+    <tr>
+      <th>{{ m.label }}</th>
+      <td>
+        {% set s = trend_dict[m.key] %}
+        {{ s.avg if s and s.avg is not none else "-" }}{{ m.unit }}
+        ／ 最大: {{ s.max if s and s.max is not none else "-" }}{{ m.unit }}
+        ／ 最小: {{ s.min if s and s.min is not none else "-" }}{{ m.unit }}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title">📈 指標推移・分布（全戦略横断）</h2>
   <div class="metric-switcher" style="display:flex;gap:1.1rem;margin-bottom:1rem;">
     {% for m in dashboard_metrics %}
       <button class="metric-tab{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}')">{{ m.label }}</button>
@@ -35,21 +55,23 @@
 </section>
 
 <section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-list"></i> 戦略評価履歴（{{ ai_name }}）</h2>
+  <h2 class="panel-title">🗂 管轄戦略リスト</h2>
   <div style="overflow-x:auto;">
     <table class="hud-table" style="width:100%;min-width:900px;">
       <thead>
         <tr>
-          <th>日時</th>
-          <th>戦略ファイル</th>
+          <th>戦略名</th>
+          <th>評価日時</th>
           {% for m in dashboard_metrics %}<th>{{ m.label }}</th>{% endfor %}
         </tr>
       </thead>
       <tbody>
         {% for s in strategy_list %}
         <tr>
-          <td style="white-space:nowrap;">{{ s.evaluated_at }}</td>
-          <td>{{ s.strategy }}</td>
+          <td>
+            <a href="/strategies/detail/{{ s.strategy }}" class="hud-link" style="font-weight:600;">{{ s.strategy }}</a>
+          </td>
+          <td>{{ s.evaluated_at }}</td>
           {% for m in dashboard_metrics %}
             <td>
               {% set v = s[m.key] %}
@@ -79,7 +101,6 @@ const dashboardMetrics = {{ dashboard_metrics | tojson | safe }};
 let selectedMetric = dashboardMetrics[0].key;
 let selectedMode = "trend";
 
-// グラフ描画
 function drawTrendChart(metric) {
   const ctx = document.getElementById('metricChart').getContext('2d');
   if (window.metricChartObj) window.metricChartObj.destroy();
@@ -171,7 +192,7 @@ function drawDistCharts(metric) {
       }
     }
   });
-  // サマリー（中央値・四分位など簡易計算）
+  // サマリー
   if (values && values.length) {
     const sorted = values.slice().sort((a,b)=>a-b);
     const median = quantile(sorted,0.5);
@@ -194,7 +215,6 @@ function quantile(arr, q) {
   }
 }
 
-// サマリー
 function showSummary(data, conf) {
   document.getElementById('metric-summary-label').textContent = conf.label;
   document.getElementById('metric-avg').textContent = (data.avg != null) ? data.avg : "-";
