@@ -3,17 +3,16 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from pathlib import Path
 
-router = APIRouter()
+router = APIRouter(prefix="/push_history")  # prefixを修正
+
 templates = Jinja2Templates(directory="noctria_gui/templates")
 
-PUSH_LOG_DIR = Path("logs/push")  # 例: pushログ保存ディレクトリを指定してください
+PUSH_LOG_DIR = Path("logs/push")  # pushログ保存ディレクトリ
 
-@router.get("/push/history")
+@router.get("/", summary="Push履歴ページ")
 async def push_history(request: Request):
     logs = []
-    # ログファイルなどからpush履歴を読み込む処理を実装
-    # 例: logs = load_push_logs() またはファイル走査
-    # 以下はサンプルの空リストです
+    # ログ読み込み処理をここに実装
     filters = {
         "strategy": request.query_params.get("strategy", ""),
         "tag": request.query_params.get("tag", ""),
@@ -25,14 +24,11 @@ async def push_history(request: Request):
         "request": request,
         "logs": logs,
         "filters": filters,
-        # ページネーションや総ページ数を追加するならここに
         "total_pages": 1,
         "current_page": 1
     })
 
-@router.post("/push/trigger")
+@router.post("/trigger", summary="Pushトリガー")
 async def push_trigger(strategy_name: str = Form(...)):
-    # 戦略のGitHub Push実行トリガー処理を実装
-    # 例: trigger_push(strategy_name)
-    # 処理後はpush履歴ページなどへリダイレクト
-    return RedirectResponse(url="/push/history", status_code=303)
+    # Push実行トリガー処理をここに実装
+    return RedirectResponse(url="/push_history", status_code=303)
