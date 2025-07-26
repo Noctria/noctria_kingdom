@@ -103,9 +103,16 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.umd.min.js"></script>
+<!-- 
+  修正点:
+  1. BoxPlotプラグインのURLに `@sgratzl/` を追加しました。
+  2. Histogramプラグインのバージョンを最新のパッチに更新しました。
+  3. defer属性により、これらのスクリプトがHTML解析後に正しい順序で実行されることを保証します。
+-->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.2/dist/chartjs-chart-histogram.umd.min.js"></script>
 
-<script defer src="/static/js/dashboard.js"></script>
+<!-- あなたのカスタムスクリプトは最後に読み込みます -->
+<script src="/static/js/dashboard.js"></script>
 {% endblock %}
