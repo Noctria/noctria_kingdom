@@ -1,3 +1,129 @@
+{% extends "base_hud.html" %}
+
+{% block title %}👑 Noctria Kingdom - Central Governance HUD{% endblock %}
+{% block header_icon %}<i class="fas fa-chess-king"></i>{% endblock %}
+{% block header_title %}CENTRAL GOVERNANCE HUD{% endblock %}
+{% block header_nav_href %}#{% endblock %}
+{% block header_nav_text %}—{% endblock %}
+
+{% block content %}
+<!-- 🔢 Key Metrics -->
+<section class="hud-panel metrics">
+  <h2 class="panel-title">KEY METRICS</h2>
+  <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+    <div class="metric-item">
+      <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
+      <p class="metric-value text-green">
+        {{ overall_metrics['win_rate']['avg'] if overall_metrics['win_rate'] else '-' }}%
+      </p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-arrow-up"></i> 採用戦略数</h3>
+      <p class="metric-value">{{ stats.promoted_count }}</p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-upload"></i> GitHubへPush済</h3>
+      <p class="metric-value text-blue">{{ stats.pushed_count }}</p>
+    </div>
+    <div class="metric-item">
+      <h3><i class="fas fa-history"></i> PDCA再評価数</h3>
+      <p class="metric-value text-yellow">{{ stats.pdca_count }}</p>
+    </div>
+  </div>
+</section>
+
+<!-- 📈 Oracle予測グラフ -->
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
+  <div id="forecast-data-holder" data-forecast='{{ forecast | tojson | safe }}'></div>
+  <canvas id="forecastChart" width="900" height="300" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+</section>
+
+<!-- 🟦 指標×AI・分布ダッシュボード -->
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 全AI・全指標トレンド/分布可視化</h2>
+
+  <div class="chart-mode-switcher hud-btn-group" style="margin-bottom: 0.7rem;">
+    <button id="tab-trend" class="mode-tab active hud-btn" onclick="window.switchChartMode('trend')">
+      <i class="fas fa-chart-line"></i> トレンド
+    </button>
+    <button id="tab-dist" class="mode-tab hud-btn" onclick="window.switchChartMode('dist')">
+      <i class="fas fa-chart-area"></i> 分布
+    </button>
+  </div>
+
+  <div class="metric-switcher hud-btn-group" style="margin-bottom: 0.9rem;">
+    {% for m in dashboard_metrics %}
+      <button class="metric-tab hud-btn{% if loop.first %} active{% endif %}" onclick="window.switchMetric('{{ m.key }}')">
+        {{ m.label }}
+      </button>
+    {% endfor %}
+    <button class="metric-tab hud-btn metric-tab-overall" onclick="window.switchAI('overall')" id="tab-overall" style="margin-left: 2em;">
+      <i class="fas fa-globe"></i> 全体平均
+    </button>
+  </div>
+
+  <div class="ai-switcher hud-btn-group" id="ai-switcher" style="margin-bottom: 1rem;">
+    {% for ai in ai_names %}
+      <button
+        class="ai-tab hud-btn{% if loop.first %} active{% endif %}"
+        onclick="window.switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));"
+      >
+        {{ ai }}
+        <a
+          href="/ai/{{ ai }}"
+          class="ai-detail-link"
+          target="_blank"
+          title="AI詳細ページを別タブで開く"
+          onclick="event.stopPropagation();"
+          style="margin-left: 0.25em;"
+        >
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+      </button>
+    {% endfor %}
+  </div>
+
+  <div id="trend-canvas-box">
+    <canvas id="metricChart" width="900" height="230" style="max-width:100%; background:#181c2b; margin:16px 0;"></canvas>
+  </div>
+
+  <div id="dist-canvas-box" style="display:none;">
+    <canvas id="distHistogram" width="900" height="180" style="max-width:100%; background:#181c2b; margin:12px 0 0 0;"></canvas>
+    <canvas id="distBoxplot" width="900" height="90" style="max-width:100%; background:#1a1f2f; margin:0;"></canvas>
+  </div>
+
+  <div class="metric-summary" style="margin-top:1.2rem; color:#aee3fc; font-size:1.05em;">
+    <span id="metric-summary-label">平均</span>: <span id="metric-avg">-</span><span id="metric-unit"></span>
+    ／ 最大: <span id="metric-max">-</span><span id="metric-unit-max"></span>
+    ／ 最小: <span id="metric-min">-</span><span id="metric-unit-min"></span>
+    ／ 前回差分: <span id="metric-diff">-</span><span id="metric-unit-diff"></span>
+    <span id="metric-summary-dist"></span>
+  </div>
+</section>
+
+<!-- 🟧 AIごとの進捗率 -->
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-bolt"></i> AIごとの進捗率</h2>
+  <div class="panel-graph-row" style="display:flex;gap:2rem;flex-wrap:wrap;">
+    {% for ai in ai_progress %}
+    <div class="mini-panel" style="flex:1 1 220px;min-width:180px;max-width:240px; background:rgba(34,38,58,0.86); border-radius:1.2rem; padding:1rem 1.2rem; box-shadow:0 0 14px 0 #199bda38;">
+      <h3 style="font-size:1.1rem;color:#7eeafc;font-weight:600;">{{ ai.name }}</h3>
+      <canvas id="progress-{{ ai.id }}" width="120" height="120"></canvas>
+      <div class="progress-label" style="margin-top:.7em; color:#e6f1ff;font-weight:bold;">
+        {{ ai.progress }}%
+        <span style="margin-left:1em; color:#aac7ff;font-weight:normal;">{{ ai.phase }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.min.js"></script>
 <script>
 const metricsDict = {{ metrics_dict | tojson | safe }};
 const overallMetrics = {{ overall_metrics | tojson | safe }};
