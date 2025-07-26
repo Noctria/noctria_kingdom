@@ -122,15 +122,17 @@
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.umd.min.js"></script>
 <script>
-// プラグイン登録（histogram, boxplot）
-Chart.register(window['ChartjsChartHistogram'].HistogramController);
-Chart.register(window['ChartjsChartHistogram'].HistogramElement);
-Chart.register(window['ChartjsChartBoxplot'].BoxPlotController);
-Chart.register(window['ChartjsChartBoxplot'].BoxAndWhiskers);
-Chart.register(window['ChartjsChartBoxplot'].Violin);
+// プラグイン登録
+Chart.register(
+  window.ChartjsChartHistogram.HistogramController,
+  window.ChartjsChartHistogram.HistogramElement,
+  window.ChartjsChartBoxplot.BoxPlotController,
+  window.ChartjsChartBoxplot.BoxAndWhiskers,
+  window.ChartjsChartBoxplot.Violin
+);
 
 const metricsDict = {{ metrics_dict | tojson | safe }};
 const overallMetrics = {{ overall_metrics | tojson | safe }};
