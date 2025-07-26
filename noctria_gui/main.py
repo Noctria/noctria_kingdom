@@ -57,6 +57,7 @@ from noctria_gui.routes import (
     act_history, act_history_detail,
     pdca, pdca_recheck, pdca_routes, pdca_summary,
     prometheus_routes, push,
+    push_history,  # ← ここを追加
     statistics,  # 追加：統計ルーターをインポート
     statistics_detail, statistics_ranking,
     statistics_scoreboard, statistics_tag_ranking, statistics_compare,
@@ -90,6 +91,7 @@ app.include_router(pdca_recheck.router)
 app.include_router(pdca_routes.router)
 app.include_router(pdca_summary.router)
 app.include_router(push.router)
+app.include_router(push_history.router)  # ← ここを追加
 
 # --- 戦略 ---
 app.include_router(strategy_routes.router, prefix="/strategies", tags=["strategies"])
