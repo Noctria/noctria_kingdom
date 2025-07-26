@@ -15,7 +15,7 @@ end
 %% --- Kingdom AI層 ---
 subgraph Kingdom統治AI[Noctria Kingdom 統治層]
   RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
-  KING["king_noctria.py<br>統合AI"]
+  KING["core/king_noctria.py<br>統合AI"]
 end
 
 %% --- ストラテジAI/DAG群 ---
@@ -29,42 +29,42 @@ end
 
 %% --- Hermes LLM生成ノード（新設） ---
 subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
-  HGEN["strategy_generator.py<br>🦉 LLM戦略コード生成"]
+  HGEN["hermes/strategy_generator.py<br>🦉 LLM戦略コード生成"]
 end
 
 %% --- LLM層 ---
-subgraph LLM層[Noctria LLM層]
-  LLM_MAIN["main.py<br>🚪 LLMサーバ（評価API）"]
-  LLM_SERVER["veritas_llm_server.py<br>🧠 LLM生成サーバ"]
-  LLM_PROMPT["llm_prompt_builder.py<br>📜 プロンプトビルダー"]
-  LLM_EVALAPI["veritas_eval_api.py<br>📄 評価ログAPI"]
+subgraph LLM層[llm/ - Noctria LLM層]
+  LLM_MAIN["llm/main.py<br>🚪 LLMサーバ（評価API）"]
+  LLM_SERVER["llm/veritas_llm_server.py<br>🧠 LLM生成サーバ"]
+  LLM_PROMPT["llm/llm_prompt_builder.py<br>📜 プロンプトビルダー"]
+  LLM_EVALAPI["llm/veritas_eval_api.py<br>📄 評価ログAPI"]
 end
 
 %% --- Plan Data層（分離構成反映+Airflow定時バッチ追加）---
-subgraph PlanData["src/plan_data（PDCA-Plan根拠/分析クラスタ）"]
+subgraph PlanData[plan_data/ - PDCA-Plan根拠/分析クラスタ]
   PLAN_COLLECT["collector.py<br>データ収集・統合"]
   PLAN_FEATURE["features.py<br>特徴量生成"]
   PLAN_STAT["statistics.py<br>指標/集計"]
   PLAN_ANALYZER["analyzer.py<br>要因分析・特徴抽出"]
   PLAN_PROMPT["llm_plan_prompt.py<br>LLM用プロンプト生成"]
   PLAN_ANOMALY["anomaly_detector.py<br>異常検知"]
-  PLAN_PDCA_DAG["pdca_plan_summary_dag.py<br>🗓️ PDCA-Planサマリー<br>Airflow定時バッチ"]
-  PLAN_PDCA_BATCH["run_pdca_plan_workflow.py<br>🛠️ サマリー自動生成バッチ"]
+  PLAN_PDCA_DAG["pdca_plan_summary_dag.py<br>🗓️ サマリーDAG"]
+  PLAN_PDCA_BATCH["run_pdca_plan_workflow.py<br>🛠️ サマリー自動生成"]
 end
 
 %% --- GUI/API層 ---
 subgraph GUI_API[GUI・API・外部連携]
-  GUI["FastAPI/Streamlit<br>🖥️ GUI・REST API<br><u>src/core/dag_trigger.py<br>Airflow DAGトリガー連携</u>"]
+  GUI["FastAPI/Streamlit<br>🖥️ GUI・REST API<br><u>core/dag_trigger.py<br>Airflow DAGトリガー</u>"]
   API["外部APIトリガー<br>🔗 API Endpoint"]
 end
 
 %% --- データ・ファイル層 ---
-subgraph DATA["データ/成果物ストア"]
+subgraph DATA["data/ - データ/成果物ストア"]
   GIT["GitHub<br>📦 戦略リポジトリ"]
-  ACTLOG["PDCA/Actログ<br>📜"]
-  STRATJSON["戦略ファイル群<br>🗂️"]
+  ACTLOG["PDCA/Actログ<br>📜（履歴JSON群）"]
+  STRATJSON["戦略ファイル群<br>🗂️（.json/.py戦略）"]
   HERMES_STRAT["hermes_generated<br>🦉 Hermes戦略群"]
-  EVALRES["評価結果<br>📊"]
+  EVALRES["評価結果<br>📊 data/stats/*.json"]
   PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>📝 Planサマリー"]
 end
 
