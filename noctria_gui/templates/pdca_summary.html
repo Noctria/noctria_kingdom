@@ -22,6 +22,33 @@
   color: var(--bg-color);
   border-radius: 4px;
 }
+
+/* HUD風のセレクトボックス */
+.hud-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--panel-border);
+    color: var(--text-color-base);
+    font-family: var(--font-family);
+    font-size: 1rem;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%2210%22%20viewBox%3D%220%200%2014%2010%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M7%2010L0%200h14L7%2010z%22%20fill%3D%22%237DF9FF%22/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 14px 10px;
+}
+
+.hud-select:hover, .hud-select:focus {
+    border-color: var(--glow-primary);
+    box-shadow: 0 0 8px var(--glow-primary);
+    outline: none;
+    color: var(--text-color-title);
+}
 </style>
 {% endblock %}
 
@@ -46,13 +73,13 @@
         <input id="to-date" type="text" name="to" value="{{ filter.to | default('') }}" autocomplete="off">
         
         <label for="mode-select"><i class="fas fa-eye"></i> 表示モード</label>
-        <select id="mode-select" name="mode">
+        <select id="mode-select" name="mode" class="hud-select">
             <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
             <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
         </select>
         
         <label for="limit-select"><i class="fas fa-list-ol"></i> 表示件数</label>
-        <select id="limit-select" name="limit">
+        <select id="limit-select" name="limit" class="hud-select">
             <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
             <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
             <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
