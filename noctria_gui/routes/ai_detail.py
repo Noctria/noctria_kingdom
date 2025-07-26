@@ -73,7 +73,13 @@ def get_ai_detail(ai_name):
         vals = []
         for date in dates:
             day_vals = trend[date][k]
-            vals.append(round(sum(day_vals)/len(day_vals), m["dec"]) if day_vals else None)
+            # 数値のみ抽出して平均値を計算
+            numeric_vals = [v for v in day_vals if isinstance(v, (int, float))]
+            if numeric_vals:
+                avg_val = round(sum(numeric_vals) / len(numeric_vals), m["dec"])
+            else:
+                avg_val = None
+            vals.append(avg_val)
         # floatでラップしJSONシリアライズ可能にする
         trend_dict[k] = {
             "labels": list(dates),
@@ -84,7 +90,7 @@ def get_ai_detail(ai_name):
             "diff": float(round((vals[-1] - vals[-2]), m["dec"])) if len(vals) >= 2 else None
         }
 
-    # metric_distもfloat化
+    # metric_distもfloat化（念のため）
     for k in metric_dist:
         metric_dist[k] = [float(v) for v in metric_dist[k]]
 
