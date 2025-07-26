@@ -71,6 +71,7 @@
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot/build/Chart.BoxPlot.min.js"></script>
 <script>
 {% for metric in dashboard_metrics %}
 (function() {
@@ -107,32 +108,23 @@
 })();
 {% endfor %}
 
-// 分布グラフ（ヒストグラム＆ボックスプロット）
 (function() {
   const histCtx = document.getElementById('distHistogram');
   const boxCtx = document.getElementById('distBoxplot');
   if (!histCtx || !boxCtx) return;
-  const metric = "{{ dashboard_metrics[0].key }}";
-  const values = {{ metric_dist[dashboard_metrics[0].key] | tojson | safe }};
-  new Chart(histCtx.getContext('2d'), {
-    type: 'histogram',
-    data: {
-      datasets: [{ label: metric, data: values }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: "#a8b2d1" } },
-        y: { ticks: { color: "#a8b2d1" } }
-      }
-    }
-  });
+
+  // 分布描画対象の指標キーを最初のメトリクスで安全に取得
+  const metricKey = "{{ dashboard_metrics[0].key if dashboard_metrics|length > 0 else '' }}";
+  const values = {{ metric_dist[metricKey] | tojson | safe }};
+
+  // ヒストグラムはChart.js標準にはないためプラグイン利用または代替描画検討が必要
+  // ここではボックスプロットの例を示します
+
   new Chart(boxCtx.getContext('2d'), {
     type: 'boxplot',
     data: {
-      labels: [metric],
-      datasets: [{ label: metric, data: [values] }]
+      labels: [metricKey],
+      datasets: [{ label: metricKey, data: [values] }]
     },
     options: {
       responsive: true,
