@@ -20,8 +20,10 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 veritas_dir = STRATEGIES_DIR / "veritas_generated"
 
+
 @router.get("/", response_class=HTMLResponse)
 async def list_strategies(request: Request):
+    """戦略ファイル一覧表示（.pyファイルのみ）"""
     if not veritas_dir.exists():
         raise HTTPException(status_code=500, detail="戦略ディレクトリが存在しません")
 
@@ -33,8 +35,10 @@ async def list_strategies(request: Request):
         "strategies": strategy_names
     })
 
+
 @router.get("/view", response_class=HTMLResponse)
 async def view_strategy(request: Request, name: str):
+    """指定戦略ファイルの内容を表示（.py）"""
     if ".." in name or "/" in name or "\\" in name:
         raise HTTPException(status_code=400, detail="不正なファイル名です")
 
@@ -54,8 +58,10 @@ async def view_strategy(request: Request, name: str):
         "content": content
     })
 
+
 @router.get("/overview", response_class=HTMLResponse)
 async def strategy_overview(request: Request):
+    """メタ情報付きの戦略一覧表示"""
     data = []
     for file in veritas_dir.glob("*.json"):
         try:
@@ -77,7 +83,7 @@ async def strategy_overview(request: Request):
         "strategies": data
     })
 
-# 拡張版：詳細検索パラメータ追加
+
 @router.get("/search", response_class=HTMLResponse)
 async def strategy_search(
     request: Request,
@@ -87,6 +93,7 @@ async def strategy_search(
     tags: str = Query(default=""),
     ai: str = Query(default=""),
 ):
+    """詳細検索パラメータ追加対応"""
     matched = []
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
@@ -142,8 +149,10 @@ async def strategy_search(
         "ai": ai,
     })
 
+
 @router.get("/export", response_class=FileResponse)
 async def export_strategy(name: str):
+    """Python または JSON 戦略ファイルのダウンロード"""
     if ".." in name or "/" in name or "\\" in name:
         raise HTTPException(status_code=400, detail="不正なファイル名です")
 
@@ -159,6 +168,25 @@ async def export_strategy(name: str):
         media_type=media_type
     )
 
+
 @router.get("/compare", response_class=HTMLResponse)
 async def get_strategy_compare_page(request: Request):
-    return templates.TemplateResponse("strategy_compare.html", {"request": request})
+    """戦略比較ページ表示"""
+    # 戦略比較用にメタ情報付きの戦略一覧を渡す拡張も可能
+    data = []
+    for file in veritas_dir.glob("*.json"):
+        try:
+            with open(file, encoding="utf-8") as f:
+                j = json.load(f)
+                j["strategy"] = j.get("strategy", file.stem)
+                j["win_rate"] = j.get("win_rate", None)
+                j["num_trades"] = j.get("num_trades", None)
+                j["max_drawdown"] = j.get("max_drawdown", None)
+                data.append(j)
+        except Exception as e:
+            print(f"⚠️ 読み込み失敗: {file.name} - {e}")
+
+    return templates.TemplateResponse("strategy_compare.html", {
+        "request": request,
+        "strategies": data
+    })
