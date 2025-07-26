@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-👑 Central Governance Dashboard Route (v3.2) - AI別勝率推移グラフ本番データ対応
+👑 Central Governance Dashboard Route (v3.3) - AI別勝率推移グラフ切替/サマリー強化対応
 """
 
 import logging
@@ -114,6 +114,21 @@ async def dashboard_view(request: Request):
         {"id": "prometheus", "name": "Prometheus", "progress": 88, "phase": "予測完了"},
     ]
 
+    # --- AI別勝率時系列（辞書型）---
+    ai_winrate_dict = {}
+    for ai in ai_names:
+        values = [row.get(ai) for row in winrate_trend]
+        labels = [row["date"] for row in winrate_trend]
+        data = [v for v in values if v is not None]
+        ai_winrate_dict[ai] = {
+            "labels": labels,
+            "values": values,
+            "avg": round(sum(data) / len(data), 2) if data else None,
+            "max": max(data) if data else None,
+            "min": min(data) if data else None,
+            "diff": round((data[-1] - data[-2]), 2) if len(data) >= 2 else None
+        }
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats_data,
@@ -121,4 +136,5 @@ async def dashboard_view(request: Request):
         "winrate_trend": winrate_trend,
         "ai_progress": ai_progress,
         "ai_names": ai_names,
+        "ai_winrate_dict": ai_winrate_dict,
     })
