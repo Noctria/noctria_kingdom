@@ -33,7 +33,6 @@
 
 <section class="hud-panel">
   <h2 class="panel-title"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
-  <!-- ▼▼▼ 修正点: JavaScriptに渡す全てのデータをこのdivに集約 ▼▼▼ -->
   <div id="data-holder" 
        style="display:none;"
        data-metrics-dict='{{ metrics_dict | tojson | safe }}'
@@ -113,14 +112,14 @@
 
 {% block extra_scripts %}
 <!-- 
-  ▼▼▼ 修正点 ▼▼▼
-  - Chart.js本体、BoxPlotプラグイン、HistogramプラグインのURLを動作確認済みの正しいものに修正しました。
-  - defer属性で、HTML解析後にスクリプトが記述順に実行されることを保証します。
+  Chart.js本体とプラグインをCDNから読み込みます。
+  defer属性により、HTMLの解析後にスクリプトが記述順に実行されます。
 -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.2/dist/chartjs-chart-histogram.umd.min.js"></script>
+<!-- ▼▼▼ 修正点: HistogramプラグインのURLに @sgratzl/ を追加 ▼▼▼ -->
+<script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-histogram@4.0.2/dist/chartjs-chart-histogram.umd.min.js"></script>
 
-<!-- 最後に、修正したカスタムスクリプトを読み込みます -->
+<!-- 最後に、カスタムスクリプトを読み込みます -->
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}
