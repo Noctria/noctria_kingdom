@@ -11,23 +11,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   try {
-    // ▼▼▼ 改善点: どのプラグインが失敗したか、より具体的にチェックする ▼▼▼
     if (typeof window.ChartjsChartHistogram === 'undefined') {
-      throw new Error('Histogramプラグイン(chartjs-chart-histogram)が読み込まれていません。dashboard.htmlのCDN URLを確認してください。');
+      throw new Error('Histogramプラグインが読み込まれていません。CDN URLを確認してください。');
     }
     if (typeof window.ChartjsChartBoxAndViolinPlot === 'undefined') {
-      throw new Error('BoxPlotプラグイン(@sgratzl/chartjs-chart-box-and-violin-plot)が読み込まれていません。dashboard.htmlのCDN URLを確認してください。');
+      throw new Error('BoxPlotプラグインが読み込まれていません。CDN URLを確認してください。');
     }
 
     const { BoxPlotController, BoxAndWhiskers, Violin } = window.ChartjsChartBoxAndViolinPlot;
     const { HistogramController, HistogramElement } = window.ChartjsChartHistogram;
 
-    // 各コンポーネントが本当に存在するかを最終チェック
     if (!HistogramController || !HistogramElement || !BoxPlotController || !BoxAndWhiskers || !Violin) {
-      throw new Error('プラグインは読み込まれましたが、必要なコンポーネントが不足しています。バージョン互換性の問題かもしれません。');
+      throw new Error('プラグインは読み込まれましたが、必要なコンポーネントが不足しています。');
     }
 
-    // 必須ライブラリを登録
     Chart.register(
       HistogramController,
       HistogramElement,
@@ -36,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
       Violin
     );
   } catch (e) {
-    // 登録に失敗した場合、コンソールにエラーを出力して処理を中断する
     console.error('Chart.jsのプラグイン登録に失敗しました。', e);
     return;
   }
@@ -65,9 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- チャートインスタンス管理 ---
   let metricChartObj, histChart, boxChart;
 
-  /**
-   * トレンドチャートを描画または更新します。
-   */
+  // トレンドチャート描画
   function drawMetricChart(metric, ai) {
     const ctx = document.getElementById('metricChart')?.getContext('2d');
     if (!ctx) return;
@@ -103,9 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSummaryUI(conf, data);
   }
 
-  /**
-   * 分布チャート（ヒストグラム・箱ひげ図）を描画または更新します。
-   */
+  // 分布チャート描画
   function drawDistCharts(metric, ai) {
     const histCtx = document.getElementById('distHistogram')?.getContext('2d');
     const boxCtx = document.getElementById('distBoxplot')?.getContext('2d');
@@ -133,9 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  /**
-   * 下部のサマリー情報を更新します。
-   */
+  // サマリーUI更新
   function updateSummaryUI(conf, data) {
     const format = (val) => val != null ? val : "-";
     document.getElementById('metric-summary-label').textContent = conf.label;
@@ -146,9 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#metric-unit, #metric-unit-max, #metric-unit-min, #metric-unit-diff').forEach(el => el.textContent = conf.unit || '');
   }
 
-  /**
-   * 現在の選択状態に基づいてチャートを再描画します。
-   */
+  // チャート再描画
   function redrawCharts() {
     if (!selectedMetric || !selectedAI) return;
     if (selectedMode === 'trend') {
@@ -158,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- イベントハンドラをグローバルスコープに登録（onclickから呼び出すため） ---
+  // グローバル関数登録
   window.switchChartMode = (mode) => {
     selectedMode = mode;
     document.getElementById('tab-trend').classList.toggle('active', mode === 'trend');
@@ -191,9 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
     redrawCharts();
   };
 
-  // --- 初期化処理 ---
+  // 初期化
   if(selectedMetric && selectedAI) {
-      redrawCharts();
-      window.switchAI(selectedAI); // 初期のアクティブ状態を正しく反映
+    redrawCharts();
+    window.switchAI(selectedAI);
   }
 });
