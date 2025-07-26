@@ -15,12 +15,10 @@ import requests
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-# Airflow Webserver のベースURL（例: "http://localhost:8080/api/v1"）
-AIRFLOW_API_BASE_URL = os.getenv("AIRFLOW_API_BASE_URL", "http://localhost:8080/api/v1")
-
-# Airflow WebserverのBasic認証情報
-AIRFLOW_API_USERNAME = os.getenv("AIRFLOW_API_USERNAME", "airflow")
-AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_API_PASSWORD", "airflow")
+# .envの変数名に合わせて修正
+AIRFLOW_API_BASE_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
+AIRFLOW_API_USERNAME = os.getenv("AIRFLOW_USERNAME", "admin")
+AIRFLOW_API_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 
 
 class AirflowDagTrigger:
@@ -59,7 +57,6 @@ class AirflowDagTrigger:
             payload["conf"] = conf
 
         if execution_date is not None:
-            # Airflow APIではISO8601フォーマットが必要
             dt = datetime.fromisoformat(execution_date)
             if replace_microseconds:
                 dt = dt.replace(microsecond=0)
@@ -95,7 +92,6 @@ class AirflowDagTrigger:
         return [d["dag_id"] for d in data.get("dags", [])]
 
 
-# シンプルなインスタンスをモジュール変数として用意
 default_trigger = AirflowDagTrigger()
 
 def trigger_dag(
@@ -103,27 +99,7 @@ def trigger_dag(
     conf: Optional[Dict[str, Any]] = None,
     execution_date: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    シンプルにDAGをトリガーする関数。
-
-    Args:
-        dag_id (str): トリガーするDAGのID
-        conf (dict, optional): DAGに渡すパラメータ
-        execution_date (str, optional): 実行日時（ISO8601形式）
-
-    Returns:
-        dict: Airflow API レスポンス
-    """
     return default_trigger.trigger_dag(dag_id=dag_id, conf=conf, execution_date=execution_date)
 
 def list_dags(limit: int = 1000) -> List[str]:
-    """
-    シンプルにDAG一覧（dag_idのみ）を取得する関数
-
-    Args:
-        limit (int): 最大取得数
-
-    Returns:
-        List[str]: 登録されているDAGのIDリスト
-    """
     return default_trigger.list_dags(limit=limit)
