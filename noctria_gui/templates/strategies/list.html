@@ -8,13 +8,34 @@
 
 {% block content %}
   {% if strategies %}
-    <ul style="list-style:none; padding-left:0;">
-      {% for name in strategies %}
-        <li style="margin-bottom:0.5rem;">
-          <a class="hud-link" href="/strategies/view?name={{ name }}">{{ name }}</a>
-        </li>
-      {% endfor %}
-    </ul>
+    <section class="hud-panel" style="min-height: 300px; padding: 1rem;">
+      <h2 class="panel-title"><i class="fas fa-code"></i> Strategy Files</h2>
+      <div class="strategy-cards" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        {% for name in strategies %}
+          <a href="/strategies/view?name={{ name }}" class="strategy-card hud-link" style="
+            flex: 1 0 280px;
+            padding: 1rem;
+            background: var(--bg-color);
+            border-radius: 8px;
+            box-shadow: 0 0 8px var(--glow-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            text-decoration: none;
+            color: inherit;
+            ">
+            <i class="fas fa-file-code" style="font-size: 1.8rem; color: var(--glow-primary);"></i>
+            <span style="
+              font-family: monospace;
+              font-weight: 700;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              ">{{ name }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
   {% else %}
     <p class="empty-message hud-text-muted" style="margin-top:1rem;">
       まだ戦略が生成されていません。
