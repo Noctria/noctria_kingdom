@@ -10,14 +10,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
-  // ▼▼▼ 修正点: 正しいグローバル変数名から機能を取得 ▼▼▼
-  const { BoxPlotController, BoxAndWhiskers, Violin } = window.ChartjsChartBoxAndViolinPlot || {};
-  const { HistogramController, HistogramElement } = window.ChartjsChartHistogram || {};
-
   try {
-    // プラグインが正しく読み込まれたか最終チェック
+    // ▼▼▼ 改善点: どのプラグインが失敗したか、より具体的にチェックする ▼▼▼
+    if (typeof window.ChartjsChartHistogram === 'undefined') {
+      throw new Error('Histogramプラグイン(chartjs-chart-histogram)が読み込まれていません。dashboard.htmlのCDN URLを確認してください。');
+    }
+    if (typeof window.ChartjsChartBoxAndViolinPlot === 'undefined') {
+      throw new Error('BoxPlotプラグイン(@sgratzl/chartjs-chart-box-and-violin-plot)が読み込まれていません。dashboard.htmlのCDN URLを確認してください。');
+    }
+
+    const { BoxPlotController, BoxAndWhiskers, Violin } = window.ChartjsChartBoxAndViolinPlot;
+    const { HistogramController, HistogramElement } = window.ChartjsChartHistogram;
+
+    // 各コンポーネントが本当に存在するかを最終チェック
     if (!HistogramController || !HistogramElement || !BoxPlotController || !BoxAndWhiskers || !Violin) {
-      throw new Error('Chart.jsのプラグインコンポーネントが不足しています。');
+      throw new Error('プラグインは読み込まれましたが、必要なコンポーネントが不足しています。バージョン互換性の問題かもしれません。');
     }
 
     // 必須ライブラリを登録
@@ -29,14 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
       Violin
     );
   } catch (e) {
-    console.error('Chart.jsのプラグイン登録に失敗しました。ライブラリが正しく読み込まれているか、CDNのURLを確認してください。', e);
-    return; // 処理を中断
+    // 登録に失敗した場合、コンソールにエラーを出力して処理を中断する
+    console.error('Chart.jsのプラグイン登録に失敗しました。', e);
+    return;
   }
 
   // --- データ取得 ---
   const dataHolder = document.getElementById('data-holder');
   if (!dataHolder) {
-    console.error('データ保持用のdiv要素が見つかりません。');
+    console.error('データ保持用のdiv要素(#data-holder)が見つかりません。');
     return;
   }
   const metricsDict = JSON.parse(dataHolder.dataset.metricsDict || '{}');
@@ -59,8 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /**
    * トレンドチャートを描画または更新します。
-   * @param {string} metric 描画する指標のキー
-   * @param {string} ai 描画するAIの名前 ('overall'を含む)
    */
   function drawMetricChart(metric, ai) {
     const ctx = document.getElementById('metricChart')?.getContext('2d');
@@ -89,16 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { color: "#e6f1ff" } },
-          title: { display: false }
-        },
-        scales: {
-          x: { ticks: { color: "#a8b2d1" } },
-          y: { ticks: { color: "#a8b2d1" } }
-        }
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#e6f1ff" } }, title: { display: false } },
+        scales: { x: { ticks: { color: "#a8b2d1" } }, y: { ticks: { color: "#a8b2d1" } } }
       }
     });
     updateSummaryUI(conf, data);
@@ -106,8 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /**
    * 分布チャート（ヒストグラム・箱ひげ図）を描画または更新します。
-   * @param {string} metric 描画する指標のキー
-   * @param {string} ai 描画するAIの名前 ('overall'を含む)
    */
   function drawDistCharts(metric, ai) {
     const histCtx = document.getElementById('distHistogram')?.getContext('2d');
@@ -126,52 +123,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const label = ai === 'overall' ? '全体' : ai;
 
-    // ヒストグラムと箱ひげ図の描画オプションを追加
     histChart = new Chart(histCtx, { 
-      type: 'histogram',
-      data: {
-        datasets: [{
-          label: conf.label,
-          data: data,
-          backgroundColor: 'rgba(24,225,239,0.5)',
-          borderColor: '#18e1ef',
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { 
-          legend: { display: false },
-          title: { display: true, text: `${conf.label} 分布（${label}）`, color: "#e6f1ff" }
-        },
-        scales: { x: { ticks: { color: "#a8b2d1" } }, y: { ticks: { color: "#a8b2d1" } } }
-      }
+      type: 'histogram', data: { datasets: [{ label: conf.label, data: data, backgroundColor: 'rgba(24,225,239,0.5)', borderColor: '#18e1ef', }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: `${conf.label} 分布（${label}）`, color: "#e6f1ff" } }, scales: { x: { ticks: { color: "#a8b2d1" } }, y: { ticks: { color: "#a8b2d1" } } } }
     });
     boxChart = new Chart(boxCtx, { 
-      type: 'boxplot',
-      data: {
-        labels: [conf.label],
-        datasets: [{
-          label: conf.label,
-          data: [data],
-          backgroundColor: 'rgba(34,38,58,0.86)',
-          borderColor: '#7eeafc',
-          outlierColor: '#FF6384',
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { ticks: { color: "#a8b2d1" } } }
-      }
+      type: 'boxplot', data: { labels: [conf.label], datasets: [{ label: conf.label, data: [data], backgroundColor: 'rgba(34,38,58,0.86)', borderColor: '#7eeafc', outlierColor: '#FF6384', }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: "#a8b2d1" } } } }
     });
   }
 
   /**
    * 下部のサマリー情報を更新します。
-   * @param {object} conf 選択された指標の設定
-   * @param {object} data 表示するデータ
    */
   function updateSummaryUI(conf, data) {
     const format = (val) => val != null ? val : "-";
@@ -195,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- イベントハンドラをグローバルスコープに登録 ---
+  // --- イベントハンドラをグローバルスコープに登録（onclickから呼び出すため） ---
   window.switchChartMode = (mode) => {
     selectedMode = mode;
     document.getElementById('tab-trend').classList.toggle('active', mode === 'trend');
