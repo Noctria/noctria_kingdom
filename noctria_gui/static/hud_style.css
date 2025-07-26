@@ -1,4 +1,148 @@
-/* --- Flatpickr HUDカスタムスタイル --- */
+/* =============================
+   Noctria Kingdom GUI HUD Style v1.0
+   Dark theme with glow effects
+   ============================= */
+
+/* --- カラーバリアブル定義 --- */
+:root {
+  --bg-color: #0a0f2c;
+  --glow-primary: #22d1ee;
+  --text-color-base: #d0e9ff;
+  --panel-bg: #131a4f;
+  --panel-border: #22d1ee44;
+  --text-color-title: #a0d8ff;
+  --accent-color-1: #55c3ff;
+  --font-family: 'Roboto Mono', monospace;
+}
+
+/* --- 基本レイアウト --- */
+html, body {
+  background-color: var(--bg-color);
+  color: var(--text-color-base);
+  font-family: var(--font-family);
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* --- HUDコンテナ --- */
+.hud-container-simple {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* --- ヘッダー --- */
+.header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-color-base);
+  font-weight: 700;
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hud-title i {
+  color: var(--glow-primary);
+  filter: drop-shadow(0 0 6px var(--glow-primary));
+}
+
+/* --- ナビゲーションボタン --- */
+.nav-item-back {
+  color: var(--glow-primary);
+  text-decoration: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nav-item-back:hover {
+  text-decoration: underline;
+}
+
+/* --- HUDパネル --- */
+.hud-panel {
+  background-color: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 0 15px var(--glow-primary);
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-color-base);
+}
+
+/* --- パネルタイトル --- */
+.panel-title {
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--glow-primary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  filter: drop-shadow(0 0 8px var(--glow-primary));
+}
+
+/* --- リンクスタイル --- */
+.hud-link {
+  background: var(--bg-color);
+  box-shadow: 0 0 12px var(--glow-primary);
+  border-radius: 8px;
+  color: var(--text-color-base);
+  text-decoration: none;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  justify-content: center;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud-link:hover {
+  background: var(--panel-bg);
+  box-shadow: 0 0 18px var(--glow-primary);
+}
+
+/* --- メトリックアイテム --- */
+.metrics {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.metric-item {
+  background: var(--bg-color);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 0 10px var(--glow-primary);
+  flex: 1 1 160px;
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.text-green {
+  color: #4caf50;
+}
+
+.text-red {
+  color: #f44336;
+}
+
+/* --- フォント・テーブル・フォーム系は別CSSで管理されている想定 --- */
+
+/* ========================
+   Flatpickr HUDカスタムスタイル
+   ======================== */
+
 .flatpickr-calendar {
   background: var(--bg-color);
   border: 1px solid var(--glow-primary);
