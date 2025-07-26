@@ -1,0 +1,235 @@
+{% extends "base_hud.html" %}
+
+{% block title %}🤖 AI Detail - {{ ai_name }}{% endblock %}
+{% block header_icon %}<i class="fas fa-robot"></i>{% endblock %}
+{% block header_title %}AI DETAIL — {{ ai_name }}{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-info-circle"></i> {{ ai_name }} — 指標推移・分布</h2>
+  <div class="metric-switcher" style="display:flex;gap:1.1rem;margin-bottom:1rem;">
+    {% for m in dashboard_metrics %}
+      <button class="metric-tab{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}')">{{ m.label }}</button>
+    {% endfor %}
+  </div>
+  <div class="chart-mode-switcher" style="display:flex;gap:1rem;margin-bottom:.8rem;">
+    <button id="tab-trend" class="mode-tab active" onclick="switchChartMode('trend')"><i class="fas fa-chart-line"></i> トレンド</button>
+    <button id="tab-dist" class="mode-tab" onclick="switchChartMode('dist')"><i class="fas fa-chart-area"></i> 分布</button>
+  </div>
+  <div id="trend-canvas-box">
+    <canvas id="metricChart" width="900" height="230" style="max-width:100%;background:#181c2b;margin:16px 0;"></canvas>
+  </div>
+  <div id="dist-canvas-box" style="display:none;">
+    <canvas id="distHistogram" width="900" height="180" style="max-width:100%;background:#181c2b;margin:12px 0 0 0;"></canvas>
+    <canvas id="distBoxplot" width="900" height="90" style="max-width:100%;background:#1a1f2f;margin:0;"></canvas>
+  </div>
+  <div class="metric-summary" style="margin-top:1.2rem;color:#aee3fc;font-size:1.05em;">
+    <span id="metric-summary-label">平均</span>: <span id="metric-avg">-</span>
+    ／ 最大: <span id="metric-max">-</span>
+    ／ 最小: <span id="metric-min">-</span>
+    ／ 前回差分: <span id="metric-diff">-</span>
+    <span id="metric-summary-dist"></span>
+  </div>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-list"></i> 戦略評価履歴（{{ ai_name }}）</h2>
+  <div style="overflow-x:auto;">
+    <table class="hud-table" style="width:100%;min-width:900px;">
+      <thead>
+        <tr>
+          <th>日時</th>
+          <th>戦略ファイル</th>
+          {% for m in dashboard_metrics %}<th>{{ m.label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in strategy_list %}
+        <tr>
+          <td style="white-space:nowrap;">{{ s.evaluated_at }}</td>
+          <td>{{ s.strategy }}</td>
+          {% for m in dashboard_metrics %}
+            <td>
+              {% set v = s[m.key] %}
+              {% if v is not none %}
+                {{ (v * 100)|round(m.dec) if m.unit == '%' and v <= 1.0 else v|round(m.dec) }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.min.js"></script>
+<script>
+const trendDict = {{ trend_dict | tojson | safe }};
+const metricDist = {{ metric_dist | tojson | safe }};
+const dashboardMetrics = {{ dashboard_metrics | tojson | safe }};
+let selectedMetric = dashboardMetrics[0].key;
+let selectedMode = "trend";
+
+// グラフ描画
+function drawTrendChart(metric) {
+  const ctx = document.getElementById('metricChart').getContext('2d');
+  if (window.metricChartObj) window.metricChartObj.destroy();
+  let data = trendDict[metric];
+  let conf = dashboardMetrics.find(m => m.key === metric);
+  window.metricChartObj = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: conf.label,
+        data: data.values,
+        borderColor: '#18e1ef',
+        backgroundColor: 'rgba(24,225,239,0.10)',
+        pointRadius: 3,
+        tension: 0.20,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#e6f1ff" } },
+        title: { display: true, text: `${conf.label}トレンド`, color: "#e6f1ff" }
+      },
+      scales: {
+        x: { ticks: { color: "#a8b2d1" } },
+        y: { ticks: { color: "#a8b2d1" } }
+      }
+    }
+  });
+  showSummary(data, conf);
+}
+
+function drawDistCharts(metric) {
+  const histCtx = document.getElementById('distHistogram').getContext('2d');
+  const boxCtx = document.getElementById('distBoxplot').getContext('2d');
+  if (window.histChart) window.histChart.destroy();
+  if (window.boxChart) window.boxChart.destroy();
+  let values = metricDist[metric] || [];
+  let conf = dashboardMetrics.find(m => m.key === metric);
+  // ヒストグラム
+  window.histChart = new Chart(histCtx, {
+    type: 'histogram',
+    data: {
+      datasets: [{
+        label: conf.label + ' 分布',
+        data: values,
+        borderColor: '#18e1ef',
+        backgroundColor: 'rgba(24,225,239,0.15)',
+        binsNumber: 15
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#e6f1ff" } },
+        title: { display: true, text: `${conf.label} ヒストグラム`, color: "#e6f1ff" }
+      },
+      scales: {
+        x: { ticks: { color: "#a8b2d1" } },
+        y: { ticks: { color: "#a8b2d1" } }
+      }
+    }
+  });
+  // 箱ひげ
+  window.boxChart = new Chart(boxCtx, {
+    type: 'boxplot',
+    data: {
+      labels: [" "],
+      datasets: [{
+        label: conf.label + ' 箱ひげ',
+        data: [values],
+        borderColor: '#f2e25c',
+        backgroundColor: 'rgba(242,226,92,0.12)',
+        outlierColor: '#f56565',
+        itemRadius: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#e6f1ff" } },
+        title: { display: true, text: `${conf.label} 箱ひげ図`, color: "#e6f1ff" }
+      },
+      scales: {
+        x: { ticks: { color: "#a8b2d1" } },
+        y: { ticks: { color: "#a8b2d1" } }
+      }
+    }
+  });
+  // サマリー（中央値・四分位など簡易計算）
+  if (values && values.length) {
+    const sorted = values.slice().sort((a,b)=>a-b);
+    const median = quantile(sorted,0.5);
+    const q1 = quantile(sorted,0.25);
+    const q3 = quantile(sorted,0.75);
+    document.getElementById('metric-summary-dist').innerHTML = ` ／ 中央値: ${median} ／ Q1: ${q1} ／ Q3: ${q3}`;
+  } else {
+    document.getElementById('metric-summary-dist').innerHTML = "";
+  }
+}
+
+function quantile(arr, q) {
+  if (!arr.length) return '-';
+  const pos = ((arr.length) - 1) * q;
+  const base = Math.floor(pos), rest = pos - base;
+  if ((arr[base+1]!==undefined)) {
+    return (arr[base] + rest*(arr[base+1]-arr[base])).toFixed(2);
+  } else {
+    return arr[base].toFixed(2);
+  }
+}
+
+// サマリー
+function showSummary(data, conf) {
+  document.getElementById('metric-summary-label').textContent = conf.label;
+  document.getElementById('metric-avg').textContent = (data.avg != null) ? data.avg : "-";
+  document.getElementById('metric-max').textContent = (data.max != null) ? data.max : "-";
+  document.getElementById('metric-min').textContent = (data.min != null) ? data.min : "-";
+  document.getElementById('metric-diff').textContent = (data.diff != null ? (data.diff >= 0 ? "+" : "") + data.diff : "-");
+  document.getElementById('metric-summary-dist').innerHTML = '';
+}
+
+window.switchMetric = function(metric) {
+  selectedMetric = metric;
+  if(selectedMode === "trend") drawTrendChart(selectedMetric);
+  else drawDistCharts(selectedMetric);
+  document.querySelectorAll('.metric-tab').forEach(btn => btn.classList.remove('active'));
+  document.querySelector(`.metric-tab[onclick*="${metric}"]`).classList.add('active');
+}
+window.switchChartMode = function(mode) {
+  selectedMode = mode;
+  if (mode === "trend") {
+    document.getElementById('trend-canvas-box').style.display = '';
+    document.getElementById('dist-canvas-box').style.display = 'none';
+    drawTrendChart(selectedMetric);
+    document.getElementById('tab-trend').classList.add('active');
+    document.getElementById('tab-dist').classList.remove('active');
+  } else {
+    document.getElementById('trend-canvas-box').style.display = 'none';
+    document.getElementById('dist-canvas-box').style.display = '';
+    drawDistCharts(selectedMetric);
+    document.getElementById('tab-trend').classList.remove('active');
+    document.getElementById('tab-dist').classList.add('active');
+  }
+}
+
+window.onload = () => {
+  drawTrendChart(selectedMetric);
+};
+</script>
+{% endblock %}
