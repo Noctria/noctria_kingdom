@@ -7,14 +7,21 @@
 - AI詳細 (/ai/{ai_name})
 """
 
+import sys
+from pathlib import Path
+
+# プロジェクトルートをsys.pathに追加（例: routes/ai_routes.pyから3階層上がnoctria_kingdom）
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from collections import defaultdict
 import os
 import json
-from pathlib import Path
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, STATS_DIR  # 必要に応じてパスを修正
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, STATS_DIR  # パスはプロジェクトルートから見た相対パスが正しいことが前提
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -81,7 +88,6 @@ def get_ai_detail(ai_name: str):
         vals = []
         for date in dates:
             day_vals = trend[date][k]
-            # 数値のみ抽出して平均値を計算
             numeric_vals = [v for v in day_vals if isinstance(v, (int, float))]
             if numeric_vals:
                 avg_val = round(sum(numeric_vals) / len(numeric_vals), m["dec"])
@@ -99,7 +105,7 @@ def get_ai_detail(ai_name: str):
             "diff": round((vals[-1] - vals[-2]), m["dec"]) if len(vals) >= 2 else None
         }
 
-    # ■ 追加修正：valuesがメソッドになっていた場合の対応（安全策）
+    # ■ 追加修正：valuesがメソッドだった場合の対応（安全策）
     for k in trend_dict:
         if callable(trend_dict[k].get("values")):
             trend_dict[k]["values"] = list(trend_dict[k]["values"]())
