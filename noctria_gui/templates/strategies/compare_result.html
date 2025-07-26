@@ -1,4 +1,3 @@
-<!-- noctria_gui/templates/strategies/compare_result.html -->
 {% extends "base_hud.html" %}
 
 {% block title %}📈 Strategy Comparison - Noctria Kingdom HUD{% endblock %}
@@ -29,7 +28,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // ✅ Jinja2から受け取ったJSONデータ
     const strategies = {{ strategies | tojson }};
 
     if (!Array.isArray(strategies) || strategies.length === 0) {
