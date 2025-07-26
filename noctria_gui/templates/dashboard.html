@@ -51,7 +51,7 @@
 
   <div class="metric-switcher hud-btn-group" style="margin-bottom: 0.9rem;">
     {% for m in dashboard_metrics %}
-      <button class="metric-tab hud-btn{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}')">
+      <button class="metric-tab hud-btn{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}', event)">
         {{ m.label }}
       </button>
     {% endfor %}
@@ -64,7 +64,8 @@
     {% for ai in ai_names %}
       <button
         class="ai-tab hud-btn{% if loop.first %} active{% endif %}"
-        onclick="switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));"
+        data-ai-name="{{ ai }}"
+        onclick="switchAI('{{ ai }}')"
       >
         {{ ai }}
         <a
@@ -99,228 +100,12 @@
   </div>
 </section>
 
-<section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-bolt"></i> AIごとの進捗率</h2>
-  <div class="panel-graph-row" style="display:flex;gap:2rem;flex-wrap:wrap;">
-    {% for ai in ai_progress %}
-    <div class="mini-panel" style="flex:1 1 220px;min-width:180px;max-width:240px; background:rgba(34,38,58,0.86); border-radius:1.2rem; padding:1rem 1.2rem; box-shadow:0 0 14px 0 #199bda38;">
-      <h3 style="font-size:1.1rem;color:#7eeafc;font-weight:600;">{{ ai.name }}</h3>
-      <canvas id="progress-{{ ai.id }}" width="120" height="120"></canvas>
-      <div class="progress-label" style="margin-top:.7em; color:#e6f1ff;font-weight:bold;">
-        {{ ai.progress }}%
-        <span style="margin-left:1em; color:#aac7ff;font-weight:normal;">{{ ai.phase }}</span>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</section>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.umd.min.js"></script>
 
-<script>
-// ▼▼▼【修正点】ここから▼▼▼
-// DOMの読み込みが完了してからスクリプトを実行する
-document.addEventListener('DOMContentLoaded', function() {
-  // プラグイン登録
-  // DOMContentLoaded内で実行することで、ライブラリが未定義である問題を回避
-  Chart.register(
-    window.ChartjsChartHistogram.HistogramController,
-    window.ChartjsChartHistogram.HistogramElement,
-    window.ChartjsChartBoxplot.BoxPlotController,
-    window.ChartjsChartBoxplot.BoxAndWhiskers,
-    window.ChartjsChartBoxplot.Violin
-  );
-
-  // --- データ準備 ---
-  const metricsDict = {{ metrics_dict | tojson | safe }};
-  const overallMetrics = {{ overall_metrics | tojson | safe }};
-  const dashboardMetrics = {{ dashboard_metrics | tojson | safe }};
-  const aiNames = {{ ai_names | tojson | safe }};
-  const aiMetricDist = {{ ai_metric_dist | tojson | safe }};
-
-  // --- 状態管理 ---
-  let selectedMetric = dashboardMetrics[0].key;
-  let selectedAI = aiNames[0];
-  let selectedMode = "trend"; // "trend" または "dist"
-
-  // --- チャート描画関数 ---
-  // トレンドチャートの描画
-  window.drawMetricChart = function(metric, ai) {
-    const ctx = document.getElementById('metricChart').getContext('2d');
-    if (window.metricChartObj) window.metricChartObj.destroy();
-    let data, label, unit, dec;
-    let showAI = true;
-    if (ai === 'overall') {
-      data = overallMetrics[metric];
-      label = "全体平均";
-      showAI = false;
-    } else {
-      data = (metricsDict[metric] && metricsDict[metric][ai]) ? metricsDict[metric][ai] : { labels: [], values: [] };
-      label = ai;
-    }
-    let conf = dashboardMetrics.find(m => m.key === metric);
-    unit = conf.unit;
-    dec = conf.dec;
-    window.metricChartObj = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.labels,
-        datasets: [{
-          label: conf.label + (showAI ? `（${label}）` : "（全体平均）"),
-          data: data.values,
-          borderColor: '#18e1ef',
-          backgroundColor: 'rgba(24,225,239,0.10)',
-          pointRadius: 3,
-          tension: 0.20,
-          fill: false
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { labels: { color: "#e6f1ff" } },
-          title: { display: true, text: `${conf.label}トレンド（${label}）`, color: "#e6f1ff" }
-        },
-        scales: {
-          x: { ticks: { color: "#a8b2d1" } },
-          y: { ticks: { color: "#a8b2d1" } }
-        }
-      }
-    });
-    // サマリー更新
-    document.getElementById('metric-summary-label').textContent = conf.label;
-    document.getElementById('metric-avg').textContent = (data.avg != null) ? data.avg : "-";
-    document.getElementById('metric-max').textContent = (data.max != null) ? data.max : "-";
-    document.getElementById('metric-min').textContent = (data.min != null) ? data.min : "-";
-    document.getElementById('metric-diff').textContent = (data.diff != null ? (data.diff >= 0 ? "+" : "") + data.diff : "-");
-    document.getElementById('metric-unit').textContent = unit;
-    document.getElementById('metric-unit-max').textContent = unit;
-    document.getElementById('metric-unit-min').textContent = unit;
-    document.getElementById('metric-unit-diff').textContent = unit;
-    // AIスイッチャーの表示/非表示
-    document.getElementById('ai-switcher').style.display = showAI ? 'flex' : 'none';
-    // 「全体平均」タブのアクティブ状態を切り替え
-    document.getElementById('tab-overall').classList.toggle('active', !showAI);
-    // AIタブのアクティブ状態を切り替え
-    document.querySelectorAll('.ai-tab').forEach(btn => btn.classList.remove('active'));
-    if (showAI) {
-      const aiBtn = Array.from(document.querySelectorAll('.ai-tab')).find(btn => btn.onclick.toString().includes(`'${ai}'`));
-      if (aiBtn) aiBtn.classList.add('active');
-    }
-  }
-
-  // 分布チャート（ヒストグラム・箱ひげ図）の描画
-  window.drawDistCharts = function(metric, ai) {
-    const histCtx = document.getElementById('distHistogram').getContext('2d');
-    const boxCtx = document.getElementById('distBoxplot').getContext('2d');
-    if (window.histChart) window.histChart.destroy();
-    if (window.boxChart) window.boxChart.destroy();
-
-    let data = [];
-    let label = ai === 'overall' ? '全体' : ai;
-    let conf = dashboardMetrics.find(m => m.key === metric);
-    if (ai === 'overall') {
-      data = aiMetricDist[metric]?.flatMap(d => d.values) || [];
-    } else {
-      data = aiMetricDist[metric]?.find(d => d.ai === ai)?.values || [];
-    }
-
-    window.histChart = new Chart(histCtx, {
-      type: 'histogram',
-      data: {
-        datasets: [{
-          label: conf.label,
-          data: data,
-          backgroundColor: 'rgba(24,225,239,0.5)',
-          borderColor: '#18e1ef',
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { 
-          legend: { display: false },
-          title: { display: true, text: `${conf.label} 分布（${label}）`, color: "#e6f1ff" }
-        },
-        scales: {
-          x: { ticks: { color: "#a8b2d1" } },
-          y: { ticks: { color: "#a8b2d1" } }
-        }
-      }
-    });
-
-    window.boxChart = new Chart(boxCtx, {
-      type: 'boxplot',
-      data: {
-        labels: [conf.label],
-        datasets: [{
-          label: conf.label,
-          data: [data],
-          backgroundColor: 'rgba(34,38,58,0.86)',
-          borderColor: '#7eeafc',
-          outlierColor: '#FF6384',
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { ticks: { color: "#a8b2d1" } }
-        }
-      }
-    });
-  }
-
-  // --- イベントハンドラ関数 ---
-  // onclickから呼び出されるため、windowオブジェクトに登録する
-  window.switchMetric = function(metric) {
-    selectedMetric = metric;
-    document.querySelectorAll('.metric-tab').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    if (selectedMode === "trend") {
-      window.drawMetricChart(selectedMetric, selectedAI);
-    } else {
-      window.drawDistCharts(selectedMetric, selectedAI);
-    }
-  }
-
-  window.switchAI = function(ai) {
-    selectedAI = ai;
-    if (selectedMode === "trend") {
-      window.drawMetricChart(selectedMetric, selectedAI);
-    } else {
-      window.drawDistCharts(selectedMetric, selectedAI);
-    }
-  }
-
-  window.switchChartMode = function(mode) {
-    selectedMode = mode;
-    document.querySelectorAll('.mode-tab').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`tab-${mode}`).classList.add('active');
-    document.getElementById('trend-canvas-box').style.display = (mode === "trend") ? 'block' : 'none';
-    document.getElementById('dist-canvas-box').style.display = (mode === "dist") ? 'block' : 'none';
-    if (mode === "trend") {
-      window.drawMetricChart(selectedMetric, selectedAI);
-    } else {
-      window.drawDistCharts(selectedMetric, selectedAI);
-    }
-  }
-
-  // --- 初期描画 ---
-  window.drawMetricChart(selectedMetric, selectedAI);
-
-});
-// ▲▲▲【修正点】ここまで▲▲▲
-</script>
-<style>
-/* HUDスタイルUIのボタン・タブ類 */
-.ai-tab .ai-detail-link {
-  margin-left: 0.3em;
-  vertical-align: middle;
-  color: #19c0e9;
-}
-</style>
+<script defer src="/static/js/dashboard.js"></script>
 {% endblock %}
