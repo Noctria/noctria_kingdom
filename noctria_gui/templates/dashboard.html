@@ -44,21 +44,21 @@
   <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 全AI・全指標トレンド/分布可視化</h2>
 
   <div class="chart-mode-switcher hud-btn-group" style="margin-bottom: 0.7rem;">
-    <button id="tab-trend" class="mode-tab active hud-btn" onclick="window.switchChartMode('trend')">
+    <button id="tab-trend" class="mode-tab active hud-btn" onclick="switchChartMode('trend')">
       <i class="fas fa-chart-line"></i> トレンド
     </button>
-    <button id="tab-dist" class="mode-tab hud-btn" onclick="window.switchChartMode('dist')">
+    <button id="tab-dist" class="mode-tab hud-btn" onclick="switchChartMode('dist')">
       <i class="fas fa-chart-area"></i> 分布
     </button>
   </div>
 
   <div class="metric-switcher hud-btn-group" style="margin-bottom: 0.9rem;">
     {% for m in dashboard_metrics %}
-      <button class="metric-tab hud-btn{% if loop.first %} active{% endif %}" onclick="window.switchMetric('{{ m.key }}')">
+      <button class="metric-tab hud-btn{% if loop.first %} active{% endif %}" onclick="switchMetric('{{ m.key }}')">
         {{ m.label }}
       </button>
     {% endfor %}
-    <button class="metric-tab hud-btn metric-tab-overall" onclick="window.switchAI('overall')" id="tab-overall" style="margin-left: 2em;">
+    <button class="metric-tab hud-btn metric-tab-overall" onclick="switchAI('overall')" id="tab-overall" style="margin-left: 2em;">
       <i class="fas fa-globe"></i> 全体平均
     </button>
   </div>
@@ -67,7 +67,7 @@
     {% for ai in ai_names %}
       <button
         class="ai-tab hud-btn{% if loop.first %} active{% endif %}"
-        onclick="window.switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));"
+        onclick="switchAI('{{ ai }}');window.history.pushState({}, '', '/dashboard#'+encodeURIComponent('{{ ai }}'));"
       >
         {{ ai }}
         <a
@@ -125,6 +125,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-histogram@4.0.0/dist/chartjs-chart-histogram.min.js"></script>
 <script>
+// プラグイン登録（histogram, boxplot）
+Chart.register(window['ChartjsChartHistogram'].HistogramController);
+Chart.register(window['ChartjsChartHistogram'].HistogramElement);
+Chart.register(window['ChartjsChartBoxplot'].BoxPlotController);
+Chart.register(window['ChartjsChartBoxplot'].BoxAndWhiskers);
+Chart.register(window['ChartjsChartBoxplot'].Violin);
+
 const metricsDict = {{ metrics_dict | tojson | safe }};
 const overallMetrics = {{ overall_metrics | tojson | safe }};
 const dashboardMetrics = {{ dashboard_metrics | tojson | safe }};
