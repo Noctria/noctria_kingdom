@@ -57,13 +57,14 @@ from noctria_gui.routes import (
     act_history, act_history_detail,
     pdca, pdca_recheck, pdca_routes, pdca_summary,
     prometheus_routes, push,
+    statistics,  # 追加：統計ルーターをインポート
     statistics_detail, statistics_ranking,
     statistics_scoreboard, statistics_tag_ranking, statistics_compare,
     strategy_detail, strategy_heatmap, strategy_routes,
     tag_heatmap, tag_summary, tag_summary_detail,
     # 追加↓
     hermes,
-    ai_routes  # ここを追加
+    ai_routes  # AIルーターもインポート
 )
 
 logger.info("Integrating all routers into the main application...")
@@ -95,7 +96,8 @@ app.include_router(strategy_routes.router, prefix="/strategies", tags=["strategi
 app.include_router(strategy_detail.router)
 app.include_router(strategy_heatmap.router)
 
-# --- 統計（dashboardは除外）---
+# --- 統計 ---
+app.include_router(statistics.router, prefix="/statistics", tags=["statistics"])  # ここでstatisticsルーターを登録
 app.include_router(statistics_detail.router)
 app.include_router(statistics_ranking.router)
 app.include_router(statistics_scoreboard.router)
