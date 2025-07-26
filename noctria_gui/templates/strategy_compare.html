@@ -1,7 +1,6 @@
 {% extends "base_hud.html" %}
 
 {% block title %}📑 比較条件選択{% endblock %}
-
 {% block header_icon %}<i class="fas fa-sliders-h"></i>{% endblock %}
 {% block header_title %}比較条件の選択{% endblock %}
 {% block header_nav %}
@@ -11,15 +10,11 @@
 {% endblock %}
 
 {% block content %}
-  <form id="compareForm" method="get" action="/strategies/compare">
-    <input type="hidden" name="mode" value="{{ mode }}">
-    <input type="hidden" name="sort" value="check">
-    <input type="hidden" id="keys" name="{{ mode }}s" value="">
-
+  <form id="compareForm" method="post" action="/statistics/compare/render">
     <div id="options" class="table-wrapper" style="max-height: 60vh; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
       {% for k in all_keys %}
         <label class="strategy-item-checkbox">
-          <input type="checkbox" value="{{ k }}">
+          <input type="checkbox" name="selected" value="{{ k }}">
           <span class="custom-checkbox"></span>
           <span style="margin-left: 0.5rem;">{{ k }}</span>
         </label>
@@ -30,24 +25,4 @@
       <button type="submit" class="hud-btn">📈 比較する</button>
     </div>
   </form>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const compareForm = document.getElementById('compareForm');
-
-  if (compareForm) {
-    compareForm.addEventListener('submit', (event) => {
-      const checkedBoxes = document.querySelectorAll('#options input[type=checkbox]:checked');
-      const selectedValues = Array.from(checkedBoxes).map(box => box.value);
-      const keysInput = document.getElementById('keys');
-      if (keysInput) {
-        keysInput.value = selectedValues.join(',');
-      }
-      // フォーム送信はそのまま続行
-    });
-  }
-});
-</script>
 {% endblock %}
