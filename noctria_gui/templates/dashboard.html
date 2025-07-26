@@ -117,8 +117,16 @@
 -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-box-and-violin-plot@4.0.1/dist/chartjs-chart-box-and-violin-plot.umd.min.js"></script>
-<!-- ▼▼▼ 修正点: HistogramプラグインのURLに @sgratzl/ を追加 ▼▼▼ -->
 <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-histogram@4.0.2/dist/chartjs-chart-histogram.umd.min.js"></script>
+
+<!-- ▼▼▼ 追加: ライブラリの読み込み状況を確認するためのデバッグコード ▼▼▼ -->
+<script defer>
+  console.log("--- ライブラリ読み込み状況チェック ---");
+  console.log("Chart.js本体:", typeof Chart);
+  console.log("BoxPlotプラグイン:", typeof window.ChartjsChartBoxAndViolinPlot);
+  console.log("Histogramプラグイン:", typeof window.ChartjsChartHistogram);
+  console.log("--- チェック完了 ---");
+</script>
 
 <!-- 最後に、カスタムスクリプトを読み込みます -->
 <script src="/static/js/dashboard.js"></script>
