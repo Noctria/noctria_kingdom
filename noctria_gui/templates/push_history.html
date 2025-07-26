@@ -1,59 +1,58 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>📤 Push履歴 - Noctria Kingdom</title>
-  <link rel="stylesheet" href="/static/style.css" />
-</head>
-<body>
-  <h1>📤 Veritas Push履歴一覧</h1>
+{% extends "base_hud.html" %}
 
-  <!-- 🚀 Pushトリガーフォーム -->
-  <div class="card">
-    <h2>🚀 戦略をGitHubへPush</h2>
-    <form method="post" action="/push/trigger">
-      <label>
-        戦略名（例: Aurora_VX2）:
-        <input type="text" name="strategy_name" required placeholder="例: Aurora_VX2">
-      </label>
-      <button type="submit" class="btn">🚀 Push実行</button>
-    </form>
-  </div>
+{% block title %}📤 Push履歴 - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-upload"></i>{% endblock %}
+{% block header_title %}PUSH HISTORY{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}← ダッシュボードへ戻る{% endblock %}
 
-  <!-- 🔍 フィルターUI -->
-  <form method="get" action="/push/history" class="filter card">
-    <label>
-      戦略名
-      <input type="text" name="strategy" value="{{ filters.strategy }}">
+{% block content %}
+<!-- 🚀 Pushトリガーフォーム -->
+<section class="hud-panel">
+  <h2 class="panel-title">🚀 戦略をGitHubへPush</h2>
+  <form method="post" action="/push/trigger" class="filter-form">
+    <label class="hud-label">
+      戦略名（例: Aurora_VX2）:
+      <input type="text" name="strategy_name" required placeholder="例: Aurora_VX2" class="hud-input">
     </label>
-    <label>
-      タグ
-      <input type="text" name="tag" value="{{ filters.tag }}">
+    <button type="submit" class="hud-button">🚀 Push実行</button>
+  </form>
+</section>
+
+<!-- 🔍 フィルターUI -->
+<section class="hud-panel">
+  <form method="get" action="/push/history" class="filter-form">
+    <label class="hud-label">戦略名
+      <input type="text" name="strategy" value="{{ filters.strategy }}" class="hud-input">
     </label>
-    <label>
-      開始日
-      <input type="date" name="start_date" value="{{ filters.start_date }}">
+    <label class="hud-label">タグ
+      <input type="text" name="tag" value="{{ filters.tag }}" class="hud-input">
     </label>
-    <label>
-      終了日
-      <input type="date" name="end_date" value="{{ filters.end_date }}">
+    <label class="hud-label">開始日
+      <input type="date" name="start_date" value="{{ filters.start_date }}" class="hud-input">
     </label>
-    <label>
-      並び順
-      <select name="sort">
+    <label class="hud-label">終了日
+      <input type="date" name="end_date" value="{{ filters.end_date }}" class="hud-input">
+    </label>
+    <label class="hud-label">並び順
+      <select name="sort" class="hud-select">
         <option value="desc" {% if filters.sort == 'desc' %}selected{% endif %}>新しい順</option>
         <option value="asc" {% if filters.sort == 'asc' %}selected{% endif %}>古い順</option>
       </select>
     </label>
-    <button type="submit" class="btn">🔍 検索</button>
-    <a class="btn"
+    <button type="submit" class="hud-button">🔍 検索</button>
+    <a class="hud-button hud-button-secondary"
        href="/push/export?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">
       📤 CSV出力
     </a>
   </form>
+</section>
 
-  <!-- 📋 Pushログ一覧 -->
-  <table class="table">
+<!-- 📋 Pushログ一覧 -->
+<section class="hud-panel">
+  <h2 class="panel-title">Pushログ一覧</h2>
+  {% if logs %}
+  <table class="hud-table">
     <thead>
       <tr>
         <th>日時</th>
@@ -72,27 +71,28 @@
         <td>{{ log.tag or "-" }}</td>
         <td>{{ log.pushed_by or "-" }}</td>
         <td>{{ log.message or "-" }}</td>
-        <td>
-          <a href="/push/detail?timestamp={{ log.timestamp }}" class="btn">🔍 詳細</a>
-        </td>
+        <td><a href="/push/detail?timestamp={{ log.timestamp }}" class="hud-button">🔍 詳細</a></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+    <p class="hud-text-muted">Push履歴はまだありません。</p>
+  {% endif %}
 
-  <!-- 📄 ページネーション -->
+  <!-- ページネーション -->
   {% if total_pages > 1 %}
-  <div style="margin-top: 1rem;">
+  <nav style="margin-top: 1rem;">
     {% for p in range(1, total_pages + 1) %}
       {% if p == current_page %}
-        <strong style="margin: 0 4px;">[{{ p }}]</strong>
+        <strong class="hud-pagination-current">[{{ p }}]</strong>
       {% else %}
-        <a href="?page={{ p }}&strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&sort={{ filters.sort }}" style="margin: 0 4px;">
+        <a href="?page={{ p }}&strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&sort={{ filters.sort }}" class="hud-pagination-link">
           {{ p }}
         </a>
       {% endif %}
     {% endfor %}
-  </div>
+  </nav>
   {% endif %}
-</body>
-</html>
+</section>
+{% endblock %}
