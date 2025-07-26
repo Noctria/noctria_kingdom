@@ -4,7 +4,6 @@ from fastapi.templating import Jinja2Templates
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
 
 from datetime import datetime
-from collections import defaultdict
 from pathlib import Path
 import os, json, csv, io
 
@@ -57,7 +56,7 @@ def filter_and_sort_logs(data, mode, key, sort_by, order):
     return filtered
 
 
-@router.get("/statistics/detail", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 async def detail_page(request: Request):
     params = request.query_params
     mode = params.get("mode", "strategy")
@@ -78,7 +77,7 @@ async def detail_page(request: Request):
     })
 
 
-@router.get("/statistics/detail/export")
+@router.get("/export")
 async def export_csv(request: Request):
     params = request.query_params
     mode = params.get("mode", "strategy")
