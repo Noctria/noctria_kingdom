@@ -14,7 +14,7 @@ import io
 from typing import Optional, List, Dict, Any
 
 # --- ここで prefix を付ける ---
-router = APIRouter(prefix="/statistics", tags=["statistics_compare"])
+router = APIRouter(prefix="/statistics/compare", tags=["statistics_compare"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
