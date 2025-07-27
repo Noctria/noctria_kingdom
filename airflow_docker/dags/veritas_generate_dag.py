@@ -1,6 +1,6 @@
 # airflow_docker/dags/veritas_generate_dag.py
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
 import os
