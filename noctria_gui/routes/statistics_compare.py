@@ -25,6 +25,7 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
     except Exception:
         return None
 
+
 def load_strategy_logs() -> List[Dict[str, Any]]:
     data: List[Dict[str, Any]] = []
     log_dir = Path(ACT_LOG_DIR)
@@ -40,6 +41,7 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
                 continue
     return data
 
+
 def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]) -> List[Dict[str, Any]]:
     filtered = []
     for d in records:
@@ -51,6 +53,7 @@ def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime],
             continue
         filtered.append(d)
     return filtered
+
 
 def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[str, Dict[str, List[float]]]:
     stat_map: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
@@ -66,17 +69,43 @@ def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[st
                     stat_map[key][k].append(v)
     return stat_map
 
+
+# ==============================
+# フォーム表示用ルート追加
+# ==============================
+@router.get("/statistics/compare/form", response_class=HTMLResponse)
+async def compare_form(request: Request):
+    all_logs = load_strategy_logs()
+    strategies = []
+    seen = set()
+    for log in all_logs:
+        strat_name = log.get("strategy")
+        if strat_name and strat_name not in seen:
+            seen.add(strat_name)
+            strategies.append({
+                "strategy": strat_name,
+                "win_rate": round(log.get("win_rate", 0)*100, 2),
+                "max_drawdown": round(log.get("max_drawdown", 0)*100, 2),
+                "num_trades": log.get("num_trades", 0),
+            })
+
+    return templates.TemplateResponse("strategies/compare_form.html", {
+        "request": request,
+        "strategies": strategies,
+    })
+
+
 # ==============================
 # 互換リダイレクト: /statistics/compare → /strategies/compare
 # ==============================
 @router.get("/statistics/compare", include_in_schema=False)
 async def legacy_statistics_compare_redirect(request: Request):
-    # クエリパラメータも引き継ぎ
     query = request.url.query
     url = "/strategies/compare"
     if query:
         url += f"?{query}"
     return RedirectResponse(url=url, status_code=307)
+
 
 @router.get("/statistics/compare/export", include_in_schema=False)
 async def legacy_statistics_export_redirect(request: Request):
@@ -85,6 +114,7 @@ async def legacy_statistics_export_redirect(request: Request):
     if query:
         url += f"?{query}"
     return RedirectResponse(url=url, status_code=307)
+
 
 # ==============================
 # メイン: 戦略比較画面
@@ -141,6 +171,7 @@ async def compare(request: Request) -> HTMLResponse:
             "to": request.query_params.get("to", ""),
         }
     })
+
 
 @router.get("/strategies/compare/export")
 async def export_csv(request: Request) -> StreamingResponse:
