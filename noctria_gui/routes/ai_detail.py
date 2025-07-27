@@ -6,13 +6,22 @@
 - 指定AIの全指標トレンド・分布・全戦略リスト等を集約表示
 """
 
+import sys
+from pathlib import Path
 import os
 import json
 from collections import defaultdict
-from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
+# ───────────────────────────────
+# 📌 プロジェクトルートを sys.path に追加
+# routes/ai_detail.py から見て3階層上がプロジェクトルート noctria_kingdom
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+# ───────────────────────────────
 
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, DATA_DIR
 
@@ -73,14 +82,12 @@ def get_ai_detail(ai_name):
         vals = []
         for date in dates:
             day_vals = trend[date][k]
-            # 数値のみ抽出して平均値を計算
             numeric_vals = [v for v in day_vals if isinstance(v, (int, float))]
             if numeric_vals:
                 avg_val = round(sum(numeric_vals) / len(numeric_vals), m["dec"])
             else:
                 avg_val = None
             vals.append(avg_val)
-        # floatでラップしJSONシリアライズ可能にする
         trend_dict[k] = {
             "labels": list(dates),
             "values": [float(v) if v is not None else None for v in vals],
@@ -90,11 +97,11 @@ def get_ai_detail(ai_name):
             "diff": float(round((vals[-1] - vals[-2]), m["dec"])) if len(vals) >= 2 else None
         }
 
-    # metric_distもfloat化（念のため）
     for k in metric_dist:
         metric_dist[k] = [float(v) for v in metric_dist[k]]
 
     return ai_name, trend_dict, metric_dist, sorted(strategy_list, key=lambda x: x["evaluated_at"], reverse=True)
+
 
 @router.get("/{ai_name}", response_class=HTMLResponse)
 async def ai_detail_view(request: Request, ai_name: str):
