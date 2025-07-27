@@ -5,9 +5,10 @@
 {% block header_title %}Action History{% endblock %}
 
 {% block content %}
-<div class="hud-panel">
+<section class="hud-panel">
   <h2 class="panel-title">📜 Action Logs</h2>
-  <table class="hud-table">
+  {% if logs %}
+  <table class="hud-table" style="width:100%;">
     <thead>
       <tr>
         <th>Timestamp</th>
@@ -22,7 +23,7 @@
         <td>{{ log.get("timestamp", "-") }}</td>
         <td>{{ log.get("action_type", "-") }}</td>
         <td>{{ log.get("strategy_id", "-") }}</td>
-        <td class="text-cyan">
+        <td class="text-cyan" style="font-weight:700;">
           {% if log.get("score_mean") is not none %}
             {{ "%.2f"|format(log["score_mean"]) }}
           {% else %}
@@ -33,5 +34,8 @@
       {% endfor %}
     </tbody>
   </table>
-</div>
+  {% else %}
+    <p class="hud-text-muted" style="margin-top:1rem;">No action logs available.</p>
+  {% endif %}
+</section>
 {% endblock %}
