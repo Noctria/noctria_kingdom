@@ -7,6 +7,9 @@ from datetime import datetime
 from core.path_config import VERITAS_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from core.logger import setup_logger
 
+# --- モデル構造クラスをimport（同じディレクトリ階層に simple_model.py がある想定） ---
+from src.veritas.models.ml_model.simple_model import SimpleModel
+
 # --- 専門家の記録係をセットアップ ---
 logger = setup_logger("VeritasGenerator", LOGS_DIR / "veritas" / "generator.log")
 
@@ -21,19 +24,22 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 MODEL_PATH = os.getenv("VERITAS_MODEL_DIR", str(VERITAS_MODELS_DIR / "ml_model"))
 
 def load_ml_model():
-    """MLモデルをロードする（実際のモデルによって実装は変わる）"""
+    """MLモデルをロードする（モデル構造クラスにstate_dictを読み込みevalモード）"""
     if not os.path.exists(MODEL_PATH):
         logger.error(f"❌ MLモデルディレクトリが存在しません: {MODEL_PATH}")
         raise FileNotFoundError(f"ML model directory not found: {MODEL_PATH}")
     
     logger.info(f"🧠 MLモデルをロード中: {MODEL_PATH}")
-    # 例：PyTorchモデルのロード（モデルファイル名は適宜調整）
     model_file = os.path.join(MODEL_PATH, "model.pt")
     if not os.path.isfile(model_file):
         logger.error(f"❌ モデルファイルが見つかりません: {model_file}")
         raise FileNotFoundError(f"Model file not found: {model_file}")
 
-    model = torch.load(model_file, map_location=torch.device('cpu'))
+    # モデル構造のインスタンス化
+    model = SimpleModel()
+    # 学習済み重みの読み込み
+    state_dict = torch.load(model_file, map_location=torch.device('cpu'))
+    model.load_state_dict(state_dict)
     model.eval()
     logger.info("✅ MLモデルのロード完了")
     return model
