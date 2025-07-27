@@ -4,11 +4,7 @@ import os
 import torch
 import psycopg2
 from datetime import datetime
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-# --- 王国の中枢モジュールをインポート ---
-# ★ 修正点: LOGS_DIRをインポートリストに追加
-from core.path_config import MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
+from core.path_config import VERITAS_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from core.logger import setup_logger
 
 # --- 専門家の記録係をセットアップ ---
@@ -20,44 +16,53 @@ DB_USER = os.getenv("POSTGRES_USER", "airflow")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
-MODEL_PATH = os.getenv("MODEL_DIR", str(MODELS_DIR / "nous-hermes-2"))
 
-# --- LLMモデルのロード ---
-def load_llm_model():
-    """LLMモデルとトークナイザーをロードする"""
+# MLモデルのパスをenv変数かデフォルトで指定
+MODEL_PATH = os.getenv("VERITAS_MODEL_DIR", str(VERITAS_MODELS_DIR / "ml_model"))
+
+def load_ml_model():
+    """MLモデルをロードする（実際のモデルによって実装は変わる）"""
     if not os.path.exists(MODEL_PATH):
-        logger.error(f"❌ モデルディレクトリが存在しません: {MODEL_PATH}")
-        raise FileNotFoundError(f"Model directory not found: {MODEL_PATH}")
+        logger.error(f"❌ MLモデルディレクトリが存在しません: {MODEL_PATH}")
+        raise FileNotFoundError(f"ML model directory not found: {MODEL_PATH}")
     
-    logger.info(f"🧠 LLMモデルをロード中: {MODEL_PATH}")
-    model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, local_files_only=True)
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
-    logger.info("✅ LLMモデルのロード完了")
-    return model, tokenizer
+    logger.info(f"🧠 MLモデルをロード中: {MODEL_PATH}")
+    # 例：PyTorchモデルのロード（モデルファイル名は適宜調整）
+    model_file = os.path.join(MODEL_PATH, "model.pt")
+    if not os.path.isfile(model_file):
+        logger.error(f"❌ モデルファイルが見つかりません: {model_file}")
+        raise FileNotFoundError(f"Model file not found: {model_file}")
 
-# --- プロンプト生成 ---
+    model = torch.load(model_file, map_location=torch.device('cpu'))
+    model.eval()
+    logger.info("✅ MLモデルのロード完了")
+    return model
+
 def build_prompt(symbol: str, tag: str, target_metric: str) -> str:
-    """DAGのコンフィグからプロンプトを生成する"""
-    prompt = f"あなたはプロの金融エンジニアです。通貨ペア'{symbol}'を対象とし、'{tag}'という特性を持つ取引戦略をPythonで記述してください。この戦略は特に'{target_metric}'という指標を最大化することを目的とします。コードには、戦略のロジックを実装した`simulate()`関数を含めてください。"
-    logger.info(f"📝 生成されたプロンプト: {prompt[:100]}...")
+    """
+    MLモデル用のパラメータ生成または説明文字列を作る。
+    MLモデルはプロンプト不要な場合、この関数は単にパラメータ説明を返すなどに書き換えてください。
+    """
+    prompt = f"通貨ペア'{symbol}', 特性'{tag}', 目標指標'{target_metric}'に基づく取引戦略生成用のパラメータ"
+    logger.info(f"📝 生成されたパラメータ説明: {prompt}")
     return prompt
 
-# --- 戦略生成 ---
 def generate_strategy_code(prompt: str) -> str:
-    """プロンプトを元にLLMで戦略コードを生成する"""
-    model, tokenizer = load_llm_model()
-    inputs = tokenizer(prompt, return_tensors="pt")
-    
-    with torch.no_grad():
-        outputs = model.generate(inputs["input_ids"], max_new_tokens=1024, pad_token_id=tokenizer.eos_token_id)
-        
-    generated_code = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    # プロンプト部分を除去してコードだけを返す
-    code_only = generated_code[len(prompt):].strip()
-    logger.info("🤖 LLMによる戦略コードの生成完了")
-    return code_only
+    """
+    MLモデルを使って戦略コードや戦略パラメータを生成する関数の雛形。
+    実際の推論ロジックはモデル仕様に合わせて実装してください。
+    """
+    model = load_ml_model()
 
-# --- DB保存 ---
+    # ダミーの推論例：promptの長さを特徴量にして乱数生成でコード文字列を返す（実際は推論結果をコード化）
+    import random
+    random.seed(len(prompt))
+    dummy_code = f"# Generated strategy code for prompt: {prompt}\n"
+    dummy_code += f"def simulate():\n    return {random.uniform(0, 1):.4f}  # 戦略のスコア例\n"
+
+    logger.info("🤖 MLモデルによる戦略コードの生成完了（ダミー）")
+    return dummy_code
+
 def save_to_db(prompt: str, response: str):
     """生成結果をPostgreSQLに保存する"""
     conn = None
@@ -79,7 +84,6 @@ def save_to_db(prompt: str, response: str):
         if conn:
             conn.close()
 
-# --- ファイル保存 ---
 def save_to_file(code: str, tag: str) -> str:
     """生成されたコードをファイルに保存し、ファイルパスを返す"""
     now = datetime.now().strftime("%Y%m%d_%H%M%S")
