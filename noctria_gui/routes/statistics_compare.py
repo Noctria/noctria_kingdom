@@ -13,7 +13,8 @@ import csv
 import io
 from typing import Optional, List, Dict, Any
 
-router = APIRouter()
+# --- ここで prefix を付ける ---
+router = APIRouter(prefix="/statistics", tags=["statistics_compare"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 
@@ -73,7 +74,7 @@ def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[st
 # ==============================
 # フォーム表示用ルート追加
 # ==============================
-@router.get("/statistics/compare/form", response_class=HTMLResponse)
+@router.get("/compare/form", response_class=HTMLResponse)
 async def compare_form(request: Request):
     all_logs = load_strategy_logs()
     strategies = []
@@ -98,7 +99,7 @@ async def compare_form(request: Request):
 # ==============================
 # 互換リダイレクト: /statistics/compare → /strategies/compare
 # ==============================
-@router.get("/statistics/compare", include_in_schema=False)
+@router.get("/compare", include_in_schema=False)
 async def legacy_statistics_compare_redirect(request: Request):
     query = request.url.query
     url = "/strategies/compare"
@@ -107,7 +108,7 @@ async def legacy_statistics_compare_redirect(request: Request):
     return RedirectResponse(url=url, status_code=307)
 
 
-@router.get("/statistics/compare/export", include_in_schema=False)
+@router.get("/compare/export", include_in_schema=False)
 async def legacy_statistics_export_redirect(request: Request):
     query = request.url.query
     url = "/strategies/compare/export"
@@ -119,7 +120,7 @@ async def legacy_statistics_export_redirect(request: Request):
 # ==============================
 # メイン: 戦略比較画面
 # ==============================
-@router.get("/strategies/compare", response_class=HTMLResponse)
+@router.get("/compare", response_class=HTMLResponse)
 async def compare(request: Request) -> HTMLResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
@@ -173,7 +174,7 @@ async def compare(request: Request) -> HTMLResponse:
     })
 
 
-@router.get("/strategies/compare/export")
+@router.get("/compare/export")
 async def export_csv(request: Request) -> StreamingResponse:
     mode = request.query_params.get("mode", "strategy")
     from_date = parse_date(request.query_params.get("from"))
