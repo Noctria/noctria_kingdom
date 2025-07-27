@@ -15,6 +15,7 @@ from pathlib import Path
 # ========================================
 PROJECT_ROOT = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parents[2]
 SRC_DIR = PROJECT_ROOT / "src"
+BASE_DIR = PROJECT_ROOT  # ここでBASE_DIRをプロジェクトルートに設定
 
 # ========================================
 # 🏛️ Airflow構成領域
