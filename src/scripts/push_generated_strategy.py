@@ -6,7 +6,7 @@ from datetime import datetime
 
 def push_generated_strategies():
     repo_dir = str(BASE_DIR)
-    strategy_dir = "strategies/veritas_generated"
+    strategy_dir = BASE_DIR / "src" / "strategies" / "veritas_generated"  # 正しいパスに修正
 
     os.chdir(repo_dir)
 
