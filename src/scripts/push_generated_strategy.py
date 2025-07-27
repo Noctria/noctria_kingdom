@@ -12,7 +12,7 @@ def push_generated_strategies():
 
     subprocess.run(["git", "add", strategy_dir], check=True)
 
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     commit_message = f"🤖 Veritas戦略自動採用: {timestamp}"
     subprocess.run(["git", "commit", "-m", commit_message], check=True)
     subprocess.run(["git", "push", "origin", "main"], check=True)
