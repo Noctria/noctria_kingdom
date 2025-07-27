@@ -1,4 +1,4 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
+from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, VERITAS_MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
 import sys
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -40,7 +40,7 @@ with DAG(
     # ✅ 手動確認ポイント
     pause_for_review = EmptyOperator(
         task_id="pause_for_review",
-        doc_md="""
+        doc_md=""" 
         ### 🧠 手動レビュー推奨ポイント
         - Airflow UIで構造スキャン結果を確認してください
         - 問題なければ手動で次に進めてください
