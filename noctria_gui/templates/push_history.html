@@ -10,38 +10,43 @@
 <!-- 🚀 Pushトリガーフォーム -->
 <section class="hud-panel">
   <h2 class="panel-title">🚀 戦略をGitHubへPush</h2>
-  <form method="post" action="/push/trigger" class="filter-form">
-    <label class="hud-label">
+  <form method="post" action="/push/trigger" class="filter-form" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
+    <label class="hud-label" style="flex:1 1 250px;">
       戦略名（例: Aurora_VX2）:
-      <input type="text" name="strategy_name" required placeholder="例: Aurora_VX2" class="hud-input">
+      <input type="text" name="strategy_name" required placeholder="例: Aurora_VX2" class="hud-input" style="width:100%;">
     </label>
-    <button type="submit" class="hud-button">🚀 Push実行</button>
+    <button type="submit" class="hud-button" style="flex-shrink:0; min-width:120px;">🚀 Push実行</button>
   </form>
 </section>
 
 <!-- 🔍 フィルターUI -->
 <section class="hud-panel">
-  <form method="get" action="/push/history" class="filter-form">
-    <label class="hud-label">戦略名
-      <input type="text" name="strategy" value="{{ filters.strategy }}" class="hud-input">
+  <form method="get" action="/push/history" class="filter-form" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
+    <label class="hud-label" style="flex:1 1 180px;">
+      戦略名
+      <input type="text" name="strategy" value="{{ filters.strategy }}" class="hud-input" style="width:100%;">
     </label>
-    <label class="hud-label">タグ
-      <input type="text" name="tag" value="{{ filters.tag }}" class="hud-input">
+    <label class="hud-label" style="flex:1 1 140px;">
+      タグ
+      <input type="text" name="tag" value="{{ filters.tag }}" class="hud-input" style="width:100%;">
     </label>
-    <label class="hud-label">開始日
-      <input type="date" name="start_date" value="{{ filters.start_date }}" class="hud-input">
+    <label class="hud-label" style="flex:1 1 150px;">
+      開始日
+      <input type="date" name="start_date" value="{{ filters.start_date }}" class="hud-input" style="width:100%;">
     </label>
-    <label class="hud-label">終了日
-      <input type="date" name="end_date" value="{{ filters.end_date }}" class="hud-input">
+    <label class="hud-label" style="flex:1 1 150px;">
+      終了日
+      <input type="date" name="end_date" value="{{ filters.end_date }}" class="hud-input" style="width:100%;">
     </label>
-    <label class="hud-label">並び順
-      <select name="sort" class="hud-select">
+    <label class="hud-label" style="flex:1 1 140px;">
+      並び順
+      <select name="sort" class="hud-select" style="width:100%;">
         <option value="desc" {% if filters.sort == 'desc' %}selected{% endif %}>新しい順</option>
         <option value="asc" {% if filters.sort == 'asc' %}selected{% endif %}>古い順</option>
       </select>
     </label>
-    <button type="submit" class="hud-button">🔍 検索</button>
-    <a class="hud-button hud-button-secondary"
+    <button type="submit" class="hud-button" style="min-width:100px;">🔍 検索</button>
+    <a class="hud-button hud-button-secondary" style="min-width:120px; text-align:center;"
        href="/push/export?strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">
       📤 CSV出力
     </a>
@@ -52,7 +57,7 @@
 <section class="hud-panel">
   <h2 class="panel-title">Pushログ一覧</h2>
   {% if logs %}
-  <table class="hud-table">
+  <table class="hud-table" style="width:100%;">
     <thead>
       <tr>
         <th>日時</th>
@@ -71,7 +76,7 @@
         <td>{{ log.tag or "-" }}</td>
         <td>{{ log.pushed_by or "-" }}</td>
         <td>{{ log.message or "-" }}</td>
-        <td><a href="/push/detail?timestamp={{ log.timestamp }}" class="hud-button">🔍 詳細</a></td>
+        <td><a href="/push/detail?timestamp={{ log.timestamp }}" class="hud-button" style="padding:0.3rem 0.6rem; font-size:0.9rem;">🔍 詳細</a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -82,12 +87,12 @@
 
   <!-- ページネーション -->
   {% if total_pages > 1 %}
-  <nav style="margin-top: 1rem;">
+  <nav style="margin-top: 1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
     {% for p in range(1, total_pages + 1) %}
       {% if p == current_page %}
-        <strong class="hud-pagination-current">[{{ p }}]</strong>
+        <strong class="hud-pagination-current" style="padding:0.3rem 0.6rem; background:var(--glow-primary); border-radius:6px; color:#0a0f2c;">[{{ p }}]</strong>
       {% else %}
-        <a href="?page={{ p }}&strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&sort={{ filters.sort }}" class="hud-pagination-link">
+        <a href="?page={{ p }}&strategy={{ filters.strategy }}&tag={{ filters.tag }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&sort={{ filters.sort }}" class="hud-pagination-link" style="padding:0.3rem 0.6rem; border-radius:6px; border:1px solid var(--panel-border); color:var(--text-color-base); text-decoration:none;">
           {{ p }}
         </a>
       {% endif %}
