@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-📌 Noctria Kingdom Path Config (v4.4)
+📌 Noctria Kingdom Path Config (v4.5)
 - 王国全体のパス構造を一元管理します。
 - Docker/WSL/ローカル環境の差異を吸収し、自動で切り替えます。
 - プロジェクトルート直下の `src` ディレクトリ構成を前提とします。
@@ -43,6 +43,11 @@ EXPERTS_DIR = SRC_DIR / "experts"
 NOCTRIA_AI_DIR = SRC_DIR / "noctria_ai"
 TOOLS_DIR = SRC_DIR / "tools"
 
+# --- モデルディレクトリを分離 ---
+VERITAS_MODELS_DIR = VERITAS_DIR / "models"
+HERMES_DIR = SRC_DIR / "hermes"  # Hermes用ディレクトリがsrc配下にある場合
+HERMES_MODELS_DIR = HERMES_DIR / "models"
+
 # ========================================
 # 📦 データ・モデル・ログ領域
 # ========================================
@@ -51,7 +56,8 @@ STATS_DIR = DATA_DIR / "stats"  # 追加：統計用ディレクトリ
 
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
-MODELS_DIR = PROJECT_ROOT / "models"
+# MODELS_DIR は廃止しました。
+
 INSTITUTIONS_DIR = PROJECT_ROOT / "institutions"
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
@@ -120,7 +126,9 @@ __all__ = [
     "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
     "CORE_DIR", "SCRIPTS_DIR", "VERITAS_DIR", "STRATEGIES_DIR", "STRATEGIES_VERITAS_GENERATED_DIR",
     "EXECUTION_DIR", "EXPERTS_DIR", "NOCTRIA_AI_DIR", "TOOLS_DIR",
-    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "MODELS_DIR", "INSTITUTIONS_DIR",
+    "VERITAS_MODELS_DIR", "HERMES_MODELS_DIR",  # 新規追加
+    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
+    "INSTITUTIONS_DIR",
     "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR", "ORACLE_FORECAST_JSON", "STATS_DIR",
     "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
     "NOCTRIA_GUI_ROUTES_DIR", "NOCTRIA_GUI_SERVICES_DIR", "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
