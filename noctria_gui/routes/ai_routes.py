@@ -46,6 +46,11 @@ async def ai_list(request: Request):
 def get_ai_detail(ai_name: str):
     trend = defaultdict(lambda: defaultdict(list))
     metric_dist = defaultdict(list)
+
+    # DASHBOARD_METRICSのキーで必ず空リスト初期化（安全対策）
+    for m in DASHBOARD_METRICS:
+        metric_dist[m["key"]]  # ここでキーを確実に作る
+
     strategy_list = []
 
     if not os.path.isdir(STATS_DIR):
