@@ -78,7 +78,7 @@
   const ctx = document.getElementById('trendChart-{{ metric.key }}');
   if (!ctx) return;
   const labels = {{ trend_dict[metric.key].labels | tojson | safe }};
-  const values = {{ trend_dict[metric.key].values | tojson | safe }};
+  const values = {{ trend_dict[metric.key]["values"] | tojson | safe }};
   new Chart(ctx.getContext('2d'), {
     type: 'line',
     data: {
