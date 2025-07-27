@@ -9,13 +9,13 @@
 
 {% block content %}
 <!-- Main Detail Panel -->
-<main class="hud-panel detail-panel">
+<main class="hud-panel detail-panel" style="display:flex; flex-direction: column; gap:1.5rem;">
     <h2 class="panel-title">STRATEGY: {{ log.strategy }}</h2>
 
-    <div class="detail-grid">
+    <div class="detail-grid" style="display:flex; gap:2rem; flex-wrap: wrap;">
         <!-- Left Column -->
-        <div class="detail-info">
-            <dl class="hud-dl">
+        <div class="detail-info" style="flex:1 1 320px; min-width:300px;">
+            <dl class="hud-dl" style="display:grid; grid-template-columns: max-content 1fr; row-gap:0.8rem; column-gap:1rem;">
                 <div>
                     <dt>Symbol</dt>
                     <dd>{{ log.symbol }}</dd>
@@ -55,7 +55,7 @@
                     <dd>
                         {% if log.tags %}
                             {% for t in log.tags %}
-                                <span class="hud-tag">{{ t }}</span>
+                                <span class="hud-tag" style="display:inline-block; background:var(--glow-primary); color: var(--bg-color); padding:0.2rem 0.6rem; border-radius:0.75rem; margin-right:0.4rem; font-weight:700;">{{ t }}</span>
                             {% endfor %}
                         {% else %}<span>-</span>{% endif %}
                     </dd>
@@ -64,17 +64,17 @@
         </div>
 
         <!-- Right Column -->
-        <div class="detail-actions">
-            <h3 class="actions-title">OPERATIONS</h3>
+        <div class="detail-actions" style="flex:1 1 180px; min-width:180px; display:flex; flex-direction: column; gap:1rem;">
+            <h3 class="actions-title panel-title" style="font-size:1.1rem; color: var(--text-color-normal); filter: drop-shadow(0 0 8px var(--glow-primary)); margin-bottom:0.5rem;">OPERATIONS</h3>
             <form method="post" action="/act-history/repush">
                 <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                <button class="hud-btn" type="submit">
+                <button class="hud-button" type="submit" style="width:100%; display:flex; align-items:center; gap:0.5rem; justify-content:center;">
                     <i class="fas fa-redo"></i> 再Push可にする
                 </button>
             </form>
             <form method="post" action="/act-history/reevaluate">
                 <input type="hidden" name="strategy_name" value="{{ log.strategy }}">
-                <button class="hud-btn" type="submit">
+                <button class="hud-button" type="submit" style="width:100%; display:flex; align-items:center; gap:0.5rem; justify-content:center;">
                     <i class="fas fa-cogs"></i> 再評価する
                 </button>
             </form>
@@ -83,8 +83,8 @@
 </main>
 
 <!-- Raw JSON Section -->
-<section class="hud-panel log-content-panel">
+<section class="hud-panel log-content-panel" style="overflow-x:auto; white-space: pre-wrap; font-family: 'Roboto Mono', monospace; font-size:0.85rem; max-height: 320px;">
     <h2 class="panel-title"><i class="fas fa-code"></i> RAW LOG DATA</h2>
-    <pre class="log-json">{{ log.json_text }}</pre>
+    <pre class="log-json" style="color: var(--text-color-light); background: var(--bg-color); padding: 1rem; border-radius: 12px;">{{ log.json_text }}</pre>
 </section>
 {% endblock %}
