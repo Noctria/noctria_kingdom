@@ -15,7 +15,7 @@ import numpy as np
 import requests
 from typing import Optional, Dict, Any
 
-from src.veritas.veritas_machina import VeritasMachina
+from src.veritas.veritas_machina import VeritasMachina  # ※ クラス名はVeritasMachinaに修正しました
 from src.strategies.prometheus_oracle import PrometheusOracle
 from src.strategies.aurus_singularis import AurusSingularis
 from src.strategies.levia_tempest import LeviaTempest
@@ -42,7 +42,7 @@ class KingNoctria:
 
     def __init__(self):
         logging.info("王の評議会を構成するため、五臣を招集します。")
-        self.veritas = VeritasStrategist()          # 戦略立案官
+        self.veritas = VeritasMachina()          # 戦略立案官
         self.prometheus = PrometheusOracle()        # 未来予測官
         self.aurus = AurusSingularis()              # 総合市場分析官
         self.levia = LeviaTempest()                 # 高速スキャルピングAI
