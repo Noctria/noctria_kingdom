@@ -33,6 +33,16 @@ DASHBOARD_METRICS = [
     {"key": "profit_factor",  "label": "PF",        "unit": "",     "dec": 2},
 ]
 
+# --- AI一覧ページ ---
+@router.get("/", response_class=HTMLResponse, summary="AI一覧ページ")
+async def ai_list(request: Request):
+    ai_names = ["Aurus", "Levia", "Noctus", "Prometheus", "Veritas"]
+    return templates.TemplateResponse("ai_list.html", {
+        "request": request,
+        "ai_names": ai_names
+    })
+
+# --- AI詳細情報取得関数 ---
 def get_ai_detail(ai_name: str):
     trend = defaultdict(lambda: defaultdict(list))
     metric_dist = defaultdict(list)
@@ -98,7 +108,7 @@ def get_ai_detail(ai_name: str):
 
     return ai_name, final_trend_dict, final_metric_dist, sorted(strategy_list, key=lambda x: x["evaluated_at"], reverse=True)
 
-
+# --- AI詳細ページ ---
 @router.get("/{ai_name}", response_class=HTMLResponse, summary="AI詳細ページ")
 async def ai_detail_view(request: Request, ai_name: str):
     ai_name, trend_dict, metric_dist, strategy_list = get_ai_detail(ai_name)
