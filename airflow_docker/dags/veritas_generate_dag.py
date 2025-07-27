@@ -1,5 +1,3 @@
-# airflow_docker/dags/veritas_generate_dag.py
-
 from datetime import datetime, timedelta
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
@@ -30,7 +28,7 @@ def _generate_and_save_task(**kwargs):
         prompt = build_prompt(symbol, tag, target_metric)
         logger.info(f"📝 プロンプト生成完了: {prompt[:100]}...")
 
-        # 2. LLMによる戦略コード生成
+        # 2. MLモデルによる戦略コード生成
         generated_code = generate_strategy_code(prompt)
         logger.info(f"🧠 戦略コード生成完了。コード長: {len(generated_code)}")
 
@@ -80,7 +78,7 @@ with DAG(
     },
     schedule_interval=None,
     catchup=False,
-    tags=["veritas", "llm", "generator"]
+    tags=["veritas", "ml", "generator"]  # LLM -> MLに変更
 ) as dag:
 
     generate_task = PythonOperator(
