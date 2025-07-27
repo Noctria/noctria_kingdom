@@ -15,7 +15,8 @@ from datetime import datetime
 from typing import List, Dict, Any
 import logging
 
-from airflow.decorators import dag, task, get_current_context
+from airflow.decorators import dag, task
+from airflow.operators.python import get_current_context
 
 # --- パス調整
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
