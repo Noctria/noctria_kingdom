@@ -1,0 +1,30 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# サンプルニューラルネットワークの定義
+class SimpleModel(nn.Module):
+    def __init__(self):
+        super(SimpleModel, self).__init__()
+        self.fc = nn.Linear(10, 1)  # 10入力、1出力
+
+    def forward(self, x):
+        return self.fc(x)
+
+# モデルのインスタンス作成
+model = SimpleModel()
+
+# サンプルのデータ（10次元の入力）
+x = torch.randn(1, 10)  # ランダムに生成されたデータ
+
+# モデルを1回通してみる
+output = model(x)
+print(output)
+
+# モデルの保存パス
+save_path = 'src/veritas/models/ml_model/model.pt'
+
+# モデルを保存
+torch.save(model.state_dict(), save_path)
+
+print(f"モデルが保存されました: {save_path}")
