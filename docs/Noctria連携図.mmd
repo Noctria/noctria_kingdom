@@ -1,4 +1,4 @@
-flowchart TD 
+flowchart TD  
 
 %% --- Veritas PDCA/Replayライン（Master DAG完全削除） ---
 subgraph Veritas_Master[Veritas PDCA/Replayライン]
@@ -40,7 +40,7 @@ subgraph LLM層[llm/ - Noctria LLM層]
   LLM_EVALAPI["llm/veritas_eval_api.py<br>📄 評価ログAPI"]
 end
 
-%% --- Plan Data層（分離構成反映+Airflow定時バッチ追加）---
+%% --- Plan Data層（分離構成+Airflow定時バッチ追加）---
 subgraph PlanData[plan_data/ - PDCA-Plan根拠/分析クラスタ]
   PLAN_COLLECT["collector.py<br>データ収集・統合"]
   PLAN_FEATURE["features.py<br>特徴量生成"]
@@ -114,11 +114,11 @@ API -- "パラメータ入力" --> VPDCA
 GUI -- "履歴DL/CSV" --> ACTLOG
 GUI -- "評価データ閲覧" --> EVALRES
 
-%% --- LLM層連携 ---
-LLM_SERVER -- "テンプレ読込" --> LLM_PROMPT
-VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
-GUI -- "戦略自動生成<br>/generate" --> LLM_SERVER
-LLM_SERVER -- "生成結果" --> VG
+%% --- LLM層連携（veritas_llm_server.pyは廃止想定） ---
+%% LLM_SERVER -.-> LLM_PROMPT
+%% VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
+%% GUI -- "戦略自動生成<br>/generate" --> LLM_SERVER
+%% LLM_SERVER -- "生成結果" --> VG
 LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_MAIN
 LLM_MAIN -- "評価ログ取得" --> GUI
 LLM_MAIN -- "veritas_eval_result.json" --- EVALRES
@@ -136,9 +136,6 @@ PLAN_ANOMALY -- "異常/逸脱情報" --> PLAN_PROMPT
 PLAN_PDCA_DAG -- "run_pdca_plan_workflow.py実行" --> PLAN_PDCA_BATCH
 PLAN_PDCA_BATCH -- "Planサマリー出力" --> PLAN_SUMMARY_JSON
 PLAN_SUMMARY_JSON -- "可視化/分析" --> GUI
-
-%% --- 依存（点線） ---
-LLM_SERVER -.-> LLM_PROMPT
 
 classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
 class VPDCA,VPUSH,VR,VREPLAY pdca;
