@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import os
 
 # サンプルニューラルネットワークの定義
 class SimpleModel(nn.Module):
@@ -22,7 +23,8 @@ output = model(x)
 print(output)
 
 # モデルの保存パス
-save_path = 'src/veritas/models/ml_model/model.pt'
+save_dir = os.path.dirname(os.path.abspath(__file__))
+save_path = os.path.join(save_dir, 'model.pt')
 
 # モデルを保存
 torch.save(model.state_dict(), save_path)
