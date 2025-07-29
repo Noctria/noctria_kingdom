@@ -32,9 +32,9 @@ subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
   HGEN["hermes/strategy_generator.py<br>🦉 LLM戦略コード生成"]
 end
 
-%% --- LLM層 ---
+%% --- LLM層 --- 
 subgraph LLM層[llm/ - Noctria LLM層]
-  LLM_MAIN["llm/main.py<br>🚪 LLMサーバ（評価API）"]
+  %% LLM_MAIN["llm/main.py<br>🚪 LLMサーバ（評価API）"]  <-- 削除（廃止）
   LLM_SERVER["llm/veritas_llm_server.py<br>🧠 LLM生成サーバ"]
   LLM_PROMPT["llm/llm_prompt_builder.py<br>📜 プロンプトビルダー"]
   LLM_EVALAPI["llm/veritas_eval_api.py<br>📄 評価ログAPI"]
@@ -119,10 +119,8 @@ GUI -- "評価データ閲覧" --> EVALRES
 %% VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
 %% GUI -- "戦略自動生成<br>/generate" --> LLM_SERVER
 %% LLM_SERVER -- "生成結果" --> VG
-LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_MAIN
-LLM_MAIN -- "評価ログ取得" --> GUI
-LLM_MAIN -- "veritas_eval_result.json" --- EVALRES
-LLM_EVALAPI -- "veritas_eval_result.json" --- EVALRES
+LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_PROMPT
+LLM_PROMPT -- "評価ログ解析" --> EVALRES
 
 %% --- PlanData層連携（分離構成+Airflow定時バッチ）---
 PLAN_COLLECT -- "生データ（時系列DF）" --> PLAN_FEATURE
@@ -147,7 +145,7 @@ classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
 class GIT,ACTLOG,STRATJSON,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON data;
 
 classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
-class LLM_MAIN,LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
+class LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
 
 classDef hermes fill:#e1f4ff,stroke:#2d9fc2,stroke-width:2px;
 class HA,HGEN hermes;
