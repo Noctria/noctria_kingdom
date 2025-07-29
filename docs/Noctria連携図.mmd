@@ -66,6 +66,7 @@ subgraph DATA["data/ - データ/成果物ストア"]
   HERMES_STRAT["hermes_generated<br>🦉 Hermes戦略群"]
   EVALRES["評価結果<br>📊 data/stats/*.json"]
   PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>📝 Planサマリー"]
+  ORACLE_FORECAST_JSON["oracle_forecast.json<br>🔮 未来予測結果JSON"]
 end
 
 %% --- Master/PDCA/Replayフロー ---
@@ -114,6 +115,10 @@ API -- "パラメータ入力" --> VPDCA
 GUI -- "履歴DL/CSV" --> ACTLOG
 GUI -- "評価データ閲覧" --> EVALRES
 
+%% --- Prometheus未来予測のJSON出力（追加） ---
+PA -- "未来予測結果" --> ORACLE_FORECAST_JSON
+ORACLE_FORECAST_JSON -- "予測データ参照" --> GUI
+
 %% --- LLM層連携（veritas_llm_server.pyは廃止想定） ---
 %% LLM_SERVER -.-> LLM_PROMPT
 %% VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
@@ -142,7 +147,7 @@ classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
 class GUI,API gui;
 
 classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
-class GIT,ACTLOG,STRATJSON,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON data;
+class GIT,ACTLOG,STRATJSON,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON,ORACLE_FORECAST_JSON data;
 
 classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
 class LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
