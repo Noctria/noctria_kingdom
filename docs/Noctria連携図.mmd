@@ -120,7 +120,8 @@ GUI -- "評価データ閲覧" --> EVALRES
 %% --- Prometheus未来予測のJSON出力 ---
 PA -- "未来予測結果" --> ORACLE_FORECAST_JSON
 ORACLE_FORECAST_JSON -- "予測データ参照" --> GUI
-ORACLE_FORECAST_JSON -- "予測データ参照" --> KING  %% Prometheus予測 → King 統合（追加）
+%% Prometheus予測 → King 統合（追加）
+ORACLE_FORECAST_JSON -- "予測データ参照" --> KING
 
 %% --- LLM層連携（veritas_llm_server.pyは廃止想定） ---
 LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_PROMPT
