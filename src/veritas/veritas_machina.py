@@ -2,20 +2,18 @@
 # coding: utf-8
 
 """
-🧠 Veritas Machina (v2.6 ML専用)
+🧠 Veritas Machina（理想形・統治AI経由専用）
 - MLベースの戦略生成・評価・ランキングAI
-- 全工程で堅牢なエラー処理と詳細なログ
-- 生成/評価の出力をファイル保存、根拠説明も数値に基づく
-- LLM/自然言語要約は含まず
+- 戻り値にdecision_id, caller, ai_source等を付与
+- 必ずNoctria王経由でのみ呼ばれる
 """
 
 import subprocess
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
-import sys
 import traceback
 
 from src.core.path_config import (
@@ -38,7 +36,6 @@ class VeritasMachina:
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"\n--- {desc} [{datetime.now()}] ---\n")
                 f.write("STDOUT:\n")
-                # CalledProcessErrorにも対応
                 out = getattr(proc, "stdout", "") or ""
                 err = getattr(proc, "stderr", "") or ""
                 if isinstance(out, bytes):
@@ -83,15 +80,22 @@ class VeritasMachina:
         except Exception as e:
             return f"自動説明生成エラー: {e}"
 
-    def propose(self, top_n: int = 5, **params) -> Dict[str, Any]:
+    def propose(
+        self,
+        top_n: int = 5,
+        decision_id: Optional[str] = None,
+        caller: Optional[str] = "king_noctria",
+        **params
+    ) -> Dict[str, Any]:
         try:
-            # 1. 戦略生成（ML最適化）
+            # --- ML戦略生成 ---
             if not Path(VERITAS_GENERATE_SCRIPT).exists():
                 msg = f"戦略生成スクリプトが見つかりません: {VERITAS_GENERATE_SCRIPT}"
                 logging.error(msg)
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
             try:
-                logging.info(f"新たな戦略生成プロセス開始（パラメータ: {params}）")
+                logging.info(f"戦略生成プロセス開始（パラメータ: {params}）")
                 cli_args = self._build_cli_args(params)
                 res = subprocess.run(
                     ["python", str(VERITAS_GENERATE_SCRIPT)] + cli_args,
@@ -103,17 +107,20 @@ class VeritasMachina:
                 self._save_subprocess_output(e, self.generate_log_path, "VERITAS GENERATE (FAILED)")
                 error_message = f"戦略生成失敗: {e.stderr or e}"
                 logging.error(error_message)
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": error_message, "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": error_message, "strategy_rankings": [], "explanation": "", "params": params}
             except Exception as e:
                 err_detail = traceback.format_exc()
                 logging.error(f"戦略生成時エラー: {err_detail}")
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": f"戦略生成時エラー: {e}", "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": f"戦略生成時エラー: {e}", "strategy_rankings": [], "explanation": "", "params": params}
 
-            # 2. 評価（ML評価スクリプト）
+            # --- ML評価 ---
             if not Path(VERITAS_EVALUATE_SCRIPT).exists():
                 msg = f"戦略評価スクリプトが見つかりません: {VERITAS_EVALUATE_SCRIPT}"
                 logging.error(msg)
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
             try:
                 logging.info("戦略評価プロセス開始。")
                 cli_args = self._build_cli_args(params)
@@ -127,17 +134,20 @@ class VeritasMachina:
                 self._save_subprocess_output(e, self.evaluate_log_path, "VERITAS EVALUATE (FAILED)")
                 error_message = f"戦略評価失敗: {e.stderr or e}"
                 logging.error(error_message)
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": error_message, "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": error_message, "strategy_rankings": [], "explanation": "", "params": params}
             except Exception as e:
                 err_detail = traceback.format_exc()
                 logging.error(f"戦略評価時エラー: {err_detail}")
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": f"戦略評価時エラー: {e}", "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": f"戦略評価時エラー: {e}", "strategy_rankings": [], "explanation": "", "params": params}
 
-            # 3. 最良戦略とランキング返却（数値説明つき）
+            # --- 戦略ランキング返却 ---
             if not Path(VERITAS_EVAL_LOG).exists():
                 msg = f"評価ログ（{VERITAS_EVAL_LOG}）が見つかりません。"
                 logging.error(msg)
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
             try:
                 logging.info("評価結果からランキング選定…")
                 with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as f:
@@ -146,7 +156,8 @@ class VeritasMachina:
                 if not passed_strategies:
                     msg = "全ての戦略が評価基準を満たしませんでした。"
                     logging.warning(msg)
-                    return {"type": "strategy_proposal", "status": "REJECTED", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
+                    return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                            "type": "strategy_proposal", "status": "REJECTED", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
                 rankings: List[dict] = sorted(
                     passed_strategies,
                     key=lambda r: r.get("final_capital", 0),
@@ -157,6 +168,9 @@ class VeritasMachina:
                 logging.info(f"最良戦略『{best_strategy.get('strategy')}』選定: {explanation}")
                 return {
                     "name": "VeritasMachina",
+                    "ai_source": "veritas",
+                    "decision_id": decision_id,
+                    "caller": caller,
                     "type": "strategy_proposal",
                     "status": "PROPOSED",
                     "strategy_details": best_strategy,
@@ -167,30 +181,34 @@ class VeritasMachina:
             except (json.JSONDecodeError, KeyError) as e:
                 msg = f"評価ログ破損 or 形式不正: {e}"
                 logging.error(msg)
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": msg, "strategy_rankings": [], "explanation": "", "params": params}
             except Exception as e:
                 err_detail = traceback.format_exc()
                 logging.error(f"最良戦略抽出時エラー: {err_detail}")
-                return {"type": "strategy_proposal", "status": "ERROR", "detail": f"最良戦略抽出時エラー: {e}", "strategy_rankings": [], "explanation": "", "params": params}
+                return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                        "type": "strategy_proposal", "status": "ERROR", "detail": f"最良戦略抽出時エラー: {e}", "strategy_rankings": [], "explanation": "", "params": params}
 
         except Exception as e:
             err_detail = traceback.format_exc()
             logging.error(f"致命的な例外: {err_detail}")
-            return {"type": "strategy_proposal", "status": "ERROR", "detail": f"致命的な例外: {e}", "strategy_rankings": [], "explanation": "", "params": params}
+            return {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": decision_id, "caller": caller,
+                    "type": "strategy_proposal", "status": "ERROR", "detail": f"致命的な例外: {e}", "strategy_rankings": [], "explanation": "", "params": params}
 
 # ========================================
-# ✅ 単体テスト＆実行ブロック
+# ✅ テストブロック（王Noctria経由テスト例）
 # ========================================
 if __name__ == "__main__":
     try:
-        logging.info("--- Veritas Machina: 単独テスト開始 ---")
+        logging.info("--- Veritas Machina: 理想形テスト開始 ---")
         strategist = VeritasMachina()
-        proposal = strategist.propose(top_n=5, risk=0.01, symbol="USDJPY", lookback=180)
+        proposal = strategist.propose(top_n=5, decision_id="KC-20250730-TEST", caller="king_noctria", risk=0.01, symbol="USDJPY", lookback=180)
         print("\n👑 王への進言（Veritas Machina）:")
         print(json.dumps(proposal, indent=4, ensure_ascii=False))
-        logging.info("--- Veritas Machina: 単独テスト完了 ---")
+        logging.info("--- Veritas Machina: 理想形テスト完了 ---")
     except Exception as e:
         err_detail = traceback.format_exc()
         logging.error(f"メインブロックで致命的例外: {err_detail}")
-        err_res = {"type": "strategy_proposal", "status": "ERROR", "detail": f"致命的な例外: {e}", "strategy_rankings": [], "explanation": "", "params": {}}
+        err_res = {"name": "VeritasMachina", "ai_source": "veritas", "decision_id": "TEST", "caller": "king_noctria",
+                   "type": "strategy_proposal", "status": "ERROR", "detail": f"致命的な例外: {e}", "strategy_rankings": [], "explanation": "", "params": {}}
         print(json.dumps(err_res, indent=4, ensure_ascii=False))
