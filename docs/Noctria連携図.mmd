@@ -1,111 +1,90 @@
-flowchart TD  
+flowchart TD
 
-%% --- Veritas PDCAライン（役割再整理後） ---
-subgraph Veritas_PDCA[Veritas PDCA統合ライン]
-  VG["veritas_generate_dag.py<br>📦 戦略評価・選定（ML評価）"]
-  VA["veritas_act_record_dag.py<br>🗒️ 採用戦略記録"]
-  VPUSH["veritas_push_dag.py<br>⬆️ GitHubへPush"]
-  VREPLAY["veritas_replay_dag.py<br>🔁 ログ再送（PDCA一部）"]
+%% --- 1. GUI/API/外部連携 ---
+subgraph GUI_API["GUI・API・外部連携"]
+  DASHBOARD["dashboard.py<br>統治ダッシュボード"]
+  PDCA_PANEL["pdca.py<br>PDCA管理"]
+  AI_PANEL["ai_routes.py<br>AI一覧・詳細"]
+  TRIGGER_PANEL["trigger.py<br>王命/統治コマンド"]
+  API["外部API/バッチ<br>自動統治連携"]
 end
 
-%% --- Kingdom 統治AI層 ---
-subgraph Kingdom統治AI[Noctria 統治層]
-  RC["noctria_royal_council_dag.py<br>👑 御前会議DAG（全AI集約）"]
-  KING["core/king_noctria.py<br>統治AI（最終意思決定）"]
+%% --- 2. 中央統治AIクラスタ ---
+subgraph KINGDOM["中央統治AIクラスタ"]
+  NOCTRIA["king_noctria.py<br>王Noctria（最終意思決定AI）"]
+  HERMES["hermes_cognitor.py<br>Hermes（LLM生成/説明AI）"]
+  VERITAS["veritas_machina.py<br>Veritas（ML評価AI）"]
+  AURUS["aurus.py<br>市場設計AI"]
+  LEVIA["levia.py<br>高速実行AI"]
+  NOCTUS["noctus.py<br>リスク管理AI"]
+  PROMETHEUS["prometheus.py<br>未来予測AI"]
 end
 
-%% --- 臣下AI群（明確な役割分担） ---
-subgraph 臣下AI群[各専門AI・未来予測・リスク評価]
-  PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
-  AA["aurus_strategy_dag.py<br>🎯 市場総合分析"]
-  LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
-  NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
-  HA["hermes_strategy_dag.py<br>🦉 戦略説明（LLM）"]
+%% --- 3. Airflow DAG Cluster ---
+subgraph DAGS["Airflow DAG群"]
+  GEN_DAG["veritas_generate_dag.py<br>戦略生成DAG"]
+  EVAL_DAG["veritas_eval_dag.py<br>一括評価DAG"]
+  RECHECK_DAG["veritas_recheck_dag.py<br>再評価DAG"]
+  ACT_DAG["veritas_act_record_dag.py<br>Act記録DAG"]
+  PUSH_DAG["veritas_push_dag.py<br>Push採用DAG"]
+  REPLAY_DAG["veritas_replay_dag.py<br>Replay再現DAG"]
 end
 
-%% --- Hermes LLM生成層（戦略・説明特化） ---
-subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
-  HGEN["hermes/strategy_generator.py<br>🦉 戦略生成（LLM）"]
+%% --- 4. データ管理・バッチ層 ---
+subgraph DATA["データ/ログ/サマリ層"]
+  STRATEGY_JSON["hermes_generated<br>Hermes戦略json"]
+  EVALRES_JSON["data/stats/*.json<br>評価結果json"]
+  ACTLOG_JSON["act_logs/adopted<br>採用ログjson"]
+  RECHECK_JSON["act_logs/rechecked<br>再評価ログ"]
+  REPLAY_JSON["act_logs/replayed<br>再送ログ"]
+  PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>Planサマリ"]
+  ORACLE_FORECAST_JSON["oracle_forecast.json<br>未来予測json"]
 end
 
-%% --- LLM層（プロンプト生成特化） ---
-subgraph LLM層[llm/ - プロンプト生成＆ログAPI]
-  LLM_PROMPT["llm/llm_prompt_builder.py<br>📜 プロンプト生成"]
-  LLM_EVALAPI["llm/veritas_eval_api.py<br>📄 評価ログAPI"]
+%% --- 5. Plan Data & LLM API層 ---
+subgraph PLAN_LLM["分析・プロンプト・LLM API"]
+  PLAN_COLLECT["plan_data/collector.py<br>データ収集"]
+  PLAN_FEATURE["plan_data/features.py<br>特徴量生成"]
+  PLAN_STAT["plan_data/statistics.py<br>指標/集計"]
+  PLAN_ANALYZER["plan_data/analyzer.py<br>要因分析"]
+  PLAN_ANOMALY["plan_data/anomaly_detector.py<br>異常検知"]
+  LLM_PROMPT["llm/llm_prompt_builder.py<br>プロンプト生成"]
+  LLM_EVALAPI["llm/veritas_eval_api.py<br>評価API"]
+  PLAN_PDCA_BATCH["plan_data/run_pdca_plan_workflow.py<br>PDCAバッチ"]
 end
 
-%% --- Plan Data層（データ分析特化）---
-subgraph PlanData[plan_data/ - データ分析特化]
-  PLAN_COLLECT["collector.py<br>データ収集"]
-  PLAN_FEATURE["features.py<br>特徴量生成"]
-  PLAN_STAT["statistics.py<br>指標/集計"]
-  PLAN_ANALYZER["analyzer.py<br>要因分析"]
-  PLAN_ANOMALY["anomaly_detector.py<br>異常検知"]
-  PLAN_PDCA_BATCH["run_pdca_plan_workflow.py<br>🛠️ サマリー自動生成"]
-end
+%% === 統治AI ⇄ GUI/API連携 ===
+DASHBOARD & PDCA_PANEL & AI_PANEL & TRIGGER_PANEL & API -->|統治指令/再評価/戦略管理| NOCTRIA
 
-%% --- GUI/API層（役割分離明確化） ---
-subgraph GUI_API[GUI・API・外部連携]
-  GUI["FastAPI/Streamlit<br>🖥️ 手動操作"]
-  API["外部APIトリガー<br>🔗 自動連携"]
-end
+%% === 統治AIから各臣下AIへの分担 ===
+NOCTRIA -- 戦略生成要請/選定 --> HERMES
+NOCTRIA -- ML評価・再評価/PDCA --> VERITAS
+NOCTRIA -- 市場設計/実行/リスク/予測 --> AURUS & LEVIA & NOCTUS & PROMETHEUS
 
-%% --- データ格納層（用途別ACTログ整理） ---
-subgraph DATA["data/ - データ管理層"]
-  GIT["GitHub<br>📦 戦略リポジトリ"]
-  ACTLOG_ADOPT["act_logs/adopted<br>📜 採用戦略ログ"]
-  ACTLOG_RECHECK["act_logs/rechecked<br>🔎 再評価ログ"]
-  ACTLOG_REPLAY["act_logs/replayed<br>🔁 再送ログ"]
-  HERMES_STRAT["hermes_generated<br>🦉 Hermes戦略群"]
-  EVALRES["data/stats/*.json<br>📊 戦略評価結果"]
-  PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>📝 Planサマリー"]
-  ORACLE_FORECAST_JSON["oracle_forecast.json<br>🔮 未来予測結果"]
-end
+%% === 各AI・DAG連携ライン ===
+HERMES --|戦略生成/説明| GEN_DAG
+VERITAS --|戦略評価/PDCA| EVAL_DAG & RECHECK_DAG
+NOCTRIA --|再評価/Replay/Push命令| RECHECK_DAG & REPLAY_DAG & PUSH_DAG
+AURUS & LEVIA & NOCTUS & PROMETHEUS --|専門パラメータ/実行支援| GEN_DAG & EVAL_DAG
 
-%% --- 統合フロー（シンプル化） ---
-HGEN --> HERMES_STRAT --> VG
-VG --> EVALRES
-EVALRES --> VA --> ACTLOG_ADOPT --> VPUSH --> GIT
+%% === DAG実行後のデータフロー ===
+GEN_DAG --> STRATEGY_JSON --> NOCTRIA
+EVAL_DAG & RECHECK_DAG --> EVALRES_JSON & RECHECK_JSON --> NOCTRIA
+ACT_DAG --> ACTLOG_JSON --> NOCTRIA
+PUSH_DAG --> DATA
+REPLAY_DAG --> REPLAY_JSON --> NOCTRIA
 
-%% --- 臣下AIから御前会議へ一元化 ---
-PA & AA & LA & NA & HA --> RC
-RC --> KING
-
-%% --- Kingは御前会議経由でのみ判断 ---
-KING --> GUI
-ORACLE_FORECAST_JSON --> RC
-
-%% --- GUI/APIによるPDCA操作 ---
-GUI & API --> VG
-
-%% --- PlanData → LLM層で明確に整理 ---
+%% === 分析・LLM層連携 ===
 PLAN_COLLECT --> PLAN_FEATURE --> PLAN_STAT
 PLAN_STAT --> PLAN_ANALYZER & PLAN_ANOMALY
 PLAN_ANALYZER & PLAN_ANOMALY --> LLM_PROMPT
-LLM_PROMPT --> PLAN_PDCA_BATCH
-PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON --> GUI
+LLM_PROMPT --> HERMES
+LLM_EVALAPI --> VERITAS
+PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON --> DASHBOARD
 
-%% --- LLM評価API → Veritasで直接活用 ---
-LLM_EVALAPI --> VG
+%% === 未来予測ライン ===
+PROMETHEUS --> ORACLE_FORECAST_JSON --> NOCTRIA
 
-%% --- 再送をPDCA統合 ---
-VREPLAY --> ACTLOG_REPLAY --> VG
+%% === 統治履歴・意思決定ログ ===
+NOCTRIA --|統治ログ/履歴/全意思決定| DASHBOARD & PDCA_PANEL
 
-%% --- クラス・色定義 ---
-classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
-class VG,VA,VPUSH,VREPLAY pdca;
-
-classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
-class GUI,API gui;
-
-classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
-class GIT,ACTLOG_ADOPT,ACTLOG_RECHECK,ACTLOG_REPLAY,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON,ORACLE_FORECAST_JSON data;
-
-classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
-class LLM_PROMPT,LLM_EVALAPI llm;
-
-classDef hermes fill:#e1f4ff,stroke:#2d9fc2,stroke-width:2px;
-class HA,HGEN hermes;
-
-classDef kingdom fill:#ffe6cc,stroke:#cc7a00,stroke-width:2px;
-class KING,RC kingdom;
