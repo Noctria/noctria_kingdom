@@ -102,6 +102,7 @@ KING -- "戦略判断/最終意思決定" --> AA
 KING -- "戦略判断/最終意思決定" --> LA
 KING -- "戦略判断/最終意思決定" --> NA
 KING -- "根拠説明/自然言語化" --> HA
+HA -- "LLM説明レポート" --> KING  %% Hermes Cognitor → King 統合（追加）
 
 %% --- Hermes LLM生成フロー ---
 HGEN -- "生成戦略ファイル" --> HERMES_STRAT
@@ -115,15 +116,12 @@ API -- "パラメータ入力" --> VPDCA
 GUI -- "履歴DL/CSV" --> ACTLOG
 GUI -- "評価データ閲覧" --> EVALRES
 
-%% --- Prometheus未来予測のJSON出力（追加） ---
+%% --- Prometheus未来予測のJSON出力 ---
 PA -- "未来予測結果" --> ORACLE_FORECAST_JSON
 ORACLE_FORECAST_JSON -- "予測データ参照" --> GUI
+ORACLE_FORECAST_JSON -- "予測データ参照" --> KING  %% Prometheus予測 → King 統合（追加）
 
 %% --- LLM層連携（veritas_llm_server.pyは廃止想定） ---
-%% LLM_SERVER -.-> LLM_PROMPT
-%% VG -- "戦略生成指示<br>/generate" --> LLM_SERVER
-%% GUI -- "戦略自動生成<br>/generate" --> LLM_SERVER
-%% LLM_SERVER -- "生成結果" --> VG
 LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_PROMPT
 LLM_PROMPT -- "評価ログ解析" --> EVALRES
 
