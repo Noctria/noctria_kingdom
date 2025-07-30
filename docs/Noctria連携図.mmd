@@ -1,156 +1,111 @@
 flowchart TD  
 
-%% --- Veritas PDCA/Replayライン（Master DAG完全削除） ---
-subgraph Veritas_Master[Veritas PDCA/Replayライン]
-  VPDCA["veritas_pdca_dag.py<br>🔁 PDCA自動ループ"]
-  VG["veritas_generate_dag.py<br>🔨 戦略生成"]
-  VE["veritas_eval_dag.py<br>📝 戦略一括評価"]
-  VA["veritas_act_record_dag.py<br>🗒️ Act（採用）記録"]
-  VS["veritas_eval_single_dag.py<br>🕹️ 単体再評価"]
-  VR["veritas_recheck_dag.py<br>🔎 戦略再評価"]
-  VPUSH["veritas_push_dag.py<br>⬆️ 戦略Push"]
-  VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
+%% --- Veritas PDCAライン（役割再整理後） ---
+subgraph Veritas_PDCA[Veritas PDCA統合ライン]
+  VG["veritas_generate_dag.py<br>📦 戦略評価・選定（ML評価）"]
+  VA["veritas_act_record_dag.py<br>🗒️ 採用戦略記録"]
+  VPUSH["veritas_push_dag.py<br>⬆️ GitHubへPush"]
+  VREPLAY["veritas_replay_dag.py<br>🔁 ログ再送（PDCA一部）"]
 end
 
-%% --- Kingdom AI層 ---
-subgraph Kingdom統治AI[Noctria Kingdom 統治層]
-  RC["noctria_kingdom_royal_council_dag.py<br>👑 御前会議DAG"]
-  KING["core/king_noctria.py<br>統合AI"]
+%% --- Kingdom 統治AI層 ---
+subgraph Kingdom統治AI[Noctria 統治層]
+  RC["noctria_royal_council_dag.py<br>👑 御前会議DAG（全AI集約）"]
+  KING["core/king_noctria.py<br>統治AI（最終意思決定）"]
 end
 
-%% --- ストラテジAI/DAG群 ---
-subgraph 戦略AI群[各戦略AI・未来予測・リスクDAG]
+%% --- 臣下AI群（明確な役割分担） ---
+subgraph 臣下AI群[各専門AI・未来予測・リスク評価]
   PA["prometheus_strategy_dag.py<br>🔮 未来予測"]
-  AA["aurus_strategy_dag.py<br>🎯 総合分析"]
+  AA["aurus_strategy_dag.py<br>🎯 市場総合分析"]
   LA["levia_strategy_dag.py<br>⚡ スキャルピング"]
   NA["noctus_strategy_dag.py<br>🛡️ リスク評価"]
-  HA["hermes_strategy_dag.py<br>🦉 LLM根拠説明"]
+  HA["hermes_strategy_dag.py<br>🦉 戦略説明（LLM）"]
 end
 
-%% --- Hermes LLM生成ノード（新設） ---
+%% --- Hermes LLM生成層（戦略・説明特化） ---
 subgraph Hermes_LLM[Hermes Cognitor LLM生成層]
-  HGEN["hermes/strategy_generator.py<br>🦉 LLM戦略コード生成"]
+  HGEN["hermes/strategy_generator.py<br>🦉 戦略生成（LLM）"]
 end
 
-%% --- LLM層 --- 
-subgraph LLM層[llm/ - Noctria LLM層]
-  %% LLM_MAIN["llm/main.py<br>🚪 LLMサーバ（評価API）"]  <-- 削除（廃止）
-  LLM_SERVER["llm/veritas_llm_server.py<br>🧠 LLM生成サーバ"]
-  LLM_PROMPT["llm/llm_prompt_builder.py<br>📜 プロンプトビルダー"]
+%% --- LLM層（プロンプト生成特化） ---
+subgraph LLM層[llm/ - プロンプト生成＆ログAPI]
+  LLM_PROMPT["llm/llm_prompt_builder.py<br>📜 プロンプト生成"]
   LLM_EVALAPI["llm/veritas_eval_api.py<br>📄 評価ログAPI"]
 end
 
-%% --- Plan Data層（分離構成+Airflow定時バッチ追加）---
-subgraph PlanData[plan_data/ - PDCA-Plan根拠/分析クラスタ]
-  PLAN_COLLECT["collector.py<br>データ収集・統合"]
+%% --- Plan Data層（データ分析特化）---
+subgraph PlanData[plan_data/ - データ分析特化]
+  PLAN_COLLECT["collector.py<br>データ収集"]
   PLAN_FEATURE["features.py<br>特徴量生成"]
   PLAN_STAT["statistics.py<br>指標/集計"]
-  PLAN_ANALYZER["analyzer.py<br>要因分析・特徴抽出"]
-  PLAN_PROMPT["llm_plan_prompt.py<br>LLM用プロンプト生成"]
+  PLAN_ANALYZER["analyzer.py<br>要因分析"]
   PLAN_ANOMALY["anomaly_detector.py<br>異常検知"]
-  PLAN_PDCA_DAG["pdca_plan_summary_dag.py<br>🗓️ サマリーDAG"]
   PLAN_PDCA_BATCH["run_pdca_plan_workflow.py<br>🛠️ サマリー自動生成"]
 end
 
-%% --- GUI/API層 ---
+%% --- GUI/API層（役割分離明確化） ---
 subgraph GUI_API[GUI・API・外部連携]
-  GUI["FastAPI/Streamlit<br>🖥️ GUI・REST API<br><u>core/dag_trigger.py<br>Airflow DAGトリガー</u>"]
-  API["外部APIトリガー<br>🔗 API Endpoint"]
+  GUI["FastAPI/Streamlit<br>🖥️ 手動操作"]
+  API["外部APIトリガー<br>🔗 自動連携"]
 end
 
-%% --- データ・ファイル層 ---
-subgraph DATA["data/ - データ/成果物ストア"]
+%% --- データ格納層（用途別ACTログ整理） ---
+subgraph DATA["data/ - データ管理層"]
   GIT["GitHub<br>📦 戦略リポジトリ"]
-  ACTLOG["PDCA/Actログ<br>📜（履歴JSON群）"]
-  STRATJSON["戦略ファイル群<br>🗂️（.json/.py戦略）"]
+  ACTLOG_ADOPT["act_logs/adopted<br>📜 採用戦略ログ"]
+  ACTLOG_RECHECK["act_logs/rechecked<br>🔎 再評価ログ"]
+  ACTLOG_REPLAY["act_logs/replayed<br>🔁 再送ログ"]
   HERMES_STRAT["hermes_generated<br>🦉 Hermes戦略群"]
-  EVALRES["評価結果<br>📊 data/stats/*.json"]
+  EVALRES["data/stats/*.json<br>📊 戦略評価結果"]
   PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>📝 Planサマリー"]
-  ORACLE_FORECAST_JSON["oracle_forecast.json<br>🔮 未来予測結果JSON"]
+  ORACLE_FORECAST_JSON["oracle_forecast.json<br>🔮 未来予測結果"]
 end
 
-%% --- Master/PDCA/Replayフロー ---
-VPDCA -- "戦略生成" --> VG
-VPDCA -- "評価" --> VE
-VPDCA -- "採用記録" --> VA
-VPDCA -- "GitHubPush" --> VPUSH
+%% --- 統合フロー（シンプル化） ---
+HGEN --> HERMES_STRAT --> VG
+VG --> EVALRES
+EVALRES --> VA --> ACTLOG_ADOPT --> VPUSH --> GIT
 
-%% --- Veritas評価後の流れ ---
-VG -- "戦略ファイル" --> STRATJSON
-STRATJSON -- "評価対象" --> VE
-VE -- "評価済戦略" --> EVALRES
-EVALRES -- "評価結果" --> VA
-VA -- "採用戦略情報" --> ACTLOG
-ACTLOG -- "Act/履歴" --> RC
-VA -- "Push要求" --> VPUSH
-VPUSH -- "GitHubコミット" --> GIT
-GIT -- "リポジトリ状態" --> RC
-
-%% --- Actログ/PDCA履歴も御前会議へ -->
-VS -- "再評価情報" --> ACTLOG
-VR -- "再評価情報" --> ACTLOG
-
-%% --- 再送DAGの流れ（Replay） ---
-VREPLAY -- "PDCAログから再送命令" --> ACTLOG
-
-%% --- 御前会議/統合AIフロー ---
+%% --- 臣下AIから御前会議へ一元化 ---
+PA & AA & LA & NA & HA --> RC
 RC --> KING
 
-%% --- ストラテジAI群と統合AIの連携イメージ ---
-KING -- "戦略判断/最終意思決定" --> PA
-KING -- "戦略判断/最終意思決定" --> AA
-KING -- "戦略判断/最終意思決定" --> LA
-KING -- "戦略判断/最終意思決定" --> NA
-KING -- "根拠説明/自然言語化" --> HA
-%% Hermes Cognitor → King 統合（追加）
-HA -- "LLM説明レポート" --> KING
+%% --- Kingは御前会議経由でのみ判断 ---
+KING --> GUI
+ORACLE_FORECAST_JSON --> RC
 
-%% --- Hermes LLM生成フロー ---
-HGEN -- "生成戦略ファイル" --> HERMES_STRAT
-HGEN -- "説明/ナラティブ" --> HA
+%% --- GUI/APIによるPDCA操作 ---
+GUI & API --> VG
 
-%% --- GUI⇔PDCA連携 --- 
-GUI -- "DAGトリガ/可視化" --> VPDCA
-API -- "パラメータ入力" --> VPDCA
+%% --- PlanData → LLM層で明確に整理 ---
+PLAN_COLLECT --> PLAN_FEATURE --> PLAN_STAT
+PLAN_STAT --> PLAN_ANALYZER & PLAN_ANOMALY
+PLAN_ANALYZER & PLAN_ANOMALY --> LLM_PROMPT
+LLM_PROMPT --> PLAN_PDCA_BATCH
+PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON --> GUI
 
-%% --- GUI・API⇔成果物 ---
-GUI -- "履歴DL/CSV" --> ACTLOG
-GUI -- "評価データ閲覧" --> EVALRES
+%% --- LLM評価API → Veritasで直接活用 ---
+LLM_EVALAPI --> VG
 
-%% --- Prometheus未来予測のJSON出力 ---
-PA -- "未来予測結果" --> ORACLE_FORECAST_JSON
-ORACLE_FORECAST_JSON -- "予測データ参照" --> GUI
-%% Prometheus予測 → King 統合（追加）
-ORACLE_FORECAST_JSON -- "予測データ参照" --> KING
+%% --- 再送をPDCA統合 ---
+VREPLAY --> ACTLOG_REPLAY --> VG
 
-%% --- LLM層連携（veritas_llm_server.pyは廃止想定） ---
-LLM_EVALAPI -- "評価ログAPI<br>/veritas/eval_logs" --> LLM_PROMPT
-LLM_PROMPT -- "評価ログ解析" --> EVALRES
-
-%% --- PlanData層連携（分離構成+Airflow定時バッチ）---
-PLAN_COLLECT -- "生データ（時系列DF）" --> PLAN_FEATURE
-PLAN_FEATURE -- "特徴量付与DF" --> PLAN_STAT
-PLAN_STAT -- "分析結果" --> PLAN_ANALYZER
-PLAN_ANALYZER -- "要因抽出/特徴分析" --> PLAN_PROMPT
-PLAN_STAT -- "異常値・ドリフト分析" --> PLAN_ANOMALY
-PLAN_ANOMALY -- "異常/逸脱情報" --> PLAN_PROMPT
-
-%% --- PDCA-Planサマリー自動生成（Airflow/バッチ） ---
-PLAN_PDCA_DAG -- "run_pdca_plan_workflow.py実行" --> PLAN_PDCA_BATCH
-PLAN_PDCA_BATCH -- "Planサマリー出力" --> PLAN_SUMMARY_JSON
-PLAN_SUMMARY_JSON -- "可視化/分析" --> GUI
-
+%% --- クラス・色定義 ---
 classDef pdca fill:#f9f9cc,stroke:#e9c900,stroke-width:2px;
-class VPDCA,VPUSH,VR,VREPLAY pdca;
+class VG,VA,VPUSH,VREPLAY pdca;
 
 classDef gui fill:#d8eafd,stroke:#2c6faa,stroke-width:2px;
 class GUI,API gui;
 
 classDef data fill:#e2ffd8,stroke:#09a509,stroke-width:1.5px;
-class GIT,ACTLOG,STRATJSON,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON,ORACLE_FORECAST_JSON data;
+class GIT,ACTLOG_ADOPT,ACTLOG_RECHECK,ACTLOG_REPLAY,HERMES_STRAT,EVALRES,PLAN_SUMMARY_JSON,ORACLE_FORECAST_JSON data;
 
 classDef llm fill:#f1e8ff,stroke:#9651ed,stroke-width:2px;
-class LLM_SERVER,LLM_PROMPT,LLM_EVALAPI llm;
+class LLM_PROMPT,LLM_EVALAPI llm;
 
 classDef hermes fill:#e1f4ff,stroke:#2d9fc2,stroke-width:2px;
 class HA,HGEN hermes;
+
+classDef kingdom fill:#ffe6cc,stroke:#cc7a00,stroke-width:2px;
+class KING,RC kingdom;
