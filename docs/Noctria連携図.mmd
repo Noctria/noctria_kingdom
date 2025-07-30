@@ -1,7 +1,8 @@
 flowchart TD
 
-%% --- 1. GUI/API/外部連携 ---
+%% --- 1. GUI/API/外部連携（最上段） ---
 subgraph GUI_API["GUI・API・外部連携"]
+  direction TB
   DASHBOARD["dashboard.py\n統治ダッシュボード"]
   PDCA_PANEL["pdca.py\nPDCA管理"]
   AI_PANEL["ai_routes.py\nAI一覧・詳細"]
@@ -9,8 +10,9 @@ subgraph GUI_API["GUI・API・外部連携"]
   API["外部API/バッチ\n自動統治連携"]
 end
 
-%% --- 2. 中央統治AIクラスタ ---
+%% --- 2. 中央統治AIクラスタ（王・臣下AI） ---
 subgraph KINGDOM["中央統治AIクラスタ"]
+  direction TB
   NOCTRIA["king_noctria.py\n王Noctria（最終意思決定AI）"]
   HERMES["hermes_cognitor.py\nHermes（LLM生成/説明AI）"]
   VERITAS["veritas_machina.py\nVeritas（ML評価AI）"]
@@ -20,8 +22,9 @@ subgraph KINGDOM["中央統治AIクラスタ"]
   PROMETHEUS["prometheus.py\n未来予測AI"]
 end
 
-%% --- 3. Airflow DAG Cluster ---
+%% --- 3. Airflow DAG Cluster（実行基盤） ---
 subgraph DAGS["Airflow DAG群"]
+  direction TB
   GEN_DAG["veritas_generate_dag.py\n戦略生成DAG"]
   EVAL_DAG["veritas_eval_dag.py\n一括評価DAG"]
   RECHECK_DAG["veritas_recheck_dag.py\n再評価DAG"]
@@ -30,8 +33,9 @@ subgraph DAGS["Airflow DAG群"]
   REPLAY_DAG["veritas_replay_dag.py\nReplay再現DAG"]
 end
 
-%% --- 4. データ管理・バッチ層 ---
-subgraph DATA["データ/ログ/サマリ層"]
+%% --- 4. データ/ログ/サマリ層（下段） ---
+subgraph DATA["データ・ログ・サマリ層"]
+  direction TB
   STRATEGY_JSON["hermes_generated\nHermes戦略json"]
   EVALRES_JSON["data/stats/*.json\n評価結果json"]
   ACTLOG_JSON["act_logs/adopted\n採用ログjson"]
@@ -41,8 +45,9 @@ subgraph DATA["データ/ログ/サマリ層"]
   ORACLE_FORECAST_JSON["oracle_forecast.json\n未来予測json"]
 end
 
-%% --- 5. Plan Data & LLM API層 ---
+%% --- 5. Plan Data & LLM API層（最下段・左側） ---
 subgraph PLAN_LLM["分析・プロンプト・LLM API"]
+  direction TB
   PLAN_COLLECT["plan_data/collector.py\nデータ収集"]
   PLAN_FEATURE["plan_data/features.py\n特徴量生成"]
   PLAN_STAT["plan_data/statistics.py\n指標/集計"]
@@ -53,51 +58,57 @@ subgraph PLAN_LLM["分析・プロンプト・LLM API"]
   PLAN_PDCA_BATCH["plan_data/run_pdca_plan_workflow.py\nPDCAバッチ"]
 end
 
-%% === 統治AI ⇄ GUI/API連携 ===
-DASHBOARD -->|統治指令/再評価/戦略管理| NOCTRIA
-PDCA_PANEL -->|統治指令/再評価/戦略管理| NOCTRIA
-AI_PANEL -->|統治指令/再評価/戦略管理| NOCTRIA
-TRIGGER_PANEL -->|統治指令/再評価/戦略管理| NOCTRIA
-API -->|統治指令/再評価/戦略管理| NOCTRIA
+%% === レイヤー間接続（上→下順に整理） ===
 
-%% === 統治AIから各臣下AIへの分担 ===
-NOCTRIA -- 戦略生成要請/選定 --> HERMES
-NOCTRIA -- ML評価・再評価/PDCA --> VERITAS
-NOCTRIA -- 市場設計/実行/リスク/予測 --> AURUS
-NOCTRIA -- 市場設計/実行/リスク/予測 --> LEVIA
-NOCTRIA -- 市場設計/実行/リスク/予測 --> NOCTUS
-NOCTRIA -- 市場設計/実行/リスク/予測 --> PROMETHEUS
+%% 1. GUI/API層→中央統治AI
+DASHBOARD --> NOCTRIA
+PDCA_PANEL --> NOCTRIA
+AI_PANEL --> NOCTRIA
+TRIGGER_PANEL --> NOCTRIA
+API --> NOCTRIA
 
-%% === 各AI・DAG連携ライン ===
-HERMES -- 戦略生成/説明 --> GEN_DAG
-VERITAS -- 戦略評価/PDCA --> EVAL_DAG
-VERITAS -- 戦略評価/PDCA --> RECHECK_DAG
-NOCTRIA -- 再評価/Replay/Push命令 --> RECHECK_DAG
-NOCTRIA -- 再評価/Replay/Push命令 --> REPLAY_DAG
-NOCTRIA -- 再評価/Replay/Push命令 --> PUSH_DAG
-AURUS -- 専門パラメータ/実行支援 --> GEN_DAG
-AURUS -- 専門パラメータ/実行支援 --> EVAL_DAG
-LEVIA -- 専門パラメータ/実行支援 --> GEN_DAG
-LEVIA -- 専門パラメータ/実行支援 --> EVAL_DAG
-NOCTUS -- 専門パラメータ/実行支援 --> GEN_DAG
-NOCTUS -- 専門パラメータ/実行支援 --> EVAL_DAG
-PROMETHEUS -- 専門パラメータ/実行支援 --> GEN_DAG
-PROMETHEUS -- 専門パラメータ/実行支援 --> EVAL_DAG
+%% 2. Noctria王→臣下AI
+NOCTRIA --> HERMES
+NOCTRIA --> VERITAS
+NOCTRIA --> AURUS
+NOCTRIA --> LEVIA
+NOCTRIA --> NOCTUS
+NOCTRIA --> PROMETHEUS
 
-%% === DAG実行後のデータフロー ===
+%% 3. 各AI→DAG
+HERMES --> GEN_DAG
+VERITAS --> EVAL_DAG
+VERITAS --> RECHECK_DAG
+NOCTRIA --> RECHECK_DAG
+NOCTRIA --> REPLAY_DAG
+NOCTRIA --> PUSH_DAG
+AURUS --> GEN_DAG
+AURUS --> EVAL_DAG
+LEVIA --> GEN_DAG
+LEVIA --> EVAL_DAG
+NOCTUS --> GEN_DAG
+NOCTUS --> EVAL_DAG
+PROMETHEUS --> GEN_DAG
+PROMETHEUS --> EVAL_DAG
+
+%% 4. DAG→データ層
 GEN_DAG --> STRATEGY_JSON
-STRATEGY_JSON --> NOCTRIA
 EVAL_DAG --> EVALRES_JSON
-EVALRES_JSON --> NOCTRIA
 RECHECK_DAG --> RECHECK_JSON
-RECHECK_JSON --> NOCTRIA
 ACT_DAG --> ACTLOG_JSON
-ACTLOG_JSON --> NOCTRIA
-PUSH_DAG --> DATA
+PUSH_DAG --> ACTLOG_JSON
 REPLAY_DAG --> REPLAY_JSON
-REPLAY_JSON --> NOCTRIA
 
-%% === 分析・LLM層連携 ===
+%% 5. データ層→王・GUI
+STRATEGY_JSON --> NOCTRIA
+EVALRES_JSON --> NOCTRIA
+RECHECK_JSON --> NOCTRIA
+ACTLOG_JSON --> NOCTRIA
+REPLAY_JSON --> NOCTRIA
+PLAN_SUMMARY_JSON --> DASHBOARD
+ORACLE_FORECAST_JSON --> NOCTRIA
+
+%% 6. Plan Data & LLM連携
 PLAN_COLLECT --> PLAN_FEATURE
 PLAN_FEATURE --> PLAN_STAT
 PLAN_STAT --> PLAN_ANALYZER
@@ -107,12 +118,10 @@ PLAN_ANOMALY --> LLM_PROMPT
 LLM_PROMPT --> HERMES
 LLM_EVALAPI --> VERITAS
 PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON
-PLAN_SUMMARY_JSON --> DASHBOARD
 
-%% === 未来予測ライン ===
+%% 7. PROMETHEUS→未来予測json
 PROMETHEUS --> ORACLE_FORECAST_JSON
-ORACLE_FORECAST_JSON --> NOCTRIA
 
-%% === 統治履歴・意思決定ログ ===
-NOCTRIA -- 統治ログ/履歴/全意思決定 --> DASHBOARD
-NOCTRIA -- 統治ログ/履歴/全意思決定 --> PDCA_PANEL
+%% 8. Noctria統治履歴→ダッシュボード
+NOCTRIA -- 統治履歴/全意思決定 --> DASHBOARD
+NOCTRIA -- 統治履歴/全意思決定 --> PDCA_PANEL
