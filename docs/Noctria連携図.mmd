@@ -2,89 +2,117 @@ flowchart TD
 
 %% --- 1. GUI/API/外部連携 ---
 subgraph GUI_API["GUI・API・外部連携"]
-  DASHBOARD["dashboard.py<br>統治ダッシュボード"]
-  PDCA_PANEL["pdca.py<br>PDCA管理"]
-  AI_PANEL["ai_routes.py<br>AI一覧・詳細"]
-  TRIGGER_PANEL["trigger.py<br>王命/統治コマンド"]
-  API["外部API/バッチ<br>自動統治連携"]
+  DASHBOARD["dashboard.py\n統治ダッシュボード"]
+  PDCA_PANEL["pdca.py\nPDCA管理"]
+  AI_PANEL["ai_routes.py\nAI一覧・詳細"]
+  TRIGGER_PANEL["trigger.py\n王命/統治コマンド"]
+  API["外部API/バッチ\n自動統治連携"]
 end
 
 %% --- 2. 中央統治AIクラスタ ---
 subgraph KINGDOM["中央統治AIクラスタ"]
-  NOCTRIA["king_noctria.py<br>王Noctria（最終意思決定AI）"]
-  HERMES["hermes_cognitor.py<br>Hermes（LLM生成/説明AI）"]
-  VERITAS["veritas_machina.py<br>Veritas（ML評価AI）"]
-  AURUS["aurus.py<br>市場設計AI"]
-  LEVIA["levia.py<br>高速実行AI"]
-  NOCTUS["noctus.py<br>リスク管理AI"]
-  PROMETHEUS["prometheus.py<br>未来予測AI"]
+  NOCTRIA["king_noctria.py\n王Noctria（最終意思決定AI）"]
+  HERMES["hermes_cognitor.py\nHermes（LLM生成/説明AI）"]
+  VERITAS["veritas_machina.py\nVeritas（ML評価AI）"]
+  AURUS["aurus.py\n市場設計AI"]
+  LEVIA["levia.py\n高速実行AI"]
+  NOCTUS["noctus.py\nリスク管理AI"]
+  PROMETHEUS["prometheus.py\n未来予測AI"]
 end
 
 %% --- 3. Airflow DAG Cluster ---
 subgraph DAGS["Airflow DAG群"]
-  GEN_DAG["veritas_generate_dag.py<br>戦略生成DAG"]
-  EVAL_DAG["veritas_eval_dag.py<br>一括評価DAG"]
-  RECHECK_DAG["veritas_recheck_dag.py<br>再評価DAG"]
-  ACT_DAG["veritas_act_record_dag.py<br>Act記録DAG"]
-  PUSH_DAG["veritas_push_dag.py<br>Push採用DAG"]
-  REPLAY_DAG["veritas_replay_dag.py<br>Replay再現DAG"]
+  GEN_DAG["veritas_generate_dag.py\n戦略生成DAG"]
+  EVAL_DAG["veritas_eval_dag.py\n一括評価DAG"]
+  RECHECK_DAG["veritas_recheck_dag.py\n再評価DAG"]
+  ACT_DAG["veritas_act_record_dag.py\nAct記録DAG"]
+  PUSH_DAG["veritas_push_dag.py\nPush採用DAG"]
+  REPLAY_DAG["veritas_replay_dag.py\nReplay再現DAG"]
 end
 
 %% --- 4. データ管理・バッチ層 ---
 subgraph DATA["データ/ログ/サマリ層"]
-  STRATEGY_JSON["hermes_generated<br>Hermes戦略json"]
-  EVALRES_JSON["data/stats/*.json<br>評価結果json"]
-  ACTLOG_JSON["act_logs/adopted<br>採用ログjson"]
-  RECHECK_JSON["act_logs/rechecked<br>再評価ログ"]
-  REPLAY_JSON["act_logs/replayed<br>再送ログ"]
-  PLAN_SUMMARY_JSON["pdca_plan_summary.json<br>Planサマリ"]
-  ORACLE_FORECAST_JSON["oracle_forecast.json<br>未来予測json"]
+  STRATEGY_JSON["hermes_generated\nHermes戦略json"]
+  EVALRES_JSON["data/stats/*.json\n評価結果json"]
+  ACTLOG_JSON["act_logs/adopted\n採用ログjson"]
+  RECHECK_JSON["act_logs/rechecked\n再評価ログ"]
+  REPLAY_JSON["act_logs/replayed\n再送ログ"]
+  PLAN_SUMMARY_JSON["pdca_plan_summary.json\nPlanサマリ"]
+  ORACLE_FORECAST_JSON["oracle_forecast.json\n未来予測json"]
 end
 
 %% --- 5. Plan Data & LLM API層 ---
 subgraph PLAN_LLM["分析・プロンプト・LLM API"]
-  PLAN_COLLECT["plan_data/collector.py<br>データ収集"]
-  PLAN_FEATURE["plan_data/features.py<br>特徴量生成"]
-  PLAN_STAT["plan_data/statistics.py<br>指標/集計"]
-  PLAN_ANALYZER["plan_data/analyzer.py<br>要因分析"]
-  PLAN_ANOMALY["plan_data/anomaly_detector.py<br>異常検知"]
-  LLM_PROMPT["llm/llm_prompt_builder.py<br>プロンプト生成"]
-  LLM_EVALAPI["llm/veritas_eval_api.py<br>評価API"]
-  PLAN_PDCA_BATCH["plan_data/run_pdca_plan_workflow.py<br>PDCAバッチ"]
+  PLAN_COLLECT["plan_data/collector.py\nデータ収集"]
+  PLAN_FEATURE["plan_data/features.py\n特徴量生成"]
+  PLAN_STAT["plan_data/statistics.py\n指標/集計"]
+  PLAN_ANALYZER["plan_data/analyzer.py\n要因分析"]
+  PLAN_ANOMALY["plan_data/anomaly_detector.py\n異常検知"]
+  LLM_PROMPT["llm/llm_prompt_builder.py\nプロンプト生成"]
+  LLM_EVALAPI["llm/veritas_eval_api.py\n評価API"]
+  PLAN_PDCA_BATCH["plan_data/run_pdca_plan_workflow.py\nPDCAバッチ"]
 end
 
 %% === 統治AI ⇄ GUI/API連携 ===
-DASHBOARD & PDCA_PANEL & AI_PANEL & TRIGGER_PANEL & API -->|統治指令/再評価/戦略管理| NOCTRIA
+DASHBOARD -->|統治指令/再評価/戦略管理| NOCTRIA
+PDCA_PANEL -->|統治指令/再評価/戦略管理| NOCTRIA
+AI_PANEL -->|統治指令/再評価/戦略管理| NOCTRIA
+TRIGGER_PANEL -->|統治指令/再評価/戦略管理| NOCTRIA
+API -->|統治指令/再評価/戦略管理| NOCTRIA
 
 %% === 統治AIから各臣下AIへの分担 ===
 NOCTRIA -- 戦略生成要請/選定 --> HERMES
 NOCTRIA -- ML評価・再評価/PDCA --> VERITAS
-NOCTRIA -- 市場設計/実行/リスク/予測 --> AURUS & LEVIA & NOCTUS & PROMETHEUS
+NOCTRIA -- 市場設計/実行/リスク/予測 --> AURUS
+NOCTRIA -- 市場設計/実行/リスク/予測 --> LEVIA
+NOCTRIA -- 市場設計/実行/リスク/予測 --> NOCTUS
+NOCTRIA -- 市場設計/実行/リスク/予測 --> PROMETHEUS
 
 %% === 各AI・DAG連携ライン ===
-HERMES --|戦略生成/説明| GEN_DAG
-VERITAS --|戦略評価/PDCA| EVAL_DAG & RECHECK_DAG
-NOCTRIA --|再評価/Replay/Push命令| RECHECK_DAG & REPLAY_DAG & PUSH_DAG
-AURUS & LEVIA & NOCTUS & PROMETHEUS --|専門パラメータ/実行支援| GEN_DAG & EVAL_DAG
+HERMES -- 戦略生成/説明 --> GEN_DAG
+VERITAS -- 戦略評価/PDCA --> EVAL_DAG
+VERITAS -- 戦略評価/PDCA --> RECHECK_DAG
+NOCTRIA -- 再評価/Replay/Push命令 --> RECHECK_DAG
+NOCTRIA -- 再評価/Replay/Push命令 --> REPLAY_DAG
+NOCTRIA -- 再評価/Replay/Push命令 --> PUSH_DAG
+AURUS -- 専門パラメータ/実行支援 --> GEN_DAG
+AURUS -- 専門パラメータ/実行支援 --> EVAL_DAG
+LEVIA -- 専門パラメータ/実行支援 --> GEN_DAG
+LEVIA -- 専門パラメータ/実行支援 --> EVAL_DAG
+NOCTUS -- 専門パラメータ/実行支援 --> GEN_DAG
+NOCTUS -- 専門パラメータ/実行支援 --> EVAL_DAG
+PROMETHEUS -- 専門パラメータ/実行支援 --> GEN_DAG
+PROMETHEUS -- 専門パラメータ/実行支援 --> EVAL_DAG
 
 %% === DAG実行後のデータフロー ===
-GEN_DAG --> STRATEGY_JSON --> NOCTRIA
-EVAL_DAG & RECHECK_DAG --> EVALRES_JSON & RECHECK_JSON --> NOCTRIA
-ACT_DAG --> ACTLOG_JSON --> NOCTRIA
+GEN_DAG --> STRATEGY_JSON
+STRATEGY_JSON --> NOCTRIA
+EVAL_DAG --> EVALRES_JSON
+EVALRES_JSON --> NOCTRIA
+RECHECK_DAG --> RECHECK_JSON
+RECHECK_JSON --> NOCTRIA
+ACT_DAG --> ACTLOG_JSON
+ACTLOG_JSON --> NOCTRIA
 PUSH_DAG --> DATA
-REPLAY_DAG --> REPLAY_JSON --> NOCTRIA
+REPLAY_DAG --> REPLAY_JSON
+REPLAY_JSON --> NOCTRIA
 
 %% === 分析・LLM層連携 ===
-PLAN_COLLECT --> PLAN_FEATURE --> PLAN_STAT
-PLAN_STAT --> PLAN_ANALYZER & PLAN_ANOMALY
-PLAN_ANALYZER & PLAN_ANOMALY --> LLM_PROMPT
+PLAN_COLLECT --> PLAN_FEATURE
+PLAN_FEATURE --> PLAN_STAT
+PLAN_STAT --> PLAN_ANALYZER
+PLAN_STAT --> PLAN_ANOMALY
+PLAN_ANALYZER --> LLM_PROMPT
+PLAN_ANOMALY --> LLM_PROMPT
 LLM_PROMPT --> HERMES
 LLM_EVALAPI --> VERITAS
-PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON --> DASHBOARD
+PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON
+PLAN_SUMMARY_JSON --> DASHBOARD
 
 %% === 未来予測ライン ===
-PROMETHEUS --> ORACLE_FORECAST_JSON --> NOCTRIA
+PROMETHEUS --> ORACLE_FORECAST_JSON
+ORACLE_FORECAST_JSON --> NOCTRIA
 
 %% === 統治履歴・意思決定ログ ===
-NOCTRIA --|統治ログ/履歴/全意思決定| DASHBOARD & PDCA_PANEL
-
+NOCTRIA -- 統治ログ/履歴/全意思決定 --> DASHBOARD
+NOCTRIA -- 統治ログ/履歴/全意思決定 --> PDCA_PANEL
