@@ -2,9 +2,9 @@
 # coding: utf-8
 
 """
-👑 /api/king - 中央統治AI NoctriaのAPIルート（統一集約版）
-- すべての統治操作（PDCA/戦略生成/再評価/Push/Replay等）を王経由APIに統合
-- 統治ID(意思決定ID)の一元管理、王ログ保存・取得
+👑 /api/king - 中央統治AI NoctriaのAPIルート（理想形・decision_id一元管理）
+- 全てのコマンドは「王本体でdecision_id発行・全統治履歴に保存」
+- APIはその橋渡しに徹する
 """
 
 from fastapi import APIRouter, Request
@@ -17,73 +17,54 @@ from src.core.king_noctria import KingNoctria
 from datetime import datetime
 from pathlib import Path
 import json
-import uuid
 
 router = APIRouter(prefix="/api/king", tags=["King"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-KING_LOG_PATH = LOGS_DIR / "king_log.json"
+KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"  # 1行1レコード型を推奨
 
 def load_logs() -> list:
     try:
         if KING_LOG_PATH.exists():
             with open(KING_LOG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return [json.loads(line) for line in f if line.strip()]
         return []
     except Exception as e:
         print(f"🔴 load_logs失敗: {e}")
         return []
 
-def save_log(entry: dict):
-    try:
-        logs = load_logs()
-        logs.append(entry)
-        with open(KING_LOG_PATH, "w", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"🔴 save_log失敗: {e}")
-
 @router.post("/command")
 async def king_command_api(request: Request):
     """
-    👑 王Noctriaによる統治コマンドAPI（すべてのPDCA/DAG/AI指令をここに統合）
-    例: {"command": "recheck", "args": {...}, "ai": "veritas"}
+    👑 王Noctriaによる統治コマンドAPI（全PDCA/DAG/AI指令を統一集約）
     """
     try:
         data = await request.json()
         command = data.get("command")
         args = data.get("args", {})
         ai = data.get("ai", None)
-        decision_id = f"KC-{uuid.uuid4()}"
+        caller = "king_routes"
+        reason = data.get("reason", f"APIコマンド[{command}]実行")
         
         king = KingNoctria()
-
-        # --- 王の采配で各コマンドに対応（臣下AI/DAG等の一元采配） ---
+        # --- 王の采配で各コマンドに対応 ---
+        # すべて「decision_idは王本体で発行」
         if command == "council":
-            result = king.hold_council(args)
+            result = king.hold_council(args, caller=caller, reason=reason)
         elif command == "generate_strategy":
-            result = king.generate_strategy(args)
+            result = king.trigger_generate(args, caller=caller, reason=reason)
         elif command == "evaluate":
-            result = king.evaluate(args)
+            result = king.trigger_eval(args, caller=caller, reason=reason)
         elif command == "recheck":
-            result = king.recheck(args)
+            result = king.trigger_recheck(args, caller=caller, reason=reason)
         elif command == "push":
-            result = king.push(args)
+            result = king.trigger_push(args, caller=caller, reason=reason)
         elif command == "replay":
-            result = king.replay(args)
+            result = king.trigger_replay(args.get("log_path", ""), caller=caller, reason=reason)
         else:
             return JSONResponse(content={"error": f"未知コマンド: {command}"}, status_code=400)
-        
-        log_entry = {
-            "decision_id": decision_id,
-            "timestamp": datetime.now().isoformat(),
-            "command": command,
-            "args": args,
-            "ai": ai,
-            "result": result
-        }
-        save_log(log_entry)
-        result["decision_id"] = decision_id  # 統治ID付与
+
+        # ここで王本体のdecision_idが返ってきているはず
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(
