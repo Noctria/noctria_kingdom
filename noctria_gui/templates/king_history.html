@@ -1,8 +1,8 @@
 {% extends "base_hud.html" %}
 
-{% block title %}👑 評議会ログ履歴 - Noctria Kingdom HUD{% endblock %}
+{% block title %}👑 統治AI・評議会ログ履歴 - Noctria Kingdom HUD{% endblock %}
 {% block header_icon %}<i class="fas fa-crown"></i>{% endblock %}
-{% block header_title %}評議会ログ履歴{% endblock %}
+{% block header_title %}統治AI・評議会ログ履歴{% endblock %}
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
@@ -15,11 +15,15 @@
 
 <section class="hud-panel log-panel">
   {% if logs %}
-    <div class="table-wrapper" style="max-height: 600px; overflow-y: auto;">
+    <div class="table-wrapper" style="max-height: 650px; overflow-y: auto;">
       <table class="hud-table">
         <thead>
           <tr>
             <th>🕒 日時</th>
+            <th>🆔 統治ID</th>
+            <th>📦 コマンド</th>
+            <th>👤 呼出元</th>
+            <th>📝 理由</th>
             <th>👑 王命</th>
             <th>🗡️ Aurus</th>
             <th>🌊 Levia</th>
@@ -29,9 +33,19 @@
         </thead>
         <tbody>
           {% for log in logs %}
-          {% set r = log.result or log.decision or {} %}
+          {% set r = log.result or log.decision or log or {} %}
           <tr>
             <td>{{ log.timestamp | default("-") }}</td>
+            <td>
+              <span class="decision-id-badge" title="Click to copy" onclick="navigator.clipboard.writeText('{{ log.decision_id or '-' }}')">
+                {{ log.decision_id or '-' }}
+              </span>
+            </td>
+            <td>{{ log.command | default(r.command) | default("-") }}</td>
+            <td>{{ log.caller | default("-") }}</td>
+            <td>
+              <span title="{{ log.reason | default('-') }}">{{ log.reason | default('-') }}</span>
+            </td>
             <td><strong>{{ r.final_decision | default("-") }}</strong></td>
             <td>
               {% if r.assessments and r.assessments.aurus_proposal %}
@@ -66,7 +80,55 @@
       </table>
     </div>
   {% else %}
-    <p style="text-align: center;">📭 評議会の履歴はまだ存在しません。</p>
+    <p style="text-align: center;">📭 統治AI・評議会の履歴はまだ存在しません。</p>
   {% endif %}
 </section>
+
+<style>
+  .decision-id-badge {
+    background: #2828c6;
+    color: #fff;
+    font-size: 11px;
+    border-radius: 3px;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    user-select: all;
+  }
+  .decision-id-badge:hover {
+    background: #16c6b7;
+  }
+  .hud-table th, .hud-table td {
+    white-space: nowrap;
+    padding: 4px 8px;
+    font-size: 13px;
+  }
+  .hud-table th {
+    background: #13133c;
+    color: #66f1ff;
+    font-weight: bold;
+    border-bottom: 2px solid #444;
+    text-align: center;
+  }
+  .hud-table td {
+    background: #101020;
+    color: #c6e7fa;
+    border-bottom: 1px solid #223;
+    text-align: center;
+  }
+  .hud-table details summary {
+    cursor: pointer;
+    color: #6ae4dc;
+  }
+  .hud-panel.log-panel {
+    margin-top: 24px;
+  }
+  .table-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 1px 8px #2bdbe6a0;
+    background: #0b0c22e0;
+    padding: 8px 12px 2px 12px;
+    border: 1.5px solid #2ed1f1;
+  }
+</style>
 {% endblock %}
