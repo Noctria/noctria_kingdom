@@ -5,20 +5,20 @@ from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 
-# 相対インポートに修正（または sys.path に親ディレクトリを追加）
-from . import chat_history_api, chat_api
-
-# ロガー設定
 logger = logging.getLogger("noctria_logger")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 app = FastAPI()
 
-app.include_router(chat_history_api.router)
-app.include_router(chat_api.router)
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+@app.on_event("startup")
+async def startup_event():
+    global chat_history_api, chat_api
+    from . import chat_history_api, chat_api
+    app.include_router(chat_history_api.router)
+    app.include_router(chat_api.router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
