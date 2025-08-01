@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any, List, Union
 from pathlib import Path
 import logging
 
-from src.core.path_config import MODELS_DIR, MARKET_DATA_CSV, ORACLE_FORECAST_JSON
+from src.core.path_config import VERITAS_MODELS_DIR, MARKET_DATA_CSV, ORACLE_FORECAST_JSON
 from src.core.settings import ALPHAVANTAGE_API_KEY
 
 # ✅ ダミー MarketDataFetcher
@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - 
 
 class PrometheusOracle:
     def __init__(self, model_path: Optional[Path] = None):
-        self.model_path = model_path or (MODELS_DIR / "prometheus_oracle.keras")
+        self.model_path = model_path or (VERITAS_MODELS_DIR / "prometheus_oracle.keras")
         self.model = self._load_or_build_model()
         self.market_fetcher = MarketDataFetcher(api_key=ALPHAVANTAGE_API_KEY)
 
