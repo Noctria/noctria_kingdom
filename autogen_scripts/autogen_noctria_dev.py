@@ -41,7 +41,6 @@ Noctria KingdomのAI統治開発者として、FX USD/JPYトレードAIをFintok
 - 自動化スクリプトやAIエージェント経由での変更も同様とする。
 ---
 
-
 【議論・開発方針】
 - 既存構成やmmdと照合しながら効率的な設計・実装を行うこと。
 - コードや設計提案は必ず全体像を明示し、断片的ではなく再利用・保守性を重視。
@@ -53,7 +52,9 @@ async def main():
         client = OpenAIChatCompletionClient(model="gpt-4o")
         proxy = UserProxyAgent(
             name="Daifuku_Proxy",
-            system_message=noctria_persona
+            description=noctria_persona,                   # ← system_messageの代わりにdescription!
+            code_execution_config={"work_dir": "workspace"},# ← 必須（ダミーOK）
+            human_input_mode="NEVER"                        # ← 完全自動進行
         )
         assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
 
