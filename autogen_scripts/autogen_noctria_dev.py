@@ -1,3 +1,5 @@
+import sys
+print(sys.path)
 import asyncio
 import os
 import pathlib
