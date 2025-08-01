@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from autogen_agentchat.agents import AssistantAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
-from autogen_core.message import UserMessage
+from autogen_core._message_context import UserMessage
 
 load_dotenv()
 
