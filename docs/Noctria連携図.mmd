@@ -1,128 +1,103 @@
 flowchart TD
 
-%% GUI/API (Blue)
-subgraph GUI_API["🖥️ GUI・API・外部連携"]
-direction TB
-style GUI_API fill:#E8F4FD,stroke:#0369A1,stroke-width:2px
-DASHBOARD["dashboard.py\n統治ダッシュボード"]
-PDCA_PANEL["pdca.py\nPDCA管理"]
-AI_PANEL["ai_routes.py\nAI一覧・詳細"]
-TRIGGER_PANEL["trigger.py\n王命・統治コマンド"]
-API["外部API・バッチ\n自動統治連携"]
+%% === 中央統治・王AI層 ===
+subgraph CENTRAL_GOV["👑 Central Governance (Noctria Kingdom)"]
+  KNOCTRIA["king_noctria.py<br>王AI：中央統治・指令発令"]
+  HERMES["hermes_cognitor.py<br>Hermes：LLM要約/解説"]
+  VERITAS["veritas_machine.py<br>Veritas：ML戦略評価"]
+  PROMETHEUS["prometheus_oracle.py<br>Prometheus：未来予測"]
+  AURUS["aurus_singularis.py<br>Aurus：市場分析"]
+  LEVIA["levia_tempest.py<br>Levia：スキャルピング/流動性"]
 end
 
-%% 中央統治AI (Gold)
-subgraph KINGDOM["👑 中央統治AIクラスタ"]
-direction TB
-style KINGDOM fill:#FFF8E6,stroke:#D97706,stroke-width:2px
-NOCTRIA["king_noctria.py\n王Noctria（最終意思決定AI）"]
-HERMES["hermes_cognitor.py\nHermes（LLM生成・説明AI）"]
-VERITAS["veritas_machina.py\nVeritas（ML評価AI）"]
-AURUS["aurus.py\n市場設計AI"]
-LEVIA["levia.py\n高速実行AI"]
-NOCTUS["noctus.py\nリスク管理AI"]
-PROMETHEUS["prometheus.py\n未来予測AI"]
+%% === Airflowワークフロー・PDCA自動化クラスタ ===
+subgraph AIRFLOW_PDCA["🔁 Airflow PDCA/Strategy Workflow"]
+  DAG_PDCA["veritas_pdca_dag.py<br>PDCA自動ループ"]
+  DAG_GEN["veritas_generate_dag.py<br>戦略生成"]
+  DAG_EVAL["veritas_eval_dag.py<br>戦略一括評価"]
+  DAG_REEVAL["veritas_eval_single_dag.py<br>単体再評価"]
+  DAG_PUSH["veritas_push_dag.py<br>採用/Push"]
+  DAG_REPLAY["veritas_replay_dag.py<br>Replay/リカバリ"]
+  DAG_ACTREC["veritas_act_record_dag.py<br>Act記録"]
 end
 
-%% Airflow DAG群 (Light Purple)
-subgraph DAGS["⚙️ Airflow DAG群"]
-direction TB
-style DAGS fill:#F3E8FF,stroke:#7C3AED,stroke-width:2px
-GEN_DAG["veritas_generate_dag.py\n戦略生成DAG"]
-EVAL_DAG["veritas_eval_dag.py\n一括評価DAG"]
-RECHECK_DAG["veritas_recheck_dag.py\n再評価DAG"]
-ACT_DAG["veritas_act_record_dag.py\nAct記録DAG"]
-PUSH_DAG["veritas_push_dag.py\nPush採用DAG"]
-REPLAY_DAG["veritas_replay_dag.py\nReplay再現DAG"]
+%% === モデル・生成・評価クラスタ ===
+subgraph STRATEGY_GEN["🧠 ML戦略生成・評価"]
+  STRAT_GEN["strategy_generator.py<br>戦略生成ロジック"]
+  SIMPLE_MODEL["models/ml_model/simple_model.py<br>MLモデル本体"]
+  STRAT_EVAL["strategy_evaluator.py<br>戦略評価ロジック"]
 end
 
-%% データ管理 (Light Green)
-subgraph DATA["📚 データ・ログ・サマリ層"]
-direction TB
-style DATA fill:#E6FFFA,stroke:#10B981,stroke-width:2px
-STRATEGY_JSON["hermes_generated\nHermes戦略json"]
-EVALRES_JSON["data/stats/*.json\n評価結果json"]
-ACTLOG_JSON["act_logs/adopted\n採用ログjson"]
-RECHECK_JSON["act_logs/rechecked\n再評価ログ"]
-REPLAY_JSON["act_logs/replayed\n再送ログ"]
-PLAN_SUMMARY_JSON["pdca_plan_summary.json\nPlanサマリ"]
-ORACLE_FORECAST_JSON["oracle_forecast.json\n未来予測json"]
+%% === GUI/HUD・APIクラスタ ===
+subgraph GUI_API["💻 GUI・API（FastAPI/HTML/HUD）"]
+  ROUTES_HOME["routes/home.py"]
+  ROUTES_DASH["routes/dashboard.py"]
+  ROUTES_KING["routes/king_routes.py"]
+  ROUTES_AI["routes/ai_routes.py"]
+  ROUTES_PDCA["routes/pdca.py"]
+  ROUTES_TRIGGER["routes/trigger.py"]
+  GUI_TEMPLATES["templates/*.html<br>（base_hud, dashboard, trigger, etc.）"]
+  STATIC_HUD["static/hud_style.css"]
 end
 
-%% 分析・LLM API層 (Light Orange)
-subgraph PLAN_LLM["🧠 分析・プロンプト・LLM API"]
-direction TB
-style PLAN_LLM fill:#FFF7ED,stroke:#F97316,stroke-width:2px
-PLAN_COLLECT["plan_data/collector.py\nデータ収集"]
-PLAN_FEATURE["plan_data/features.py\n特徴量生成"]
-PLAN_STAT["plan_data/statistics.py\n指標・集計"]
-PLAN_ANALYZER["plan_data/analyzer.py\n要因分析"]
-PLAN_ANOMALY["plan_data/anomaly_detector.py\n異常検知"]
-LLM_PROMPT["llm/llm_prompt_builder.py\nプロンプト生成"]
-LLM_EVALAPI["llm/veritas_eval_api.py\n評価API"]
-PLAN_PDCA_BATCH["plan_data/run_pdca_plan_workflow.py\nPDCAバッチ"]
+%% === DB・Log・Config・データクラスタ ===
+subgraph STORAGE["🗄️ データ/設定/ログ"]
+  POSTGRES["PostgreSQL<br>戦略・評価記録"]
+  LOGS["logs/<br>各種ログ"]
+  CONFIG["core/path_config.py, settings.py"]
 end
 
-%% --- Connections（上から下へ縦方向を強調）---
+%% === データ/指標フロー（AI↔DAG/DB） ===
+KNOCTRIA -- 指令/統治 --> HERMES
+KNOCTRIA -- 指令/統治 --> VERITAS
+KNOCTRIA -- 指令/統治 --> PROMETHEUS
+KNOCTRIA -- 指令/統治 --> AURUS
+KNOCTRIA -- 指令/統治 --> LEVIA
 
-%% GUI/API → 王Noctria
-DASHBOARD --> NOCTRIA
-PDCA_PANEL --> NOCTRIA
-AI_PANEL --> NOCTRIA
-TRIGGER_PANEL --> NOCTRIA
-API --> NOCTRIA
+KNOCTRIA -- 発令/操作 --> ROUTES_KING
 
-%% 王Noctria → 各AI
-NOCTRIA --> HERMES
-NOCTRIA --> VERITAS
-NOCTRIA --> AURUS
-NOCTRIA --> LEVIA
-NOCTRIA --> NOCTUS
-NOCTRIA --> PROMETHEUS
+HERMES -- LLMサマリ/解説 --> ROUTES_AI
+VERITAS -- 評価/PDCA統括 --> AIRFLOW_PDCA
+VERITAS -- 戦略評価 --> STRAT_EVAL
+VERITAS -- 戦略生成 --> STRAT_GEN
+STRAT_GEN -- モデル読込/生成 --> SIMPLE_MODEL
 
-%% AI → DAG群
-HERMES --> GEN_DAG
-VERITAS --> EVAL_DAG
-VERITAS --> RECHECK_DAG
-AURUS --> GEN_DAG
-LEVIA --> GEN_DAG
-NOCTUS --> EVAL_DAG
-PROMETHEUS --> EVAL_DAG
-NOCTRIA --> ACT_DAG
-NOCTRIA --> PUSH_DAG
-NOCTRIA --> REPLAY_DAG
+AIRFLOW_PDCA -- 戦略生成・評価 --> STRATEGY_GEN
+AIRFLOW_PDCA -- Act記録/評価記録 --> POSTGRES
+AIRFLOW_PDCA -- ログ/障害 --> LOGS
 
-%% DAG群 → データ層
-GEN_DAG --> STRATEGY_JSON
-EVAL_DAG --> EVALRES_JSON
-RECHECK_DAG --> RECHECK_JSON
-ACT_DAG --> ACTLOG_JSON
-PUSH_DAG --> ACTLOG_JSON
-REPLAY_DAG --> REPLAY_JSON
+ROUTES_HOME --> GUI_TEMPLATES
+ROUTES_DASH --> GUI_TEMPLATES
+ROUTES_AI --> GUI_TEMPLATES
+ROUTES_KING --> GUI_TEMPLATES
+ROUTES_TRIGGER --> GUI_TEMPLATES
+GUI_TEMPLATES -.-> STATIC_HUD
 
-%% データ層 → 王Noctria & GUI
-STRATEGY_JSON --> NOCTRIA
-EVALRES_JSON --> NOCTRIA
-RECHECK_JSON --> NOCTRIA
-ACTLOG_JSON --> NOCTRIA
-REPLAY_JSON --> NOCTRIA
-PLAN_SUMMARY_JSON --> DASHBOARD
-ORACLE_FORECAST_JSON --> NOCTRIA
+GUI_TEMPLATES -- 表示データ --> POSTGRES
+ROUTES_PDCA -- PDCA操作 --> AIRFLOW_PDCA
+ROUTES_TRIGGER -- DAG操作 --> AIRFLOW_PDCA
 
-%% 分析・LLM層内連携
-PLAN_COLLECT --> PLAN_FEATURE
-PLAN_FEATURE --> PLAN_STAT
-PLAN_STAT --> PLAN_ANALYZER
-PLAN_STAT --> PLAN_ANOMALY
-PLAN_ANALYZER --> LLM_PROMPT
-PLAN_ANOMALY --> LLM_PROMPT
-LLM_PROMPT --> HERMES
-LLM_EVALAPI --> VERITAS
-PLAN_PDCA_BATCH --> PLAN_SUMMARY_JSON
+STRAT_GEN -- モデル/評価パラメータ --> CONFIG
+AIRFLOW_PDCA -- 設定読込 --> CONFIG
 
-%% PROMETHEUS→未来予測
-PROMETHEUS --> ORACLE_FORECAST_JSON
+PROMETHEUS -- 未来予測/指標 --> ROUTES_DASH
+AURUS -- 市場分析 --> ROUTES_DASH
+LEVIA -- スキャルピング成績 --> ROUTES_DASH
 
-%% 統治履歴 → GUI
-NOCTRIA --> DASHBOARD
-NOCTRIA --> PDCA_PANEL
+%% === 各AIのデータ参照系 ===
+VERITAS -- 評価/PDCA集計 --> ROUTES_PDCA
+HERMES -- サマリ/解説 --> ROUTES_AI
+PROMETHEUS -- 予測値 --> ROUTES_DASH
+
+%% === バックアップ・Replay系 ===
+DAG_REPLAY -- ログ/記録 --> POSTGRES
+DAG_ACTREC -- Act記録 --> POSTGRES
+
+%% === 環境変数・設定ファイル ===
+CONFIG -.-> STRAT_GEN
+CONFIG -.-> AIRFLOW_PDCA
+CONFIG -.-> ROUTES_DASH
+
+%% === モデル保存・バージョン管理 ===
+SIMPLE_MODEL -- モデルファイル管理 --> STORAGE
+
