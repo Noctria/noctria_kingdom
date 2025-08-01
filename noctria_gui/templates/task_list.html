@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head><title>開発タスク管理</title></head>
+<body>
+<h1>開発タスク一覧</h1>
+<table border="1" id="task-table">
+  <thead><tr><th>ファイル名</th><th>ステータス</th><th>コメント</th><th>操作</th></tr></thead>
+  <tbody></tbody>
+</table>
+<script>
+async function fetchTasks() {
+  const res = await fetch("/tasks/");
+  const data = await res.json();
+  const tbody = document.querySelector("#task-table tbody");
+  tbody.innerHTML = "";
+  for (const [file, info] of Object.entries(data)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${file}</td>
+      <td>${info.status}</td>
+      <td>${info.comments.join("<br>")}</td>
+      <td>
+        <button onclick="updateStatus('${file}', 'reviewing')">レビュー中</button>
+        <button onclick="updateStatus('${file}', 'completed')">完了</button>
+        <button onclick="updateStatus('${file}', 'rejected')">差戻し</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+async function updateStatus(file, status) {
+  const res = await fetch(`/tasks/${file}/status?status=${status}`, {method: "POST"});
+  if (res.ok) {
+    alert("ステータスを更新しました。");
+    fetchTasks();
+  } else {
+    alert("更新に失敗しました。");
+  }
+}
+
+fetchTasks();
+</script>
+</body>
+</html>
