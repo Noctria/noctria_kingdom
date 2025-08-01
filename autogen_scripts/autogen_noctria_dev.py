@@ -9,7 +9,7 @@ import datetime
 
 load_dotenv()
 
-from autogen_agentchat import AssistantAgent, UserProxyAgent
+from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 def save_log(log_text):
