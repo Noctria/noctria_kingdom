@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>運用ログダッシュボード</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>運用ログダッシュボード</h1>
+  <canvas id="eventChart" width="600" height="400"></canvas>
+
+  <script>
+    async function fetchLogs() {
+      const res = await fetch('/logs/');
+      return res.json();
+    }
+
+    async function drawChart() {
+      const logs = await fetchLogs();
+
+      // イベント種別ごとの集計
+      const counts = {};
+      logs.forEach(log => {
+        counts[log.event_type] = (counts[log.event_type] || 0) + 1;
+      });
+
+      const ctx = document.getElementById('eventChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(counts),
+          datasets: [{
+            label: 'イベント数',
+            data: Object.values(counts),
+            backgroundColor: 'rgba(34, 209, 238, 0.7)'
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    drawChart();
+  </script>
+</body>
+</html>
