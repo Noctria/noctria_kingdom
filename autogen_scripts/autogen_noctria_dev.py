@@ -53,7 +53,7 @@ async def main():
         proxy = UserProxyAgent(
             name="Daifuku_Proxy",
             description=noctria_persona,                   # ← system_messageの代わりにdescription!
-            code_execution_config={"work_dir": "workspace"},# ← 必須（ダミーOK）
+            enable_code_execution=False,
             human_input_mode="NEVER"                        # ← 完全自動進行
         )
         assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
