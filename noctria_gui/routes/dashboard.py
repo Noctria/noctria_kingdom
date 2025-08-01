@@ -1,22 +1,17 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-"""
-👑 Central Governance Dashboard Route (v4.1) - 全指標分布可視化（ヒストグラム/箱ひげ）統合
-"""
-
 import logging
 import os
 import json
 from collections import defaultdict
+from typing import Tuple, List, Dict, Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, STATS_DIR
 from strategies.prometheus_oracle import PrometheusOracle
-
-STATS_DIR = "data/stats"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
@@ -30,10 +25,7 @@ DASHBOARD_METRICS = [
     {"key": "profit_factor",  "label": "PF",        "unit": "",     "dec": 2},
 ]
 
-def load_ai_metrics_trend_and_dist():
-    """
-    トレンド用＋分布用の全データ集計
-    """
+def load_ai_metrics_trend_and_dist() -> Tuple[List[Dict[str, Any]], List[str], Dict[str, Dict[str, List[float]]]]:
     date_ai_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     ai_metric_dist = defaultdict(lambda: defaultdict(list))
     if not os.path.isdir(STATS_DIR):
@@ -52,16 +44,13 @@ def load_ai_metrics_trend_and_dist():
                 k = m["key"]
                 v = d.get(k)
                 if v is not None:
-                    # %系は0-1なら100倍
                     if k in ["win_rate", "max_drawdown"] and v <= 1.0:
                         v = v * 100
-                    # トレンド
                     if date:
                         date_ai_metrics[date][ai][k].append(v)
-                    # 分布
                     ai_metric_dist[ai][k].append(v)
         except Exception as e:
-            logging.warning(f"AI指標ファイル読込失敗: {fname}, {e}")
+            logging.warning(f"AI指標ファイル読込失敗: {fname}, エラー: {e}", exc_info=True)
 
     ai_names = set()
     for d in date_ai_metrics.values():
@@ -74,7 +63,7 @@ def load_ai_metrics_trend_and_dist():
             for m in DASHBOARD_METRICS:
                 k = m["key"]
                 vals = date_ai_metrics[date][ai][k]
-                entry[f"{ai}__{k}"] = round(sum(vals)/len(vals), m["dec"]) if vals else None
+                entry[f"{ai}__{k}"] = round(sum(vals)/len(vals), m["dec"]) if vals and len(vals) > 0 else None
         trend.append(entry)
     return trend, ai_names, ai_metric_dist
 
@@ -91,12 +80,8 @@ async def dashboard_view(request: Request):
     }
     forecast_data = []
 
-    # Oracle予測取得（省略、従来通り）
-
-    # --- トレンド・分布データ集計 ---
     metric_trend, ai_names, ai_metric_dist = load_ai_metrics_trend_and_dist()
 
-    # --- AIごとの進捗（ダミー） ---
     ai_progress = [
         {"id": "king", "name": "King", "progress": 80, "phase": "評価中"},
         {"id": "aurus", "name": "Aurus", "progress": 65, "phase": "再評価"},
@@ -105,7 +90,6 @@ async def dashboard_view(request: Request):
         {"id": "prometheus", "name": "Prometheus", "progress": 88, "phase": "予測完了"},
     ]
 
-    # --- トレンド（既存通り） ---
     metrics_dict = {}
     for m in DASHBOARD_METRICS:
         k = m["key"]
@@ -117,13 +101,12 @@ async def dashboard_view(request: Request):
             metrics_dict[k][ai] = {
                 "labels": labels,
                 "values": values,
-                "avg": round(sum(data) / len(data), m["dec"]) if data else None,
-                "max": round(max(data), m["dec"]) if data else None,
-                "min": round(min(data), m["dec"]) if data else None,
+                "avg": round(sum(data) / len(data), m["dec"]) if data and len(data) > 0 else None,
+                "max": round(max(data), m["dec"]) if data and len(data) > 0 else None,
+                "min": round(min(data), m["dec"]) if data and len(data) > 0 else None,
                 "diff": round((data[-1] - data[-2]), m["dec"]) if len(data) >= 2 else None
             }
 
-    # --- 全体平均（各指標ごと）---
     overall_metrics = {}
     for m in DASHBOARD_METRICS:
         k = m["key"]
@@ -149,5 +132,5 @@ async def dashboard_view(request: Request):
         "dashboard_metrics": DASHBOARD_METRICS,
         "metrics_dict": metrics_dict,
         "overall_metrics": overall_metrics,
-        "ai_metric_dist": ai_metric_dist,  # 分布用データも渡す
+        "ai_metric_dist": ai_metric_dist,
     })
