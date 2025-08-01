@@ -2,7 +2,9 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (v2.5 - fixed)
+🔮 Prometheus Oracle (理想形 v2.6)
+- 未来予測AI。全予測にdecision_id/caller/reasonを記録返却。
+- 必ずNoctria王経由で呼び出す設計
 """
 
 import numpy as np
@@ -65,7 +67,13 @@ class PrometheusOracle:
         logging.info("神託の修練が完了しました。")
         self.save_model()
 
-    def predict_with_confidence(self, n_days: int = 14, output: str = "df") -> Union[pd.DataFrame, List[Dict[str, Any]]]:
+    def predict_with_confidence(
+        self, n_days: int = 14,
+        output: str = "df",
+        decision_id: Optional[str] = None,
+        caller: Optional[str] = "king_noctria",
+        reason: Optional[str] = None
+    ) -> Union[pd.DataFrame, List[Dict[str, Any]]]:
         logging.info(f"今後{n_days}日間の未来を占います…")
         try:
             dates = [datetime.today() + timedelta(days=i) for i in range(n_days)]
@@ -79,6 +87,9 @@ class PrometheusOracle:
                 "forecast": y_pred.round(2),
                 "lower": y_lower.round(2),
                 "upper": y_upper.round(2),
+                "decision_id": decision_id,
+                "caller": caller,
+                "reason": reason
             })
 
             logging.debug("🔍 生成された予測データ:\n%s", df.head(2).to_string(index=False))
@@ -90,8 +101,14 @@ class PrometheusOracle:
             logging.error(f"未来予測の儀にて予期せぬ事象: {e}", exc_info=True)
             return [] if output == "list" else pd.DataFrame()
 
-    def predict(self, n_days: int = 14) -> List[Dict[str, Any]]:
-        result = self.predict_with_confidence(n_days=n_days, output="list")
+    def predict(
+        self, n_days: int = 14,
+        decision_id: Optional[str] = None,
+        caller: Optional[str] = "king_noctria",
+        reason: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        result = self.predict_with_confidence(n_days=n_days, output="list",
+                                              decision_id=decision_id, caller=caller, reason=reason)
         if not result:
             logging.warning("⚠️ ORACLEからの予測リストが空です。")
         return result
@@ -118,8 +135,13 @@ class PrometheusOracle:
             logging.error(f"神託の検証中にエラー: {e}", exc_info=True)
             return {}
 
-    def write_forecast_json(self, n_days: int = 14):
-        df = self.predict_with_confidence(n_days=n_days)
+    def write_forecast_json(
+        self, n_days: int = 14,
+        decision_id: Optional[str] = None,
+        caller: Optional[str] = "king_noctria",
+        reason: Optional[str] = None
+    ):
+        df = self.predict_with_confidence(n_days=n_days, decision_id=decision_id, caller=caller, reason=reason)
         try:
             ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
             df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
@@ -133,7 +155,7 @@ if __name__ == "__main__":
     logging.info("--- Prometheus Oracle Test Start ---")
     oracle = PrometheusOracle()
     oracle.train(pd.DataFrame(np.random.rand(100, 2), columns=["x", "y"]), epochs=2)
-    oracle.write_forecast_json(n_days=7)
+    oracle.write_forecast_json(n_days=7, decision_id="KC-20250730-TEST", caller="test", reason="テスト")
     metrics = oracle.get_metrics()
     logging.info(f"テスト用指標: {metrics}")
     logging.info("--- Prometheus Oracle Test End ---")
