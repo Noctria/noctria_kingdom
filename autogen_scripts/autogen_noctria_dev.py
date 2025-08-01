@@ -2,7 +2,9 @@ import asyncio
 import os
 import pathlib
 
-from autogen import AssistantAgent, UserProxyAgent
+# --- 修正点 ---
+# autogenライブラリの構造に合わせて、agentchatモジュールから直接インポートする
+from autogen.agentchat import AssistantAgent, UserProxyAgent
 from dotenv import load_dotenv
 
 # .envファイルのパスを正しく設定
@@ -48,10 +50,8 @@ async def main():
         "まず、最適な全体設計案を、具体的なファイル構成と主要なクラス名を含めて提案してください。"
     )
 
-    # --- 修正点 ---
     # UserProxyAgentからAssistantAgentにチャットを開始する
     # これにより、エージェント間で適切にメッセージがやり取りされる
-    # 直接 _model_client.create を呼び出すのではなく、エージェントの対話メソッドを使用する
     await proxy.initiate_chat(
         assistant,
         message=user_message,
