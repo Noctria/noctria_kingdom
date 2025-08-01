@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 # --- 修正点 ---
 # autogen-agentchatパッケージの正しいimportに変更
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
+from autogen_ext.models.openai import OpenAIChatCompletionClient  # 追記
 
 # .envファイルのパスを正しく設定
 # このスクリプトの親ディレクトリの親ディレクトリにある.envファイルを読み込む
@@ -18,21 +19,15 @@ async def main():
     if not api_key:
         raise ValueError("環境変数 'OPENAI_API_KEY' が設定されていません。")
 
-    # LLMのモデル設定
-    # gpt-4oモデルを使用し、APIキーを設定
-    config_list = [
-        {
-            "model": "gpt-4o",
-            "api_key": api_key,
-        }
-    ]
+    # OpenAIクライアントを作成（AssistantAgentに渡す）
+    client = OpenAIChatCompletionClient(model="gpt-4o", api_key=api_key)
 
     # アシスタントエージェントを定義
-    # システムメッセージでAIの役割を明確に設定
+    # system_messageでAIの役割を明確に設定し、model_clientを渡す
     assistant = AssistantAgent(
         name="Noctria_Assistant",
         system_message="あなたは、FX自動トレードシステムの設計を支援する優秀なAIアシスタントです。具体的で実践的な提案を行ってください。",
-        llm_config={"config_list": config_list},
+        model_client=client,
     )
 
     # ユーザープロキシエージェントを定義
@@ -40,7 +35,7 @@ async def main():
     proxy = UserProxyAgent(
         name="Daifuku_Proxy",
         human_input_mode="NEVER",  # ユーザーからの入力を待たずに処理を続ける
-        max_consecutive_auto_reply=1, # 連続自動応答を1回に制限
+        max_consecutive_auto_reply=1,  # 連続自動応答を1回に制限
         is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TERMINATE"),
     )
 
@@ -56,6 +51,9 @@ async def main():
         assistant,
         message=user_message,
     )
+
+    # クライアントを閉じる
+    await client.close()
 
 
 if __name__ == "__main__":
