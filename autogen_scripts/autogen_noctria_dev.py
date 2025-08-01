@@ -2,7 +2,6 @@
 # Python 3.10.12, venv=autogen_venv
 
 from dotenv import load_dotenv
-import os
 import asyncio
 import sys
 import datetime
@@ -17,13 +16,12 @@ def save_log(log_text):
     with open(fname, "w", encoding="utf-8") as f:
         f.write(log_text)
 
-# 分身AIプロンプト＋追加ルールをここで定義
 noctria_persona = """
 あなたは「大福雅之」の分身AIです。
 Noctria KingdomのAI統治開発者として、FX USD/JPYトレードAIをFintokeiルールとMT5仕様を厳守しつつ、
 利益最大化・全自動PDCA実現・現場本番品質に徹底的にこだわって設計・運用・議論を行ってください。
 
----
+--- 
 【追加開発ルール】
 - 新規ファイル・新規ディレクトリの作成は極力避ける。
 - 新しい処理や機能追加が必要な場合はまず既存のファイルやクラス、関数に追記・統合できないかを最優先で検討すること。
@@ -33,7 +31,6 @@ Noctria KingdomのAI統治開発者として、FX USD/JPYトレードAIをFintok
 - コードファイルを追加した場合やリンクを作った場合は、都度mmdを更新してほしい。
 ---
 
----
 【追加開発ルール：Git運用】
 - コードの修正やファイルの追加・削除など、プロジェクトに何らかの変更を加えた場合は、必ず`git add`・`git commit`・`git push`まで一連の操作を実施すること。
 - 複数ファイルにまたがる修正時も、必ず全てステージング・コミットした上でpushすること。
@@ -50,18 +47,15 @@ Noctria KingdomのAI統治開発者として、FX USD/JPYトレードAIをFintok
 async def main():
     try:
         client = OpenAIChatCompletionClient(model="gpt-4o")
-        proxy = UserProxyAgent(
-            name="Daifuku_Proxy",
-            description=noctria_persona,                   # ← system_messageの代わりにdescription!
-            enable_code_execution=False,
-            human_input_mode="NEVER"                        # ← 完全自動進行
-        )
+        proxy = UserProxyAgent(name="Daifuku_Proxy")
         assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
 
-        # 初回メッセージ
+        # 初回メッセージに分身AIプロンプトと指示を含める
+        initial_message = noctria_persona + "\n\nUSD/JPY FXの自動トレードAIをFintokei＋MT5制約のもとで設計します。まず最適な全体設計案をファイル構成・主要クラス名付きで提案してください。"
+
         result = await proxy.initiate_chat(
             assistant,
-            message="USD/JPY FXの自動トレードAIをFintokei＋MT5制約のもとで設計します。まず最適な全体設計案をファイル構成・主要クラス名付きで提案してください。",
+            message=initial_message,
             max_turns=6
         )
         save_log(str(result))
