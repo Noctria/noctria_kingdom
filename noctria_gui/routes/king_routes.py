@@ -7,7 +7,7 @@
 - APIはその橋渡しに徹する
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 import json
 import logging
+from typing import Dict, Any
 
 router = APIRouter(prefix="/api/king", tags=["King"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -26,7 +27,7 @@ KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"  # 1行1レコード型を推奨
 
 logger = logging.getLogger("king_routes")
 
-def load_logs() -> list:
+def load_logs() -> list[Dict[str, Any]]:
     try:
         if KING_LOG_PATH.exists():
             with open(KING_LOG_PATH, "r", encoding="utf-8") as f:
@@ -36,6 +37,9 @@ def load_logs() -> list:
         logger.error(f"🔴 load_logs失敗: {e}")
         return []
 
+# KingNoctriaのインスタンスをグローバルに生成し共有する案（負荷軽減）
+king_instance = KingNoctria()
+
 @router.post("/command")
 async def king_command_api(request: Request):
     """
@@ -44,33 +48,38 @@ async def king_command_api(request: Request):
     try:
         data = await request.json()
         command = data.get("command")
+        if not command:
+            raise HTTPException(status_code=400, detail="commandパラメータが必要です。")
+        
         args = data.get("args", {})
-        ai = data.get("ai", None)  # 現状使われていないが将来対応用に保持
+        if not isinstance(args, dict):
+            args = {}
+
+        ai = data.get("ai", None)  # 将来対応用
         caller = "king_routes"
         reason = data.get("reason", f"APIコマンド[{command}]実行")
-        
-        king = KingNoctria()
 
         # --- 王の采配で各コマンドに対応 ---
-        # すべて「decision_idは王本体で発行」
         if command == "council":
-            result = king.hold_council(args, caller=caller, reason=reason)
+            result = king_instance.hold_council(args, caller=caller, reason=reason)
         elif command == "generate_strategy":
-            result = king.trigger_generate(args, caller=caller, reason=reason)
+            result = king_instance.trigger_generate(args, caller=caller, reason=reason)
         elif command == "evaluate":
-            result = king.trigger_eval(args, caller=caller, reason=reason)
+            result = king_instance.trigger_eval(args, caller=caller, reason=reason)
         elif command == "recheck":
-            result = king.trigger_recheck(args, caller=caller, reason=reason)
+            result = king_instance.trigger_recheck(args, caller=caller, reason=reason)
         elif command == "push":
-            result = king.trigger_push(args, caller=caller, reason=reason)
+            result = king_instance.trigger_push(args, caller=caller, reason=reason)
         elif command == "replay":
             log_path = args.get("log_path", "") if isinstance(args, dict) else ""
-            result = king.trigger_replay(log_path, caller=caller, reason=reason)
+            result = king_instance.trigger_replay(log_path, caller=caller, reason=reason)
         else:
             return JSONResponse(content={"error": f"未知コマンド: {command}"}, status_code=400)
 
-        # ここで王本体のdecision_idが返ってきているはず
+        # decision_idが返ってきているはず
         return JSONResponse(content=result)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"King command failed: {e}", exc_info=True)
         return JSONResponse(
