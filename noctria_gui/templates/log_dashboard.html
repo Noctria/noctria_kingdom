@@ -1,21 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <title>運用ログダッシュボード</title>
+  <meta charset="UTF-8" />
+  <title>運用ログダッシュボード - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/hud_style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body.hud-container-simple {
+      padding: 1rem;
+      background-color: var(--bg-color);
+      color: var(--text-color-base);
+      font-family: var(--font-family);
+      min-height: 100vh;
+    }
+    h1 {
+      font-weight: 700;
+      font-size: 1.8rem;
+      color: var(--text-color-normal);
+      margin-bottom: 1.5rem;
+      filter: drop-shadow(0 0 8px var(--glow-primary));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .hud-panel {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      box-shadow: 0 0 15px var(--glow-primary);
+      padding: 1.5rem 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    #eventChart {
+      width: 100% !important;
+      height: 400px !important;
+    }
+  </style>
 </head>
-<body>
-  <h1>運用ログダッシュボード</h1>
-  <canvas id="eventChart" width="600" height="400"></canvas>
+<body class="hud-container-simple">
+  <h1><i class="fas fa-chart-bar"></i> 運用ログダッシュボード</h1>
 
+  <section class="hud-panel">
+    <canvas id="eventChart"></canvas>
+  </section>
+
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <script>
     async function fetchLogs() {
       const res = await fetch('/logs/');
+      if (!res.ok) {
+        console.error("ログ取得失敗");
+        return [];
+      }
       return res.json();
     }
 
     async function drawChart() {
       const logs = await fetchLogs();
+      if (!logs.length) {
+        // データなし表示等を後で実装可能
+        return;
+      }
 
       // イベント種別ごとの集計
       const counts = {};
@@ -31,13 +77,20 @@
           datasets: [{
             label: 'イベント数',
             data: Object.values(counts),
-            backgroundColor: 'rgba(34, 209, 238, 0.7)'
+            backgroundColor: 'rgba(34, 209, 238, 0.7)',
+            borderColor: 'rgba(34, 209, 238, 1)',
+            borderWidth: 1,
+            hoverBackgroundColor: 'rgba(34, 209, 238, 0.9)'
           }]
         },
         options: {
           responsive: true,
+          plugins: {
+            legend: { labels: { color: 'var(--text-color-base)' } }
+          },
           scales: {
-            y: { beginAtZero: true }
+            x: { ticks: { color: 'var(--text-color-base)' }, grid: { color: 'var(--panel-border)' } },
+            y: { beginAtZero: true, ticks: { color: 'var(--text-color-base)' }, grid: { color: 'var(--panel-border)' } }
           }
         }
       });
