@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # --- 修正点 ---
 # autogen-agentchatパッケージの正しいimportに変更
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
-from autogen_core.models.openai import OpenAIChatCompletionClient
+from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 # .envファイルのパスを正しく設定
 # このスクリプトの親ディレクトリの親ディレクトリにある.envファイルを読み込む
