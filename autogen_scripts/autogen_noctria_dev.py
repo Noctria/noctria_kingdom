@@ -32,11 +32,12 @@ async def main():
 
     # ユーザープロキシエージェントを定義
     # このエージェントがユーザーの代わりにアシスタントと対話する
+    # ※ ここでエラーが起きる場合は human_input_mode などの引数は外してください
     proxy = UserProxyAgent(
         name="Daifuku_Proxy",
-        human_input_mode="NEVER",  # ユーザーからの入力を待たずに処理を続ける
-        max_consecutive_auto_reply=1,  # 連続自動応答を1回に制限
-        is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TERMINATE"),
+        # human_input_mode="NEVER",
+        # max_consecutive_auto_reply=1,
+        # is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TERMINATE"),
     )
 
     # ユーザーからの最初のメッセージ
@@ -46,7 +47,6 @@ async def main():
     )
 
     # UserProxyAgentからAssistantAgentにチャットを開始する
-    # これにより、エージェント間で適切にメッセージがやり取りされる
     await proxy.initiate_chat(
         assistant,
         message=user_message,
@@ -54,7 +54,6 @@ async def main():
 
     # クライアントを閉じる
     await client.close()
-
 
 if __name__ == "__main__":
     # 非同期関数mainを実行する
