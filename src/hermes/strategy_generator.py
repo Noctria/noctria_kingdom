@@ -25,7 +25,8 @@ DB_USER = os.getenv("POSTGRES_USER", "airflow")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
-MODEL_PATH = os.getenv("MODEL_DIR", str(MODELS_DIR / "nous-hermes-2"))
+# 修正: MODEL_PATH は HERMES_MODELS_DIR に基づく
+MODEL_PATH = os.getenv("MODEL_DIR", str(HERMES_MODELS_DIR / "nous-hermes-2"))
 
 # --- LLMモデルのロード ---
 def load_llm_model():
@@ -92,9 +93,13 @@ def save_to_file(code: str, tag: str) -> str:
     save_dir = STRATEGIES_DIR / "hermes_generated"
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / filename
-    with open(save_path, "w", encoding="utf-8") as f:
-        f.write(code)
-    logger.info(f"💾 戦略をファイルに保存しました: {save_path}")
+    try:
+        with open(save_path, "w", encoding="utf-8") as f:
+            f.write(code)
+        logger.info(f"💾 戦略をファイルに保存しました: {save_path}")
+    except Exception as e:
+        logger.error(f"🚨 戦略ファイル保存に失敗: {e}", exc_info=True)
+        raise
     return str(save_path)
 
 # --- サンプル実行ブロック ---
