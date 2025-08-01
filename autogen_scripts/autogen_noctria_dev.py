@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from autogen_agentchat.agents import AssistantAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+from autogen_core.message import UserMessage
 
 load_dotenv()
 
@@ -22,7 +23,7 @@ async def main():
     user_message = "USD/JPYの自動トレードAIの設計を提案してください。"
 
     response = await assistant._model_client.create(
-        messages=[{"role": "user", "content": user_message}]
+        messages=[UserMessage(content=user_message)]
     )
     print("AI response:", response.choices[0].message.content)
 
