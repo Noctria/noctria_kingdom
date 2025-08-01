@@ -14,12 +14,12 @@ async def main():
 
     user_message = "USD/JPYの自動トレードAIの設計を提案してください。"
 
-    # 非同期でチャット補完を呼び出し
-    response = await client.chat.completions.acreate(
-        model="gpt-4o",
-        messages=[
-            {"role": "user", "content": user_message}
-        ]
+    # 同期メソッドcreateをasyncio.to_threadで呼び出す
+    response = await asyncio.to_thread(
+        lambda: client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": user_message}],
+        )
     )
 
     print("AI response:", response.choices[0].message.content)
