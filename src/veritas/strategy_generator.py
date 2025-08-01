@@ -1,16 +1,23 @@
 # src/veritas/strategy_generator.py
 
+import sys
+from pathlib import Path
+
+# --- ここで src ディレクトリの絶対パスを sys.path に追加 ---
+src_path = Path(__file__).resolve().parents[1]  # src/veritas/ の一つ上 = src/
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
 import os
 import torch
 import psycopg2
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from core.path_config import VERITAS_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from core.logger import setup_logger
 
-from src.veritas.models.ml_model.simple_model import SimpleModel
+from veritas.models.ml_model.simple_model import SimpleModel
 
 logger = setup_logger("VeritasGenerator", LOGS_DIR / "veritas" / "generator.log")
 
