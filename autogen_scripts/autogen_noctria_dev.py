@@ -23,7 +23,7 @@ async def main():
         "まず最適な全体設計案をファイル構成・主要クラス名付きで提案してください。"
     )
 
-    response = await assistant._model_client.acreate(
+    response = await assistant._model_client.create(
         messages=[{"role": "user", "content": user_message}]
     )
 
