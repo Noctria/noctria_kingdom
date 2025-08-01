@@ -2,8 +2,9 @@ import asyncio
 import os
 import pathlib
 from dotenv import load_dotenv
-from autogen.agentchat import AssistantAgent, UserProxyAgent
+from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
 
 # .envファイルのパスを正しく設定
 env_path = pathlib.Path(__file__).parent.parent / ".env"
