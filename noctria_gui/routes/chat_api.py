@@ -1,23 +1,28 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from openai import OpenAI
-from conversation_history_manager import ConversationHistoryManager
+import os
 import asyncio
+
+from src.noctria_gui.services.conversation_history_manager import ConversationHistoryManager
 
 router = APIRouter()
 
-# グローバルで履歴管理（単純例）
-history_mgr = None
-client = None
+def get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEYが設定されていません。")
+    return OpenAI(api_key=api_key)
 
-@router.on_event("startup")
-async def startup_event():
-    global client, history_mgr
-    client = OpenAI(api_key="YOUR_API_KEY")  # 実際は環境変数等から取得推奨
-    history_mgr = ConversationHistoryManager(client)
+def get_history_manager() -> ConversationHistoryManager:
+    return ConversationHistoryManager()
 
 @router.post("/chat")
-async def chat(request: Request):
+async def chat(
+    request: Request,
+    client: OpenAI = Depends(get_openai_client),
+    history_mgr: ConversationHistoryManager = Depends(get_history_manager)
+):
     data = await request.json()
     user_msg = data.get("message", "").strip()
     if not user_msg:
@@ -28,7 +33,7 @@ async def chat(request: Request):
     response = await asyncio.to_thread(
         lambda: client.chat.completions.create(
             model="gpt-4o",
-            messages=history_mgr.history
+            messages=history_mgr.get_history()
         )
     )
     assistant_msg = response.choices[0].message.content
