@@ -1,12 +1,10 @@
 import asyncio
 import os
-import pathlib
 from dotenv import load_dotenv
 from autogen_agentchat.agents import AssistantAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
-env_path = pathlib.Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv()
 
 async def main():
     api_key = os.getenv("OPENAI_API_KEY")
@@ -17,22 +15,15 @@ async def main():
 
     assistant = AssistantAgent(
         name="Noctria_Assistant",
-        system_message="あなたは、FX自動トレードシステムの設計を支援する優秀なAIアシスタントです。具体的で実践的な提案を行ってください。",
+        system_message="FX自動トレードAIの設計を支援してください。",
         model_client=client,
     )
 
-    user_message = (
-        "USD/JPY FXの自動トレードAIをFintokei＋MT5の制約のもとで設計します。"
-        "まず、最適な全体設計案を、具体的なファイル構成と主要なクラス名を含めて提案してください。"
-    )
+    user_message = "USD/JPYの自動トレードAIの設計を提案してください。"
 
-    # 同期API createをasyncio.to_threadで非同期呼び出し
-    response = await asyncio.to_thread(
-        lambda: assistant._model_client.create(
-            messages=[{"role": "user", "content": user_message}]
-        )
+    response = await assistant._model_client.create(
+        messages=[{"role": "user", "content": user_message}]
     )
-
     print("AI response:", response.choices[0].message.content)
 
     await client.close()
