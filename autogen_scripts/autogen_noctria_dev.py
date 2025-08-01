@@ -36,7 +36,7 @@ async def main():
     )
 
     # UserProxyAgentからAssistantAgentへメッセージを送信し対話開始
-    await proxy.receive(user_message, assistant)
+    await proxy.send(user_message, assistant)
 
     # OpenAIクライアントを閉じる
     await client.close()
