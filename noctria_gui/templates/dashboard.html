@@ -7,6 +7,13 @@
 {% block header_nav_text %}—{% endblock %}
 
 {% block content %}
+<div id="data-holder"
+     data-metrics-dict='{{ metrics_dict | tojson | safe }}'
+     data-overall-metrics='{{ overall_metrics | tojson | safe }}'
+     data-dashboard-metrics='{{ dashboard_metrics | tojson | safe }}'
+     data-ai-names='{{ ai_names | tojson | safe }}'>
+</div>
+
 <section class="hud-panel dashboard-nav" style="padding: 1rem; margin-bottom: 1rem;">
   <h2 class="panel-title text-normal"><i class="fas fa-compass"></i> Navigation</h2>
   <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
