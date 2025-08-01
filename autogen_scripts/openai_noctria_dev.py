@@ -2,6 +2,7 @@ import os
 import asyncio
 import subprocess
 import re
+import platform
 from dotenv import load_dotenv
 from openai import OpenAI
 import datetime
@@ -60,9 +61,6 @@ def git_commit_push(file_path: str, message: str) -> bool:
         return False
 
 def split_files_from_response(response: str):
-    """
-    AI応答内に '# ファイル名: filename.py' 形式で複数ファイルコードを含む場合に分割抽出
-    """
     pattern = r"# ファイル名:\s*(.+\.py)\s*\n"
     splits = re.split(pattern, response)
     files = {}
@@ -73,6 +71,22 @@ def split_files_from_response(response: str):
         files[filename] = content.strip()
         i += 2
     return files
+
+def show_diff(old_file, new_file):
+    if platform.system() == "Windows":
+        cmd = ["fc", old_file, new_file]
+    else:
+        cmd = ["diff", "-u", old_file, new_file]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.stdout:
+            print("==== 差分 ====")
+            print(result.stdout)
+        else:
+            print("差分なし")
+    except Exception as e:
+        print(f"差分表示でエラー発生: {e}")
 
 async def main():
     api_key = os.getenv("OPENAI_API_KEY")
@@ -100,6 +114,7 @@ async def main():
     implementation_messages = [{"role": "user", "content": implementation_prompt}]
 
     max_turns = 10
+    prev_code_paths = []
 
     for turn in range(max_turns):
         print(f"\n--- Turn {turn+1} ---")
@@ -124,10 +139,8 @@ async def main():
 
         design_messages.append({"role": "user", "content": implementation_response})
 
-        # 複数ファイル分割保存
         files = split_files_from_response(implementation_response)
         if not files:
-            # ファイル分割指示がない場合は1ファイル保存
             code_filename = os.path.join(OUTPUT_DIR, f"turn_{turn+1}_generated_code.py")
             with open(code_filename, "w", encoding="utf-8") as f:
                 f.write(f"# 自動生成コード - ターン {turn+1}\n")
@@ -135,24 +148,32 @@ async def main():
             print(f"コードを保存しました: {code_filename}")
             log_message(f"コードを保存しました: {code_filename}")
 
-            # 品質チェック
+            if prev_code_paths:
+                show_diff(prev_code_paths[-1], code_filename)
+            prev_code_paths.append(code_filename)
+
             passed = await asyncio.to_thread(run_code_quality_checks, code_filename)
             if not passed:
                 print(f"ターン{turn+1}のコード品質に問題があります。改善をAIに要求してください。")
                 log_message(f"ターン{turn+1}のコード品質に問題あり。")
 
-            # Git連携
             commit_message = f"Auto commit: generated code turn {turn+1}"
             git_commit_push(code_filename, commit_message)
 
         else:
-            # 複数ファイル保存・品質チェック・Git連携
             for fname, content in files.items():
                 file_path = os.path.join(OUTPUT_DIR, fname)
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(content)
                 print(f"コードを保存しました: {file_path}")
                 log_message(f"コードを保存しました: {file_path}")
+
+                if prev_code_paths:
+                    # 差分表示は直前に保存した同名ファイルのみ対応
+                    prev_same = [p for p in prev_code_paths if os.path.basename(p) == fname]
+                    if prev_same:
+                        show_diff(prev_same[-1], file_path)
+                prev_code_paths.append(file_path)
 
                 passed = await asyncio.to_thread(run_code_quality_checks, file_path)
                 if not passed:
@@ -162,12 +183,17 @@ async def main():
                 commit_message = f"Auto commit: generated code turn {turn+1} file {fname}"
                 git_commit_push(file_path, commit_message)
 
-        # ユーザー割込み判定
-        print("続行する場合はEnterを押してください。終了する場合は'q'を入力してEnterを押してください。")
+        print("コマンド入力: 続行=Enter, 終了=q, 一時停止=p, スキップ=s")
         user_input = await asyncio.to_thread(input)
         if user_input.strip().lower() == "q":
             print("ユーザーによる中断指示を受けました。処理を終了します。")
             break
+        elif user_input.strip().lower() == "p":
+            print("一時停止中。再開するにはEnterを押してください。")
+            await asyncio.to_thread(input)
+        elif user_input.strip().lower() == "s":
+            print("このターンをスキップします。")
+            continue
 
     print("\n=== 自動対話ワークフロー終了 ===")
     log_message("=== 自動対話ワークフロー終了 ===")
