@@ -1,18 +1,54 @@
 <!DOCTYPE html>
-<html>
-<head><title>対話履歴</title></head>
-<body>
-<h1>対話履歴</h1>
-<pre id="history"></pre>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>対話履歴 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/hud_style.css" />
+  <style>
+    body.hud-container-simple {
+      padding: 1rem;
+    }
+    h1 {
+      color: var(--text-color-normal);
+      filter: drop-shadow(0 0 8px var(--glow-primary));
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+    }
+    pre#history {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1rem;
+      color: var(--text-color-base);
+      font-family: var(--font-family);
+      max-height: 80vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      box-shadow: 0 0 15px var(--glow-primary);
+    }
+  </style>
+</head>
+<body class="hud-container-simple">
+  <h1><i class="fas fa-comments"></i> 対話履歴</h1>
+  <pre id="history">読み込み中...</pre>
 
-<script>
-async function loadHistory() {
-    const res = await fetch('/chat_history');
-    const history = await res.json();
-    const el = document.getElementById('history');
-    el.textContent = JSON.stringify(history, null, 2);
-}
-loadHistory();
-</script>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script>
+    async function loadHistory() {
+      try {
+        const res = await fetch('/chat_history');
+        if (!res.ok) throw new Error('通信エラー');
+        const history = await res.json();
+        const el = document.getElementById('history');
+        el.textContent = JSON.stringify(history, null, 2);
+      } catch (e) {
+        document.getElementById('history').textContent = '履歴の読み込みに失敗しました。';
+      }
+    }
+    loadHistory();
+  </script>
 </body>
 </html>
