@@ -2,7 +2,6 @@ import os
 import asyncio
 import subprocess
 import re
-import platform
 from dotenv import load_dotenv
 from openai import OpenAI
 import datetime
@@ -11,7 +10,7 @@ import sys
 load_dotenv()
 
 OUTPUT_DIR = "./generated_code"
-LOG_FILE = "./generated_code/chat_log.txt"
+LOG_FILE = os.path.join(OUTPUT_DIR, "chat_log.txt")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 ROLE_PROMPTS = {
@@ -55,13 +54,13 @@ async def call_openai(client, messages):
         return None
 
 def split_files_from_response(response: str):
-    pattern = r"# ファイル名:\s*(.+\.py)\s*\n"
+    pattern = r"# ファイル名:\s*(.+?\.py)\s*\n"
     splits = re.split(pattern, response)
     files = {}
     i = 1
     while i < len(splits):
         filename = splits[i].strip()
-        content = splits[i+1]
+        content = splits[i + 1]
         files[filename] = content.strip()
         i += 2
     return files
@@ -81,7 +80,6 @@ def run_pytest(test_dir: str) -> (bool, str):
 
 async def multi_agent_loop(client, max_turns=5):
     messages = {role: [{"role": "user", "content": prompt}] for role, prompt in ROLE_PROMPTS.items()}
-    prev_code_paths = []
 
     for turn in range(max_turns):
         print(f"\n=== Turn {turn+1} ===")
@@ -102,12 +100,10 @@ async def multi_agent_loop(client, max_turns=5):
 
             if role in ("implement", "test", "doc"):
                 files = split_files_from_response(response)
-                saved_paths = []
                 if not files:
                     filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn+1}.py")
                     with open(filename, "w", encoding="utf-8") as f:
                         f.write(response)
-                    saved_paths.append(filename)
                     print(f"{role} AIのコード保存: {filename}")
                     log_message(f"{role} AIのコード保存: {filename}")
                 else:
@@ -115,7 +111,6 @@ async def multi_agent_loop(client, max_turns=5):
                         file_path = os.path.join(OUTPUT_DIR, fname)
                         with open(file_path, "w", encoding="utf-8") as f:
                             f.write(content)
-                        saved_paths.append(file_path)
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
 
