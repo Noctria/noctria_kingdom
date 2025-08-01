@@ -1,11 +1,11 @@
 import asyncio
 import os
 import pathlib
+from dotenv import load_dotenv
 
 # --- 修正点 ---
-# autogenライブラリの構造に合わせて、agentchatモジュールから直接インポートする
-from autogen.agentchat import AssistantAgent, UserProxyAgent
-from dotenv import load_dotenv
+# autogen-agentchatパッケージの正しいimportに変更
+from autogen_agentchat import AssistantAgent, UserProxyAgent
 
 # .envファイルのパスを正しく設定
 # このスクリプトの親ディレクトリの親ディレクトリにある.envファイルを読み込む
