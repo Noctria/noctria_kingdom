@@ -15,26 +15,24 @@ from pathlib import Path
 import logging
 
 from src.core.path_config import VERITAS_MODELS_DIR
-# 使用箇所も
-self.model_path = model_path or (VERITAS_MODELS_DIR / "aurus_singularis_v2.4.keras")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
-
+logger = logging.getLogger(__name__)
 
 class AurusSingularis:
     def __init__(self, model_path: Optional[Path] = None):
-        self.model_path = model_path or (MODELS_DIR / "aurus_singularis_v2.4.keras")
+        self.model_path = model_path or (VERITAS_MODELS_DIR / "aurus_singularis_v2.4.keras")
         self.model = self._load_or_build_model()
 
     def _load_or_build_model(self) -> tf.keras.Model:
         if self.model_path.exists():
-            logging.info(f"書庫より分析官の知性を読み込んでおります: {self.model_path}")
+            logger.info(f"書庫より分析官の知性を読み込んでおります: {self.model_path}")
             try:
                 return tf.keras.models.load_model(self.model_path)
             except Exception as e:
-                logging.error(f"知性の読み込みに失敗: {e}")
+                logger.error(f"知性の読み込みに失敗: {e}")
         # モデル構造定義
-        logging.info("新たな分析モデルを構築します。")
+        logger.info("新たな分析モデルを構築します。")
         model = tf.keras.Sequential([
             tf.keras.layers.Input(shape=(19,)),
             tf.keras.layers.Dense(128, activation='relu'),
@@ -51,9 +49,9 @@ class AurusSingularis:
         try:
             self.model_path.parent.mkdir(parents=True, exist_ok=True)
             self.model.save(self.model_path)
-            logging.info(f"知性を保存しました: {self.model_path}")
+            logger.info(f"知性を保存しました: {self.model_path}")
         except Exception as e:
-            logging.error(f"モデル保存失敗: {e}")
+            logger.error(f"モデル保存失敗: {e}")
 
     def _preprocess_data(self, market_data: Dict[str, Any]) -> np.ndarray:
         trend_map = {"bullish": 1.0, "neutral": 0.5, "bearish": 0.0}
@@ -83,7 +81,7 @@ class AurusSingularis:
         return np.array(features).reshape(1, -1)
 
     def train(self, data: Optional[pd.DataFrame] = None, epochs: int = 10, batch_size: int = 32):
-        logging.info("Aurus訓練開始…")
+        logger.info("Aurus訓練開始…")
         if data is not None and not data.empty:
             X_train = data.iloc[:, :-1].values
             y_train = data.iloc[:, -1].values
@@ -91,16 +89,16 @@ class AurusSingularis:
             X_train = np.random.rand(100, 19)
             y_train = np.random.randint(0, 3, 100)
         self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
-        logging.info("Aurus訓練完了。知性を保存。")
+        logger.info("Aurus訓練完了。知性を保存。")
         self.save_model()
 
     def propose(self, market_data: Dict[str, Any], decision_id: Optional[str] = None, caller: Optional[str] = None, reason: Optional[str] = None) -> Dict[str, Any]:
-        logging.info("Aurus総合市場分析を実行…")
+        logger.info("Aurus総合市場分析を実行…")
         processed_data = self._preprocess_data(market_data)
         try:
             prediction = self.model.predict(processed_data)[0]
         except Exception as e:
-            logging.error(f"推論時エラー: {e}")
+            logger.error(f"推論時エラー: {e}")
             return {
                 "name": "AurusSingularis",
                 "type": "comprehensive_analysis_report",
@@ -118,7 +116,7 @@ class AurusSingularis:
         signal = signal_map[signal_index]
         confidence_score = float(prediction[signal_index])
 
-        logging.info(f"Aurus分析結果: {signal} (確信度: {confidence_score:.2f})")
+        logger.info(f"Aurus分析結果: {signal} (確信度: {confidence_score:.2f})")
 
         return {
             "name": "AurusSingularis",
@@ -134,7 +132,7 @@ class AurusSingularis:
 
 
 if __name__ == "__main__":
-    logging.info("--- Aurus Singularis: 単独試練開始 ---")
+    logger.info("--- Aurus Singularis: 単独試練開始 ---")
     aurus_ai = AurusSingularis()
     aurus_ai.train(epochs=3)
 
@@ -151,4 +149,4 @@ if __name__ == "__main__":
     proposal = aurus_loaded.propose(mock_market_data, decision_id="TEST-DECID", caller="__main__", reason="テスト用")
     print("\n👑 王への進言:")
     print(pd.Series(proposal))
-    logging.info("--- Aurus Singularis: 単独試練完了 ---")
+    logger.info("--- Aurus Singularis: 単独試練完了 ---")
