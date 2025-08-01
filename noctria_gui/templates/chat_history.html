@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>対話履歴</title></head>
+<body>
+<h1>対話履歴</h1>
+<pre id="history"></pre>
+
+<script>
+async function loadHistory() {
+    const res = await fetch('/chat_history');
+    const history = await res.json();
+    const el = document.getElementById('history');
+    el.textContent = JSON.stringify(history, null, 2);
+}
+loadHistory();
+</script>
+</body>
+</html>
