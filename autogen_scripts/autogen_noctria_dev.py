@@ -15,23 +15,22 @@ async def main():
 
     client = OpenAIChatCompletionClient(model="gpt-4o", api_key=api_key)
 
+    # UserProxyAgent と AssistantAgent をインスタンス化
     proxy = UserProxyAgent(name="Daifuku_Proxy")
     assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
 
-    # UserProxyAgentの会話管理用のConversationを生成
-    conversation = proxy.create_conversation()
-
-    # 会話にAssistantAgentを登録（対話相手として設定）
-    conversation.set_assistant(assistant)
-
-    # UserProxyAgentがAssistantAgentにメッセージを送る
+    # UserProxyAgent から直接OpenAIに問い合わせる（UserProxyAgentがsend_messageを持たない場合の代替）
     user_message = (
         "USD/JPY FXの自動トレードAIをFintokei＋MT5制約のもとで設計します。"
         "まず最適な全体設計案をファイル構成・主要クラス名付きで提案してください。"
     )
-    response = await conversation.send_message(user_message)
 
-    print("AI response:", response.text)
+    # ここではUserProxyAgentを使わずにAssistantAgentを直接呼び出す例
+    response = await assistant.model_client.chat.completions.acreate(
+        model=assistant.model_client.model,
+        messages=[{"role": "user", "content": user_message}]
+    )
+    print("AI response:", response.choices[0].message.content)
 
     await client.close()
 
