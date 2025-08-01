@@ -66,51 +66,68 @@ def split_files_from_response(response: str):
         i += 2
     return files
 
+def run_pytest(test_dir: str) -> (bool, str):
+    try:
+        result = subprocess.run(
+            ["pytest", test_dir, "--maxfail=1", "--disable-warnings", "-q"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        success = (result.returncode == 0)
+        return success, result.stdout + "\n" + result.stderr
+    except Exception as e:
+        return False, f"pytest実行例外: {e}"
+
 async def multi_agent_loop(client, max_turns=5):
-    # 初期メッセージを役割ごとにセット
     messages = {role: [{"role": "user", "content": prompt}] for role, prompt in ROLE_PROMPTS.items()}
     prev_code_paths = []
 
     for turn in range(max_turns):
         print(f"\n=== Turn {turn+1} ===")
-
-        # 役割順に呼び出し、次役割のユーザーメッセージに前役割の応答を渡す
         order = ["design", "implement", "test", "review", "doc"]
+
         for i, role in enumerate(order):
             print(f"\n--- {role.upper()} AI ---")
             response = await call_openai(client, messages[role])
             if response is None:
-                print(f"{role} AIの応答取得に失敗。処理を中断します。")
+                print(f"{role} AIの応答取得に失敗。処理中断。")
                 return
-
             print(response)
             log_message(f"{role} AI: {response}")
             messages[role].append({"role": "assistant", "content": response})
 
-            # 次の役割にこの応答をユーザーメッセージとして渡す
             next_role = order[(i + 1) % len(order)]
             messages[next_role].append({"role": "user", "content": response})
 
-            # 生成コードの保存と品質チェック（implement, test, docのみ対応）
             if role in ("implement", "test", "doc"):
                 files = split_files_from_response(response)
+                saved_paths = []
                 if not files:
-                    code_filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn+1}.py")
-                    with open(code_filename, "w", encoding="utf-8") as f:
+                    filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn+1}.py")
+                    with open(filename, "w", encoding="utf-8") as f:
                         f.write(response)
-                    print(f"{role} AIのコードを保存しました: {code_filename}")
-                    log_message(f"{role} AIのコードを保存しました: {code_filename}")
-                    prev_code_paths.append(code_filename)
+                    saved_paths.append(filename)
+                    print(f"{role} AIのコード保存: {filename}")
+                    log_message(f"{role} AIのコード保存: {filename}")
                 else:
                     for fname, content in files.items():
                         file_path = os.path.join(OUTPUT_DIR, fname)
                         with open(file_path, "w", encoding="utf-8") as f:
                             f.write(content)
-                        print(f"{role} AIのコードを保存しました: {file_path}")
-                        log_message(f"{role} AIのコードを保存しました: {file_path}")
-                        prev_code_paths.append(file_path)
+                        saved_paths.append(file_path)
+                        print(f"{role} AIのコード保存: {file_path}")
+                        log_message(f"{role} AIのコード保存: {file_path}")
 
-        # ターン終了後ユーザー操作
+                if role == "test":
+                    success, test_log = await asyncio.to_thread(run_pytest, OUTPUT_DIR)
+                    print(f"テスト実行結果 success={success}")
+                    print(test_log)
+                    log_message(f"テスト結果:\n{test_log}")
+
+                    feedback = f"テスト結果: {'成功' if success else '失敗'}\nログ:\n{test_log}"
+                    messages["review"].append({"role": "user", "content": feedback})
+
         print("\nコマンド入力: 続行=Enter, 終了=q, 一時停止=p")
         user_input = await asyncio.to_thread(input)
         if user_input.strip().lower() == "q":
