@@ -11,22 +11,25 @@ load_dotenv(dotenv_path=env_path)
 async def main():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEYが環境変数に設定されていません。")
+        raise RuntimeError("OPENAI_API_KEYが設定されていません。")
 
     client = OpenAIChatCompletionClient(model="gpt-4o", api_key=api_key)
 
     proxy = UserProxyAgent(name="Daifuku_Proxy")
     assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
 
-    initial_message = (
+    # UserProxyAgent と AssistantAgent の会話履歴を管理するセッションを作成
+    conversation = await proxy.create_conversation(assistant)
+
+    # 最初のメッセージを送信し会話を開始
+    user_message = (
         "USD/JPY FXの自動トレードAIをFintokei＋MT5制約のもとで設計します。"
         "まず最適な全体設計案をファイル構成・主要クラス名付きで提案してください。"
     )
 
-    # 代理AIとアシスタントAIの対話を実行
-    response = await proxy.run_conversation(assistant, initial_message, max_turns=6)
+    response = await conversation.send_user_message(user_message)
 
-    print("AI response:", response)
+    print("AI response:", response.text)
 
     await client.close()
 
