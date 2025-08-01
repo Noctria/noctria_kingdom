@@ -9,8 +9,8 @@ import datetime
 
 load_dotenv()
 
-from autogen.agentchat import AssistantAgent, UserProxyAgent
-from autogen.ext.openai import OpenAIChatCompletionClient
+from autogen_agentchat import AssistantAgent, UserProxyAgent
+from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 def save_log(log_text):
     fname = f"autogen_log_{datetime.datetime.now():%Y%m%d_%H%M%S}.txt"
