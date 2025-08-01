@@ -18,12 +18,18 @@ async def main():
     proxy = UserProxyAgent(name="Daifuku_Proxy")
     assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
 
-    # UserProxyAgent に直接メッセージを送り、AssistantAgent へ連携
-    response = await proxy.send_message_to_assistant(
-        assistant,
+    # UserProxyAgentの会話管理用のConversationを生成
+    conversation = proxy.create_conversation()
+
+    # 会話にAssistantAgentを登録（対話相手として設定）
+    conversation.set_assistant(assistant)
+
+    # UserProxyAgentがAssistantAgentにメッセージを送る
+    user_message = (
         "USD/JPY FXの自動トレードAIをFintokei＋MT5制約のもとで設計します。"
         "まず最適な全体設計案をファイル構成・主要クラス名付きで提案してください。"
     )
+    response = await conversation.send_message(user_message)
 
     print("AI response:", response.text)
 
