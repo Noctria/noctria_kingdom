@@ -7,8 +7,6 @@
 {% block header_nav_text %}—{% endblock %}
 
 {% block content %}
-
-<!-- 主要ページへのHUDカードナビゲーション -->
 <section class="hud-panel dashboard-nav" style="padding: 1rem; margin-bottom: 1rem;">
   <h2 class="panel-title text-normal"><i class="fas fa-compass"></i> Navigation</h2>
   <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
@@ -38,7 +36,7 @@
     <div class="metric-item">
       <h3 class="text-normal"><i class="fas fa-chart-line"></i> 平均勝率</h3>
       <p class="metric-value text-green">
-        {{ overall_metrics['win_rate']['avg'] if overall_metrics['win_rate'] else '-' }}%
+        {{ overall_metrics.get('win_rate', {}).get('avg', '-') }}%
       </p>
     </div>
   </div>
@@ -46,14 +44,13 @@
 
 <section class="hud-panel">
   <h2 class="panel-title text-normal"><i class="fas fa-chart-area"></i> ORACLE予測チャート</h2>
-  <!-- 省略 -->
+  <canvas id="oracleForecastChart" width="600" height="300"></canvas>
 </section>
 
 <section class="hud-panel">
   <h2 class="panel-title text-normal"><i class="fas fa-chart-bar"></i> 全AI・全指標トレンド可視化</h2>
-  <!-- 省略 -->
+  <canvas id="allAiMetricsChart" width="600" height="300"></canvas>
 </section>
-
 {% endblock %}
 
 {% block extra_scripts %}
