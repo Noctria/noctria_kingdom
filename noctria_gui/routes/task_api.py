@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import JSONResponse
 from typing import Optional
 import logging
-import task_manager
+from . import task_manager   # ← ここを相対インポートに変更
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
