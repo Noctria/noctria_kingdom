@@ -27,7 +27,7 @@ async def main():
 
     # ここではUserProxyAgentを使わずにAssistantAgentを直接呼び出す例
     response = await assistant.model_client.chat.completions.acreate(
-        model=assistant.model_client.model,
+        model=assistant._model_client.model,
         messages=[{"role": "user", "content": user_message}]
     )
     print("AI response:", response.choices[0].message.content)
