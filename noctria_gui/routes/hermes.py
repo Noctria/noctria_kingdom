@@ -1,10 +1,16 @@
 # noctria_gui/routes/hermes.py
 
+import sys
+from pathlib import Path
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-# Hermes戦略生成AIの呼び出し（srcパスの調整は要環境依存。sys.path追記等は必要に応じて）
+# 必要に応じてsys.pathにsrcの親ディレクトリを追加（環境依存）
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
 from src.hermes.strategy_generator import build_prompt, generate_strategy_code, save_to_file, save_to_db
 
 router = APIRouter()
@@ -22,11 +28,10 @@ class HermesStrategyResponse(BaseModel):
     saved_path: Optional[str] = None
 
 @router.post("/hermes/generate_strategy", response_model=HermesStrategyResponse)
-def generate_strategy(req: HermesStrategyRequest):
+async def generate_strategy(req: HermesStrategyRequest):
     try:
         prompt = build_prompt(req.symbol, req.tag, req.target_metric)
         code = generate_strategy_code(prompt)
-        # 今後explanationもHermesで自動生成可能。ここはプレースホルダ
         explanation = f"Hermes生成戦略：{req.symbol} / {req.tag} / {req.target_metric}"
         save_path = save_to_file(code, req.tag)
         save_to_db(prompt, code)
@@ -38,4 +43,5 @@ def generate_strategy(req: HermesStrategyRequest):
             saved_path=save_path
         )
     except Exception as e:
+        logging.error(f"Hermes生成失敗: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Hermes生成失敗: {str(e)}")
