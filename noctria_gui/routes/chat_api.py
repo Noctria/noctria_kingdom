@@ -4,7 +4,7 @@ from openai import OpenAI
 import os
 import asyncio
 
-from src.noctria_gui.services.conversation_history_manager import ConversationHistoryManager
+from conversation_history_manager import ConversationHistoryManager
 
 router = APIRouter()
 
