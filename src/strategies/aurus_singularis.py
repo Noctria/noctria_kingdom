@@ -14,7 +14,7 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 import logging
 
-from src.core.path_config import MODELS_DIR
+from src.core.path_config import VERITAS_MODELS_DIR, HERMES_MODELS_DIR
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
