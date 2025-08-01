@@ -14,7 +14,9 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 import logging
 
-from src.core.path_config import VERITAS_MODELS_DIR, HERMES_MODELS_DIR
+from src.core.path_config import VERITAS_MODELS_DIR
+# 使用箇所も
+self.model_path = model_path or (VERITAS_MODELS_DIR / "aurus_singularis_v2.4.keras")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
