@@ -1,60 +1,41 @@
-import asyncio
-import os
-import pathlib
-from dotenv import load_dotenv
-
-# --- 修正点 ---
-# autogen-agentchatパッケージの正しいimportに変更
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+import asyncio
+import os
+from dotenv import load_dotenv
+import pathlib
 
-# .envファイルのパスを正しく設定
-# このスクリプトの親ディレクトリの親ディレクトリにある.envファイルを読み込む
 env_path = pathlib.Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 async def main():
-    # 環境変数からAPIキーを読み込む
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("環境変数 'OPENAI_API_KEY' が設定されていません。")
+        raise RuntimeError("OPENAI_API_KEYが設定されていません。")
 
-    # OpenAIクライアントを作成（AssistantAgentに渡す）
     client = OpenAIChatCompletionClient(model="gpt-4o", api_key=api_key)
 
-    # アシスタントエージェントを定義
-    # system_messageでAIの役割を明確に設定し、model_clientを渡す
-    assistant = AssistantAgent(
-        name="Noctria_Assistant",
-        system_message="あなたは、FX自動トレードシステムの設計を支援する優秀なAIアシスタントです。具体的で実践的な提案を行ってください。",
-        model_client=client,
-    )
+    proxy = UserProxyAgent(name="Daifuku_Proxy")
+    assistant = AssistantAgent(name="Noctria_Assistant", model_client=client)
 
-    # ユーザープロキシエージェントを定義
-    # このエージェントがユーザーの代わりにアシスタントと対話する
-    # ※ ここでエラーが起きる場合は human_input_mode などの引数は外してください
-    proxy = UserProxyAgent(
-        name="Daifuku_Proxy",
-        # human_input_mode="NEVER",
-        # max_consecutive_auto_reply=1,
-        # is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TERMINATE"),
-    )
-
-    # ユーザーからの最初のメッセージ
+    # 代理ユーザーからのメッセージをAssistantに送る
     user_message = (
         "USD/JPY FXの自動トレードAIをFintokei＋MT5の制約のもとで設計します。"
         "まず、最適な全体設計案を、具体的なファイル構成と主要なクラス名を含めて提案してください。"
     )
 
-    # UserProxyAgentからAssistantAgentにチャットを開始する
-    await proxy.initiate_chat(
-        assistant,
-        message=user_message,
-    )
+    # send_messageを使う（もし存在しないなら下記を参照）
+    try:
+        response = await proxy.send_message(user_message, assistant)
+        print("AI response:", response)
+    except AttributeError:
+        # send_messageが無ければ直接APIを呼び出す方法へフォールバック
+        response = await assistant._model_client.acreate(
+            messages=[{"role": "user", "content": user_message}]
+        )
+        print("AI response:", response.choices[0].message.content)
 
-    # クライアントを閉じる
     await client.close()
 
 if __name__ == "__main__":
-    # 非同期関数mainを実行する
     asyncio.run(main())
