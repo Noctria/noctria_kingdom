@@ -12,6 +12,7 @@ import torch
 import psycopg2
 from datetime import datetime
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import re
 
 from src.core.path_config import MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from src.core.logger import setup_logger
@@ -55,7 +56,11 @@ def generate_strategy_code(prompt: str) -> str:
     with torch.no_grad():
         outputs = model.generate(inputs["input_ids"], max_new_tokens=1024, pad_token_id=tokenizer.eos_token_id)
     generated_code = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    code_only = generated_code[len(prompt):].strip()
+
+    # 安全にPythonコード部分を抽出（def simulate以降）
+    match = re.search(r"(def simulate\(.*)", generated_code, re.DOTALL)
+    code_only = match.group(1).strip() if match else generated_code.strip()
+
     logger.info("🤖 Hermesによる戦略コードの生成完了")
     return code_only
 
@@ -94,7 +99,6 @@ def save_to_file(code: str, tag: str) -> str:
 
 # --- サンプル実行ブロック ---
 if __name__ == "__main__":
-    # ダミーパラメータ
     symbol = "USDJPY"
     tag = "trend_breakout"
     target_metric = "win_rate"
