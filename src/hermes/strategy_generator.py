@@ -14,7 +14,7 @@ from datetime import datetime
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
 
-from src.core.path_config import MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
+from src.core.path_config import HERMES_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from src.core.logger import setup_logger
 
 logger = setup_logger("HermesGenerator", LOGS_DIR / "hermes" / "generator.log")
