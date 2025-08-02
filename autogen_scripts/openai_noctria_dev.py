@@ -39,19 +39,37 @@ def log_message(message: str):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
 
-async def call_openai(client, messages):
-    try:
-        response = await asyncio.to_thread(
-            lambda: client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
+async def call_openai(client, messages, retry=3, delay=2):
+    """
+    OpenAI APIを呼び出す関数（リトライ対応）
+
+    Args:
+        client: OpenAIクライアントインスタンス
+        messages: チャットメッセージリスト
+        retry: 最大リトライ回数（デフォルト3回）
+        delay: リトライ間隔（秒）
+
+    Returns:
+        API応答のテキスト（str）
+
+    Raises:
+        Exception: 全リトライ失敗時に例外を再送出
+    """
+    for attempt in range(retry):
+        try:
+            response = await asyncio.to_thread(
+                lambda: client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                )
             )
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        log_message(f"API呼び出しエラー: {e}")
-        print(f"API呼び出しエラー: {e}", file=sys.stderr)
-        return None
+            return response.choices[0].message.content
+        except Exception as e:
+            log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
+            print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
+            if attempt + 1 == retry:
+                raise
+            await asyncio.sleep(delay)
 
 def split_files_from_response(response: str):
     pattern = r"# ファイル名:\s*(.+?\.py)\s*\n"
