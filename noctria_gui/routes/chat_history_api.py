@@ -1,48 +1,50 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
-import datetime
-import threading
+import asyncpg
+import os
 
 router = APIRouter()
 
-# スレッドセーフなメモリ内チャット履歴管理（シンプル版）
-class ChatHistoryManager:
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.history: List[Dict[str, Any]] = []
-
-    def add_message(self, role: str, content: str):
-        with self.lock:
-            self.history.append({
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "role": role,
-                "content": content
-            })
-
-    def get_history(self) -> List[Dict[str, Any]]:
-        with self.lock:
-            return list(self.history)  # コピーを返す
-
-# シングルトン的に使う
-chat_manager = ChatHistoryManager()
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URLが設定されていません。")
 
 class ChatMessage(BaseModel):
     role: str
     content: str
 
-@router.get("/chat_history")
+@router.on_event("startup")
+async def startup():
+    router.db_pool = await asyncpg.create_pool(DATABASE_URL)
+
+@router.on_event("shutdown")
+async def shutdown():
+    await router.db_pool.close()
+
+@router.get("/chat_history", response_model=List[Dict[str, Any]])
 async def get_chat_history():
-    """
-    チャット履歴を取得
-    """
-    return JSONResponse(content=chat_manager.get_history())
+    async with router.db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT timestamp, role, content FROM chat_history ORDER BY timestamp ASC"
+        )
+        history = [
+            {
+                "timestamp": row["timestamp"].isoformat(),
+                "role": row["role"],
+                "content": row["content"],
+            }
+            for row in rows
+        ]
+    return JSONResponse(content=history)
 
 @router.post("/chat_history")
 async def post_chat_message(message: ChatMessage):
-    """
-    チャット履歴にメッセージを追加
-    """
-    chat_manager.add_message(message.role, message.content)
+    async with router.db_pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO chat_history (role, content) VALUES ($1, $2)",
+            message.role,
+            message.content,
+        )
     return {"status": "success"}
