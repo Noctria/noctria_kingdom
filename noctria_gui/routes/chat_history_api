@@ -1,5 +1,3 @@
-# noctria_gui/routes/chat_history_api.py
-
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -27,6 +25,7 @@ class ChatHistoryManager:
         with self.lock:
             return list(self.history)  # コピーを返す
 
+# シングルトン的に使う
 chat_manager = ChatHistoryManager()
 
 class ChatMessage(BaseModel):
