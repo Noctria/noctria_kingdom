@@ -7,13 +7,12 @@ import json
 import logging
 import traceback
 from typing import Any
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import Response, RedirectResponse, JSONResponse, HTMLResponse
 from starlette.responses import FileResponse
 
-# もしsrcをPYTHONPATHに入れていない場合に対応する簡易設定（実行環境によって調整ください）
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 if SRC_DIR not in sys.path:
@@ -21,9 +20,6 @@ if SRC_DIR not in sys.path:
 
 from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
-# ─────────────────────────────
-# 📝 ロギング設定
-# ─────────────────────────────
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -31,22 +27,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────
-# 🚀 FastAPI 初期化
-# ─────────────────────────────
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
     version="2.0.0",
 )
 
-# ─────────────────────────────
-# 🗂️ 静的ファイルとテンプレート
-# ─────────────────────────────
 app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-# Jinja2カスタムフィルター例
 def from_json(value: Any) -> Any:
     if isinstance(value, str):
         try:
@@ -57,9 +46,7 @@ def from_json(value: Any) -> Any:
 
 templates.env.filters["from_json"] = from_json
 
-# ─────────────────────────────
-# 🔗 ルーター登録（既存のNoctria Kingdom各ルーター群）
-# ─────────────────────────────
+# 既存ルーターインポート群
 from noctria_gui.routes import (
     dashboard, home_routes, king_routes, logs_routes,
     path_checker, trigger, upload, upload_history,
@@ -71,13 +58,12 @@ from noctria_gui.routes import (
     strategy_detail, strategy_heatmap, strategy_routes,
     tag_heatmap, tag_summary, tag_summary_detail,
     hermes, ai_routes,
-    chat_history_api,  # ★ここにチャット履歴APIを追加
-    chat_api           # ★チャットAPI（あれば）も追加
+    chat_history_api,  # チャット履歴API
+    chat_api           # OpenAIチャットAPI
 )
 
 logger.info("Integrating all routers into the main application...")
 
-# --- 既存ルーター群をinclude ---
 app.include_router(home_routes.router)
 app.include_router(dashboard.router)
 app.include_router(king_routes.router)
@@ -117,22 +103,16 @@ app.include_router(path_checker.router)
 app.include_router(prometheus_routes.router)
 app.include_router(upload.router)
 
-# --- ここから追加部分：チャット関連エンドポイント ---
+# チャット関連ルーター
 app.include_router(chat_history_api.router)
 app.include_router(chat_api.router)
 
 logger.info("✅ All routers have been integrated successfully.")
 
-# ─────────────────────────────
-# 🏰 トップページは /dashboard へリダイレクト
-# ─────────────────────────────
 @app.get("/", include_in_schema=False)
 async def root_redirect():
     return RedirectResponse(url="/dashboard")
 
-# ─────────────────────────────
-# 🖼 favicon.ico 対応
-# ─────────────────────────────
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     icon_path = NOCTRIA_GUI_STATIC_DIR / "favicon.ico"
@@ -140,9 +120,6 @@ async def favicon():
         return FileResponse(icon_path, media_type="image/x-icon")
     return Response(status_code=204)
 
-# ─────────────────────────────
-# 🌎 グローバル例外ハンドラー（オプション）
-# ─────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     tb = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
