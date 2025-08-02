@@ -39,6 +39,27 @@ def log_message(message: str):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
 
+def git_commit_and_push(repo_dir: str, message: str) -> bool:
+    """
+    指定ディレクトリでgit add・commit・pushを実行する。
+
+    Args:
+        repo_dir: Gitリポジトリのルートディレクトリ
+        message: コミットメッセージ
+
+    Returns:
+        成功したらTrue、失敗したらFalse
+    """
+    try:
+        subprocess.run(["git", "-C", repo_dir, "add", "."], check=True)
+        subprocess.run(["git", "-C", repo_dir, "commit", "-m", message], check=True)
+        subprocess.run(["git", "-C", repo_dir, "push"], check=True)
+        log_message(f"Git commit & push succeeded: {message}")
+        return True
+    except subprocess.CalledProcessError as e:
+        log_message(f"Git commit/push failed: {e}")
+        return False
+
 async def call_openai(client, messages, retry=3, delay=2):
     """
     OpenAI APIを呼び出す関数（リトライ対応）
@@ -131,6 +152,11 @@ async def multi_agent_loop(client, max_turns=5):
                             f.write(content)
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
+
+                # Git連携処理を追加
+                commit_message = f"{role} AI generated files - turn {turn+1}"
+                if not git_commit_and_push(OUTPUT_DIR, commit_message):
+                    print(f"警告: Git連携に失敗しました。手動でコミットを確認してください。")
 
                 if role == "test":
                     success, test_log = await asyncio.to_thread(run_pytest, OUTPUT_DIR)
