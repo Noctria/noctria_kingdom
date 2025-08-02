@@ -7,7 +7,10 @@
   <style>
     body.hud-container-simple {
       padding: 1rem;
-      font-family: var(--font-family);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-height: 100vh;
     }
     h1 {
       color: var(--text-color-normal);
@@ -18,71 +21,122 @@
       gap: 0.5rem;
       font-weight: 700;
     }
-    #history {
-      max-height: 80vh;
-      overflow-y: auto;
+    pre#history {
       background-color: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 8px;
       padding: 1rem;
-      box-shadow: 0 0 15px var(--glow-primary);
-    }
-    .message {
-      margin-bottom: 1rem;
-      padding: 0.5rem 1rem;
-      border-radius: 12px;
-      max-width: 80%;
+      color: var(--text-color-base);
+      font-family: var(--font-family);
+      overflow-y: auto;
       white-space: pre-wrap;
-      line-height: 1.4;
+      box-shadow: 0 0 15px var(--glow-primary);
+      flex-grow: 1;
+      max-height: 70vh;
+      margin-bottom: 1rem;
     }
-    .message.user {
-      background-color: #cce5ff;
-      color: #004085;
-      align-self: flex-start;
-    }
-    .message.assistant {
-      background-color: #d4edda;
-      color: #155724;
-      align-self: flex-end;
-    }
-    #history-container {
+    form#chatForm {
       display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.5rem;
+    }
+    textarea#messageInput {
+      flex-grow: 1;
+      resize: none;
+      padding: 0.5rem;
+      font-family: var(--font-family);
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 0 8px var(--glow-primary);
+      background-color: var(--panel-bg);
+      color: var(--text-color-base);
+      height: 3rem;
+      min-height: 2.5rem;
+    }
+    button#sendButton {
+      background-color: var(--glow-primary);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      padding: 0 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--glow-primary);
+      transition: background-color 0.3s ease;
+    }
+    button#sendButton:hover {
+      background-color: var(--glow-primary-hover, #0088ff);
     }
   </style>
 </head>
 <body class="hud-container-simple">
   <h1><i class="fas fa-comments"></i> 対話履歴</h1>
-  <div id="history" aria-live="polite" aria-label="チャット履歴">
-    <div id="history-container"></div>
-  </div>
+  <pre id="history">読み込み中...</pre>
+
+  <form id="chatForm">
+    <textarea id="messageInput" placeholder="ここにメッセージを入力してください…" rows="1" required></textarea>
+    <button type="submit" id="sendButton">送信</button>
+  </form>
 
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <script>
+    const historyEl = document.getElementById('history');
+    const messageInput = document.getElementById('messageInput');
+    const chatForm = document.getElementById('chatForm');
+
     async function loadHistory() {
       try {
         const res = await fetch('/chat_history');
         if (!res.ok) throw new Error('通信エラー');
         const history = await res.json();
-        const container = document.getElementById('history-container');
-        container.innerHTML = '';
-
-        history.forEach(item => {
-          const div = document.createElement('div');
-          div.classList.add('message');
-          div.classList.add(item.role === 'user' ? 'user' : 'assistant');
-          div.textContent = item.content;
-          container.appendChild(div);
-        });
-
-        // 自動スクロールで最新メッセージ表示
-        const historyDiv = document.getElementById('history');
-        historyDiv.scrollTop = historyDiv.scrollHeight;
+        historyEl.textContent = JSON.stringify(history, null, 2);
+        // スクロールを最新まで自動調整
+        historyEl.scrollTop = historyEl.scrollHeight;
       } catch (e) {
-        document.getElementById('history-container').textContent = '履歴の読み込みに失敗しました。';
+        historyEl.textContent = '履歴の読み込みに失敗しました。';
       }
     }
+
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      // ユーザーメッセージを履歴に追加しAPIに送信
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({role: 'user', content: message})
+        });
+        if (!res.ok) throw new Error('送信失敗');
+        const data = await res.json();
+
+        // APIからの返答を履歴に追加
+        await fetch('/chat_history', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({role: 'assistant', content: data.reply})
+        });
+
+        // 入力欄クリア＆履歴再読み込み
+        messageInput.value = '';
+        await loadHistory();
+        messageInput.focus();
+      } catch (error) {
+        alert('メッセージ送信に失敗しました。');
+        console.error(error);
+      }
+    });
+
+    // Enterキー押下で送信（Shift+Enterは改行）
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.dispatchEvent(new Event('submit'));
+      }
+    });
+
     loadHistory();
   </script>
 </body>
