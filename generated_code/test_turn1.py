@@ -1,108 +1,93 @@
-指定されたソースコードに基づいて、Pythonの`unittest`フレームワークを使用して各モジュールに対する基本的な単体テストを作成します。最初に簡単なテスト環境を整えるため、テストを別ファイルに記述します。
+あなたの提供してくれた改善点に基づいて、基本的な単体テストのコードを示します。これにより、主要なモジュールの機能を確認することができます。これらのテストコードは、`unittest`ライブラリを使ってPythonで記述しています。
 
-以下に、各モジュールのテストファイルを示します。
+### テスト用ファイル構造
 
-### `test_data_handler.py`
+- `tests/`ディレクトリを作成し、その中に各モジュールに対するテストファイルを配置します。
 
-```python
-import unittest
-from data_handler import DataHandler
-import os
-import tempfile
-
-class TestDataHandler(unittest.TestCase):
-    
-    def setUp(self):
-        # テスト用のCSVファイルを一時的に作成
-        self.test_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.csv')
-        self.test_file.write("date,price\n2023-10-01,150.00\n2023-10-02,151.00\n")
-        self.test_file.close()
-
-    def tearDown(self):
-        # テスト後にファイルを削除
-        os.unlink(self.test_file.name)
-
-    def test_get_historical_data(self):
-        data_handler = DataHandler(self.test_file.name)
-        data = data_handler.get_historical_data()
-        self.assertEqual(len(data), 2)
-        self.assertEqual(data[0]['date'], '2023-10-01')
-        self.assertEqual(data[0]['price'], '150.00')
-
-    def test_file_not_found_error(self):
-        data_handler = DataHandler("non_existent_file.csv")
-        with self.assertRaises(FileNotFoundError):
-            data_handler.get_historical_data()
-
-if __name__ == "__main__":
-    unittest.main()
-```
-
-### `test_strategy.py`
+#### tests/test_market_data.py
 
 ```python
 import unittest
-from strategy import BreakoutStrategy
+import market_data
 
-class TestBreakoutStrategy(unittest.TestCase):
+class TestMarketData(unittest.TestCase):
+    def test_get_market_data(self):
+        data = market_data.get_market_data('USD/JPY')
+        self.assertIsNotNone(data)
+        self.assertFalse(data.empty)
+        self.assertIn('Close', data.columns)
+        self.assertEqual(len(data), 100)
 
-    def setUp(self):
-        self.strategy = BreakoutStrategy(0.01, 20)
-
-    def test_generate_signal_no_data(self):
-        with self.assertRaises(IndexError):
-            self.strategy.generate_signal([])
-
-    def test_generate_signal_buy(self):
-        past_data = [{'price': 1.0}] * 20
-        signal = self.strategy.generate_signal({'price': 1.02, 'history': past_data})
-        self.assertEqual(signal, 'BUY')
-
-    def test_generate_signal_sell(self):
-        past_data = [{'price': 1.02}] * 20
-        signal = self.strategy.generate_signal({'price': 1.00, 'history': past_data})
-        self.assertEqual(signal, 'SELL')
-
-    def test_generate_signal_none(self):
-        past_data = [{'price': 1.0}] * 20
-        signal = self.strategy.generate_signal({'price': 1.01, 'history': past_data})
-        self.assertIsNone(signal)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
 ```
 
-### `test_order_executor.py`
+#### tests/test_strategy.py
 
 ```python
 import unittest
-from order_executor import OrderExecutor
+import pandas as pd
+import strategy
 
-class TestOrderExecutor(unittest.TestCase):
-
+class TestStrategy(unittest.TestCase):
     def setUp(self):
-        self.executor = OrderExecutor()
+        self.data = pd.DataFrame({
+            'Date': pd.date_range(start='2023-01-01', periods=100),
+            'Close': [i + 100 for i in range(100)]
+        })
 
-    def test_execute_buy_order(self):
-        result = self.executor.execute_order('BUY')
-        self.assertTrue(result)
-        self.assertEqual(self.executor.last_order, 'BUY')
+    def test_calculate_sma(self):
+        sma = strategy.calculate_sma(self.data, window=5)
+        self.assertEqual(len(sma), 100)
+        self.assertTrue(sma.isnull().sum() > 0) # Initially some values should be NaN
 
-    def test_execute_sell_order(self):
-        result = self.executor.execute_order('SELL')
-        self.assertTrue(result)
-        self.assertEqual(self.executor.last_order, 'SELL')
+    def test_generate_signals(self):
+        buy_signals, sell_signals = strategy.generate_signals(self.data)
+        self.assertIsNotNone(buy_signals)
+        self.assertIsNotNone(sell_signals)
 
-    def test_execute_invalid_order(self):
-        result = self.executor.execute_order('INVALID')
-        self.assertFalse(result)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
 ```
 
-### 注意点
+#### tests/test_order_execution.py
 
-- 各テストファイルは仮のインターフェースに基づいて書かれており、実際の関数名や振る舞いが異なる場合は、それに応じてテストを修正してください。
-- テストケースは、モックデータや仮想の条件を使用してテストを実行します。
-- 実際には、クラスや関数のシグネチャ、戻り値、および詳細な仕様に応じてテストをカスタマイズする必要があります。
+```python
+import unittest
+import pandas as pd
+from io import StringIO
+import contextlib
+import order_execution
+
+class TestOrderExecution(unittest.TestCase):
+    def setUp(self):
+        # Setup the signals as per the structure expected in the application.
+        self.buy_signals = pd.DataFrame({
+            'Date': pd.date_range(start='2023-01-06', periods=5),
+            'Close': [105, 106, 107, 108, 109]
+        })
+        self.sell_signals = pd.DataFrame({
+            'Date': pd.date_range(start='2023-01-11', periods=5),
+            'Close': [110, 109, 108, 107, 106]
+        })
+
+    def test_execute_trades(self):
+        with StringIO() as buf, contextlib.redirect_stdout(buf):
+            order_execution.execute_trades(self.buy_signals, self.sell_signals)
+            output = buf.getvalue()
+        
+        self.assertIn("Buying at 2023-01-06 00:00:00 - Price: 105", output)
+        self.assertIn("Selling at 2023-01-11 00:00:00 - Price: 110", output)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+### テストの実行
+これらのテストは、`unittest`フレームワークを使ってそれぞれのファイルから実行することができます。`tests/`ディレクトリに移動し、以下のコマンドでテストを実行します。
+
+```bash
+python -m unittest discover -s tests
+```
+
+これにより、提案したモジュールの基本的な機能が意図したとおりに動作するかをテストし、コードの信頼性を向上させることができるでしょう。
