@@ -21,7 +21,7 @@
       gap: 0.5rem;
       font-weight: 700;
     }
-    pre#history {
+    #history {
       background-color: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 8px;
@@ -29,11 +29,40 @@
       color: var(--text-color-base);
       font-family: var(--font-family);
       overflow-y: auto;
-      white-space: pre-wrap;
-      box-shadow: 0 0 15px var(--glow-primary);
       flex-grow: 1;
       max-height: 70vh;
       margin-bottom: 1rem;
+      box-shadow: 0 0 15px var(--glow-primary);
+    }
+    .msg {
+      padding: 8px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .msg.user {
+      background-color: #004080;
+      color: white;
+      margin-left: auto;
+      text-align: right;
+    }
+    .msg.assistant {
+      background-color: #e0e0e0;
+      color: black;
+      margin-right: auto;
+      text-align: left;
+    }
+    .msg-role {
+      font-weight: bold;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+    .msg-time {
+      font-size: 0.7rem;
+      color: gray;
+      margin-top: 4px;
+      text-align: right;
     }
     form#chatForm {
       display: flex;
@@ -52,6 +81,7 @@
       color: var(--text-color-base);
       height: 3rem;
       min-height: 2.5rem;
+      overflow-y: hidden;
     }
     button#sendButton {
       background-color: var(--glow-primary);
@@ -71,7 +101,7 @@
 </head>
 <body class="hud-container-simple">
   <h1><i class="fas fa-comments"></i> 対話履歴</h1>
-  <pre id="history">読み込み中...</pre>
+  <div id="history">読み込み中...</div>
 
   <form id="chatForm">
     <textarea id="messageInput" placeholder="ここにメッセージを入力してください…" rows="1" required></textarea>
@@ -84,14 +114,27 @@
     const messageInput = document.getElementById('messageInput');
     const chatForm = document.getElementById('chatForm');
 
+    function renderHistory(history) {
+      historyEl.innerHTML = '';
+      history.forEach(({ role, content, timestamp }) => {
+        const div = document.createElement('div');
+        div.className = role === 'user' ? 'msg user' : 'msg assistant';
+        div.innerHTML = `
+          <div class="msg-role">${role === 'user' ? 'あなた' : 'アシスタント'}</div>
+          <div class="msg-content">${content.replace(/\n/g, '<br>')}</div>
+          <div class="msg-time">${new Date(timestamp).toLocaleString()}</div>
+        `;
+        historyEl.appendChild(div);
+      });
+      historyEl.scrollTop = historyEl.scrollHeight;
+    }
+
     async function loadHistory() {
       try {
         const res = await fetch('/chat_history');
         if (!res.ok) throw new Error('通信エラー');
         const history = await res.json();
-        historyEl.textContent = JSON.stringify(history, null, 2);
-        // スクロールを最新まで自動調整
-        historyEl.scrollTop = historyEl.scrollHeight;
+        renderHistory(history);
       } catch (e) {
         historyEl.textContent = '履歴の読み込みに失敗しました。';
       }
@@ -102,8 +145,8 @@
       const message = messageInput.value.trim();
       if (!message) return;
 
-      // ユーザーメッセージを履歴に追加しAPIに送信
       try {
+        // ユーザーメッセージを送信し、アシスタント応答を取得
         const res = await fetch('/chat', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -112,16 +155,11 @@
         if (!res.ok) throw new Error('送信失敗');
         const data = await res.json();
 
-        // APIからの返答を履歴に追加
-        await fetch('/chat_history', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({role: 'assistant', content: data.reply})
-        });
-
-        // 入力欄クリア＆履歴再読み込み
-        messageInput.value = '';
+        // 履歴を再取得してUI更新
         await loadHistory();
+
+        messageInput.value = '';
+        messageInput.style.height = '3rem';
         messageInput.focus();
       } catch (error) {
         alert('メッセージ送信に失敗しました。');
@@ -129,12 +167,9 @@
       }
     });
 
-    // Enterキー押下で送信（Shift+Enterは改行）
-    messageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        chatForm.dispatchEvent(new Event('submit'));
-      }
+    messageInput.addEventListener('input', () => {
+      messageInput.style.height = 'auto';
+      messageInput.style.height = messageInput.scrollHeight + 'px';
     });
 
     loadHistory();
