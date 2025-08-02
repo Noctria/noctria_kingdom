@@ -7,6 +7,7 @@
   <style>
     body.hud-container-simple {
       padding: 1rem;
+      font-family: var(--font-family);
     }
     h1 {
       color: var(--text-color-normal);
@@ -17,23 +18,45 @@
       gap: 0.5rem;
       font-weight: 700;
     }
-    pre#history {
+    #history {
+      max-height: 80vh;
+      overflow-y: auto;
       background-color: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 8px;
       padding: 1rem;
-      color: var(--text-color-base);
-      font-family: var(--font-family);
-      max-height: 80vh;
-      overflow-y: auto;
-      white-space: pre-wrap;
       box-shadow: 0 0 15px var(--glow-primary);
+    }
+    .message {
+      margin-bottom: 1rem;
+      padding: 0.5rem 1rem;
+      border-radius: 12px;
+      max-width: 80%;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+    .message.user {
+      background-color: #cce5ff;
+      color: #004085;
+      align-self: flex-start;
+    }
+    .message.assistant {
+      background-color: #d4edda;
+      color: #155724;
+      align-self: flex-end;
+    }
+    #history-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
     }
   </style>
 </head>
 <body class="hud-container-simple">
   <h1><i class="fas fa-comments"></i> 対話履歴</h1>
-  <pre id="history">読み込み中...</pre>
+  <div id="history" aria-live="polite" aria-label="チャット履歴">
+    <div id="history-container"></div>
+  </div>
 
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <script>
@@ -42,10 +65,22 @@
         const res = await fetch('/chat_history');
         if (!res.ok) throw new Error('通信エラー');
         const history = await res.json();
-        const el = document.getElementById('history');
-        el.textContent = JSON.stringify(history, null, 2);
+        const container = document.getElementById('history-container');
+        container.innerHTML = '';
+
+        history.forEach(item => {
+          const div = document.createElement('div');
+          div.classList.add('message');
+          div.classList.add(item.role === 'user' ? 'user' : 'assistant');
+          div.textContent = item.content;
+          container.appendChild(div);
+        });
+
+        // 自動スクロールで最新メッセージ表示
+        const historyDiv = document.getElementById('history');
+        historyDiv.scrollTop = historyDiv.scrollHeight;
       } catch (e) {
-        document.getElementById('history').textContent = '履歴の読み込みに失敗しました。';
+        document.getElementById('history-container').textContent = '履歴の読み込みに失敗しました。';
       }
     }
     loadHistory();
