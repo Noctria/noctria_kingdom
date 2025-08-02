@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 from openai import OpenAI
 import os
 import asyncio
 
-# ここでは chat_history_api.py の chat_manager を利用する例
-from .chat_history_api import chat_manager  # 既存のチャット履歴管理インスタンスを利用
+from .chat_history_api import chat_manager  # chat_history_api の chat_manager を利用
 
 router = APIRouter()
 
@@ -25,8 +24,10 @@ async def chat(
     if not user_msg:
         return JSONResponse({"error": "メッセージが空です"}, status_code=400)
 
+    # ユーザーメッセージを履歴に追加
     chat_manager.add_message("user", user_msg)
 
+    # OpenAI API へ履歴を渡して応答を取得
     response = await asyncio.to_thread(
         lambda: client.chat.completions.create(
             model="gpt-4o",
@@ -34,6 +35,8 @@ async def chat(
         )
     )
     assistant_msg = response.choices[0].message.content
+
+    # アシスタント応答を履歴に追加
     chat_manager.add_message("assistant", assistant_msg)
 
     return JSONResponse({"reply": assistant_msg})
