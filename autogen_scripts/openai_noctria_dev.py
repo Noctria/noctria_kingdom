@@ -39,6 +39,7 @@ ROLE_PROMPTS = {
         "複数ファイルに分割生成し、# ファイル名: filename.py を必ず記載。\n"
         "設計は関数・クラスの構造と流れを明確に、パス管理はpath_config.py一元化ルール厳守。\n"
         "設計説明は簡潔に。"
+        "VeritasのML設計・実装は必ずGPUクラウドサービス（AWS/GCP/Azure等）上のトレーニング・推論運用を前提とすること。\n"
     ),
     "implement": prepend_knowledge(
         "設計AIの指示とNoctria連携図に従い実装コードを生成してください。\n"
