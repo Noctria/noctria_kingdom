@@ -1,18 +1,17 @@
-import pandas as pd
-from unittest.mock import patch
-from order_execution import execute_trade
-from path_config import MODEL_PATH, FEATURES_PATH
+# ファイル名: test_order_execution.py
+# バージョン: v0.1.0
+# 生成日時: 2025-08-04T01:41:27.161529
+# 生成AI: openai_noctria_dev.py
+# UUID: 7b2acea9-6a33-4955-bcf6-1d248cac2ef6
+# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-@patch('order_execution.pickle.load')
-def test_execute_trade(mock_model_load):
-    # モックモデルが予測を返すように設定
-    class MockModel:
-        def predict(self, X):
-            return [1, 0, 1]
+import pytest
+from generated_code.order_execution import execute_trade
+from src.core.path_config import MODEL_PATH, FEATURES_PATH
 
-    mock_model_load.return_value = MockModel()
 
-    data = pd.DataFrame({'Feature1': [0, 1, 0], 'Feature2': [1, 0, 1]})
-    data.to_csv(FEATURES_PATH, index=False)
+def test_order_execution():
+    result = execute_trade(model_path=str(MODEL_PATH), features_path=str(FEATURES_PATH))
+    assert result is not None
 
-    execute_trade()  # print出力を視覚的に確認する
+```

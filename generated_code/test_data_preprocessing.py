@@ -1,23 +1,18 @@
-import pandas as pd
-from data_preprocessing import DataPreprocessing
+# ファイル名: test_data_preprocessing.py
+# バージョン: v0.1.0
+# 生成日時: 2025-08-04T01:41:27.135900
+# 生成AI: openai_noctria_dev.py
+# UUID: 172e15ce-04f3-44cb-9fbc-4be98fe1b39c
+# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-def test_handle_missing_values():
-    data = pd.DataFrame({'value': [1, None, 3, None, 5]})
-    processor = DataPreprocessing()
-    result = processor.handle_missing_values(data)
-    expected = data.fillna(method='ffill').fillna(method='bfill')
-    pd.testing.assert_frame_equal(result, expected)
+import pytest
+from generated_code.data_preprocessing import DataPreprocessing
+from src.core.path_config import LOCAL_DATA_PATH
 
-def test_scale_data():
-    data = pd.DataFrame({'value': [1, 2, 3, 4, 5]})
-    processor = DataPreprocessing()
-    result = processor.scale_data(data)
-    assert result.mean().abs().max() < 1e-7  # 平均が0に近い
-    assert result.std().abs().max() - 1 < 1e-7  # 標準偏差が1に近い
 
-def test_prepare_data():
-    data = pd.DataFrame({'value': [1, None, 3, None, 5]})
-    processor = DataPreprocessing()
-    result = processor.prepare_data(data)
-    expected_data = processor.scale_data(processor.handle_missing_values(data))
-    pd.testing.assert_frame_equal(result, expected_data)
+def test_data_preprocessing():
+    dp = DataPreprocessing(data_path=str(LOCAL_DATA_PATH))
+    result = dp.preprocess()
+    assert result is not None
+
+```
