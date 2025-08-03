@@ -1,33 +1,21 @@
-# ファイル名: test_turn2.py
-# バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:46:25.260442
-# 生成AI: openai_noctria_dev.py
-# UUID: fa919502-7518-4d20-9f74-fc9f4683082e
-# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
+# test_data_preprocessing.py
 
-ありがとうございます。この設計は、Noctriaガイドラインに基づいて設計されており、各モジュールが具体的にどのように機能するかを明確にし、責任ある管理と透明性を確保しています。以下に、各ファイルの記載された要素について簡単に解説し、必要に応じて追加のノートやコメントを付加します。
+import pytest
+import pandas as pd
+from data_preprocessing import load_data, preprocess_data
 
-### 1. `data_preprocessing.py`
-このファイルでは、データの収集と前処理を担います。プライバシーに配慮し、データは匿名化されて処理されます。
-- **ポイント:** データのロードとクリーニングの際には、特にプライバシーと倫理面での配慮が必要です。
+def test_load_data_with_valid_file(tmp_path):
+    # 一時的なCSVファイルを生成
+    file = tmp_path / "data.csv"
+    file.write_text("a,b\n1,2\n3,4")
+    df = load_data(str(file))
+    assert not df.empty
 
-### 2. `model_selection.py`
-モデルの選択とパラメータチューニングを担当します。公平な評価指標を用いてバイアスを抑えたモデルを選択します。
-- **ポイント:** バイアスを抑えるための技術的手法（例：クロスバリデーションの利用）は重要です。
+def test_load_data_with_missing_file():
+    df = load_data("not_exist.csv")
+    assert df.empty
 
-### 3. `risk_management.py`
-トレードにおけるリスク管理を行います。特に、トレードの持続性を念頭にリスクを管理します。
-- **ポイント:** リスク管理の計算には高い精度が要求されます。可能な範囲でリスクを定量化して、健全な取引を支援します。
-
-### 4. `performance_evaluation.py`
-トレードのパフォーマンスを多面的に評価します。透明な評価基準に基づき、公正な分析を支援します。
-- **ポイント:** パフォーマンス指標は、トレード戦略を評価する際の重要な要素です。多様な指標を組み合わせて使用することで、より客観的な評価が可能です。
-
-### 5. `order_execution.py`
-注文の実行を行います。最終判断は `king_noctria.py` を通じて行われます。
-- **ポイント:** 注文実行における決定プロセスは、アルゴリズムの効率性を確保します。
-
-## 全体の設計指針
-各ファイルは、バージョン管理によって常に最新の変更が記録され、履歴データベースにその理由がログインされるよう設計されています。これにより、全体のプロジェクトでの透明性と説明責任が強化されています。また、各プロセスがNoctriaガイドラインに準拠し、倫理的観点からも一貫性があることを保証します。
-
-もしさらなる具体例や詳細が必要であれば、お知らせください。各モジュールの構造や関数の具体的な実装などについても詳細に説明できます。
+def test_preprocess_data_fillna():
+    df = pd.DataFrame({"a": [1, None], "b": [3, 4]})
+    result = preprocess_data(df)
+    assert result.isna().sum().sum() == 0
