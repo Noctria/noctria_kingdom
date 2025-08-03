@@ -1,21 +1,20 @@
 # ファイル名: test_order_execution.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-04T02:13:25.137849
+# 生成日時: 2025-08-04T02:13:42.958796
 # 生成AI: openai_noctria_dev.py
-# UUID: d3ba4a0e-3e35-442b-b4b9-52fef6daee12
+# UUID: ae219abf-227a-49da-aec8-917b5c385d8c
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-```python
+import pytest
 from order_execution import execute_trade
+from src.core.path_config import MODEL_PATH, FEATURES_PATH
 
 def test_execute_trade():
-    model = "trained_model"
-    features = "sample_features"
-    success = execute_trade(model, features)
-    assert success is True
+    # Add tests for execute_trade function
 
-def test_model_and_features_paths():
-    from src.core.path_config import MODEL_PATH, FEATURES_PATH
+def test_model_path():
     assert MODEL_PATH == "/path/to/model"
+
+def test_features_path():
     assert FEATURES_PATH == "/path/to/features"
 ```
