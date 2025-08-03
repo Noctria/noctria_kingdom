@@ -1,42 +1,65 @@
-`SyntaxError` の原因は、`test_turn1.py` ファイルの内容に無効な文字（特に全角の句読点「、」など）が含まれているためであるようです。以下の手順を実施し、この問題を解決します。
+# ファイル名: doc_turn5.py
+# バージョン: v0.1.0
+# 生成日時: 2025-08-03T13:38:45.744313
+# 生成AI: openai_noctria_dev.py
+# UUID: 29023c3e-2631-4852-b890-c4c2b56ad030
 
-### 解決手順
+テストが失敗している原因は、Pythonコード内にPythonとして解釈できない日本語の説明文があり、それが`SyntaxError`を引き起こしていることです。この問題は、日本語の説明文をコメントとして扱うことで解決できます。
 
-1. **テキストエディタでファイルを開く**:
-   - `generated_code/test_turn1.py` を信頼性のあるテキストエディタ（例：VSCode、Sublime Text、PyCharm）で開きます。
+ここでは、コメントアウトの手法を用いた修正版のコード例を示します。
 
-2. **冒頭の無効な文字を削除**:
-   - ファイルの1行目にある無効な文字や、説明文として記載されている不要な日本語コメントを削除します。
-
-3. **正しいPythonコードを追加**:
-   - 削除後、以下に示すような簡単なPythonユニットテストのテンプレートをファイルに書き込みます。
+### 修正版 `test_turn1.py`
 
 ```python
-import unittest
+# -*- coding: utf-8 -*-
+import pytest
+import pandas as pd
+from data_feed import fetch_usd_jpy_data, preprocess_data
+from unittest.mock import patch
+import requests
 
-class TestExample(unittest.TestCase):
-    def test_true(self):
-        # 簡単なテスト例
-        self.assertTrue(True)
+# テストコードの目的:
+# 各モジュールの機能を確認するために、正常系、異常系、統合テストで構成されたテストスイートを作成します。
+# パス設定の管理は、`path_config.py`を通じて行います。
 
-if __name__ == '__main__':
-    unittest.main()
+# 正常系テスト: USD/JPYのデータ取得をテスト
+@patch('data_feed.requests.get')
+def test_fetch_usd_jpy_data(mock_get):
+    # モックのレスポンス設定を行い、API呼び出しをシミュレート
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [{'timestamp': '2023-01-01T00:00:00Z', 'rate': 130.0}]
+    
+    df = fetch_usd_jpy_data()
+    assert isinstance(df, pd.DataFrame)  # データ型がDataFrameであることを確認
+    assert not df.empty  # データフレームが空でないことを確認
+
+# 異常系テスト: API呼び出し失敗時の動作確認
+@patch('data_feed.requests.get')
+def test_fetch_usd_jpy_data_error(mock_get):
+    # API呼び出しが例外を発生させるケースをシミュレート
+    mock_get.side_effect = requests.exceptions.RequestException("API Error")
+    
+    with pytest.raises(requests.exceptions.RequestException):
+        fetch_usd_jpy_data()
+
+# データの前処理機能をテストする
+def test_preprocess_data():
+    # サンプルデータセットを用意
+    data = [{'timestamp': '2023-01-01T00:00:00Z', 'rate': 130.0}]
+    df = pd.DataFrame(data)
+    
+    # 前処理を実行
+    processed_df = preprocess_data(df)
+    
+    # 前処理結果の確認
+    assert processed_df.index.name == 'timestamp'  # インデックスが'timestamp'であることの確認
+    assert 'rate' in processed_df.columns  # 'rate'列が存在していることの確認
 ```
 
-4. **ファイルの保存**:
-   - 編集が完了したら、ファイルをUTF-8エンコーディングで保存します。多くのエディタでは保存時にエンコーディングを指定できる場合があります。
+### 修正のポイント
 
-5. **テストの再実行**:
-   - コマンドラインやターミナルで以下のコマンドを使用してテストを実行し、エラーが解消されたか確認します。
+- **コメントアウト**: 日本語の説明文を先頭に`#`を付けることで、Pythonコードとして解釈されずにコメントとして残すことができます。
+- **エンコード指定**: ファイル冒頭に`# -*- coding: utf-8 -*-`を追加し、文字エンコーディングをUTF-8として明示しています（Python 3ではデフォルトですが、明示することで誤解を防げます）。
+- 各テストが期待通りに作動し、範囲が明確で他者も理解しやすいようにコメントを活用しています。
 
-```bash
-python -m unittest generated_code/test_turn1.py
-```
-
-または、`pytest` を利用している場合には次のように実行します：
-
-```bash
-pytest generated_code/test_turn1.py
-```
-
-これで `SyntaxError` が解決され、テストが正常に実行されるようになるはずです。ファイル内に構文を壊すような無効な文字列がないことを確認するのがポイントです。問題が再発する場合は、具体的なエラーメッセージを確認し、さらなる改善点を探していきます。
+修正を行った後、再度`pytest`を実行し、エラーが解消されることを確認してください。これにより、コードが正常に動作するはずです。
