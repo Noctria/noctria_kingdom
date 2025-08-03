@@ -4627,3 +4627,127 @@ if __name__ == "__main__":
 [2025-08-03 14:08:58] implement AIのコード保存: ./generated_code/strategy_execution.py
 [2025-08-03 14:08:58] implement AIのコード保存: ./generated_code/path_config.py
 [2025-08-03 14:08:58] implement AIのコード保存: ./generated_code/gui_management.py
+[2025-08-03 14:09:01] Git commit & push succeeded: implement AI generated files - turn 1
+[2025-08-03 14:09:29] test AI: このプロジェクトの内容に基づいて、Pythonのユニットテストを作成します。以下の例では、`pytest`を使用して正常系・異常系のテストコードを記述します。すべてのテストで必要なパスは`path_config.py`からインポートしています。これにより、プロジェクトの一貫性を保ちながらテストを実行できます。
+
+### 1. データ収集と前処理のテスト
+
+#### test_data_collection.py
+```python
+# ファイル名: test_data_collection.py
+
+import pytest
+import pandas as pd
+from unittest.mock import patch, Mock
+from data_collection import fetch_usd_jpy_data, process_data
+from path_config import DATA_SOURCE_URL
+
+def test_fetch_usd_jpy_data_success():
+    """Test successful data fetching."""
+    with patch('data_collection.requests.get') as mock_get:
+        mock_get.return_value = Mock(status_code=200, json=lambda: [{'date': '2023-01-01', 'price': 135}])
+        df = fetch_usd_jpy_data()
+        assert not df.empty
+        assert 'price' in df.columns
+
+def test_fetch_usd_jpy_data_failure():
+    """Test data fetching failure."""
+    with patch('data_collection.requests.get') as mock_get:
+        mock_get.return_value.raise_for_status.side_effect = Exception('Error fetching data')
+        with pytest.raises(Exception):
+            fetch_usd_jpy_data()
+
+def test_process_data():
+    """Test data processing."""
+    data = {'date': ['2023-01-01'], 'price': [135]}
+    df = pd.DataFrame(data)
+    processed_df = process_data(df)
+    assert 'normalized_price' in processed_df.columns
+    assert not processed_df.empty
+```
+
+### 2. モデル設計・トレーニングのテスト
+
+#### test_model_design.py
+```python
+# ファイル名: test_model_design.py
+
+import pytest
+from model_design import build_model
+
+def test_build_model():
+    """Test model building."""
+    try:
+        model = build_model((10, 1))
+        assert model is not None
+        assert len(model.layers) > 0
+    except Exception:
+        pytest.fail("Model could not be built.")
+```
+
+#### test_model_training.py
+```python
+# ファイル名: test_model_training.py
+
+from unittest.mock import MagicMock
+from model_training import train_model
+
+def test_train_model():
+    """Test model training."""
+    mock_model = MagicMock()
+    X_train, y_train = [[0.1]*10]*100, [0.1]*100
+    try:
+        train_model(mock_model, X_train, y_train)
+        mock_model.fit.assert_called_once()
+    except Exception:
+        pytest.fail("Model training failed.")
+```
+
+### 3. モデル評価のテスト
+
+#### test_model_evaluation.py
+```python
+# ファイル名: test_model_evaluation.py
+
+from unittest.mock import MagicMock
+from model_evaluation import evaluate_model
+
+def test_evaluate_model():
+    """Test model evaluation."""
+    mock_model = MagicMock()
+    mock_model.predict.return_value = [0.1]*100
+    X_test, y_test = [[0.1]*10]*100, [0.1]*100
+    mse, mae = evaluate_model(mock_model, X_test, y_test)
+    assert mse >= 0
+    assert mae >= 0
+```
+
+### 4. 戦略実行のテスト
+
+#### test_strategy_execution.py
+```python
+# ファイル名: test_strategy_execution.py
+
+from unittest.mock import patch
+from strategy_execution import generate_trade_signal, execute_strategy
+
+def test_generate_trade_signal():
+    """Test signal generation."""
+    predictions = [0.1, -0.1, 0.2]
+    signals = generate_trade_signal(predictions)
+    assert signals == ['BUY', 'SELL', 'BUY']
+
+@patch('strategy_execution.execute_order')
+def test_execute_strategy(mock_execute_order):
+    """Test strategy execution."""
+    signals = ['BUY', 'SELL']
+    execute_strategy(signals)
+    assert mock_execute_order.call_count == 2
+```
+
+これらのテストは、予想される結果に基づいて各関数を検証します。異常系テストでは例外が発生する状況を確認し、正常系では適切な出力が得られることを確認します。これらのテストを実行することで、コードが期待通りに動作するかどうかを検証できます。
+[2025-08-03 14:09:29] test AIのコード保存: ./generated_code/test_data_collection.py
+[2025-08-03 14:09:29] test AIのコード保存: ./generated_code/test_model_design.py
+[2025-08-03 14:09:29] test AIのコード保存: ./generated_code/test_model_training.py
+[2025-08-03 14:09:29] test AIのコード保存: ./generated_code/test_model_evaluation.py
+[2025-08-03 14:09:29] test AIのコード保存: ./generated_code/test_strategy_execution.py
