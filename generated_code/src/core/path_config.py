@@ -5,7 +5,6 @@
 # UUID: 16e6148c-d354-4cbc-9f1b-211126ba8539
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-```python
 # ディレクトリパスやファイルパスを集中管理するモジュール
 # PEP8に準拠し、全てのパス定義に型注釈を追加します。
 
@@ -22,4 +21,3 @@ FEATURES_PATH: Final[str] = "/path/to/features"
 
 # モデルファイルパス
 MODEL_PATH: Final[str] = "/path/to/model"
-```
