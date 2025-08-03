@@ -1,9 +1,10 @@
 import os
 from datetime import datetime
 
-UNDEF_FILE = "autogen_scripts/undefined_symbols.txt"
-KNOWLEDGE_PATH = "docs/knowledge.md"
-PROMPT_OUT = "autogen_scripts/ai_prompt_fix_missing.txt"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UNDEF_FILE = os.path.join(BASE_DIR, "undefined_symbols.txt")
+KNOWLEDGE_PATH = os.path.join(BASE_DIR, "..", "docs", "knowledge.md")
+PROMPT_OUT = os.path.join(BASE_DIR, "ai_prompt_fix_missing.txt")
 
 if not os.path.exists(UNDEF_FILE):
     raise FileNotFoundError(f"{UNDEF_FILE} が見つかりません")
@@ -15,6 +16,9 @@ with open(KNOWLEDGE_PATH, "r", encoding="utf-8") as f:
 
 with open(UNDEF_FILE, "r", encoding="utf-8") as f:
     missing = f.read().strip()
+
+if not missing:
+    missing = "未定義シンボルはありません。"
 
 timestamp = datetime.now().isoformat()
 
@@ -42,6 +46,6 @@ prompt = f"""
 """
 
 with open(PROMPT_OUT, "w", encoding="utf-8") as f:
-    f.write(prompt.strip())
+    f.write(prompt.rstrip())
 
 print(f"AI用プロンプトを {PROMPT_OUT} に生成しました！")
