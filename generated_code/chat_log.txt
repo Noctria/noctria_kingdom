@@ -6599,3 +6599,120 @@ def test_fetch_market_data_network_error(mock_binance):
 
 この修正を行った後に、再度テストを実行して問題が解消されたことを確認してください。
 [2025-08-03 17:16:34] doc AIのコード保存: ./generated_code/test_data_collection.py
+[2025-08-03 17:16:38] Git commit & push succeeded: doc AI generated files - turn 3
+[2025-08-03 17:21:39] design AI: あなたのケースでは、日本語がコードとして解釈されているようでした。それを防ぐために、すべての日本語コメントを`#`で正しく始めるか、英語のコメントに置き換えることをお勧めします。以下に修正例を示します。英語でのコメントを使用して、コードの意図を明確に説明しています。
+
+```python
+# File: test_data_collection.py
+
+import pytest
+import pandas as pd
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
+
+# Test for successful market data retrieval
+@patch('ccxt.binance')
+def test_fetch_market_data_success(mock_binance):
+    # Create a mock exchange object
+    mock_exchange = MagicMock()
+    # Set a sample return value for the mocked fetch_ohlcv function
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
+    # Assign the mock exchange to the binance object
+    mock_binance.return_value = mock_exchange
+
+    # Retrieve the storage path for the CSV file
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
+    
+    # Execute the function to fetch market data
+    fetch_market_data()
+    
+    # Assert the CSV file was created successfully
+    assert os.path.exists(csv_path)
+    
+    # Validate the contents of the CSV file are correct
+    df = pd.read_csv(csv_path)
+    assert not df.empty
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+# Test for network error handling
+@patch('ccxt.binance')
+def test_fetch_market_data_network_error(mock_binance):
+    # Simulate a network error by setting a side effect
+    mock_binance.side_effect = Exception('NetworkError')
+    
+    # Ensure an exception is raised during a network error
+    with pytest.raises(Exception):
+        fetch_market_data()
+```
+
+### 修正ポイント:
+
+1. **コメントの翻訳**: 日本語の説明を英語に置き換えることにより、コメントが誤解されるリスクをなくしています。
+2. **コメントの適用範囲を明確に**: 各コードブロックに対するコメントを追加することで、コードの目的や処理を明確に記述しています。
+3. **テストの意図を明示**: 何をテストし、どのような結果を期待するのかをコメントで説明しています。
+
+この英語コメント版を使うことで、構文エラーが解決されるとともに、コードの国際化にも役立ちます。変更を適用したら再度テストを行い、エラーが解消されたことを確認してください。
+[2025-08-03 17:21:55] implement AI: ありがとうございます。指摘の通り、日本語のコメントを`#`で正しく始めることでPythonのコードとして誤って解釈されることを防げますが、さらに英語でコメントを記述するのも多くの開発環境で推奨される慣習です。
+
+英語のコメントを使用したコードは、国際化された環境や異なるバックグラウンドの開発者にとっても理解しやすく、メンテナンスしやすいものになります。以下に示すのは、英語でコメントを付けたテストコードの例です。
+
+```python
+# File: test_data_collection.py
+
+import pytest
+import pandas as pd
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
+
+# Test for successful market data retrieval
+@patch('ccxt.binance')
+def test_fetch_market_data_success(mock_binance):
+    # Create a mock exchange object
+    mock_exchange = MagicMock()
+    # Set a sample return value for the mocked fetch_ohlcv function
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
+    # Link the mock exchange to the binance object
+    mock_binance.return_value = mock_exchange
+
+    # Get the storage path for the CSV file
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
+    
+    # Execute the function to fetch and store market data
+    fetch_market_data()
+    
+    # Ensure the CSV file was created successfully
+    assert os.path.exists(csv_path)
+    
+    # Validate the CSV file contents
+    df = pd.read_csv(csv_path)
+    assert not df.empty
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+# Test for network error handling in market data retrieval
+@patch('ccxt.binance')
+def test_fetch_market_data_network_error(mock_binance):
+    # Simulate a network error using a side effect
+    mock_binance.side_effect = Exception('NetworkError')
+    
+    # Check if an exception is raised during a network issue
+    with pytest.raises(Exception):
+        fetch_market_data()
+```
+
+### Key Points:
+- **Standardized Comments**: Using English for comments helps meet internationalization standards and facilitates understanding for a broader audience.
+- **Clear Intent Description**: It is important to clearly state the intention behind each test and what it is verifying. This helps in maintaining the test cases as code evolves.
+- **Robust Testing**: The tests aim to cover successful data retrieval and robust error handling, ensuring the function behaves as expected under different scenarios.
+
+Apply these changes and re-run the tests to ensure they pass and that the code behaves as expected. This will also help future-proof the code against potential team expansions globally or in multilingual settings.
+[2025-08-03 17:21:55] implement AIのコード保存: ./generated_code/implement_turn4.py
