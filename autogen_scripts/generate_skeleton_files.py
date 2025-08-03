@@ -11,19 +11,25 @@ def add_skeleton_to_file(file_path, symbol):
 
     with open(file_path, "r+", encoding="utf-8") as f:
         content = f.read()
-        # 既に骨格ありならスキップ
-        if f"class {symbol}" in content or f"def {symbol}" in content or re.search(rf"\b{symbol}\b", content):
+
+        # 厳密なクラス・関数定義の正規表現パターン
+        class_pattern = re.compile(rf"^class\s+{re.escape(symbol)}\b", re.MULTILINE)
+        def_pattern = re.compile(rf"^def\s+{re.escape(symbol)}\b", re.MULTILINE)
+        const_pattern = re.compile(rf"^{re.escape(symbol)}\s*=", re.MULTILINE)
+
+        if class_pattern.search(content) or def_pattern.search(content) or const_pattern.search(content):
+            # すでに骨格あり
             return
 
         f.seek(0, os.SEEK_END)
         if symbol.isupper():
-            # 定数の想定
-            f.write(f"{symbol} = 'TODO:値'\n\n")
+            # 定数（Noneにしておく）
+            f.write(f"{symbol} = None  # TODO: 適切な値に変更\n\n")
         elif symbol[0].isupper():
-            # クラスの想定
-            f.write(f"class {symbol}:\n    pass\n\n")
+            # クラス骨格
+            f.write(f"class {symbol}:\n    def __init__(self):\n        pass\n\n")
         else:
-            # 関数の想定
+            # 関数骨格
             f.write(f"def {symbol}(*args, **kwargs):\n    pass\n\n")
 
 def generate_skeleton_files():
@@ -35,6 +41,7 @@ def generate_skeleton_files():
         lines = f.readlines()
 
     pattern = re.compile(r": '(\w+)' not defined in (\w+\.py)")
+    count = 0
     for line in lines:
         m = pattern.search(line)
         if m:
@@ -42,6 +49,10 @@ def generate_skeleton_files():
             target_file = os.path.join(FOLDER, file)
             add_skeleton_to_file(target_file, symbol)
             print(f"[骨格生成] {target_file} に {symbol} の骨格を追加")
+            count += 1
+
+    if count == 0:
+        print("[骨格生成] 追加すべき未定義シンボルが見つかりませんでした。")
 
 if __name__ == "__main__":
     generate_skeleton_files()
