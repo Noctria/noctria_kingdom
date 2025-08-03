@@ -16,4 +16,3 @@ class OrderExecutor:
 def log_difference_and_reason(old_data, new_data, reason):
     # 実装に応じた差分記録
     pass
-python

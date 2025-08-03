@@ -1,3 +1,5 @@
+import pandas as pd
+from keras.models import Sequential
 import tensorflow as tf
 from path_config import PathConfig
 
@@ -25,4 +27,3 @@ class VeritasML:
         except Exception as e:
             print(f"予測中にエラーが発生: {e}")
             return []
-python

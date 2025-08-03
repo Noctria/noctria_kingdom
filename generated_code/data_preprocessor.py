@@ -9,4 +9,3 @@ class DataPreprocessor:
         except Exception as e:
             print(f"前処理中にエラーが発生: {e}")
             return pd.DataFrame()
-python

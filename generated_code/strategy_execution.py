@@ -19,4 +19,3 @@ def execute_strategy(signals):
     except Exception as e:
         logging.error(f"Error executing strategy: {e}")
         raise
-python

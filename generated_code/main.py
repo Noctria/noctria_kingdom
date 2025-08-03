@@ -25,4 +25,3 @@ def main():
         order_execution.execute_trades(buy_signals, sell_signals)
     except Exception as e:
         logging.error(f"Trade execution failed: {e}")
-python

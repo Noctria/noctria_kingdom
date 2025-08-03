@@ -12,4 +12,3 @@ def test_model_predict():
 
     assert len(predictions) == 10
     assert isinstance(predictions, np.ndarray)
-python

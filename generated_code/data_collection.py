@@ -2,7 +2,6 @@ import ccxt
 import pandas as pd
 import os
 
-# --- ストレージパスを直接定義（または path_config.py から定数import推奨） ---
 STORAGE_PATH = "./local_data/"
 
 def fetch_market_data():
@@ -20,10 +19,8 @@ def fetch_market_data():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-# テストや他モジュールから呼べるよう関数名をエクスポート
 def fetch_forex_data():
     fetch_market_data()
 
 if __name__ == "__main__":
     fetch_market_data()
-

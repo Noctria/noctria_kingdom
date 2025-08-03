@@ -5,4 +5,3 @@ def calculate_var(position_size, price_data):
 def set_stop_loss(order):
     # ストップロスの設定
     pass
-python

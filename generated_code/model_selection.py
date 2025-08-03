@@ -6,4 +6,3 @@ def select_model(data):
     pass
 
 optimal_model = select_model(cleaned_data)
-python

@@ -8,4 +8,3 @@ def test_build_model():
         assert len(model.layers) > 0
     except Exception:
         pytest.fail("Model could not be built.")
-python

@@ -1,3 +1,4 @@
+from typing import Tuple
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
 import logging
@@ -14,4 +15,3 @@ def build_model(input_shape: Tuple[int, ...]) -> Sequential:
     except Exception as e:
         logging.error(f"Error building model: {e}")
         raise
-python

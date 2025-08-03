@@ -9,4 +9,3 @@ def test_evaluate_model():
     mse, mae = evaluate_model(mock_model, X_test, y_test)
     assert mse >= 0
     assert mae >= 0
-python

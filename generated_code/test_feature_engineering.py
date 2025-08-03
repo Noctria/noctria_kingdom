@@ -11,4 +11,3 @@ def test_calculate_technical_indicators():
     engineered_data = pd.read_csv(FEATURES_PATH)
     expected_sma = engineered_data['Close'].rolling(window=20).mean()
     pd.testing.assert_series_equal(engineered_data['SMA_20'], expected_sma, check_names=False)
-python

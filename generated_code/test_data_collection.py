@@ -11,7 +11,6 @@ def test_fetch_forex_data_success(mock_get):
 
     mock_get.return_value = MockResponse()
 
-    # 実行して、適切に保存されることを確認
     fetch_forex_data()  # 戻り値がないためエラーがないことを確認
 
     with open(LOCAL_DATA_PATH, 'r') as file:

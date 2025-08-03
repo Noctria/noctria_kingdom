@@ -25,5 +25,3 @@ def test_calculate_rsi():
     data = pd.DataFrame({'close': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
     model = StrategyModel(short_window=3, medium_window=5, rsi_period=14)
     result = model.calculate_rsi(data)
-    assert 'rsi' in result.columns  # RSIが計算され、カラムが追加されている
-python

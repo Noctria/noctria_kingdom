@@ -24,9 +24,3 @@ strategy = TradingStrategy()
 strategy.load_data()
 strategy.generate_signals()
 strategy.execute_trades()
-
-システムをGUIで管理し、利用者が視覚的に戦略を確認、変更、実行できるようにします。GUIの実装はHUDスタイルを適用して統一しますが、詳細なHTML/CSSのコードは省略します。
-
-- **パスの統合管理**: 全てのファイルパスを`path_config.py`で管理しているため、パスの変更を容易にしています。
-- **例外処理**: 各機能は適切な例外処理を組み込み、システムの安全性と信頼性を確保しています。
-- **型アノテーションとPEP8**: 全ての関数には型アノテーションを追加し、PEP8に準拠したコードスタイルを維持しています。

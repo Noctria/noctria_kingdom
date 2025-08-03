@@ -3,4 +3,3 @@ def evaluate_performance(trades):
     pass
 
 performance_metrics = evaluate_performance(trade_history)
-python
