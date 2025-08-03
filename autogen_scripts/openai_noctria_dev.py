@@ -8,6 +8,8 @@ import datetime
 import sys
 from uuid import uuid4
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "utils")))
 from cycle_logger import insert_turn_history
@@ -37,6 +39,18 @@ ENV_INFO = (
     "- noctria_gui/配下HTMLはhud_style.cssに準拠したHUDスタイル統一。\n"
     "- 全プロダクトの最終判断・注文の可否はsrc/core/king_noctria.pyに集約。\n"
 )
+
+# === ロギング設定（ログローテーション付き） ===
+logger = logging.getLogger("openai_noctria_dev")
+logger.setLevel(logging.INFO)
+handler = RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+def log_message(message: str):
+    print(message)
+    logger.info(message)
 
 def load_file(path, max_chars=None):
     try:
@@ -115,11 +129,6 @@ def get_role_prompts():
         for role in ["design", "implement", "test", "review", "doc"]
     }
 
-def log_message(message: str):
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {message}\n")
-
 def git_commit_and_push(repo_dir: str, message: str) -> bool:
     try:
         subprocess.run(["git", "-C", repo_dir, "add", "."], check=True)
@@ -146,6 +155,9 @@ def build_file_header(filename: str, ai_name: str = "openai_noctria_dev.py", ver
 
 def save_ai_generated_file(file_path: str, content: str):
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    if os.path.exists(file_path):
+        print(f"[警告] ファイルが既に存在します（上書きされます）: {file_path}")
+        log_message(f"警告: ファイルが既に存在します（上書き）: {file_path}")
     header = build_file_header(file_path)
     if content.strip().startswith("# ファイル名:"):
         merged = content
@@ -220,7 +232,8 @@ async def call_openai(client, messages, retry=3, delay=2):
             log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
             print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
             if attempt + 1 == retry:
-                raise
+                log_message(f"最終試行でAPI呼び出しに失敗しました。処理を中断します。")
+                raise RuntimeError("OpenAI API呼び出しが最終試行で失敗しました。") from e
             await asyncio.sleep(delay)
 
 # --- 未定義シンボル自動注入ロジック ---
@@ -248,6 +261,24 @@ async def call_openai_for_missing_symbols(client, prompt):
             await asyncio.sleep(2)
     raise RuntimeError("AI補完失敗")
 
+async def auto_fix_missing_symbols(client, max_attempts=5):
+    attempts = 0
+    while attempts < max_attempts:
+        run_find_undefined_symbols()
+        if not os.path.exists(UNDEF_FILE):
+            break
+        with open(UNDEF_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content or content.lower().startswith("=== 0 missing"):
+                break
+        prompt = run_gen_prompt_for_undefined_symbols()
+        ai_response = await call_openai_for_missing_symbols(client, prompt)
+        save_and_commit_ai_files(ai_response)
+        attempts += 1
+    else:
+        print(f"[警告] 未定義シンボル補完が {max_attempts} 回繰り返しても解消されません。")
+        log_message(f"未定義シンボル補完が {max_attempts} 回繰り返し失敗")
+
 def save_and_commit_ai_files(ai_response):
     files = split_files_from_response(ai_response)
     if not files:
@@ -261,27 +292,13 @@ def save_and_commit_ai_files(ai_response):
         log_message(f"[未定義補完] AIのコード保存: {file_path}")
     git_commit_and_push(OUTPUT_DIR, "fix: 自動未定義シンボル補完")
 
-async def auto_fix_missing_symbols(client):
-    while True:
-        run_find_undefined_symbols()
-        if not os.path.exists(UNDEF_FILE):
-            break
-        with open(UNDEF_FILE, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-            if not content or content.lower().startswith("=== 0 missing"):
-                break
-        prompt = run_gen_prompt_for_undefined_symbols()
-        ai_response = await call_openai_for_missing_symbols(client, prompt)
-        save_and_commit_ai_files(ai_response)
-        # もう一度ループして、まだ未定義が残っていないか再チェック
-
 async def multi_agent_loop(client, max_turns=10):
     consecutive_fails = 0
     for turn in range(max_turns):
         print(f"\n=== Turn {turn+1} ===")
 
         # --- 1. テスト・実装前に未定義シンボル自動補完（全消えるまで）---
-        await auto_fix_missing_symbols(client)
+        await auto_fix_missing_symbols(client, max_attempts=5)
 
         order = ["design", "implement", "test", "review", "doc"]
         role_prompts = get_role_prompts()
@@ -349,7 +366,7 @@ async def multi_agent_loop(client, max_turns=10):
                     messages["review"].append({"role": "user", "content": feedback})
 
             # --- 2. テスト・実装の後にも未定義シンボル自動補完 ---
-            await auto_fix_missing_symbols(client)
+            await auto_fix_missing_symbols(client, max_attempts=5)
 
         # 進捗DB保存
         try:
