@@ -1,56 +1,46 @@
 # ファイル名: test_data_collection.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:16:34.761313
+# 生成日時: 2025-08-03T19:19:08.019360
 # 生成AI: openai_noctria_dev.py
-# UUID: 42d3a356-671b-4b27-b94c-4fe0b3bed9c3
+# UUID: 34e6daba-75fa-457c-9906-d6e3b71acd30
+# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
 import pytest
-import pandas as pd
-import os
-from unittest.mock import patch, MagicMock
-from path_config import get_path
-from data_collection import fetch_market_data
+import requests
+from unittest.mock import patch
+from data_collection import fetch_forex_data
+from path_config import DATA_SOURCE_URL, LOCAL_DATA_PATH
 
-# Test for successful market data fetch
-@patch('ccxt.binance')  # Mock ccxt.binance to eliminate external dependency
-def test_fetch_market_data_success(mock_binance):
-    mock_exchange = MagicMock()
-    # Set the return value for the mock fetch_ohlcv method
-    mock_exchange.fetch_ohlcv.return_value = [
-        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
-    ]
-    mock_binance.return_value = mock_exchange
+# 目的: 正常にAPIからデータを取得して保存できることを確認する
+# 期待結果: データ取得後、保存に成功
+@patch('data_collection.requests.get')
+def test_fetch_forex_data_success(mock_get):
+    class MockResponse:
+        status_code = 200
+        text = "Sample data"
 
-    # Get the path where data will be stored
-    storage_path = get_path('trading')
-    csv_path = os.path.join(storage_path, 'market_data.csv')
-    
-    # Execute the data fetching function
-    fetch_market_data()
-    
-    # Verify that the CSV file was created successfully
-    assert os.path.exists(csv_path)
-    
-    # Verify the contents of the CSV file
-    df = pd.read_csv(csv_path)
-    assert not df.empty
-    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+    mock_get.return_value = MockResponse()
 
-# Test for handling network errors
-@patch('ccxt.binance')  # Mock ccxt.binance to simulate network error
-def test_fetch_market_data_network_error(mock_binance):
-    # Simulate a network error by setting a side effect
-    mock_binance.side_effect = Exception('NetworkError')
+    # 実行して、適切に保存されることを確認
+    fetch_forex_data()  # 戻り値がないためエラーがないことを確認
+
+    with open(LOCAL_DATA_PATH, 'r') as file:
+        data = file.read()
+        assert data == "Sample data"
+
+# 目的: APIからデータ取得が失敗する場合の例外処理を確認する
+# 期待結果: ConnectionErrorが発生する
+@patch('data_collection.requests.get')
+def test_fetch_forex_data_failure(mock_get):
+    class MockResponse:
+        status_code = 404
     
-    # Check if an exception is raised when fetching market data
-    with pytest.raises(Exception):
-        fetch_market_data()
+    mock_get.return_value = MockResponse()
+
+    with pytest.raises(ConnectionError):
+        fetch_forex_data()
 ```
 
-### 修正ポイント:
+### `test_feature_engineering.py`
 
-1. **英語でのコメントアウト**: 日本語コメントを英語に置き換えました。これにより、Pythonが意図しない内容をコードとして解釈することを防ぎます。
-2. **コメントの適切な配置**: 各機能に対してコメントを配置し、コード全体の意図がわかりやすくなるようにしています。
-3. **可読性の改善**: コードの可読性を向上させるため、重要な部分に説明を加えています。
-
-この修正を行った後に、再度テストを実行して問題が解消されたことを確認してください。
+```python
