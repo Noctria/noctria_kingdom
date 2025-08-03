@@ -17,17 +17,25 @@ ROLE_PROMPTS = {
     "design": (
         "あなたは戦略設計AIです。USD/JPYの自動トレードAIの戦略を詳細に設計してください。\n"
         "まず、noctria_kingdom/docs/Noctria連携図.mmdを読み込み、その内容（システム全体の連携構造、各ファイルやコンポーネントの関係性）を把握してください。\n"
+        "【パス管理重要ルール】\n"
+        "・すべてのパス定義（ディレクトリやファイルパス等）は noctria_kingdom/src/core/path_config.py で集中管理します。\n"
+        "・他のPythonファイルでは絶対にパス文字列を直書きせず、必ずpath_config.pyからimportして参照してください。\n"
+        "・既存コードのパス直書きや分散記述があれば、必ずpath_config.pyに統合する設計案を作成してください。\n"
         "その上で、この連携図に記載されたすべてのファイル群・コンポーネントの"
         "1. 構造上の問題点 2. 冗長な部分や重複機能 3. 改善・統合・リファクタ案 "
         "4. 保守性・拡張性のための設計提案 5. 不足しているテストやドキュメント などをレビューしてください。\n"
         "各ファイルの役割や依存関係についても可視化し、具体的な改良案・統合案を出してください。\n"
-        "最初に連携図（Mermaidファイル）の内容を出力し、そのあとにレビューと提案を出力してください。"
+        "最初に連携図（Mermaidファイル）の内容を出力し、そのあとにレビューと提案を出力してください。\n"
         "複数ファイルに分割生成してください。ファイルの先頭に必ず「# ファイル名: filename.py」を記載してください。\n"
         "戦略設計は実装に必要な関数やクラスの構造、処理の流れを明確に示し、拡張や修正が容易な設計にしてください。\n"
         "設計説明は簡潔かつ具体的に。過度に冗長にならないように注意してください。"
     ),
     "implement": (
         "設計AIの指示とnoctria_kingdom/docs/Noctria連携図.mmdに従い、改良された構造・設計に基づく実装コードを生成してください。\n"
+        "【パス管理重要ルール】\n"
+        "・すべてのパス指定は noctria_kingdom/src/core/path_config.py で集中管理します。\n"
+        "・他のファイル内でパス文字列を直接記述することは禁止です。必ずpath_config.pyからimportして参照してください。\n"
+        "・既存のパス直書きやos.path.join等による分散パス指定があれば、必ずpath_config.pyに集約して修正してください。\n"
         "あなたは実装AIです。設計AIからの指示に基づきコードを生成し、改善提案をしてください。\n"
         "複数ファイルに分割し、ファイル先頭に「# ファイル名: filename.py」を必ず記載してください。\n"
         "コードは説明文なしで、実行可能な純粋なPythonコードのみを返してください。\n"
@@ -40,7 +48,9 @@ ROLE_PROMPTS = {
     ),
     "test": (
         "Noctria連携図.mmdおよび設計AIのレビューをもとに、各コンポーネントのテストコードを生成してください。\n"
-        "冗長・重複・境界・エラーケース・統合的な連携テストもカバーしてください。"
+        "【パス管理重要ルール】\n"
+        "・テストコードでもファイルパス・ディレクトリ指定が必要な場合は、必ずnoctria_kingdom/src/core/path_config.pyからimportして利用してください。\n"
+        "冗長・重複・境界・エラーケース・統合的な連携テストもカバーしてください。\n"
         "あなたはテストAIです。生成されたコードに対する単体テストコードを作成してください。\n"
         "テストコードはunittestまたはpytest形式で統一してください。\n"
         "各機能の正常系テストに加え、境界値や異常系のテストケースも含めてください。\n"
@@ -49,7 +59,10 @@ ROLE_PROMPTS = {
         "テストコードは読みやすく保守しやすい構造にしてください。"
     ),
     "review": (
-        "生成コードとテストを連携図.mmdに照らして評価し、全体最適化や構造上の統合・リファクタ案も追加で指摘してください。"
+        "生成コードとテストを連携図.mmdに照らして評価し、全体最適化や構造上の統合・リファクタ案も追加で指摘してください。\n"
+        "【パス管理重要ルール】\n"
+        "・すべてのコード・テストがnoctria_kingdom/src/core/path_config.pyでパスを集中管理しているか厳格にチェックしてください。\n"
+        "・パスの直書きや分散記述があれば必ず指摘し、修正案を具体的に出してください。\n"
         "あなたはレビューAIです。実装AIとテストAIの生成したコードとテスト結果を評価してください。\n"
         "コードのバグ、ロジックの問題点を指摘し、具体的な改善提案を述べてください。\n"
         "リファクタリングやパフォーマンス改善、セキュリティ上の懸念（例：SQLインジェクション）も検討してください。\n"
@@ -57,7 +70,9 @@ ROLE_PROMPTS = {
         "テスト結果からのフィードバックも分析し、必要ならばコードやテストの追加改善を指示してください。"
     ),
     "doc": (
-        "Noctria連携図.mmdをもとに、全体構成の説明、ファイル相互関係のMermaid可視化、環境構築・実行手順も含むドキュメントを自動生成してください。"
+        "Noctria連携図.mmdをもとに、全体構成の説明、ファイル相互関係のMermaid可視化、環境構築・実行手順も含むドキュメントを自動生成してください。\n"
+        "【パス管理重要ルール】\n"
+        "・path_config.pyによるパス集中管理の意義・設計思想・利用例をREADMEやドキュメントでわかりやすく説明してください。\n"
         "あなたはドキュメントAIです。生成コードのAPIドキュメントやREADMEを自動生成してください。\n"
         "APIドキュメントはOpenAPI仕様やdocstring形式で詳細かつ正確に作成してください。\n"
         "READMEには環境構築手順、使い方、依存関係、注意点をわかりやすく記載してください。\n"
@@ -65,22 +80,14 @@ ROLE_PROMPTS = {
     ),
 }
 
+# ...（以下は従来通り、省略可能）
+
 def log_message(message: str):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
 
 def git_commit_and_push(repo_dir: str, message: str) -> bool:
-    """
-    指定ディレクトリでgit add・commit・pushを実行する。
-
-    Args:
-        repo_dir: Gitリポジトリのルートディレクトリ
-        message: コミットメッセージ
-
-    Returns:
-        成功したらTrue、失敗したらFalse
-    """
     try:
         subprocess.run(["git", "-C", repo_dir, "add", "."], check=True)
         subprocess.run(["git", "-C", repo_dir, "commit", "-m", message], check=True)
@@ -92,21 +99,6 @@ def git_commit_and_push(repo_dir: str, message: str) -> bool:
         return False
 
 async def call_openai(client, messages, retry=3, delay=2):
-    """
-    OpenAI APIを呼び出す関数（リトライ対応）
-
-    Args:
-        client: OpenAIクライアントインスタンス
-        messages: チャットメッセージリスト
-        retry: 最大リトライ回数（デフォルト3回）
-        delay: リトライ間隔（秒）
-
-    Returns:
-        API応答のテキスト（str）
-
-    Raises:
-        Exception: 全リトライ失敗時に例外を再送出
-    """
     for attempt in range(retry):
         try:
             response = await asyncio.to_thread(
@@ -184,7 +176,6 @@ async def multi_agent_loop(client, max_turns=5):
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
 
-                # Git連携処理を追加
                 commit_message = f"{role} AI generated files - turn {turn+1}"
                 if not git_commit_and_push(OUTPUT_DIR, commit_message):
                     print(f"警告: Git連携に失敗しました。手動でコミットを確認してください。")
