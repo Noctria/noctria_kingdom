@@ -13,8 +13,23 @@ OUTPUT_DIR = "./generated_code"
 LOG_FILE = os.path.join(OUTPUT_DIR, "chat_log.txt")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# 【重要】開発環境情報（全AIへの共通前提として各プロンプト先頭に付与）
+ENV_INFO = (
+    "【重要・開発環境情報】\n"
+    "- Windows PC上でWSL2（Ubuntu）を利用しています。\n"
+    "- noctria_kingdom/airflow_docker/ 内のファイル・処理はAirflowのDockerコンテナ上（Linuxベース）で動作します。\n"
+    "- noctria_kingdom/noctria_gui/ 内のファイル・ルートはWSL側のvenv（venv_gui）で動作します。\n"
+    "- noctria_kingdom自体はWSL側のvenv（venv_noctria）で稼働します。\n"
+    "- この自動化AIスクリプトはWSL側のvenv（autogen_venv）で稼働しています。\n"
+    "- Windows/WSL/Linux/Docker間のパスの違い・ボリュームマウントに注意。\n"
+    "- Docker（Airflow）とWSL側Pythonは“直接ファイル共有できる部分・できない部分”があるため、設計時はパス・データ連携方法・依存管理を必ず明確にしてください。\n"
+    "- venvごとのpip依存（venv_noctria, venv_gui, autogen_venv等）が混じらないよう注意。\n"
+    "\n"
+)
+
 ROLE_PROMPTS = {
     "design": (
+        ENV_INFO +
         "あなたは戦略設計AIです。USD/JPYの自動トレードAIの戦略を詳細に設計してください。\n"
         "まず、noctria_kingdom/docs/Noctria連携図.mmdを読み込み、その内容（システム全体の連携構造、各ファイルやコンポーネントの関係性）を把握してください。\n"
         "【パス管理重要ルール】\n"
@@ -31,6 +46,7 @@ ROLE_PROMPTS = {
         "設計説明は簡潔かつ具体的に。過度に冗長にならないように注意してください。"
     ),
     "implement": (
+        ENV_INFO +
         "設計AIの指示とnoctria_kingdom/docs/Noctria連携図.mmdに従い、改良された構造・設計に基づく実装コードを生成してください。\n"
         "【パス管理重要ルール】\n"
         "・すべてのパス指定は noctria_kingdom/src/core/path_config.py で集中管理します。\n"
@@ -47,6 +63,7 @@ ROLE_PROMPTS = {
         "コード整形ツール（Black, isort）を通した後の状態を意識してください。"
     ),
     "test": (
+        ENV_INFO +
         "Noctria連携図.mmdおよび設計AIのレビューをもとに、各コンポーネントのテストコードを生成してください。\n"
         "【パス管理重要ルール】\n"
         "・テストコードでもファイルパス・ディレクトリ指定が必要な場合は、必ずnoctria_kingdom/src/core/path_config.pyからimportして利用してください。\n"
@@ -59,6 +76,7 @@ ROLE_PROMPTS = {
         "テストコードは読みやすく保守しやすい構造にしてください。"
     ),
     "review": (
+        ENV_INFO +
         "生成コードとテストを連携図.mmdに照らして評価し、全体最適化や構造上の統合・リファクタ案も追加で指摘してください。\n"
         "【パス管理重要ルール】\n"
         "・すべてのコード・テストがnoctria_kingdom/src/core/path_config.pyでパスを集中管理しているか厳格にチェックしてください。\n"
@@ -70,6 +88,7 @@ ROLE_PROMPTS = {
         "テスト結果からのフィードバックも分析し、必要ならばコードやテストの追加改善を指示してください。"
     ),
     "doc": (
+        ENV_INFO +
         "Noctria連携図.mmdをもとに、全体構成の説明、ファイル相互関係のMermaid可視化、環境構築・実行手順も含むドキュメントを自動生成してください。\n"
         "【パス管理重要ルール】\n"
         "・path_config.pyによるパス集中管理の意義・設計思想・利用例をREADMEやドキュメントでわかりやすく説明してください。\n"
@@ -80,7 +99,7 @@ ROLE_PROMPTS = {
     ),
 }
 
-# ...（以下は従来通り、省略可能）
+# ...（以下は従来通り省略可能。main等はそのまま）
 
 def log_message(message: str):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
