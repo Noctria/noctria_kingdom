@@ -21,6 +21,12 @@
 - コードはUTF-8で保存。
 - Black/isortでコード整形を想定。
 
+## 中央統治・注文執行ルール
+- Noctria Kingdomにおける**最終的な意思決定・注文の実行は必ず `src/core/king_noctria.py` を唯一のエントリーポイントとして実施すること**。
+- 各AIエージェント・コンポーネントは king_noctria.py を経由せずに直接注文・アクションを発行してはならない。
+- 新規機能や拡張時も必ず king_noctria.py への集約設計・統治フローを守ること。
+- GUIやAPI、Airflowからの注文・アクション要求も、king_noctria.py を通じて判断・執行される構造に統一すること。
+
 ## GUIスタイル・HUD統一ルール
 - Noctria KingdomのGUI管理ツール（`noctria_kingdom/noctria_gui/`配下）は**すべてのHTMLテンプレート・ページを `noctria_gui/static/hud_style.css` に準拠したHUDスタイルで開発・統一すること**。
 - デザインやレイアウトを修正・追加する際は、**必ずhud_style.cssの定義・トークンを優先利用し、HUDデザインと一貫性を保つ**。
