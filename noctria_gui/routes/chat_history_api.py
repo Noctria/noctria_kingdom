@@ -6,10 +6,10 @@ import asyncpg
 import os
 
 # --- ここを追加 ---
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 # 1. .env.local > .env の順で読み込む
 load_dotenv(find_dotenv('.env.local'), override=True)
-load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
+load_dotenv(find_dotenv('.env'), override=False)  # .envは上書きしない
 # --- ここまで ---
 
 router = APIRouter()
