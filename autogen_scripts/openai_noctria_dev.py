@@ -63,6 +63,7 @@ def role_prompt_template(role):
         "・knowledge.md/Noctria連携図を毎ターン最新で反映せよ。\n"
         "・全プロンプト/生成物は最新ルール・AI倫理/説明責任/バージョン管理/A/Bテスト/ロールバック/人間承認/セキュリティ/障害対応など全ガイドラインを必ず遵守せよ。\n"
         "・各ターンで生成物/理由/差分を履歴DBへ記録・説明を添付し、進化の証跡とすること。\n"
+        "・【重要】すべてのPythonファイルは必ず「generated_code/」直下に出力し、サブディレクトリや「generated_code/」の重複は絶対に作らないこと。ファイル名にはディレクトリ名を含めず、例: data_collector.py 形式のみ許可。\n"
     )
     if role == "design":
         return (
@@ -165,6 +166,15 @@ def split_files_from_response(response: str):
         i += 2
     return files
 
+def sanitize_filename(fname: str) -> str:
+    fname = fname.replace("\\", "/")
+    while fname.startswith("./"):
+        fname = fname[2:]
+    while fname.startswith("generated_code/"):
+        fname = fname[len("generated_code/"):]
+    # basenameのみでflat化（サブディレクトリ不可）
+    return os.path.basename(fname)
+
 def run_pytest_and_collect_detail(test_dir: str):
     import shutil
     report_file = os.path.join(test_dir, "pytest_result.json")
@@ -244,7 +254,8 @@ def save_and_commit_ai_files(ai_response):
         print("AI出力から保存すべきファイルが検出できませんでした")
         return
     for fname, content in files.items():
-        file_path = os.path.join(OUTPUT_DIR, fname)
+        flat_fname = sanitize_filename(fname)
+        file_path = os.path.join(OUTPUT_DIR, flat_fname)
         save_ai_generated_file(file_path, content)
         print(f"[未定義補完] AIのコード保存: {file_path}")
         log_message(f"[未定義補完] AIのコード保存: {file_path}")
@@ -309,7 +320,8 @@ async def multi_agent_loop(client, max_turns=10):
                     log_message(f"{role} AIのコード保存: {filename}")
                 else:
                     for fname, content in files.items():
-                        file_path = os.path.join(OUTPUT_DIR, fname)
+                        flat_fname = sanitize_filename(fname)
+                        file_path = os.path.join(OUTPUT_DIR, flat_fname)
                         save_ai_generated_file(file_path, content)
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
