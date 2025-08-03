@@ -46,7 +46,7 @@ def from_json(value: Any) -> Any:
 
 templates.env.filters["from_json"] = from_json
 
-# 既存ルーターインポート群
+# --- 各種ルーターのインポート ---
 from noctria_gui.routes import (
     dashboard, home_routes, king_routes, logs_routes,
     path_checker, trigger, upload, upload_history,
@@ -59,7 +59,8 @@ from noctria_gui.routes import (
     tag_heatmap, tag_summary, tag_summary_detail,
     hermes, ai_routes,
     chat_history_api,  # チャット履歴API
-    chat_api           # OpenAIチャットAPI
+    chat_api,          # OpenAIチャットAPI
+    devcycle_history   # ←★進捗ダッシュボードルート（追加！）
 )
 
 logger.info("Integrating all routers into the main application...")
@@ -98,6 +99,7 @@ app.include_router(tag_summary_detail.router)
 app.include_router(tag_heatmap.router)
 
 app.include_router(ai_routes.router)
+app.include_router(devcycle_history.router)  # ←★追加
 
 app.include_router(path_checker.router)
 app.include_router(prometheus_routes.router)
