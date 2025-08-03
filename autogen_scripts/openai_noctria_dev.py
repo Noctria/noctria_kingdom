@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import datetime
 import sys
+from uuid import uuid4
 
 load_dotenv()
 
@@ -16,7 +17,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 KNOWLEDGE_PATH = "noctria_kingdom/docs/knowledge.md"
 MMD_PATH = "noctria_kingdom/docs/Noctria連携図.mmd"
 
-# WSL/Docker/GPU/GUI等 環境情報（AIの前提知識として全ROLEに注入）
 ENV_INFO = (
     "【実行環境・開発方針】\n"
     "- Windows PC上のWSL2（Ubuntu）＋ AirflowはDocker運用。\n"
@@ -40,7 +40,6 @@ def load_file(path, max_chars=None):
         return ""
 
 def prepend_env_and_knowledge_and_mmd(prompt: str) -> str:
-    """ENV情報・knowledge.md・Noctria連携図.mmdをすべてプロンプト冒頭に自動注入"""
     knowledge = load_file(KNOWLEDGE_PATH, max_chars=7000)
     mmd = load_file(MMD_PATH, max_chars=4000)
     return (
@@ -97,22 +96,27 @@ def git_commit_and_push(repo_dir: str, message: str) -> bool:
         log_message(f"Git commit/push failed: {e}")
         return False
 
-async def call_openai(client, messages, retry=3, delay=2):
-    for attempt in range(retry):
-        try:
-            response = await asyncio.to_thread(
-                lambda: client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=messages,
-                )
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
-            print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
-            if attempt + 1 == retry:
-                raise
-            await asyncio.sleep(delay)
+def build_file_header(filename: str, ai_name: str = "openai_noctria_dev.py", version: str = "v0.1.0"):
+    now = datetime.datetime.now().isoformat()
+    uid = str(uuid4())
+    return (
+        f"# ファイル名: {os.path.basename(filename)}\n"
+        f"# バージョン: {version}\n"
+        f"# 生成日時: {now}\n"
+        f"# 生成AI: {ai_name}\n"
+        f"# UUID: {uid}\n"
+        "\n"
+    )
+
+def save_ai_generated_file(file_path: str, content: str):
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    header = build_file_header(file_path)
+    if content.strip().startswith("# ファイル名:"):
+        merged = content
+    else:
+        merged = header + content
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(merged)
 
 def split_files_from_response(response: str):
     pattern = r"# ファイル名:\s*(.+?\.py)\s*\n"
@@ -139,6 +143,23 @@ def run_pytest(test_dir: str) -> (bool, str):
     except Exception as e:
         return False, f"pytest実行例外: {e}"
 
+async def call_openai(client, messages, retry=3, delay=2):
+    for attempt in range(retry):
+        try:
+            response = await asyncio.to_thread(
+                lambda: client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                )
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
+            print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
+            if attempt + 1 == retry:
+                raise
+            await asyncio.sleep(delay)
+
 async def multi_agent_loop(client, max_turns=5):
     messages = {role: [{"role": "user", "content": prompt}] for role, prompt in ROLE_PROMPTS.items()}
 
@@ -163,15 +184,13 @@ async def multi_agent_loop(client, max_turns=5):
                 files = split_files_from_response(response)
                 if not files:
                     filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn+1}.py")
-                    with open(filename, "w", encoding="utf-8") as f:
-                        f.write(response)
+                    save_ai_generated_file(filename, response)
                     print(f"{role} AIのコード保存: {filename}")
                     log_message(f"{role} AIのコード保存: {filename}")
                 else:
                     for fname, content in files.items():
                         file_path = os.path.join(OUTPUT_DIR, fname)
-                        with open(file_path, "w", encoding="utf-8") as f:
-                            f.write(content)
+                        save_ai_generated_file(file_path, content)
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
 
