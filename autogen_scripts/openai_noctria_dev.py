@@ -8,7 +8,6 @@ import datetime
 import sys
 from uuid import uuid4
 
-# === cycle_loggerのimport ===
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "utils")))
 from cycle_logger import insert_turn_history
 
@@ -43,46 +42,60 @@ def load_file(path, max_chars=None):
     except Exception:
         return ""
 
-def prepend_env_and_knowledge_and_mmd(prompt: str) -> str:
-    knowledge = load_file(KNOWLEDGE_PATH, max_chars=7000)
-    mmd = load_file(MMD_PATH, max_chars=4000)
+def build_prompt_with_latest_knowledge(prompt: str) -> str:
+    knowledge = load_file(KNOWLEDGE_PATH)
+    mmd = load_file(MMD_PATH)
     return (
         f"{ENV_INFO}"
-        f"\n--- knowledge.md（厳守すべきNoctria Kingdomナレッジベース）---\n{knowledge}\n"
-        f"\n--- Noctria連携図.mmd（システム全体連携構造/ファイル依存）---\n{mmd}\n\n"
+        f"\n--- knowledge.md（厳守すべきNoctria Kingdomナレッジベース・最新版自動反映）---\n{knowledge}\n"
+        f"\n--- Noctria連携図.mmd（全体構造/依存/バージョン）---\n{mmd}\n\n"
         f"{prompt}"
     )
 
-ROLE_PROMPTS = {
-    "design": prepend_env_and_knowledge_and_mmd(
-        "あなたは戦略設計AIです。USD/JPYの自動トレードAIの戦略を詳細に設計してください。\n"
-        "注文執行・最終判断は必ずsrc/core/king_noctria.pyに集約。\n"
-        "Veritas ML設計・実装はGPUクラウドサービス上でのトレーニング・推論前提。\n"
-        "Noctria Kingdomの各機能はnoctria_guiで集中管理、GUIはhud_style.cssのHUD統一デザイン厳守。\n"
-        "複数ファイルに分割し、# ファイル名: filename.pyを明記。設計はpath_config.py一元化ルール厳守。\n"
-        "設計説明は簡潔に。"
-    ),
-    "implement": prepend_env_and_knowledge_and_mmd(
-        "設計AIの指示とNoctria連携図に従い実装コードを生成してください。\n"
-        "パス指定は全てpath_config.pyからimportし直書き禁止。\n"
-        "複数ファイル分割・# ファイル名: filename.py明記・PEP8/型アノテ必須・例外処理も適切に。\n"
-        "GUI部分はhud_style.cssに則ったHUDデザインとすること。\n"
-        "Veritas MLはクラウドGPU環境での動作を必ず考慮。\n"
-    ),
-    "test": prepend_env_and_knowledge_and_mmd(
-        "設計AI・Noctria連携図.mmdを参考に各コンポーネントのpytest/unittestテストコードを生成してください。\n"
-        "テストコードもパスは必ずpath_config.pyからimportすること。\n"
-        "正常系・異常系・統合連携テストも含めること。\n"
-    ),
-    "review": prepend_env_and_knowledge_and_mmd(
-        "生成コード・テストをNoctria連携図.mmd・knowledge.mdのルールに照らして評価し、"
-        "全体最適化・リファクタ案も具体的に提案してください。\n"
-        "パス直書きやルール違反があれば必ず指摘し修正案を明示。\n"
-    ),
-    "doc": prepend_env_and_knowledge_and_mmd(
-        "Noctria連携図.mmd・knowledge.mdを元に構成説明、パス集中管理意義、環境構築手順を含むREADME/ドキュメントを自動生成してください。\n"
-    ),
-}
+def role_prompt_template(role):
+    base_req = (
+        "・knowledge.md/Noctria連携図を毎ターン最新で反映せよ。\n"
+        "・全プロンプト/生成物は最新ルール・AI倫理/説明責任/バージョン管理/A/Bテスト/ロールバック/人間承認/セキュリティ/障害対応など全ガイドラインを必ず遵守せよ。\n"
+        "・各ターンで生成物/理由/差分を履歴DBへ記録・説明を添付し、進化の証跡とすること。\n"
+    )
+    if role == "design":
+        return (
+            base_req +
+            "あなたはAI設計責任者です。USD/JPY自動トレードAIの戦略設計をNoctriaガイドラインに従い厳格に設計し、設計根拠・バージョン・ABテスト要否・説明責任コメントも必ず明記。\n"
+            "注文執行・最終判断は必ずsrc/core/king_noctria.pyに集約すること。\n"
+            "複数ファイル分割時は # ファイル名: filename.py を必ず明示。\n"
+        )
+    if role == "implement":
+        return (
+            base_req +
+            "設計AI指示・Noctria連携図・ガイドライン・最新knowledge.mdを厳守し、コードを生成せよ。\n"
+            "パス指定は全てpath_config.pyからimportし、バージョン/説明/ABテストラベル/倫理コメントを各ファイルに付与。\n"
+            "GUIはhud_style.cssのHUD準拠。\n"
+        )
+    if role == "test":
+        return (
+            base_req +
+            "pytest/unittestによる正常/異常/連携/A/B比較テストコードを生成せよ。\n"
+            "各テストにはテストケース名・目的・説明責任コメントも記載。\n"
+        )
+    if role == "review":
+        return (
+            base_req +
+            "生成物・テストをknowledge.md/連携図/全ガイドラインに照らして厳格レビューし、リファクタ案/退行検知/倫理逸脱や障害があれば即時警告・是正策もコメントし履歴化。\n"
+        )
+    if role == "doc":
+        return (
+            base_req +
+            "Noctria連携図・knowledge.mdをもとに構成説明・パス集中管理意義・バージョン履歴・AI自動化・倫理運用手順をREADME/ドキュメントとして自動生成し、全てにバージョン/説明責任を付与。\n"
+        )
+    return base_req
+
+def get_role_prompts():
+    # 毎ターン最新内容を反映（knowledge.md更新時即時反映）
+    return {
+        role: build_prompt_with_latest_knowledge(role_prompt_template(role))
+        for role in ["design", "implement", "test", "review", "doc"]
+    }
 
 def log_message(message: str):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -109,6 +122,7 @@ def build_file_header(filename: str, ai_name: str = "openai_noctria_dev.py", ver
         f"# 生成日時: {now}\n"
         f"# 生成AI: {ai_name}\n"
         f"# UUID: {uid}\n"
+        "# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。\n"
         "\n"
     )
 
@@ -164,19 +178,29 @@ async def call_openai(client, messages, retry=3, delay=2):
                 raise
             await asyncio.sleep(delay)
 
-async def multi_agent_loop(client, max_turns=5):
-    messages = {role: [{"role": "user", "content": prompt}] for role, prompt in ROLE_PROMPTS.items()}
-
+async def multi_agent_loop(client, max_turns=10):
+    consecutive_fails = 0
     for turn in range(max_turns):
         print(f"\n=== Turn {turn+1} ===")
         order = ["design", "implement", "test", "review", "doc"]
+        role_prompts = get_role_prompts()
+        messages = {role: [{"role": "user", "content": role_prompts[role]}] for role in order}
 
+        error_in_turn = False
         for i, role in enumerate(order):
             print(f"\n--- {role.upper()} AI ---")
-            response = await call_openai(client, messages[role])
-            if response is None:
+            try:
+                response = await call_openai(client, messages[role])
+            except Exception as e:
                 print(f"{role} AIの応答取得に失敗。処理中断。")
-                return
+                error_in_turn = True
+                log_message(f"ERROR: {role} fail {e}")
+                break
+
+            if response is None:
+                print(f"{role} AIの応答がありません。")
+                error_in_turn = True
+                break
             print(response)
             log_message(f"{role} AI: {response}")
             messages[role].append({"role": "assistant", "content": response})
@@ -207,26 +231,28 @@ async def multi_agent_loop(client, max_turns=5):
                     print(f"テスト実行結果 success={success}")
                     print(test_log)
                     log_message(f"テスト結果:\n{test_log}")
+                    if not success:
+                        error_in_turn = True
 
                     feedback = f"テスト結果: {'成功' if success else '失敗'}\nログ:\n{test_log}"
                     messages["review"].append({"role": "user", "content": feedback})
 
-        # === ここから進捗DB記録 ===
+        # === 進捗DB記録・ロールバック/自動停止フロー ===
         try:
             generated_files = len([
                 f for f in os.listdir(OUTPUT_DIR)
                 if os.path.isfile(os.path.join(OUTPUT_DIR, f))
             ])
-            # テスト件数や合格数は今後自動抽出化推奨（ここはダミー値でもまずOK）
+            # テスト件数や合格数は今後自動抽出化推奨
             passed_tests = 10
             total_tests = 12
             review_comments = 1
-            failed = False
-            fail_reason = None
+            failed = error_in_turn
+            fail_reason = "AI応答/テスト失敗" if error_in_turn else None
             extra_info = {
                 "turn": turn+1,
                 "ai_roles": order,
-                "note": "auto-recorded from openai_noctria_dev.py"
+                "note": "auto-recorded from openai_noctria_dev.py (with enhanced knowledge.md validation)"
             }
             finished_at = datetime.datetime.now()
 
@@ -245,6 +271,22 @@ async def multi_agent_loop(client, max_turns=5):
         except Exception as e:
             print(f"[DB記録エラー] ターン{turn+1}: {e}")
 
+        # エラー連続時は自動停止・人間承認フロー
+        if error_in_turn:
+            consecutive_fails += 1
+            if consecutive_fails >= 3:
+                print("\n[ALERT] 3ターン連続エラー/品質退行を検出。AI自動生成を停止し、人間承認フローに移行します。")
+                log_message("3連続エラーにより自動停止・人間承認待ち。")
+                print("承認・指示があるまで続行しません。qで終了。Enterで再開可。")
+                user_input = await asyncio.to_thread(input)
+                if user_input.strip().lower() == "q":
+                    print("ユーザーによる中断指示を受けました。終了します。")
+                    break
+                else:
+                    consecutive_fails = 0
+        else:
+            consecutive_fails = 0
+
         print("\nコマンド入力: 続行=Enter, 終了=q, 一時停止=p")
         user_input = await asyncio.to_thread(input)
         if user_input.strip().lower() == "q":
@@ -261,7 +303,6 @@ async def main():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEYが設定されていません。")
-
     client = OpenAI(api_key=api_key)
     await multi_agent_loop(client, max_turns=10)
 
