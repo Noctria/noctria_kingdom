@@ -1,0 +1,11 @@
+=== Missing class/function definitions ===
+test_data_collection.py: 'DATA_SOURCE_URL' not defined in path_config.py
+test_data_collection.py: 'LOCAL_DATA_PATH' not defined in path_config.py
+test_data_preprocessing.py: 'DataPreprocessing' not defined in data_preprocessing.py
+test_feature_engineering.py: 'LOCAL_DATA_PATH' not defined in path_config.py
+test_feature_engineering.py: 'FEATURES_PATH' not defined in path_config.py
+test_model_training.py: 'train_model' not defined in model_training.py
+test_model_training.py: 'FEATURES_PATH' not defined in path_config.py
+test_order_execution.py: 'execute_trade' not defined in order_execution.py
+test_order_execution.py: 'MODEL_PATH' not defined in path_config.py
+test_order_execution.py: 'FEATURES_PATH' not defined in path_config.py
