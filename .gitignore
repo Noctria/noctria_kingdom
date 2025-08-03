@@ -75,3 +75,11 @@ strategies/veritas_generated/*
 # 旧形式・一時的な戦略出力（必要に応じて保持）
 veritas_generated/
 output_generated/
+
+# ==========================
+# 🔹 AI自動生成成果物・ログ除外
+# ==========================
+generated_code/*.txt
+generated_code/*.log
+generated_code/*.tmp
+
