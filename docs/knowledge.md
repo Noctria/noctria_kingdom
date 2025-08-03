@@ -21,6 +21,12 @@
 - コードはUTF-8で保存。
 - Black/isortでコード整形を想定。
 
+## GUIスタイル・HUD統一ルール
+- Noctria KingdomのGUI管理ツール（`noctria_kingdom/noctria_gui/`配下）は**すべてのHTMLテンプレート・ページを `noctria_gui/static/hud_style.css` に準拠したHUDスタイルで開発・統一すること**。
+- デザインやレイアウトを修正・追加する際は、**必ずhud_style.cssの定義・トークンを優先利用し、HUDデザインと一貫性を保つ**。
+- 独自CSSやインラインスタイルの利用は原則避け、hud_style.cssのカスタムプロパティ・クラスを活用すること。
+- HUDデザインに則ったパネル・グロー・ダークテーマ・モノスペースフォント・グリッド背景などを標準とする。
+
 ## Veritas MLクラウド運用ポリシー
 - Veritas（ML/AI関連機能）は**将来的にAWS/GCP/AzureなどのGPUクラウドサービス上でトレーニング・推論を行うことを前提**に設計・実装すること。
 - コードは「ローカル/WSL環境」だけでなく「GPUクラウド（JupyterHub, Sagemaker, Vertex AI等）」での利用や拡張を常に意識。
