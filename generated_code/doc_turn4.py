@@ -1,65 +1,65 @@
 # ファイル名: doc_turn4.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T13:36:41.980649
+# 生成日時: 2025-08-03T17:22:55.692522
 # 生成AI: openai_noctria_dev.py
-# UUID: e427839e-d218-4ab0-ab52-9522c83bdb9b
+# UUID: d920b5d8-d2ff-4ac2-9815-690d5d29dc5f
 
-テストが失敗する原因は、`test_turn1.py`ファイルにPythonのコードとして解釈されない日本語の説明文が存在し、その結果として`SyntaxError`が発生していることです。この問題を解決するためには、日本語のコメントを正しく処理する必要があります。
+エラーログによると、日本語のテキストが`test_data_collection.py`ファイルに残っており、構文エラーを引き起こしています。以下の手順に従って、問題を解決してください：
 
-### 修正案
+1. **日本語のテキストをすべて削除または英語に置き換える**: 日本語説明が混在するとPythonがそれをコードとして誤解釈する可能性があります。
+2. **コメントを適切に使う**: 説明が必要な場合は、必ず英語で`#`を使ってコメントにしてください。
 
-以下に適切に日本語コメントを処理した`test_turn1.py`の修正版を示します:
+以下は修正例です。すべてのコメントを英語で記述し、日本語は削除しています：
 
 ```python
-# -*- coding: utf-8 -*-
+# File: test_data_collection.py
+
 import pytest
 import pandas as pd
-from data_feed import fetch_usd_jpy_data, preprocess_data
-from unittest.mock import patch
-import requests
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
 
-# 各モジュールの機能をテストするためのテストコードです
-# 正常系、異常系のテストを含む一連のユニットテストとして実施します
-# パス設定などは`path_config.py`からのインポートを推奨します
+# Test to ensure market data is fetched and saved successfully
+@patch('ccxt.binance')  # Mock the Binance exchange to avoid real API calls
+def test_fetch_market_data_success(mock_binance):
+    # Create a mock exchange object
+    mock_exchange = MagicMock()
 
-# 正常系テスト: USD/JPYのデータ取得機能をテスト
-@patch('data_feed.requests.get')
-def test_fetch_usd_jpy_data(mock_get):
-    # モックレスポンスを設定し、API呼び出しをシミュレート
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = [{'timestamp': '2023-01-01T00:00:00Z', 'rate': 130.0}]
-    
-    df = fetch_usd_jpy_data()
-    assert isinstance(df, pd.DataFrame)  # データがDataFrame型であることを確認
-    assert not df.empty  # データフレームが空でないことを確認
+    # Define mock return value for fetch_ohlcv
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
 
-# 異常系テスト: API呼び出しエラー時の動作を確認
-@patch('data_feed.requests.get')
-def test_fetch_usd_jpy_data_error(mock_get):
-    # リクエスト例外を発生させ、エラーケースをシミュレート
-    mock_get.side_effect = requests.exceptions.RequestException("API Error")
-    
-    with pytest.raises(requests.exceptions.RequestException):
-        fetch_usd_jpy_data()
+    # Set the mock exchange in place of the real Binance class
+    mock_binance.return_value = mock_exchange
 
-# データ前処理機能のテスト
-def test_preprocess_data():
-    # サンプルデータを用いてテスト
-    data = [{'timestamp': '2023-01-01T00:00:00Z', 'rate': 130.0}]
-    df = pd.DataFrame(data)
+    # Determine the path for the CSV file where the data will be stored
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
     
-    # データ前処理を実行
-    processed_df = preprocess_data(df)
+    # Invoke the function to fetch and save market data
+    fetch_market_data()
     
-    # 前処理後のデータフレームの検証
-    assert processed_df.index.name == 'timestamp'  # インデックスが'timestamp'であることを確認
-    assert 'rate' in processed_df.columns  # 'rate'列が存在することを確認
+    # Verify that the CSV file has been created at the expected path
+    assert os.path.exists(csv_path)
+    
+    # Verify the CSV content
+    df = pd.read_csv(csv_path)
+    assert not df.empty  # Check that the data frame is not empty
+    # Validate that DataFrame columns match expectations
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+# Test for handling network errors gracefully
+@patch('ccxt.binance')  # Mock the Binance exchange to simulate a network error
+def test_fetch_market_data_network_error(mock_binance):
+    # Cause the mock to raise an Exception to simulate a network error
+    mock_binance.side_effect = Exception('NetworkError')
+    
+    # Verify that an exception is raised when there is a network error
+    with pytest.raises(Exception):
+        fetch_market_data()
 ```
 
-### 修正のポイント
-
-- **コメントアウト**: 日本語のコメントを `#` で始めることで、Pythonパーサによる誤解を防ぎます。
-- **エンコード指定**: `# -*- coding: utf-8 -*-` をファイルの冒頭に記載して、UTF-8エンコーディングで文字列を処理することを明示します。
-- **簡潔なコメント**: コードの目的やテストの内容を簡潔に説明するコメントを適切に配置します。
-
-修正を適用した後は、`pytest`を再実行して、エラーが解決されたことを確認してください。これにより、テストが正常に実行されるようになります。
+この修正により、スクリプトが簡潔になり、Pythonが意図通りに解釈可能な構成となっています。この状態でテストを再実行し、エラーが解消されたかを確認してください。もしまだ問題が残る場合は、ファイル全体を見直し、ASCII以外の文字が混じっていないか確認する必要があります。
