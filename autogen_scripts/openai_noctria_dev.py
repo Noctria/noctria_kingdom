@@ -7,6 +7,7 @@ from openai import OpenAI
 import datetime
 import sys
 from uuid import uuid4
+import json
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "utils")))
 from cycle_logger import insert_turn_history
@@ -32,7 +33,6 @@ ENV_INFO = (
 )
 
 def load_file(path, max_chars=None):
-    """ファイル内容を最大max_chars分だけ取得（全文渡すときはmax_chars=None）"""
     try:
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -52,6 +52,7 @@ def build_prompt_with_latest_knowledge(prompt: str) -> str:
         f"{prompt}"
     )
 
+# --- 改良プロンプト（test向け／正常・異常系バランス/説明コメント/except多用禁止） ---
 def role_prompt_template(role):
     base_req = (
         "・knowledge.md/Noctria連携図を毎ターン最新で反映せよ。\n"
@@ -75,6 +76,12 @@ def role_prompt_template(role):
     if role == "test":
         return (
             base_req +
+            "【テスト品質要件】\n"
+            "- 正常系テストと異常系テストの両方を必ず実装（正常系50%以上）\n"
+            "- 各テスト関数には目的・期待結果をコメントで明記\n"
+            "- 不要なexcept/冗長な例外catchは禁止（pytestのwith pytest.raises推奨）\n"
+            "- 無意味なダミー/重複テストを排除し実用カバレッジ重視\n"
+            "- コードは# ファイル名: test_xxx.py で区切ること\n"
             "設計AI・Noctria連携図.mmdを参考に各コンポーネントのpytest/unittestテストコードを生成してください。\n"
             "必ずPythonコードとして`def test_xxx():`を含み、テスト関数・アサーション等を実装してください。\n"
             "pytest/unittestによる正常/異常/連携/A/B比較テストコードを生成せよ。\n"
@@ -95,7 +102,6 @@ def role_prompt_template(role):
     return base_req
 
 def get_role_prompts():
-    # 毎ターン最新内容を反映（knowledge.md更新時即時反映）
     return {
         role: build_prompt_with_latest_knowledge(role_prompt_template(role))
         for role in ["design", "implement", "test", "review", "doc"]
@@ -152,18 +158,41 @@ def split_files_from_response(response: str):
         i += 2
     return files
 
-def run_pytest(test_dir: str) -> (bool, str):
+# ---- ★★ pytestの詳細JSON出力をDB extra_infoに記録する新ロジック ★★ ----
+def run_pytest_and_collect_detail(test_dir: str):
+    import shutil
+    report_file = os.path.join(test_dir, "pytest_result.json")
+    # 必要ならpip install pytest-json-report
+    cmd = ["pytest", test_dir, "--json-report", f"--json-report-file={report_file}", "--disable-warnings", "-q"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if not os.path.exists(report_file):
+        # レポートがなければ通常のstdout/stderrだけ返す
+        return 0, 0, 0, [], result.stdout + "\n" + result.stderr
     try:
-        result = subprocess.run(
-            ["pytest", test_dir, "--maxfail=1", "--disable-warnings", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        success = (result.returncode == 0)
-        return success, result.stdout + "\n" + result.stderr
+        with open(report_file, "r") as f:
+            report = json.load(f)
+        pass_count = report["summary"].get("passed", 0)
+        fail_count = report["summary"].get("failed", 0)
+        error_count = report["summary"].get("errors", 0)
+        total = pass_count + fail_count + error_count
+        # 詳細: 各テスト名とoutcome, 短いエラー
+        error_details = []
+        for t in report.get("tests", []):
+            detail = {
+                "name": t.get("nodeid"),
+                "outcome": t.get("outcome"),
+                "message": t.get("call", {}).get("longrepr", "") if t.get("call") else ""
+            }
+            error_details.append(detail)
+        # レポートjsonを削除しておくときはここで
+        if os.path.exists(report_file):
+            try:
+                os.remove(report_file)
+            except Exception:
+                pass
+        return pass_count, total, fail_count + error_count, error_details, result.stdout + "\n" + result.stderr
     except Exception as e:
-        return False, f"pytest実行例外: {e}"
+        return 0, 0, 0, [], f"pytest解析エラー: {e}\n{result.stdout}\n{result.stderr}"
 
 async def call_openai(client, messages, retry=3, delay=2):
     for attempt in range(retry):
@@ -191,6 +220,7 @@ async def multi_agent_loop(client, max_turns=10):
         messages = {role: [{"role": "user", "content": role_prompts[role]}] for role in order}
 
         error_in_turn = False
+        pytest_results = {}
         for i, role in enumerate(order):
             print(f"\n--- {role.upper()} AI ---")
             try:
@@ -231,14 +261,22 @@ async def multi_agent_loop(client, max_turns=10):
                     print(f"警告: Git連携に失敗しました。手動でコミットを確認してください。")
 
                 if role == "test":
-                    success, test_log = await asyncio.to_thread(run_pytest, OUTPUT_DIR)
-                    print(f"テスト実行結果 success={success}")
-                    print(test_log)
-                    log_message(f"テスト結果:\n{test_log}")
-                    if not success:
+                    # --- 改良: pytest詳細を収集 ---
+                    passed, total, failed, details, log = await asyncio.to_thread(run_pytest_and_collect_detail, OUTPUT_DIR)
+                    print(f"テスト実行結果: 合格={passed} / 総数={total} / 失敗={failed}")
+                    log_message(f"テスト結果:\n{log}")
+                    pytest_results = dict(
+                        passed_tests=passed,
+                        total_tests=total,
+                        failed=failed > 0,
+                        fail_reason=details[0]['message'][:100] if details and failed > 0 else None,
+                        details=details,
+                        pytest_log=log
+                    )
+                    if failed > 0:
                         error_in_turn = True
 
-                    feedback = f"テスト結果: {'成功' if success else '失敗'}\nログ:\n{test_log}"
+                    feedback = f"テスト結果: {'成功' if failed == 0 else '失敗'}\nログ:\n{log}"
                     messages["review"].append({"role": "user", "content": feedback})
 
         # === 進捗DB記録・ロールバック/自動停止フロー ===
@@ -247,16 +285,18 @@ async def multi_agent_loop(client, max_turns=10):
                 f for f in os.listdir(OUTPUT_DIR)
                 if os.path.isfile(os.path.join(OUTPUT_DIR, f))
             ])
-            # テスト件数や合格数は今後自動抽出化推奨
-            passed_tests = 10
-            total_tests = 12
-            review_comments = 1
+            # テスト結果はpytest_resultsから反映
+            passed_tests = pytest_results.get("passed_tests", 0)
+            total_tests = pytest_results.get("total_tests", 0)
+            review_comments = 1  # TODO: レビューAIから抽出でも可
             failed = error_in_turn
-            fail_reason = "AI応答/テスト失敗" if error_in_turn else None
+            fail_reason = pytest_results.get("fail_reason") if failed else None
             extra_info = {
                 "turn": turn+1,
                 "ai_roles": order,
-                "note": "auto-recorded from openai_noctria_dev.py (with enhanced knowledge.md validation)"
+                "pytest_details": pytest_results.get("details", []),
+                "pytest_log": pytest_results.get("pytest_log", ""),
+                "note": "auto-recorded from openai_noctria_dev.py (pytest詳細収集版)"
             }
             finished_at = datetime.datetime.now()
 
