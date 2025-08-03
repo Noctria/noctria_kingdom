@@ -21,6 +21,12 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 KNOWLEDGE_PATH = "noctria_kingdom/docs/knowledge.md"
 MMD_PATH = "noctria_kingdom/docs/Noctria連携図.mmd"
 
+# --- 未定義シンボル補完用のパス ---
+UNDEF_FILE = "autogen_scripts/undefined_symbols.txt"
+PROMPT_OUT = "autogen_scripts/ai_prompt_fix_missing.txt"
+GEN_PROMPT_SCRIPT = "autogen_scripts/gen_prompt_for_undefined_symbols.py"
+FIND_UNDEF_SCRIPT = "autogen_scripts/find_undefined_symbols.py"
+
 ENV_INFO = (
     "【実行環境・開発方針】\n"
     "- Windows PC上のWSL2（Ubuntu）＋ AirflowはDocker運用。\n"
@@ -207,16 +213,72 @@ async def call_openai(client, messages, retry=3, delay=2):
                 raise
             await asyncio.sleep(delay)
 
+# --- 未定義シンボル自動注入ロジック ---
+
+def run_find_undefined_symbols():
+    subprocess.run(["python3", FIND_UNDEF_SCRIPT], check=True)
+
+def run_gen_prompt_for_undefined_symbols():
+    subprocess.run(["python3", GEN_PROMPT_SCRIPT], check=True)
+    with open(PROMPT_OUT, "r", encoding="utf-8") as f:
+        return f.read()
+
+async def call_openai_for_missing_symbols(client, prompt):
+    messages = [{"role": "user", "content": prompt}]
+    for attempt in range(3):
+        try:
+            response = await asyncio.to_thread(
+                lambda: client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                )
+            )
+            return response.choices[0].message.content
+        except Exception:
+            await asyncio.sleep(2)
+    raise RuntimeError("AI補完失敗")
+
+def save_and_commit_ai_files(ai_response):
+    files = split_files_from_response(ai_response)
+    if not files:
+        print("AI出力から保存すべきファイルが検出できませんでした")
+        return
+    for fname, content in files.items():
+        file_path = os.path.join(OUTPUT_DIR, fname)
+        save_ai_generated_file(file_path, content)
+        print(f"[未定義補完] AIのコード保存: {file_path}")
+        log_message(f"[未定義補完] AIのコード保存: {file_path}")
+    git_commit_and_push(OUTPUT_DIR, "fix: 自動未定義シンボル補完")
+
+async def auto_fix_missing_symbols(client):
+    while True:
+        run_find_undefined_symbols()
+        if not os.path.exists(UNDEF_FILE):
+            break
+        with open(UNDEF_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content or content.lower().startswith("=== 0 missing"):
+                break
+        prompt = run_gen_prompt_for_undefined_symbols()
+        ai_response = await call_openai_for_missing_symbols(client, prompt)
+        save_and_commit_ai_files(ai_response)
+        # もう一度ループして、まだ未定義が残っていないか再チェック
+
 async def multi_agent_loop(client, max_turns=10):
     consecutive_fails = 0
     for turn in range(max_turns):
         print(f"\n=== Turn {turn+1} ===")
+
+        # --- 1. テスト・実装前に未定義シンボル自動補完（全消えるまで）---
+        await auto_fix_missing_symbols(client)
+
         order = ["design", "implement", "test", "review", "doc"]
         role_prompts = get_role_prompts()
         messages = {role: [{"role": "user", "content": role_prompts[role]}] for role in order}
 
         error_in_turn = False
         pytest_results = {}
+
         for i, role in enumerate(order):
             print(f"\n--- {role.upper()} AI ---")
             try:
@@ -274,6 +336,10 @@ async def multi_agent_loop(client, max_turns=10):
                     feedback = f"テスト結果: {'成功' if failed == 0 else '失敗'}\nログ:\n{log}"
                     messages["review"].append({"role": "user", "content": feedback})
 
+            # --- 2. テスト・実装の後にも未定義シンボル自動補完 ---
+            await auto_fix_missing_symbols(client)
+
+        # 進捗DB保存
         try:
             generated_files = len([
                 f for f in os.listdir(OUTPUT_DIR)
