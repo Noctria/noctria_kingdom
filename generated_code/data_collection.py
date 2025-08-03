@@ -1,40 +1,33 @@
 # ファイル名: data_collection.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T14:08:58.398958
+# 生成日時: 2025-08-03T17:09:17.279204
 # 生成AI: openai_noctria_dev.py
-# UUID: c611c44c-b0c7-44b9-b1d0-ba5b8177a18d
+# UUID: 28c1514f-0ffe-4d6d-ad9b-c6ea9b1f4c16
 
-import requests
+import ccxt
 import pandas as pd
-from typing import Tuple
-import logging
-from path_config import DATA_SOURCE_URL
+import os
+from path_config import get_path
 
-def fetch_usd_jpy_data() -> pd.DataFrame:
-    """Fetch USD/JPY data from data source."""
+def fetch_market_data() -> None:
     try:
-        response = requests.get(DATA_SOURCE_URL)
-        response.raise_for_status()
-        data = response.json()
-        df = pd.DataFrame(data)
-        return df
+        exchange = ccxt.binance()
+        data = exchange.fetch_ohlcv('USD/JPY', timeframe='1m')
+        df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        
+        storage_path = get_path('trading')
+        df.to_csv(os.path.join(storage_path, 'market_data.csv'), index=False)
+    except ccxt.NetworkError as e:
+        print(f"Network error occurred: {e}")
+    except ccxt.ExchangeError as e:
+        print(f"Exchange error occurred: {e}")
     except Exception as e:
-        logging.error(f"Error fetching data: {e}")
-        raise
+        print(f"An unexpected error occurred: {e}")
 
-def process_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and normalize data for model input."""
-    try:
-        # Data cleaning and normalization steps
-        df = df.dropna()
-        df['normalized_price'] = (df['price'] - df['price'].mean()) / df['price'].std()
-        return df
-    except Exception as e:
-        logging.error(f"Error processing data: {e}")
-        raise
+fetch_market_data()
 ```
 
-### 2. モデル設計・トレーニング
+### 3. `ml_model.py`
+ここでは、機械学習モデルの初期化と予測機能を実装します。
 
-#### model_design.py
 ```python
