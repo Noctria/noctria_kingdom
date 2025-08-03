@@ -1,85 +1,81 @@
 flowchart TD
-  %% --- パス・ロガー基盤 ---
-  subgraph core
-    path[path_config.py]
-    logger[logger.py]
-    data_loader[data_loader.py]
-    king[king_noctria.py]
-  end
+  %% === AI/統治コア ===
+  KingNoctria[src/core/king_noctria.py<br>👑 KingNoctria]
+  VeritasMachina[src/veritas/veritas_machina.py<br>🧠 VeritasMachina]
+  PrometheusOracle[src/strategies/prometheus_oracle.py<br>🔮 PrometheusOracle]
+  AurusSingularis[src/strategies/aurus_singularis.py<br>⚔️ AurusSingularis]
+  LeviaTempest[src/strategies/levia_tempest.py<br>⚡ LeviaTempest]
+  NoctusSentinella[src/strategies/noctus_sentinella.py<br>🛡️ NoctusSentinella]
+  HermesCognitor[src/strategies/hermes_cognitor.py<br>🦉 HermesCognitor]
+  PlanStatistics[src/plan_data/statistics.py<br>PlanStatistics]
+  AnomalyDetector[src/plan_data/anomaly_detector.py<br>AnomalyDetector]
+  PlanCollector[src/plan_data/collector.py<br>PlanDataCollector]
+  FeatureEngineer[src/plan_data/features.py<br>FeatureEngineer]
+  DataLoader[src/core/data_loader.py<br>MarketDataFetcher]
+  Logger[src/core/logger.py<br>Logger]
 
-  %% --- AI/戦略モジュール ---
-  subgraph veritas
-    veritas_eval[evaluate_veritas.py]
-    veritas_gen[veritas_generate_strategy.py]
-    strategy_gen[strategy_generator.py]
-    machina[veritas_machina.py]
-    simple_model[models/ml_model/simple_model.py]
-  end
-  subgraph strategies
-    aurus[aurus_singularis.py]
-    levia[levia_tempest.py]
-    noctus[noctus_sentinella.py]
-    prometheus[prometheus_oracle.py]
-    hermes[hermes_cognitor.py]
-  end
-  subgraph plan
-    collector[plan_data/collector.py]
-    statistics[plan_data/statistics.py]
-    features[plan_data/features.py]
-  end
+  %% === 統治API/ルート ===
+  KingRoutes[noctria_gui/routes/king_routes.py<br>API: /api/king]
+  Dashboard[noctria_gui/routes/dashboard.py<br>Dashboard]
+  PDCARecheck[noctria_gui/routes/pdca_recheck.py]
+  PDCA[noctria_gui/routes/pdca.py]
+  
+  %% === Airflow DAG ===
+  NoctriaKingdomDAG[airflow_docker/dags/noctria_kingdom_dag.py]
+  AurusDAG[airflow_docker/dags/aurus_strategy_dag.py]
+  LeviaDAG[airflow_docker/dags/levia_strategy_dag.py]
+  PrometheusDAG[airflow_docker/dags/prometheus_strategy_dag.py]
+  NoctusDAG[airflow_docker/dags/noctus_strategy_dag.py]
+  HermesDAG[airflow_docker/dags/hermes_strategy_dag.py]
+  VeritasPushDAG[airflow_docker/dags/veritas_push_dag.py]
 
-  %% --- DAG/ワークフロー ---
-  subgraph dag
-    aurus_dag[aurus_strategy_dag.py]
-    levia_dag[levia_strategy_dag.py]
-    noctus_dag[noctus_strategy_dag.py]
-    prometheus_dag[prometheus_strategy_dag.py]
-    hermes_dag[hermes_strategy_dag.py]
-    veritas_push_dag[veritas_push_dag.py]
-    king_dag[noctria_kingdom_dag.py]
-  end
+  %% === 戦略生成/評価 ===
+  VeritasGenerate[src/veritas/veritas_generate_strategy.py]
+  VeritasEval[src/veritas/evaluate_veritas.py]
+  VeritasStrategyGen[src/veritas/strategy_generator.py]
+  SimpleModel[src/veritas/models/ml_model/simple_model.py]
 
-  %% --- GUI/API ---
-  subgraph gui
-    king_routes[noctria_gui/routes/king_routes.py]
-  end
+  %% === データ ===
+  VeritasEvalLog[data/stats/veritas_eval_result.json]
 
-  %% --- 依存関係 ---
-  path --> logger
-  logger -->|setup_logger| strategy_gen
-  logger -->|setup_logger| veritas_gen
-  logger -->|setup_logger| machina
-  logger -->|setup_logger| king
-  logger -->|setup_logger| veritas_eval
+  %% === 依存関係 ===
+  KingRoutes --API/GUI呼び出し--> KingNoctria
+  KingNoctria --評議会/意思決定--> VeritasMachina
+  KingNoctria --評議会/意思決定--> PrometheusOracle
+  KingNoctria --評議会/意思決定--> AurusSingularis
+  KingNoctria --評議会/意思決定--> LeviaTempest
+  KingNoctria --評議会/意思決定--> NoctusSentinella
+  KingNoctria --評議会/意思決定--> HermesCognitor
+  KingNoctria --DAGトリガー/統治API--> NoctriaKingdomDAG
+  KingNoctria --DAGトリガー/統治API--> AurusDAG
+  KingNoctria --DAGトリガー/統治API--> LeviaDAG
+  KingNoctria --DAGトリガー/統治API--> PrometheusDAG
+  KingNoctria --DAGトリガー/統治API--> NoctusDAG
+  KingNoctria --DAGトリガー/統治API--> HermesDAG
+  KingNoctria --DAGトリガー/統治API--> VeritasPushDAG
+  VeritasMachina --CLI/評価ログ--> VeritasGenerate
+  VeritasMachina --CLI/評価ログ--> VeritasEval
+  VeritasMachina --生成・評価スクリプト--> VeritasStrategyGen
+  VeritasMachina --評価ログ読込--> VeritasEvalLog
+  VeritasEval --出力--> VeritasEvalLog
+  VeritasStrategyGen --モデル--> SimpleModel
+  PlanStatistics --評価ログdict/df--> AnomalyDetector
+  PlanStatistics --コレクタdf--> PlanCollector
+  PlanStatistics --特徴量--> FeatureEngineer
+  Dashboard --統計/異常要約--> PlanStatistics
+  Dashboard --異常要約--> AnomalyDetector
+  PlanCollector --各種外部API/CSV--> PlanStatistics
+  PDCA --統計/評価ログ--> PlanStatistics
+  PDCARecheck --再評価API/DAG--> KingNoctria
+  NoctriaKingdomDAG --コア判定/評議会--> KingNoctria
+  NoctriaKingdomDAG --観測データ--> DataLoader
+  DataLoader --API/履歴管理--> PlanCollector
+  Logger --全体ロガー/violations--> All
 
-  king -->|臣下呼び出し| aurus
-  king -->|臣下呼び出し| levia
-  king -->|臣下呼び出し| noctus
-  king -->|臣下呼び出し| prometheus
-  king -->|臣下呼び出し| hermes
-  king -->|ML評価| machina
-  king -->|外部API| data_loader
+  %% === データフロー/例 ===
+  VeritasEvalLog --dict入力--> AnomalyDetector
 
-  veritas_gen -->|パス利用| path
-  veritas_eval -->|パス利用| path
+  %% === コメント ===
+  classDef main fill:#181f38,stroke:#5474b8,stroke-width:2px,color:#eee;
+  class KingNoctria,VeritasMachina,PrometheusOracle,AurusSingularis,LeviaTempest,NoctusSentinella,HermesCognitor,NoctriaKingdomDAG main;
 
-  aurus_dag -->|strategy import| aurus
-  levia_dag -->|strategy import| levia
-  noctus_dag -->|strategy import| noctus
-  prometheus_dag -->|strategy import| prometheus
-  hermes_dag -->|strategy import| hermes
-
-  king_dag --> king
-  king_routes --> king
-
-  collector --> statistics
-  statistics --> features
-
-  plan -->|参照| collector
-  plan -->|参照| statistics
-
-  king -->|DAG/APIトリガー| king_dag
-  king_routes --> king
-
-  strategy_gen --> simple_model
-  machina --> simple_model
