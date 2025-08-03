@@ -1,80 +1,70 @@
 flowchart TD
 
-%% --- 統治AI・五臣クラスタ ---
+%% === 統治AI・五臣クラスタ ===
     KN[src/core/king_noctria.py<br>KingNoctria]
-    VM[src/veritas/veritas_machina.py<br>VeritasMachina]
-    PRM[src/strategies/prometheus_oracle.py<br>PrometheusOracle]
+    VRM[src/veritas/veritas_machina.py<br>VeritasMachina]
+    PRO[src/strategies/prometheus_oracle.py<br>PrometheusOracle]
     ARS[src/strategies/aurus_singularis.py<br>AurusSingularis]
-    LEV[src/strategies/levia_tempest.py<br>LeviaTempest]
+    LVA[src/strategies/levia_tempest.py<br>LeviaTempest]
     NOC[src/strategies/noctus_sentinella.py<br>NoctusSentinella]
-    HER[src/strategies/hermes_cognitor.py<br>HermesCognitorStrategy]
+    HMS[src/strategies/hermes_cognitor.py<br>HermesCognitorStrategy]
 
-    KN -- "呼び出し/進言" --> ARS
-    KN -- "呼び出し/進言" --> LEV
-    KN -- "未来予測" --> PRM
-    KN -- "LLM説明" --> HER
-    KN -- "リスク評価" --> NOC
-    KN -- "戦略生成/評価トリガー" --> VM
-
-%% --- Veritasクラスタ ---
-    VM -- "戦略生成CLI/評価CLI" --> VGS[src/veritas/veritas_generate_strategy.py<br>veritas_generate_strategy.py]
-    VM -- "戦略評価" --> VEV[src/veritas/evaluate_veritas.py<br>evaluate_veritas.py]
-    VM -- "戦略生成AI" --> SGEN[src/veritas/strategy_generator.py<br>strategy_generator.py]
-    SGEN -- "MLモデルロード" --> SMM[src/veritas/models/ml_model/simple_model.py<br>SimpleModel]
-    VGS -- "戦略ファイル生成" --> VGD[strategies/veritas_generated/]
-    VEV -- "戦略評価" --> VGD
-    VEV -- "評価用データ読込" --> DCSV[preprocessed/sample_test_data.csv]
-
-%% --- PlanData/統計クラスタ ---
-    subgraph PlanDataクラスタ
-        PDC[src/plan_data/collector.py<br>PlanDataCollector]
-        PFE[src/plan_data/features.py<br>FeatureEngineer]
-        PST[src/plan_data/statistics.py<br>PlanStatistics]
-    end
-
-    PFE -- "ASSET_SYMBOLS/DF取得" --> PDC
-    PST -- "時系列/評価ログ収集" --> PDC
-
-%% --- リスク管理・依存 ---
-    NOC -- "リスク計算/ヒストリカルデータ" --> RM[src/core/risk_manager.py<br>RiskManager]
-
-%% --- 共通パス管理 ---
-    classDef sysclass fill:#222,stroke:#888,stroke-width:1px,color:#fff
+%% === コア・設定・共通領域 ===
     PCFG[src/core/path_config.py<br>path_config]
-    class PCFG sysclass
-    ARS -- "モデルパス管理" --> PCFG
-    PRM -- "モデルパス管理" --> PCFG
-    LEV -- "モデルパス管理" --> PCFG
-    NOC -- "ログ/パス管理" --> PCFG
-    HER -- "ファイルパス参照" --> PCFG
-    VM -- "スクリプト/評価ログ参照" --> PCFG
-    SGEN -- "ディレクトリ参照" --> PCFG
-    PDC -- "パス参照" --> PCFG
-    PST -- "パス参照" --> PCFG
+    RSKM[src/core/risk_manager.py<br>RiskManager]
 
-%% --- 五臣 ↔ PlanData 統計/特徴量連携例（省略可）---
-    ARS -. "時系列/特徴量" .-> PFE
-    LEV -. "時系列/特徴量" .-> PFE
-    PRM -. "時系列/特徴量" .-> PFE
+%% === 戦略自動生成・評価・モデルクラスタ ===
+    VGEN[src/veritas/veritas_generate_strategy.py<br>veritas_generate_strategy]
+    VEVAL[src/veritas/evaluate_veritas.py<br>evaluate_veritas]
+    VSG[src/veritas/strategy_generator.py<br>strategy_generator]
+    SMM[src/veritas/models/ml_model/simple_model.py<br>SimpleModel]
 
-%% --- GUI/PDCAサマリー/API等への拡張可（省略中） ---
+%% === プラン統計クラスタ ===
+    PLCOL[src/plan_data/collector.py<br>PlanDataCollector]
+    PLST[src/plan_data/statistics.py<br>PlanStatistics]
+    PLFT[src/plan_data/features.py<br>FeatureEngineer]
 
-%% --- 補足 ---
-    subgraph 戦略生成パイプライン
-        VGS
-        SGEN
-        SMM
-        VGD
-    end
-    subgraph 戦略評価パイプライン
-        VEV
-        VGD
-        DCSV
-    end
+%% === Airflow DAGクラスタ ===
+    DAG_AUR[airflow_docker/dags/aurus_strategy_dag.py<br>AurusStrategyDAG]
+    DAG_HMS[airflow_docker/dags/hermes_strategy_dag.py<br>HermesStrategyDAG]
 
-%% --- 説明 ---
-%% KN: 王Noctriaの中枢
-%% VM: 戦略評価AI（Veritas）
-%% PRM/ARS/LEV/NOC/HER: 五臣AI
-%% PlanData: 市場・ニュース・マクロ・イベントデータ収集＆特徴量生成＆統計
+%% === 呼び出し・依存関係 ===
+    %% Kingと五臣
+    KN -- "呼び出し" --> VRM
+    KN -- "呼び出し" --> PRO
+    KN -- "呼び出し" --> ARS
+    KN -- "呼び出し" --> LVA
+    KN -- "呼び出し" --> NOC
+    KN -- "呼び出し" --> HMS
 
+    %% 五臣の依存
+    VRM -- "戦略生成/評価スクリプト" --> VGEN
+    VRM -- "戦略生成/評価スクリプト" --> VEVAL
+
+    VRM -- "モデル/戦略保存" --> VSG
+    VSG -- "モデル利用" --> SMM
+
+    NOC -- "リスク評価" --> RSKM
+
+    ARS -- "パス・モデル依存" --> PCFG
+    PRO -- "パス・モデル依存" --> PCFG
+    VRM -- "パス依存" --> PCFG
+    VGEN -- "パス依存" --> PCFG
+    VEVAL -- "パス依存" --> PCFG
+    VSG -- "パス依存" --> PCFG
+    LVA -- "パス依存" --> PCFG
+    NOC -- "パス依存" --> PCFG
+    HMS -- "パス依存" --> PCFG
+
+    NOC -- "リスク計算" --> RSKM
+
+    %% PlanData/統計
+    PLST -- "データ収集" --> PLCOL
+    PLFT -- "特徴量追加" --> PLCOL
+
+    %% Airflow
+    DAG_AUR -- "import" --> ARS
+    DAG_HMS -- "import" --> HMS
+
+%% === コメント ===
+    %% 他DAG/PDCA/GUI系は未接続
