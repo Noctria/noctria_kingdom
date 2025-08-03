@@ -1,108 +1,85 @@
 flowchart TD
+  %% --- パス・ロガー基盤 ---
+  subgraph core
+    path[path_config.py]
+    logger[logger.py]
+    data_loader[data_loader.py]
+    king[king_noctria.py]
+  end
 
-%% ========== [1] 戦略生成・評価・実行クラスタ（Veritas/Prometheus等） ==========
-subgraph STRATEGY_CLUSTER["🧠 戦略AI・生成/評価/予測クラスタ"]
-    direction TB
+  %% --- AI/戦略モジュール ---
+  subgraph veritas
+    veritas_eval[evaluate_veritas.py]
+    veritas_gen[veritas_generate_strategy.py]
+    strategy_gen[strategy_generator.py]
+    machina[veritas_machina.py]
+    simple_model[models/ml_model/simple_model.py]
+  end
+  subgraph strategies
+    aurus[aurus_singularis.py]
+    levia[levia_tempest.py]
+    noctus[noctus_sentinella.py]
+    prometheus[prometheus_oracle.py]
+    hermes[hermes_cognitor.py]
+  end
+  subgraph plan
+    collector[plan_data/collector.py]
+    statistics[plan_data/statistics.py]
+    features[plan_data/features.py]
+  end
 
-    %% -- 戦略生成
-    VGEN["src/veritas/veritas_generate_strategy.py<br/>✒️ Veritas Strategy Generator"]
-    VEVAL["src/veritas/evaluate_veritas.py<br/>⚖️ Veritas Machina Evaluator"]
-    VSTRGEN["src/veritas/strategy_generator.py<br/>🤖 Veritas ML戦略自動生成"]
-    SMODEL["src/veritas/models/ml_model/simple_model.py<br/>PyTorch SimpleModel"]
+  %% --- DAG/ワークフロー ---
+  subgraph dag
+    aurus_dag[aurus_strategy_dag.py]
+    levia_dag[levia_strategy_dag.py]
+    noctus_dag[noctus_strategy_dag.py]
+    prometheus_dag[prometheus_strategy_dag.py]
+    hermes_dag[hermes_strategy_dag.py]
+    veritas_push_dag[veritas_push_dag.py]
+    king_dag[noctria_kingdom_dag.py]
+  end
 
-    %% -- AI/戦略官
-    PROM["src/strategies/prometheus_oracle.py<br/>🔮 Prometheus Oracle"]
-    AURUS["src/strategies/aurus_singularis.py<br/>🎯 Aurus Singularis"]
-    LEVIA["src/strategies/levia_tempest.py<br/>⚡ Levia Tempest"]
-    NOCTUS["src/strategies/noctus_sentinella.py<br/>🛡️ Noctus Sentinella"]
-    HERMES["src/strategies/hermes_cognitor.py<br/>🦉 Hermes Cognitor (LLM説明)"]
+  %% --- GUI/API ---
+  subgraph gui
+    king_routes[noctria_gui/routes/king_routes.py]
+  end
 
-    %% -- コア
-    PATHCONF["src/core/path_config.py<br/>📌 Path Config"]
-    RISK["src/core/risk_manager.py<br/>リスク管理"]
-    LOGGER["src/core/logger.py<br/>ロガー"]
-end
+  %% --- 依存関係 ---
+  path --> logger
+  logger -->|setup_logger| strategy_gen
+  logger -->|setup_logger| veritas_gen
+  logger -->|setup_logger| machina
+  logger -->|setup_logger| king
+  logger -->|setup_logger| veritas_eval
 
-%% ========== [2] Planデータ収集・統計クラスタ ==========
-subgraph PLAN_CLUSTER["📊 Planデータ収集・統計クラスタ"]
-    direction TB
+  king -->|臣下呼び出し| aurus
+  king -->|臣下呼び出し| levia
+  king -->|臣下呼び出し| noctus
+  king -->|臣下呼び出し| prometheus
+  king -->|臣下呼び出し| hermes
+  king -->|ML評価| machina
+  king -->|外部API| data_loader
 
-    PCOLL["src/plan_data/collector.py<br/>データ収集（市場/FRED/ニュース）"]
-    PSTATS["src/plan_data/statistics.py<br/>統計・KPI集計"]
-    PFEAT["src/plan_data/features.py<br/>特徴量生成"]
-end
+  veritas_gen -->|パス利用| path
+  veritas_eval -->|パス利用| path
 
-%% ========== [3] Airflowワークフロー/DAGクラスタ ==========
-subgraph DAG_CLUSTER["🛠️ AirflowワークフローDAGクラスタ"]
-    direction TB
+  aurus_dag -->|strategy import| aurus
+  levia_dag -->|strategy import| levia
+  noctus_dag -->|strategy import| noctus
+  prometheus_dag -->|strategy import| prometheus
+  hermes_dag -->|strategy import| hermes
 
-    DAG_AURUS["airflow_docker/dags/aurus_strategy_dag.py<br/>Aurus分析DAG"]
-    DAG_HERMES["airflow_docker/dags/hermes_strategy_dag.py<br/>Hermes説明DAG"]
-    DAG_LEVIA["airflow_docker/dags/levia_strategy_dag.py<br/>LeviaスキャルピングDAG"]
-    DAG_PROM["airflow_docker/dags/prometheus_strategy_dag.py<br/>Prometheus予測DAG"]
-    DAG_NOCTUS["airflow_docker/dags/noctus_strategy_dag.py<br/>NoctusリスクDAG"]
-    DAG_PUSH["airflow_docker/dags/veritas_push_dag.py<br/>戦略GitHub Push DAG"]
-    DAG_KING["airflow_docker/dags/noctria_kingdom_dag.py<br/>👑 王国Royal Council DAG"]
-end
+  king_dag --> king
+  king_routes --> king
 
-%% ========== [4] 統治/中央AI・API・GUIクラスタ ==========
-subgraph CENTRAL_CLUSTER["👑 中央統治AI・API・GUIクラスタ"]
-    direction TB
+  collector --> statistics
+  statistics --> features
 
-    KINGROUTES["noctria_gui/routes/king_routes.py<br/>中央統治API"]
-    KINGNOCTRIA["src/core/king_noctria.py<br/>KingNoctria統治AI"]
-    LOGS["logs/king_log.jsonl ほか"]
-end
+  plan -->|参照| collector
+  plan -->|参照| statistics
 
-%% ========== [5] ファイル依存・接続線 ==========
-%% -- Veritas生成・評価・戦略
-VGEN -->|戦略ファイル生成| VSTRGEN
-VSTRGEN -->|戦略Py出力| SMODEL
-VEVAL -->|評価| VGEN
-VEVAL -->|戦略評価| SMODEL
-PROM -->|未来予測| PATHCONF
-AURUS -->|市場分析| PATHCONF
-LEVIA -->|スキャルピング| PATHCONF
-NOCTUS -->|リスク管理| RISK
-NOCTUS -->|PathConfig参照| PATHCONF
-HERMES -->|説明生成| PATHCONF
+  king -->|DAG/APIトリガー| king_dag
+  king_routes --> king
 
-%% -- Plan/統計系
-PSTATS -->|データ集計| PCOLL
-PFEAT -->|特徴量| PCOLL
-
-%% -- Airflow DAG <-> AI戦略
-DAG_AURUS -->|分析| AURUS
-DAG_HERMES -->|説明| HERMES
-DAG_LEVIA -->|スキャル| LEVIA
-DAG_PROM -->|予測| PROM
-DAG_NOCTUS -->|リスク| NOCTUS
-DAG_PUSH -->|GitHubPush| VGEN
-DAG_KING -->|御前会議| KINGNOCTRIA
-
-%% -- 統治AI/GUI <-> 王
-KINGROUTES -->|API呼び出し| KINGNOCTRIA
-KINGNOCTRIA -->|全AI統治| PROM
-KINGNOCTRIA -->|全AI統治| AURUS
-KINGNOCTRIA -->|全AI統治| LEVIA
-KINGNOCTRIA -->|全AI統治| NOCTUS
-KINGNOCTRIA -->|全AI統治| HERMES
-KINGROUTES -->|統治ログ| LOGS
-
-%% -- PathConfig依存（全体構成）
-PATHCONF -->|全戦略/データ構造管理| VGEN
-PATHCONF -->|全戦略/データ構造管理| PROM
-PATHCONF -->|全戦略/データ構造管理| AURUS
-PATHCONF -->|全戦略/データ構造管理| LEVIA
-PATHCONF -->|全戦略/データ構造管理| NOCTUS
-PATHCONF -->|全戦略/データ構造管理| HERMES
-PATHCONF -->|全戦略/データ構造管理| PCOLL
-PATHCONF -->|全戦略/データ構造管理| PSTATS
-PATHCONF -->|全戦略/データ構造管理| PFEAT
-
-%% -- ロガー等（省略可）
-LOGGER -->|logging| VGEN
-LOGGER -->|logging| VSTRGEN
-
-%% -- 補足
-%% AI・戦略/リスク/統治API/DAGは全て王経由で統合
+  strategy_gen --> simple_model
+  machina --> simple_model
