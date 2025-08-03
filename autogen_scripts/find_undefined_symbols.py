@@ -5,12 +5,18 @@ FOLDER = "./generated_code"
 results = []
 
 def extract_imports(code):
-    pattern = r'from\s+(\w+)\s+import\s+([\w, ]+)'
     imports = []
-    for match in re.finditer(pattern, code):
+    # from xxx import yyy, zzz
+    pattern_from = r'from\s+(\w+)\s+import\s+([\w, ]+)'
+    for match in re.finditer(pattern_from, code):
         mod = match.group(1)
         symbols = [s.strip() for s in match.group(2).split(',')]
         imports.append((mod, symbols))
+    # import xxx
+    pattern_import = r'import\s+(\w+)'
+    for match in re.finditer(pattern_import, code):
+        mod = match.group(1)
+        imports.append((mod, []))  # 空リストはモジュール全体のimportを示す
     return imports
 
 def extract_defs(code):
@@ -18,7 +24,7 @@ def extract_defs(code):
     # クラスと関数定義
     for m in re.finditer(r'^class\s+(\w+)|^def\s+(\w+)', code, re.MULTILINE):
         defs.update([d for d in m.groups() if d])
-    # 変数定義（シンプルに先頭の単語 = で抽出）
+    # 変数定義（単純に先頭の単語=で抽出）
     for m in re.finditer(r'^(\w+)\s*=', code, re.MULTILINE):
         defs.add(m.group(1))
     return defs
@@ -37,6 +43,9 @@ for fname in test_files:
         if mod not in pyfiles:
             results.append(f"{fname}: モジュール '{mod}' が存在しません")
             continue
+        if symbols == []:
+            # import xxx の場合はモジュール存在チェックだけでOK
+            continue
         target_path = os.path.join(FOLDER, pyfiles[mod])
         with open(target_path, "r", encoding="utf-8") as tf:
             target_code = tf.read()
@@ -49,7 +58,7 @@ if results:
     print("=== Missing class/function/variable definitions ===")
     for line in results:
         print(line)
-    # ファイルに出力
+    # 未定義情報をファイルに出力
     with open(os.path.join(FOLDER, "undefined_symbols.txt"), "w", encoding="utf-8") as uf:
         uf.write("\n".join(results))
 else:
