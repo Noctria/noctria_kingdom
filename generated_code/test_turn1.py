@@ -1,127 +1,224 @@
 # ファイル名: test_turn1.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T10:55:54.303052
+# 生成日時: 2025-08-03T14:18:29.935973
 # 生成AI: openai_noctria_dev.py
-# UUID: 8eef4de7-b3aa-4a3c-9508-fcfeefa02720
+# UUID: 1e53745f-c2e2-4bad-a6de-e95e99d2eee2
 
-このコードスケルトンに対して、各モジュールの機能をテストするための`pytest`/`unittest`用テストコードを作成します。テストコードでは、正常系、異常系、そしてモジュール間の統合連携テストを含めます。また、パス設定などは`path_config.py`からインポートします。
+以下に自動トレードAIの各モジュールに対するテストコードのテンプレートを示します。Pythonの`unittest`フレームワークを使用し、各コンポーネントの正常系・異常系に対するテストを実装します。
 
-以下はその実装例です。
-
-### `tests/test_data_feed.py`
+### 1. `test_data_fetcher.py`
 
 ```python
-import pytest
-import pandas as pd
-from data_feed import fetch_usd_jpy_data, preprocess_data
+# test_data_fetcher.py
+
+import unittest
 from unittest.mock import patch
-import requests
-
-@patch('data_feed.requests.get')
-def test_fetch_usd_jpy_data(mock_get):
-    # Mock response
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = [{'timestamp': '2023-01-01T00:00:00Z', 'rate': 130.0}]
-    
-    df = fetch_usd_jpy_data()
-    assert isinstance(df, pd.DataFrame)
-    assert not df.empty
-
-@patch('data_feed.requests.get')
-def test_fetch_usd_jpy_data_error(mock_get):
-    # Simulate an error response
-    mock_get.side_effect = requests.exceptions.RequestException("API Error")
-    
-    with pytest.raises(requests.exceptions.RequestException):
-        fetch_usd_jpy_data()
-
-def test_preprocess_data():
-    # Sample data
-    data = [{'timestamp': '2023-01-01T00:00:00Z', 'rate': 130.0}]
-    df = pd.DataFrame(data)
-    processed_df = preprocess_data(df)
-    
-    assert processed_df.index.name == 'timestamp'
-    assert 'rate' in processed_df.columns
-```
-
-### `tests/test_model_training.py`
-
-```python
-import pytest
-from model_training import train_model
 import pandas as pd
-from unittest.mock import patch
+from data_fetcher import DataFetcher
 
-@patch('veritas.Model.save')
-@patch('veritas.Model.train')
-@patch('veritas.Model')
-def test_train_model(mock_model_class, mock_train, mock_save):
-    # Initialize mock
-    mock_model_instance = mock_model_class.return_value
-    
-    # Sample data
-    data = pd.DataFrame({'feature': [1, 2, 3], 'label': [0, 1, 0]})
-    
-    train_model(data)
-    
-    mock_train.assert_called_once_with(data)
-    mock_save.assert_called_once_with("model_output_path")
+class TestDataFetcher(unittest.TestCase):
+
+    @patch('data_fetcher.requests.get')
+    def test_fetch_data_success(self, mock_get):
+        # モックされたAPIレスポンスを設定
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = [{'close': 1.0}, {'close': 1.1}]
+        
+        fetcher = DataFetcher()
+        df = fetcher.fetch_data("http://fakeapi.com", {})
+        self.assertIsInstance(df, pd.DataFrame)
+        self.assertFalse(df.empty)
+
+    @patch('data_fetcher.requests.get')
+    def test_fetch_data_failure(self, mock_get):
+        # モックされたAPIレスポンスを500エラーに設定
+        mock_get.return_value.status_code = 500
+        fetcher = DataFetcher()
+        with self.assertRaises(Exception):
+            fetcher.fetch_data("http://fakeapi.com", {})
+
+if __name__ == '__main__':
+    unittest.main()
 ```
 
-### `tests/test_trading_strategy.py`
+### 2. `test_feature_engineering.py`
 
 ```python
+# test_feature_engineering.py
+
+import unittest
 import pandas as pd
-from trading_strategy import generate_signals
+from feature_engineering import FeatureEngineering
 
-def test_generate_signals():
-    # Sample model output
-    model_output = pd.DataFrame({'prediction': [0.1, -0.1, 0.0]})
-    
-    signals = generate_signals(model_output)
-    
-    assert 'signal' in signals.columns
-    assert list(signals['signal']) == ['buy', 'sell', 'sell']
+class TestFeatureEngineering(unittest.TestCase):
+
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'close': [100, 101, 102, 103, 104]
+        })
+        self.feature_engineering = FeatureEngineering()
+
+    def test_generate_features(self):
+        df_features = self.feature_engineering.generate_features(self.df)
+        self.assertIn('price_change', df_features.columns)
+        self.assertIn('volatility', df_features.columns)
+
+    def test_scale_features(self):
+        df_features = self.feature_engineering.generate_features(self.df)
+        df_scaled = self.feature_engineering.scale_features(df_features)
+        self.assertAlmostEqual(df_scaled['price_change'].mean(), 0, places=7)
+        self.assertAlmostEqual(df_scaled['volatility'].mean(), 0, places=7)
+
+if __name__ == '__main__':
+    unittest.main()
 ```
 
-### `tests/test_order_execution.py`
+### 3. `test_veritas_training.py`
 
 ```python
-from order_execution import execute_order
+# test_veritas_training.py
+
+import unittest
+import pandas as pd
+import os
+from veritas_training import VeritasTraining
+
+class TestVeritasTraining(unittest.TestCase):
+
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'feature1': [1, 2, 3, 4, 5],
+            'target': [0, 1, 0, 1, 0]
+        })
+        self.model_path = "/tmp/test_model.pkl"
+        self.trainer = VeritasTraining()
+
+    def test_train_model(self):
+        self.trainer.train_model(self.df, self.model_path)
+        self.assertTrue(os.path.exists(self.model_path))
+        os.remove(self.model_path)  # Cleanup
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+### 4. `test_veritas_inference.py`
+
+```python
+# test_veritas_inference.py
+
+import unittest
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+import joblib
+from veritas_inference import VeritasInference
+
+class TestVeritasInference(unittest.TestCase):
+
+    def setUp(self):
+        self.model_path = "/tmp/test_model.pkl"
+        self.model = RandomForestRegressor()
+        joblib.dump(self.model, self.model_path)
+        self.inference = VeritasInference()
+        self.df = pd.DataFrame({
+            'feature1': [1, 2, 3, 4, 5]
+        })
+
+    def tearDown(self):
+        os.remove(self.model_path)  # Cleanup
+
+    def test_load_model(self):
+        model = self.inference.load_model(self.model_path)
+        self.assertIsNotNone(model)
+
+    def test_predict(self):
+        loaded_model = self.inference.load_model(self.model_path)
+        predictions = self.inference.predict(loaded_model, self.df)
+        self.assertIsInstance(predictions, pd.Series)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+### 5. `test_strategy_evaluator.py`
+
+```python
+# test_strategy_evaluator.py
+
+import unittest
+import pandas as pd
+from strategy_evaluator import StrategyEvaluator
+
+class TestStrategyEvaluator(unittest.TestCase):
+
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'predicted_signal': [1, -1, 0, 1],
+            'price_change': [0.01, -0.02, 0.00, 0.03]
+        })
+        self.evaluator = StrategyEvaluator()
+
+    def test_evaluate(self):
+        total_profit, evaluated_df = self.evaluator.evaluate(self.df)
+        self.assertGreaterEqual(total_profit, 0)  # Assuming profit is non-negative in the test case
+        self.assertIn('profit', evaluated_df.columns)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+### 6. `test_order_generator.py`
+
+```python
+# test_order_generator.py
+
+import unittest
+import pandas as pd
+from order_generator import OrderGenerator
+
+class TestOrderGenerator(unittest.TestCase):
+
+    def setUp(self):
+        self.signals = pd.Series([1, -1, 0, 1])
+        self.generator = OrderGenerator()
+
+    def test_generate_orders(self):
+        orders = self.generator.generate_orders(self.signals)
+        self.assertEqual(orders.shape[0], self.signals.shape[0])
+        self.assertIn('order', orders.columns)
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+### 統合連携テスト
+
+以下は全体をテストするための統合テストのテンプレートです。
+
+```python
+# test_king_noctria.py
+
+import unittest
 from unittest.mock import patch
+import pandas as pd
+from src.core.king_noctria import KingNoctria
 
-@patch('order_execution.print')
-def test_execute_order_buy(mock_print):
-    execute_order('buy')
-    assert mock_print.called
+class TestKingNoctria(unittest.TestCase):
 
-@patch('order_execution.print')
-def test_execute_order_sell(mock_print):
-    execute_order('sell')
-    assert mock_print.called
+    @patch('src.core.king_noctria.DataFetcher.fetch_data')
+    @patch('src.core.king_noctria.VeritasInference.load_model')
+    @patch('src.core.king_noctria.VeritasInference.predict')
+    def test_execute_strategy(self, mock_predict, mock_load_model, mock_fetch_data):
+        mock_fetch_data.return_value = pd.DataFrame({'close': [1, 2, 3]})
+        mock_load_model.return_value = None  # モックされたモデル (詳細は不要)
+        mock_predict.return_value = pd.Series([0, 1, -1])
 
-@patch('order_execution.print')
-def test_execute_order_invalid(mock_print):
-    execute_order('hold')
-    mock_print.assert_called_with("No valid signal to execute: hold")
+        king = KingNoctria()
+        # Mocked methods should handle the data properly
+        king.execute_strategy("http://fakeapi.com", "/tmp/fake_model_path.pkl", {})
+
+if __name__ == '__main__':
+    unittest.main()
 ```
 
-### 統合テスト
-
-各モジュールが連携する統合テストは特に`scheduler.py`をベースにするのが自然ですが、Airflow DAGは通常、エンドツーエンドテストとしてではなく、各タスクのモック/シミュレーションによって検証されます。ここでは単体の整合性確認として以下のテストを追加します。
-
-### `tests/test_scheduler.py`
-
-```python
-from scheduler import create_dag
-
-def test_dag_integrity():
-    dag = create_dag()
-    # Check DAG ID
-    assert dag.dag_id == 'usd_jpy_trading'
-    # Check tasks count
-    assert len(dag.tasks) == 4
-```
-
-これらのテストは、あなたの環境で`pytest`を使って実行することができます。テストケースにおいて、API呼び出しや学習モデルなどの外部依存がある場合はモックを使ってテストを実行可能にしています。
+これらのテストは個々のコンポーネントが適切に動作するかを確認し、例外処理も含めてさまざまなケースを検証します。各テストコード内で`path_config.py`で定義したパスを使用する形にすることも考慮してください。
