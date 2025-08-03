@@ -1,0 +1,114 @@
+{% extends "base_hud.html" %}
+
+{% block title %}🧭 開発AIサイクル進捗履歴 - Noctria HUD{% endblock %}
+
+{% block header_icon %}<i class="fas fa-robot"></i>{% endblock %}
+{% block header_title %}開発AIサイクル進捗履歴{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}ダッシュボードへ戻る{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-tasks"></i> 進捗サマリー</h2>
+  <canvas id="progressChart" style="max-width: 100%; background: #131a4f; border-radius: 8px; margin-bottom: 2rem;"></canvas>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title"><i class="fas fa-list"></i> 履歴テーブル</h2>
+  <div style="overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; color:var(--text-color-base); background: var(--panel-bg);">
+      <thead>
+        <tr>
+          <th>ターン</th>
+          <th>開始時刻</th>
+          <th>終了時刻</th>
+          <th>合格数/総数</th>
+          <th>合格率</th>
+          <th>生成ファイル</th>
+          <th>レビュー指摘</th>
+          <th>失敗</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in history %}
+        <tr>
+          <td>{{ row.turn_number }}</td>
+          <td>{{ row.started_at.strftime('%Y-%m-%d %H:%M:%S') if row.started_at else '' }}</td>
+          <td>{{ row.finished_at.strftime('%Y-%m-%d %H:%M:%S') if row.finished_at else '' }}</td>
+          <td>{{ row.passed_tests }}/{{ row.total_tests }}</td>
+          <td>{{ row.pass_rate }}%</td>
+          <td>{{ row.generated_files }}</td>
+          <td>{{ row.review_comments }}</td>
+          <td>
+            {% if row.failed %}
+              <span class="text-red">失敗</span>
+            {% else %}
+              <span class="text-green">成功</span>
+            {% endif %}
+          </td>
+          <td>{{ row.extra_info.note if row.extra_info and row.extra_info.note else '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const data = {
+    labels: {{ history|map(attribute='turn_number')|list }},
+    datasets: [
+      {
+        label: "合格率 (%)",
+        data: {{ history|map(attribute='pass_rate')|list }},
+        borderColor: "#22d1ee",
+        backgroundColor: "#131a4f",
+        tension: 0.15,
+        yAxisID: 'y1',
+      },
+      {
+        label: "生成ファイル数",
+        data: {{ history|map(attribute='generated_files')|list }},
+        borderColor: "#4caf50",
+        backgroundColor: "#4caf5077",
+        type: 'bar',
+        yAxisID: 'y2',
+      }
+    ]
+  };
+  const config = {
+    type: 'line',
+    data,
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#22d1ee' } } },
+      scales: {
+        y1: {
+          type: 'linear',
+          position: 'left',
+          min: 0, max: 100,
+          grid: { color: "#233" },
+          title: { display: true, text: "合格率(%)", color: "#22d1ee" },
+          ticks: { color: "#22d1ee" }
+        },
+        y2: {
+          type: 'linear',
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "生成ファイル数", color: "#4caf50" },
+          ticks: { color: "#4caf50" }
+        }
+      }
+    }
+  };
+  new Chart(document.getElementById('progressChart'), config);
+});
+</script>
+{% endblock %}
