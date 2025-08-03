@@ -1,0 +1,69 @@
+flowchart TD
+    %% === Coreクラスタ ===
+    subgraph Core
+        KN[king_noctria.py<br>KingNoctria]
+        PC[path_config.py<br>全パス管理]
+        RM[risk_manager.py<br>RiskManager]
+    end
+
+    %% === Strategies・AIクラスタ ===
+    subgraph Strategies
+        PO[prometheus_oracle.py<br>PrometheusOracle]
+        AS[aurus_singularis.py<br>AurusSingularis]
+        LT[levia_tempest.py<br>LeviaTempest]
+        NS[noctus_sentinella.py<br>NoctusSentinella]
+        HC[hermes_cognitor.py<br>HermesCognitor]
+        VM[veritas_machina.py<br>VeritasMachina]
+        PM[モデル<br>prometheus_oracle.keras]
+        AM[モデル<br>aurus_singularis_v2.4.keras]
+    end
+
+    %% === Veritas戦略生成/評価クラスタ ===
+    subgraph Veritas
+        VG[veritas_generate_strategy.py<br>戦略生成]
+        VGD[veritas_generated/<br>生成戦略ファイル群]
+        VE[evaluate_veritas.py<br>戦略評価]
+        TD[sample_test_data.csv<br>評価用データ]
+        VL[veritas_eval_result.json<br>評価結果ログ]
+    end
+
+    %% === Config（その他基盤） ===
+    subgraph Config
+        ST[settings.py]
+        DL[data_loader.py]
+    end
+
+    %% === 依存・呼び出し関係 ===
+    KN --> PO
+    KN --> AS
+    KN --> LT
+    KN --> NS
+    KN --> HC
+    KN --> VM
+
+    PO --> PC
+    PO --> ST
+    PO --> DL
+    PO -- "load/save" --> PM
+    AS --> PC
+    AS -- "load/save" --> AM
+    LT --> PC
+    NS --> PC
+    NS --> RM
+    HC --> PC
+    VM --> PC
+
+    %% Veritasライン
+    VM -- "subprocess" --> VG
+    VG --> PC
+    VG -- "write" --> VGD
+
+    VM -- "subprocess" --> VE
+    VE --> PC
+    VE -- "read" --> VGD
+    VE -- "read" --> TD
+    VE -- "write" --> VL
+
+    %% Veritas生成/評価も王AIから呼び出し可
+    KN --> VM
+
