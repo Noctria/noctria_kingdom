@@ -1,12 +1,14 @@
-DATA_SOURCE_URL = "https://api.example.com/usd_jpy"
-DATA_API_ENDPOINT = "https://api.example.com/market"
+# ファイル名: path_config.py
+# バージョン: v0.1.0
+# 生成日時: 2025-08-04T01:03:54.479971
+# 生成AI: openai_noctria_dev.py
+# UUID: cd5f555b-7910-4108-8411-20d54e6a052c
+# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-MODEL_SAVE_PATH = "./models/usd_jpy_model.h5"
+DATA_SOURCE_URL = "https://example.com/data_source"
+LOCAL_DATA_PATH = "/path/to/local/data"
+FEATURES_PATH = "/path/to/features"
+MODEL_PATH = "/path/to/model"
+```
 
-LOCAL_DATA_PATH = "./local_data/"
-FEATURES_PATH = "./features/"
-DATA_PATH = "/dummy/data/path"  # テスト用ダミーパス
-
-def get_path(name):
-    # nameに応じたダミーパスを返す（テスト時はこれで十分）
-    return f"./local_data/{name}"
+```python
