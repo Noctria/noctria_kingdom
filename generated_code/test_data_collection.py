@@ -1,8 +1,8 @@
 # ファイル名: test_data_collection.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:10:43.604107
+# 生成日時: 2025-08-03T17:12:49.814320
 # 生成AI: openai_noctria_dev.py
-# UUID: 30430b66-37a2-4dd2-a747-eba5cd3c0ec6
+# UUID: 487e22b0-95b0-421d-af10-a8bba8751aab
 
 import pytest
 import pandas as pd
@@ -11,38 +11,43 @@ from unittest.mock import patch, MagicMock
 from path_config import get_path
 from data_collection import fetch_market_data
 
-# Binanceのmockを利用して、マーケットデータの取得テストを行います。
+# Binanceのモックを使用して市場データを取得するテスト
 @patch('ccxt.binance')
 def test_fetch_market_data_success(mock_binance):
+    # モックオブジェクトを使用して仮の取引所を設定
     mock_exchange = MagicMock()
+    # 1分ごとのOHLCVデータのサンプルを返すように設定
     mock_exchange.fetch_ohlcv.return_value = [
         [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
     ]
+    # バイナンスオブジェクトとしてモックを返す設定
     mock_binance.return_value = mock_exchange
 
-    # 取得したデータが正しいパスに保存されているかを確認します。
+    # データが保存されるパスの取得
     storage_path = get_path('trading')
     csv_path = os.path.join(storage_path, 'market_data.csv')
     
-    # データ収集の関数を実行
+    # データ収集の関数を呼び出して検証
     fetch_market_data()
     
-    # ファイルが存在するかを確認
+    # データの保存が成功したか確認
     assert os.path.exists(csv_path)
     
     # 保存されたCSVファイルが空でないことを確認
     df = pd.read_csv(csv_path)
     assert not df.empty
+    # データフレームのカラムが正しいか確認
     assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
 
-# ネットワークエラーの場合のテストを行います。
+# ネットワークエラーが発生した場合のエラー処理のテスト
 @patch('ccxt.binance')
 def test_fetch_market_data_network_error(mock_binance):
+    # ネットワークエラーを模擬する
     mock_binance.side_effect = Exception('NetworkError')
 
-    # ネットワークエラーが発生した際に例外がスローされるかを確認します。
+    # ネットワークエラーが発生した際に例外がスローされるかを確認
     with pytest.raises(Exception):
         fetch_market_data()
 ```
 
-このように、コードに日本語で説明を追加する際には、説明部分をすべて `#` で始めることでコメントアウトし、Pythonの構文エラーを防ぎましょう。これにより、コードの可読性も向上し、メンテナンスがしやすくなります。コメントを正しく記述した後、再度テストを実行して、エラーが解消されたかどうかを確認してください。
+このスクリプトでは、すべての説明を`#`でコメントアウトしているため、日本語テキストは実行時に無視され、Pythonコードの一部として誤解されることはありません。修正後は、再度テストを実行して問題が解決されていることを確認してください。
