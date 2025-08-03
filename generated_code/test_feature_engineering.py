@@ -1,20 +1,14 @@
 # ファイル名: test_feature_engineering.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-04T03:03:06.983464
+# 生成日時: 2025-08-04T03:11:05.824438
 # 生成AI: openai_noctria_dev.py
-# UUID: 37f818a1-a46f-4608-9b37-6de1418d1669
+# UUID: 974f91e0-11c3-4c88-af8e-2ebe33d41e88
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
 import pytest
 from src.core.path_config import LOCAL_DATA_PATH, FEATURES_PATH
 
-def test_local_data_path():
-    assert isinstance(LOCAL_DATA_PATH, str)
-    assert LOCAL_DATA_PATH != ""
-
-def test_features_path():
-    assert isinstance(FEATURES_PATH, str)
-    assert FEATURES_PATH != ""
-```
-
+def test_feature_path_definitions():
+    assert str(LOCAL_DATA_PATH).endswith("data/local_data.csv")
+    assert str(FEATURES_PATH).endswith("data/features")
 ```
