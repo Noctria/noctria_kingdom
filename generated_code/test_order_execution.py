@@ -1,17 +1,16 @@
 # ファイル名: test_order_execution.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-04T03:11:29.464037
+# 生成日時: 2025-08-04T03:17:56.446529
 # 生成AI: openai_noctria_dev.py
-# UUID: f33ac173-0604-49a9-80f0-37e6315d0adb
+# UUID: 4f4f23b1-fa8f-4029-9336-a7f95733ef1f
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
+```python
 import pytest
-from generated_code.order_execution import execute_trade
+from order_execution import execute_trade
 from src.core.path_config import MODEL_PATH, FEATURES_PATH
 
 def test_execute_trade():
-    try:
-        execute_trade(MODEL_PATH, FEATURES_PATH)
-    except Exception as e:
-        assert False, f"Trade execution failed with exception {e}"
+    result = execute_trade(MODEL_PATH, FEATURES_PATH)
+    assert result == "Trade Executed Successfully"
 ```
