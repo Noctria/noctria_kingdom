@@ -11488,3 +11488,22 @@ pytest: error: unrecognized arguments: --json-report --json-report-file=./genera
 [2025-08-04 02:58:22] [未定義補完] AIのコード保存: ./generated_code/test_model_training.py
 [2025-08-04 02:58:22] 警告: ファイルが既に存在します（上書き）: ./generated_code/test_order_execution.py
 [2025-08-04 02:58:22] [未定義補完] AIのコード保存: ./generated_code/test_order_execution.py
+[2025-08-04 02:58:25] Git commit/push failed: Command '['git', '-C', './generated_code', 'push']' died with <Signals.SIGINT: 2>.
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/path_config.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/path_config.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/data_preprocessing.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/data_preprocessing.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/model_training.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/model_training.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/order_execution.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/order_execution.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/test_data_collection.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/test_data_collection.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/test_data_preprocessing.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/test_data_preprocessing.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/test_feature_engineering.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/test_feature_engineering.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/test_model_training.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/test_model_training.py
+[2025-08-04 03:02:05] 警告: ファイルが既に存在します（上書き）: ./generated_code/test_order_execution.py
+[2025-08-04 03:02:05] [未定義補完] AIのコード保存: ./generated_code/test_order_execution.py
