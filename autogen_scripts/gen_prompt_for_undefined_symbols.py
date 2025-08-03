@@ -1,26 +1,35 @@
 import os
+from datetime import datetime
 
-UNDEF_FILE = "autogen_scripts/undefined_symbols.txt"   # find_undefined_symbols.py の出力
+UNDEF_FILE = "autogen_scripts/undefined_symbols.txt"
 KNOWLEDGE_PATH = "docs/knowledge.md"
 PROMPT_OUT = "autogen_scripts/ai_prompt_fix_missing.txt"
 
-# 1. knowledge.mdのロード
+if not os.path.exists(UNDEF_FILE):
+    raise FileNotFoundError(f"{UNDEF_FILE} が見つかりません")
+if not os.path.exists(KNOWLEDGE_PATH):
+    raise FileNotFoundError(f"{KNOWLEDGE_PATH} が見つかりません")
+
 with open(KNOWLEDGE_PATH, "r", encoding="utf-8") as f:
     knowledge = f.read()
 
-# 2. 未定義シンボルリストのロード
 with open(UNDEF_FILE, "r", encoding="utf-8") as f:
     missing = f.read().strip()
 
-# 3. AI用プロンプト組み立て
+timestamp = datetime.now().isoformat()
+
 prompt = f"""
-【Noctria Kingdom自動補完指示】
-- 下記の「knowledge.md」（開発ルール）を厳守せよ。
-- 現在pytestで「未定義/未実装」となっているクラス・関数・変数リストをすべて定義/実装せよ。
-- 各コードは必ず「# ファイル名: xxx.py」ヘッダーをつけ、generated_code/配下に追加・上書きすること。
+【Noctria Kingdom自動補完指示】【生成日時: {timestamp}】
+- 下記「knowledge.md」（開発ルール）を厳守せよ。
+- pytestの「未定義/未実装」クラス・関数・変数をすべて定義/実装せよ。
+- 各コードは「# ファイル名: xxx.py」ヘッダー必須。
+- path_config.pyのみ src/core/path_config.py に、他は generated_code/直下に必ず上書き。
+- 生成先ディレクトリは絶対にネスト禁止（generated_code/generated_code等を作らないこと）。
 - 新たな説明文や余計なコメント、Markdown囲みは絶対に書かない。
-- すべての定義は型アノテーション・PEP8厳守で書くこと。
-- 実装不足・型違反・命名不一致がないかも自動で点検し、確実にpytestを通る水準で補完せよ。
+- すべてPEP8/型アノテーション・命名規則厳守。
+- テストコードはtest_*.py, 本体コードは*.py、ドキュメントは絶対.py化しない。
+- コード定義がpytestで通るまで正確に補完せよ。命名ブレや型違反がないかも点検。
+- OSや環境依存の記述は排除すること。
 
 ---
 【knowledge.md】
