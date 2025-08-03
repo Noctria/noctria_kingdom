@@ -7,13 +7,23 @@ import os
 import psycopg2
 import json
 from datetime import datetime
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # ★統合パス管理を利用
+from decimal import Decimal
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # 統合パス管理
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+def _decimal_to_float(obj):
+    """再帰的にDecimal型をfloat化する（辞書/リスト全対応）"""
+    if isinstance(obj, dict):
+        return {k: _decimal_to_float(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_decimal_to_float(v) for v in obj]
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    return obj
+
 def fetch_devcycle_history(limit=100):
-    # ★ path_config or .envから吸う運用推奨
     db = {
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", "5432")),
@@ -32,7 +42,6 @@ def fetch_devcycle_history(limit=100):
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    # dictで返す
     keys = [
         "id", "turn_number", "started_at", "finished_at", "passed_tests", "total_tests", "pass_rate",
         "generated_files", "review_comments", "failed", "fail_reason", "extra_info", "created_at"
@@ -46,6 +55,8 @@ def fetch_devcycle_history(limit=100):
                 record["extra_info"] = json.loads(record["extra_info"])
             except Exception:
                 record["extra_info"] = {}
+        # ここでDecimal型をfloatへ変換！
+        record = _decimal_to_float(record)
         history.append(record)
     return list(reversed(history))  # 時系列昇順にする
 
