@@ -57,6 +57,13 @@ STATS_DIR = DATA_DIR / "stats"  # 追加：統計用ディレクトリ
 
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+
+# 新規追加（未定義解消用）
+DATA_SOURCE_URL = "https://example.com/data/source.csv"  # 実際のURLに差し替えてください
+LOCAL_DATA_PATH = DATA_DIR / "local_data"
+FEATURES_PATH = PROCESSED_DATA_DIR / "features"
+MODEL_PATH = DATA_DIR / "models" / "latest_model.pkl"
+
 # MODELS_DIR は廃止しました。
 
 INSTITUTIONS_DIR = PROJECT_ROOT / "institutions"
