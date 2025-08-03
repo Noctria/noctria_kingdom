@@ -7,12 +7,13 @@ import os
 import psycopg2
 import json
 from datetime import datetime
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # ★統合パス管理を利用
 
 router = APIRouter()
-templates = Jinja2Templates(directory="noctria_gui/templates")
+templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 def fetch_devcycle_history(limit=100):
-    # .envやsettings経由でOK。ここは直接指定例
+    # ★ path_config or .envから吸う運用推奨
     db = {
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", "5432")),
