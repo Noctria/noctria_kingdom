@@ -28,6 +28,7 @@ UNDEF_FILE = "autogen_scripts/undefined_symbols.txt"
 PROMPT_OUT = "autogen_scripts/ai_prompt_fix_missing.txt"
 GEN_PROMPT_SCRIPT = "autogen_scripts/gen_prompt_for_undefined_symbols.py"
 FIND_UNDEF_SCRIPT = "autogen_scripts/find_undefined_symbols.py"
+GENERATE_SKELETON_SCRIPT = "autogen_scripts/generate_skeleton_files.py"  # 追加
 
 ENV_INFO = (
     "【実行環境・開発方針】\n"
@@ -241,6 +242,9 @@ async def call_openai(client, messages, retry=3, delay=2):
 def run_find_undefined_symbols():
     subprocess.run(["python3", FIND_UNDEF_SCRIPT], check=True)
 
+def run_generate_skeleton_files():
+    subprocess.run(["python3", GENERATE_SKELETON_SCRIPT], check=True)  # ここで骨格生成を呼ぶ
+
 def run_gen_prompt_for_undefined_symbols():
     subprocess.run(["python3", GEN_PROMPT_SCRIPT], check=True)
     with open(PROMPT_OUT, "r", encoding="utf-8") as f:
@@ -265,6 +269,10 @@ async def auto_fix_missing_symbols(client, max_attempts=5):
     attempts = 0
     while attempts < max_attempts:
         run_find_undefined_symbols()
+
+        # 追加：骨格ファイル生成を自動実行し、未定義シンボルの骨格を先に作る
+        run_generate_skeleton_files()
+
         if not os.path.exists(UNDEF_FILE):
             print("[auto_fix] 未定義ファイルなし、ループ終了")
             break
