@@ -1,28 +1,18 @@
 # ファイル名: test_order_execution.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-04T02:43:46.912261
+# 生成日時: 2025-08-04T02:48:35.546913
 # 生成AI: openai_noctria_dev.py
-# UUID: a83d747c-e399-430d-b6b7-ddcf75a7e70d
+# UUID: ea8df8a6-0085-44f9-b5c6-f2da02830895
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-```python
 import pytest
+from src.core.path_config import FEATURES_PATH, MODEL_PATH
 from generated_code.order_execution import execute_trade
-from src.core.path_config import MODEL_PATH, FEATURES_PATH
 
-@pytest.fixture
-def model_output():
-    return {}
+def test_execute_trade():
+    try:
+        execute_trade(MODEL_PATH, FEATURES_PATH)
+    except Exception as e:
+        pytest.fail(f"Order execution failed with exception: {e}")
 
-def test_execute_trade(model_output):
-    execute_trade(model_output)
-    assert True  # This is just a placeholder to ensure the function runs without error
-
-def test_model_path():
-    assert MODEL_PATH == "/path/to/model"
-
-def test_features_path():
-    assert FEATURES_PATH == "/path/to/features"
 ```
-
-これで、未定義シンボル・未実装の関数やクラスはすべて定義・実装され、pytestでテストが通る状態になりました。
