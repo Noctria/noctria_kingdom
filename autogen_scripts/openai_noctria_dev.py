@@ -33,31 +33,35 @@ def prepend_knowledge(prompt: str) -> str:
     )
 
 ROLE_PROMPTS = {
-    "design": ENV_INFO + prepend_knowledge(
+    "design": prepend_knowledge(
         "あなたは戦略設計AIです。USD/JPYの自動トレードAIの戦略を詳細に設計してください。\n"
         "まず、noctria_kingdom/docs/Noctria連携図.mmdを読み込み、その内容（システム全体の連携構造、各ファイルやコンポーネントの関係性）を把握してください。\n"
         "複数ファイルに分割生成し、# ファイル名: filename.py を必ず記載。\n"
         "設計は関数・クラスの構造と流れを明確に、パス管理はpath_config.py一元化ルール厳守。\n"
-        "設計説明は簡潔に。"
+        "設計説明は簡潔に。\n"
         "VeritasのML設計・実装は必ずGPUクラウドサービス（AWS/GCP/Azure等）上のトレーニング・推論運用を前提とすること。\n"
+        "Noctria Kingdomの各機能はnoctria_guiで集中管理され、"
+        "GUI管理ツールのhtmlはnoctria_gui/static/hud_style.cssに準拠したHUD風デザインに統一されていることも考慮せよ。\n"
     ),
-    "implement": ENV_INFO + prepend_knowledge(
+    "implement": prepend_knowledge(
         "設計AIの指示とNoctria連携図に従い実装コードを生成してください。\n"
         "パス指定は全てpath_config.pyからimportし直書き禁止。\n"
-        "複数ファイル分割・# ファイル名: filename.py明記・PEP8/型アノテ必須・例外処理も適切に。"
+        "複数ファイル分割・# ファイル名: filename.py明記・PEP8/型アノテ必須・例外処理も適切に。\n"
+        "GUI部分はhud_style.cssに則ったHUDデザインとすること。\n"
+        "Veritas MLはクラウドGPU環境での動作を必ず考慮。\n"
     ),
-    "test": ENV_INFO + prepend_knowledge(
+    "test": prepend_knowledge(
         "設計AI・Noctria連携図.mmdを参考に各コンポーネントのpytest/unittestテストコードを生成してください。\n"
         "テストコードもパスは必ずpath_config.pyからimportすること。\n"
-        "正常系・異常系・統合連携テストも含めること。"
+        "正常系・異常系・統合連携テストも含めること。\n"
     ),
-    "review": ENV_INFO + prepend_knowledge(
+    "review": prepend_knowledge(
         "生成コード・テストをNoctria連携図.mmd・knowledge.mdのルールに照らして評価し、"
         "全体最適化・リファクタ案も具体的に提案してください。\n"
-        "パス直書きやルール違反があれば必ず指摘し修正案を明示。"
+        "パス直書きやルール違反があれば必ず指摘し修正案を明示。\n"
     ),
-    "doc": ENV_INFO + prepend_knowledge(
-        "Noctria連携図.mmd・knowledge.mdを元に構成説明、パス集中管理意義、環境構築手順を含むREADME/ドキュメントを自動生成してください。"
+    "doc": prepend_knowledge(
+        "Noctria連携図.mmd・knowledge.mdを元に構成説明、パス集中管理意義、環境構築手順を含むREADME/ドキュメントを自動生成してください。\n"
     ),
 }
 
