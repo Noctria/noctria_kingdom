@@ -39,7 +39,7 @@ def test_fetch_forex_data_failure(mock_get):
 
     with pytest.raises(ConnectionError):
         fetch_forex_data()
-```
+
 
 ### `test_feature_engineering.py`
 
