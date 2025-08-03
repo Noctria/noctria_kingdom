@@ -8,13 +8,13 @@ import psycopg2
 import json
 from datetime import datetime
 from decimal import Decimal
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # 統合パス管理
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # 共通パス管理
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 def _decimal_to_float(obj):
-    """再帰的にDecimal型をfloat化する（辞書/リスト全対応）"""
+    """再帰的にDecimal型をfloat化（dict/リスト/単体対応）"""
     if isinstance(obj, dict):
         return {k: _decimal_to_float(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -55,10 +55,10 @@ def fetch_devcycle_history(limit=100):
                 record["extra_info"] = json.loads(record["extra_info"])
             except Exception:
                 record["extra_info"] = {}
-        # ここでDecimal型をfloatへ変換！
+        # Decimal型をfloat化
         record = _decimal_to_float(record)
         history.append(record)
-    return list(reversed(history))  # 時系列昇順にする
+    return list(reversed(history))  # 昇順（古い→新しい順）にする
 
 @router.get("/devcycle/history", response_class=HTMLResponse)
 async def devcycle_history(request: Request):
