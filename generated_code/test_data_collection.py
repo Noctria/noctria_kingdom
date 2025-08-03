@@ -1,43 +1,44 @@
 # ファイル名: test_data_collection.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T14:10:14.451348
+# 生成日時: 2025-08-03T17:09:46.734113
 # 生成AI: openai_noctria_dev.py
-# UUID: 80f24697-4d14-48ff-8b74-6087255a3deb
+# UUID: e2055cfe-c8b2-46f8-b3d2-5b1a51f42fe8
 
 import pytest
 import pandas as pd
-from unittest.mock import patch, Mock
-from data_collection import fetch_usd_jpy_data, process_data
-from path_config import DATA_SOURCE_URL
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
 
-def test_fetch_usd_jpy_data_success():
-    """Test successful data fetching."""
-    with patch('data_collection.requests.get') as mock_get:
-        mock_get.return_value = Mock(status_code=200, json=lambda: [{'date': '2023-01-01', 'price': 135}])
-        df = fetch_usd_jpy_data()
-        assert not df.empty
-        assert 'price' in df.columns
+@patch('ccxt.binance')
+def test_fetch_market_data_success(mock_binance):
+    mock_exchange = MagicMock()
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
+    mock_binance.return_value = mock_exchange
 
-def test_fetch_usd_jpy_data_failure():
-    """Test data fetching failure."""
-    with patch('data_collection.requests.get') as mock_get:
-        mock_get.return_value.raise_for_status.side_effect = Exception('Error fetching data')
-        with pytest.raises(Exception):
-            fetch_usd_jpy_data()
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
+    
+    fetch_market_data()
+    
+    assert os.path.exists(csv_path)
+    
+    df = pd.read_csv(csv_path)
+    assert not df.empty
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
 
-def test_process_data():
-    """Test data processing."""
-    data = {'date': ['2023-01-01'], 'price': [135]}
-    df = pd.DataFrame(data)
-    processed_df = process_data(df)
-    assert 'normalized_price' in processed_df.columns
-    assert not processed_df.empty
+@patch('ccxt.binance')
+def test_fetch_market_data_network_error(mock_binance):
+    mock_binance.side_effect = Exception('NetworkError')
+
+    with pytest.raises(Exception):
+        fetch_market_data()
 ```
 
-### 再確認事項
+### 2. `test_ml_model.py`
+`ml_model.py`のテストです。
 
-- `test_data_collection.py`のPython構文が正しいか再度確認してください。
-- `path_config.py`からURLのパスを正しくインポートし、ハードコーディングされたパスを避けること。
-- `pytest`で再テストし、エラーメッセージが解消されたことを確認します。
-
-この修正により、構文エラーが解消されることを願います。もしエラーが引き続き発生する場合は、再度エラーログを確認し、他の部分での同様の問題がないかご注意ください。
+```python

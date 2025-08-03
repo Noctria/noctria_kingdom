@@ -5737,3 +5737,119 @@ strategy.execute_trades()
 [2025-08-03 17:09:17] implement AIのコード保存: ./generated_code/data_collection.py
 [2025-08-03 17:09:17] implement AIのコード保存: ./generated_code/ml_model.py
 [2025-08-03 17:09:17] implement AIのコード保存: ./generated_code/trading_strategy.py
+[2025-08-03 17:09:21] Git commit & push succeeded: implement AI generated files - turn 1
+[2025-08-03 17:09:46] test AI: 以上の設計に基づいて、各コンポーネントのテストコードを用意します。`pytest`や`unittest`フレームワークを使用して、正常系・異常系のテストと統合連携テストを実施します。以下に例を示します。
+
+### 1. `test_data_collection.py`
+以下は、`data_collection.py`についてのテストです。
+
+```python
+# ファイル名: test_data_collection.py
+import pytest
+import pandas as pd
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
+
+@patch('ccxt.binance')
+def test_fetch_market_data_success(mock_binance):
+    mock_exchange = MagicMock()
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
+    mock_binance.return_value = mock_exchange
+
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
+    
+    fetch_market_data()
+    
+    assert os.path.exists(csv_path)
+    
+    df = pd.read_csv(csv_path)
+    assert not df.empty
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+@patch('ccxt.binance')
+def test_fetch_market_data_network_error(mock_binance):
+    mock_binance.side_effect = Exception('NetworkError')
+
+    with pytest.raises(Exception):
+        fetch_market_data()
+```
+
+### 2. `test_ml_model.py`
+`ml_model.py`のテストです。
+
+```python
+# ファイル名: test_ml_model.py
+import pytest
+import numpy as np
+from ml_model import VeritasModel
+
+def test_model_initialization():
+    model = VeritasModel()
+    assert model.model is not None
+
+def test_model_predict():
+    model = VeritasModel()
+    features = np.random.rand(10, 10)  # Assuming input shape is (10,)
+    predictions = model.predict(features)
+
+    assert len(predictions) == 10
+    assert isinstance(predictions, np.ndarray)
+```
+
+### 3. `test_trading_strategy.py`
+以下は`trading_strategy.py`のテストで、買いと売りのシグナルを正しく生成し、実行されることを確認します。
+
+```python
+# ファイル名: test_trading_strategy.py
+import pytest
+import pandas as pd
+from unittest.mock import patch
+from trading_strategy import TradingStrategy
+
+@patch('ml_model.VeritasModel.predict')
+def test_generate_signals(mock_predict):
+    mock_predict.return_value = [0.5, -0.5, 0.3, -0.1]  # Example predictions
+    strategy = TradingStrategy()
+    strategy.load_data()
+    
+    strategy.data = pd.DataFrame({
+        'timestamp': [1, 2, 3, 4],
+        'open': [100, 200, 300, 400],
+        'high': [101, 201, 301, 401],
+        'low': [99, 199, 299, 399],
+        'close': [100, 200, 300, 400],
+        'volume': [1000, 1000, 1000, 1000]
+    })
+    
+    strategy.generate_signals()
+    expected_signals = ['buy', 'sell', 'buy', 'sell']
+    
+    assert all(strategy.data['signals'] == expected_signals)
+
+@patch('src.core.king_noctria.execute_order')
+def test_execute_trades(mock_execute_order):
+    mock_execute_order.return_value = True
+    strategy = TradingStrategy()
+    strategy.data = pd.DataFrame({
+        'signals': ['buy', 'sell'],
+        'close': [100, 200]
+    })
+    
+    strategy.execute_trades()
+    assert mock_execute_order.call_count == 2
+```
+
+### **まとめ**
+- **モックを使った依存関係の置き換え**: 外部システムや複雑なロジックをモックし、テスト環境のコントロールを保ちながらテストを実施しています。
+- **例外処理の確認**: 例外シナリオをテストすることでシステムの堅牢性を検証しています。
+- **正常系と異常系の両方を網羅**: 正常に動作するシナリオと、異常が発生するシナリオを確認することで、信頼性を向上させています。
+
+これにより、今後の開発・拡張・メンテナンスがスムーズに行えるような基盤が整うことが期待できます。
+[2025-08-03 17:09:46] test AIのコード保存: ./generated_code/test_data_collection.py
+[2025-08-03 17:09:46] test AIのコード保存: ./generated_code/test_ml_model.py
+[2025-08-03 17:09:46] test AIのコード保存: ./generated_code/test_trading_strategy.py
