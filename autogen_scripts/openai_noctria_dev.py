@@ -75,7 +75,11 @@ def role_prompt_template(role):
     if role == "test":
         return (
             base_req +
+            "設計AI・Noctria連携図.mmdを参考に各コンポーネントのpytest/unittestテストコードを生成してください。\n"
+            "必ずPythonコードとして`def test_xxx():`を含み、テスト関数・アサーション等を実装してください。\n"
             "pytest/unittestによる正常/異常/連携/A/B比較テストコードを生成せよ。\n"
+            "テスト以外の設計や方針、説明テキストを含めてはなりません。\n"
+            "テストコード以外は.mdや.txtでdocs/に出力してください。\n"
             "各テストにはテストケース名・目的・説明責任コメントも記載。\n"
         )
     if role == "review":
