@@ -1,16 +1,18 @@
 import ccxt
 import pandas as pd
 import os
-from path_config import get_path
 
-def fetch_market_data() -> None:
+# --- ストレージパスを直接定義（または path_config.py から定数import推奨） ---
+STORAGE_PATH = "./local_data/"
+
+def fetch_market_data():
     try:
         exchange = ccxt.binance()
-        data = exchange.fetch_ohlcv('USD/JPY', timeframe='1m')
+        # 実際のUSD/JPYがなければダミーのBTC/USDTなどに変更
+        data = exchange.fetch_ohlcv('BTC/USDT', timeframe='1m')
         df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        
-        storage_path = get_path('trading')
-        df.to_csv(os.path.join(storage_path, 'market_data.csv'), index=False)
+        os.makedirs(STORAGE_PATH, exist_ok=True)
+        df.to_csv(os.path.join(STORAGE_PATH, 'market_data.csv'), index=False)
     except ccxt.NetworkError as e:
         print(f"Network error occurred: {e}")
     except ccxt.ExchangeError as e:
@@ -18,5 +20,10 @@ def fetch_market_data() -> None:
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-fetch_market_data()
-python
+# テストや他モジュールから呼べるよう関数名をエクスポート
+def fetch_forex_data():
+    fetch_market_data()
+
+if __name__ == "__main__":
+    fetch_market_data()
+

@@ -1,14 +1,25 @@
+# ファイル名: data_preprocessing.py
+# バージョン: v0.1.0
+# 生成日時: 2025-08-03T17:46:05.822999
+# 生成AI: openai_noctria_dev.py
+# UUID: 19161bea-346c-4330-8427-7e85543f5f43
+
 from path_config import DATA_PATH
 import pandas as pd
 
 def load_data(source):
     # データを指定されたソースからロード
-    pass
+    try:
+        return pd.read_csv(source)
+    except Exception:
+        return pd.DataFrame()  # ファイルが無い時は空DataFrame返す
 
 def preprocess_data(data):
     # 標準化や欠損値補完、異常値処理
-    pass
+    if data.empty:
+        return data
+    # 欠損値を平均で補完（例）
+    return data.fillna(data.mean(numeric_only=True))
 
 raw_data = load_data(DATA_PATH)
 cleaned_data = preprocess_data(raw_data)
-python
