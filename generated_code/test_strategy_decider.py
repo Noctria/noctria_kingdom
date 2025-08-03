@@ -1,13 +1,3 @@
-# ファイル名: test_strategy_decider.py
-# バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:48:45.918164
-# 生成AI: openai_noctria_dev.py
-# UUID: b7de6e8c-77fd-43b9-9a00-94226d618699
-# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
-
-# 説明: 戦略決定モジュールのテスト
-# バージョン: 1.0.0
-
 import unittest
 from strategy_decider import StrategyDecider
 
@@ -41,8 +31,4 @@ class TestStrategyDecider(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-```
-
-### order_executor.pyのテストコード
-
-```python
+python

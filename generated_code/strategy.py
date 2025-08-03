@@ -12,8 +12,4 @@ def generate_signals(data, short_window=5, long_window=20):
                         (data['SMA_Short'].shift(1) >= data['SMA_Long'].shift(1))]
 
     return buy_signals, sell_signals
-```
-
-#### order_execution.py
-
-```python
+python

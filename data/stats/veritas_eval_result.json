@@ -5,7 +5,10 @@
   "num_trades": 45,
   "profit_factor": 1.98,
   "symbol": "USDJPY",
-  "tags": ["scalping"],
+  "tags": [
+    "scalping"
+  ],
   "evaluated_at": "2025-07-06T15:32:00",
-  "pushed": false
+  "pushed": false,
+  "ai": "Veritas"
 }

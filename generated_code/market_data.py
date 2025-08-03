@@ -9,8 +9,4 @@ def get_market_data(pair):
         'Close': [100 + random.gauss(0, 1) for _ in range(100)]
     })
     return data
-```
-
-#### strategy.py
-
-```python
+python

@@ -13,7 +13,4 @@ class DataCollector:
         except Exception as e:
             print(f"データ収集中にエラーが発生: {e}")
             return pd.DataFrame()
-```
-
-### 3. 前処理
-```python
+python

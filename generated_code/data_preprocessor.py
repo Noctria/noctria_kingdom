@@ -9,7 +9,4 @@ class DataPreprocessor:
         except Exception as e:
             print(f"前処理中にエラーが発生: {e}")
             return pd.DataFrame()
-```
-
-### 4. 機械学習モジュール (Veritas)
-```python
+python

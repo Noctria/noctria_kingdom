@@ -1,13 +1,3 @@
-# ファイル名: test_order_executor.py
-# バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:48:45.940931
-# 生成AI: openai_noctria_dev.py
-# UUID: 3f67411d-af86-4c0b-9aba-b5619aff37a6
-# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
-
-# 説明: 注文執行モジュールのテスト
-# バージョン: 1.0.0
-
 import unittest
 from unittest.mock import patch
 from order_executor import OrderExecutor
@@ -38,8 +28,4 @@ class TestOrderExecutor(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-```
-
-### risk_manager.pyのテストコード
-
-```python
+python

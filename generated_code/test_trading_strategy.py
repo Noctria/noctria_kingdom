@@ -1,10 +1,3 @@
-# ファイル名: test_trading_strategy.py
-# バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:09:46.746127
-# 生成AI: openai_noctria_dev.py
-# UUID: 70150044-9cb6-48e5-aca7-4b0ab45af1cc
-
-import pytest
 import pandas as pd
 from unittest.mock import patch
 from trading_strategy import TradingStrategy
@@ -40,9 +33,7 @@ def test_execute_trades(mock_execute_order):
     
     strategy.execute_trades()
     assert mock_execute_order.call_count == 2
-```
 
-### **まとめ**
 - **モックを使った依存関係の置き換え**: 外部システムや複雑なロジックをモックし、テスト環境のコントロールを保ちながらテストを実施しています。
 - **例外処理の確認**: 例外シナリオをテストすることでシステムの堅牢性を検証しています。
 - **正常系と異常系の両方を網羅**: 正常に動作するシナリオと、異常が発生するシナリオを確認することで、信頼性を向上させています。

@@ -25,7 +25,4 @@ class VeritasML:
         except Exception as e:
             print(f"予測中にエラーが発生: {e}")
             return []
-```
-
-### 5. 注文決定と執行
-```python
+python
