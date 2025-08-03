@@ -13,55 +13,70 @@ OUTPUT_DIR = "./generated_code"
 LOG_FILE = os.path.join(OUTPUT_DIR, "chat_log.txt")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# knowledge.mdでのナレッジ一元管理ルール
 KNOWLEDGE_PATH = "noctria_kingdom/docs/knowledge.md"
+MMD_PATH = "noctria_kingdom/docs/Noctria連携図.mmd"
 
-def load_knowledge() -> str:
-    """knowledge.mdの内容を取得（各プロンプト先頭で利用）"""
+# WSL/Docker/GPU/GUI等 環境情報（AIの前提知識として全ROLEに注入）
+ENV_INFO = (
+    "【実行環境・開発方針】\n"
+    "- Windows PC上のWSL2（Ubuntu）＋ AirflowはDocker運用。\n"
+    "- airflow_docker/ はDocker内、noctria_gui/はvenv_gui、noctria_kingdom/はvenv_noctria、autogenはautogen_venvで稼働。\n"
+    "- パス・ボリューム共有、venv依存分離を常に意識。\n"
+    "- Veritas（ML）は将来的にGPUクラウドサービス（AWS/GCP/Azure等）運用前提。\n"
+    "- Noctriaの全機能はnoctria_gui/GUI管理ツールで集中管理できる設計徹底。\n"
+    "- noctria_gui/配下HTMLはhud_style.cssに準拠したHUDスタイル統一。\n"
+    "- 全プロダクトの最終判断・注文の可否はsrc/core/king_noctria.pyに集約。\n"
+)
+
+def load_file(path, max_chars=None):
+    """ファイル内容を最大max_chars分だけ取得（全文渡すときはmax_chars=None）"""
     try:
-        with open(KNOWLEDGE_PATH, "r", encoding="utf-8") as f:
-            return f.read()
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            if max_chars:
+                return content[:max_chars]
+            return content
     except Exception:
         return ""
 
-def prepend_knowledge(prompt: str) -> str:
-    """knowledge.mdの内容をプロンプト冒頭に付与"""
-    knowledge = load_knowledge()
+def prepend_env_and_knowledge_and_mmd(prompt: str) -> str:
+    """ENV情報・knowledge.md・Noctria連携図.mmdをすべてプロンプト冒頭に自動注入"""
+    knowledge = load_file(KNOWLEDGE_PATH, max_chars=7000)
+    mmd = load_file(MMD_PATH, max_chars=4000)
     return (
-        f"【重要: まず{KNOWLEDGE_PATH}（ナレッジベース）を読み込み、その内容・方針・ルールを厳守すること】\n"
-        f"{knowledge}\n\n{prompt}"
+        f"{ENV_INFO}"
+        f"\n--- knowledge.md（厳守すべきNoctria Kingdomナレッジベース）---\n{knowledge}\n"
+        f"\n--- Noctria連携図.mmd（システム全体連携構造/ファイル依存）---\n{mmd}\n\n"
+        f"{prompt}"
     )
 
 ROLE_PROMPTS = {
-    "design": prepend_knowledge(
+    "design": prepend_env_and_knowledge_and_mmd(
         "あなたは戦略設計AIです。USD/JPYの自動トレードAIの戦略を詳細に設計してください。\n"
-        "まず、noctria_kingdom/docs/Noctria連携図.mmdを読み込み、その内容（システム全体の連携構造、各ファイルやコンポーネントの関係性）を把握してください。\n"
-        "複数ファイルに分割生成し、# ファイル名: filename.py を必ず記載。\n"
-        "設計は関数・クラスの構造と流れを明確に、パス管理はpath_config.py一元化ルール厳守。\n"
-        "設計説明は簡潔に。\n"
-        "Noctria Kingdomでは、注文執行・最終判断は必ずsrc/core/king_noctria.pyに集約してください。\n"
-        "VeritasのML設計・実装は必ずGPUクラウドサービス（AWS/GCP/Azure等）上のトレーニング・推論運用を前提とすること。\n"
-        "Noctria Kingdomの各機能はnoctria_guiで集中管理され、"
-        "GUI管理ツールのhtmlはnoctria_gui/static/hud_style.cssに準拠したHUD風デザインに統一されていることも考慮せよ。\n"
+        "注文執行・最終判断は必ずsrc/core/king_noctria.pyに集約。\n"
+        "Veritas ML設計・実装はGPUクラウドサービス上でのトレーニング・推論前提。\n"
+        "Noctria Kingdomの各機能はnoctria_guiで集中管理、GUIはhud_style.cssのHUD統一デザイン厳守。\n"
+        "複数ファイルに分割し、# ファイル名: filename.pyを明記。設計はpath_config.py一元化ルール厳守。\n"
+        "設計説明は簡潔に。"
     ),
-    "implement": prepend_knowledge(
+    "implement": prepend_env_and_knowledge_and_mmd(
         "設計AIの指示とNoctria連携図に従い実装コードを生成してください。\n"
         "パス指定は全てpath_config.pyからimportし直書き禁止。\n"
         "複数ファイル分割・# ファイル名: filename.py明記・PEP8/型アノテ必須・例外処理も適切に。\n"
         "GUI部分はhud_style.cssに則ったHUDデザインとすること。\n"
         "Veritas MLはクラウドGPU環境での動作を必ず考慮。\n"
     ),
-    "test": prepend_knowledge(
+    "test": prepend_env_and_knowledge_and_mmd(
         "設計AI・Noctria連携図.mmdを参考に各コンポーネントのpytest/unittestテストコードを生成してください。\n"
         "テストコードもパスは必ずpath_config.pyからimportすること。\n"
         "正常系・異常系・統合連携テストも含めること。\n"
     ),
-    "review": prepend_knowledge(
+    "review": prepend_env_and_knowledge_and_mmd(
         "生成コード・テストをNoctria連携図.mmd・knowledge.mdのルールに照らして評価し、"
         "全体最適化・リファクタ案も具体的に提案してください。\n"
         "パス直書きやルール違反があれば必ず指摘し修正案を明示。\n"
     ),
-    "doc": prepend_knowledge(
+    "doc": prepend_env_and_knowledge_and_mmd(
         "Noctria連携図.mmd・knowledge.mdを元に構成説明、パス集中管理意義、環境構築手順を含むREADME/ドキュメントを自動生成してください。\n"
     ),
 }
