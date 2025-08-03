@@ -4,7 +4,7 @@ from openai import OpenAI
 import os
 import asyncio
 
-from .chat_history_api import chat_manager  # chat_history_api の chat_manager を利用
+#from .chat_history_api import chat_manager  # chat_history_api の chat_manager を利用
 
 router = APIRouter()
 
