@@ -6446,3 +6446,156 @@ def test_fetch_market_data_network_error(mock_binance):
 
 適切なコメントを添えることで、テストコードは明確かつメンテナンスしやすくなります。コメントは他の開発者が迅速にコードの意図を理解するのに役立ち、コードのバグ発見や改善プロセスを効率化します。
 [2025-08-03 17:15:57] test AIのコード保存: ./generated_code/test_data_collection.py
+[2025-08-03 17:16:00] Git commit & push succeeded: test AI generated files - turn 3
+[2025-08-03 17:16:03] テスト結果:
+
+==================================== ERRORS ====================================
+___________ ERROR collecting generated_code/test_data_collection.py ____________
+autogen_venv/lib/python3.12/site-packages/_pytest/python.py:498: in importtestmodule
+    mod = import_path(
+autogen_venv/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+autogen_venv/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:177: in exec_module
+    source_stat, co = _rewrite_test(fn, self.config)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autogen_venv/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:357: in _rewrite_test
+    tree = ast.parse(source, filename=strfn)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/ast.py:52: in parse
+    return compile(source, filename, mode, flags,
+E     File "/mnt/d/noctria_kingdom/generated_code/test_data_collection.py", line 57
+E       1. **目的の明示**: テストの目的をはっきりさせることで、コードを読む人が何を確認しようとしているのかすぐに理解できます。
+E                                      ^
+E   SyntaxError: invalid character '、' (U+3001)
+=========================== short test summary info ============================
+ERROR generated_code/test_data_collection.py
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 error in 1.00s
+
+
+[2025-08-03 17:16:19] review AI: エラーログによると、`test_data_collection.py`内で日本語の説明文が誤ってコードとして解釈されているため、構文エラーが発生しています。この問題を解決するためには、以下の方法で英語でコメントアウトするか、日本語コメントをすべて`#`で始めてください。
+
+以下に修正案を示します：
+
+```python
+# ファイル名: test_data_collection.py
+
+import pytest
+import pandas as pd
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
+
+# Test for successful market data fetch
+@patch('ccxt.binance')  # Mock ccxt.binance to eliminate external dependency
+def test_fetch_market_data_success(mock_binance):
+    mock_exchange = MagicMock()
+    # Set up mock return value for the fetch_ohlcv call
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
+    mock_binance.return_value = mock_exchange
+
+    # Get the path where the data will be stored
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
+    
+    # Execute the function to test
+    fetch_market_data()
+    
+    # Verify the CSV file was created
+    assert os.path.exists(csv_path)
+    
+    # Verify the CSV content
+    df = pd.read_csv(csv_path)
+    assert not df.empty
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+# Test for handling network errors
+@patch('ccxt.binance')  # Mock ccxt.binance to simulate a network error
+def test_fetch_market_data_network_error(mock_binance):
+    # Simulate a network error
+    mock_binance.side_effect = Exception('NetworkError')
+    
+    # Check if the exception is raised during fetch_market_data execution
+    with pytest.raises(Exception):
+        fetch_market_data()
+```
+
+### 修正ポイント:
+
+1. **日本語部分を削除する**: 説明部分などをすべてコードから削除しました。
+2. **コメントを英語で書く**: 日本語ではなく英語でコメントすることで、構文エラーを引き起こさないようにします。
+3. **不要な説明の削除**: コード内に必要でない情報（ドキュメントの説明など）が混入しないようにします。
+
+この修正を行った後、再びテストを実行してエラーが解消されるか確認してください。
+[2025-08-03 17:16:34] doc AI: エラーログによると、`test_data_collection.py`内で日本語がコードとして解釈され、構文エラーが発生しているようです。この問題を回避するために、以下の修正案を参考にしてください。日本語のコメントはすべて`#`を使って正しくコメントアウトするか、英語でコメントを記述しましょう。
+
+以下に修正例を示します：
+
+```python
+# ファイル名: test_data_collection.py
+
+import pytest
+import pandas as pd
+import os
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
+
+# Test for successful market data fetch
+@patch('ccxt.binance')  # Mock ccxt.binance to eliminate external dependency
+def test_fetch_market_data_success(mock_binance):
+    mock_exchange = MagicMock()
+    # Set the return value for the mock fetch_ohlcv method
+    mock_exchange.fetch_ohlcv.return_value = [
+        [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
+    ]
+    mock_binance.return_value = mock_exchange
+
+    # Get the path where data will be stored
+    storage_path = get_path('trading')
+    csv_path = os.path.join(storage_path, 'market_data.csv')
+    
+    # Execute the data fetching function
+    fetch_market_data()
+    
+    # Verify that the CSV file was created successfully
+    assert os.path.exists(csv_path)
+    
+    # Verify the contents of the CSV file
+    df = pd.read_csv(csv_path)
+    assert not df.empty
+    assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+# Test for handling network errors
+@patch('ccxt.binance')  # Mock ccxt.binance to simulate network error
+def test_fetch_market_data_network_error(mock_binance):
+    # Simulate a network error by setting a side effect
+    mock_binance.side_effect = Exception('NetworkError')
+    
+    # Check if an exception is raised when fetching market data
+    with pytest.raises(Exception):
+        fetch_market_data()
+```
+
+### 修正ポイント:
+
+1. **英語でのコメントアウト**: 日本語コメントを英語に置き換えました。これにより、Pythonが意図しない内容をコードとして解釈することを防ぎます。
+2. **コメントの適切な配置**: 各機能に対してコメントを配置し、コード全体の意図がわかりやすくなるようにしています。
+3. **可読性の改善**: コードの可読性を向上させるため、重要な部分に説明を加えています。
+
+この修正を行った後に、再度テストを実行して問題が解消されたことを確認してください。
+[2025-08-03 17:16:34] doc AIのコード保存: ./generated_code/test_data_collection.py

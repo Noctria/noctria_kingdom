@@ -1,65 +1,56 @@
 # ファイル名: test_data_collection.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-03T17:15:57.191216
+# 生成日時: 2025-08-03T17:16:34.761313
 # 生成AI: openai_noctria_dev.py
-# UUID: bc5260a4-b413-4c5c-beae-a50539ee4ade
+# UUID: 42d3a356-671b-4b27-b94c-4fe0b3bed9c3
 
-import pytest  # PytestはPythonの主要なテスティングフレームワークで、簡潔なテストを書くためのツールを提供します。
+import pytest
 import pandas as pd
 import os
-from unittest.mock import patch, MagicMock  # unittest.mockはテストダブルを作成するための標準ライブラリ。
-from path_config import get_path  # パス情報を取得するユーティリティ関数をインポート。
-from data_collection import fetch_market_data  # テスト対象関数をインポート。
+from unittest.mock import patch, MagicMock
+from path_config import get_path
+from data_collection import fetch_market_data
 
-# 市場データ取得成功時のテスト
-@patch('ccxt.binance')  # ccxt.binanceをモックすることで外部依存を排除します。
+# Test for successful market data fetch
+@patch('ccxt.binance')  # Mock ccxt.binance to eliminate external dependency
 def test_fetch_market_data_success(mock_binance):
-    # MagicMockオブジェクトによって仮想の取引所インスタンスを構築します。
     mock_exchange = MagicMock()
-
-    # データ取得メソッドが固定のサンプルデータセットを返すように設定します。
+    # Set the return value for the mock fetch_ohlcv method
     mock_exchange.fetch_ohlcv.return_value = [
         [1609459200000, 104.56, 104.57, 104.56, 104.57, 1000]
     ]
-
-    # モックされたBinanceクラスのインスタンスを返します。
     mock_binance.return_value = mock_exchange
 
-    # データ保存先のパスを取得します。
+    # Get the path where data will be stored
     storage_path = get_path('trading')
     csv_path = os.path.join(storage_path, 'market_data.csv')
     
-    # データ収集関数を実行し、その結果を検証します。
+    # Execute the data fetching function
     fetch_market_data()
     
-    # 期待通りのパスにファイルが保存されたかを検証します。
+    # Verify that the CSV file was created successfully
     assert os.path.exists(csv_path)
     
-    # 保存されたCSVファイルが空でないことを確認します。
+    # Verify the contents of the CSV file
     df = pd.read_csv(csv_path)
     assert not df.empty
-    # CSVのカラム名が期待通りかどうかを確認します。
     assert list(df.columns) == ['timestamp', 'open', 'high', 'low', 'close', 'volume']
 
-# ネットワークエラー発生時の例外処理のテスト
-@patch('ccxt.binance')  # ccxt.binanceをモックしてネットワークエラーを引き起こします。
+# Test for handling network errors
+@patch('ccxt.binance')  # Mock ccxt.binance to simulate network error
 def test_fetch_market_data_network_error(mock_binance):
-    # ネットワークエラーを模擬し、例外が発生するようにしています。
+    # Simulate a network error by setting a side effect
     mock_binance.side_effect = Exception('NetworkError')
-
-    # 関数呼び出し時に例外がスローされることを期待します。
+    
+    # Check if an exception is raised when fetching market data
     with pytest.raises(Exception):
         fetch_market_data()
 ```
 
-### コメントの目的と効果
+### 修正ポイント:
 
-1. **目的の明示**: テストの目的をはっきりさせることで、コードを読む人が何を確認しようとしているのかすぐに理解できます。
-   
-2. **テストの流れ説明**: モックの設定からテストの実行、そしてアサーションまでの一連の流れを説明し、なぜその手順が必要なのかを補足します。
+1. **英語でのコメントアウト**: 日本語コメントを英語に置き換えました。これにより、Pythonが意図しない内容をコードとして解釈することを防ぎます。
+2. **コメントの適切な配置**: 各機能に対してコメントを配置し、コード全体の意図がわかりやすくなるようにしています。
+3. **可読性の改善**: コードの可読性を向上させるため、重要な部分に説明を加えています。
 
-3. **エラーハンドリングの明確化**: 特定の例外が発生することを意図している場合、その理由を明らかにし、意図的に発生させたエラーが正しく処理されているかを確認します。
-
-### 結論
-
-適切なコメントを添えることで、テストコードは明確かつメンテナンスしやすくなります。コメントは他の開発者が迅速にコードの意図を理解するのに役立ち、コードのバグ発見や改善プロセスを効率化します。
+この修正を行った後に、再度テストを実行して問題が解消されたことを確認してください。
