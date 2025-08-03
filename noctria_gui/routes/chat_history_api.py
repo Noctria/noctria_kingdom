@@ -5,6 +5,12 @@ from typing import List, Dict, Any
 import asyncpg
 import os
 
+# --- ここを追加 ---
+from dotenv import load_dotenv
+# 絶対パスで明示も可（例：/mnt/d/noctria_kingdom/.env）
+load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
+# --- ここまで ---
+
 router = APIRouter()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
