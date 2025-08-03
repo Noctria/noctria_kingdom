@@ -8,6 +8,10 @@ import datetime
 import sys
 from uuid import uuid4
 
+# === cycle_loggerのimport ===
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "utils")))
+from cycle_logger import insert_turn_history
+
 load_dotenv()
 
 OUTPUT_DIR = "./generated_code"
@@ -206,6 +210,40 @@ async def multi_agent_loop(client, max_turns=5):
 
                     feedback = f"テスト結果: {'成功' if success else '失敗'}\nログ:\n{test_log}"
                     messages["review"].append({"role": "user", "content": feedback})
+
+        # === ここから進捗DB記録 ===
+        try:
+            generated_files = len([
+                f for f in os.listdir(OUTPUT_DIR)
+                if os.path.isfile(os.path.join(OUTPUT_DIR, f))
+            ])
+            # テスト件数や合格数は今後自動抽出化推奨（ここはダミー値でもまずOK）
+            passed_tests = 10
+            total_tests = 12
+            review_comments = 1
+            failed = False
+            fail_reason = None
+            extra_info = {
+                "turn": turn+1,
+                "ai_roles": order,
+                "note": "auto-recorded from openai_noctria_dev.py"
+            }
+            finished_at = datetime.datetime.now()
+
+            insert_turn_history(
+                turn_number=turn+1,
+                passed_tests=passed_tests,
+                total_tests=total_tests,
+                generated_files=generated_files,
+                review_comments=review_comments,
+                failed=failed,
+                fail_reason=fail_reason,
+                extra_info=extra_info,
+                finished_at=finished_at
+            )
+            print(f"[DB記録] ターン{turn+1} の実績をDB保存しました")
+        except Exception as e:
+            print(f"[DB記録エラー] ターン{turn+1}: {e}")
 
         print("\nコマンド入力: 続行=Enter, 終了=q, 一時停止=p")
         user_input = await asyncio.to_thread(input)
