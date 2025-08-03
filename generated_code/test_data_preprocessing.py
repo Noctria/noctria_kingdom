@@ -1,22 +1,22 @@
 # ファイル名: test_data_preprocessing.py
 # バージョン: v0.1.0
-# 生成日時: 2025-08-04T02:48:35.536299
+# 生成日時: 2025-08-04T02:48:54.822952
 # 生成AI: openai_noctria_dev.py
-# UUID: 74f5e1e9-8861-4ea6-b97e-8b3c3b956609
+# UUID: 9a54e867-7757-4351-8b07-59749aba2d62
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
-import pytest
-import pandas as pd
+```python
+# -*- coding: utf-8 -*-
+"""
+generated_code/test_data_preprocessing.py
+
+Test module for data preprocessing using pytest.
+"""
+
 from generated_code.data_preprocessing import DataPreprocessing
 
-def test_data_preprocessing():
-    dp = DataPreprocessing()
-    data = pd.DataFrame({'feature1': [1, 2, 3], 'feature2': [4, 5, 6]})
-    df_scaled = dp.preprocess(data)
-    
-    assert df_scaled is not None
-    assert df_scaled.shape == data.shape
-
-```
-
+def test_clean_data():
+    data_prep = DataPreprocessing(" some data ")
+    cleaned_data = data_prep.clean_data()
+    assert cleaned_data == "some data"
 ```
