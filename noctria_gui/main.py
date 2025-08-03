@@ -107,7 +107,7 @@ app.include_router(upload.router)
 
 # チャット関連ルーター
 app.include_router(chat_history_api.router)
-app.include_router(chat_api.router)
+#app.include_router(chat_api.router)
 
 logger.info("✅ All routers have been integrated successfully.")
 
