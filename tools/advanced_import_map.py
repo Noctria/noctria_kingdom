@@ -1,6 +1,6 @@
-import ast
 from pathlib import Path
 from collections import defaultdict
+import ast
 
 def extract_imports(filepath):
     imports = set()
@@ -15,67 +15,57 @@ def extract_imports(filepath):
                 if node.module:
                     imports.add(node.module)
     except Exception as e:
-        # print(f"⚠️ {filepath}: {e}")
         pass
     return imports
+
+def mod_name_from_path(p):
+    # 例: src/strategies/aurus_singularis.py → strategies.aurus_singularis
+    parts = Path(p).with_suffix('').parts
+    if parts[0] == "src":
+        parts = parts[1:]
+    return ".".join(parts)
+
+def path_from_mod_name(mod_name, file_map):
+    # 例: strategies.aurus_singularis → src/strategies/aurus_singularis.py
+    for path, mod in file_map.items():
+        if mod == mod_name:
+            return path
+    return None
 
 def main():
     base_dirs = ["src", "noctria_gui"]
     files = []
     for base in base_dirs:
         files += list(Path(base).rglob("*.py"))
+    file_mod_map = {str(f): mod_name_from_path(str(f)) for f in files}
+    mod_file_map = {v: k for k, v in file_mod_map.items()}
 
-    # import_map: ファイル→import先
-    import_map = defaultdict(set)
-    # reverse_map: ファイル名→import元（誰にimportされてるか）
-    reverse_map = defaultdict(set)
-
-    # 拡張: ファイル名を"モジュールパス"形式にする
-    path_to_mod = lambda p: str(p).replace("/", ".").replace("\\", ".").rstrip(".py")
-
-    mod_name_map = {}
+    # ファイル→import先ファイル（.py存在ベースで）
+    import_graph = defaultdict(set)
     for f in files:
-        mods = extract_imports(str(f))
-        mod_name = path_to_mod(f)
-        mod_name_map[mod_name] = str(f)
-        for m in mods:
-            import_map[str(f)].add(m)
+        imps = extract_imports(str(f))
+        for imp in imps:
+            # .pyとして存在するimportのみ
+            imp_py = path_from_mod_name(imp, file_mod_map)
+            if imp_py:
+                import_graph[str(f)].add(imp_py)
 
-    # 逆参照マップ
-    for f, imps in import_map.items():
-        for m in imps:
-            reverse_map[m].add(f)
-
-    # 孤立ファイル: どこもimportせず、誰からもimportされていない
+    # 誰からもimportされていない.py
+    imported = set()
+    for imps in import_graph.values():
+        imported |= imps
     all_files = set(str(f) for f in files)
-    import_targets = set()
-    for imps in import_map.values():
-        import_targets.update(imps)
+    isolated = all_files - imported
 
-    non_isolated = set()
-    for f, imps in import_map.items():
-        if imps:
-            non_isolated.add(f)
-        # 逆参照されているなら非孤立
-        mod_name = path_to_mod(f)
-        if mod_name in reverse_map and reverse_map[mod_name]:
-            non_isolated.add(f)
-
-    isolated = all_files - non_isolated
-
-    print("\n# ------ 非孤立ファイル ------")
-    for f in sorted(non_isolated):
-        print(f)
-
-    print("\n# ------ 孤立ファイル ------")
+    print("# ------ 孤立ファイル (importされてない.py) ------")
     for f in sorted(isolated):
         print(f)
 
-    # Mermaid出力例
-    print("\nflowchart TD")
-    for f, imps in import_map.items():
-        for m in imps:
-            print(f'    "{f}" --> "{m}"')
+    print("\n# ------ Mermaid矢印（.py存在のみ） ------")
+    print("flowchart TD")
+    for f, imps in import_graph.items():
+        for t in imps:
+            print(f'    "{f}" --> "{t}"')
 
 if __name__ == "__main__":
     main()
