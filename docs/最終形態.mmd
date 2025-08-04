@@ -1,72 +1,63 @@
 flowchart TD
+  %% === PDCA/戦略/統治DAG群 ===
+  subgraph Airflow_DAGs["Airflow DAG群"]
+    direction TB
+    VGEN["veritas_generate_dag.py<br>🔨 戦略生成"]
+    VEVAL["veritas_eval_dag.py<br>📝 一括評価"]
+    VEVALS["veritas_eval_single_dag.py<br>🕹️ 個別評価"]
+    VACT["veritas_act_record_dag.py<br>🗒️ 採用Act記録"]
+    VPUSH["veritas_push_dag.py<br>⬆️ GitHub Push"]
+    VRECHECK["veritas_recheck_dag.py<br>🔎 個別再評価"]
+    VREFACTOR["veritas_refactor_dag.py<br>🔧 リファクタ"]
+    VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
+    VTO["veritas_to_order_dag.py<br>⚔️ EA命令JSON化"]
+    VPDCA["veritas_pdca_dag.py<br>🔁 PDCAループ"]
+    NROYAL["noctria_kingdom_royal_council_dag.py<br>👑 王国御前会議"]
+  end
 
-%% ======================== Kingdom/AI中枢クラスタ =========================
-subgraph Kingdom_Council["👑 Noctria Kingdom 統治・PDCA系DAG"]
-    K_PDCA["noctria_kingdom_pdca_dag.py<br>🏰 PDCA最適化＆王の最終判断"]
-    K_RC["noctria_kingdom_dag.py<br>👑 御前会議・最終決断"]
-    K_SIM["simulate_strategy_dag.py<br>📊 昇格戦略シミュレーション"]
-    K_META_APPLY["metaai_apply_dag.py<br>📌 MetaAI最適パラ適用"]
-    K_META_EVAL["metaai_evaluate_dag.py<br>📊 MetaAIモデル評価"]
-end
+  %% === 王統治・AI層 ===
+  subgraph Kingdom統治["Noctria Kingdom 中枢AI統治層"]
+    direction TB
+    KING["king_noctria.py<br>👑 King Noctria<br>（decision_id統治・DAG統括・全AI呼出し）"]
+    AURUS["aurus_singularis.py<br>🎯 Aurus<br>市場分析AI"]
+    LEVIA["levia_tempest.py<br>⚡ Levia<br>スキャルピングAI"]
+    NOCTUS["noctus_sentinella.py<br>🛡️ Noctus<br>リスク管理官"]
+    PROM["prometheus_oracle.py<br>🔮 Prometheus<br>未来予測"]
+    HERMES["hermes_cognitor.py<br>🦉 Hermes<br>LLM要約/説明"]
+    VERITAS["veritas_machina.py<br>⚖️ Veritas<br>戦略評価"]
+  end
 
-%% ====================== 四臣下DAGクラスター =========================
-subgraph Ministers["四臣下DAG（AIエージェント戦略系）"]
-    AURUS["aurus_strategy_dag.py<br>⚔️ Aurus Trend解析"]
-    LEVIA["levia_strategy_dag.py<br>⚡ Levia スキャルピング"]
-    NOCTUS["noctus_strategy_dag.py<br>🛡️ Noctus リスク評価"]
-    PROMETHEUS["prometheus_strategy_dag.py<br>🔮 Prometheus 未来予測"]
-    HERMES["hermes_strategy_dag.py<br>🦉 Hermes Cognitor LLM要約"]
-end
+  %% === 呼び出し関係（王→臣下AI/DAG） ===
+  KING --> AURUS
+  KING --> LEVIA
+  KING --> NOCTUS
+  KING --> PROM
+  KING --> HERMES
+  KING --> VERITAS
 
-%% ====================== Veritas PDCA/Replay/生成 =========================
-subgraph Veritas_Master["Veritas PDCA/Replay/生成系"]
-    V_PDCA["veritas_pdca_dag.py<br>🔁 PDCAサイクル自動化"]
-    V_GEN["veritas_generate_dag.py<br>🧠 戦略自動生成＋GitHub Push"]
-    V_EVAL["veritas_eval_dag.py<br>✅ 戦略一括評価"]
-    V_EVAL1["veritas_eval_single_dag.py<br>🔁 単体再評価"]
-    V_PUSH["veritas_push_dag.py<br>⬆️ 採用戦略Push"]
-    V_RECHECK["veritas_recheck_dag.py<br>🔎 個別戦略再評価"]
-    V_REPLAY["veritas_replay_dag.py<br>🔄 PDCAログから再送"]
-    V_ACTREC["veritas_act_record_dag.py<br>🗒️ Act記録（統治ID必須）"]
-    V_TO_ORDER["veritas_to_order_dag.py<br>⚔️ EA命令書自動生成"]
-    V_REFACTOR["veritas_refactor_dag.py<br>🔧 Veritas構造リファクタ"]
-end
+  KING -. decision_id/統治API経由 .-> VGEN
+  KING -. decision_id/統治API経由 .-> VEVAL
+  KING -. decision_id/統治API経由 .-> VACT
+  KING -. decision_id/統治API経由 .-> VPUSH
+  KING -. decision_id/統治API経由 .-> VRECHECK
+  KING -. decision_id/統治API経由 .-> VREFACTOR
+  KING -. decision_id/統治API経由 .-> VREPLAY
+  KING -. decision_id/統治API経由 .-> VTO
+  KING -. decision_id/統治API経由 .-> VPDCA
+  KING -. decision_id/統治API経由 .-> NROYAL
 
-%% ====================== PDCA/分析・自動要因サマリー系 ======================
-subgraph PDCA_Analysis["PDCA/Plan/分析系"]
-    PDCA_SUMMARY["pdca_plan_summary_dag.py<br>📋 要因分析＆自動サマリー"]
-    STRUCT_CHECK["structure_check_dag.py<br>🧱 パス・構造Lint"]
-    VERIFY_PATH["verify_path_config_dag.py<br>🛡️ パス検査"]
-end
+  %% === DAG間の代表的な流れ ===
+  VGEN --> VEVAL --> VACT --> VPUSH
+  VEVALS --> VACT
+  VACT --> VTO
+  VRECHECK --> VEVAL
+  VREFACTOR --> VPUSH
+  VREPLAY --> VACT
 
-%% ========= メイン依存・連携矢印（PDCA連携・自動化フロー） =========
+  %% === 補足: 主要パス・ログ保存層（省略可） ===
+  %% データ/ログ/AIモデル層は省略
 
-%% PDCA中枢
-K_PDCA --四臣連携/昇格フロー--> K_RC
-K_PDCA --PDCA最適化連携--> K_META_APPLY
-K_META_APPLY --評価連携--> K_META_EVAL
-
-%% Aurus/Levia/Noctus/Prometheus/Hermesは独立DAG
-AURUS ---|戦略データ| K_PDCA
-LEVIA ---|戦略データ| K_PDCA
-NOCTUS ---|リスク評価| K_PDCA
-PROMETHEUS ---|予測データ| K_PDCA
-HERMES ---|要約・説明| K_PDCA
-
-%% Veritas PDCA統合
-V_PDCA --> V_GEN --> V_EVAL --> V_PUSH
-V_EVAL1 -. 個別再評価 .-> V_EVAL
-V_RECHECK -. 個別再評価 .-> V_EVAL
-V_GEN --> V_TO_ORDER
-V_TO_ORDER --> V_ACTREC
-
-%% リファクタ・検証
-V_REFACTOR --> STRUCT_CHECK
-STRUCT_CHECK --> VERIFY_PATH
-
-%% 分析・サマリー
-PDCA_SUMMARY --> K_PDCA
-
-%% その他：Replay・再送
-V_REPLAY -. 再送/再現 .-> V_PDCA
+  %% === 説明 ===
+  classDef king fill:#222,stroke:#fb0,stroke-width:2px;
+  class KING king;
 
