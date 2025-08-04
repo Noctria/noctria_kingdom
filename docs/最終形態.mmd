@@ -1,12 +1,12 @@
 flowchart TD
 
 %% --- PDCA-Plan自動化ワークフロー ---
-subgraph PDCA_Plan[PDCA-Plan Workflow (src/plan_data/)]
-  COL[collector.py<br>PlanDataCollector<br>📦データ集約]
-  FE[features.py<br>FeatureEngineer<br>🔬特徴量エンジニアリング]
-  AN[analyzer.py<br>PlanAnalyzer<br>🧠要因分析・LLMラベル]
-  ST[statistics.py<br>PlanStatistics<br>📊統計集計]
-  RUN[run_pdca_plan_workflow.py<br>🪢ワークフロー統括]
+subgraph PDCA_Plan
+  COL[collector.py<br>PlanDataCollector<br>データ集約]
+  FE[features.py<br>FeatureEngineer<br>特徴量]
+  AN[analyzer.py<br>PlanAnalyzer<br>要因分析]
+  ST[statistics.py<br>PlanStatistics<br>統計集計]
+  RUN[run_pdca_plan_workflow.py<br>ワークフロー]
 end
 
 COL --> FE
@@ -17,39 +17,39 @@ AN --> RUN
 ST --> RUN
 
 %% --- Core戦略AI群 ---
-subgraph AI_Strategies["戦略AI群 (src/strategies/)"]
+subgraph AI_Strategies
   AURUS["aurus_singularis.py<br>市場総合AI"]
-  LEVIA["levia_tempest.py<br>スキャルピングAI"]
-  NOCTUS["noctus_sentinella.py<br>リスク管理官"]
-  PROME["prometheus_oracle.py<br>未来予測AI"]
-  HERMES["hermes_cognitor.py<br>LLM要約AI"]
+  LEVIA["levia_tempest.py<br>スキャルピング"]
+  NOCTUS["noctus_sentinella.py<br>リスク管理"]
+  PROME["prometheus_oracle.py<br>未来予測"]
+  HERMES["hermes_cognitor.py<br>LLM要約"]
 end
 
 %% --- AI統括/王 ---
-subgraph KINGDOM_CORE["Noctria Kingdom Central"]
+subgraph KINGDOM_CORE
   KING["king_noctria.py<br>王AI中枢"]
 end
 
-KING -->|進言/統治/説明要求|AURUS
+KING --> AURUS
 KING --> LEVIA
 KING --> NOCTUS
 KING --> PROME
 KING --> HERMES
 
 %% --- Data・PathConfig ---
-subgraph CORE["core"]
+subgraph CORE
   PATHCFG["path_config.py<br>パス管理"]
-  LOGGER["logger.py<br>ログ基盤"]
+  LOGGER["logger.py<br>ログ"]
 end
 
-%% --- GUI連携ライン（代表例）---
-subgraph GUI["noctria_gui/"]
-  DASH["routes/dashboard.py<br>ダッシュボード"]
-  PDCA_SUMM["routes/pdca_summary.py"]
+%% --- GUI連携 ---
+subgraph GUI
+  DASH["dashboard.py"]
+  PDCA_SUMM["pdca_summary.py"]
 end
 
-RUN -- JSON出力/統計 --> PDCA_SUMM
-ST -- KPI・統計値 --> PDCA_SUMM
+RUN -- JSON/統計 --> PDCA_SUMM
+ST -- KPI --> PDCA_SUMM
 PATHCFG -.-> KING
 PATHCFG -.-> AURUS
 PATHCFG -.-> PROME
@@ -57,11 +57,11 @@ PATHCFG -.-> FE
 LOGGER -.-> KING
 
 %% --- DAG・自動化 ---
-subgraph DAGS["airflow_docker/dags/"]
+subgraph DAGS
   DAG1["veritas_pdca_dag.py"]
   DAG2["noctria_kingdom_pdca_dag.py"]
   DAG3["pdca_plan_summary_dag.py"]
 end
 
-DAG3 -->|PDCAプラン実行|RUN
+DAG3 --> RUN
 
