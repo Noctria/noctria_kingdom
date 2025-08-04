@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
->>>>>>> 572191d22755722942baf299a92693377c177f7a
 # tools/apply_refactor_plan.py
 
 import os
