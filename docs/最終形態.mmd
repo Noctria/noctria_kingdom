@@ -1,63 +1,67 @@
 flowchart TD
-  %% === PDCA/戦略/統治DAG群 ===
-  subgraph Airflow_DAGs["Airflow DAG群"]
-    direction TB
-    VGEN["veritas_generate_dag.py<br>🔨 戦略生成"]
-    VEVAL["veritas_eval_dag.py<br>📝 一括評価"]
-    VEVALS["veritas_eval_single_dag.py<br>🕹️ 個別評価"]
-    VACT["veritas_act_record_dag.py<br>🗒️ 採用Act記録"]
-    VPUSH["veritas_push_dag.py<br>⬆️ GitHub Push"]
-    VRECHECK["veritas_recheck_dag.py<br>🔎 個別再評価"]
-    VREFACTOR["veritas_refactor_dag.py<br>🔧 リファクタ"]
-    VREPLAY["veritas_replay_dag.py<br>🔁 ログから再送"]
-    VTO["veritas_to_order_dag.py<br>⚔️ EA命令JSON化"]
-    VPDCA["veritas_pdca_dag.py<br>🔁 PDCAループ"]
-    NROYAL["noctria_kingdom_royal_council_dag.py<br>👑 王国御前会議"]
-  end
 
-  %% === 王統治・AI層 ===
-  subgraph Kingdom統治["Noctria Kingdom 中枢AI統治層"]
-    direction TB
-    KING["king_noctria.py<br>👑 King Noctria<br>（decision_id統治・DAG統括・全AI呼出し）"]
-    AURUS["aurus_singularis.py<br>🎯 Aurus<br>市場分析AI"]
-    LEVIA["levia_tempest.py<br>⚡ Levia<br>スキャルピングAI"]
-    NOCTUS["noctus_sentinella.py<br>🛡️ Noctus<br>リスク管理官"]
-    PROM["prometheus_oracle.py<br>🔮 Prometheus<br>未来予測"]
-    HERMES["hermes_cognitor.py<br>🦉 Hermes<br>LLM要約/説明"]
-    VERITAS["veritas_machina.py<br>⚖️ Veritas<br>戦略評価"]
-  end
+%% --- PDCA-Plan自動化ワークフロー ---
+subgraph PDCA_Plan[PDCA-Plan Workflow (src/plan_data/)]
+  COL[collector.py<br>PlanDataCollector<br>📦データ集約]
+  FE[features.py<br>FeatureEngineer<br>🔬特徴量エンジニアリング]
+  AN[analyzer.py<br>PlanAnalyzer<br>🧠要因分析・LLMラベル]
+  ST[statistics.py<br>PlanStatistics<br>📊統計集計]
+  RUN[run_pdca_plan_workflow.py<br>🪢ワークフロー統括]
+end
 
-  %% === 呼び出し関係（王→臣下AI/DAG） ===
-  KING --> AURUS
-  KING --> LEVIA
-  KING --> NOCTUS
-  KING --> PROM
-  KING --> HERMES
-  KING --> VERITAS
+COL --> FE
+FE --> AN
+COL --> ST
+FE --> AN
+AN --> RUN
+ST --> RUN
 
-  KING -. decision_id/統治API経由 .-> VGEN
-  KING -. decision_id/統治API経由 .-> VEVAL
-  KING -. decision_id/統治API経由 .-> VACT
-  KING -. decision_id/統治API経由 .-> VPUSH
-  KING -. decision_id/統治API経由 .-> VRECHECK
-  KING -. decision_id/統治API経由 .-> VREFACTOR
-  KING -. decision_id/統治API経由 .-> VREPLAY
-  KING -. decision_id/統治API経由 .-> VTO
-  KING -. decision_id/統治API経由 .-> VPDCA
-  KING -. decision_id/統治API経由 .-> NROYAL
+%% --- Core戦略AI群 ---
+subgraph AI_Strategies["戦略AI群 (src/strategies/)"]
+  AURUS["aurus_singularis.py<br>市場総合AI"]
+  LEVIA["levia_tempest.py<br>スキャルピングAI"]
+  NOCTUS["noctus_sentinella.py<br>リスク管理官"]
+  PROME["prometheus_oracle.py<br>未来予測AI"]
+  HERMES["hermes_cognitor.py<br>LLM要約AI"]
+end
 
-  %% === DAG間の代表的な流れ ===
-  VGEN --> VEVAL --> VACT --> VPUSH
-  VEVALS --> VACT
-  VACT --> VTO
-  VRECHECK --> VEVAL
-  VREFACTOR --> VPUSH
-  VREPLAY --> VACT
+%% --- AI統括/王 ---
+subgraph KINGDOM_CORE["Noctria Kingdom Central"]
+  KING["king_noctria.py<br>王AI中枢"]
+end
 
-  %% === 補足: 主要パス・ログ保存層（省略可） ===
-  %% データ/ログ/AIモデル層は省略
+KING -->|進言/統治/説明要求|AURUS
+KING --> LEVIA
+KING --> NOCTUS
+KING --> PROME
+KING --> HERMES
 
-  %% === 説明 ===
-  classDef king fill:#222,stroke:#fb0,stroke-width:2px;
-  class KING king;
+%% --- Data・PathConfig ---
+subgraph CORE["core"]
+  PATHCFG["path_config.py<br>パス管理"]
+  LOGGER["logger.py<br>ログ基盤"]
+end
+
+%% --- GUI連携ライン（代表例）---
+subgraph GUI["noctria_gui/"]
+  DASH["routes/dashboard.py<br>ダッシュボード"]
+  PDCA_SUMM["routes/pdca_summary.py"]
+end
+
+RUN -- JSON出力/統計 --> PDCA_SUMM
+ST -- KPI・統計値 --> PDCA_SUMM
+PATHCFG -.-> KING
+PATHCFG -.-> AURUS
+PATHCFG -.-> PROME
+PATHCFG -.-> FE
+LOGGER -.-> KING
+
+%% --- DAG・自動化 ---
+subgraph DAGS["airflow_docker/dags/"]
+  DAG1["veritas_pdca_dag.py"]
+  DAG2["noctria_kingdom_pdca_dag.py"]
+  DAG3["pdca_plan_summary_dag.py"]
+end
+
+DAG3 -->|PDCAプラン実行|RUN
 
