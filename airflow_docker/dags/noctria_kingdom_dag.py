@@ -19,6 +19,7 @@ import numpy as np
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
 
+# プロジェクトルートをsys.pathに追加
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -46,15 +47,24 @@ with DAG(
     tags=['noctria', 'kingdom', 'royal_council']
 ) as dag:
 
+    # JSON用にDataFrameを辞書リストに変換するユーティリティ
+    def serialize_for_json(obj):
+        if isinstance(obj, pd.DataFrame):
+            return obj.to_dict(orient="records")
+        if isinstance(obj, dict):
+            return {k: serialize_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [serialize_for_json(x) for x in obj]
+        return obj
+
     # --- タスク1: 市場データの観測 ---
     def fetch_market_data_task(**kwargs):
         logger = logging.getLogger("MarketObserver")
-        # conf取得
         conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
         reason = conf.get("reason", "理由未指定")
         logger.info(f"【市場観測・発令理由】{reason}")
 
-        # ダミー市場データを作成
+        # ここではダミーデータを生成。実際は MarketDataFetcher 等で取得可。
         dummy_hist_data = pd.DataFrame({
             'Close': np.random.normal(loc=150, scale=2, size=100)
         })
@@ -130,16 +140,14 @@ with DAG(
         # 発令理由も記録に残す
         report['trigger_reason'] = reason
 
+        # DataFrameを辞書のリストに変換してJSONシリアライズ可能にする
+        report_serializable = serialize_for_json(report)
+
         log_file_path = LOGS_DIR / "kingdom_council_reports" / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_report.json"
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # DataFrameはJSONにできないため、シリアライズ可能な形式に変換
-        if 'assessments' in report and 'noctus_assessment' in report['assessments']:
-            if 'historical_data' in report['assessments']['noctus_assessment']:
-                del report['assessments']['noctus_assessment']['historical_data']
-
         with open(log_file_path, 'w', encoding='utf-8') as f:
-            json.dump(report, f, ensure_ascii=False, indent=4)
+            json.dump(report_serializable, f, ensure_ascii=False, indent=4)
 
         logger.info(f"王命を公式記録として書庫に納めました: {log_file_path}")
 
