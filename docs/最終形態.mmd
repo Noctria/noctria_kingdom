@@ -1,81 +1,72 @@
 flowchart TD
-  %% === AI/統治コア ===
-  KingNoctria[src/core/king_noctria.py<br>👑 KingNoctria]
-  VeritasMachina[src/veritas/veritas_machina.py<br>🧠 VeritasMachina]
-  PrometheusOracle[src/strategies/prometheus_oracle.py<br>🔮 PrometheusOracle]
-  AurusSingularis[src/strategies/aurus_singularis.py<br>⚔️ AurusSingularis]
-  LeviaTempest[src/strategies/levia_tempest.py<br>⚡ LeviaTempest]
-  NoctusSentinella[src/strategies/noctus_sentinella.py<br>🛡️ NoctusSentinella]
-  HermesCognitor[src/strategies/hermes_cognitor.py<br>🦉 HermesCognitor]
-  PlanStatistics[src/plan_data/statistics.py<br>PlanStatistics]
-  AnomalyDetector[src/plan_data/anomaly_detector.py<br>AnomalyDetector]
-  PlanCollector[src/plan_data/collector.py<br>PlanDataCollector]
-  FeatureEngineer[src/plan_data/features.py<br>FeatureEngineer]
-  DataLoader[src/core/data_loader.py<br>MarketDataFetcher]
-  Logger[src/core/logger.py<br>Logger]
 
-  %% === 統治API/ルート ===
-  KingRoutes[noctria_gui/routes/king_routes.py<br>API: /api/king]
-  Dashboard[noctria_gui/routes/dashboard.py<br>Dashboard]
-  PDCARecheck[noctria_gui/routes/pdca_recheck.py]
-  PDCA[noctria_gui/routes/pdca.py]
-  
-  %% === Airflow DAG ===
-  NoctriaKingdomDAG[airflow_docker/dags/noctria_kingdom_dag.py]
-  AurusDAG[airflow_docker/dags/aurus_strategy_dag.py]
-  LeviaDAG[airflow_docker/dags/levia_strategy_dag.py]
-  PrometheusDAG[airflow_docker/dags/prometheus_strategy_dag.py]
-  NoctusDAG[airflow_docker/dags/noctus_strategy_dag.py]
-  HermesDAG[airflow_docker/dags/hermes_strategy_dag.py]
-  VeritasPushDAG[airflow_docker/dags/veritas_push_dag.py]
+%% ======================== Kingdom/AI中枢クラスタ =========================
+subgraph Kingdom_Council["👑 Noctria Kingdom 統治・PDCA系DAG"]
+    K_PDCA["noctria_kingdom_pdca_dag.py<br>🏰 PDCA最適化＆王の最終判断"]
+    K_RC["noctria_kingdom_dag.py<br>👑 御前会議・最終決断"]
+    K_SIM["simulate_strategy_dag.py<br>📊 昇格戦略シミュレーション"]
+    K_META_APPLY["metaai_apply_dag.py<br>📌 MetaAI最適パラ適用"]
+    K_META_EVAL["metaai_evaluate_dag.py<br>📊 MetaAIモデル評価"]
+end
 
-  %% === 戦略生成/評価 ===
-  VeritasGenerate[src/veritas/veritas_generate_strategy.py]
-  VeritasEval[src/veritas/evaluate_veritas.py]
-  VeritasStrategyGen[src/veritas/strategy_generator.py]
-  SimpleModel[src/veritas/models/ml_model/simple_model.py]
+%% ====================== 四臣下DAGクラスター =========================
+subgraph Ministers["四臣下DAG（AIエージェント戦略系）"]
+    AURUS["aurus_strategy_dag.py<br>⚔️ Aurus Trend解析"]
+    LEVIA["levia_strategy_dag.py<br>⚡ Levia スキャルピング"]
+    NOCTUS["noctus_strategy_dag.py<br>🛡️ Noctus リスク評価"]
+    PROMETHEUS["prometheus_strategy_dag.py<br>🔮 Prometheus 未来予測"]
+    HERMES["hermes_strategy_dag.py<br>🦉 Hermes Cognitor LLM要約"]
+end
 
-  %% === データ ===
-  VeritasEvalLog[data/stats/veritas_eval_result.json]
+%% ====================== Veritas PDCA/Replay/生成 =========================
+subgraph Veritas_Master["Veritas PDCA/Replay/生成系"]
+    V_PDCA["veritas_pdca_dag.py<br>🔁 PDCAサイクル自動化"]
+    V_GEN["veritas_generate_dag.py<br>🧠 戦略自動生成＋GitHub Push"]
+    V_EVAL["veritas_eval_dag.py<br>✅ 戦略一括評価"]
+    V_EVAL1["veritas_eval_single_dag.py<br>🔁 単体再評価"]
+    V_PUSH["veritas_push_dag.py<br>⬆️ 採用戦略Push"]
+    V_RECHECK["veritas_recheck_dag.py<br>🔎 個別戦略再評価"]
+    V_REPLAY["veritas_replay_dag.py<br>🔄 PDCAログから再送"]
+    V_ACTREC["veritas_act_record_dag.py<br>🗒️ Act記録（統治ID必須）"]
+    V_TO_ORDER["veritas_to_order_dag.py<br>⚔️ EA命令書自動生成"]
+    V_REFACTOR["veritas_refactor_dag.py<br>🔧 Veritas構造リファクタ"]
+end
 
-  %% === 依存関係 ===
-  KingRoutes --API/GUI呼び出し--> KingNoctria
-  KingNoctria --評議会/意思決定--> VeritasMachina
-  KingNoctria --評議会/意思決定--> PrometheusOracle
-  KingNoctria --評議会/意思決定--> AurusSingularis
-  KingNoctria --評議会/意思決定--> LeviaTempest
-  KingNoctria --評議会/意思決定--> NoctusSentinella
-  KingNoctria --評議会/意思決定--> HermesCognitor
-  KingNoctria --DAGトリガー/統治API--> NoctriaKingdomDAG
-  KingNoctria --DAGトリガー/統治API--> AurusDAG
-  KingNoctria --DAGトリガー/統治API--> LeviaDAG
-  KingNoctria --DAGトリガー/統治API--> PrometheusDAG
-  KingNoctria --DAGトリガー/統治API--> NoctusDAG
-  KingNoctria --DAGトリガー/統治API--> HermesDAG
-  KingNoctria --DAGトリガー/統治API--> VeritasPushDAG
-  VeritasMachina --CLI/評価ログ--> VeritasGenerate
-  VeritasMachina --CLI/評価ログ--> VeritasEval
-  VeritasMachina --生成・評価スクリプト--> VeritasStrategyGen
-  VeritasMachina --評価ログ読込--> VeritasEvalLog
-  VeritasEval --出力--> VeritasEvalLog
-  VeritasStrategyGen --モデル--> SimpleModel
-  PlanStatistics --評価ログdict/df--> AnomalyDetector
-  PlanStatistics --コレクタdf--> PlanCollector
-  PlanStatistics --特徴量--> FeatureEngineer
-  Dashboard --統計/異常要約--> PlanStatistics
-  Dashboard --異常要約--> AnomalyDetector
-  PlanCollector --各種外部API/CSV--> PlanStatistics
-  PDCA --統計/評価ログ--> PlanStatistics
-  PDCARecheck --再評価API/DAG--> KingNoctria
-  NoctriaKingdomDAG --コア判定/評議会--> KingNoctria
-  NoctriaKingdomDAG --観測データ--> DataLoader
-  DataLoader --API/履歴管理--> PlanCollector
-  Logger --全体ロガー/violations--> All
+%% ====================== PDCA/分析・自動要因サマリー系 ======================
+subgraph PDCA_Analysis["PDCA/Plan/分析系"]
+    PDCA_SUMMARY["pdca_plan_summary_dag.py<br>📋 要因分析＆自動サマリー"]
+    STRUCT_CHECK["structure_check_dag.py<br>🧱 パス・構造Lint"]
+    VERIFY_PATH["verify_path_config_dag.py<br>🛡️ パス検査"]
+end
 
-  %% === データフロー/例 ===
-  VeritasEvalLog --dict入力--> AnomalyDetector
+%% ========= メイン依存・連携矢印（PDCA連携・自動化フロー） =========
 
-  %% === コメント ===
-  classDef main fill:#181f38,stroke:#5474b8,stroke-width:2px,color:#eee;
-  class KingNoctria,VeritasMachina,PrometheusOracle,AurusSingularis,LeviaTempest,NoctusSentinella,HermesCognitor,NoctriaKingdomDAG main;
+%% PDCA中枢
+K_PDCA --四臣連携/昇格フロー--> K_RC
+K_PDCA --PDCA最適化連携--> K_META_APPLY
+K_META_APPLY --評価連携--> K_META_EVAL
+
+%% Aurus/Levia/Noctus/Prometheus/Hermesは独立DAG
+AURUS ---|戦略データ| K_PDCA
+LEVIA ---|戦略データ| K_PDCA
+NOCTUS ---|リスク評価| K_PDCA
+PROMETHEUS ---|予測データ| K_PDCA
+HERMES ---|要約・説明| K_PDCA
+
+%% Veritas PDCA統合
+V_PDCA --> V_GEN --> V_EVAL --> V_PUSH
+V_EVAL1 -. 個別再評価 .-> V_EVAL
+V_RECHECK -. 個別再評価 .-> V_EVAL
+V_GEN --> V_TO_ORDER
+V_TO_ORDER --> V_ACTREC
+
+%% リファクタ・検証
+V_REFACTOR --> STRUCT_CHECK
+STRUCT_CHECK --> VERIFY_PATH
+
+%% 分析・サマリー
+PDCA_SUMMARY --> K_PDCA
+
+%% その他：Replay・再送
+V_REPLAY -. 再送/再現 .-> V_PDCA
 
