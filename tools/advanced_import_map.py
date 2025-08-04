@@ -5,18 +5,18 @@ from collections import defaultdict
 
 def extract_imports(filepath):
     imports = set()
-    with open(filepath, "r", encoding="utf-8") as f:
-        try:
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
             tree = ast.parse(f.read(), filename=filepath)
-        except Exception:
-            return set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for n in node.names:
-                imports.add(n.name)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                imports.add(node.module)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for n in node.names:
+                    imports.add(n.name)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.add(node.module)
+    except Exception as e:
+        print(f"⚠️ {filepath}: {e}")
     return imports
 
 def main():
@@ -27,7 +27,11 @@ def main():
     import_map = defaultdict(set)
     for f in files:
         mods = extract_imports(str(f))
+        if mods:
+            print(f"{f}: {mods}")   # ← 必ずprint
         for m in mods:
             import_map[str(f)].add(m)
-    # ここで「孤立」かどうかを判定（双方向性・テンプレート参照は別途）
-    # ... 出力処理（Mermaid等）
+    print("=== 合計ファイル数:", len(files))
+
+if __name__ == "__main__":
+    main()
