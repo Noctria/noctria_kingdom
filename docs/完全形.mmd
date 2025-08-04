@@ -1,0 +1,177 @@
+flowchart TD
+    core_king_noctria["king_noctria"] --> core_path_config["path_config"]
+    core_king_noctria["king_noctria"] --> strategies_noctus_sentinella["noctus_sentinella"]
+    core_king_noctria["king_noctria"] --> veritas_veritas_machina["veritas_machina"]
+    core_king_noctria["king_noctria"] --> strategies_levia_tempest["levia_tempest"]
+    core_king_noctria["king_noctria"] --> strategies_hermes_cognitor["hermes_cognitor"]
+    core_king_noctria["king_noctria"] --> strategies_prometheus_oracle["prometheus_oracle"]
+    core_king_noctria["king_noctria"] --> strategies_aurus_singularis["aurus_singularis"]
+    core_logger["logger"] --> core_path_config["path_config"]
+    core_strategy_evaluator["strategy_evaluator"] --> core_path_config["path_config"]
+    core_strategy_optimizer_adjusted["strategy_optimizer_adjusted"] --> core_risk_control["risk_control"]
+    core_data_market_data_fetcher["market_data_fetcher"] --> core_logger["logger"]
+    execution_generate_order_json["generate_order_json"] --> core_path_config["path_config"]
+    execution_simulate_official_strategy["simulate_official_strategy"] --> core_risk_control["risk_control"]
+    execution_simulate_official_strategy["simulate_official_strategy"] --> core_path_config["path_config"]
+    execution_simulate_official_strategy["simulate_official_strategy"] --> core_logger["logger"]
+    hermes_strategy_generator["strategy_generator"] --> core_path_config["path_config"]
+    hermes_strategy_generator["strategy_generator"] --> core_logger["logger"]
+    noctria_ai_noctria["noctria"] --> core_data_market_data_fetcher["market_data_fetcher"]
+    noctria_ai_noctria["noctria"] --> core_meta_ai["meta_ai"]
+    noctria_ai_noctria["noctria"] --> core_risk_manager["risk_manager"]
+    plan_data_statistics["statistics"] --> plan_data_collector["collector"]
+    scripts_apply_best_params_to_kingdom["apply_best_params_to_kingdom"] --> core_path_config["path_config"]
+    scripts_apply_best_params_to_kingdom["apply_best_params_to_kingdom"] --> core_logger["logger"]
+    scripts_apply_best_params_to_metaai["apply_best_params_to_metaai"] --> core_path_config["path_config"]
+    scripts_apply_best_params_to_metaai["apply_best_params_to_metaai"] --> core_meta_ai_env_with_fundamentals["meta_ai_env_with_fundamentals"]
+    scripts_apply_best_params_to_metaai["apply_best_params_to_metaai"] --> core_logger["logger"]
+    scripts_evaluate_metaai_model["evaluate_metaai_model"] --> core_path_config["path_config"]
+    scripts_evaluate_metaai_model["evaluate_metaai_model"] --> core_meta_ai_env_with_fundamentals["meta_ai_env_with_fundamentals"]
+    scripts_evaluate_single_strategy["evaluate_single_strategy"] --> core_strategy_evaluator["strategy_evaluator"]
+    scripts_evaluate_single_strategy["evaluate_single_strategy"] --> core_path_config["path_config"]
+    scripts_evaluate_single_strategy["evaluate_single_strategy"] --> core_market_loader["market_loader"]
+    scripts_generate_dummy_logs["generate_dummy_logs"] --> core_path_config["path_config"]
+    scripts_github_push_adopted_strategies["github_push_adopted_strategies"] --> core_path_config["path_config"]
+    scripts_log_pdca_result["log_pdca_result"] --> core_path_config["path_config"]
+    scripts_meta_ai_tensorboard_train["meta_ai_tensorboard_train"] --> core_meta_ai["meta_ai"]
+    scripts_meta_ai_tensorboard_train["meta_ai_tensorboard_train"] --> core_path_config["path_config"]
+    scripts_optimize_params_with_optuna["optimize_params_with_optuna"] --> core_path_config["path_config"]
+    scripts_optimize_params_with_optuna["optimize_params_with_optuna"] --> core_meta_ai_env_with_fundamentals["meta_ai_env_with_fundamentals"]
+    scripts_optimize_params_with_optuna["optimize_params_with_optuna"] --> core_logger["logger"]
+    scripts_push_generated_strategy["push_generated_strategy"] --> core_path_config["path_config"]
+    scripts_recheck_runner["recheck_runner"] --> core_strategy_evaluator["strategy_evaluator"]
+    strategies_aurus_singularis["aurus_singularis"] --> core_path_config["path_config"]
+    strategies_hermes_cognitor["hermes_cognitor"] --> core_path_config["path_config"]
+    strategies_noctus_sentinella["noctus_sentinella"] --> core_risk_manager["risk_manager"]
+    strategies_prometheus_oracle["prometheus_oracle"] --> core_data_loader["data_loader"]
+    strategies_prometheus_oracle["prometheus_oracle"] --> core_path_config["path_config"]
+    strategies_prometheus_oracle["prometheus_oracle"] --> core_settings["settings"]
+    strategies_reinforcement_reinforcement_learning["reinforcement_learning"] --> core_NoctriaEnv["NoctriaEnv"]
+    tools_apply_refactor_plan["apply_refactor_plan"] --> core_path_config["path_config"]
+    tools_export_all_logs["export_all_logs"] --> core_path_config["path_config"]
+    tools_fix_path_violations["fix_path_violations"] --> core_path_config["path_config"]
+    tools_generate_refactor_plan["generate_refactor_plan"] --> core_path_config["path_config"]
+    tools_git_handler["git_handler"] --> core_path_config["path_config"]
+    tools_git_handler["git_handler"] --> core_logger["logger"]
+    tools_hardcoded_path_replacer["hardcoded_path_replacer"] --> core_path_config["path_config"]
+    tools_push_official_strategy_to_github["push_official_strategy_to_github"] --> core_path_config["path_config"]
+    tools_scan_refactor_plan["scan_refactor_plan"] --> core_path_config["path_config"]
+    tools_strategy_classifier["strategy_classifier"] --> core_path_config["path_config"]
+    tools_structure_auditor["structure_auditor"] --> core_path_config["path_config"]
+    tools_structure_refactor["structure_refactor"] --> core_path_config["path_config"]
+    tools_tag_summary_generator["tag_summary_generator"] --> core_path_config["path_config"]
+    veritas_evaluate_veritas["evaluate_veritas"] --> core_path_config["path_config"]
+    veritas_generate_strategy_file["generate_strategy_file"] --> core_path_config["path_config"]
+    veritas_promote_accepted_strategies["promote_accepted_strategies"] --> core_path_config["path_config"]
+    veritas_record_act_log["record_act_log"] --> core_path_config["path_config"]
+    veritas_strategy_generator["strategy_generator"] --> veritas_models_ml_model_simple_model["simple_model"]
+    veritas_strategy_generator["strategy_generator"] --> core_path_config["path_config"]
+    veritas_strategy_generator["strategy_generator"] --> core_logger["logger"]
+    veritas_veritas_generate_strategy["veritas_generate_strategy"] --> core_path_config["path_config"]
+    veritas_veritas_machina["veritas_machina"] --> core_path_config["path_config"]
+    core_dag_trigger["dag_trigger (孤立)"]:::isolated
+    core_env_config["env_config (孤立)"]:::isolated
+    core_king_noctria["king_noctria (孤立)"]:::isolated
+    core_meta_ai_env["meta_ai_env (孤立)"]:::isolated
+    core_noctriaenv["noctriaenv (孤立)"]:::isolated
+    core_pdca_log_parser["pdca_log_parser (孤立)"]:::isolated
+    core_strategy_optimizer_adjusted["strategy_optimizer_adjusted (孤立)"]:::isolated
+    core_task_scheduler["task_scheduler (孤立)"]:::isolated
+    core_utils["utils (孤立)"]:::isolated
+    core_veritas_trigger_api["veritas_trigger_api (孤立)"]:::isolated
+    execution_challenge_monitor["challenge_monitor (孤立)"]:::isolated
+    execution_execution_manager["execution_manager (孤立)"]:::isolated
+    execution_generate_order_json["generate_order_json (孤立)"]:::isolated
+    execution_optimized_order_execution["optimized_order_execution (孤立)"]:::isolated
+    execution_order_execution["order_execution (孤立)"]:::isolated
+    execution_save_model_metadata["save_model_metadata (孤立)"]:::isolated
+    execution_simulate_official_strategy["simulate_official_strategy (孤立)"]:::isolated
+    execution_switch_to_best_model["switch_to_best_model (孤立)"]:::isolated
+    execution_tensorflow_task["tensorflow_task (孤立)"]:::isolated
+    execution_trade_analysis["trade_analysis (孤立)"]:::isolated
+    execution_trade_monitor["trade_monitor (孤立)"]:::isolated
+    execution_trade_simulator["trade_simulator (孤立)"]:::isolated
+    hermes_strategy_generator["strategy_generator (孤立)"]:::isolated
+    noctria_ai_noctria["noctria (孤立)"]:::isolated
+    plan_data_analyzer["analyzer (孤立)"]:::isolated
+    plan_data_anomaly_detector["anomaly_detector (孤立)"]:::isolated
+    plan_data_features["features (孤立)"]:::isolated
+    plan_data_llm_plan_prompt["llm_plan_prompt (孤立)"]:::isolated
+    plan_data_run_pdca_plan_workflow["run_pdca_plan_workflow (孤立)"]:::isolated
+    plan_data_statistics["statistics (孤立)"]:::isolated
+    plan_data_test_plan_analyzer["test_plan_analyzer (孤立)"]:::isolated
+    scripts_apply_best_params_to_kingdom["apply_best_params_to_kingdom (孤立)"]:::isolated
+    scripts_apply_best_params_to_metaai["apply_best_params_to_metaai (孤立)"]:::isolated
+    scripts_evaluate_metaai_model["evaluate_metaai_model (孤立)"]:::isolated
+    scripts_evaluate_single_strategy["evaluate_single_strategy (孤立)"]:::isolated
+    scripts_generate_dummy_logs["generate_dummy_logs (孤立)"]:::isolated
+    scripts_generate_path_mapping["generate_path_mapping (孤立)"]:::isolated
+    scripts_github_push_adopted_strategies["github_push_adopted_strategies (孤立)"]:::isolated
+    scripts_log_pdca_result["log_pdca_result (孤立)"]:::isolated
+    scripts_meta_ai_tensorboard_train["meta_ai_tensorboard_train (孤立)"]:::isolated
+    scripts_optimize_params_with_optuna["optimize_params_with_optuna (孤立)"]:::isolated
+    scripts_push_generated_strategy["push_generated_strategy (孤立)"]:::isolated
+    scripts_push_generated_strategy_to_github_dag["push_generated_strategy_to_github_dag (孤立)"]:::isolated
+    scripts_recheck_runner["recheck_runner (孤立)"]:::isolated
+    scripts_tag_adoption_log["tag_adoption_log (孤立)"]:::isolated
+    strategies_adaptive_trading["adaptive_trading (孤立)"]:::isolated
+    strategies_auto_adjustment["auto_adjustment (孤立)"]:::isolated
+    strategies_market_analysis["market_analysis (孤立)"]:::isolated
+    strategies_portfolio_optimizer["portfolio_optimizer (孤立)"]:::isolated
+    strategies_quantum_prediction["quantum_prediction (孤立)"]:::isolated
+    strategies_self_play["self_play (孤立)"]:::isolated
+    strategies_strategy_runner["strategy_runner (孤立)"]:::isolated
+    strategies_evolutionary_evolutionary_algorithm["evolutionary_algorithm (孤立)"]:::isolated
+    strategies_official_sample_strategy["sample_strategy (孤立)"]:::isolated
+    strategies_portfolio_portfolio_optimizer["portfolio_optimizer (孤立)"]:::isolated
+    strategies_reinforcement_dqn_agent["dqn_agent (孤立)"]:::isolated
+    strategies_reinforcement_experience_replay["experience_replay (孤立)"]:::isolated
+    strategies_reinforcement_exploration_strategy["exploration_strategy (孤立)"]:::isolated
+    strategies_reinforcement_huber_loss["huber_loss (孤立)"]:::isolated
+    strategies_reinforcement_prioritized_experience_replay["prioritized_experience_replay (孤立)"]:::isolated
+    strategies_reinforcement_reinforcement_learning["reinforcement_learning (孤立)"]:::isolated
+    strategies_reinforcement_target_network["target_network (孤立)"]:::isolated
+    strategies_veritas_generated_veritas_default_20250727_105549["veritas_default_20250727_105549 (孤立)"]:::isolated
+    strategies_veritas_generated_veritas_default_20250727_135858["veritas_default_20250727_135858 (孤立)"]:::isolated
+    strategies_veritas_generated_veritas_default_20250803_194802["veritas_default_20250803_194802 (孤立)"]:::isolated
+    strategies_veritas_generated_veritas_strategy_20250705_105551["veritas_strategy_20250705_105551 (孤立)"]:::isolated
+    strategies_veritas_generated_veritas_strategy_20250705_110439["veritas_strategy_20250705_110439 (孤立)"]:::isolated
+    strategies_veritas_generated_xxx["xxx (孤立)"]:::isolated
+    tools_apply_path_fixes["apply_path_fixes (孤立)"]:::isolated
+    tools_apply_refactor_plan["apply_refactor_plan (孤立)"]:::isolated
+    tools_apply_refactor_plan_v2["apply_refactor_plan_v2 (孤立)"]:::isolated
+    tools_dependency_analyzer["dependency_analyzer (孤立)"]:::isolated
+    tools_diagnose_dependencies["diagnose_dependencies (孤立)"]:::isolated
+    tools_export_all_logs["export_all_logs (孤立)"]:::isolated
+    tools_fix_import_paths["fix_import_paths (孤立)"]:::isolated
+    tools_fix_logger_usage["fix_logger_usage (孤立)"]:::isolated
+    tools_fix_path_violations["fix_path_violations (孤立)"]:::isolated
+    tools_generate_cleanup_script["generate_cleanup_script (孤立)"]:::isolated
+    tools_generate_github_template_summary["generate_github_template_summary (孤立)"]:::isolated
+    tools_generate_readme_summary["generate_readme_summary (孤立)"]:::isolated
+    tools_generate_refactor_plan["generate_refactor_plan (孤立)"]:::isolated
+    tools_generate_routes_init["generate_routes_init (孤立)"]:::isolated
+    tools_git_handler["git_handler (孤立)"]:::isolated
+    tools_hardcoded_path_replacer["hardcoded_path_replacer (孤立)"]:::isolated
+    tools_push_official_strategy_to_github["push_official_strategy_to_github (孤立)"]:::isolated
+    tools_refactor_manager["refactor_manager (孤立)"]:::isolated
+    tools_reorganize_docs["reorganize_docs (孤立)"]:::isolated
+    tools_resolve_merge_conflicts["resolve_merge_conflicts (孤立)"]:::isolated
+    tools_save_tree_snapshot["save_tree_snapshot (孤立)"]:::isolated
+    tools_scan_and_fix_paths["scan_and_fix_paths (孤立)"]:::isolated
+    tools_scan_refactor_plan["scan_refactor_plan (孤立)"]:::isolated
+    tools_strategy_classifier["strategy_classifier (孤立)"]:::isolated
+    tools_structure_auditor["structure_auditor (孤立)"]:::isolated
+    tools_structure_refactor["structure_refactor (孤立)"]:::isolated
+    tools_tag_summary_generator["tag_summary_generator (孤立)"]:::isolated
+    tools_verify_imports["verify_imports (孤立)"]:::isolated
+    tools_verify_path_config["verify_path_config (孤立)"]:::isolated
+    tools_verify_path_config_usage["verify_path_config_usage (孤立)"]:::isolated
+    veritas_evaluate_veritas["evaluate_veritas (孤立)"]:::isolated
+    veritas_generate_strategy_file["generate_strategy_file (孤立)"]:::isolated
+    veritas_promote_accepted_strategies["promote_accepted_strategies (孤立)"]:::isolated
+    veritas_record_act_log["record_act_log (孤立)"]:::isolated
+    veritas_strategy_generator["strategy_generator (孤立)"]:::isolated
+    veritas_veritas_airflow_executor["veritas_airflow_executor (孤立)"]:::isolated
+    veritas_veritas_generate_strategy["veritas_generate_strategy (孤立)"]:::isolated
+    veritas_generate_templates_strategy_template["strategy_template (孤立)"]:::isolated
