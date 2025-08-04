@@ -1,34 +1,56 @@
 flowchart TD
 
-%% --- PDCA-Plan自動化ワークフロー ---
-subgraph PDCA_Plan
-  COL[collector.py<br>PlanDataCollector<br>データ集約]
-  FE[features.py<br>FeatureEngineer<br>特徴量]
-  AN[analyzer.py<br>PlanAnalyzer<br>要因分析]
-  ST[statistics.py<br>PlanStatistics<br>統計集計]
-  RUN[run_pdca_plan_workflow.py<br>ワークフロー]
+subgraph DAGS
+  VGEN["veritas_generate_dag.py"]
+  VEVAL["veritas_eval_dag.py"]
+  VPDCA["veritas_pdca_dag.py"]
+  NK_PDCA["noctria_kingdom_pdca_dag.py"]
+  PDCA_SUMDAG["pdca_plan_summary_dag.py"]
+  VACT["veritas_act_record_dag.py"]
+  VRECHECK["veritas_recheck_dag.py"]
 end
 
-COL --> FE
-FE --> AN
-COL --> ST
-FE --> AN
-AN --> RUN
-ST --> RUN
-
-%% --- Core戦略AI群 ---
-subgraph AI_Strategies
-  AURUS["aurus_singularis.py<br>市場総合AI"]
-  LEVIA["levia_tempest.py<br>スキャルピング"]
-  NOCTUS["noctus_sentinella.py<br>リスク管理"]
-  PROME["prometheus_oracle.py<br>未来予測"]
-  HERMES["hermes_cognitor.py<br>LLM要約"]
+subgraph PLAN_DATA
+  COL[collector.py]
+  FE[features.py]
+  AN[analyzer.py]
+  ST[statistics.py]
+  RUN[run_pdca_plan_workflow.py]
 end
 
-%% --- AI統括/王 ---
-subgraph KINGDOM_CORE
-  KING["king_noctria.py<br>王AI中枢"]
+subgraph STRATEGIES
+  AURUS["aurus_singularis.py"]
+  LEVIA["levia_tempest.py"]
+  NOCTUS["noctus_sentinella.py"]
+  PROME["prometheus_oracle.py"]
+  HERMES["hermes_cognitor.py"]
 end
+
+subgraph KINGDOM
+  KING["king_noctria.py"]
+end
+
+%% --- DAGSからplan_data/AI/kingなどへのフロー ---
+PDCA_SUMDAG -- calls --> RUN
+RUN --> COL
+RUN --> FE
+RUN --> AN
+RUN --> ST
+
+VGEN -- strategy_gen --> AURUS
+VGEN -- strategy_gen --> LEVIA
+VGEN -- strategy_gen --> NOCTUS
+VGEN -- strategy_gen --> PROME
+VGEN -- strategy_gen --> HERMES
+
+VEVAL -- eval --> AURUS
+VEVAL -- eval --> NOCTUS
+
+VPDCA -- orchestrates --> KING
+NK_PDCA -- orchestrates --> KING
+
+VACT -- calls --> KING
+VRECHECK -- calls --> KING
 
 KING --> AURUS
 KING --> LEVIA
@@ -36,32 +58,7 @@ KING --> NOCTUS
 KING --> PROME
 KING --> HERMES
 
-%% --- Data・PathConfig ---
-subgraph CORE
-  PATHCFG["path_config.py<br>パス管理"]
-  LOGGER["logger.py<br>ログ"]
-end
-
-%% --- GUI連携 ---
-subgraph GUI
-  DASH["dashboard.py"]
-  PDCA_SUMM["pdca_summary.py"]
-end
-
-RUN -- JSON/統計 --> PDCA_SUMM
-ST -- KPI --> PDCA_SUMM
-PATHCFG -.-> KING
-PATHCFG -.-> AURUS
-PATHCFG -.-> PROME
-PATHCFG -.-> FE
-LOGGER -.-> KING
-
-%% --- DAG・自動化 ---
-subgraph DAGS
-  DAG1["veritas_pdca_dag.py"]
-  DAG2["noctria_kingdom_pdca_dag.py"]
-  DAG3["pdca_plan_summary_dag.py"]
-end
-
-DAG3 --> RUN
+%% コア参照
+KING -.-> COL
+KING -.-> RUN
 
