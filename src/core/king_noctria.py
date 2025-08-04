@@ -63,7 +63,7 @@ class KingNoctria:
         # 臣下AIの報告収集
         aurus_proposal = self.aurus.propose(market_data)
         levia_proposal = self.levia.propose(market_data)
-        prometheus_forecast = self.prometheus.predict(days=7)
+        prometheus_forecast = self.prometheus.predict(n_days=7)
         hermes_explanation = self.hermes.propose({
             "features": market_data,
             "labels": [
