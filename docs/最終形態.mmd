@@ -1,6 +1,6 @@
 flowchart TD
 
-%% --- Plan層（計画・分析・未来予測） ---
+%% --- Plan層（計画・戦略立案） ---
 subgraph P[Plan（計画・戦略立案）]
     PLAN_COLLECTOR["plan_data/collector.py<br>データ収集・集約"]
     PLAN_STATS["plan_data/statistics.py<br>KPI・統計算出"]
@@ -19,15 +19,12 @@ subgraph P[Plan（計画・戦略立案）]
     PLAN_WORKFLOW -->|features/labels/KPI| VERITAS
     PLAN_WORKFLOW -->|features/labels/KPI| HERMES
     PLAN_WORKFLOW -->|features/labels/KPI| PROMETHEUS
-
-    %% 各AIはPlan層のサブノードとして並列
 end
 
 %% --- Do層（実行・意思決定） ---
 subgraph D[Do（実行・売買シグナル）]
     LEVIA["strategies/levia_tempest.py<br>スキャルピングAI"]
     AURUS_DO["strategies/aurus_singularis.py<br>シグナル出力"]
-    %% PlanのAURUSとDoのAURUSを別ノードで示す（用途ごと）
 end
 
 %% --- Check層（リスク・監査） ---
@@ -37,48 +34,45 @@ end
 
 %% --- Act層（改善・閾値修正・学習） ---
 subgraph A[Act（改善・再評価）]
-    %% Act層は今回は省略または今後設計
     ACT_PLACEHOLDER["（Act層: 閾値再設計・AI再学習等）"]
 end
 
 %% --- データ/情報フロー ---
-%% PlanからDoへ（戦略シグナル・売買提案）
 AURUS -- シグナル/戦略提案 --> LEVIA
 AURUS -- シグナル/戦略提案 --> AURUS_DO
 VERITAS -- 戦略提案 --> AURUS_DO
 PROMETHEUS -- 未来予測値 --> LEVIA
 PROMETHEUS -- 未来予測値 --> AURUS_DO
 
-%% DoからCheckへ（行動案＋市場データ）
 LEVIA -- 行動案/市況 --> NOCTUS
 AURUS_DO -- 行動案/市況 --> NOCTUS
 
-%% CheckからActへ（承認or警告）
 NOCTUS -- 承認/警告/改善要請 --> ACT_PLACEHOLDER
 
-%% ActからPlan/Do層へ（閾値修正・再学習）
 ACT_PLACEHOLDER -- 閾値/モデル更新 --> PLAN_ANALYZER
 ACT_PLACEHOLDER -- 閾値/モデル更新 --> AURUS
 ACT_PLACEHOLDER -- 閾値/モデル更新 --> LEVIA
 
-%% --- GUI/王Noctriaとの連携ノード（省略可） ---
-%% 例: GUI/王がすべてのAIを統治・最終意思決定
+%% --- ノード色・フォント色調整 ---
+style PLAN_COLLECTOR fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#1e293b
+style PLAN_STATS fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#1e293b
+style PLAN_ANALYZER fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#1e293b
+style PLAN_WORKFLOW fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#1e293b
 
-style PLAN_COLLECTOR fill:#374151,stroke:#d1fae5,stroke-width:2px
-style PLAN_STATS fill:#374151,stroke:#d1fae5,stroke-width:2px
-style PLAN_ANALYZER fill:#374151,stroke:#d1fae5,stroke-width:2px
-style PLAN_WORKFLOW fill:#1e293b,stroke:#7dd3fc,stroke-width:2px
-style AURUS fill:#334155,stroke:#facc15,stroke-width:2px
-style VERITAS fill:#334155,stroke:#f59e42,stroke-width:2px
-style HERMES fill:#334155,stroke:#8b5cf6,stroke-width:2px
-style PROMETHEUS fill:#334155,stroke:#38bdf8,stroke-width:2px
-style LEVIA fill:#6d28d9,stroke:#fde68a,stroke-width:2px
-style AURUS_DO fill:#334155,stroke:#facc15,stroke-width:2px
-style NOCTUS fill:#64748b,stroke:#d1d5db,stroke-width:2px
-style ACT_PLACEHOLDER fill:#a7f3d0,stroke:#475569,stroke-width:2px
+style AURUS fill:#38bdf8,stroke:#0ea5e9,stroke-width:2px,color:#fff
+style VERITAS fill:#fbbf24,stroke:#f59e42,stroke-width:2px,color:#1e293b
+style HERMES fill:#a78bfa,stroke:#6366f1,stroke-width:2px,color:#1e293b
+style PROMETHEUS fill:#f9fafb,stroke:#3b82f6,stroke-width:2px,color:#0f172a
+
+style LEVIA fill:#f3f4f6,stroke:#fbbf24,stroke-width:2px,color:#1e293b
+style AURUS_DO fill:#38bdf8,stroke:#0ea5e9,stroke-width:2px,color:#fff
+
+style NOCTUS fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#1e293b
+
+style ACT_PLACEHOLDER fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#1e293b
 
 %% --- サブグラフラベル色分け ---
-style P fill:#172554,stroke:#f472b6,stroke-width:2px
-style D fill:#f3f4f6,stroke:#a7f3d0,stroke-width:2px
-style C fill:#e0e7ef,stroke:#f87171,stroke-width:2px
-style A fill:#ecfeff,stroke:#38bdf8,stroke-width:2px
+style P fill:#f3e8ff,stroke:#8b5cf6,stroke-width:2px,color:#3b0764
+style D fill:#f0fdfa,stroke:#34d399,stroke-width:2px,color:#065f46
+style C fill:#fef2f2,stroke:#f87171,stroke-width:2px,color:#7f1d1d
+style A fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,color:#064e3b
