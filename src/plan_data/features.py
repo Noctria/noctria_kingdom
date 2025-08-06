@@ -1,5 +1,23 @@
+# src/plan_data/features.py
+
 import pandas as pd
 import numpy as np
+from src.plan_data.feature_spec import FEATURE_SPEC
+from src.plan_data.collector import ASSET_SYMBOLS  # 必要に応じて調整
+
+def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
+    """feature_spec.pyに準拠したカラム順・型・補完でDataFrameを整形"""
+    columns = list(FEATURE_SPEC.keys())
+    for col in columns:
+        if col not in df.columns:
+            df[col] = pd.NA
+    for col in columns:
+        try:
+            dtype = FEATURE_SPEC[col]["type"]
+            df[col] = df[col].astype(dtype)
+        except Exception:
+            pass
+    return df[columns]
 
 class FeatureEngineer:
     def __init__(self, symbols: dict = None):
@@ -21,69 +39,66 @@ class FeatureEngineer:
     def add_technical_features(self, df: pd.DataFrame) -> pd.DataFrame:
         newdf = df.copy()
 
-        # 1. 市場系アセットの特徴量（従来通り）
+        # 1. 市場系アセットの特徴量
         for key in self.symbols:
-            c = f"{key}_Close"
-            v = f"{key}_Volume"
+            # 小文字・アンダースコアへ統一
+            key_l = key.lower()
+            c = f"{key_l}_close"
+            v = f"{key_l}_volume"
             if c in newdf.columns:
-                newdf[f"{key}_Return"] = newdf[c].pct_change()
-                newdf[f"{key}_Volatility_5d"] = newdf[f"{key}_Return"].rolling(5).std()
-                newdf[f"{key}_Volatility_20d"] = newdf[f"{key}_Return"].rolling(20).std()
-                newdf[f"{key}_RSI_14d"] = self.calc_rsi(newdf[c], window=14)
-                # ゴールデンクロス
+                newdf[f"{key_l}_return"] = newdf[c].pct_change()
+                newdf[f"{key_l}_volatility_5d"] = newdf[f"{key_l}_return"].rolling(5).std()
+                newdf[f"{key_l}_volatility_20d"] = newdf[f"{key_l}_return"].rolling(20).std()
+                newdf[f"{key_l}_rsi_14d"] = self.calc_rsi(newdf[c], window=14)
                 ma_short = newdf[c].rolling(5).mean()
                 ma_long = newdf[c].rolling(25).mean()
                 gc_flag = (ma_short > ma_long) & (ma_short.shift(1) <= ma_long.shift(1))
-                newdf[f"{key}_GC_Flag"] = gc_flag.astype(int)
-                # 3本MAパーフェクトオーダー
+                newdf[f"{key_l}_gc_flag"] = gc_flag.astype(int)
                 ma_mid = newdf[c].rolling(25).mean()
                 ma_longer = newdf[c].rolling(75).mean()
-                newdf[f"{key}_MA5"] = ma_short
-                newdf[f"{key}_MA25"] = ma_mid
-                newdf[f"{key}_MA75"] = ma_longer
+                newdf[f"{key_l}_ma5"] = ma_short
+                newdf[f"{key_l}_ma25"] = ma_mid
+                newdf[f"{key_l}_ma75"] = ma_longer
                 po_up = ((ma_short > ma_mid) & (ma_mid > ma_longer)).astype(int)
                 po_down = ((ma_short < ma_mid) & (ma_mid < ma_longer)).astype(int)
-                newdf[f"{key}_PO_UP"] = po_up
-                newdf[f"{key}_PO_DOWN"] = po_down
+                newdf[f"{key_l}_po_up"] = po_up
+                newdf[f"{key_l}_po_down"] = po_down
             if v in newdf.columns:
-                newdf[f"{key}_Volume_MA5"] = newdf[v].rolling(5).mean()
-                newdf[f"{key}_Volume_MA20"] = newdf[v].rolling(20).mean()
-                avg20 = newdf[f"{key}_Volume_MA20"]
-                newdf[f"{key}_Volume_Spike"] = ((newdf[v] > avg20 * 2) & (avg20 > 0)).astype(int)
+                newdf[f"{key_l}_volume_ma5"] = newdf[v].rolling(5).mean()
+                newdf[f"{key_l}_volume_ma20"] = newdf[v].rolling(20).mean()
+                avg20 = newdf[f"{key_l}_volume_ma20"]
+                newdf[f"{key_l}_volume_spike"] = ((newdf[v] > avg20 * 2) & (avg20 > 0)).astype(int)
 
         # 2. ニュース件数・センチメント系
-        if "News_Count" in newdf.columns:
-            newdf["News_Count_Change"] = newdf["News_Count"].diff()
-            newdf["News_Spike_Flag"] = (newdf["News_Count"] > newdf["News_Count"].rolling(20).mean() * 2).astype(int)
-        if "News_Positive" in newdf.columns and "News_Negative" in newdf.columns:
-            newdf["News_Positive_Ratio"] = newdf["News_Positive"] / (newdf["News_Count"] + 1e-6)
-            newdf["News_Negative_Ratio"] = newdf["News_Negative"] / (newdf["News_Count"] + 1e-6)
-            # ポジ/ネガ優勢フラグ
-            newdf["News_Positive_Lead"] = (newdf["News_Positive"] > newdf["News_Negative"]).astype(int)
-            newdf["News_Negative_Lead"] = (newdf["News_Negative"] > newdf["News_Positive"]).astype(int)
+        if "news_count" in newdf.columns:
+            newdf["news_count_change"] = newdf["news_count"].diff()
+            newdf["news_spike_flag"] = (newdf["news_count"] > newdf["news_count"].rolling(20).mean() * 2).astype(int)
+        if "news_positive" in newdf.columns and "news_negative" in newdf.columns:
+            newdf["news_positive_ratio"] = newdf["news_positive"] / (newdf["news_count"] + 1e-6)
+            newdf["news_negative_ratio"] = newdf["news_negative"] / (newdf["news_count"] + 1e-6)
+            newdf["news_positive_lead"] = (newdf["news_positive"] > newdf["news_negative"]).astype(int)
+            newdf["news_negative_lead"] = (newdf["news_negative"] > newdf["news_positive"]).astype(int)
 
         # 3. マクロ経済指標系（例：CPI、失業率、政策金利）
-        for macro in ["CPIAUCSL_Value", "UNRATE_Value", "FEDFUNDS_Value"]:
+        for macro in ["cpiaucsl_value", "unrate_value", "fedfunds_value"]:
             if macro in newdf.columns:
-                newdf[f"{macro}_Diff"] = newdf[macro].diff()
-                newdf[f"{macro}_Spike_Flag"] = (np.abs(newdf[f"{macro}_Diff"]) > newdf[f"{macro}_Diff"].rolling(12).std() * 2).astype(int)
+                newdf[f"{macro}_diff"] = newdf[macro].diff()
+                newdf[f"{macro}_spike_flag"] = (np.abs(newdf[f"{macro}_diff"]) > newdf[f"{macro}_diff"].rolling(12).std() * 2).astype(int)
 
-        # 4. 経済カレンダー・イベントフラグ（例: FOMC, CPI, NFP...）
-        # カラムが存在していれば「イベント日」フラグそのまま
-        event_cols = [c for c in newdf.columns if c.upper() in {"FOMC", "CPI", "NFP", "ECB", "BOJ", "GDP"}]
+        # 4. 経済カレンダー・イベントフラグ（例: fomc, cpi, nfp...）
+        event_cols = [c for c in newdf.columns if c.lower() in {"fomc", "cpi", "nfp", "ecb", "boj", "gdp"}]
         for event in event_cols:
-            # イベント発生日で1, それ以外は0 or nan
-            newdf[f"{event}_Today_Flag"] = (newdf[event] == 1).astype(int)
+            newdf[f"{event.lower()}_today_flag"] = (newdf[event] == 1).astype(int)
 
-        return newdf
+        # 必ずfeature_spec準拠に変換
+        return align_to_feature_spec(newdf)
 
 # テスト例
 if __name__ == "__main__":
-    from collector import ASSET_SYMBOLS
     import sys
     sys.path.append(".")
-    import collector
-    base_df = collector.PlanDataCollector().collect_all(lookback_days=180)
+    from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+    base_df = PlanDataCollector().collect_all(lookback_days=180)
     fe = FeatureEngineer(ASSET_SYMBOLS)
     feat_df = fe.add_technical_features(base_df)
     pd.set_option('display.max_columns', 80)
