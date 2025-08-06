@@ -2,13 +2,13 @@
 # coding: utf-8
 
 """
-🛡️ Noctus Sentinella (理想形 v2.2 - decision_id伝播対応)
-- 全リスク評価に decision_id/caller/理由 を一元化
-- 必ず王（Noctria）経由で呼ばれる前提
+🛡️ Noctus Sentinella (Plan特徴量同期対応)
+- 全リスク評価に decision_id/caller/理由/feature_dict
+- Plan層（feature_engineer/collector）で生成した任意の特徴量セット対応
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import pandas as pd
 import numpy as np
 
@@ -17,75 +17,69 @@ from src.core.risk_manager import RiskManager
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 class NoctusSentinella:
-    def __init__(self, risk_threshold: float = 0.02, max_spread: float = 0.018, min_liquidity: float = 120, max_volatility: float = 0.25):
+    def __init__(
+        self,
+        col_map: Optional[Dict[str, str]] = None,
+        risk_threshold: float = 0.02,
+        max_spread: float = 0.018,
+        min_liquidity: float = 120,
+        max_volatility: float = 0.25
+    ):
+        """
+        col_map: Plan層の特徴量名とNoctus側パラメータのマッピング
+          例: {"liquidity": "USDJPY_Volume", "spread": "USDJPY_Spread", ...}
+        """
+        self.col_map = col_map or {
+            "liquidity": "volume",
+            "spread": "spread",
+            "volatility": "volatility",
+            "price": "price",
+            "historical_data": "historical_data"
+        }
         self.risk_threshold = risk_threshold
         self.max_spread = max_spread
         self.min_liquidity = min_liquidity
         self.max_volatility = max_volatility
         self.risk_manager: Optional[RiskManager] = None
-        logging.info("リスク管理官ノクトゥス、着任。王国の影を見守ります。")
+        logging.info("リスク管理官ノクトゥス（特徴量dict同期型）着任。")
 
     def assess(
         self,
-        market_data: Dict[str, Any],
+        feature_dict: Dict[str, Any],
         proposed_action: str,
         decision_id: Optional[str] = None,
         caller: Optional[str] = "king_noctria",
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        必ずdecision_id/caller/理由付きでリスク評価返却
-        """
-        logging.info(f"進言『{proposed_action}』に対するリスク評価を開始します。")
+        logging.info(f"進言『{proposed_action}』に対するリスク評価を開始。特徴量dict受領。")
         # HOLDは常に承認
         if proposed_action == "HOLD":
-            logging.info("行動『HOLD』は承認されました。影は動くべき時ではない。")
             return self._create_assessment("APPROVE", "No action proposed.", 0.0, decision_id, caller, reason)
 
         try:
-            liquidity = market_data.get("volume", None)
-            spread = market_data.get("spread", None)
-            volatility = market_data.get("volatility", None)
-            price = market_data.get("price", None)
-            historical_data = market_data.get("historical_data", None)
+            liquidity = feature_dict.get(self.col_map["liquidity"], None)
+            spread = feature_dict.get(self.col_map["spread"], None)
+            volatility = feature_dict.get(self.col_map["volatility"], None)
+            price = feature_dict.get(self.col_map["price"], None)
+            historical_data = feature_dict.get(self.col_map["historical_data"], None)
             if None in (liquidity, spread, volatility, price, historical_data) or getattr(historical_data, 'empty', True):
-                raise ValueError("リスク評価に必要な市場データまたはヒストリカルデータが欠損しています。")
+                raise ValueError("リスク評価に必要な特徴量が不足または不正。")
             self.risk_manager = RiskManager(historical_data=historical_data)
             risk_score = self.risk_manager.calculate_var_ratio(price)
         except Exception as e:
-            logging.error(f"評価不能。安全のため拒否。詳細: {e}")
-            return self._create_assessment("VETO", f"Missing or invalid market data: {e}", 1.0, decision_id, caller, reason)
+            logging.error(f"評価不能: {e}")
+            return self._create_assessment("VETO", f"特徴量不足/異常: {e}", 1.0, decision_id, caller, reason)
 
         if liquidity < self.min_liquidity:
-            return self._create_assessment(
-                "VETO",
-                f"市場の活気が失われています（流動性: {liquidity} < 閾値: {self.min_liquidity}）。",
-                risk_score, decision_id, caller, reason
-            )
+            return self._create_assessment("VETO", f"流動性不足({liquidity}<{self.min_liquidity})", risk_score, decision_id, caller, reason)
         if spread > self.max_spread:
-            return self._create_assessment(
-                "VETO",
-                f"市場の霧が深すぎます（スプレッド: {spread} > 閾値: {self.max_spread}）。",
-                risk_score, decision_id, caller, reason
-            )
+            return self._create_assessment("VETO", f"スプレッド過大({spread}>{self.max_spread})", risk_score, decision_id, caller, reason)
         if volatility > self.max_volatility:
-            return self._create_assessment(
-                "VETO",
-                f"市場が荒れ狂っています（ボラティリティ: {volatility} > 閾値: {self.max_volatility}）。",
-                risk_score, decision_id, caller, reason
-            )
+            return self._create_assessment("VETO", f"ボラティリティ過大({volatility}>{self.max_volatility})", risk_score, decision_id, caller, reason)
         if risk_score > self.risk_threshold:
-            return self._create_assessment(
-                "VETO",
-                f"予測される損失が許容範囲を超えています（リスクスコア: {risk_score:.4f} > 閾値: {self.risk_threshold:.4f}）。",
-                risk_score, decision_id, caller, reason
-            )
+            return self._create_assessment("VETO", f"リスク過大({risk_score:.4f}>{self.risk_threshold:.4f})", risk_score, decision_id, caller, reason)
 
-        return self._create_assessment(
-            "APPROVE",
-            "全ての監視項目は正常範囲内。影からの警告はありません。",
-            risk_score, decision_id, caller, reason
-        )
+        return self._create_assessment("APPROVE", "全監視項目正常", risk_score, decision_id, caller, reason)
 
     def _create_assessment(
         self,
@@ -96,10 +90,6 @@ class NoctusSentinella:
         caller: Optional[str],
         reason: Optional[str]
     ) -> Dict[str, Any]:
-        if decision == "VETO":
-            logging.warning(f"【拒否権発動】理由: {reason_text}")
-        else:
-            logging.info(f"【承認】理由: {reason_text}")
         return {
             "name": "NoctusSentinella",
             "type": "risk_assessment",
@@ -111,20 +101,19 @@ class NoctusSentinella:
             "action_reason": reason
         }
 
-# ========================================
-# ✅ 単体テスト＆実行ブロック
-# ========================================
+# === テスト例 ===
 if __name__ == "__main__":
-    logging.info("--- リスク管理官ノクトゥス、単独試練の儀を開始 ---")
-    noctus_ai = NoctusSentinella()
+    logging.info("--- Noctus: Plan特徴量dictテスト ---")
+    # Plan層の特徴量dict例
     dummy_hist_data = pd.DataFrame({'Close': np.random.normal(loc=150, scale=2, size=100)})
     dummy_hist_data['returns'] = dummy_hist_data['Close'].pct_change().dropna()
-    safe_market_data = {
-        "price": 152.5, "volume": 150, "spread": 0.012,
-        "volatility": 0.15, "historical_data": dummy_hist_data
+    feature_dict = {
+        "price": 152.5,
+        "volume": 150,
+        "spread": 0.012,
+        "volatility": 0.15,
+        "historical_data": dummy_hist_data
     }
-    # 各評価にdecision_id, caller, reasonを明示
-    safe_assessment = noctus_ai.assess(safe_market_data, "BUY", decision_id="KC-EX-1", caller="king_noctria", reason="シナリオ1")
-    print(f"🛡️ ノクトゥスの最終判断: {safe_assessment['decision']} (理由: {safe_assessment['reason']})")
-
-    logging.info("--- リスク管理官ノクトゥス、単独試練の儀を完了 ---")
+    noctus_ai = NoctusSentinella()
+    res = noctus_ai.assess(feature_dict, "BUY", decision_id="TEST-NOCTUS-1", caller="__main__", reason="Plan特徴量dictテスト")
+    print(f"🛡️ ノクトゥス判定: {res['decision']} ({res['reason']})")
