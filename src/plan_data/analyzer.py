@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any, List
+from src.plan_data.feature_spec import FEATURE_SPEC
 
 class PlanAnalyzer:
     """
@@ -14,9 +15,15 @@ class PlanAnalyzer:
         actlog_df: Optional[pd.DataFrame] = None,
         anomaly_df: Optional[pd.DataFrame] = None,
     ):
+        # カラム名を小文字・アンダースコアで揃える
         self.stats_df = stats_df.copy() if stats_df is not None else pd.DataFrame()
+        self.stats_df.columns = [c.lower() for c in self.stats_df.columns]
         self.actlog_df = actlog_df.copy() if actlog_df is not None else None
+        if self.actlog_df is not None:
+            self.actlog_df.columns = [c.lower() for c in self.actlog_df.columns]
         self.anomaly_df = anomaly_df.copy() if anomaly_df is not None else None
+        if self.anomaly_df is not None:
+            self.anomaly_df.columns = [c.lower() for c in self.anomaly_df.columns]
 
     def extract_features(self) -> Dict[str, Any]:
         """
@@ -28,17 +35,17 @@ class PlanAnalyzer:
         # 基本統計
         features["win_rate_mean"] = win_mean = df["win_rate"].mean() if "win_rate" in df else np.nan
         features["win_rate_std"] = win_std = df["win_rate"].std() if "win_rate" in df else np.nan
-        features["max_drawdown_mean"] = dd_mean = df["max_dd"].mean() if "max_dd" in df else np.nan
+        features["drawdown_mean"] = dd_mean = df["drawdown"].mean() if "drawdown" in df else np.nan
         features["num_trades_mean"] = numtr_mean = df["num_trades"].mean() if "num_trades" in df else np.nan
 
         # 直近傾向
         if not df.empty:
             last = df.iloc[-1]
             features["last_win_rate"] = last.get("win_rate", np.nan)
-            features["last_max_dd"] = last.get("max_dd", np.nan)
+            features["last_drawdown"] = last.get("drawdown", np.nan)
         else:
             features["last_win_rate"] = np.nan
-            features["last_max_dd"] = np.nan
+            features["last_drawdown"] = np.nan
 
         # 急変動検知（7日比較）
         if "win_rate" in df and len(df) >= 7:
@@ -54,11 +61,11 @@ class PlanAnalyzer:
             features["win_rate_rapid_decrease"] = False
 
         # ニュース件数の急増/急減フラグ
-        if "News_Count" in df and len(df) >= 7:
-            news_now = df["News_Count"].iloc[-1]
-            news_7ago = df["News_Count"].iloc[-7]
+        if "news_count" in df and len(df) >= 7:
+            news_now = df["news_count"].iloc[-1]
+            news_7ago = df["news_count"].iloc[-7]
             news_delta = news_now - news_7ago
-            rolling_std = df["News_Count"].rolling(20).std().iloc[-1] if len(df) >= 20 else 1
+            rolling_std = df["news_count"].rolling(20).std().iloc[-1] if len(df) >= 20 else 1
             features["news_count_delta_7d"] = news_delta
             features["news_count_spike"] = bool(news_delta > rolling_std * 2)
         else:
@@ -66,17 +73,17 @@ class PlanAnalyzer:
             features["news_count_spike"] = False
 
         # ポジ/ネガニュース優勢のフラグ
-        if {"News_Positive", "News_Negative"}.issubset(df.columns):
-            pos_now = df["News_Positive"].iloc[-1]
-            neg_now = df["News_Negative"].iloc[-1]
+        if {"news_positive", "news_negative"}.issubset(df.columns):
+            pos_now = df["news_positive"].iloc[-1]
+            neg_now = df["news_negative"].iloc[-1]
             features["news_positive_lead"] = bool(pos_now > neg_now)
             features["news_negative_lead"] = bool(neg_now > pos_now)
         else:
             features["news_positive_lead"] = False
             features["news_negative_lead"] = False
 
-        # マクロ経済指標の急変（例: CPI、失業率、金利...）
-        macro_cols = [c for c in df.columns if c.endswith("_Value")]
+        # マクロ経済指標の急変（例: cpiaucsl_value、unrate_value、fedfunds_value...）
+        macro_cols = [c for c in df.columns if c.endswith("_value")]
         for mc in macro_cols:
             if len(df) >= 7:
                 now = df[mc].iloc[-1]
@@ -99,14 +106,14 @@ class PlanAnalyzer:
             features["bad_strategies"] = []
 
         # 危険なDD判定
-        if "max_dd" in df and not df.empty:
-            features["dangerous_max_dd"] = int((df["max_dd"] < -15).sum())
+        if "drawdown" in df and not df.empty:
+            features["dangerous_drawdown"] = int((df["drawdown"] < -15).sum())
         else:
-            features["dangerous_max_dd"] = 0
+            features["dangerous_drawdown"] = 0
 
-        # 主要イベント日フラグ（例: FOMC, CPI, NFP）
-        event_candidates = {"FOMC", "CPI", "NFP", "ECB", "BOJ", "GDP"}
-        event_cols = [c for c in df.columns if c.upper() in event_candidates]
+        # 主要イベント日フラグ（例: fomc, cpi, nfp, ...）
+        event_candidates = {"fomc", "cpi", "nfp", "ecb", "boj", "gdp"}
+        event_cols = [c for c in df.columns if c in event_candidates]
         for event in event_cols:
             features[f"{event}_today"] = bool(df[event].iloc[-1] == 1) if not df.empty else False
 
@@ -122,8 +129,8 @@ class PlanAnalyzer:
             labels.append("📈 勝率が直近7日間で大きく上昇しています。")
         if features.get("win_rate_rapid_decrease"):
             labels.append("📉 勝率が直近7日間で急落しています。")
-        if features.get("dangerous_max_dd", 0) > 0:
-            labels.append(f"⚠️ 最大ドローダウンが危険域（-15%以下）が{features['dangerous_max_dd']}件見られます。")
+        if features.get("dangerous_drawdown", 0) > 0:
+            labels.append(f"⚠️ ドローダウンが危険域（-15%以下）が{features['dangerous_drawdown']}件見られます。")
         if features.get("good_strategies"):
             gs = "、".join(features["good_strategies"][:3])
             labels.append(f"🌟 好調な戦略: {gs}")
@@ -140,12 +147,12 @@ class PlanAnalyzer:
         # マクロ指標系
         for macro in [k for k in features if k.endswith("_spike")]:
             if features[macro]:
-                label = macro.replace("_spike", "").replace("_Value", "")
+                label = macro.replace("_spike", "").replace("_value", "").upper()
                 labels.append(f"📊 {label}が直近で大きく変動しています。")
         # イベント系
         for k, v in features.items():
             if k.endswith("_today") and v:
-                event = k.replace("_today", "")
+                event = k.replace("_today", "").upper()
                 labels.append(f"⏰ 今日は重要イベント日（{event}）です。")
         return labels
 
@@ -165,7 +172,7 @@ class PlanAnalyzer:
             return pd.DataFrame()
         tag_stats = self.stats_df.groupby("tag").agg(
             win_rate_mean=("win_rate", "mean"),
-            max_dd_mean=("max_dd", "mean"),
+            drawdown_mean=("drawdown", "mean"),
             num_trades_sum=("num_trades", "sum"),
             strategy_count=("strategy", "nunique"),
         ).reset_index()
@@ -187,6 +194,7 @@ class PlanAnalyzer:
         fred_col: str, 
         threshold: float = None
     ) -> dict:
+        merged_df.columns = [c.lower() for c in merged_df.columns]
         if fred_col not in merged_df:
             return {}
 
@@ -198,22 +206,22 @@ class PlanAnalyzer:
             f"{fred_col}_high": {
                 "count": int(high_cond.sum()),
                 "win_rate_mean": merged_df.loc[high_cond, "win_rate"].mean() if "win_rate" in merged_df else np.nan,
-                "max_dd_mean": merged_df.loc[high_cond, "max_dd"].mean() if "max_dd" in merged_df else np.nan,
+                "drawdown_mean": merged_df.loc[high_cond, "drawdown"].mean() if "drawdown" in merged_df else np.nan,
                 "num_trades_mean": merged_df.loc[high_cond, "num_trades"].mean() if "num_trades" in merged_df else np.nan,
             },
             f"{fred_col}_low": {
                 "count": int(low_cond.sum()),
                 "win_rate_mean": merged_df.loc[low_cond, "win_rate"].mean() if "win_rate" in merged_df else np.nan,
-                "max_dd_mean": merged_df.loc[low_cond, "max_dd"].mean() if "max_dd" in merged_df else np.nan,
+                "drawdown_mean": merged_df.loc[low_cond, "drawdown"].mean() if "drawdown" in merged_df else np.nan,
                 "num_trades_mean": merged_df.loc[low_cond, "num_trades"].mean() if "num_trades" in merged_df else np.nan,
             }
         }
         return summary
 
     def correlation_with_fred(self, merged_df: pd.DataFrame, fred_col: str) -> Optional[float]:
+        merged_df.columns = [c.lower() for c in merged_df.columns]
         if fred_col not in merged_df or "win_rate" not in merged_df:
             return None
         return merged_df[["win_rate", fred_col]].corr().iloc[0, 1]
 
     # 追加の分析関数も随時対応OK
-
