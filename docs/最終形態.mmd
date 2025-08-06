@@ -1,78 +1,79 @@
 flowchart TD
 
-%% --- Plan層（計画・戦略立案） ---
-subgraph P[Plan（計画・戦略立案）]
-    PLAN_COLLECTOR["plan_data/collector.py<br>データ収集・集約"]
-    PLAN_STATS["plan_data/statistics.py<br>KPI・統計算出"]
-    PLAN_ANALYZER["plan_data/analyzer.py<br>特徴量・要因分析"]
-    PLAN_WORKFLOW["plan_data/run_pdca_plan_workflow.py<br>Pワークフロー統合"]
+  %% --- Plan層（計画・特徴量生成） ---
+  subgraph Plan["🗺️ PLAN層: 市場分析・特徴量生成 (src/plan_data/)"]
+    COLLECTOR["collector.py<br>🟩 データ収集<br>yfinance/FRED/ニュース/イベント"]
+    FEATURES["features.py<br>🟦 テクニカル・マクロ特徴量生成"]
+    STATISTICS["statistics.py<br>🟪 KPI集計/統計"]
+    ANALYZER["analyzer.py<br>🟧 要因抽出・自然言語説明"]
+    PLAN_WORKFLOW["run_pdca_plan_workflow.py<br>🟫 PDCA Planワークフロー"]
+    DF_OUTPUT["出力: <br><b>標準特徴量DataFrame</b>（詳細下記）"]
+    COLLECTOR --> FEATURES
+    FEATURES --> STATISTICS
+    FEATURES --> ANALYZER
+    ANALYZER --> PLAN_WORKFLOW
+    STATISTICS --> PLAN_WORKFLOW
+    PLAN_WORKFLOW --> DF_OUTPUT
+  end
 
-    AURUS["strategies/aurus_singularis.py<br>市場総合分析AI"]
-    VERITAS["strategies/veritas_machina.py<br>ML戦略生成・評価AI"]
-    HERMES["strategies/hermes_cognitor.py<br>LLM説明・要約AI"]
-    PROMETHEUS["strategies/prometheus_oracle.py<br>未来予測AI"]
+  %% --- 標準特徴量例 ---
+  subgraph DF["🗃️ 標準特徴量DataFrame"]
+    DF_COLUMNS["主なカラム:<br>
+    - Date, {Asset}_Close, {Asset}_Volume, {Asset}_Return<br>
+    - {Asset}_Volatility_5d/20d, {Asset}_RSI_14d, {Asset}_GC_Flag<br>
+    - News_Count, News_Positive, News_Negative, News_Positive_Ratio, ...<br>
+    - CPIAUCSL_Value, UNRATE_Value, FEDFUNDS_Value, ...<br>
+    - FOMC, CPI, NFP, ...イベント系<br>
+    - 他: テクニカル/マクロ特徴量（詳細：features.py参照）"]
+  end
+  DF_OUTPUT --> DF_COLUMNS
 
-    PLAN_COLLECTOR --> PLAN_STATS
-    PLAN_STATS --> PLAN_ANALYZER
-    PLAN_ANALYZER --> PLAN_WORKFLOW
-    PLAN_WORKFLOW -->|features/labels/KPI| AURUS
-    PLAN_WORKFLOW -->|features/labels/KPI| VERITAS
-    PLAN_WORKFLOW -->|features/labels/KPI| HERMES
-    PLAN_WORKFLOW -->|features/labels/KPI| PROMETHEUS
-end
+  %% --- 各戦略AI（臣下AI） ---
+  subgraph Strategies["🤖 各AI臣下（src/strategies/）"]
+    AURUS["aurus_singularis.py<br>🟦 総合市場分析AI<br>（ML/主要テク・マクロ特徴量）"]
+    LEVIA["levia_tempest.py<br>🟧 スキャルピングAI<br>（即時データ/閾値反応型）"]
+    NOCTUS["noctus_sentinella.py<br>🟫 リスク評価AI<br>（RiskManager+市場データ）"]
+    PROMETHEUS["prometheus_oracle.py<br>🟪 未来予測AI<br>（ML/時系列特徴量）"]
+    HERMES["hermes_cognitor.py<br>🟦 LLM要約・説明AI<br>（Plan特徴量＋要因説明）"]
+    VERITAS["veritas_machina.py<br>🟩 ML戦略生成/評価AI"]
+  end
 
-%% --- Do層（実行・意思決定） ---
-subgraph D[Do（実行・売買シグナル）]
-    LEVIA["strategies/levia_tempest.py<br>スキャルピングAI"]
-    AURUS_DO["strategies/aurus_singularis.py<br>シグナル出力"]
-end
+  DF_OUTPUT -- "dict/DFで受け渡し\n（臣下ごとに要素抽出・前処理）" --> AURUS
+  DF_OUTPUT --> LEVIA
+  DF_OUTPUT --> NOCTUS
+  DF_OUTPUT --> PROMETHEUS
+  DF_OUTPUT --> VERITAS
+  ANALYZER -- "要因抽出＋特徴量dict" --> HERMES
 
-%% --- Check層（リスク・監査） ---
-subgraph C[Check（監査・リスク評価）]
-    NOCTUS["strategies/noctus_sentinella.py<br>リスク評価・承認AI"]
-end
+  %% --- 王（Noctria）による統治 ---
+  subgraph King["👑 Noctria（中央統治AI）"]
+    KING["king_noctria.py<br>PDCA統括・臣下AI制御"]
+  end
 
-%% --- Act層（改善・閾値修正・学習） ---
-subgraph A[Act（改善・再評価）]
-    ACT_PLACEHOLDER["（Act層: 閾値再設計・AI再学習等）"]
-end
+  AURUS -- "signal/解釈/要約" --> KING
+  LEVIA -- "signal/解釈" --> KING
+  NOCTUS -- "リスク判定" --> KING
+  PROMETHEUS -- "未来予測" --> KING
+  HERMES -- "LLM説明/要約" --> KING
+  VERITAS -- "戦略提案/評価" --> KING
 
-%% --- データ/情報フロー ---
-AURUS -- シグナル/戦略提案 --> LEVIA
-AURUS -- シグナル/戦略提案 --> AURUS_DO
-VERITAS -- 戦略提案 --> AURUS_DO
-PROMETHEUS -- 未来予測値 --> LEVIA
-PROMETHEUS -- 未来予測値 --> AURUS_DO
+  %% --- デザイン調整: 明暗配色+可読性向上 ---
+  style COLLECTOR fill:#2176ae,color:#fff
+  style FEATURES fill:#2a9d8f,color:#fff
+  style STATISTICS fill:#6649b8,color:#fff
+  style ANALYZER fill:#e68653,color:#fff
+  style PLAN_WORKFLOW fill:#8367c7,color:#fff
+  style DF_OUTPUT fill:#1d3557,color:#fff
+  style DF_COLUMNS fill:#d7eefa,color:#333
 
-LEVIA -- 行動案/市況 --> NOCTUS
-AURUS_DO -- 行動案/市況 --> NOCTUS
+  style AURUS fill:#2980b9,color:#fff
+  style LEVIA fill:#e89c4d,color:#111
+  style NOCTUS fill:#574f7d,color:#fff
+  style PROMETHEUS fill:#512b81,color:#fff
+  style HERMES fill:#5fa8d3,color:#111
+  style VERITAS fill:#52b788,color:#fff
 
-NOCTUS -- 承認/警告/改善要請 --> ACT_PLACEHOLDER
-
-ACT_PLACEHOLDER -- 閾値/モデル更新 --> PLAN_ANALYZER
-ACT_PLACEHOLDER -- 閾値/モデル更新 --> AURUS
-ACT_PLACEHOLDER -- 閾値/モデル更新 --> LEVIA
-
-%% --- ノード色・フォント色調整 ---
-style PLAN_COLLECTOR fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#1e293b
-style PLAN_STATS fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#1e293b
-style PLAN_ANALYZER fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#1e293b
-style PLAN_WORKFLOW fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#1e293b
-
-style AURUS fill:#38bdf8,stroke:#0ea5e9,stroke-width:2px,color:#fff
-style VERITAS fill:#fbbf24,stroke:#f59e42,stroke-width:2px,color:#1e293b
-style HERMES fill:#a78bfa,stroke:#6366f1,stroke-width:2px,color:#1e293b
-style PROMETHEUS fill:#f9fafb,stroke:#3b82f6,stroke-width:2px,color:#0f172a
-
-style LEVIA fill:#f3f4f6,stroke:#fbbf24,stroke-width:2px,color:#1e293b
-style AURUS_DO fill:#38bdf8,stroke:#0ea5e9,stroke-width:2px,color:#fff
-
-style NOCTUS fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#1e293b
-
-style ACT_PLACEHOLDER fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#1e293b
-
-%% --- サブグラフラベル色分け ---
-style P fill:#f3e8ff,stroke:#8b5cf6,stroke-width:2px,color:#3b0764
-style D fill:#f0fdfa,stroke:#34d399,stroke-width:2px,color:#065f46
-style C fill:#fef2f2,stroke:#f87171,stroke-width:2px,color:#7f1d1d
-style A fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,color:#064e3b
+  style KING fill:#FFD700,color:#2d2d2d,stroke:#222,stroke-width:3px
+  style Plan stroke:#aaa,stroke-width:2px
+  style Strategies stroke:#aaa,stroke-width:2px
+  style King stroke:#bca136,stroke-width:2px
