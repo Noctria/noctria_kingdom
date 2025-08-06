@@ -9,26 +9,27 @@ from collections import defaultdict, Counter
 from statistics import mean, stdev
 import pandas as pd
 from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from src.plan_data.feature_spec import FEATURE_SPEC
 
 class PlanStatistics:
     def __init__(self, collector: Optional[PlanDataCollector] = None, use_timeseries: bool = True, lookback_days: int = 365):
         self.collector = collector or PlanDataCollector()
-        # データ型によって使い分け
         self._data = self.collector.collect_all(lookback_days=lookback_days)
-        self._is_timeseries = isinstance(self._data, pd.DataFrame) and "Date" in self._data.columns
+        # カラム名小文字変換（安全のため）
+        if isinstance(self._data, pd.DataFrame):
+            self._data.columns = [c.lower() for c in self._data.columns]
+        self._is_timeseries = isinstance(self._data, pd.DataFrame) and "date" in self._data.columns
 
     # --- 評価ログ・戦略系（従来互換） ---
     def win_rate_stats(self) -> Dict[str, Any]:
         """評価ログから勝率の基本統計を算出"""
-        # ①評価ログ形式
         if isinstance(self._data, dict) and "eval_results" in self._data:
             evals = self._data["eval_results"]
             if not evals:
                 return {"count": 0, "mean": None, "min": None, "max": None}
             rates = [e.get("win_rate", 0.0) for e in evals if "win_rate" in e]
-        # ②時系列DF形式
-        elif self._is_timeseries and "win_rate" in self._data.columns:
-            rates = self._data["win_rate"].dropna().tolist()
+        elif self._is_timeseries and "win_flag" in self._data.columns:
+            rates = self._data["win_flag"].dropna().tolist()
         else:
             rates = []
         return {
@@ -43,9 +44,9 @@ class PlanStatistics:
         """評価ログまたはDFから最大ドローダウンの基本統計を算出"""
         if isinstance(self._data, dict) and "eval_results" in self._data:
             evals = self._data["eval_results"]
-            dd = [e.get("max_drawdown", 0.0) for e in evals if "max_drawdown" in e]
-        elif self._is_timeseries and "max_dd" in self._data.columns:
-            dd = self._data["max_dd"].dropna().tolist()
+            dd = [e.get("drawdown", 0.0) for e in evals if "drawdown" in e]
+        elif self._is_timeseries and "drawdown" in self._data.columns:
+            dd = self._data["drawdown"].dropna().tolist()
         else:
             dd = []
         return {
@@ -56,7 +57,7 @@ class PlanStatistics:
             "std": round(stdev(dd), 2) if len(dd) > 1 else None
         }
 
-    def tag_performance(self) -> Dict[str, Dict[str, Any]]:
+    def tag_performance(self) -> Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
         """タグ別の勝率・採用率などを集計"""
         if isinstance(self._data, dict) and "eval_results" in self._data:
             evals = self._data["eval_results"]
@@ -73,10 +74,9 @@ class PlanStatistics:
                     "mean_win_rate": round(mean(win_rates), 2) if win_rates else None,
                 }
             return result
-        # 時系列DF形式でtagカラムがある場合
-        elif self._is_timeseries and "tag" in self._data.columns:
+        elif self._is_timeseries and "tag" in self._data.columns and "win_flag" in self._data.columns:
             df = self._data
-            tag_stats = df.groupby("tag")["win_rate"].agg(["count", "mean", "std"]).reset_index()
+            tag_stats = df.groupby("tag")["win_flag"].agg(["count", "mean", "std"]).reset_index()
             return tag_stats.to_dict(orient="records")
         else:
             return {}
@@ -89,7 +89,6 @@ class PlanStatistics:
                 return 0.0
             adopted = [e for e in evals if e.get("pushed") is True]
             return round(100 * len(adopted) / len(evals), 2)
-        # 時系列型には非対応（None）
         return None
 
     def act_signal_stats(self) -> Dict[str, int]:
@@ -98,7 +97,6 @@ class PlanStatistics:
             logs = self._data["act_logs"]
             counter = Counter(log.get("signal", "UNKNOWN") for log in logs)
             return dict(counter)
-        # 時系列型には非対応（None）
         return {}
 
     # --- 時系列/マクロ/ニュース・イベント系 ---
@@ -107,7 +105,7 @@ class PlanStatistics:
         result = {}
         if self._is_timeseries:
             for col in self._data.columns:
-                if col.endswith("_Value"):
+                if col.endswith("_value"):
                     s = self._data[col].dropna()
                     result[col] = {
                         "mean": s.mean(),
@@ -120,42 +118,42 @@ class PlanStatistics:
     def news_stats(self) -> Dict[str, Any]:
         """NewsAPI等によるニュース件数やポジ/ネガ件数の統計"""
         stats = {}
-        if self._is_timeseries and "News_Count" in self._data.columns:
-            nc = self._data["News_Count"].dropna()
-            stats["News_Count"] = {
-                "mean": int(nc.mean()),
-                "std": int(nc.std()),
-                "min": int(nc.min()),
-                "max": int(nc.max()),
+        if self._is_timeseries and "news_count" in self._data.columns:
+            nc = self._data["news_count"].dropna()
+            stats["news_count"] = {
+                "mean": int(nc.mean()) if not nc.empty else 0,
+                "std": int(nc.std()) if not nc.empty else 0,
+                "min": int(nc.min()) if not nc.empty else 0,
+                "max": int(nc.max()) if not nc.empty else 0,
             }
-        if self._is_timeseries and "News_Positive" in self._data.columns:
-            np_ = self._data["News_Positive"].dropna()
-            stats["News_Positive"] = {
-                "mean": int(np_.mean()),
-                "std": int(np_.std()),
-                "min": int(np_.min()),
-                "max": int(np_.max()),
+        if self._is_timeseries and "news_positive" in self._data.columns:
+            np_ = self._data["news_positive"].dropna()
+            stats["news_positive"] = {
+                "mean": int(np_.mean()) if not np_.empty else 0,
+                "std": int(np_.std()) if not np_.empty else 0,
+                "min": int(np_.min()) if not np_.empty else 0,
+                "max": int(np_.max()) if not np_.empty else 0,
             }
-        if self._is_timeseries and "News_Negative" in self._data.columns:
-            nn = self._data["News_Negative"].dropna()
-            stats["News_Negative"] = {
-                "mean": int(nn.mean()),
-                "std": int(nn.std()),
-                "min": int(nn.min()),
-                "max": int(nn.max()),
+        if self._is_timeseries and "news_negative" in self._data.columns:
+            nn = self._data["news_negative"].dropna()
+            stats["news_negative"] = {
+                "mean": int(nn.mean()) if not nn.empty else 0,
+                "std": int(nn.std()) if not nn.empty else 0,
+                "min": int(nn.min()) if not nn.empty else 0,
+                "max": int(nn.max()) if not nn.empty else 0,
             }
         return stats
 
     def event_stats(self) -> Dict[str, Any]:
-        """主要イベント（FOMC等）の日数や発生日一覧"""
+        """主要イベント（fomc等）の日数や発生日一覧"""
         result = {}
         if self._is_timeseries:
-            for ev in ["FOMC", "CPI", "NFP", "ECB", "BOJ", "GDP"]:
+            for ev in ["fomc", "cpi", "nfp", "ecb", "boj", "gdp"]:
                 if ev in self._data.columns:
-                    days = self._data[self._data[ev] == 1]["Date"]
+                    days = self._data[self._data[ev] == 1]["date"]
                     result[ev] = {
                         "count": len(days),
-                        "recent": days.max() if not days.empty else None
+                        "recent": str(days.max()) if not days.empty else None
                     }
         return result
 
@@ -171,7 +169,6 @@ class PlanStatistics:
             "news_stats": self.news_stats(),
             "event_stats": self.event_stats(),
         }
-
 
 # テスト/手動実行用
 if __name__ == "__main__":
