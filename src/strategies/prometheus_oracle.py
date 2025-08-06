@@ -2,9 +2,10 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (理想形 v2.6)
-- 未来予測AI。全予測にdecision_id/caller/reasonを記録返却。
-- 必ずNoctria王経由で呼び出す設計
+🔮 Prometheus Oracle (Plan層連携バージョン)
+- Plan層（features/analyzer等）で生成した特徴量DataFrameから未来予測
+- 予測にはdecision_id/caller/reasonを記録返却
+- モデル訓練もDataFrame直受け（feature_order指定）
 """
 
 import numpy as np
@@ -15,27 +16,21 @@ from typing import Optional, Dict, Any, List, Union
 from pathlib import Path
 import logging
 
-from src.core.path_config import VERITAS_MODELS_DIR, MARKET_DATA_CSV, ORACLE_FORECAST_JSON
-from src.core.settings import ALPHAVANTAGE_API_KEY
-
-# ✅ ダミー MarketDataFetcher
-try:
-    from src.core.data_loader import MarketDataFetcher
-except ImportError:
-    logging.warning("⚠️ MarketDataFetcherが見つかりません。ダミークラスで代用します。")
-    class MarketDataFetcher:
-        def __init__(self, *args, **kwargs): pass
-        def fetch(self): return None
+from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
 class PrometheusOracle:
-    def __init__(self, model_path: Optional[Path] = None):
+    def __init__(
+        self,
+        model_path: Optional[Path] = None,
+        feature_order: Optional[List[str]] = None,
+    ):
         self.model_path = model_path or (VERITAS_MODELS_DIR / "prometheus_oracle.keras")
-        self.model = self._load_or_build_model()
-        self.market_fetcher = MarketDataFetcher(api_key=ALPHAVANTAGE_API_KEY)
+        self.feature_order = feature_order  # List[str], Plan層で定義した特徴量カラム順
+        self.model = self._load_or_build_model(input_dim=len(feature_order) if feature_order else 30)
 
-    def _load_or_build_model(self) -> tf.keras.Model:
+    def _load_or_build_model(self, input_dim: int = 30) -> tf.keras.Model:
         if self.model_path.exists():
             logging.info(f"古の神託を読み解いております: {self.model_path}")
             try:
@@ -44,7 +39,7 @@ class PrometheusOracle:
                 logging.error(f"神託の解読に失敗しました: {e}")
         logging.info("新たな神託の儀を執り行います。")
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(64, activation='relu', input_shape=(30,)),
+            tf.keras.layers.Dense(64, activation='relu', input_shape=(input_dim,)),
             tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dense(1)
         ])
@@ -59,89 +54,66 @@ class PrometheusOracle:
         except Exception as e:
             logging.error(f"神託の封印に失敗しました: {e}")
 
-    def train(self, data: pd.DataFrame, epochs: int = 10, batch_size: int = 32):
-        logging.info("神託の力を高めるための修練を開始します…")
-        X_train = np.random.rand(100, 30)
-        y_train = np.random.rand(100)
+    def train(
+        self,
+        features_df: pd.DataFrame,
+        target_col: str,
+        epochs: int = 10,
+        batch_size: int = 32
+    ):
+        if not self.feature_order:
+            raise ValueError("feature_order（特徴量カラム順）を指定してください。")
+        X_train = features_df[self.feature_order].values
+        y_train = features_df[target_col].values
         self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
         logging.info("神託の修練が完了しました。")
         self.save_model()
 
-    def predict_with_confidence(
-        self, n_days: int = 14,
-        output: str = "df",
+    def predict_future(
+        self,
+        features_df: pd.DataFrame,
+        n_days: int = 14,
         decision_id: Optional[str] = None,
         caller: Optional[str] = "king_noctria",
         reason: Optional[str] = None
-    ) -> Union[pd.DataFrame, List[Dict[str, Any]]]:
-        logging.info(f"今後{n_days}日間の未来を占います…")
-        try:
-            dates = [datetime.today() + timedelta(days=i) for i in range(n_days)]
-            y_pred = np.linspace(150, 160, n_days) + np.random.normal(0, 1, n_days)
-            confidence_margin = np.random.uniform(1.5, 2.5, n_days)
-            y_lower = y_pred - confidence_margin
-            y_upper = y_pred + confidence_margin
+    ) -> pd.DataFrame:
+        if not self.feature_order:
+            raise ValueError("feature_order（特徴量カラム順）を指定してください。")
+        # 直近n日分の特徴量で未来予測
+        df_input = features_df[self.feature_order].tail(n_days)
+        X_input = df_input.values
+        y_pred = self.model.predict(X_input).flatten()
+        # ここで信頼区間などを計算・追加も可能
+        confidence_margin = np.std(y_pred) * 1.5 if len(y_pred) > 1 else 2.0
+        y_lower = y_pred - confidence_margin
+        y_upper = y_pred + confidence_margin
 
-            df = pd.DataFrame({
-                "date": [d.strftime("%Y-%m-%d") for d in dates],
-                "forecast": y_pred.round(2),
-                "lower": y_lower.round(2),
-                "upper": y_upper.round(2),
-                "decision_id": decision_id,
-                "caller": caller,
-                "reason": reason
-            })
+        # 日付
+        if 'Date' in features_df.columns:
+            dates = features_df['Date'].tail(n_days).tolist()
+        else:
+            dates = [str(datetime.today() + timedelta(days=i))[:10] for i in range(n_days)]
 
-            logging.debug("🔍 生成された予測データ:\n%s", df.head(2).to_string(index=False))
-
-            if output == "list":
-                return df.to_dict(orient="records")
-            return df
-        except Exception as e:
-            logging.error(f"未来予測の儀にて予期せぬ事象: {e}", exc_info=True)
-            return [] if output == "list" else pd.DataFrame()
-
-    def predict(
-        self, n_days: int = 14,
-        decision_id: Optional[str] = None,
-        caller: Optional[str] = "king_noctria",
-        reason: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        result = self.predict_with_confidence(n_days=n_days, output="list",
-                                              decision_id=decision_id, caller=caller, reason=reason)
-        if not result:
-            logging.warning("⚠️ ORACLEからの予測リストが空です。")
-        return result
-
-    def get_metrics(self) -> Dict[str, float]:
-        try:
-            test_df = self.predict_with_confidence(n_days=7, output="df")
-            test_df["y_true"] = test_df["forecast"] + np.random.normal(0, 0.5, len(test_df))
-            return self.evaluate_model(test_df)
-        except Exception as e:
-            logging.error(f"評価指標の算出中にエラー: {e}", exc_info=True)
-            return {}
-
-    def evaluate_model(self, test_data: pd.DataFrame) -> Dict[str, float]:
-        logging.info("神託の精度を検証します…")
-        try:
-            y_true = test_data['y_true']
-            y_pred = test_data.get('forecast')
-            mse = np.mean((y_true - y_pred) ** 2)
-            rmse = np.sqrt(mse)
-            mae = np.mean(np.abs(y_true - y_pred))
-            return {'MSE': round(mse, 4), 'RMSE': round(rmse, 4), 'MAE': round(mae, 4)}
-        except Exception as e:
-            logging.error(f"神託の検証中にエラー: {e}", exc_info=True)
-            return {}
+        df = pd.DataFrame({
+            "date": dates,
+            "forecast": y_pred.round(4),
+            "lower": y_lower.round(4),
+            "upper": y_upper.round(4),
+            "decision_id": decision_id,
+            "caller": caller,
+            "reason": reason
+        })
+        return df
 
     def write_forecast_json(
-        self, n_days: int = 14,
+        self,
+        features_df: pd.DataFrame,
+        n_days: int = 14,
         decision_id: Optional[str] = None,
         caller: Optional[str] = "king_noctria",
         reason: Optional[str] = None
     ):
-        df = self.predict_with_confidence(n_days=n_days, decision_id=decision_id, caller=caller, reason=reason)
+        df = self.predict_future(features_df, n_days, decision_id, caller, reason)
         try:
             ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
             df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
@@ -149,13 +121,26 @@ class PrometheusOracle:
         except Exception as e:
             logging.error(f"神託JSONの保存に失敗: {e}")
 
-
+# =====================
 # ✅ テストブロック
+# =====================
 if __name__ == "__main__":
-    logging.info("--- Prometheus Oracle Test Start ---")
-    oracle = PrometheusOracle()
-    oracle.train(pd.DataFrame(np.random.rand(100, 2), columns=["x", "y"]), epochs=2)
-    oracle.write_forecast_json(n_days=7, decision_id="KC-20250730-TEST", caller="test", reason="テスト")
-    metrics = oracle.get_metrics()
-    logging.info(f"テスト用指標: {metrics}")
-    logging.info("--- Prometheus Oracle Test End ---")
+    logging.info("--- Prometheus Oracle Plan連携テスト ---")
+    # ▼ 例: Plan層から特徴量DataFrameを生成
+    plan_features = pd.DataFrame(
+        np.random.rand(30, 8),  # 8特徴量・30サンプル
+        columns=["USDJPY_Close", "USDJPY_Volatility_5d", "SP500_Close", "VIX_Close",
+                 "News_Count", "CPIAUCSL_Value", "FEDFUNDS_Value", "UNRATE_Value"]
+    )
+    # ▼ feature_orderはPlan層設計と一致させる
+    feature_order = [
+        "USDJPY_Close", "USDJPY_Volatility_5d", "SP500_Close", "VIX_Close",
+        "News_Count", "CPIAUCSL_Value", "FEDFUNDS_Value", "UNRATE_Value"
+    ]
+    plan_features['target'] = plan_features["USDJPY_Close"].shift(-1).fillna(method='ffill')
+    oracle = PrometheusOracle(feature_order=feature_order)
+    oracle.train(plan_features, target_col="target", epochs=3)
+    forecast_df = oracle.predict_future(plan_features, n_days=7, decision_id="KC-TEST", caller="test", reason="単体テスト")
+    print(forecast_df.tail(7))
+    oracle.write_forecast_json(plan_features, n_days=7, decision_id="KC-TEST", caller="test", reason="単体テスト")
+    logging.info("--- Prometheus Oracle Plan連携テスト完了 ---")
