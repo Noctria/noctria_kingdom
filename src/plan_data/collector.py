@@ -14,6 +14,8 @@ except ImportError:
 from dotenv import load_dotenv
 load_dotenv()
 
+from src.plan_data.feature_spec import FEATURE_SPEC
+
 ASSET_SYMBOLS = {
     # --- 優先度S, A, Bアセット ---
     "USDJPY": "JPY=X",
@@ -51,6 +53,22 @@ FRED_SERIES = {
     "CPI": "CPIAUCSL",
 }
 
+def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
+    """feature_spec.py準拠でカラム順・型・NaN補完を整形"""
+    columns = list(FEATURE_SPEC.keys())
+    # 欠損カラムはNaNで追加
+    for col in columns:
+        if col not in df.columns:
+            df[col] = pd.NA
+    # 型変換（失敗時はスキップ）
+    for col in columns:
+        try:
+            dtype = FEATURE_SPEC[col]["type"]
+            df[col] = df[col].astype(dtype)
+        except Exception:
+            pass
+    return df[columns]
+
 class PlanDataCollector:
     def __init__(self, fred_api_key: Optional[str] = None, event_calendar_csv: Optional[str] = None):
         self.fred_api_key = fred_api_key or os.getenv("FRED_API_KEY")
@@ -75,8 +93,13 @@ class PlanDataCollector:
                 cols = ["Date", "Close"]
                 if "Volume" in df.columns:
                     cols.append("Volume")
+                # カラム名統一（小文字/アンダースコア、feature_spec側で調整）
                 df = df[cols].rename(
-                    columns={"Close": f"{key}_Close", "Volume": f"{key}_Volume"}
+                    columns={
+                        "Date": "date",
+                        "Close": f"{key.lower()}_close",
+                        "Volume": f"{key.lower()}_volume"
+                    }
                 )
                 dfs.append(df)
             except Exception as e:
@@ -87,11 +110,14 @@ class PlanDataCollector:
             if merged is None:
                 merged = df
             else:
-                merged = pd.merge(merged, df, on="Date", how="outer")
+                merged = pd.merge(merged, df, on="date", how="outer")
         if merged is not None:
-            merged = merged.sort_values("Date")
+            merged = merged.sort_values("date")
             merged = merged.fillna(method="ffill")
-            merged = merged.dropna(subset=[f"USDJPY_Close"])
+            # USDJPYがfeature_spec未定義なら例外処理
+            key = "usdjpy_close"
+            if key in merged.columns:
+                merged = merged.dropna(subset=[key])
             merged = merged.reset_index(drop=True)
         return merged
 
@@ -112,30 +138,30 @@ class PlanDataCollector:
             r.raise_for_status()
             obs = r.json()["observations"]
             df = pd.DataFrame(obs)
-            df = df.rename(columns={"date": "Date", "value": f"{series_id}_Value"})
-            df["Date"] = pd.to_datetime(df["Date"])
-            df[f"{series_id}_Value"] = pd.to_numeric(df[f"{series_id}_Value"], errors="coerce")
-            return df[["Date", f"{series_id}_Value"]]
+            # カラム名統一
+            df = df.rename(columns={"date": "date", "value": f"{series_id.lower()}_value"})
+            df["date"] = pd.to_datetime(df["date"])
+            df[f"{series_id.lower()}_value"] = pd.to_numeric(df[f"{series_id.lower()}_value"], errors="coerce")
+            return df[["date", f"{series_id.lower()}_value"]]
         except Exception as e:
             print(f"[collector] FREDデータ({series_id})取得失敗: {e}")
             return pd.DataFrame()
 
     def fetch_event_calendar(self) -> pd.DataFrame:
-        """
-        経済カレンダーCSV（カラム例: Date, FOMC, CPI, NFP, ...）
-        """
+        """経済カレンダーCSV（カラム例: date, fomc, cpi, nfp, ...）"""
         try:
             df = pd.read_csv(self.event_calendar_csv)
-            df["Date"] = pd.to_datetime(df["Date"])
+            # カラム名統一
+            df.columns = [col.lower() for col in df.columns]
+            if "date" in df.columns:
+                df["date"] = pd.to_datetime(df["date"])
             return df
         except Exception as e:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
     def fetch_newsapi_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
-        """
-        NewsAPIで日次ニュース件数＋ポジ/ネガワード件数を返す
-        """
+        """NewsAPIで日次ニュース件数＋ポジ/ネガワード件数を返す"""
         api_key = self.newsapi_key
         if not api_key:
             print("[collector] NEWSAPI_KEYが未設定です")
@@ -156,7 +182,6 @@ class PlanDataCollector:
                 data = r.json()
                 n_total = data.get("totalResults", 0)
                 articles = data.get("articles", [])
-                # ポジ/ネガワード例（必要に応じて拡張）
                 pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
                 neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
                 pos_count = sum(
@@ -168,8 +193,8 @@ class PlanDataCollector:
                     for a in articles
                 )
                 dfs.append(
-                    {"Date": pd.to_datetime(day_str), "News_Count": n_total,
-                     "News_Positive": pos_count, "News_Negative": neg_count}
+                    {"date": pd.to_datetime(day_str), "news_count": n_total,
+                     "news_positive": pos_count, "news_negative": neg_count}
                 )
             except Exception as e:
                 print(f"[collector] NewsAPI {day_str}取得失敗: {e}")
@@ -187,22 +212,24 @@ class PlanDataCollector:
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and df is not None:
-                df = pd.merge(df, fred_df, on="Date", how="left")
-                df = df.sort_values("Date").fillna(method="ffill")
+                df = pd.merge(df, fred_df, on="date", how="left")
+                df = df.sort_values("date").fillna(method="ffill")
         # イベントカレンダー
         event_df = self.fetch_event_calendar()
         if not event_df.empty and df is not None:
-            df = pd.merge(df, event_df, on="Date", how="left")
+            df = pd.merge(df, event_df, on="date", how="left")
         # NewsAPI（日次ニュース件数・ポジネガ件数）
         news_df = self.fetch_newsapi_counts(start_str, end_str)
         if not news_df.empty and df is not None:
-            df = pd.merge(df, news_df, on="Date", how="left")
+            df = pd.merge(df, news_df, on="date", how="left")
         if df is not None:
             df = df.reset_index(drop=True)
+            df = align_to_feature_spec(df)  # ★ ここで標準仕様に整形
         return df
 
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
     df = collector.collect_all(lookback_days=7)
-    print(df[["Date", "News_Count", "News_Positive", "News_Negative"]].tail())
+    # テスト時はfeature_specにあるカラム名でアクセス
+    print(df[[col for col in df.columns if "news" in col or "date" in col]].tail())
