@@ -10,32 +10,32 @@ from src.plan_data.collector import ASSET_SYMBOLS
 
 def prepare_levia_input(row) -> dict:
     """
-    Plan層の特徴量DataFrameの1行からLeviaTempest用dictに変換
+    Plan層DataFrameの1行からLevia用dict生成
     """
-    # USDJPY関連・volume/volatility/スプレッドだけで良いが、柔軟に拡張
     return {
         "price": row.get("USDJPY_Close", 0.0),
-        "previous_price": row.get("USDJPY_Close_prev", 0.0),  # 新たに生成する
+        "previous_price": row.get("USDJPY_Close", 0.0) - row.get("USDJPY_Return", 0.0) if "USDJPY_Return" in row else row.get("USDJPY_Close", 0.0),
         "volume": row.get("USDJPY_Volume", 0.0),
+        "spread": row.get("USDJPY_Spread", 0.015),  # ダミー or 計算値
         "volatility": row.get("USDJPY_Volatility_5d", 0.0),
-        "spread": row.get("USDJPY_Spread", 0.015),  # スプレッド計算値がある場合のみ
         "symbol": "USDJPY"
     }
 
 def main(lookback_days: int = 10):
-    # 1. データ収集と特徴量エンジニアリング
+    # 1. データ収集＋特徴量
     collector = PlanDataCollector()
-    base_df = collector.collect_all(lookback_days=lookback_days)
+    base_df = collector.collect_all(lookback_days=lookback_days + 1)
     fe = FeatureEngineer(ASSET_SYMBOLS)
     feat_df = fe.add_technical_features(base_df)
 
-    # スプレッドやprevious_priceを補う（デモ用簡易計算）
-    if "USDJPY_Close" in feat_df.columns:
-        feat_df["USDJPY_Close_prev"] = feat_df["USDJPY_Close"].shift(1)
+    # 必要カラム補完
     if "USDJPY_High" in feat_df.columns and "USDJPY_Low" in feat_df.columns:
         feat_df["USDJPY_Spread"] = feat_df["USDJPY_High"] - feat_df["USDJPY_Low"]
     else:
-        feat_df["USDJPY_Spread"] = 0.015  # ダミー値
+        feat_df["USDJPY_Spread"] = 0.015
+
+    if "USDJPY_Return" not in feat_df.columns:
+        feat_df["USDJPY_Return"] = feat_df["USDJPY_Close"].pct_change()
 
     levia = LeviaTempest()
     results = []
@@ -46,10 +46,7 @@ def main(lookback_days: int = 10):
             "date": row.get("Date"),
             "signal": proposal["signal"],
             "confidence": proposal["confidence"],
-            "price": market_data["price"],
-            "volatility": market_data["volatility"],
-            "volume": market_data["volume"],
-            "spread": market_data["spread"],
+            "reason": proposal.get("reason", ""),
             "decision_id": proposal["decision_id"]
         })
 
@@ -58,4 +55,4 @@ def main(lookback_days: int = 10):
     print(df)
 
 if __name__ == "__main__":
-    main(lookback_days=10)
+    main(lookback_days=7)
