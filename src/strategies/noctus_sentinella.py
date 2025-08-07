@@ -2,12 +2,12 @@
 # coding: utf-8
 
 """
-🛡️ Noctus Sentinella (Plan特徴量同期対応)
-- ロット計算＆リスク許容チェックI/F新設
+🛡️ Noctus Sentinella (リスク＋ロット計算I/F付)
+- calculate_lot_and_risk: Fintokei/一般口座のリスクに基づきロットサイズ判定＆注文判定
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import pandas as pd
 import numpy as np
 
@@ -38,17 +38,53 @@ class NoctusSentinella:
         self.risk_manager: Optional[RiskManager] = None
         logging.info("リスク管理官ノクトゥス（特徴量dict同期型）着任。")
 
-    def assess(
+    def calculate_lot_and_risk(
         self,
         feature_dict: Dict[str, Any],
-        proposed_action: str,
+        side: str,
+        entry_price: float,
+        stop_loss_price: float,
+        capital: float,
+        risk_percent: float = 0.01,
         decision_id: Optional[str] = None,
         caller: Optional[str] = "king_noctria",
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        min_risk: float = 0.005,
+        max_risk: float = 0.01
     ) -> Dict[str, Any]:
-        logging.info(f"進言『{proposed_action}』に対するリスク評価を開始。特徴量dict受領。")
-        if proposed_action == "HOLD":
-            return self._create_assessment("APPROVE", "No action proposed.", 0.0, decision_id, caller, reason)
+        """
+        [NEW] 王やPlan層の公式リスク＆ロット計算API
+        - ストップロス・エントリー距離とリスク許容割合からロット計算
+        - Fintokei基準: リスク0.5%～1.0%のみ許可
+        """
+        sl_distance = abs(entry_price - stop_loss_price)
+        if sl_distance <= 0:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text="ストップロスとエントリー価格が同一/逆方向です",
+                lot=0, risk_amount=0, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+
+        # 許容リスク額
+        risk_amount = capital * risk_percent
+        # ガード: 0.5～1.0%以外NG
+        min_risk_amount = capital * min_risk
+        max_risk_amount = capital * max_risk
+        if not (min_risk_amount <= risk_amount <= max_risk_amount):
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"リスク額 {risk_amount:.2f} が許容範囲（{min_risk_amount:.2f}～{max_risk_amount:.2f}）外",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        # ロット計算: 1pip単位・最小ロット0.01想定
+        lot = risk_amount / sl_distance
+        lot = max(round(lot, 2), 0.01)
+
+        # 他のPlan特徴量でリスク/流動性チェック
         try:
             liquidity = feature_dict.get(self.col_map["liquidity"], None)
             spread = feature_dict.get(self.col_map["spread"], None)
@@ -60,88 +96,109 @@ class NoctusSentinella:
             self.risk_manager = RiskManager(historical_data=historical_data)
             risk_score = self.risk_manager.calculate_var_ratio(price)
         except Exception as e:
-            logging.error(f"評価不能: {e}")
-            return self._create_assessment("VETO", f"特徴量不足/異常: {e}", 1.0, decision_id, caller, reason)
-        if liquidity < self.min_liquidity:
-            return self._create_assessment("VETO", f"流動性不足({liquidity}<{self.min_liquidity})", risk_score, decision_id, caller, reason)
-        if spread > self.max_spread:
-            return self._create_assessment("VETO", f"スプレッド過大({spread}>{self.max_spread})", risk_score, decision_id, caller, reason)
-        if volatility > self.max_volatility:
-            return self._create_assessment("VETO", f"ボラティリティ過大({volatility}>{self.max_volatility})", risk_score, decision_id, caller, reason)
-        if risk_score > self.risk_threshold:
-            return self._create_assessment("VETO", f"リスク過大({risk_score:.4f}>{self.risk_threshold:.4f})", risk_score, decision_id, caller, reason)
-        return self._create_assessment("APPROVE", "全監視項目正常", risk_score, decision_id, caller, reason)
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"特徴量不足/異常: {e}",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
 
-    def _create_assessment(
+        if liquidity < self.min_liquidity:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"流動性不足({liquidity}<{self.min_liquidity})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        if spread > self.max_spread:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"スプレッド過大({spread}>{self.max_spread})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        if volatility > self.max_volatility:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"ボラティリティ過大({volatility}>{self.max_volatility})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        if risk_score > self.risk_threshold:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"リスク過大({risk_score:.4f}>{self.risk_threshold:.4f})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+
+        return self._create_calc_result(
+            decision="APPROVE",
+            reason_text="全監視項目正常/許可",
+            lot=lot, risk_amount=risk_amount, risk_percent=risk_percent,
+            entry_price=entry_price, stop_loss_price=stop_loss_price,
+            capital=capital, decision_id=decision_id, caller=caller, reason=reason
+        )
+
+    def _create_calc_result(
         self,
         decision: str,
         reason_text: str,
-        score: float,
+        lot: float,
+        risk_amount: float,
+        risk_percent: float,
+        entry_price: float,
+        stop_loss_price: float,
+        capital: float,
         decision_id: Optional[str],
         caller: Optional[str],
         reason: Optional[str]
     ) -> Dict[str, Any]:
         return {
             "name": "NoctusSentinella",
-            "type": "risk_assessment",
+            "type": "risk_calc",
             "decision": decision,
-            "risk_score": round(score, 4),
             "reason": reason_text,
+            "lot": round(lot, 3),
+            "risk_amount": round(risk_amount, 2),
+            "risk_percent": risk_percent,
+            "entry_price": entry_price,
+            "stop_loss": stop_loss_price,
+            "capital": capital,
             "decision_id": decision_id,
             "caller": caller,
             "action_reason": reason
         }
 
-    # 新設: ロット/リスク判定I/F
-    def calculate_lot_and_risk(
-        self,
-        symbol: str,
-        entry_price: float,
-        stop_loss_price: float,
-        capital: float,
-        risk_percent_min: float = 0.005,
-        risk_percent_max: float = 0.01,
-        pip_value: Optional[float] = None
-    ) -> dict:
-        """
-        指定条件下で「許容リスク範囲0.5%～1%」をガードしつつロットサイズ計算＆エラー理由返却
-        pip_value: 1ロットあたり1pipsの金額（未指定ならUSDJPY→1000円仮実装）
+    # 既存のassess()等は省略
 
-        Returns:
-            dict: { "ok": bool, "lot": float, "risk_amount": float, "msg": str }
-        """
-        if pip_value is None:
-            pip_value = 1000.0  # USDJPY用仮値
-
-        sl_pips = abs(entry_price - stop_loss_price) / 0.01
-        if sl_pips <= 0:
-            return {"ok": False, "lot": 0, "risk_amount": 0, "msg": "SLがエントリー価格と同一/逆方向"}
-
-        for rp in [risk_percent_max, risk_percent_min]:
-            if rp < 0 or rp > 1:
-                return {"ok": False, "lot": 0, "risk_amount": 0, "msg": "リスク率異常"}
-
-        risk_amount = capital * risk_percent_max
-        min_risk = capital * risk_percent_min
-        max_risk = capital * risk_percent_max
-
-        risk_per_lot = sl_pips * pip_value
-        if risk_per_lot <= 0:
-            return {"ok": False, "lot": 0, "risk_amount": 0, "msg": "SL幅またはpip値異常"}
-
-        lot = risk_amount / risk_per_lot
-
-        if not (min_risk <= lot * risk_per_lot <= max_risk):
-            return {
-                "ok": False,
-                "lot": lot,
-                "risk_amount": lot * risk_per_lot,
-                "msg": f"許容リスク範囲外: {min_risk:.2f}～{max_risk:.2f}円, この注文: {lot * risk_per_lot:.2f}円"
-            }
-
-        return {
-            "ok": True,
-            "lot": lot,
-            "risk_amount": lot * risk_per_lot,
-            "msg": "許容範囲内でロット決定"
-        }
+# === テスト例 ===
+if __name__ == "__main__":
+    logging.info("--- Noctus: ロット/リスク計算テスト ---")
+    dummy_hist_data = pd.DataFrame({'Close': np.random.normal(loc=150, scale=2, size=100)})
+    dummy_hist_data['returns'] = dummy_hist_data['Close'].pct_change().dropna()
+    feature_dict = {
+        "price": 152.5,
+        "volume": 150,
+        "spread": 0.012,
+        "volatility": 0.15,
+        "historical_data": dummy_hist_data
+    }
+    noctus_ai = NoctusSentinella()
+    res = noctus_ai.calculate_lot_and_risk(
+        feature_dict=feature_dict,
+        side="BUY",
+        entry_price=152.60,
+        stop_loss_price=152.30,
+        capital=20000,
+        risk_percent=0.007,
+        decision_id="TEST-NOCTUS-1",
+        caller="test",
+        reason="unit_test"
+    )
+    print(f"🛡️ Noctusロット/リスク判定: {res['decision']} ({res['reason']}) Lot: {res['lot']}, Risk額: {res['risk_amount']}")
