@@ -3,12 +3,11 @@
 
 """
 🛡️ Noctus Sentinella (Plan特徴量同期対応)
-- 全リスク評価に decision_id/caller/理由/feature_dict
-- Plan層（feature_engineer/collector）で生成した任意の特徴量セット対応
+- ロット計算＆リスク許容チェックI/F新設
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import pandas as pd
 import numpy as np
 
@@ -25,10 +24,6 @@ class NoctusSentinella:
         min_liquidity: float = 120,
         max_volatility: float = 0.25
     ):
-        """
-        col_map: Plan層の特徴量名とNoctus側パラメータのマッピング
-          例: {"liquidity": "USDJPY_Volume", "spread": "USDJPY_Spread", ...}
-        """
         self.col_map = col_map or {
             "liquidity": "volume",
             "spread": "spread",
@@ -52,10 +47,8 @@ class NoctusSentinella:
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
         logging.info(f"進言『{proposed_action}』に対するリスク評価を開始。特徴量dict受領。")
-        # HOLDは常に承認
         if proposed_action == "HOLD":
             return self._create_assessment("APPROVE", "No action proposed.", 0.0, decision_id, caller, reason)
-
         try:
             liquidity = feature_dict.get(self.col_map["liquidity"], None)
             spread = feature_dict.get(self.col_map["spread"], None)
@@ -69,7 +62,6 @@ class NoctusSentinella:
         except Exception as e:
             logging.error(f"評価不能: {e}")
             return self._create_assessment("VETO", f"特徴量不足/異常: {e}", 1.0, decision_id, caller, reason)
-
         if liquidity < self.min_liquidity:
             return self._create_assessment("VETO", f"流動性不足({liquidity}<{self.min_liquidity})", risk_score, decision_id, caller, reason)
         if spread > self.max_spread:
@@ -78,7 +70,6 @@ class NoctusSentinella:
             return self._create_assessment("VETO", f"ボラティリティ過大({volatility}>{self.max_volatility})", risk_score, decision_id, caller, reason)
         if risk_score > self.risk_threshold:
             return self._create_assessment("VETO", f"リスク過大({risk_score:.4f}>{self.risk_threshold:.4f})", risk_score, decision_id, caller, reason)
-
         return self._create_assessment("APPROVE", "全監視項目正常", risk_score, decision_id, caller, reason)
 
     def _create_assessment(
@@ -101,19 +92,56 @@ class NoctusSentinella:
             "action_reason": reason
         }
 
-# === テスト例 ===
-if __name__ == "__main__":
-    logging.info("--- Noctus: Plan特徴量dictテスト ---")
-    # Plan層の特徴量dict例
-    dummy_hist_data = pd.DataFrame({'Close': np.random.normal(loc=150, scale=2, size=100)})
-    dummy_hist_data['returns'] = dummy_hist_data['Close'].pct_change().dropna()
-    feature_dict = {
-        "price": 152.5,
-        "volume": 150,
-        "spread": 0.012,
-        "volatility": 0.15,
-        "historical_data": dummy_hist_data
-    }
-    noctus_ai = NoctusSentinella()
-    res = noctus_ai.assess(feature_dict, "BUY", decision_id="TEST-NOCTUS-1", caller="__main__", reason="Plan特徴量dictテスト")
-    print(f"🛡️ ノクトゥス判定: {res['decision']} ({res['reason']})")
+    # 新設: ロット/リスク判定I/F
+    def calculate_lot_and_risk(
+        self,
+        symbol: str,
+        entry_price: float,
+        stop_loss_price: float,
+        capital: float,
+        risk_percent_min: float = 0.005,
+        risk_percent_max: float = 0.01,
+        pip_value: Optional[float] = None
+    ) -> dict:
+        """
+        指定条件下で「許容リスク範囲0.5%～1%」をガードしつつロットサイズ計算＆エラー理由返却
+        pip_value: 1ロットあたり1pipsの金額（未指定ならUSDJPY→1000円仮実装）
+
+        Returns:
+            dict: { "ok": bool, "lot": float, "risk_amount": float, "msg": str }
+        """
+        if pip_value is None:
+            pip_value = 1000.0  # USDJPY用仮値
+
+        sl_pips = abs(entry_price - stop_loss_price) / 0.01
+        if sl_pips <= 0:
+            return {"ok": False, "lot": 0, "risk_amount": 0, "msg": "SLがエントリー価格と同一/逆方向"}
+
+        for rp in [risk_percent_max, risk_percent_min]:
+            if rp < 0 or rp > 1:
+                return {"ok": False, "lot": 0, "risk_amount": 0, "msg": "リスク率異常"}
+
+        risk_amount = capital * risk_percent_max
+        min_risk = capital * risk_percent_min
+        max_risk = capital * risk_percent_max
+
+        risk_per_lot = sl_pips * pip_value
+        if risk_per_lot <= 0:
+            return {"ok": False, "lot": 0, "risk_amount": 0, "msg": "SL幅またはpip値異常"}
+
+        lot = risk_amount / risk_per_lot
+
+        if not (min_risk <= lot * risk_per_lot <= max_risk):
+            return {
+                "ok": False,
+                "lot": lot,
+                "risk_amount": lot * risk_per_lot,
+                "msg": f"許容リスク範囲外: {min_risk:.2f}～{max_risk:.2f}円, この注文: {lot * risk_per_lot:.2f}円"
+            }
+
+        return {
+            "ok": True,
+            "lot": lot,
+            "risk_amount": lot * risk_per_lot,
+            "msg": "許容範囲内でロット決定"
+        }
