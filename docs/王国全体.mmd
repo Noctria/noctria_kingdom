@@ -1,0 +1,40 @@
+flowchart TD
+
+%% --- Plan層（P/補助AI含む） ---
+subgraph Plan["Plan層"]
+  subgraph PlanCore["判断中枢"]
+    KNO["king_noctria.py<br>👑 王Noctria"]
+    VERITAS["veritas_machina.py"]
+    PROME["prometheus_oracle.py"]
+    AURUS["aurus_singularis.py"]
+    LEVIA["levia_tempest.py"]
+    NOCTUS["noctus_sentinella.py"]
+  end
+
+  subgraph PlanData["データ生成/分析"]
+    COLLECTOR["collector.py"]
+    FEATURES["features.py"]
+    STATISTICS["statistics.py"]
+    ANALYZER["analyzer.py"]
+  end
+
+  KNO <-- "特徴量・統計・根拠提供" --> COLLECTOR
+  KNO <-- "" --> FEATURES
+  KNO <-- "" --> STATISTICS
+  KNO <-- "" --> ANALYZER
+end
+
+%% --- Do層（D/実行） ---
+subgraph Do["Do層"]
+  OE["order_execution.py"]
+  OOE["optimized_order_execution.py"]
+end
+
+%% --- 接続部 ---
+KNO -- "注文指令（lot, SL 必須）" --> OE
+OE -- "MT5発注API" --> MT5["MT5"]
+
+OE -.-> CCheck["Check層（PDCAログ）"]
+
+classDef gray fill:#eee,stroke:#bbb,color:#888;
+class CCheck gray;
