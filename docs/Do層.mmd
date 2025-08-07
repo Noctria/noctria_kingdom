@@ -1,0 +1,29 @@
+flowchart TD
+  %% --- Plan/Check層（入口部分） ---
+  subgraph Plan層
+    PLAN[plan_data/feature_spec.py<br>plan_data/collector.py<br>plan_data/features.py<br>plan_data/statistics.py<br>plan_data/analyzer.py]
+    STRAT[strategies/aurus_singularis.py<br>levia_tempest.py<br>prometheus_oracle.py]
+  end
+
+  subgraph Check層
+    CHECK[core/risk_control.py<br>execution/challenge_monitor.py]
+  end
+
+  %% --- Do層メイン ---
+  subgraph Do層["Do層（実オーダー執行/リスク/監視）"]
+    ORDER[execution/order_execution.py<br>（発注API本体/新I/F統一）]
+    OPTORDER[execution/optimized_order_execution.py<br>（分割/リトライ案）]
+    CHALMON[execution/challenge_monitor.py<br>（リスク/損失アラート）]
+    GENORDER[execution/generate_order_json.py<br>（シグナル記録・JSON化）]
+  end
+
+  %% --- 接続部分 ---
+  PLAN -- "特徴量・判断・注文信号" --> ORDER
+  STRAT -- "エントリーシグナル/発注リクエスト" --> ORDER
+  CHECK -- "リスク監視・アラート/lot制限" --> ORDER
+  CHECK -- "リスク閾値/損失監視" --> CHALMON
+
+  ORDER -- "注文内容・実行結果" --> GENORDER
+
+  %% 補足（分割/リトライ案）
+  ORDER -. "高度な発注最適化案" .-> OPTORDER
