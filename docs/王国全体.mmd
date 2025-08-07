@@ -1,40 +1,57 @@
 flowchart TD
 
-%% --- Plan層（P/補助AI含む） ---
-subgraph Plan["Plan層"]
-  subgraph PlanCore["判断中枢"]
-    KNO["king_noctria.py<br>👑 王Noctria"]
-    VERITAS["veritas_machina.py"]
-    PROME["prometheus_oracle.py"]
-    AURUS["aurus_singularis.py"]
-    LEVIA["levia_tempest.py"]
-    NOCTUS["noctus_sentinella.py"]
-  end
-
-  subgraph PlanData["データ生成/分析"]
-    COLLECTOR["collector.py"]
-    FEATURES["features.py"]
-    STATISTICS["statistics.py"]
-    ANALYZER["analyzer.py"]
-  end
-
-  COLLECTOR -- "特徴量・統計提供" --> KNO
-  FEATURES  -- "特徴量提供" --> KNO
-  STATISTICS -- "統計提供" --> KNO
-  ANALYZER -- "根拠・説明提供" --> KNO
+%% === Plan層 ===
+subgraph PLAN層[Plan層（特徴量/判断材料生成）]
+    COLLECTOR["PlanDataCollector"]
+    ANALYZER["PlanAnalyzer"]
+    FEATURES["features_dict（entry, stop, capital, etc.）"]
 end
 
-%% --- Do層（D/実行） ---
-subgraph Do["Do層"]
-  OE["order_execution.py"]
-  OOE["optimized_order_execution.py"]
+%% === 王（中央統治AI） ===
+KING["King Noctria<br>統治AI（order_trade, hold_council, issue_order_safely）"]
+
+%% === 臣下AI ===
+subgraph 臣下AI
+    VERITAS["VeritasMachina<br>戦略生成"]
+    AURUS["AurusSingularis<br>日足系"]
+    LEVIA["LeviaTempest<br>短期系"]
+    PROMETHEUS["PrometheusOracle<br>予測"]
+    NOCTUS["NoctusSentinella<br>リスク・ロット判定"]
+    HERMES["HermesCognitor<br>解説/説明LLM"]
 end
 
-%% --- 接続部 ---
-KNO -- "注文指令（lot, SL 必須）" --> OE
-OE -- "MT5発注API" --> MT5["MT5"]
+%% === Do層（注文実行/API） ===
+ORDER_EXEC["OrderExecution<br>Do層（MT5発注）"]
 
-OE -.-> CCheck["Check層（PDCAログ）"]
+%% === Check層 ===
+CHECK_RESULT["リスク判定結果/lot"]
 
-classDef gray fill:#eee,stroke:#bbb,color:#888;
-class CCheck gray;
+%% === PDCAログ ===
+subgraph LOGS["PDCA/王国ログ"]
+    PDCA_LOG["veritas_orders/act_logs"]
+    KING_LOG["king_decision_log.json"]
+end
+
+%% === フロー ===
+
+COLLECTOR -- 集約データ/特徴量 --> ANALYZER
+ANALYZER -- features_dict/取引判断材料 --> KING
+
+KING -- 戦略/予測/説明依頼 --> VERITAS
+KING -- 進言依頼（日足） --> AURUS
+KING -- 進言依頼（短期） --> LEVIA
+KING -- 未来予測依頼 --> PROMETHEUS
+KING -- LLM説明依頼 --> HERMES
+
+KING -- リスク・ロット判定依頼 --> NOCTUS
+NOCTUS --|lot/判定結果|--> KING
+
+KING --|注文/SL必須/lot|--> ORDER_EXEC
+
+ORDER_EXEC --|実績・結果|--> KING
+KING --|王命・取引記録|--> KING_LOG
+ORDER_EXEC --|発注ログ|--> PDCA_LOG
+
+%% === Check層（Check/再評価・VETO時）===
+NOCTUS --|VETO理由/NG|--> KING
+
