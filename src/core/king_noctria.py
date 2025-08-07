@@ -1,8 +1,23 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+👑 King Noctria (理想型 v3.2) - Noctusにリスク・ロット計算を委譲版
+- decision_id, caller, reason で統治判断を一元管理
+- 全DAG/AI/臣下呼び出し・御前会議・トリガーでdecision_idを必ず発行・伝搬
+- 統治履歴は全てdecision_id単位でJSONログ保存
+- Do層 order_execution.py をリスクガード・SL強制付きで一元制御
+- ロット/リスク計算はNoctus（NoctusSentinella）へ委譲！
+"""
+
 import logging
 import json
 import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any
+
+import pandas as pd
+import numpy as np
 
 import requests
 
@@ -14,6 +29,7 @@ from src.strategies.noctus_sentinella import NoctusSentinella
 from src.strategies.hermes_cognitor import HermesCognitorStrategy
 
 from src.execution.order_execution import OrderExecution
+
 from core.path_config import AIRFLOW_API_BASE
 
 KING_LOG_PATH = "/opt/airflow/data/king_decision_log.json"
@@ -44,80 +60,90 @@ class KingNoctria:
         except Exception as e:
             logging.error(f"King log保存失敗: {e}")
 
-    # =============================
-    # ここからリファクタ後の新API
-    # =============================
+    # --- ★ Noctusに計算委譲！ ---
     def order_trade(
         self,
         symbol: str,
+        side: str,
         entry_price: float,
-        stop_loss: float,
-        direction: str,  # 'buy' or 'sell'
-        account_info: dict,
-        caller="king_noctria",
-        reason="AI発注"
+        stop_loss_price: float,
+        capital: float,
+        risk_percent: float = 0.01,
+        feature_dict: Optional[dict] = None,
+        caller: str = "king_noctria",
+        reason: str = "AI指令自動注文"
     ) -> dict:
         """
-        王命による取引発注。リスク判定・ロット計算はNoctusに委譲。発注はOrderExecutionに命じる。
+        王命による安全発注メソッド。ロット計算とリスク許可判定はNoctusに委譲。
         """
-        decision_id = self._generate_decision_id()
-        timestamp = datetime.now().isoformat()
-
-        # Step1: Noctusにリスク評価・ロット計算を命じる
-        risk_result = self.noctus.calculate_lot_and_risk(
-            symbol=symbol,
+        # --- 1. ロット/リスク判定をNoctusに依頼 ---
+        if feature_dict is None:
+            # 最低限必要な情報だけ組み立て
+            feature_dict = {
+                "price": entry_price,
+                "volume": 100,         # 仮値。実運用ではPlan層feature_dict推奨
+                "spread": 0.01,        # 仮値
+                "volatility": 0.15,    # 仮値
+                "historical_data": pd.DataFrame({"Close": np.random.normal(entry_price, 2, 100)})
+            }
+        # Noctusに"計算してもらう"（仮想メソッド。実装はNoctusに加筆）
+        noctus_result = self.noctus.calculate_lot_and_risk(
+            feature_dict=feature_dict,
+            side=side,
             entry_price=entry_price,
-            stop_loss=stop_loss,
-            direction=direction,
-            account_info=account_info,
-            risk_percent_min=0.5,
-            risk_percent_max=1.0
+            stop_loss_price=stop_loss_price,
+            capital=capital,
+            risk_percent=risk_percent,
+            decision_id=self._generate_decision_id(),
+            caller=caller,
+            reason=reason
         )
-
-        if not risk_result.get("ok"):
-            entry = {
-                "decision_id": decision_id,
-                "timestamp": timestamp,
-                "action": "order_trade",
-                "symbol": symbol,
-                "direction": direction,
-                "status": "rejected",
-                "risk_reason": risk_result.get("reason"),
+        # VETOなら終了
+        if noctus_result["decision"] != "APPROVE":
+            self._save_king_log({
+                "timestamp": datetime.now().isoformat(),
+                "decision_id": noctus_result.get("decision_id", ""),
                 "caller": caller,
                 "reason": reason,
-            }
-            self._save_king_log(entry)
-            return entry
+                "symbol": symbol,
+                "side": side,
+                "entry_price": entry_price,
+                "stop_loss": stop_loss_price,
+                "capital": capital,
+                "risk_percent": risk_percent,
+                "noctus_result": noctus_result,
+                "status": "REJECTED"
+            })
+            return {"status": "rejected", "noctus_result": noctus_result}
 
-        lot = risk_result["lot"]
-        risk_value = risk_result["risk_value"]
-
-        # Step2: Do層（OrderExecution）へ命令
-        order_result = self.order_executor.execute_order(
+        lot = noctus_result["lot"]
+        # --- 2. Do層API発注（SL必須） ---
+        result = self.order_executor.execute_order(
             symbol=symbol,
             lot=lot,
-            order_type=direction,
-            stop_loss=stop_loss  # 新I/F想定：必ずSLを渡す
+            order_type=side,
+            entry_price=entry_price,
+            stop_loss=stop_loss_price
         )
-
-        entry = {
-            "decision_id": decision_id,
-            "timestamp": timestamp,
-            "action": "order_trade",
-            "symbol": symbol,
-            "direction": direction,
-            "status": "executed" if order_result.get("status") == "success" else "error",
-            "lot": lot,
-            "risk_value": risk_value,
-            "risk_detail": risk_result,
-            "order_result": order_result,
+        # --- 3. 王の決裁ログ記録 ---
+        order_log = {
+            "timestamp": datetime.now().isoformat(),
+            "decision_id": noctus_result.get("decision_id", self._generate_decision_id()),
             "caller": caller,
             "reason": reason,
+            "symbol": symbol,
+            "side": side,
+            "entry_price": entry_price,
+            "stop_loss": stop_loss_price,
+            "lot": lot,
+            "capital": capital,
+            "risk_percent": risk_percent,
+            "noctus_result": noctus_result,
+            "api_result": result,
+            "status": "EXECUTED"
         }
-        self._save_king_log(entry)
-        return entry
-
-    # --- 旧安全ラッパも互換用途で残してもよい（推奨はorder_tradeに移行）
+        self._save_king_log(order_log)
+        return result
 
     def hold_council(self, market_data: dict, caller="king_routes", reason="御前会議決裁") -> dict:
         decision_id = self._generate_decision_id()
@@ -171,25 +197,66 @@ class KingNoctria:
         self._save_king_log(council_report)
         return council_report
 
-    # ...DAGトリガー系は従来通り...
+    def _trigger_dag(self, dag_id: str, conf: Optional[Dict[str, Any]] = None,
+                     airflow_user: str = "admin", airflow_pw: str = "admin",
+                     caller="king_noctria", reason="王命トリガー") -> dict:
+        decision_id = self._generate_decision_id()
+        payload_conf = conf or {}
+        payload_conf.update({
+            "decision_id": decision_id,
+            "caller": caller,
+            "reason": reason,
+        })
+        endpoint = f"{AIRFLOW_API_BASE}/api/v1/dags/{dag_id}/dagRuns"
+        auth = (airflow_user, airflow_pw)
+        timestamp = datetime.now().isoformat()
+        try:
+            resp = requests.post(endpoint, json={"conf": payload_conf}, auth=auth)
+            resp.raise_for_status()
+            log_entry = {
+                "decision_id": decision_id,
+                "timestamp": timestamp,
+                "dag_id": dag_id,
+                "trigger_conf": payload_conf,
+                "caller": caller,
+                "reason": reason,
+                "trigger_type": "dag",
+                "status": "success",
+                "result": resp.json()
+            }
+            self._save_king_log(log_entry)
+            return {"status": "success", "result": resp.json()}
+        except Exception as e:
+            log_entry = {
+                "decision_id": decision_id,
+                "timestamp": timestamp,
+                "dag_id": dag_id,
+                "trigger_conf": payload_conf,
+                "caller": caller,
+                "reason": reason,
+                "trigger_type": "dag",
+                "status": "error",
+                "error": str(e)
+            }
+            self._save_king_log(log_entry)
+            logging.error(f"Airflow DAG [{dag_id}] トリガー失敗: {e}")
+            return {"status": "error", "error": str(e)}
+
+    # ...（DAGトリガー系は従来どおり）...
 
 if __name__ == "__main__":
     logging.info("--- 王の中枢機能、単独試練の儀を開始 ---")
 
     king = KingNoctria()
 
-    # サンプル発注コール
-    dummy_account_info = {
-        "capital": 20000,
-        "currency": "JPY",
-        # ...他の証拠金・レバレッジ情報など...
-    }
+    # 例：AI/PDCA/DAGからの公式発注ラッパ使用例
     result = king.order_trade(
         symbol="USDJPY",
+        side="buy",
         entry_price=157.20,
-        stop_loss=156.70,
-        direction="buy",
-        account_info=dummy_account_info,
+        stop_loss_price=156.70,
+        capital=20000,           # 現口座資金
+        risk_percent=0.007,      # 0.7%など
         caller="AIシナリオ",
         reason="AI推奨取引"
     )
