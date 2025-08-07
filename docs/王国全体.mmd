@@ -18,10 +18,10 @@ subgraph Plan["Plan層"]
     ANALYZER["analyzer.py"]
   end
 
-  KNO <-- "特徴量・統計・根拠提供" --> COLLECTOR
-  KNO <-- "" --> FEATURES
-  KNO <-- "" --> STATISTICS
-  KNO <-- "" --> ANALYZER
+  COLLECTOR -- "特徴量・統計提供" --> KNO
+  FEATURES  -- "特徴量提供" --> KNO
+  STATISTICS -- "統計提供" --> KNO
+  ANALYZER -- "根拠・説明提供" --> KNO
 end
 
 %% --- Do層（D/実行） ---
