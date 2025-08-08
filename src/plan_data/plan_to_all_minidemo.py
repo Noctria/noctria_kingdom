@@ -1,11 +1,5 @@
 # src/plan_data/plan_to_all_minidemo.py
 
-"""
-Plan層→全AIワークフロー最小デモ
-- Plan層で標準特徴量DataFrame/dict生成
-- Aurus/Levia/Noctus/Prometheus/Hermes/Veritas 全AIへ同一ターン連携・進言を一括取得
-"""
-
 import sys
 from pathlib import Path
 import json
@@ -20,6 +14,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
 from plan_data.features import FeatureEngineer
 from plan_data.analyzer import PlanAnalyzer
+from plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER  # ←追加
+
 from strategies.aurus_singularis import AurusSingularis
 from strategies.levia_tempest import LeviaTempest
 from strategies.noctus_sentinella import NoctusSentinella
@@ -33,31 +29,33 @@ def main():
     base_df = collector.collect_all(lookback_days=60)
     fe = FeatureEngineer(ASSET_SYMBOLS)
     feat_df = fe.add_technical_features(base_df)
-    # 最新ターンのdict（Aurus/Levia/Noctus等に渡す用）
-    feature_dict = feat_df.dropna().iloc[-1].to_dict()
-    # 使用カラム順（Aurus/Prometheus/Veritasなど学習型AIで必須）
-    feature_order = [c for c in feat_df.columns if c not in {"label", "Date"}]
 
-    print("📝 Plan層標準特徴量セット:", list(feature_dict.keys()))
+    # カラム順をSTANDARD_FEATURE_ORDERで合わせてdict生成
+    feat_df = feat_df.dropna(subset=STANDARD_FEATURE_ORDER)
+    latest_row = feat_df.iloc[-1]
+    feature_dict = {col: latest_row.get(col, 0.0) for col in STANDARD_FEATURE_ORDER}
+    feature_order = [col for col in STANDARD_FEATURE_ORDER if col in feat_df.columns]
+
+    print("📝 Plan層標準特徴量セット:", feature_order)
     print("特徴量（最新ターン）:", feature_dict)
 
-    # 2. Aurus（総合市場分析AI）
+    # 2. Aurus
     aurus_ai = AurusSingularis(feature_order=feature_order)
     aurus_out = aurus_ai.propose(feature_dict, decision_id="ALLDEMO-001", caller="plan_to_all", reason="一括デモ")
     print("\n🎯 Aurus進言:", aurus_out)
 
-    # 3. Levia（スキャルピングAI）
+    # 3. Levia
     levia_ai = LeviaTempest(feature_order=feature_order)
     levia_out = levia_ai.propose(feature_dict, decision_id="ALLDEMO-002", caller="plan_to_all", reason="一括デモ")
     print("\n⚡ Levia進言:", levia_out)
 
-    # 4. Noctus（リスク管理AI, ロット判定あり）
+    # 4. Noctus
     noctus_ai = NoctusSentinella()
     noctus_out = noctus_ai.calculate_lot_and_risk(
         feature_dict=feature_dict,
         side="BUY",
-        entry_price=feature_dict.get("price", 150),
-        stop_loss_price=feature_dict.get("price", 150) - 0.3,
+        entry_price=feature_dict.get("USDJPY_Close", 150),
+        stop_loss_price=feature_dict.get("USDJPY_Close", 150) - 0.3,
         capital=10000,
         risk_percent=0.007,
         decision_id="ALLDEMO-003",
@@ -66,12 +64,12 @@ def main():
     )
     print("\n🛡️ Noctus判定:", noctus_out)
 
-    # 5. Prometheus（未来予測AI）
+    # 5. Prometheus
     prometheus_ai = PrometheusOracle(feature_order=feature_order)
     pred_df = prometheus_ai.predict_future(feat_df, n_days=5, decision_id="ALLDEMO-004", caller="plan_to_all", reason="一括デモ")
     print("\n🔮 Prometheus予測:\n", pred_df.head(5))
 
-    # 6. Hermes（LLM説明AI）
+    # 6. Hermes
     analyzer = PlanAnalyzer(feat_df)
     explain_features = analyzer.extract_features()
     labels = analyzer.make_explanation_labels(explain_features)
@@ -82,7 +80,7 @@ def main():
     )
     print("\n🦉 Hermes要約:\n", json.dumps(hermes_out, indent=2, ensure_ascii=False))
 
-    # 7. Veritas（戦略提案AI, symbolは適宜調整）
+    # 7. Veritas
     veritas_ai = VeritasMachina()
     veritas_out = veritas_ai.propose(
         top_n=2,
@@ -93,7 +91,7 @@ def main():
     )
     print("\n🧠 Veritas戦略:\n", json.dumps(veritas_out, indent=2, ensure_ascii=False))
 
-    # --- まとめて保存（例: 全進言をJSONにまとめる） ---
+    # --- まとめて保存 ---
     out = dict(
         aurus=aurus_out,
         levia=levia_out,
