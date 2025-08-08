@@ -2,129 +2,198 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (標準feature_order準拠)
-- Plan層（features/analyzer等）で生成した標準特徴量DataFrameから未来予測
-- feature_orderはPlan層設計で標準化・連携
+🛡️ Noctus Sentinella (feature_order準拠・標準特徴量dict対応)
+- Plan層標準dict/feature_orderに完全準拠
+- calculate_lot_and_risk: リスク・ロットサイズ判定（Fintokei等にも対応）
 """
 
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
-from pathlib import Path
 import logging
+from typing import Dict, Any, Optional, List
+import pandas as pd
+import numpy as np
 
-from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON
+from src.core.risk_manager import RiskManager
 from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
-class PrometheusOracle:
+class NoctusSentinella:
     def __init__(
         self,
-        model_path: Optional[Path] = None,
-        feature_order: Optional[List[str]] = None
+        feature_order: Optional[List[str]] = None,
+        col_map: Optional[Dict[str, str]] = None,
+        risk_threshold: float = 0.02,
+        max_spread: float = 0.018,
+        min_liquidity: float = 120,
+        max_volatility: float = 0.25
     ):
         self.feature_order = feature_order or STANDARD_FEATURE_ORDER
-        self.model_path = model_path or (VERITAS_MODELS_DIR / "prometheus_oracle.keras")
-        self.model = self._load_or_build_model(input_dim=len(self.feature_order))
+        # 標準特徴量名へのマッピング
+        self.col_map = col_map or {
+            "liquidity": "volume",
+            "spread": "spread",
+            "volatility": "volatility",
+            "price": "price",
+            "historical_data": "historical_data"
+        }
+        self.risk_threshold = risk_threshold
+        self.max_spread = max_spread
+        self.min_liquidity = min_liquidity
+        self.max_volatility = max_volatility
+        self.risk_manager: Optional[RiskManager] = None
+        logging.info("NoctusSentinella（feature_order/標準dict準拠）着任。")
 
-    def _load_or_build_model(self, input_dim: int) -> tf.keras.Model:
-        if self.model_path.exists():
-            logging.info(f"神託モデル読込: {self.model_path}")
-            try:
-                return tf.keras.models.load_model(self.model_path)
-            except Exception as e:
-                logging.error(f"神託モデル読込失敗: {e}")
-        logging.info(f"新規神託モデル構築 (input_dim={input_dim})")
-        model = tf.keras.Sequential([
-            tf.keras.layers.Dense(64, activation='relu', input_shape=(input_dim,)),
-            tf.keras.layers.Dense(32, activation='relu'),
-            tf.keras.layers.Dense(1)
-        ])
-        model.compile(optimizer='adam', loss='mse')
-        return model
-
-    def save_model(self):
-        try:
-            self.model_path.parent.mkdir(parents=True, exist_ok=True)
-            self.model.save(self.model_path)
-            logging.info(f"神託モデル保存: {self.model_path}")
-        except Exception as e:
-            logging.error(f"神託モデル保存失敗: {e}")
-
-    def train(
+    def calculate_lot_and_risk(
         self,
-        features_df: pd.DataFrame,
-        target_col: str,
-        epochs: int = 10,
-        batch_size: int = 32
-    ):
-        X_train = features_df[self.feature_order].values
-        y_train = features_df[target_col].values
-        self.model = self._load_or_build_model(input_dim=len(self.feature_order))
-        self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
-        self.save_model()
-
-    def predict_future(
-        self,
-        features_df: pd.DataFrame,
-        n_days: int = 14,
+        feature_dict: Dict[str, Any],
+        side: str,
+        entry_price: float,
+        stop_loss_price: float,
+        capital: float,
+        risk_percent: float = 0.01,
         decision_id: Optional[str] = None,
         caller: Optional[str] = "king_noctria",
-        reason: Optional[str] = None
-    ) -> pd.DataFrame:
-        df_input = features_df[self.feature_order].tail(n_days)
-        X_input = df_input.values
-        y_pred = self.model.predict(X_input).flatten()
-        confidence_margin = np.std(y_pred) * 1.5 if len(y_pred) > 1 else 2.0
-        y_lower = y_pred - confidence_margin
-        y_upper = y_pred + confidence_margin
+        reason: Optional[str] = None,
+        min_risk: float = 0.005,
+        max_risk: float = 0.01
+    ) -> Dict[str, Any]:
+        sl_distance = abs(entry_price - stop_loss_price)
+        if sl_distance <= 0:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text="ストップロスとエントリー価格が同一/逆方向です",
+                lot=0, risk_amount=0, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
 
-        if 'Date' in features_df.columns:
-            dates = features_df['Date'].tail(n_days).tolist()
-        else:
-            dates = [str(datetime.today() + timedelta(days=i))[:10] for i in range(n_days)]
+        risk_amount = capital * risk_percent
+        min_risk_amount = capital * min_risk
+        max_risk_amount = capital * max_risk
+        if not (min_risk_amount <= risk_amount <= max_risk_amount):
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"リスク額 {risk_amount:.2f} が許容範囲（{min_risk_amount:.2f}～{max_risk_amount:.2f}）外",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        lot = risk_amount / sl_distance
+        lot = max(round(lot, 2), 0.01)
 
-        df = pd.DataFrame({
-            "date": dates,
-            "forecast": y_pred.round(4),
-            "lower": y_lower.round(4),
-            "upper": y_upper.round(4),
+        # 標準dictから取得
+        try:
+            liquidity = feature_dict.get(self.col_map["liquidity"], None)
+            spread = feature_dict.get(self.col_map["spread"], None)
+            volatility = feature_dict.get(self.col_map["volatility"], None)
+            price = feature_dict.get(self.col_map["price"], None)
+            historical_data = feature_dict.get(self.col_map["historical_data"], None)
+            if None in (liquidity, spread, volatility, price, historical_data) or getattr(historical_data, 'empty', True):
+                raise ValueError("リスク評価に必要な特徴量が不足/不正。")
+            self.risk_manager = RiskManager(historical_data=historical_data)
+            risk_score = self.risk_manager.calculate_var_ratio(price)
+        except Exception as e:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"特徴量不足/異常: {e}",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+
+        if liquidity < self.min_liquidity:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"流動性不足({liquidity}<{self.min_liquidity})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        if spread > self.max_spread:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"スプレッド過大({spread}>{self.max_spread})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        if volatility > self.max_volatility:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"ボラティリティ過大({volatility}>{self.max_volatility})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+        if risk_score > self.risk_threshold:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"リスク過大({risk_score:.4f}>{self.risk_threshold:.4f})",
+                lot=0, risk_amount=risk_amount, risk_percent=risk_percent,
+                entry_price=entry_price, stop_loss_price=stop_loss_price,
+                capital=capital, decision_id=decision_id, caller=caller, reason=reason
+            )
+
+        return self._create_calc_result(
+            decision="APPROVE",
+            reason_text="全監視項目正常/許可",
+            lot=lot, risk_amount=risk_amount, risk_percent=risk_percent,
+            entry_price=entry_price, stop_loss_price=stop_loss_price,
+            capital=capital, decision_id=decision_id, caller=caller, reason=reason
+        )
+
+    def _create_calc_result(
+        self,
+        decision: str,
+        reason_text: str,
+        lot: float,
+        risk_amount: float,
+        risk_percent: float,
+        entry_price: float,
+        stop_loss_price: float,
+        capital: float,
+        decision_id: Optional[str],
+        caller: Optional[str],
+        reason: Optional[str]
+    ) -> Dict[str, Any]:
+        return {
+            "name": "NoctusSentinella",
+            "type": "risk_calc",
+            "decision": decision,
+            "reason": reason_text,
+            "lot": round(lot, 3),
+            "risk_amount": round(risk_amount, 2),
+            "risk_percent": risk_percent,
+            "entry_price": entry_price,
+            "stop_loss": stop_loss_price,
+            "capital": capital,
             "decision_id": decision_id,
             "caller": caller,
-            "reason": reason
-        })
-        return df
-
-    def write_forecast_json(
-        self,
-        features_df: pd.DataFrame,
-        n_days: int = 14,
-        decision_id: Optional[str] = None,
-        caller: Optional[str] = "king_noctria",
-        reason: Optional[str] = None
-    ):
-        df = self.predict_future(features_df, n_days, decision_id, caller, reason)
-        try:
-            ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
-            df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
-            logging.info(f"予測結果保存: {ORACLE_FORECAST_JSON}")
-        except Exception as e:
-            logging.error(f"予測JSON保存失敗: {e}")
+            "action_reason": reason
+        }
 
 # === テスト例 ===
 if __name__ == "__main__":
-    logging.info("--- Prometheus Oracle feature_orderテスト ---")
-    test_df = pd.DataFrame(
-        np.random.rand(30, len(STANDARD_FEATURE_ORDER)),
-        columns=STANDARD_FEATURE_ORDER
+    logging.info("--- Noctus: feature_order標準化テスト ---")
+    dummy_hist_data = pd.DataFrame({'Close': np.random.normal(loc=150, scale=2, size=100)})
+    dummy_hist_data['returns'] = dummy_hist_data['Close'].pct_change().dropna()
+    feature_dict = {
+        "price": 152.5,
+        "volume": 150,
+        "spread": 0.012,
+        "volatility": 0.15,
+        "historical_data": dummy_hist_data
+    }
+    noctus_ai = NoctusSentinella(feature_order=STANDARD_FEATURE_ORDER)
+    res = noctus_ai.calculate_lot_and_risk(
+        feature_dict=feature_dict,
+        side="BUY",
+        entry_price=152.60,
+        stop_loss_price=152.30,
+        capital=20000,
+        risk_percent=0.007,
+        decision_id="TEST-NOCTUS-1",
+        caller="test",
+        reason="unit_test"
     )
-    test_df['target'] = test_df[STANDARD_FEATURE_ORDER[0]].shift(-1).fillna(method='ffill')
-    oracle = PrometheusOracle(feature_order=STANDARD_FEATURE_ORDER)
-    oracle.train(test_df, target_col="target", epochs=2)
-    forecast_df = oracle.predict_future(test_df, n_days=5, decision_id="KC-TEST", caller="test", reason="unit_test")
-    print(forecast_df.tail(5))
-    oracle.write_forecast_json(test_df, n_days=5, decision_id="KC-TEST", caller="test", reason="unit_test")
-    logging.info("--- Prometheus Oracle feature_orderテスト完了 ---")
+    print(f"🛡️ Noctusロット/リスク判定: {res['decision']} ({res['reason']}) Lot: {res['lot']}, Risk額: {res['risk_amount']}")
