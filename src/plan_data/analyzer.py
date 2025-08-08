@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any, List
-from src.plan_data.feature_spec import FEATURE_SPEC
+from plan_data.feature_spec import FEATURE_SPEC
 
 class PlanAnalyzer:
     """
