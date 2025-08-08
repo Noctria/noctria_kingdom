@@ -13,21 +13,15 @@ import pandas as pd
 
 # --- Plan層標準カラムセット ---
 PLAN_FEATURE_COLUMNS = [
-    # 日付・識別系
-    "Date", "tag", "strategy",
-    # 価格・テクニカル系
-    "USDJPY_Close", "USDJPY_Volume", "USDJPY_Return",
-    "USDJPY_Volatility_5d", "USDJPY_Volatility_20d", "USDJPY_RSI_14d",
-    "USDJPY_GC_Flag", "USDJPY_PO_UP", "USDJPY_PO_DOWN",
-    # ニュース・センチメント系
-    "News_Count", "News_Positive", "News_Negative",
-    "News_Positive_Ratio", "News_Negative_Ratio", "News_Spike_Flag",
-    # マクロ経済・指標系
-    "CPIAUCSL_Value", "CPIAUCSL_Diff", "CPIAUCSL_Spike_Flag",
-    "FEDFUNDS_Value", "FEDFUNDS_Diff", "FEDFUNDS_Spike_Flag",
-    # 主要イベント系
-    "FOMC", "NFP",
-    # 評価KPI・アウトカム
+    "date", "tag", "strategy",
+    "usdjpy_close", "usdjpy_volume", "usdjpy_return",
+    "usdjpy_volatility_5d", "usdjpy_volatility_20d", "usdjpy_rsi_14d",
+    "usdjpy_gc_flag", "usdjpy_po_up", "usdjpy_po_down",
+    "news_count", "news_positive", "news_negative",
+    "news_positive_ratio", "news_negative_ratio", "news_spike_flag",
+    "cpiaucsl_value", "cpiaucsl_diff", "cpiaucsl_spike_flag",
+    "fedfunds_value", "fedfunds_diff", "fedfunds_spike_flag",
+    "fomc", "nfp",
     "win_rate", "max_dd", "num_trades"
 ]
 
