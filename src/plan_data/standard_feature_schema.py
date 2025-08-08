@@ -1,12 +1,12 @@
 # src/plan_data/standard_feature_schema.py
 STANDARD_FEATURE_ORDER = [
-    "USDJPY_Close",
-    "USDJPY_Volatility_5d",
-    "SP500_Close",
-    "VIX_Close",
-    "News_Count",
-    "CPIAUCSL_Value",
-    "FEDFUNDS_Value",
-    "UNRATE_Value",
+    "usdjpy_close",
+    "usdjpy_volatility_5d",
+    "sp500_close",
+    "vix_close",
+    "news_count",
+    "cpiaucsl_value",
+    "fedfunds_value",
+    "unrate_value",
     # ...必要に応じて追加...
 ]
