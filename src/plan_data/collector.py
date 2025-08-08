@@ -1,3 +1,5 @@
+# src/plan_data/collector.py
+
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -113,7 +115,9 @@ class PlanDataCollector:
             merged = merged.sort_values("date")
             merged = merged.fillna(method="ffill")
 
-            print("DEBUG: merged.columns =", merged.columns.tolist())  # ← 追加
+            # MultiIndexならフラット化（例: ('usdjpy_close', 'JPY=X') -> 'usdjpy_close_JPY=X'）
+            if isinstance(merged.columns, pd.MultiIndex):
+                merged.columns = ['_'.join(filter(None, col)) for col in merged.columns]
 
             key = "usdjpy_close"
             if key in merged.columns:
