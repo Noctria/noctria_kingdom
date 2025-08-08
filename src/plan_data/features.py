@@ -39,11 +39,14 @@ class FeatureEngineer:
 
         # 1. 市場系アセットの特徴量
         for key in self.symbols:
-            # 小文字・アンダースコアへ統一
             key_l = key.lower()
             c = f"{key_l}_close"
             v = f"{key_l}_volume"
+
             if c in newdf.columns:
+                # 数値型に変換（非数値はNaNに）
+                newdf[c] = pd.to_numeric(newdf[c], errors='coerce')
+
                 newdf[f"{key_l}_return"] = newdf[c].pct_change()
                 newdf[f"{key_l}_volatility_5d"] = newdf[f"{key_l}_return"].rolling(5).std()
                 newdf[f"{key_l}_volatility_20d"] = newdf[f"{key_l}_return"].rolling(20).std()
@@ -61,7 +64,11 @@ class FeatureEngineer:
                 po_down = ((ma_short < ma_mid) & (ma_mid < ma_longer)).astype(int)
                 newdf[f"{key_l}_po_up"] = po_up
                 newdf[f"{key_l}_po_down"] = po_down
+
             if v in newdf.columns:
+                # 数値型に変換
+                newdf[v] = pd.to_numeric(newdf[v], errors='coerce')
+
                 newdf[f"{key_l}_volume_ma5"] = newdf[v].rolling(5).mean()
                 newdf[f"{key_l}_volume_ma20"] = newdf[v].rolling(20).mean()
                 avg20 = newdf[f"{key_l}_volume_ma20"]
@@ -69,9 +76,12 @@ class FeatureEngineer:
 
         # 2. ニュース件数・センチメント系
         if "news_count" in newdf.columns:
+            newdf["news_count"] = pd.to_numeric(newdf["news_count"], errors='coerce')
             newdf["news_count_change"] = newdf["news_count"].diff()
             newdf["news_spike_flag"] = (newdf["news_count"] > newdf["news_count"].rolling(20).mean() * 2).astype(int)
         if "news_positive" in newdf.columns and "news_negative" in newdf.columns:
+            newdf["news_positive"] = pd.to_numeric(newdf["news_positive"], errors='coerce')
+            newdf["news_negative"] = pd.to_numeric(newdf["news_negative"], errors='coerce')
             newdf["news_positive_ratio"] = newdf["news_positive"] / (newdf["news_count"] + 1e-6)
             newdf["news_negative_ratio"] = newdf["news_negative"] / (newdf["news_count"] + 1e-6)
             newdf["news_positive_lead"] = (newdf["news_positive"] > newdf["news_negative"]).astype(int)
@@ -80,6 +90,7 @@ class FeatureEngineer:
         # 3. マクロ経済指標系（例：CPI、失業率、政策金利）
         for macro in ["cpiaucsl_value", "unrate_value", "fedfunds_value"]:
             if macro in newdf.columns:
+                newdf[macro] = pd.to_numeric(newdf[macro], errors='coerce')
                 newdf[f"{macro}_diff"] = newdf[macro].diff()
                 newdf[f"{macro}_spike_flag"] = (np.abs(newdf[f"{macro}_diff"]) > newdf[f"{macro}_diff"].rolling(12).std() * 2).astype(int)
 
