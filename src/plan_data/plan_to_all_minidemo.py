@@ -24,6 +24,9 @@ def main():
     fe = FeatureEngineer(ASSET_SYMBOLS)
     feat_df = fe.add_technical_features(base_df)
 
+    print("=== feat_df columns ===")
+    print(feat_df.columns.tolist())
+    
     # カラム順をSTANDARD_FEATURE_ORDERで合わせてdict生成
     feat_df = feat_df.dropna(subset=STANDARD_FEATURE_ORDER)
     latest_row = feat_df.iloc[-1]
