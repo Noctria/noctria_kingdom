@@ -14,17 +14,10 @@ Plan層の特徴量DataFrame→AurusSingularis AI入力→予測シグナル出�
 
 import pandas as pd
 import numpy as np
-from pathlib import Path
-import sys
 
-# --- 必要なモジュールimport ---
-sys.path.append(str(Path(__file__).resolve().parent))
-from features import FeatureEngineer
-from collector import PlanDataCollector, ASSET_SYMBOLS
-
-# --- Aurus AI本体import ---
-sys.path.append(str(Path(__file__).parents[1] / "strategies"))
-from aurus_singularis import AurusSingularis
+from src.plan_data.features import FeatureEngineer
+from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from src.strategies.aurus_singularis import AurusSingularis
 
 # ---------- 1. Plan層データ生成 ----------
 def generate_plan_features(n_days=15):
@@ -49,7 +42,6 @@ def plan_row_to_aurus_dict(row: pd.Series) -> dict:
     Plan層特徴量DFの1行からAurusSingularisが必要とする特徴量dictへ変換
     """
     return {
-        # 必須入力（Aurus現行仕様に揃える）
         "price": float(row.get("USDJPY_Close", np.nan)),
         "previous_price": float(row.get("USDJPY_Close", np.nan)),  # ここは連続データでshift可
         "volume": float(row.get("USDJPY_Volume", np.nan)),
@@ -58,18 +50,18 @@ def plan_row_to_aurus_dict(row: pd.Series) -> dict:
             row.get("USDJPY_MA5", np.nan) - row.get("USDJPY_MA25", np.nan)
         ),
         "macd_signal_diff": float(row.get("USDJPY_Return", np.nan)),  # 仮置き
-        "trend_strength": 0.5,  # 追加実装可
-        "trend_prediction": "neutral",  # 追加実装可
+        "trend_strength": 0.5,
+        "trend_prediction": "neutral",
         "rsi_14": float(row.get("USDJPY_RSI_14d", np.nan)),
-        "stoch_k": 50.0,  # 仮置き（要追加実装）
-        "momentum": 0.5,  # 仮置き
-        "bollinger_upper_dist": 0.0,  # 仮置き
-        "bollinger_lower_dist": 0.0,  # 仮置き
+        "stoch_k": 50.0,
+        "momentum": 0.5,
+        "bollinger_upper_dist": 0.0,
+        "bollinger_lower_dist": 0.0,
         "sentiment": row.get("News_Positive_Ratio", 0.5),
-        "order_block": 0.0,  # 仮置き
-        "liquidity_ratio": 1.0,  # 仮置き
-        "interest_rate_diff": float(row.get("FEDFUNDS_Value", np.nan)),  # 利上げ系マクロ
-        "cpi_change_rate": float(row.get("CPIAUCSL_Value", np.nan)),     # CPI
+        "order_block": 0.0,
+        "liquidity_ratio": 1.0,
+        "interest_rate_diff": float(row.get("FEDFUNDS_Value", np.nan)),
+        "cpi_change_rate": float(row.get("CPIAUCSL_Value", np.nan)),
         "news_sentiment_score": row.get("News_Positive_Ratio", 0.5),
         "symbol": "USDJPY"
     }
