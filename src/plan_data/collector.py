@@ -14,7 +14,7 @@ except ImportError:
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.plan_data.feature_spec import FEATURE_SPEC
+from plan_data.feature_spec import FEATURE_SPEC
 
 ASSET_SYMBOLS = {
     # --- 優先度S, A, Bアセット ---
