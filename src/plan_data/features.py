@@ -2,8 +2,8 @@
 
 import pandas as pd
 import numpy as np
-from src.plan_data.feature_spec import FEATURE_SPEC
-from src.plan_data.collector import ASSET_SYMBOLS  # 必要に応じて調整
+from plan_data.feature_spec import FEATURE_SPEC
+from plan_data.collector import ASSET_SYMBOLS  # 必要に応じて調整
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
     """feature_spec.pyに準拠したカラム順・型・補完でDataFrameを整形"""
