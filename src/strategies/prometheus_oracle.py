@@ -2,21 +2,21 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (Plan層連携バージョン)
-- Plan層（features/analyzer等）で生成した特徴量DataFrameから未来予測
-- 予測にはdecision_id/caller/reasonを記録返却
-- モデル訓練もDataFrame直受け（feature_order指定）
+🔮 Prometheus Oracle (標準feature_order準拠)
+- Plan層（features/analyzer等）で生成した標準特徴量DataFrameから未来予測
+- feature_orderはPlan層設計で標準化・連携
 """
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 import logging
 
 from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON
+from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
@@ -24,20 +24,20 @@ class PrometheusOracle:
     def __init__(
         self,
         model_path: Optional[Path] = None,
-        feature_order: Optional[List[str]] = None,
+        feature_order: Optional[List[str]] = None
     ):
+        self.feature_order = feature_order or STANDARD_FEATURE_ORDER
         self.model_path = model_path or (VERITAS_MODELS_DIR / "prometheus_oracle.keras")
-        self.feature_order = feature_order  # List[str], Plan層で定義した特徴量カラム順
-        self.model = self._load_or_build_model(input_dim=len(feature_order) if feature_order else 30)
+        self.model = self._load_or_build_model(input_dim=len(self.feature_order))
 
-    def _load_or_build_model(self, input_dim: int = 30) -> tf.keras.Model:
+    def _load_or_build_model(self, input_dim: int) -> tf.keras.Model:
         if self.model_path.exists():
-            logging.info(f"古の神託を読み解いております: {self.model_path}")
+            logging.info(f"神託モデル読込: {self.model_path}")
             try:
                 return tf.keras.models.load_model(self.model_path)
             except Exception as e:
-                logging.error(f"神託の解読に失敗しました: {e}")
-        logging.info("新たな神託の儀を執り行います。")
+                logging.error(f"神託モデル読込失敗: {e}")
+        logging.info(f"新規神託モデル構築 (input_dim={input_dim})")
         model = tf.keras.Sequential([
             tf.keras.layers.Dense(64, activation='relu', input_shape=(input_dim,)),
             tf.keras.layers.Dense(32, activation='relu'),
@@ -50,9 +50,9 @@ class PrometheusOracle:
         try:
             self.model_path.parent.mkdir(parents=True, exist_ok=True)
             self.model.save(self.model_path)
-            logging.info(f"神託を王国の書庫に封印しました: {self.model_path}")
+            logging.info(f"神託モデル保存: {self.model_path}")
         except Exception as e:
-            logging.error(f"神託の封印に失敗しました: {e}")
+            logging.error(f"神託モデル保存失敗: {e}")
 
     def train(
         self,
@@ -61,12 +61,10 @@ class PrometheusOracle:
         epochs: int = 10,
         batch_size: int = 32
     ):
-        if not self.feature_order:
-            raise ValueError("feature_order（特徴量カラム順）を指定してください。")
         X_train = features_df[self.feature_order].values
         y_train = features_df[target_col].values
+        self.model = self._load_or_build_model(input_dim=len(self.feature_order))
         self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
-        logging.info("神託の修練が完了しました。")
         self.save_model()
 
     def predict_future(
@@ -77,18 +75,13 @@ class PrometheusOracle:
         caller: Optional[str] = "king_noctria",
         reason: Optional[str] = None
     ) -> pd.DataFrame:
-        if not self.feature_order:
-            raise ValueError("feature_order（特徴量カラム順）を指定してください。")
-        # 直近n日分の特徴量で未来予測
         df_input = features_df[self.feature_order].tail(n_days)
         X_input = df_input.values
         y_pred = self.model.predict(X_input).flatten()
-        # ここで信頼区間などを計算・追加も可能
         confidence_margin = np.std(y_pred) * 1.5 if len(y_pred) > 1 else 2.0
         y_lower = y_pred - confidence_margin
         y_upper = y_pred + confidence_margin
 
-        # 日付
         if 'Date' in features_df.columns:
             dates = features_df['Date'].tail(n_days).tolist()
         else:
@@ -117,30 +110,21 @@ class PrometheusOracle:
         try:
             ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
             df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
-            logging.info(f"神託を羊皮紙に記し、封印しました: {ORACLE_FORECAST_JSON}")
+            logging.info(f"予測結果保存: {ORACLE_FORECAST_JSON}")
         except Exception as e:
-            logging.error(f"神託JSONの保存に失敗: {e}")
+            logging.error(f"予測JSON保存失敗: {e}")
 
-# =====================
-# ✅ テストブロック
-# =====================
+# === テスト例 ===
 if __name__ == "__main__":
-    logging.info("--- Prometheus Oracle Plan連携テスト ---")
-    # ▼ 例: Plan層から特徴量DataFrameを生成
-    plan_features = pd.DataFrame(
-        np.random.rand(30, 8),  # 8特徴量・30サンプル
-        columns=["USDJPY_Close", "USDJPY_Volatility_5d", "SP500_Close", "VIX_Close",
-                 "News_Count", "CPIAUCSL_Value", "FEDFUNDS_Value", "UNRATE_Value"]
+    logging.info("--- Prometheus Oracle feature_orderテスト ---")
+    test_df = pd.DataFrame(
+        np.random.rand(30, len(STANDARD_FEATURE_ORDER)),
+        columns=STANDARD_FEATURE_ORDER
     )
-    # ▼ feature_orderはPlan層設計と一致させる
-    feature_order = [
-        "USDJPY_Close", "USDJPY_Volatility_5d", "SP500_Close", "VIX_Close",
-        "News_Count", "CPIAUCSL_Value", "FEDFUNDS_Value", "UNRATE_Value"
-    ]
-    plan_features['target'] = plan_features["USDJPY_Close"].shift(-1).fillna(method='ffill')
-    oracle = PrometheusOracle(feature_order=feature_order)
-    oracle.train(plan_features, target_col="target", epochs=3)
-    forecast_df = oracle.predict_future(plan_features, n_days=7, decision_id="KC-TEST", caller="test", reason="単体テスト")
-    print(forecast_df.tail(7))
-    oracle.write_forecast_json(plan_features, n_days=7, decision_id="KC-TEST", caller="test", reason="単体テスト")
-    logging.info("--- Prometheus Oracle Plan連携テスト完了 ---")
+    test_df['target'] = test_df[STANDARD_FEATURE_ORDER[0]].shift(-1).fillna(method='ffill')
+    oracle = PrometheusOracle(feature_order=STANDARD_FEATURE_ORDER)
+    oracle.train(test_df, target_col="target", epochs=2)
+    forecast_df = oracle.predict_future(test_df, n_days=5, decision_id="KC-TEST", caller="test", reason="unit_test")
+    print(forecast_df.tail(5))
+    oracle.write_forecast_json(test_df, n_days=5, decision_id="KC-TEST", caller="test", reason="unit_test")
+    logging.info("--- Prometheus Oracle feature_orderテスト完了 ---")
