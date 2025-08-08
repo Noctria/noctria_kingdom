@@ -7,20 +7,14 @@ Plan層（collector→features→statistics）からPrometheus Oracleへの連�
 
 import pandas as pd
 import numpy as np
-from datetime import datetime
-import sys
 from pathlib import Path
 
-# --- モジュールimport ---
-sys.path.append(str(Path(__file__).resolve().parent.parent))  # src/plan_data/へのパス調整
+from src.core.path_config import DATA_DIR
+from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from src.plan_data.features import FeatureEngineer
+from src.plan_data.statistics import PlanStatistics
 
-from collector import PlanDataCollector, ASSET_SYMBOLS
-from features import FeatureEngineer
-from statistics import PlanStatistics
-
-# Prometheus Oracle本体
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "strategies"))
-from prometheus_oracle import PrometheusOracle
+from src.strategies.prometheus_oracle import PrometheusOracle
 
 def main():
     # --- ① 市場データ・特徴量生成 ---
@@ -45,7 +39,7 @@ def main():
         print(f"{k}: {v}")
 
     # --- ④ 予測結果をJSON出力（オプション） ---
-    json_path = Path("data/prometheus_forecast_demo.json")
+    json_path = DATA_DIR / "prometheus_forecast_demo.json"
     forecast_df.to_json(json_path, orient="records", force_ascii=False, indent=2)
     print(f"\n📁 予測結果JSON: {json_path.resolve()}")
 
