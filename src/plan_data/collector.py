@@ -54,12 +54,6 @@ FRED_SERIES = {
 }
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    feature_spec.pyのFEATURE_SPEC（リスト）に準拠して
-    - カラム順の整列
-    - 欠損カラムはNaNで埋める
-    - 型変換処理は省略（現状feature_spec.pyに型情報が無いため）
-    """
     columns = FEATURE_SPEC  # FEATURE_SPECはリストなのでそのまま使う
 
     # 欠損カラムはNaNで追加
@@ -67,9 +61,8 @@ def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = pd.NA
 
-    # 型変換は省略（必要なら個別に実装する）
+    # 型変換は不要または個別実装
 
-    # カラム順をFEATURE_SPECに合わせて返す
     return df[columns]
 
 class PlanDataCollector:
