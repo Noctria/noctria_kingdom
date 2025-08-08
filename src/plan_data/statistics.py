@@ -8,8 +8,8 @@ from typing import Dict, Any, List, Optional, Union
 from collections import defaultdict, Counter
 from statistics import mean, stdev
 import pandas as pd
-from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
-from src.plan_data.feature_spec import FEATURE_SPEC
+from plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from plan_data.feature_spec import FEATURE_SPEC
 
 class PlanStatistics:
     def __init__(self, collector: Optional[PlanDataCollector] = None, use_timeseries: bool = True, lookback_days: int = 365):
