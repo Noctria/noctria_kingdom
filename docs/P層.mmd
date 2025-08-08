@@ -1,72 +1,54 @@
 flowchart TD
-
-  %% --- Plan層（計画・特徴量生成） ---
-  subgraph Plan["🗺️ PLAN層: 市場分析・特徴量生成 (src/plan_data/)"]
-    COLLECTOR["collector.py<br>🟩 データ収集"]
-    FEATURES["features.py<br>🟦 テク・マクロ特徴量生成"]
-    STATISTICS["statistics.py<br>🟪 KPI集計/統計"]
-    ANALYZER["analyzer.py<br>🟧 要因抽出・自然言語説明"]
-    PLAN_WF["run_pdca_plan_workflow.py<br>🟫 PDCA Planワークフロー"]
-    DF_OUT["出力: <b>特徴量DataFrame</b>"]
-    COLLECTOR --> FEATURES
-    FEATURES --> STATISTICS
-    FEATURES --> ANALYZER
-    ANALYZER --> PLAN_WF
-    STATISTICS --> PLAN_WF
-    PLAN_WF --> DF_OUT
+  %% --- Plan層 ---
+  subgraph PLAN["🗺️ PLAN層（collector→features→analyzer/statistics）"]
+    COLLECT["PlanDataCollector<br>市場データ収集"]
+    FEATENG["FeatureEngineer<br>特徴量生成"]
+    FEATDF["特徴量DataFrame/Dict出力"]
+    ANALYZER["PlanAnalyzer<br>要因抽出/ラベル"]
   end
 
-  %% --- 臣下AI（主要ファイルのみ） ---
-  subgraph Vassals["🤖 臣下AI（主要AI/リスク計算含む）"]
-    AURUS["aurus_singularis.py<br>ML市場分析"]
-    LEVIA["levia_tempest.py<br>スキャルピング"]
-    NOCTUS["noctus_sentinella.py<br>リスク計算/ロット計算"]
-    PROMETHEUS["prometheus_oracle.py<br>未来予測"]
-    HERMES["hermes_cognitor.py<br>LLM説明"]
-    VERITAS["veritas_machina.py<br>戦略評価生成"]
+  %% --- AI臣下たち ---
+  subgraph AI_UNDERLINGS["🤖 臣下AI群（src/strategies/）"]
+    AURUS["🎯 Aurus<br>総合分析<br><b>propose()</b>"]
+    LEVIA["⚡ Levia<br>スキャルピング<br><b>propose()</b>"]
+    NOCTUS["🛡️ Noctus<br>リスク/ロット判定<br><b>calculate_lot_and_risk()</b>"]
+    PROMETHEUS["🔮 Prometheus<br>未来予測<br><b>predict_future()</b>"]
+    HERMES["🦉 Hermes<br>LLM説明<br><b>propose()</b>"]
+    VERITAS["🧠 Veritas<br>戦略提案<br><b>propose()</b>"]
   end
 
-  %% --- データフロー ---
-  DF_OUT -- "dict/DFで入力" --> AURUS
-  DF_OUT --> LEVIA
-  DF_OUT --> NOCTUS
-  DF_OUT --> PROMETHEUS
-  DF_OUT --> VERITAS
-  ANALYZER -- "要因dict" --> HERMES
+  %% --- 連携 ---
+  COLLECT --> FEATENG
+  FEATENG --> FEATDF
+  FEATDF -->|最新dict/DF/feature_order| AURUS
+  FEATDF --> LEVIA
+  FEATDF --> NOCTUS
+  FEATDF --> PROMETHEUS
+  FEATDF --> VERITAS
 
-  %% --- 王（Noctria） ---
-  subgraph King["👑 Noctria（中央統治AI）"]
-    KING["king_noctria.py<br>PDCA統括"]
+  FEATDF --> ANALYZER
+  ANALYZER --> HERMES
+
+  %% --- サンプルデモ ---
+  subgraph DEMO["plan_to_all_minidemo.py"]
+    DEMOENTRY["全AI同時呼び出し"]
   end
+  DEMOENTRY --> FEATDF
+  DEMOENTRY -.-> AURUS
+  DEMOENTRY -.-> LEVIA
+  DEMOENTRY -.-> NOCTUS
+  DEMOENTRY -.-> PROMETHEUS
+  DEMOENTRY -.-> HERMES
+  DEMOENTRY -.-> VERITAS
 
-  AURUS -- "signal" --> KING
-  LEVIA -- "signal" --> KING
-  NOCTUS -- "リスク判定/lot計算" --> KING
-  PROMETHEUS -- "予測" --> KING
-  HERMES -- "要約" --> KING
-  VERITAS -- "戦略評価" --> KING
+  %% --- 装飾 ---
+  classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7
+  classDef ai fill:#333,color:#ffe476,stroke:#a97e2c
+  classDef demo fill:#25252a,stroke:#f6e58d,color:#fffaad
 
-  %% --- Do層（order_execution）への受け渡し ---
-  KING -- "公式発注: issue_order_safely() <br>（Noctus計算済lot/リスク値を受け取る）" --> DOORDER[/"order_execution.py<br>MT5発注"/]
+  class PLAN plan
+  class AI_UNDERLINGS ai
+  class DEMO demo
 
-  %% --- スタイル調整 ---
-  style COLLECTOR fill:#2176ae,color:#fff
-  style FEATURES fill:#2a9d8f,color:#fff
-  style STATISTICS fill:#6649b8,color:#fff
-  style ANALYZER fill:#e68653,color:#fff
-  style PLAN_WF fill:#8367c7,color:#fff
-  style DF_OUT fill:#1d3557,color:#fff
-
-  style AURUS fill:#2980b9,color:#fff
-  style LEVIA fill:#e89c4d,color:#111
-  style NOCTUS fill:#574f7d,color:#fff
-  style PROMETHEUS fill:#512b81,color:#fff
-  style HERMES fill:#5fa8d3,color:#111
-  style VERITAS fill:#52b788,color:#fff
-
-  style KING fill:#FFD700,color:#2d2d2d,stroke:#222,stroke-width:3px
-  style DOORDER fill:#222,color:#fff,stroke:#FFD700,stroke-width:2px
-
-  style Plan stroke:#aaa,stroke-width:2px
-  style Vassals stroke:#aaa,stroke-width:2px
-  style King stroke:#bca136,stroke-width:2px
+  %% --- 補足 ---
+  click DEMOENTRY "https://github.com/your_repo/src/plan_data/plan_to_all_minidemo.py" "サンプル実装ファイル"
