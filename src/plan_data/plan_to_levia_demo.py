@@ -3,10 +3,10 @@
 import pandas as pd
 from datetime import datetime, timedelta
 
-from src.plan_data.collector import PlanDataCollector
-from src.plan_data.features import FeatureEngineer
+from plan_data.collector import PlanDataCollector
+from plan_data.features import FeatureEngineer
 from src.strategies.levia_tempest import LeviaTempest
-from src.plan_data.collector import ASSET_SYMBOLS
+from plan_data.collector import ASSET_SYMBOLS
 
 def prepare_levia_input(row) -> dict:
     """
