@@ -1,18 +1,13 @@
 # src/plan_data/plan_to_hermes_demo.py
 
-import sys
-from pathlib import Path
 import json
+from pathlib import Path
 
-# --- パス調整 ---
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
-from plan_data.features import FeatureEngineer
-from plan_data.analyzer import PlanAnalyzer
-from strategies.hermes_cognitor import HermesCognitorStrategy
+from src.core.path_config import DATA_DIR
+from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from src.plan_data.features import FeatureEngineer
+from src.plan_data.analyzer import PlanAnalyzer
+from src.strategies.hermes_cognitor import HermesCognitorStrategy
 
 def main():
     # 1. 特徴量・要因ラベルをPlan層から生成
@@ -41,7 +36,7 @@ def main():
 
     # 3. 結果表示＆保存
     print(json.dumps(proposal, indent=2, ensure_ascii=False))
-    out_path = Path("data/demo/hermes_summary_sample.json")
+    out_path = DATA_DIR / "demo" / "hermes_summary_sample.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(proposal, f, ensure_ascii=False, indent=2)
