@@ -1,27 +1,21 @@
 # src/plan_data/plan_to_all_minidemo.py
 
-import sys
-from pathlib import Path
 import json
 import pandas as pd
 import numpy as np
 
-# --- パス調整 ---
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+from src.core.path_config import DATA_DIR
+from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from src.plan_data.features import FeatureEngineer
+from src.plan_data.analyzer import PlanAnalyzer
+from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
-from plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
-from plan_data.features import FeatureEngineer
-from plan_data.analyzer import PlanAnalyzer
-from plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER  # ←追加
-
-from strategies.aurus_singularis import AurusSingularis
-from strategies.levia_tempest import LeviaTempest
-from strategies.noctus_sentinella import NoctusSentinella
-from strategies.prometheus_oracle import PrometheusOracle
-from strategies.hermes_cognitor import HermesCognitorStrategy
-from strategies.veritas_machina import VeritasMachina
+from src.strategies.aurus_singularis import AurusSingularis
+from src.strategies.levia_tempest import LeviaTempest
+from src.strategies.noctus_sentinella import NoctusSentinella
+from src.strategies.prometheus_oracle import PrometheusOracle
+from src.strategies.hermes_cognitor import HermesCognitorStrategy
+from src.strategies.veritas_machina import VeritasMachina
 
 def main():
     # 1. 特徴量生成
@@ -100,7 +94,7 @@ def main():
         hermes=hermes_out,
         veritas=veritas_out,
     )
-    out_path = Path("data/demo/plan_to_all_minidemo.json")
+    out_path = DATA_DIR / "demo" / "plan_to_all_minidemo.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
