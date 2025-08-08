@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 import os
 import requests
-import time
 
 try:
     import yfinance as yf
@@ -13,7 +12,11 @@ except ImportError:
     raise ImportError("yfinance が必要です: pip install yfinance")
 
 from dotenv import load_dotenv
-load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
+
+# ルートディレクトリ直下の .env を明示的に読み込み
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+
+newsapi_key = os.getenv("NEWSAPI_KEY")
 
 from plan_data.feature_spec import FEATURE_SPEC
 
@@ -54,10 +57,13 @@ FRED_SERIES = {
 }
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
+    """feature_spec.py準拠でカラム順・型・NaN補完を整形"""
     columns = list(FEATURE_SPEC.keys())
+    # 欠損カラムはNaNで追加
     for col in columns:
         if col not in df.columns:
             df[col] = pd.NA
+    # 型変換（失敗時はスキップ）
     for col in columns:
         try:
             dtype = FEATURE_SPEC[col]["type"]
@@ -75,9 +81,6 @@ class PlanDataCollector:
         self.newsapi_key = os.getenv("NEWSAPI_KEY")
         if not self.newsapi_key:
             print("[collector] ⚠️ NEWSAPI_KEYが未設定です")
-        self.gnews_api_key = os.getenv("GNEWS_API_KEY")
-        if not self.gnews_api_key:
-            print("[collector] ⚠️ GNEWS_API_KEYが未設定です")
 
     def fetch_multi_assets(self, start: str, end: str, interval: str = "1d", symbols: Optional[Dict] = None) -> pd.DataFrame:
         if symbols is None:
@@ -93,6 +96,7 @@ class PlanDataCollector:
                 cols = ["Date", "Close"]
                 if "Volume" in df.columns:
                     cols.append("Volume")
+                # カラム名統一（小文字/アンダースコア、feature_spec側で調整）
                 df = df[cols].rename(
                     columns={
                         "Date": "date",
@@ -103,7 +107,6 @@ class PlanDataCollector:
                 dfs.append(df)
             except Exception as e:
                 print(f"[collector] {ticker} の取得中エラー: {e}")
-
         merged = None
         for df in dfs:
             if merged is None:
@@ -114,6 +117,7 @@ class PlanDataCollector:
             merged = merged.sort_values("date")
             merged = merged.fillna(method="ffill")
 
+            # MultiIndexならフラット化（例: ('usdjpy_close', 'JPY=X') -> 'usdjpy_close_JPY=X'）
             if isinstance(merged.columns, pd.MultiIndex):
                 merged.columns = ['_'.join(filter(None, col)) for col in merged.columns]
 
@@ -162,88 +166,47 @@ class PlanDataCollector:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
-    def fetch_newsapi_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
-        api_key = self.newsapi_key
-        if not api_key:
-            print("[collector] NEWSAPI_KEYが未設定です")
-            return pd.DataFrame()
-        dfs = []
-        dt_start = datetime.strptime(start_date, "%Y-%m-%d")
-        dt_end = datetime.strptime(end_date, "%Y-%m-%d")
-        for d in pd.date_range(dt_start, dt_end):
-            day_str = d.strftime("%Y-%m-%d")
-            url = (
-                f"https://newsapi.org/v2/everything?"
-                f"q={query}&from={day_str}&to={day_str}&language=en&pageSize=100"
-                f"&apiKey={api_key}"
-            )
-            try:
-                r = requests.get(url, timeout=10)
-                r.raise_for_status()
-                data = r.json()
-                n_total = data.get("totalResults", 0)
-                articles = data.get("articles", [])
-                pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
-                neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
-                pos_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in pos_words)
-                    for a in articles
-                )
-                neg_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in neg_words)
-                    for a in articles
-                )
-                dfs.append(
-                    {"date": pd.to_datetime(day_str), "news_count": n_total,
-                     "news_positive": pos_count, "news_negative": neg_count}
-                )
-                time.sleep(1.2)
-            except Exception as e:
-                print(f"[collector] NewsAPI {day_str}取得失敗: {e}")
-        if dfs:
-            return pd.DataFrame(dfs)
-        return pd.DataFrame()
-
-    def fetch_gnews_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
-        api_key = self.gnews_api_key
-        if not api_key:
-            print("[collector] GNEWS_API_KEYが未設定です")
-            return pd.DataFrame()
-        dfs = []
-        dt_start = datetime.strptime(start_date, "%Y-%m-%d")
-        dt_end = datetime.strptime(end_date, "%Y-%m-%d")
-        for d in pd.date_range(dt_start, dt_end):
-            day_str = d.strftime("%Y-%m-%d")
-            url = (
-                f"https://gnews.io/api/v4/search?"
-                f"q={query}&from={day_str}&to={day_str}&lang=en&max=100&token={api_key}"
-            )
-            try:
-                r = requests.get(url, timeout=10)
-                r.raise_for_status()
-                data = r.json()
-                articles = data.get("articles", [])
-                n_total = len(articles)
-                pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
-                neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
-                pos_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in pos_words)
-                    for a in articles
-                )
-                neg_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in neg_words)
-                    for a in articles
-                )
-                dfs.append(
-                    {"date": pd.to_datetime(day_str), "news_count": n_total,
-                     "news_positive": pos_count, "news_negative": neg_count}
-                )
-                time.sleep(1.2)
-            except Exception as e:
-                print(f"[collector] GNews {day_str}取得失敗: {e}")
-        if dfs:
-            return pd.DataFrame(dfs)
-        return pd.DataFrame()
+    # NewsAPIを使わないためコメントアウト
+    # def fetch_newsapi_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
+    #     api_key = self.newsapi_key
+    #     if not api_key:
+    #         print("[collector] NEWSAPI_KEYが未設定です")
+    #         return pd.DataFrame()
+    #     dfs = []
+    #     dt_start = datetime.strptime(start_date, "%Y-%m-%d")
+    #     dt_end = datetime.strptime(end_date, "%Y-%m-%d")
+    #     for d in pd.date_range(dt_start, dt_end):
+    #         day_str = d.strftime("%Y-%m-%d")
+    #         url = (
+    #             f"https://newsapi.org/v2/everything?"
+    #             f"q={query}&from={day_str}&to={day_str}&language=en&pageSize=100"
+    #             f"&apiKey={api_key}"
+    #         )
+    #         try:
+    #             r = requests.get(url, timeout=10)
+    #             r.raise_for_status()
+    #             data = r.json()
+    #             n_total = data.get("totalResults", 0)
+    #             articles = data.get("articles", [])
+    #             pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
+    #             neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
+    #             pos_count = sum(
+    #                 any(w in (a.get("title") or "").lower() for w in pos_words)
+    #                 for a in articles
+    #             )
+    #             neg_count = sum(
+    #                 any(w in (a.get("title") or "").lower() for w in neg_words)
+    #                 for a in articles
+    #             )
+    #             dfs.append(
+    #                 {"date": pd.to_datetime(day_str), "news_count": n_total,
+    #                  "news_positive": pos_count, "news_negative": neg_count}
+    #             )
+    #         except Exception as e:
+    #             print(f"[collector] NewsAPI {day_str}取得失敗: {e}")
+    #     if dfs:
+    #         return pd.DataFrame(dfs)
+    #     return pd.DataFrame()
 
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
         end = datetime.today()
@@ -253,28 +216,26 @@ class PlanDataCollector:
 
         df = self.fetch_multi_assets(start=start_str, end=end_str)
 
-        # FREDデータ
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and df is not None:
                 df = pd.merge(df, fred_df, on="date", how="left")
                 df = df.sort_values("date").fillna(method="ffill")
 
-        # イベントカレンダー
         event_df = self.fetch_event_calendar()
         if not event_df.empty and df is not None:
             df = pd.merge(df, event_df, on="date", how="left")
 
-        # GNews（日次ニュース件数・ポジネガ件数）
-        news_df = self.fetch_gnews_counts(start_str, end_str)
-        if not news_df.empty and df is not None:
-            df = pd.merge(df, news_df, on="date", how="left")
+        # NewsAPIは使わないためコメントアウト
+        # news_df = self.fetch_newsapi_counts(start_str, end_str)
+        # if not news_df.empty and df is not None:
+        #     df = pd.merge(df, news_df, on="date", how="left")
 
         if df is not None:
             df = df.reset_index(drop=True)
-            df = align_to_feature_spec(df)  # ★ ここで標準仕様に整形
-
+            df = align_to_feature_spec(df)
         return df
+
 
 if __name__ == "__main__":
     collector = PlanDataCollector()
