@@ -15,7 +15,7 @@ from src.strategies.levia_tempest import LeviaTempest
 from src.strategies.noctus_sentinella import NoctusSentinella
 from src.strategies.prometheus_oracle import PrometheusOracle
 from src.strategies.hermes_cognitor import HermesCognitorStrategy
-from src.strategies.veritas_machina import VeritasMachina
+from src.veritas.veritas_machina import VeritasMachina
 
 def main():
     # 1. 特徴量生成
