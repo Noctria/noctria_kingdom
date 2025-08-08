@@ -1,0 +1,16 @@
+| カラム名                   | 型     | 説明                  | 例値         | 利用AI例             |
+| ---------------------- | ----- | ------------------- | ---------- | ----------------- |
+| Date                   | str   | 日付（YYYY-MM-DD）      | 2025-08-08 | 全AI               |
+| USDJPY\_Close          | float | USD/JPY 終値          | 155.20     | Aurus, Prometheus |
+| USDJPY\_Return         | float | USD/JPY 前日比リターン     | 0.0012     | Aurus, Prometheus |
+| USDJPY\_Volatility\_5d | float | USD/JPY 5日標準偏差      | 0.012      | Aurus             |
+| USDJPY\_RSI\_14d       | float | RSI14               | 67.5       | Aurus, Levia      |
+| USDJPY\_GC\_Flag       | int   | ゴールデンクロス（1:発生, 0:否） | 0          | Aurus             |
+| News\_Count            | int   | ニュース総件数             | 15         | Aurus, Levia      |
+| News\_Positive         | int   | ポジティブニュース数          | 8          | Hermes            |
+| News\_Negative         | int   | ネガティブニュース数          | 4          | Hermes            |
+| News\_Spike\_Flag      | int   | ニュース件数急増（1:有, 0:無）  | 1          | Levia             |
+| CPIAUCSL\_Value        | float | 米CPI値               | 313.5      | Prometheus        |
+| CPIAUCSL\_Spike\_Flag  | int   | CPI急変フラグ            | 0          | Prometheus        |
+| FOMC                   | int   | FOMCイベント日（1:有, 0:無） | 0          | Hermes, Aurus     |
+| ...                    | ...   | 必要に応じて拡張            | ...        | ...               |
