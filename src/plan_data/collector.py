@@ -6,19 +6,14 @@ from typing import Optional, Dict
 import os
 import requests
 
-# .envのフルパスを指定して読み込む
-load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
-
-newsapi_key = os.getenv("NEWSAPI_KEY")
-print(f"DEBUG: NEWSAPI_KEY={newsapi_key}")  # 確認用
-
 try:
     import yfinance as yf
 except ImportError:
     raise ImportError("yfinance が必要です: pip install yfinance")
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
+newsapi_key = os.getenv("NEWSAPI_KEY")
 
 from plan_data.feature_spec import FEATURE_SPEC
 
