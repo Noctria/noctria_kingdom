@@ -6,17 +6,15 @@ from plan_data.feature_spec import FEATURE_SPEC
 from plan_data.collector import ASSET_SYMBOLS  # 必要に応じて調整
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
-    """feature_spec.pyに準拠したカラム順・型・補完でDataFrameを整形"""
-    columns = list(FEATURE_SPEC.keys())
+    columns = FEATURE_SPEC  # FEATURE_SPECはリストなのでそのまま使う
+
+    # 欠損カラムはNaNで追加
     for col in columns:
         if col not in df.columns:
             df[col] = pd.NA
-    for col in columns:
-        try:
-            dtype = FEATURE_SPEC[col]["type"]
-            df[col] = df[col].astype(dtype)
-        except Exception:
-            pass
+
+    # 型変換は不要または個別実装
+
     return df[columns]
 
 class FeatureEngineer:
