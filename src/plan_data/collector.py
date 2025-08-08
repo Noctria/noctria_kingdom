@@ -1,5 +1,3 @@
-# src/plan_data/collector.py
-
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -114,10 +112,15 @@ class PlanDataCollector:
         if merged is not None:
             merged = merged.sort_values("date")
             merged = merged.fillna(method="ffill")
-            # USDJPYがfeature_spec未定義なら例外処理
+
+            print("DEBUG: merged.columns =", merged.columns.tolist())  # ← 追加
+
             key = "usdjpy_close"
             if key in merged.columns:
                 merged = merged.dropna(subset=[key])
+            else:
+                print(f"DEBUG: {key} はカラムに存在しません。dropnaをスキップします。")
+
             merged = merged.reset_index(drop=True)
         return merged
 
