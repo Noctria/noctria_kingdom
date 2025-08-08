@@ -78,3 +78,5 @@ if __name__ == "__main__":
     print(PLAN_FEATURE_COLUMNS)
     print("\n■ サンプルDataFrame（冒頭3行）")
     print(SAMPLE_PLAN_DF.head(3))
+
+FEATURE_SPEC = PLAN_FEATURE_COLUMNS
