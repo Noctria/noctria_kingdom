@@ -5,18 +5,20 @@ import numpy as np
 import logging
 import pandas as pd
 import json
-from pathlib import Path
+from src.core.path_config import DATA_DIR   # パス定数をimport
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from typing import Optional, List, Dict, Any
+from pathlib import Path  # buffer_pathでstr型が渡される場合に備えて残す（外部指定ありの場合のみ）
 
-DEFAULT_BUFFER_PATH = Path("market_data_buffer.json")  # 任意でDATA_DIR等に変更可
+DEFAULT_BUFFER_PATH = DATA_DIR / "market_data_buffer.json"  # バッファはdata配下に統一
 
 class MarketDataFetcher:
     """市場データをAPI経由で取得し、トレンドを解析する"""
 
-    def __init__(self, api_key: Optional[str] = None, buffer_path: Optional[Path] = None):
+    def __init__(self, api_key: Optional[str] = None, buffer_path: Optional[str] = None):
         self.api_key = api_key
         self.base_url = "https://www.alphavantage.co/query"
+        # buffer_pathにstrやPathが来ても絶対パスにする
         self.buffer_path = Path(buffer_path) if buffer_path else DEFAULT_BUFFER_PATH
         self.price_history: List[float] = []
         self.logger = logging.getLogger("MarketDataFetcher")
