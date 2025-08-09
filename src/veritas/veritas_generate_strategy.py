@@ -2,25 +2,43 @@
 # coding: utf-8
 
 """
-✒️ Veritas Strategy Generator (v2.0)
+✒️ Veritas Strategy Generator (v2.1)
 - LLMからの指示に基づき、新しい戦略のPythonファイルを生成する。
-- 現在は固定テンプレートを使用するが、将来的にはLLMがコード自体を生成することを想定。
+- 固定テンプレートだが、将来的にはLLMがコード自体を生成する想定。
 """
 
 import os
+import re
+import sys
 import logging
 from datetime import datetime
 from pathlib import Path
 
-# --- 王国の基盤モジュールをインポート ---
-# ✅ 修正: path_configから必要な変数を正しくインポート
-from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR
+# -------------------- パス解決の堅牢化 --------------------
+# 1) 通常のパッケージ実行（python -m ...）でのインポート
+# 2) 直接実行（python src/veritas/veritas_generate_strategy.py）時に備えて、
+#    本ファイルの親ディレクトリからプロジェクトルートを推定して sys.path に追加
+try:
+    from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR
+except Exception:
+    # スクリプトのある src/veritas/ から 2つ上がプロジェクトルート想定
+    this_file = Path(__file__).resolve()
+    project_root = this_file.parent.parent.parent  # -> <project>/
+    if str(project_root) not in sys.path:
+        sys.path.append(str(project_root))
+    try:
+        # ルート直下の core/ を想定（src を切らした起動に対応）
+        from core.path_config import STRATEGIES_VERITAS_GENERATED_DIR
+    except Exception as e:
+        raise ImportError(
+            "path_config の読み込みに失敗しました。PYTHONPATH をプロジェクトルート（"
+            f"{project_root}）へ通すか、パッケージ実行（python -m ...）で実行してください。"
+        ) from e
 
-# ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+# -------------------- ロガー設定 --------------------
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
-# Veritasが生成した戦略テンプレート
-# NOTE: 将来的には、このテンプレート自体をLLMが動的に生成する
+# -------------------- 戦略テンプレート --------------------
 STRATEGY_TEMPLATE = """\
 import pandas as pd
 import numpy as np
@@ -83,25 +101,35 @@ def simulate(data: pd.DataFrame) -> dict:
     }
 """
 
+# -------------------- ユーティリティ --------------------
+def _sanitize_filename(name: str) -> str:
+    """安全なファイル名へ（英数字・ハイフン・アンダースコア以外を '_' に）"""
+    name = name.strip()
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"[^A-Za-z0-9_\-]", "_", name)
+    return name or "strategy"
+
+# -------------------- 主要関数 --------------------
 def generate_strategy_file(strategy_name: str) -> str:
     """
     指定された戦略名で、新しい戦略ファイルを生成する。
     """
     try:
-        # ✅ 修正: 正しい変数名を使用
-        output_dir = STRATEGIES_VERITAS_GENERATED_DIR
+        output_dir: Path = STRATEGIES_VERITAS_GENERATED_DIR
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_name = _sanitize_filename(strategy_name)
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        filename = f"{strategy_name}_{timestamp}.py"
+        filename = f"{safe_name}_{timestamp}.py"
         filepath = output_dir / filename
 
-        output_dir.mkdir(parents=True, exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(STRATEGY_TEMPLATE)
 
         logging.info(f"✅ 新たな戦略の羊皮紙を生成しました: {filepath}")
         return str(filepath)
     except Exception as e:
-        logging.error(f"❌ 戦略ファイルの生成中にエラーが発生しました: {e}", exc_info=True)
+        logging.error("❌ 戦略ファイルの生成中にエラーが発生しました", exc_info=True)
         raise
 
 def main():
