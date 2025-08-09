@@ -1,10 +1,13 @@
 # src/plan_data/collector.py
 
 import os
+import math
 import time
+import random
 from datetime import datetime, timedelta
-from typing import Optional, Dict
-from urllib.parse import urlencode
+from typing import Optional, Dict, List
+from pathlib import Path
+from urllib.parse import quote_plus
 
 import pandas as pd
 import requests
@@ -15,14 +18,15 @@ except ImportError:
     raise ImportError("yfinance が必要です: pip install yfinance")
 
 from dotenv import load_dotenv
-
-# .env 読み込み（パスは環境に合わせて）
 load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
 
-# FEATURE_SPEC はリスト（標準カラム順）。snake_case で運用想定。
-from plan_data.feature_spec import FEATURE_SPEC  # noqa: E402
+# FEATURE_SPEC はリスト（標準カラム順）。snake_case で運用。
+from plan_data.feature_spec import FEATURE_SPEC
 
 
+# =========================
+# 定数
+# =========================
 ASSET_SYMBOLS: Dict[str, str] = {
     "USDJPY": "JPY=X",
     "SP500": "^GSPC",
@@ -61,6 +65,7 @@ FRED_SERIES: Dict[str, str] = {
 
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
+    """FEATURE_SPEC（リスト）に合わせて不足カラムは追加（NaN）し、その順序で返す。"""
     columns = FEATURE_SPEC
     for col in columns:
         if col not in df.columns:
@@ -68,33 +73,55 @@ def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
     return df[columns]
 
 
+# =========================
+# Collector
+# =========================
 class PlanDataCollector:
-    def __init__(self, fred_api_key: Optional[str] = None, event_calendar_csv: Optional[str] = None):
+    def __init__(
+        self,
+        fred_api_key: Optional[str] = None,
+        event_calendar_csv: Optional[str] = None,
+        gnews_api_key: Optional[str] = None,
+        cache_dir: Optional[Path] = None,
+    ):
+        # FRED
         self.fred_api_key = fred_api_key or os.getenv("FRED_API_KEY")
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEYが未設定です")
+
+        # 経済カレンダー
         self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
 
-        # 🔁 NewsAPI → GNews へ切替
-        self.gnews_key = os.getenv("GNEWS_API_KEY")
-        if not self.gnews_key:
-            print("[collector] ⚠️ GNEWS_API_KEYが未設定です")
+        # GNews
+        self.gnews_api_key = gnews_api_key or os.getenv("GNEWS_API_KEY")
+        if not self.gnews_api_key:
+            print("[collector] ⚠️ GNEWS_API_KEYが未設定です（ニュース特徴は0埋め/欠損になります）")
 
-        # 任意調整用（環境変数で上書き可）
-        self.gnews_page_size = int(os.getenv("GNEWS_PAGE_SIZE", "50"))   # 1リクエストあたり件数（最大100）
-        self.gnews_max_pages = int(os.getenv("GNEWS_MAX_PAGES", "3"))    # 最大ページ数（リク制限回避用）
-        self.gnews_retry = int(os.getenv("GNEWS_RETRY", "2"))            # 429 等のリトライ回数
-        self.gnews_backoff = float(os.getenv("GNEWS_BACKOFF", "1.5"))    # バックオフ係数
+        # キャッシュ格納先
+        self.cache_dir = Path(cache_dir or "data/cache")
+        (self.cache_dir / "gnews").mkdir(parents=True, exist_ok=True)
 
-    # --------- ヘルパ群 ---------
+        # GNews チューニング（.envで上書き可）
+        self.gnews_page_size = int(os.getenv("GNEWS_PAGE_SIZE", "50"))      # 10〜100
+        self.gnews_max_pages = int(os.getenv("GNEWS_MAX_PAGES", "2"))       # 1日最大ページ数
+        self.gnews_retry = int(os.getenv("GNEWS_RETRY", "3"))               # リトライ回数
+        self.gnews_backoff = float(os.getenv("GNEWS_BACKOFF", "1.5"))       # 指数バックオフ係数
+        self.gnews_rate_per_min = int(os.getenv("GNEWS_RATE_PER_MIN", "12"))  # 1分あたり上限（無料: 約12程度）
+        self._last_call_ts: List[float] = []  # レート制御用リングバッファ
+
+        # セッション再利用
+        self._session = requests.Session()
+        self._session.headers.update({"User-Agent": "noctria-collector/1.0"})
+
+    # ---------- ヘルパ ----------
 
     @staticmethod
     def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
+        """yfinance の MultiIndex 列などをフラット化。"""
         cols = df.columns
         if isinstance(cols, pd.MultiIndex):
             df = df.copy()
-            df.columns = ["_".join([str(c) for c in tup if c is not None and c != ""])
-                          for tup in cols]
+            df.columns = ["_".join([str(c) for c in tup if c is not None and c != ""]) for tup in cols]
             return df
         if any(not isinstance(c, str) for c in cols):
             df = df.copy()
@@ -103,8 +130,9 @@ class PlanDataCollector:
 
     @staticmethod
     def _ensure_date_column(df: pd.DataFrame) -> pd.DataFrame:
+        """'date' 列を保証。存在しなければ 'Date' / 'Datetime' 等を探して変換。"""
         df = df.copy()
-        candidates = ["date", "Date", "Datetime", "datetime"]
+        candidates = ["date", "Date", "Datetime", "datetime", "index"]
         found = None
         for c in candidates:
             if c in df.columns:
@@ -119,6 +147,7 @@ class PlanDataCollector:
 
     @staticmethod
     def _pick_first_matching(df: pd.DataFrame, starts_with: str) -> Optional[str]:
+        """'Close', 'Close_^GSPC', 'Close_JPY=X' のような列から前方一致で列名を返す。"""
         if starts_with in df.columns:
             return starts_with
         low = starts_with.lower()
@@ -127,7 +156,7 @@ class PlanDataCollector:
                 return c
         return None
 
-    # --------- データ取得 ---------
+    # ---------- yfinance ----------
 
     def fetch_multi_assets(
         self,
@@ -142,13 +171,7 @@ class PlanDataCollector:
         dfs = []
         for key, ticker in symbols.items():
             try:
-                df = yf.download(
-                    ticker,
-                    start=start,
-                    end=end,
-                    interval=interval,
-                    progress=False,
-                )
+                df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
                 if df is None or df.empty:
                     print(f"[collector] {ticker} のデータなし")
                     continue
@@ -159,15 +182,11 @@ class PlanDataCollector:
 
                 close_col = self._pick_first_matching(df, "Close")
                 volume_col = self._pick_first_matching(df, "Volume")
-
                 if close_col is None:
                     print(f"[collector] {ticker} の Close 列が見つからずスキップ: cols={df.columns.tolist()}")
                     continue
 
-                out_cols = ["date", close_col]
-                if volume_col is not None:
-                    out_cols.append(volume_col)
-
+                out_cols = ["date", close_col] + ([volume_col] if volume_col else [])
                 out = df[out_cols].copy().rename(
                     columns={
                         close_col: f"{key.lower()}_close",
@@ -202,6 +221,7 @@ class PlanDataCollector:
             print("[collector] WARNING: 'date' 列が見つかりません。全列で重複排除を実施。")
             merged = merged.drop_duplicates().reset_index(drop=True)
 
+        # 価格系は前方補完（粒度差吸収）
         merged = merged.ffill()
 
         if "usdjpy_close" not in merged.columns:
@@ -209,10 +229,13 @@ class PlanDataCollector:
 
         return merged
 
+    # ---------- FRED ----------
+
     def fetch_fred_data(self, series_id: str, start_date: str, end_date: str) -> pd.DataFrame:
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEY未設定。FREDデータをスキップ")
             return pd.DataFrame()
+
         url = "https://api.stlouisfed.org/fred/series/observations"
         params = {
             "series_id": series_id,
@@ -222,7 +245,7 @@ class PlanDataCollector:
             "observation_end": end_date,
         }
         try:
-            r = requests.get(url, params=params, timeout=10)
+            r = self._session.get(url, params=params, timeout=10)
             r.raise_for_status()
             obs = r.json().get("observations", [])
             if not obs:
@@ -236,6 +259,8 @@ class PlanDataCollector:
             print(f"[collector] FREDデータ({series_id})取得失敗: {e}")
             return pd.DataFrame()
 
+    # ---------- 経済カレンダー ----------
+
     def fetch_event_calendar(self) -> pd.DataFrame:
         try:
             df = pd.read_csv(self.event_calendar_csv)
@@ -247,7 +272,155 @@ class PlanDataCollector:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
-    # ===== GNews: 期間まとめ取得→日付集計（レート制限対応） =====
+    # ---------- GNews（最適化・キャッシュつき） ----------
+
+    def _respect_rate_limit(self):
+        """1分あたりのコール上限をだいたい守る（簡易実装）。"""
+        if self.gnews_rate_per_min <= 0:
+            return
+        now = time.time()
+        window = 60.0
+        self._last_call_ts = [t for t in self._last_call_ts if now - t < window]
+        if len(self._last_call_ts) >= self.gnews_rate_per_min:
+            sleep_sec = window - (now - self._last_call_ts[0]) + 0.05
+            if sleep_sec > 0:
+                time.sleep(sleep_sec)
+        self._last_call_ts.append(time.time())
+
+    def _gnews_day_cache_path(self, day: datetime, query_key: str) -> Path:
+        """
+        日毎キャッシュのパス（query_keyはクエリをファイル名安全化したキー）。
+        例: data/cache/gnews/2025-07-01_usdjpy.parquet
+        """
+        fname = f"{day.strftime('%Y-%m-%d')}_{query_key}.parquet"
+        return self.cache_dir / "gnews" / fname
+
+    def _read_day_cache(self, day: datetime, query_key: str) -> Optional[pd.DataFrame]:
+        path = self._gnews_day_cache_path(day, query_key)
+        if path.exists():
+            try:
+                return pd.read_parquet(path)
+            except Exception:
+                # 壊れていたら削除
+                path.unlink(missing_ok=True)
+        return None
+
+    def _write_day_cache(self, day: datetime, query_key: str, df: pd.DataFrame) -> None:
+        path = self._gnews_day_cache_path(day, query_key)
+        try:
+            df.to_parquet(path, index=False)
+        except Exception:
+            # 書き込み失敗は無視
+            pass
+
+    def _fetch_gnews_one_day(self, day: datetime, query: str, lang: str = "en") -> pd.DataFrame:
+        """
+        単一日のGNews結果をページング・リトライ付きで収集し、DataFrameで返す。
+        出力列: date(news日), news_count, news_positive, news_negative
+        """
+        if not self.gnews_api_key:
+            # APIキー無し → 0行
+            return pd.DataFrame(columns=["date", "news_count", "news_positive", "news_negative"])
+
+        # キャッシュ確認
+        query_key = "".join(ch for ch in query.lower().replace(" ", "_") if ch.isalnum() or ch in "_-")
+        cached = self._read_day_cache(day, query_key)
+        if cached is not None:
+            return cached
+
+        # クエリ準備（GNewsの検索式はURLエンコード推奨）
+        q = quote_plus(query)
+        from_str = day.strftime("%Y-%m-%d")
+        to_str = day.strftime("%Y-%m-%d")
+
+        pos_words = ["gain", "rise", "surge", "record high", "bull", "up", "strong"]
+        neg_words = ["fall", "drop", "crash", "bear", "loss", "down", "weak"]
+
+        total_articles = 0
+        pos_count = 0
+        neg_count = 0
+
+        # ページング（GNews: page/ max param）
+        for page in range(1, self.gnews_max_pages + 1):
+            # レート制御
+            self._respect_rate_limit()
+
+            url = (
+                "https://gnews.io/api/v4/search"
+                f"?q={q}"
+                f"&from={from_str}"
+                f"&to={to_str}"
+                f"&lang={lang}"
+                f"&max={self.gnews_page_size}"
+                f"&page={page}"
+                f"&sortby=publishedAt"
+                f"&token={self.gnews_api_key}"
+            )
+
+            ok = False
+            last_err = None
+            for attempt in range(self.gnews_retry):
+                try:
+                    r = self._session.get(url, timeout=10)
+                    # 429対策：短い待機＋指数バックオフ
+                    if r.status_code == 429:
+                        wait = (self.gnews_backoff ** attempt) + random.uniform(0, 0.25)
+                        time.sleep(wait)
+                        continue
+                    r.raise_for_status()
+                    data = r.json()
+                    articles = data.get("articles", [])
+                    if not articles:
+                        ok = True
+                        break
+
+                    # 集計
+                    total_articles += len(articles)
+                    for a in articles:
+                        title = (a.get("title") or "").lower()
+                        if any(w in title for w in pos_words):
+                            pos_count += 1
+                        if any(w in title for w in neg_words):
+                            neg_count += 1
+
+                    # GNewsは最大 10*page ほどで頭打ちになることが多いので早期終了判定
+                    if len(articles) < self.gnews_page_size:
+                        ok = True
+                        break
+
+                    ok = True
+                    # まだ記事が続きそうなら次ページへ
+                    # ただし無料版レートの都合で深追いしすぎない
+                except requests.HTTPError as e:
+                    last_err = e
+                    wait = (self.gnews_backoff ** attempt) + random.uniform(0, 0.25)
+                    time.sleep(wait)
+                except requests.RequestException as e:
+                    last_err = e
+                    wait = (self.gnews_backoff ** attempt) + random.uniform(0, 0.25)
+                    time.sleep(wait)
+
+            if not ok and last_err:
+                print(f"[collector] GNews {from_str}取得失敗: {last_err}")
+                # その日の分は諦める（0カウントで記録）
+                break
+
+            # 1ページで記事が尽きたらループ終了
+            if ok and (total_articles == 0 or total_articles % self.gnews_page_size != 0):
+                break
+
+        out = pd.DataFrame(
+            [{
+                "date": pd.to_datetime(from_str),
+                "news_count": float(total_articles),
+                "news_positive": float(pos_count),
+                "news_negative": float(neg_count),
+            }]
+        )
+        # キャッシュ書き込み
+        self._write_day_cache(day, query_key, out)
+        return out
+
     def fetch_gnews_counts(
         self,
         start_date: str,
@@ -256,112 +429,38 @@ class PlanDataCollector:
         lang: str = "en",
     ) -> pd.DataFrame:
         """
-        GNews v4 /search を期間まとめて取得し、publishedAt の日付で groupby 集計。
-        レート制限を避けるためにページ数上限・指数バックオフ・リトライを実装。
-        返却列: [date, news_count, news_positive, news_negative]
+        GNewsで日次ニュース件数＋ポジ/ネガワード件数を返す（最適化版）
+        - 日毎キャッシュ（Parquet）
+        - レート制御・指数バックオフ
+        - ページング
         """
-        if not self.gnews_key:
-            print("[collector] GNEWS_API_KEYが未設定です")
+        try:
+            dt_start = datetime.strptime(start_date, "%Y-%m-%d")
+            dt_end = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            # フォーマット不正時は空
             return pd.DataFrame()
 
-        base_url = "https://gnews.io/api/v4/search"
-        page_size = max(1, min(100, self.gnews_page_size))
-        max_pages = max(1, self.gnews_max_pages)
+        all_days: List[pd.DataFrame] = []
+        day = dt_start
+        while day <= dt_end:
+            df_day = self._fetch_gnews_one_day(day, query=query, lang=lang)
+            all_days.append(df_day)
+            day += timedelta(days=1)
 
-        params_common = {
-            "q": query,
-            "from": start_date,
-            "to": end_date,
-            "lang": lang,
-            "max": page_size,
-            "sortby": "publishedAt",
-            "token": self.gnews_key,
-        }
-
-        articles_all = []
-        page = 1
-        retries = self.gnews_retry
-
-        while page <= max_pages:
-            params = {**params_common, "page": page}
-            url = base_url + "?" + urlencode(params)
-
-            try:
-                r = requests.get(url, timeout=10)
-                if r.status_code == 429:
-                    if retries > 0:
-                        wait = (self.gnews_backoff ** (self.gnews_retry - retries)) * 2.0
-                        print(f"[collector] GNews 429: wait {wait:.1f}s & retry... (page={page})")
-                        time.sleep(wait)
-                        retries -= 1
-                        continue
-                    else:
-                        print("[collector] GNews 429: リトライ上限。部分結果で続行します。")
-                        break
-
-                r.raise_for_status()
-                data = r.json()
-                articles = data.get("articles", [])
-                if not articles:
-                    break
-
-                articles_all.extend(articles)
-
-                # ページング終了条件
-                if len(articles) < page_size:
-                    break
-
-                # 次ページへ
-                page += 1
-                # 軽いレート間隔（サーバー負荷軽減）
-                time.sleep(0.4)
-
-            except requests.RequestException as e:
-                print(f"[collector] GNews取得失敗(page={page}): {e}")
-                # 致命的でなければ部分結果で続行
-                break
-
-        if not articles_all:
+        if not all_days:
             return pd.DataFrame()
 
-        # 簡易スコアリング
-        pos_words = ["gain", "rise", "surge", "record high", "bull", "up", "strong", "beat"]
-        neg_words = ["fall", "drop", "crash", "bear", "loss", "down", "weak", "miss"]
+        df = pd.concat(all_days, ignore_index=True)
+        # 念のため整形
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        for c in ["news_count", "news_positive", "news_negative"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
-        rows = []
-        for a in articles_all:
-            title = (a.get("title") or "")
-            desc = (a.get("description") or "")
-            text = (title + " " + desc).lower()
+        # 比率などは FeatureEngineer 側で計算する想定だが、最低限の列はここで用意しておく
+        return df[["date", "news_count", "news_positive", "news_negative"]].sort_values("date")
 
-            pub = a.get("publishedAt") or ""
-            try:
-                # publishedAt: ISO8601 (e.g. 2024-01-01T12:34:56Z)
-                d = pd.to_datetime(pub, errors="coerce").date()
-            except Exception:
-                d = None
-
-            if d is None:
-                continue
-
-            rows.append({
-                "date": pd.to_datetime(str(d)),
-                "pos": int(any(w in text for w in pos_words)),
-                "neg": int(any(w in text for w in neg_words)),
-                "cnt": 1
-            })
-
-        if not rows:
-            return pd.DataFrame()
-
-        tmp = pd.DataFrame(rows)
-        agg = tmp.groupby("date").agg(
-            news_count=("cnt", "sum"),
-            news_positive=("pos", "sum"),
-            news_negative=("neg", "sum"),
-        ).reset_index()
-
-        return agg
+    # ---------- 収集一括 ----------
 
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
         end = datetime.today()
@@ -369,28 +468,25 @@ class PlanDataCollector:
         start_str = start.strftime("%Y-%m-%d")
         end_str = end.strftime("%Y-%m-%d")
 
-        # マーケット価格群
+        # 1) マーケット価格群
         df = self.fetch_multi_assets(start=start_str, end=end_str)
 
-        # FRED（CPI/失業率/FF金利など）
+        # 2) FRED（CPI/失業率/FF金利など）
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
-            if not fred_df.empty and df is not None and not df.empty:
+            if not fred_df.empty and not df.empty:
                 df = pd.merge(df, fred_df, on="date", how="left")
                 df = df.sort_values("date").ffill()
 
-        # 経済カレンダー
+        # 3) 経済カレンダー
         event_df = self.fetch_event_calendar()
-        if not event_df.empty and df is not None and not df.empty:
+        if not event_df.empty and not df.empty:
             df = pd.merge(df, event_df, on="date", how="left")
 
-        # 🔁 GNews（日次ニュース件数・ポジネガ件数）
+        # 4) GNews（日次ニュース件数・ポジネガ件数）
         news_df = self.fetch_gnews_counts(start_str, end_str)
-        if not news_df.empty:
-            if df is None or df.empty:
-                df = news_df.copy()
-            else:
-                df = pd.merge(df, news_df, on="date", how="left")
+        if not news_df.empty and not df.empty:
+            df = pd.merge(df, news_df, on="date", how="left")
 
         if df is not None:
             df = df.reset_index(drop=True)
@@ -402,6 +498,7 @@ class PlanDataCollector:
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
-    df = collector.collect_all(lookback_days=30)
+    df = collector.collect_all(lookback_days=14)
     cols = [c for c in df.columns if "news" in c or c == "date"]
+    pd.set_option("display.max_columns", 120)
     print(df[cols].tail())
