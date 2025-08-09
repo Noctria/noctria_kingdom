@@ -2,79 +2,100 @@
 # coding: utf-8
 
 """
-📌 Noctria Kingdom Path Config (v4.5)
+📌 Noctria Kingdom Path Config (v4.6)
 - 王国全体のパス構造を一元管理します。
-- Docker/WSL/ローカル環境の差異を吸収し、自動で切り替えます。
-- プロジェクトルート直下の `src` ディレクトリ構成を前提とします。
+- Docker/WSL/ローカル環境差異を吸収し、自動切替＋環境変数で上書き可能に。
+- 将来の実行層リネーム（execution -> do）に互換レイヤで対応します。
 """
 
+from __future__ import annotations
 from pathlib import Path
+import os
 
-# ========================================
-# 🏰 基本ディレクトリ判定（Docker or ローカル）
-# ========================================
-PROJECT_ROOT = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parents[2]
+# =========================================================
+# 🏰 基本ディレクトリ判定（Docker or ローカル）＋ENV上書き
+# =========================================================
+# 優先順位: ENV(NOCTRIA_PROJECT_ROOT) > /opt/airflow > 本ファイルからの相対
+_env_root = os.getenv("NOCTRIA_PROJECT_ROOT")
+if _env_root:
+    PROJECT_ROOT = Path(_env_root).resolve()
+else:
+    PROJECT_ROOT = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parents[2]
+
 SRC_DIR = PROJECT_ROOT / "src"
-BASE_DIR = PROJECT_ROOT  # ここでBASE_DIRをプロジェクトルートに設定
+BASE_DIR = PROJECT_ROOT  # 歴史的互換（BASE_DIR = プロジェクトルート）
 
-# ========================================
+# =========================================================
 # 🏛️ Airflow構成領域
-# ========================================
+# =========================================================
 AIRFLOW_DOCKER_DIR = PROJECT_ROOT / "airflow_docker"
 DAGS_DIR = AIRFLOW_DOCKER_DIR / "dags"
 LOGS_DIR = AIRFLOW_DOCKER_DIR / "logs"
 PLUGINS_DIR = AIRFLOW_DOCKER_DIR / "plugins"
 AIRFLOW_SCRIPTS_DIR = AIRFLOW_DOCKER_DIR / "scripts"
 
-# ========================================
-# 🌐 Airflow APIベースURL（APIアクセス用）
-# ========================================
-AIRFLOW_API_BASE = "http://localhost:8080"  # 適宜、実環境に合わせて変更してください
+# =========================================================
+# 🌐 Airflow APIベースURL（ENV上書き対応）
+# =========================================================
+AIRFLOW_API_BASE = os.getenv("AIRFLOW_API_BASE", "http://localhost:8080")
 
-# ========================================
+# =========================================================
 # 🧠 知性領域（AI・戦略・評価・実行）
-# ========================================
+# =========================================================
 CORE_DIR = SRC_DIR / "core"
 SCRIPTS_DIR = SRC_DIR / "scripts"
 VERITAS_DIR = SRC_DIR / "veritas"
 STRATEGIES_DIR = SRC_DIR / "strategies"
 STRATEGIES_VERITAS_GENERATED_DIR = STRATEGIES_DIR / "veritas_generated"
-EXECUTION_DIR = SRC_DIR / "execution"
-EXPERTS_DIR = SRC_DIR / "experts"
+
+# --- 実行層（将来 rename: execution → do）互換レイヤ ---
+DO_DIR_CANDIDATE = SRC_DIR / "do"
+EXECUTION_DIR_CANDIDATE = SRC_DIR / "execution"
+DO_DIR = DO_DIR_CANDIDATE if DO_DIR_CANDIDATE.exists() else EXECUTION_DIR_CANDIDATE
+# 後方互換（旧名）：既存コードが EXECUTION_DIR を参照しても動くように
+EXECUTION_DIR = DO_DIR
+
+# --- 専門領域・アダプタ等 ---
+# 実ツリーでは experts/ はプロジェクト直下に存在。無ければ src/experts をフォールバック。
+EXPERTS_DIR = (PROJECT_ROOT / "experts") if (PROJECT_ROOT / "experts").exists() else (SRC_DIR / "experts")
 NOCTRIA_AI_DIR = SRC_DIR / "noctria_ai"
 TOOLS_DIR = SRC_DIR / "tools"
 
-# --- モデルディレクトリを分離 ---
+# --- モデル/AI関連 ---
 VERITAS_MODELS_DIR = VERITAS_DIR / "models"
-HERMES_DIR = SRC_DIR / "hermes"  # Hermes用ディレクトリがsrc配下にある場合
+HERMES_DIR = SRC_DIR / "hermes"
 HERMES_MODELS_DIR = HERMES_DIR / "models"
 
-# ========================================
+# =========================================================
 # 📦 データ・モデル・ログ領域
-# ========================================
+# =========================================================
 DATA_DIR = PROJECT_ROOT / "data"
-STATS_DIR = DATA_DIR / "stats"  # 追加：統計用ディレクトリ
+STATS_DIR = DATA_DIR / "stats"  # 統計・可視化用
 
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
-# 新規追加（未定義解消用）
-DATA_SOURCE_URL = "https://example.com/data/source.csv"  # 実際のURLに差し替えてください
+# 参照URL/パス（必要に応じて実値に差替え）
+DATA_SOURCE_URL = os.getenv("DATA_SOURCE_URL", "https://example.com/data/source.csv")
 LOCAL_DATA_PATH = DATA_DIR / "local_data"
 FEATURES_PATH = PROCESSED_DATA_DIR / "features"
 MODEL_PATH = DATA_DIR / "models" / "latest_model.pkl"
 
-# MODELS_DIR は廃止しました。
+# 制度・機関など（実ツリーでは airflow_docker/institutions を優先）
+INSTITUTIONS_DIR = (
+    AIRFLOW_DOCKER_DIR / "institutions"
+    if (AIRFLOW_DOCKER_DIR / "institutions").exists()
+    else PROJECT_ROOT / "institutions"
+)
 
-INSTITUTIONS_DIR = PROJECT_ROOT / "institutions"
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
 PUSH_LOG_DIR = DATA_DIR / "push_logs"
 ORACLE_FORECAST_JSON = DATA_DIR / "oracle" / "forecast.json"
 
-# ========================================
+# =========================================================
 # 🌐 GUI・推論サーバ・文書
-# ========================================
+# =========================================================
 NOCTRIA_GUI_DIR = PROJECT_ROOT / "noctria_gui"
 NOCTRIA_GUI_TEMPLATES_DIR = NOCTRIA_GUI_DIR / "templates"
 NOCTRIA_GUI_STATIC_DIR = NOCTRIA_GUI_DIR / "static"
@@ -84,12 +105,19 @@ LLM_SERVER_DIR = PROJECT_ROOT / "llm_server"
 DOCS_DIR = PROJECT_ROOT / "docs"
 TESTS_DIR = PROJECT_ROOT / "tests"
 
-# ========================================
+# =========================================================
 # 📄 主要ファイルパス（王国の記録物）
-# ========================================
+# =========================================================
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
-MT5_USER_PATH = Path("/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files")
+
+# Windows MT5ユーザパス（WSL/Windows混在対策）
+MT5_USER_PATH = Path(
+    os.getenv(
+        "MT5_USER_PATH",
+        "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files",
+    )
+)
 if MT5_USER_PATH.exists():
     VERITAS_ORDER_JSON = MT5_USER_PATH / "veritas_signal.json"
 else:
@@ -97,19 +125,34 @@ else:
     TEMP_DIR.mkdir(exist_ok=True)
     VERITAS_ORDER_JSON = TEMP_DIR / "veritas_signal.json"
 
-# ========================================
-# 🤖 主要スクリプトパス
-# ========================================
+# =========================================================
+# 🤖 主要スクリプトパス（存在チェックつきフォールバック）
+# =========================================================
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "veritas_generate_strategy.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
-GITHUB_PUSH_SCRIPT = SCRIPTS_DIR / "github_push.py"
 
-# ✅ 修正: 削除されていたGITHUB_REPO_URLの定義を再追加
-GITHUB_REPO_URL = "https://github.com/Noctria/noctria_kingdom"
+# 実ツリーでは airflow_docker/scripts/github_push.py が存在するため優先。
+# 無ければ src/scripts/github_push_adopted_strategies.py を代替として使う。
+_github_push_primary = AIRFLOW_SCRIPTS_DIR / "github_push.py"
+_github_push_fallback = SCRIPTS_DIR / "github_push.py"
+_github_push_alt = SCRIPTS_DIR / "github_push_adopted_strategies.py"
 
-# ========================================
+if _github_push_primary.exists():
+    GITHUB_PUSH_SCRIPT = _github_push_primary
+elif _github_push_fallback.exists():
+    GITHUB_PUSH_SCRIPT = _github_push_fallback
+elif _github_push_alt.exists():
+    GITHUB_PUSH_SCRIPT = _github_push_alt
+else:
+    # 最後の手段：存在しないが、参照時に気づけるように未作成パスを提示
+    GITHUB_PUSH_SCRIPT = _github_push_primary
+
+# 公開リポジトリURL（ENV上書き可能）
+GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "https://github.com/Noctria/noctria_kingdom")
+
+# =========================================================
 # 🗂 戦略カテゴリ分類マップ（GUI用）
-# ========================================
+# =========================================================
 CATEGORY_MAP = {
     "technical": "📈 テクニカル分析",
     "fundamental": "📰 ファンダメンタル分析",
@@ -117,30 +160,46 @@ CATEGORY_MAP = {
     "reinforcement": "🤖 強化学習",
     "hybrid": "⚔️ ハイブリッド戦略",
     "experimental": "🧪 実験戦略",
-    "legacy": "📜 旧版戦略"
+    "legacy": "📜 旧版戦略",
 }
 
-# ========================================
+# =========================================================
 # ✅ パス整合性チェック用ユーティリティ
-# ========================================
+# =========================================================
 def _lint_path_config():
     return {k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")}
 
-# ========================================
+# =========================================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
-# ========================================
+# =========================================================
 __all__ = [
-    "PROJECT_ROOT", "SRC_DIR",
-    "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR",
+    # ルート
+    "PROJECT_ROOT", "SRC_DIR", "BASE_DIR",
+    # Airflow
+    "AIRFLOW_DOCKER_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR", "AIRFLOW_API_BASE",
+    # コア/スクリプト/AI
     "CORE_DIR", "SCRIPTS_DIR", "VERITAS_DIR", "STRATEGIES_DIR", "STRATEGIES_VERITAS_GENERATED_DIR",
-    "EXECUTION_DIR", "EXPERTS_DIR", "NOCTRIA_AI_DIR", "TOOLS_DIR",
-    "VERITAS_MODELS_DIR", "HERMES_MODELS_DIR",  # 新規追加
-    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR",
+    # 実行層（新旧互換）
+    "DO_DIR", "EXECUTION_DIR",
+    # 周辺領域
+    "EXPERTS_DIR", "NOCTRIA_AI_DIR", "TOOLS_DIR",
+    # モデル/AI
+    "VERITAS_MODELS_DIR", "HERMES_DIR", "HERMES_MODELS_DIR",
+    # データ領域
+    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "STATS_DIR",
     "INSTITUTIONS_DIR",
-    "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR", "ORACLE_FORECAST_JSON", "STATS_DIR",
+    "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR", "ORACLE_FORECAST_JSON",
+    # GUI/Docs/Tests/LLM
     "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
-    "NOCTRIA_GUI_ROUTES_DIR", "NOCTRIA_GUI_SERVICES_DIR", "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
+    "NOCTRIA_GUI_ROUTES_DIR", "NOCTRIA_GUI_SERVICES_DIR",
+    "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
+    # 主要ファイル
     "VERITAS_EVAL_LOG", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
+    # スクリプト/Repo
     "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GITHUB_PUSH_SCRIPT",
-    "GITHUB_REPO_URL", "CATEGORY_MAP", "_lint_path_config"
+    "GITHUB_REPO_URL",
+    # 分類
+    "CATEGORY_MAP",
+    # ユーティリティ
+    "_lint_path_config",
 ]
