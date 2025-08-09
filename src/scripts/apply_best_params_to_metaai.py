@@ -1,141 +1,113 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
-import json
+from __future__ import annotations
+import json, os, sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
-import sys
-import os
 
-# ========================================
-# 📌 core パス解決（Airflow + CLI 両対応）
-# ========================================
+# ===== Airflow/CLI両対応の安定import（src.へ統一） =====
 try:
-    from core.path_config import *
-    from core.logger import setup_logger
-    from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
-except ImportError:
+    from src.core.path_config import DATA_DIR, LOGS_DIR, MARKET_DATA_CSV
+    from src.core.logger import setup_logger
+    from src.core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
+except Exception:
+    # 旧環境/直接実行のフォールバック
     project_root = Path(__file__).resolve().parents[1]
-    sys.path.append(str(project_root))
-    from core.path_config import *
-    from core.logger import setup_logger
-    from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
+    sys.path.append(str(project_root))  # 最低限の救済
+    from src.core.path_config import DATA_DIR, LOGS_DIR, MARKET_DATA_CSV
+    from src.core.logger import setup_logger
+    from src.core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 
-# ========================================
-# 📂 ログ出力設定
-# ========================================
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 logger = setup_logger("metaai_apply_script", LOGS_DIR / "pdca" / "metaai_apply.log")
 
+def _safe_symlink(src: Path, dst: Path) -> None:
+    """Windows/WSL でも落ちにくいシンボリックリンク更新（失敗時はコピー退避）。"""
+    try:
+        if dst.exists() or dst.is_symlink():
+            dst.unlink()
+        dst.symlink_to(src, target_is_directory=False)
+    except Exception:
+        # 権限などで失敗したらコピーで代替
+        import shutil
+        shutil.copy2(src, dst)
 
-# ========================================
-# 🚀 MetaAI 再学習 + 評価 + 保存処理
-# ========================================
 def apply_best_params_to_metaai(
     best_params: Dict[str, Any],
-    total_timesteps: int = 50000,
+    total_timesteps: int = 50_000,
     n_eval_episodes: int = 20,
-    model_version: str = None
+    model_version: str | None = None,
 ) -> Dict[str, Any]:
     """
-    ✅ MetaAIに最適パラメータを適用し再学習・評価・保存を行い、結果を返す
+    ✅ MetaAIに最適パラメータを適用して再学習→評価→保存。
+    戻り値は下流（PDCA監査/GUI）で使いやすいメタ情報を含む。
     """
     if not best_params:
-        logger.error("❌ 最適化パラメータが提供されませんでした。")
-        raise ValueError("best_params cannot be None or empty.")
+        raise ValueError("best_params cannot be empty.")
 
-    logger.info(f"📦 受け取った最適パラメータ: {best_params}")
+    logger.info("📦 受領パラメータ: %s", json.dumps(best_params, ensure_ascii=False))
 
-    # 🔄 遅延インポート（Airflow用）
+    # 遅延import（Airflowワーカーでの起動安定化）
     from stable_baselines3 import PPO
     from stable_baselines3.common.evaluation import evaluate_policy
 
-    # 📁 パス構築
-    data_path = MARKET_DATA_CSV
-    tensorboard_log_dir = LOGS_DIR / "ppo_tensorboard_logs"
-    version = model_version if model_version else datetime.now().strftime("%Y%m%d-%H%M%S")
+    # パス構築（path_configのMODELS_DIR廃止に対応）
+    MODELS_DIR = DATA_DIR / "models"
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    version = model_version or datetime.now().strftime("%Y%m%d-%H%M%S")
     model_save_path = MODELS_DIR / f"metaai_model_{version}.zip"
-    latest_model_symlink = MODELS_DIR / "metaai_model_latest.zip"
+    latest_model_alias = MODELS_DIR / "metaai_model_latest.zip"
+    tensorboard_log_dir = LOGS_DIR / "ppo_tensorboard_logs"
 
-    # 🌱 環境初期化
-    try:
-        env = TradingEnvWithFundamentals(str(data_path))
-        eval_env = TradingEnvWithFundamentals(str(data_path))
-        logger.info("🌱 環境の初期化成功")
-    except Exception as e:
-        logger.error(f"❌ 環境初期化失敗: {e}", exc_info=True)
-        raise
+    # 環境準備
+    env = TradingEnvWithFundamentals(str(MARKET_DATA_CSV))
+    eval_env = TradingEnvWithFundamentals(str(MARKET_DATA_CSV))
 
-    # 🧠 モデル構築
     try:
         model = PPO(
             "MlpPolicy",
             env,
             verbose=0,
             tensorboard_log=str(tensorboard_log_dir),
-            **best_params
+            **best_params,
         )
-        logger.info("🛠 PPOモデル構築成功")
-    except Exception as e:
-        logger.error(f"❌ モデル構築失敗: {e}", exc_info=True)
-        raise
-
-    # 🎓 モデル学習
-    try:
-        logger.info(f"⚙️ MetaAI: 再学習を開始 (Timesteps: {total_timesteps})")
+        logger.info("🛠 PPOモデル構築OK")
+        logger.info("⚙️ 再学習開始: timesteps=%d", total_timesteps)
         model.learn(total_timesteps=total_timesteps)
-        logger.info("✅ 再学習完了")
-    except Exception as e:
-        logger.error(f"❌ モデル学習中のエラー: {e}", exc_info=True)
-        raise
+        logger.info("✅ 学習完了")
 
-    # 🧪 モデル評価
-    try:
-        final_mean_reward, _ = evaluate_policy(model, eval_env, n_eval_episodes=n_eval_episodes)
-        logger.info(f"🏆 最終評価スコア: {final_mean_reward:.4f}")
-    except Exception as e:
-        logger.error(f"❌ 評価失敗（スコア=-9999で続行）: {e}", exc_info=True)
-        final_mean_reward = -9999.0
+        # 評価
+        try:
+            final_mean_reward, _ = evaluate_policy(model, eval_env, n_eval_episodes=n_eval_episodes)
+        except Exception as e:
+            logger.exception("評価失敗（-9999継続）: %s", e)
+            final_mean_reward = -9999.0
 
-    # 💾 モデル保存 & 最新リンク更新
-    try:
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        # 保存＆エイリアス更新
         model.save(model_save_path)
-        logger.info(f"📁 モデル保存完了: {model_save_path}")
+        _safe_symlink(model_save_path, latest_model_alias)
+        logger.info("📁 保存: %s / 最新リンク: %s", model_save_path, latest_model_alias)
 
-        if latest_model_symlink.exists() or latest_model_symlink.is_symlink():
-            latest_model_symlink.unlink()
-        latest_model_symlink.symlink_to(model_save_path, target_is_directory=False)
-        logger.info(f"🔗 最新モデルリンク更新: {latest_model_symlink.name} -> {model_save_path.name}")
-    except Exception as e:
-        logger.error(f"❌ モデル保存中のエラー: {e}", exc_info=True)
-        raise
-
-    return {
-        "model_path": str(model_save_path),
-        "evaluation_score": final_mean_reward
-    }
-
-
-# ========================================
-# 🧪 CLIテスト用ブロック
-# ========================================
+        # 戻り値をリッチに（DAG下流や監査で活用）
+        result = {
+            "model_path": str(model_save_path),
+            "evaluation_score": float(final_mean_reward),
+            "params": best_params,
+            "version": version,
+            "data_source": str(MARKET_DATA_CSV),
+            "tensorboard_log_dir": str(tensorboard_log_dir),
+        }
+        return result
+    finally:
+        try:
+            env.close()
+            eval_env.close()
+        except Exception:
+            pass  # 念のため
+        logger.info("🧹 環境クローズ")
+        
 if __name__ == "__main__":
-    logger.info("🧪 CLIテスト実行開始")
-
-    mock_best_params = {
-        'learning_rate': 0.0001,
-        'n_steps': 1024,
-        'gamma': 0.99,
-        'ent_coef': 0.01,
-        'clip_range': 0.2
-    }
-
-    result = apply_best_params_to_metaai(
-        best_params=mock_best_params,
-        total_timesteps=1000,
-        n_eval_episodes=2
-    )
-
-    logger.info(f"✅ テスト完了: {result}")
+    mock_best_params = dict(learning_rate=1e-4, n_steps=1024, gamma=0.99, ent_coef=0.01, clip_range=0.2)
+    r = apply_best_params_to_metaai(best_params=mock_best_params, total_timesteps=1_000, n_eval_episodes=2)
+    print(json.dumps(r, indent=2, ensure_ascii=False))
