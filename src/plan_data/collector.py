@@ -1,6 +1,7 @@
 # src/plan_data/collector.py
 
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 from urllib.parse import urlencode
@@ -23,7 +24,6 @@ from plan_data.feature_spec import FEATURE_SPEC  # noqa: E402
 
 
 ASSET_SYMBOLS: Dict[str, str] = {
-    # --- 優先度S, A, Bアセット ---
     "USDJPY": "JPY=X",
     "SP500": "^GSPC",
     "N225": "^N225",
@@ -61,17 +61,10 @@ FRED_SERIES: Dict[str, str] = {
 
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    FEATURE_SPEC（リスト）に合わせて不足カラムは追加（NaN）し、
-    最終的にその順序で返す。
-    """
     columns = FEATURE_SPEC
-
     for col in columns:
         if col not in df.columns:
             df[col] = pd.NA
-
-    # 必要であれば型変換は個別に（ここでは行わない）
     return df[columns]
 
 
@@ -87,22 +80,22 @@ class PlanDataCollector:
         if not self.gnews_key:
             print("[collector] ⚠️ GNEWS_API_KEYが未設定です")
 
+        # 任意調整用（環境変数で上書き可）
+        self.gnews_page_size = int(os.getenv("GNEWS_PAGE_SIZE", "50"))   # 1リクエストあたり件数（最大100）
+        self.gnews_max_pages = int(os.getenv("GNEWS_MAX_PAGES", "3"))    # 最大ページ数（リク制限回避用）
+        self.gnews_retry = int(os.getenv("GNEWS_RETRY", "2"))            # 429 等のリトライ回数
+        self.gnews_backoff = float(os.getenv("GNEWS_BACKOFF", "1.5"))    # バックオフ係数
+
     # --------- ヘルパ群 ---------
 
     @staticmethod
     def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        yfinance の MultiIndex 列などをフラット化。
-        例: ('Close', 'JPY=X') -> 'Close_JPY=X'
-        また、非文字列列名は文字列化。
-        """
         cols = df.columns
         if isinstance(cols, pd.MultiIndex):
             df = df.copy()
             df.columns = ["_".join([str(c) for c in tup if c is not None and c != ""])
                           for tup in cols]
             return df
-        # 単純な列でも、念のため非文字列を文字列化
         if any(not isinstance(c, str) for c in cols):
             df = df.copy()
             df.columns = [str(c) for c in cols]
@@ -110,10 +103,6 @@ class PlanDataCollector:
 
     @staticmethod
     def _ensure_date_column(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        'date' 列を保証。存在しなければ 'Date' / 'Datetime' 等を探して変換。
-        既に 'date' があれば to_datetime だけ実施。
-        """
         df = df.copy()
         candidates = ["date", "Date", "Datetime", "datetime"]
         found = None
@@ -122,7 +111,6 @@ class PlanDataCollector:
                 found = c
                 break
         if found is None:
-            # yfinance reset_index 後は 'Date' が基本だが、万一無ければそのまま
             return df
         if found != "date":
             df = df.rename(columns={found: "date"})
@@ -131,11 +119,6 @@ class PlanDataCollector:
 
     @staticmethod
     def _pick_first_matching(df: pd.DataFrame, starts_with: str) -> Optional[str]:
-        """
-        'Close', 'Close_^GSPC', 'Close_JPY=X' のような列から
-        starts_with（lower比較）で最初に一致するものを返す。
-        """
-        # 完全一致優先（例: 'Close' / 'Volume'）
         if starts_with in df.columns:
             return starts_with
         low = starts_with.lower()
@@ -153,10 +136,6 @@ class PlanDataCollector:
         interval: str = "1d",
         symbols: Optional[Dict[str, str]] = None,
     ) -> pd.DataFrame:
-        """
-        yfinance で複数アセットの Close/Volume を取得し、date で外部結合。
-        Close/Volume が MultiIndex フォーマットでも柔軟に検出する。
-        """
         if symbols is None:
             symbols = ASSET_SYMBOLS
 
@@ -174,13 +153,10 @@ class PlanDataCollector:
                     print(f"[collector] {ticker} のデータなし")
                     continue
 
-                # index -> 列へ
                 df = df.reset_index()
-                # 安全のためフラット化 & date 保証
                 df = self._flatten_columns(df)
                 df = self._ensure_date_column(df)
 
-                # Close / Volume の柔軟検出
                 close_col = self._pick_first_matching(df, "Close")
                 volume_col = self._pick_first_matching(df, "Volume")
 
@@ -199,7 +175,6 @@ class PlanDataCollector:
                     }
                 )
 
-                # 数値化
                 for c in out.columns:
                     if c != "date":
                         out[c] = pd.to_numeric(out[c], errors="coerce")
@@ -210,10 +185,8 @@ class PlanDataCollector:
                 print(f"[collector] {ticker} の取得中エラー: {e}")
 
         if not dfs:
-            # 空の DataFrame を返す（後続で安全に扱えるよう 'date' 列だけ持たせてもOK）
             return pd.DataFrame(columns=["date"])
 
-        # date で順次外部結合
         merged = dfs[0]
         for i in range(1, len(dfs)):
             merged = pd.merge(merged, dfs[i], on="date", how="outer")
@@ -229,7 +202,6 @@ class PlanDataCollector:
             print("[collector] WARNING: 'date' 列が見つかりません。全列で重複排除を実施。")
             merged = merged.drop_duplicates().reset_index(drop=True)
 
-        # 前方補完（経済指標など週次・月次と価格の粒度差をならすため）
         merged = merged.ffill()
 
         if "usdjpy_close" not in merged.columns:
@@ -265,7 +237,6 @@ class PlanDataCollector:
             return pd.DataFrame()
 
     def fetch_event_calendar(self) -> pd.DataFrame:
-        """経済カレンダーCSV（カラム例: date, fomc, cpi, nfp, ...）"""
         try:
             df = pd.read_csv(self.event_calendar_csv)
             df.columns = [col.lower() for col in df.columns]
@@ -276,78 +247,121 @@ class PlanDataCollector:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
-    # ===== GNews 版（日次件数の簡易集計） =====
+    # ===== GNews: 期間まとめ取得→日付集計（レート制限対応） =====
     def fetch_gnews_counts(
         self,
         start_date: str,
         end_date: str,
         query: str = '(USD AND JPY) OR ("dollar" AND "yen") OR USDJPY',
         lang: str = "en",
-        max_per_day: int = 100,
     ) -> pd.DataFrame:
         """
-        GNews v4 で日次ニュース件数＋簡易ポジ/ネガ件数を集計
-        返却: [date, news_count, news_positive, news_negative]
+        GNews v4 /search を期間まとめて取得し、publishedAt の日付で groupby 集計。
+        レート制限を避けるためにページ数上限・指数バックオフ・リトライを実装。
+        返却列: [date, news_count, news_positive, news_negative]
         """
-        api_key = self.gnews_key
-        if not api_key:
+        if not self.gnews_key:
             print("[collector] GNEWS_API_KEYが未設定です")
             return pd.DataFrame()
 
-        dt_start = datetime.strptime(start_date, "%Y-%m-%d")
-        dt_end = datetime.strptime(end_date, "%Y-%m-%d")
-        rows = []
-
-        pos_words = ["gain", "rise", "surge", "record high", "bull", "up", "strong", "beat"]
-        neg_words = ["fall", "drop", "crash", "bear", "loss", "down", "weak", "miss"]
-
         base_url = "https://gnews.io/api/v4/search"
+        page_size = max(1, min(100, self.gnews_page_size))
+        max_pages = max(1, self.gnews_max_pages)
 
-        for d in pd.date_range(dt_start, dt_end):
-            day_str = d.strftime("%Y-%m-%d")
-            params = {
-                "q": query,
-                "from": day_str,
-                "to": day_str,
-                "lang": lang,
-                "max": max_per_day,
-                "sortby": "publishedAt",
-                "token": api_key,
-            }
+        params_common = {
+            "q": query,
+            "from": start_date,
+            "to": end_date,
+            "lang": lang,
+            "max": page_size,
+            "sortby": "publishedAt",
+            "token": self.gnews_key,
+        }
+
+        articles_all = []
+        page = 1
+        retries = self.gnews_retry
+
+        while page <= max_pages:
+            params = {**params_common, "page": page}
             url = base_url + "?" + urlencode(params)
 
             try:
                 r = requests.get(url, timeout=10)
+                if r.status_code == 429:
+                    if retries > 0:
+                        wait = (self.gnews_backoff ** (self.gnews_retry - retries)) * 2.0
+                        print(f"[collector] GNews 429: wait {wait:.1f}s & retry... (page={page})")
+                        time.sleep(wait)
+                        retries -= 1
+                        continue
+                    else:
+                        print("[collector] GNews 429: リトライ上限。部分結果で続行します。")
+                        break
+
                 r.raise_for_status()
                 data = r.json()
-
-                total = data.get("totalArticles", 0)
                 articles = data.get("articles", [])
+                if not articles:
+                    break
 
-                def get_text(a):
-                    t = (a.get("title") or "")
-                    dsc = (a.get("description") or "")
-                    return (t + " " + dsc).lower()
+                articles_all.extend(articles)
 
-                pos_count = 0
-                neg_count = 0
-                for a in articles:
-                    text = get_text(a)
-                    if any(w in text for w in pos_words):
-                        pos_count += 1
-                    if any(w in text for w in neg_words):
-                        neg_count += 1
+                # ページング終了条件
+                if len(articles) < page_size:
+                    break
 
-                rows.append({
-                    "date": pd.to_datetime(day_str),
-                    "news_count": int(total),
-                    "news_positive": int(pos_count),
-                    "news_negative": int(neg_count),
-                })
-            except Exception as e:
-                print(f"[collector] GNews {day_str}取得失敗: {e}")
+                # 次ページへ
+                page += 1
+                # 軽いレート間隔（サーバー負荷軽減）
+                time.sleep(0.4)
 
-        return pd.DataFrame(rows) if rows else pd.DataFrame()
+            except requests.RequestException as e:
+                print(f"[collector] GNews取得失敗(page={page}): {e}")
+                # 致命的でなければ部分結果で続行
+                break
+
+        if not articles_all:
+            return pd.DataFrame()
+
+        # 簡易スコアリング
+        pos_words = ["gain", "rise", "surge", "record high", "bull", "up", "strong", "beat"]
+        neg_words = ["fall", "drop", "crash", "bear", "loss", "down", "weak", "miss"]
+
+        rows = []
+        for a in articles_all:
+            title = (a.get("title") or "")
+            desc = (a.get("description") or "")
+            text = (title + " " + desc).lower()
+
+            pub = a.get("publishedAt") or ""
+            try:
+                # publishedAt: ISO8601 (e.g. 2024-01-01T12:34:56Z)
+                d = pd.to_datetime(pub, errors="coerce").date()
+            except Exception:
+                d = None
+
+            if d is None:
+                continue
+
+            rows.append({
+                "date": pd.to_datetime(str(d)),
+                "pos": int(any(w in text for w in pos_words)),
+                "neg": int(any(w in text for w in neg_words)),
+                "cnt": 1
+            })
+
+        if not rows:
+            return pd.DataFrame()
+
+        tmp = pd.DataFrame(rows)
+        agg = tmp.groupby("date").agg(
+            news_count=("cnt", "sum"),
+            news_positive=("pos", "sum"),
+            news_negative=("neg", "sum"),
+        ).reset_index()
+
+        return agg
 
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
         end = datetime.today()
@@ -372,15 +386,14 @@ class PlanDataCollector:
 
         # 🔁 GNews（日次ニュース件数・ポジネガ件数）
         news_df = self.fetch_gnews_counts(start_str, end_str)
-        if not news_df.empty and df is not None:
-            if df.empty:
+        if not news_df.empty:
+            if df is None or df.empty:
                 df = news_df.copy()
             else:
                 df = pd.merge(df, news_df, on="date", how="left")
 
         if df is not None:
             df = df.reset_index(drop=True)
-            # collector 側で標準仕様に整形
             df = align_to_feature_spec(df)
 
         return df
@@ -389,7 +402,6 @@ class PlanDataCollector:
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
-    df = collector.collect_all(lookback_days=7)
-    # テスト: date/news系の末尾確認
+    df = collector.collect_all(lookback_days=30)
     cols = [c for c in df.columns if "news" in c or c == "date"]
     print(df[cols].tail())
