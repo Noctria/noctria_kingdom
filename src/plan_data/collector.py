@@ -185,7 +185,7 @@ class PlanDataCollector:
                 volume_col = self._pick_first_matching(df, "Volume")
 
                 if close_col is None:
-                    print(f"[collector] {ticker} の Close 列が見つからずスキップ: cols={df.columns.tolist()]}")
+                    print(f"[collector] {ticker} の Close 列が見つからずスキップ: cols={df.columns.tolist()}")
                     continue
 
                 out_cols = ["date", close_col]
