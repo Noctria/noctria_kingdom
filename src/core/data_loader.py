@@ -1,5 +1,14 @@
 # core/data_loader.py
 
+import warnings
+warnings.filterwarnings("once", category=DeprecationWarning)
+warnings.warn(
+    "DEPRECATED: `src.core.data_loader.MarketDataFetcher` は将来廃止予定です。"
+    " 正規API: `from src.core.data.market_data_fetcher import MarketDataFetcher` を利用してください。",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 import requests
 import numpy as np
 import logging
@@ -13,7 +22,9 @@ from pathlib import Path  # buffer_pathでstr型が渡される場合に備え�
 DEFAULT_BUFFER_PATH = DATA_DIR / "market_data_buffer.json"  # バッファはdata配下に統一
 
 class MarketDataFetcher:
-    """市場データをAPI経由で取得し、トレンドを解析する"""
+    """市場データをAPI経由で取得し、トレンドを解析する
+    ※ 将来廃止予定。新規コードは `src.core.data.market_data_fetcher.MarketDataFetcher.fetch()` を使用してください。
+    """
 
     def __init__(self, api_key: Optional[str] = None, buffer_path: Optional[str] = None):
         self.api_key = api_key
