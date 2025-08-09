@@ -2,113 +2,157 @@
 
 import pandas as pd
 import numpy as np
-from plan_data.feature_spec import FEATURE_SPEC
-from plan_data.collector import ASSET_SYMBOLS  # 必要に応じて調整
+from plan_data.collector import ASSET_SYMBOLS  # 既定シンボル（任意で上書き可能）
 
-def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
-    columns = FEATURE_SPEC  # FEATURE_SPECはリストなのでそのまま使う
 
-    # 欠損カラムはNaNで追加
-    for col in columns:
-        if col not in df.columns:
-            df[col] = pd.NA
+def _to_numeric(df: pd.DataFrame, cols) -> pd.DataFrame:
+    """指定列を数値化（errors='coerce'）"""
+    for c in cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    return df
 
-    # 型変換は不要または個別実装
 
-    return df[columns]
+def _safe_pct_change(s: pd.Series) -> pd.Series:
+    """
+    pandas FutureWarning 回避のため fill_method=None を明示。
+    先頭は NaN のまま。非数値は事前に数値化してから渡すこと。
+    """
+    return s.pct_change(fill_method=None)
+
 
 class FeatureEngineer:
     def __init__(self, symbols: dict = None):
         """
-        symbols: ASSET_SYMBOLSなどのdict（マーケット系シンボルのみ）
+        symbols: ASSET_SYMBOLS 互換の dict（{"USDJPY": "JPY=X", ...} のキー名を使う）
         """
-        self.symbols = symbols or {}
+        self.symbols = symbols or ASSET_SYMBOLS
 
     def calc_rsi(self, series: pd.Series, window: int = 14) -> pd.Series:
-        delta = series.diff()
-        gain = delta.where(delta > 0, 0.0)
-        loss = -delta.where(delta < 0, 0.0)
-        avg_gain = gain.rolling(window).mean()
-        avg_loss = loss.rolling(window).mean()
+        # 数値に寄せる
+        s = pd.to_numeric(series, errors="coerce")
+        delta = s.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.rolling(window=window, min_periods=window).mean()
+        avg_loss = loss.rolling(window=window, min_periods=window).mean()
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
     def add_technical_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        入力: collector.collect_all() の出力（snake_case）
+        出力: 同じ snake_case のまま、各 *_return, *_volatility_*, *_rsi_14d 等を付与
+        """
         newdf = df.copy()
 
-        # 1. 市場系アセットの特徴量
+        # 1) 市場系アセットの特徴量（close/volume があれば加工）
         for key in self.symbols:
-            key_l = key.lower()
-            c = f"{key_l}_close"
-            v = f"{key_l}_volume"
+            base = key.lower()
+            c = f"{base}_close"
+            v = f"{base}_volume"
 
             if c in newdf.columns:
-                # 数値型に変換（非数値はNaNに）
-                newdf[c] = pd.to_numeric(newdf[c], errors='coerce')
+                # 数値化
+                newdf[c] = pd.to_numeric(newdf[c], errors="coerce")
 
-                newdf[f"{key_l}_return"] = newdf[c].pct_change()
-                newdf[f"{key_l}_volatility_5d"] = newdf[f"{key_l}_return"].rolling(5).std()
-                newdf[f"{key_l}_volatility_20d"] = newdf[f"{key_l}_return"].rolling(20).std()
-                newdf[f"{key_l}_rsi_14d"] = self.calc_rsi(newdf[c], window=14)
-                ma_short = newdf[c].rolling(5).mean()
-                ma_long = newdf[c].rolling(25).mean()
-                gc_flag = (ma_short > ma_long) & (ma_short.shift(1) <= ma_long.shift(1))
-                newdf[f"{key_l}_gc_flag"] = gc_flag.astype(int)
-                ma_mid = newdf[c].rolling(25).mean()
-                ma_longer = newdf[c].rolling(75).mean()
-                newdf[f"{key_l}_ma5"] = ma_short
-                newdf[f"{key_l}_ma25"] = ma_mid
-                newdf[f"{key_l}_ma75"] = ma_longer
-                po_up = ((ma_short > ma_mid) & (ma_mid > ma_longer)).astype(int)
-                po_down = ((ma_short < ma_mid) & (ma_mid < ma_longer)).astype(int)
-                newdf[f"{key_l}_po_up"] = po_up
-                newdf[f"{key_l}_po_down"] = po_down
+                # 収益率とボラ
+                newdf[f"{base}_return"] = _safe_pct_change(newdf[c])
+                newdf[f"{base}_volatility_5d"] = (
+                    newdf[f"{base}_return"].rolling(window=5, min_periods=5).std()
+                )
+                newdf[f"{base}_volatility_20d"] = (
+                    newdf[f"{base}_return"].rolling(window=20, min_periods=20).std()
+                )
+
+                # RSI
+                newdf[f"{base}_rsi_14d"] = self.calc_rsi(newdf[c], window=14)
+
+                # 移動平均とGCフラグ
+                ma5 = newdf[c].rolling(window=5, min_periods=5).mean()
+                ma25 = newdf[c].rolling(window=25, min_periods=25).mean()
+                ma75 = newdf[c].rolling(window=75, min_periods=75).mean()
+
+                gc_flag = (ma5 > ma25) & (ma5.shift(1) <= ma25.shift(1))
+                newdf[f"{base}_gc_flag"] = gc_flag.fillna(False).astype(int)
+
+                newdf[f"{base}_ma5"] = ma5
+                newdf[f"{base}_ma25"] = ma25
+                newdf[f"{base}_ma75"] = ma75
+
+                po_up = ((ma5 > ma25) & (ma25 > ma75)).astype("Int64")
+                po_down = ((ma5 < ma25) & (ma25 < ma75)).astype("Int64")
+                newdf[f"{base}_po_up"] = po_up
+                newdf[f"{base}_po_down"] = po_down
 
             if v in newdf.columns:
-                # 数値型に変換
-                newdf[v] = pd.to_numeric(newdf[v], errors='coerce')
+                newdf[v] = pd.to_numeric(newdf[v], errors="coerce")
+                vol_ma5 = newdf[v].rolling(window=5, min_periods=5).mean()
+                vol_ma20 = newdf[v].rolling(window=20, min_periods=20).mean()
+                newdf[f"{base}_volume_ma5"] = vol_ma5
+                newdf[f"{base}_volume_ma20"] = vol_ma20
+                newdf[f"{base}_volume_spike"] = (
+                    ((newdf[v] > vol_ma20 * 2) & (vol_ma20 > 0)).fillna(False).astype(int)
+                )
 
-                newdf[f"{key_l}_volume_ma5"] = newdf[v].rolling(5).mean()
-                newdf[f"{key_l}_volume_ma20"] = newdf[v].rolling(20).mean()
-                avg20 = newdf[f"{key_l}_volume_ma20"]
-                newdf[f"{key_l}_volume_spike"] = ((newdf[v] > avg20 * 2) & (avg20 > 0)).astype(int)
-
-        # 2. ニュース件数・センチメント系
+        # 2) ニュース件数・センチメント
         if "news_count" in newdf.columns:
-            newdf["news_count"] = pd.to_numeric(newdf["news_count"], errors='coerce')
+            newdf["news_count"] = pd.to_numeric(newdf["news_count"], errors="coerce")
             newdf["news_count_change"] = newdf["news_count"].diff()
-            newdf["news_spike_flag"] = (newdf["news_count"] > newdf["news_count"].rolling(20).mean() * 2).astype(int)
-        if "news_positive" in newdf.columns and "news_negative" in newdf.columns:
-            newdf["news_positive"] = pd.to_numeric(newdf["news_positive"], errors='coerce')
-            newdf["news_negative"] = pd.to_numeric(newdf["news_negative"], errors='coerce')
-            newdf["news_positive_ratio"] = newdf["news_positive"] / (newdf["news_count"] + 1e-6)
-            newdf["news_negative_ratio"] = newdf["news_negative"] / (newdf["news_count"] + 1e-6)
-            newdf["news_positive_lead"] = (newdf["news_positive"] > newdf["news_negative"]).astype(int)
-            newdf["news_negative_lead"] = (newdf["news_negative"] > newdf["news_positive"]).astype(int)
+            base_mean20 = newdf["news_count"].rolling(window=20, min_periods=10).mean()
+            newdf["news_spike_flag"] = (
+                (newdf["news_count"] > base_mean20 * 2).fillna(False).astype(int)
+            )
 
-        # 3. マクロ経済指標系（例：CPI、失業率、政策金利）
+        if "news_positive" in newdf.columns and "news_negative" in newdf.columns:
+            _to_numeric(newdf, ["news_positive", "news_negative"])
+            denom = (newdf.get("news_count", pd.Series(index=newdf.index, dtype="float64")) + 1e-6)
+            newdf["news_positive_ratio"] = newdf["news_positive"] / denom
+            newdf["news_negative_ratio"] = newdf["news_negative"] / denom
+            newdf["news_positive_lead"] = (
+                (newdf["news_positive"] > newdf["news_negative"]).fillna(False).astype(int)
+            )
+            newdf["news_negative_lead"] = (
+                (newdf["news_negative"] > newdf["news_positive"]).fillna(False).astype(int)
+            )
+
+        # 3) マクロ（CPI/UNRATE/FEDFUNDS）
         for macro in ["cpiaucsl_value", "unrate_value", "fedfunds_value"]:
             if macro in newdf.columns:
-                newdf[macro] = pd.to_numeric(newdf[macro], errors='coerce')
-                newdf[f"{macro}_diff"] = newdf[macro].diff()
-                newdf[f"{macro}_spike_flag"] = (np.abs(newdf[f"{macro}_diff"]) > newdf[f"{macro}_diff"].rolling(12).std() * 2).astype(int)
+                newdf[macro] = pd.to_numeric(newdf[macro], errors="coerce")
+                diff = newdf[macro].diff()
+                newdf[f"{macro}_diff"] = diff
+                thr = diff.rolling(window=12, min_periods=6).std() * 2
+                newdf[f"{macro}_spike_flag"] = (np.abs(diff) > thr).fillna(False).astype(int)
 
-        # 4. 経済カレンダー・イベントフラグ（例: fomc, cpi, nfp...）
-        event_cols = [c for c in newdf.columns if c.lower() in {"fomc", "cpi", "nfp", "ecb", "boj", "gdp"}]
-        for event in event_cols:
-            newdf[f"{event.lower()}_today_flag"] = (newdf[event] == 1).astype(int)
+        # 4) 経済イベント（fomc, cpi, nfp, ...）: 0/1 を Int64 で保持、today_flag も付与
+        event_candidates = {"fomc", "cpi", "nfp", "ecb", "boj", "gdp"}
+        event_cols = [c for c in newdf.columns if c.lower() in event_candidates]
+        for c in event_cols:
+            cc = c.lower()
+            # 0/1/True/False を 0/1(Int64) に寄せる
+            if newdf[c].dropna().isin([0, 1, True, False]).all():
+                newdf[c] = newdf[c].astype("Int64")
+            # 当日フラグ（この DF は日次まとめなので 当該列==1 をそのまま today_flag とする）
+            newdf[f"{cc}_today_flag"] = (newdf[c] == 1).astype("Int64")
 
-        # 必ずfeature_spec準拠に変換
-        return align_to_feature_spec(newdf)
+        # 最後に date 昇順＆重複除去（保険）
+        if "date" in newdf.columns:
+            newdf = newdf.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+
+        # FEATURE_SPEC へは寄せず、そのまま snake_case のまま返す
+        return newdf
+
 
 # テスト例
 if __name__ == "__main__":
-    import sys
-    sys.path.append(".")
-    from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+    from src.plan_data.collector import PlanDataCollector
+
     base_df = PlanDataCollector().collect_all(lookback_days=180)
     fe = FeatureEngineer(ASSET_SYMBOLS)
     feat_df = fe.add_technical_features(base_df)
-    pd.set_option('display.max_columns', 80)
+
+    pd.set_option("display.max_columns", 120)
+    print("columns:", feat_df.columns.tolist())
     print(feat_df.tail(5))
