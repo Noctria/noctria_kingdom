@@ -1,227 +1,92 @@
-import pandas as pd
+# src/plan_data/analyzer.py
+
 import numpy as np
-from typing import Optional, Dict, Any, List
-from plan_data.feature_spec import FEATURE_SPEC
+import pandas as pd
 
 class PlanAnalyzer:
-    """
-    PDCA-Plan根拠となる要因分析・特徴量抽出・説明ラベル化・LLM連携サマリー生成クラス
-    - マクロ・ニュース・イベント系も自動判定
-    """
+    def __init__(self, df: pd.DataFrame):
+        # 数値列をできるだけ数値化（失敗はNaNに）
+        self.df = df.copy()
+        for c in self.df.columns:
+            if c == "date":
+                continue
+            if self.df[c].dtype == "object":
+                self.df[c] = pd.to_numeric(self.df[c], errors="coerce")
 
-    def __init__(
-        self,
-        stats_df: pd.DataFrame,
-        actlog_df: Optional[pd.DataFrame] = None,
-        anomaly_df: Optional[pd.DataFrame] = None,
-    ):
-        # カラム名を小文字・アンダースコアで揃える
-        self.stats_df = stats_df.copy() if stats_df is not None else pd.DataFrame()
-        self.stats_df.columns = [c.lower() for c in self.stats_df.columns]
-        self.actlog_df = actlog_df.copy() if actlog_df is not None else None
-        if self.actlog_df is not None:
-            self.actlog_df.columns = [c.lower() for c in self.actlog_df.columns]
-        self.anomaly_df = anomaly_df.copy() if anomaly_df is not None else None
-        if self.anomaly_df is not None:
-            self.anomaly_df.columns = [c.lower() for c in self.anomaly_df.columns]
+    # 安全に末尾値を取得
+    def _last(self, s: pd.Series):
+        s = pd.to_numeric(s, errors="coerce")
+        s = s.dropna()
+        return s.iloc[-1] if len(s) else np.nan
 
-    def extract_features(self) -> Dict[str, Any]:
-        """
-        指標特徴量の高度抽出（ニュース・マクロ・イベントも柔軟分析）
-        """
-        features = {}
-        df = self.stats_df
+    # 安全に n 日（行）差分を取得（末尾と n+1 個前の差）
+    def _delta(self, s: pd.Series, n: int):
+        s = pd.to_numeric(s, errors="coerce").dropna()
+        if len(s) >= (n + 1):
+            return float(s.iloc[-1] - s.iloc[-(n + 1)])
+        return np.nan
 
-        # 基本統計
-        features["win_rate_mean"] = win_mean = df["win_rate"].mean() if "win_rate" in df else np.nan
-        features["win_rate_std"] = win_std = df["win_rate"].std() if "win_rate" in df else np.nan
-        features["drawdown_mean"] = dd_mean = df["drawdown"].mean() if "drawdown" in df else np.nan
-        features["num_trades_mean"] = numtr_mean = df["num_trades"].mean() if "num_trades" in df else np.nan
+    # NaN/NA を含む比較を安全にブールへ
+    def _gt(self, value, threshold) -> bool:
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return False
+        try:
+            return float(value) > float(threshold)
+        except Exception:
+            return False
 
-        # 直近傾向
-        if not df.empty:
-            last = df.iloc[-1]
-            features["last_win_rate"] = last.get("win_rate", np.nan)
-            features["last_drawdown"] = last.get("drawdown", np.nan)
-        else:
-            features["last_win_rate"] = np.nan
-            features["last_drawdown"] = np.nan
+    def extract_features(self) -> dict:
+        feats = {}
 
-        # 急変動検知（7日比較）
-        if "win_rate" in df and len(df) >= 7:
-            winrate_7ago = df["win_rate"].iloc[-7]
-            winrate_now = df["win_rate"].iloc[-1]
-            delta7 = winrate_now - winrate_7ago
-            features["win_rate_delta_7d"] = delta7
-            features["win_rate_rapid_increase"] = bool(delta7 > 3)
-            features["win_rate_rapid_decrease"] = bool(delta7 < -3)
-        else:
-            features["win_rate_delta_7d"] = np.nan
-            features["win_rate_rapid_increase"] = False
-            features["win_rate_rapid_decrease"] = False
+        # 例：勝率の変化をみる
+        if "win_rate" in self.df.columns:
+            last_wr = self._last(self.df["win_rate"])
+            delta7 = self._delta(self.df["win_rate"], 7)
+            feats["win_rate"] = last_wr
+            feats["win_rate_delta7"] = delta7
+            feats["win_rate_rapid_increase"] = self._gt(delta7, 3)  # NaNならFalse
 
-        # ニュース件数の急増/急減フラグ
-        if "news_count" in df and len(df) >= 7:
-            news_now = df["news_count"].iloc[-1]
-            news_7ago = df["news_count"].iloc[-7]
-            news_delta = news_now - news_7ago
-            rolling_std = df["news_count"].rolling(20).std().iloc[-1] if len(df) >= 20 else 1
-            features["news_count_delta_7d"] = news_delta
-            features["news_count_spike"] = bool(news_delta > rolling_std * 2)
-        else:
-            features["news_count_delta_7d"] = np.nan
-            features["news_count_spike"] = False
+        # 最大ドローダウン（より小さいほど悪い）
+        if "max_dd" in self.df.columns:
+            last_dd = self._last(self.df["max_dd"])
+            feats["max_dd"] = last_dd
+            # 例：直近のドローダウンが閾値より悪化か
+            feats["dd_worse_than_10"] = self._gt(-last_dd, 10)  # max_dd が -10 以下で True 相当
 
-        # ポジ/ネガニュース優勢のフラグ
-        if {"news_positive", "news_negative"}.issubset(df.columns):
-            pos_now = df["news_positive"].iloc[-1]
-            neg_now = df["news_negative"].iloc[-1]
-            features["news_positive_lead"] = bool(pos_now > neg_now)
-            features["news_negative_lead"] = bool(neg_now > pos_now)
-        else:
-            features["news_positive_lead"] = False
-            features["news_negative_lead"] = False
+        # 取引回数
+        if "num_trades" in self.df.columns:
+            last_trades = self._last(self.df["num_trades"])
+            feats["num_trades"] = last_trades
+            feats["active_market"] = self._gt(last_trades, 20)
 
-        # マクロ経済指標の急変（例: cpiaucsl_value、unrate_value、fedfunds_value...）
-        macro_cols = [c for c in df.columns if c.endswith("_value")]
-        for mc in macro_cols:
-            if len(df) >= 7:
-                now = df[mc].iloc[-1]
-                ago = df[mc].iloc[-7]
-                std = df[mc].rolling(20).std().iloc[-1] if len(df) >= 20 else 1
-                delta = now - ago
-                features[f"{mc}_delta_7d"] = delta
-                features[f"{mc}_spike"] = bool(abs(delta) > std * 2)
-            else:
-                features[f"{mc}_delta_7d"] = np.nan
-                features[f"{mc}_spike"] = False
+        # 市場関連の例（存在すれば）
+        for col in ["usdjpy_close", "sp500_close", "vix_close"]:
+            if col in self.df.columns:
+                last_val = self._last(self.df[col])
+                feats[col] = last_val
 
-        # 好調/不調戦略抽出
-        if {"strategy", "win_rate"}.issubset(df.columns) and not df.empty:
-            strat_perf = df.groupby("strategy")["win_rate"].mean()
-            features["good_strategies"] = strat_perf[strat_perf > win_mean + win_std].index.tolist()
-            features["bad_strategies"] = strat_perf[strat_perf < win_mean - win_std].index.tolist()
-        else:
-            features["good_strategies"] = []
-            features["bad_strategies"] = []
+        # ニュース件数
+        if "news_count" in self.df.columns:
+            last_news = self._last(self.df["news_count"])
+            delta3 = self._delta(self.df["news_count"], 3)
+            feats["news_count"] = last_news
+            feats["news_spike_recent"] = self._gt(delta3, 50)
 
-        # 危険なDD判定
-        if "drawdown" in df and not df.empty:
-            features["dangerous_drawdown"] = int((df["drawdown"] < -15).sum())
-        else:
-            features["dangerous_drawdown"] = 0
+        # マクロ例
+        for macro in ["cpiaucsl_value", "fedfunds_value", "unrate_value"]:
+            if macro in self.df.columns:
+                feats[macro] = self._last(self.df[macro])
 
-        # 主要イベント日フラグ（例: fomc, cpi, nfp, ...）
-        event_candidates = {"fomc", "cpi", "nfp", "ecb", "boj", "gdp"}
-        event_cols = [c for c in df.columns if c in event_candidates]
-        for event in event_cols:
-            features[f"{event}_today"] = bool(df[event].iloc[-1] == 1) if not df.empty else False
+        return feats
 
-        return features
-
-    def make_explanation_labels(self, features: Dict[str, Any]) -> List[str]:
-        """
-        特徴量から自然言語ラベルを自動生成（マクロ・ニュース系も）
-        """
+    def make_explanation_labels(self, features: dict) -> list:
         labels = []
-        # 勝率・DD
         if features.get("win_rate_rapid_increase"):
-            labels.append("📈 勝率が直近7日間で大きく上昇しています。")
-        if features.get("win_rate_rapid_decrease"):
-            labels.append("📉 勝率が直近7日間で急落しています。")
-        if features.get("dangerous_drawdown", 0) > 0:
-            labels.append(f"⚠️ ドローダウンが危険域（-15%以下）が{features['dangerous_drawdown']}件見られます。")
-        if features.get("good_strategies"):
-            gs = "、".join(features["good_strategies"][:3])
-            labels.append(f"🌟 好調な戦略: {gs}")
-        if features.get("bad_strategies"):
-            bs = "、".join(features["bad_strategies"][:3])
-            labels.append(f"🔻 不調な戦略: {bs}")
-        # ニュース系
-        if features.get("news_count_spike"):
-            labels.append("📰 ニュース件数が直近で急増しています（市場の話題性が高まっています）。")
-        if features.get("news_positive_lead"):
-            labels.append("🟢 ポジティブなニュースが優勢です。")
-        if features.get("news_negative_lead"):
-            labels.append("🔴 ネガティブなニュースが優勢です。")
-        # マクロ指標系
-        for macro in [k for k in features if k.endswith("_spike")]:
-            if features[macro]:
-                label = macro.replace("_spike", "").replace("_value", "").upper()
-                labels.append(f"📊 {label}が直近で大きく変動しています。")
-        # イベント系
-        for k, v in features.items():
-            if k.endswith("_today") and v:
-                event = k.replace("_today", "").upper()
-                labels.append(f"⏰ 今日は重要イベント日（{event}）です。")
+            labels.append("勝率が直近で急上昇しています。")
+        if features.get("dd_worse_than_10"):
+            labels.append("ドローダウンが深く、リスクが高まっています。")
+        if features.get("active_market"):
+            labels.append("取引回数が多く、市場は活発です。")
+        if self._gt(features.get("news_count", np.nan), 200):
+            labels.append("ニュース件数の増加が観測されます。")
         return labels
-
-    def generate_llm_summary(self, features: Dict[str, Any], labels: List[str]) -> str:
-        """
-        LLMプロンプト用Plan根拠サマリー
-        """
-        summary = "【PDCA Plan根拠サマリー】\n"
-        if labels:
-            summary += "・" + "\n・".join(labels) + "\n"
-        summary += f"平均勝率: {features.get('win_rate_mean', np.nan):.2f}%、"
-        summary += f"取引数平均: {features.get('num_trades_mean', np.nan):.1f}回\n"
-        return summary
-
-    def summarize_tag_trends(self) -> pd.DataFrame:
-        if "tag" not in self.stats_df:
-            return pd.DataFrame()
-        tag_stats = self.stats_df.groupby("tag").agg(
-            win_rate_mean=("win_rate", "mean"),
-            drawdown_mean=("drawdown", "mean"),
-            num_trades_sum=("num_trades", "sum"),
-            strategy_count=("strategy", "nunique"),
-        ).reset_index()
-        tag_stats = tag_stats.sort_values("win_rate_mean", ascending=False)
-        return tag_stats
-
-    def analyze_anomalies(self) -> pd.DataFrame:
-        if self.anomaly_df is None or self.anomaly_df.empty:
-            return pd.DataFrame()
-        anomaly_summary = self.anomaly_df.groupby("anomaly_type").size().reset_index(name="count")
-        anomaly_summary = anomaly_summary.sort_values("count", ascending=False)
-        return anomaly_summary
-
-    # ▼▼▼ FREDデータ活用分析 ▼▼▼
-
-    def analyze_by_fred_condition(
-        self, 
-        merged_df: pd.DataFrame, 
-        fred_col: str, 
-        threshold: float = None
-    ) -> dict:
-        merged_df.columns = [c.lower() for c in merged_df.columns]
-        if fred_col not in merged_df:
-            return {}
-
-        th = threshold if threshold is not None else merged_df[fred_col].median()
-        high_cond = merged_df[fred_col] >= th
-        low_cond = merged_df[fred_col] < th
-
-        summary = {
-            f"{fred_col}_high": {
-                "count": int(high_cond.sum()),
-                "win_rate_mean": merged_df.loc[high_cond, "win_rate"].mean() if "win_rate" in merged_df else np.nan,
-                "drawdown_mean": merged_df.loc[high_cond, "drawdown"].mean() if "drawdown" in merged_df else np.nan,
-                "num_trades_mean": merged_df.loc[high_cond, "num_trades"].mean() if "num_trades" in merged_df else np.nan,
-            },
-            f"{fred_col}_low": {
-                "count": int(low_cond.sum()),
-                "win_rate_mean": merged_df.loc[low_cond, "win_rate"].mean() if "win_rate" in merged_df else np.nan,
-                "drawdown_mean": merged_df.loc[low_cond, "drawdown"].mean() if "drawdown" in merged_df else np.nan,
-                "num_trades_mean": merged_df.loc[low_cond, "num_trades"].mean() if "num_trades" in merged_df else np.nan,
-            }
-        }
-        return summary
-
-    def correlation_with_fred(self, merged_df: pd.DataFrame, fred_col: str) -> Optional[float]:
-        merged_df.columns = [c.lower() for c in merged_df.columns]
-        if fred_col not in merged_df or "win_rate" not in merged_df:
-            return None
-        return merged_df[["win_rate", fred_col]].corr().iloc[0, 1]
-
-    # 追加の分析関数も随時対応OK
