@@ -53,46 +53,50 @@ FRED_SERIES = {
     "CPI": "CPIAUCSL",
 }
 
+
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
     """FEATURE_SPEC（リスト）に合わせて欠損列を補う・順序を揃える"""
     if df is None or df.empty:
-        # 空のときでも仕様順の空DFを返す
         return pd.DataFrame(columns=FEATURE_SPEC)
-    columns = FEATURE_SPEC
-    for col in columns:
+    for col in FEATURE_SPEC:
         if col not in df.columns:
             df[col] = pd.NA
-    return df[columns]
+    return df[FEATURE_SPEC]
+
+
+def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """MultiIndex列をフラット化"""
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = ["_".join([str(x) for x in tup if x not in (None, "")]).strip("_")
+                      for tup in df.columns]
+    return df
+
 
 def _ensure_date_column(df: pd.DataFrame) -> pd.DataFrame:
     """さまざまな形の 'Date' / index を 'date' 列(datetime64) に統一"""
     if df is None or df.empty:
         return df
+    df = _flatten_columns(df)
 
-    # すでに 'date' 列があるならOK
     if "date" in df.columns:
         pass
-    # 'Date' 列があるなら小文字へ
     elif "Date" in df.columns:
         df = df.rename(columns={"Date": "date"})
-    # index名がDate/dateのとき
     elif getattr(df.index, "name", None) in ("Date", "date"):
         df = df.reset_index().rename(columns={df.index.name: "date"})
-    # DatetimeIndexだが名前が無いとき
     elif isinstance(df.index, pd.DatetimeIndex):
         df = df.reset_index().rename(columns={"index": "date"})
     else:
-        # 最後の手段：もし 'Datetime' のような列名があるなら拾う
-        for cand in ["datetime", "time", "timestamp"]:
+        for cand in ("datetime", "time", "timestamp"):
             if cand in df.columns:
                 df = df.rename(columns={cand: "date"})
                 break
 
-    # 型をdatetimeへ
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
     return df
+
 
 class PlanDataCollector:
     def __init__(self, fred_api_key: Optional[str] = None, event_calendar_csv: Optional[str] = None):
@@ -128,25 +132,20 @@ class PlanDataCollector:
                     print(f"[collector] {ticker} のデータなし")
                     continue
 
-                # indexが日付なので列化して 'date' に統一
                 df = df.reset_index()
                 df = _ensure_date_column(df)
 
-                # yfinanceは 'Close' / 'Volume' が基本
                 cols = [c for c in ["date", "Close", "Volume"] if c in df.columns]
                 if "date" not in cols or "Close" not in df.columns:
-                    # 想定外フォーマットはスキップ（ここで落ちないため）
                     print(f"[collector] {ticker} 形式想定外のためスキップ: cols={df.columns.tolist()}")
                     continue
 
-                out = df[cols].copy()
-                out = out.rename(
+                out = df[cols].copy().rename(
                     columns={
                         "Close": f"{key.lower()}_close",
                         "Volume": f"{key.lower()}_volume",
                     }
                 )
-                # 数値化（object/strを落とす）
                 for c in out.columns:
                     if c != "date":
                         out[c] = pd.to_numeric(out[c], errors="coerce")
@@ -156,28 +155,30 @@ class PlanDataCollector:
                 print(f"[collector] {ticker} の取得中エラー: {e}")
 
         if not dfs:
-            # 何も取れなかった場合は空DF
             return pd.DataFrame(columns=["date"])
 
-        # 外部結合で時系列を統一
+        # 外部結合で時系列を統一（各ステップで date 復元）
         merged = dfs[0]
         for i in range(1, len(dfs)):
             merged = pd.merge(merged, dfs[i], on="date", how="outer")
+            merged = _ensure_date_column(merged)
 
-        # 念のため 'date' 復元＆datetime化
         merged = _ensure_date_column(merged)
+        merged = _flatten_columns(merged)
 
-        # 'date' 列が無い場合でも落ちないように重複除去
+        # 'date' の有無で重複除去を分岐
         if "date" in merged.columns:
-            merged = merged.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+            merged = merged.sort_values("date")
+            merged = merged.drop_duplicates(subset=["date"], keep="last").reset_index(drop=True)
         else:
             print("[collector] WARNING: 'date' 列が見つかりません。全列で重複排除を実施。")
             merged = merged.drop_duplicates().reset_index(drop=True)
 
-        # 前方埋め
-        merged = merged.sort_values("date").fillna(method="ffill")
+        # 前方埋め（dateがあるならdateで並べ替え）
+        if "date" in merged.columns:
+            merged = merged.sort_values("date")
+        merged = merged.fillna(method="ffill")
 
-        # usdjpy_close が無ければ警告だけ出して続行（以前はdropnaしていた）
         if "usdjpy_close" not in merged.columns:
             print("DEBUG: usdjpy_close はカラムに存在しません。続行します。")
 
@@ -280,17 +281,20 @@ class PlanDataCollector:
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and df is not None and not df.empty:
                 df = pd.merge(df, fred_df, on="date", how="left")
+                df = _ensure_date_column(df)
                 df = df.sort_values("date").fillna(method="ffill")
 
         # イベントカレンダー
         event_df = self.fetch_event_calendar()
         if not event_df.empty and df is not None and not df.empty:
             df = pd.merge(df, event_df, on="date", how="left")
+            df = _ensure_date_column(df)
 
         # NewsAPI（日次ニュース件数・ポジネガ件数）
         news_df = self.fetch_newsapi_counts(start_str, end_str)
         if not news_df.empty and df is not None and not df.empty:
             df = pd.merge(df, news_df, on="date", how="left")
+            df = _ensure_date_column(df)
 
         if df is not None:
             df = _ensure_date_column(df)
@@ -298,10 +302,10 @@ class PlanDataCollector:
             df = align_to_feature_spec(df)  # ★ ここで標準仕様に整形
         return df
 
+
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
     df = collector.collect_all(lookback_days=7)
-    print(df.head())
-    # テスト時はfeature_specにあるカラム名でアクセス
-    print(df[[col for col in df.columns if "news" in col or "date" in col]].tail())
+    print("cols:", df.columns.tolist())
+    print(df[[c for c in df.columns if c in ("date", "usdjpy_close", "sp500_close", "vix_close")]].tail())
