@@ -17,6 +17,11 @@ flowchart TD
     VERITAS["🧠 Veritas<br>戦略提案<br><b>propose()</b>"]
   end
 
+  %% --- D層（受け渡し先のみ） ---
+  subgraph DO_LAYER["⚔️ Do層（受け渡し先）"]
+    ORDER["order_execution.py<br>発注API本体"]
+  end
+
   %% --- 連携 ---
   COLLECT --> FEATENG
   FEATENG --> FEATDF
@@ -28,6 +33,13 @@ flowchart TD
 
   FEATDF --> ANALYZER
   ANALYZER --> HERMES
+
+  %% --- D層への受け渡し ---
+  AURUS --> ORDER
+  LEVIA --> ORDER
+  NOCTUS --> ORDER
+  PROMETHEUS --> ORDER
+  VERITAS --> ORDER
 
   %% --- サンプルデモ ---
   subgraph DEMO["plan_to_all_minidemo.py"]
@@ -45,10 +57,12 @@ flowchart TD
   classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7
   classDef ai fill:#333,color:#ffe476,stroke:#a97e2c
   classDef demo fill:#25252a,stroke:#f6e58d,color:#fffaad
+  classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc
 
   class PLAN plan
   class AI_UNDERLINGS ai
   class DEMO demo
+  class DO_LAYER do
 
   %% --- 補足 ---
   click DEMOENTRY "https://github.com/your_repo/src/plan_data/plan_to_all_minidemo.py" "サンプル実装ファイル"
