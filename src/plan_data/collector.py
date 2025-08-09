@@ -1,9 +1,10 @@
 # src/plan_data/collector.py
 
-import pandas as pd
+import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict
-import os
+
+import pandas as pd
 import requests
 
 try:
@@ -12,11 +13,14 @@ except ImportError:
     raise ImportError("yfinance が必要です: pip install yfinance")
 
 from dotenv import load_dotenv
+
+# .env をロード（パスは環境に合わせて）
 load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
 
-from plan_data.feature_spec import FEATURE_SPEC  # FEATURE_SPECはリスト
-
-ASSET_SYMBOLS = {
+# =====================================================
+# 取得するマーケットシンボル（キー名=出力カラムの接頭辞）
+# =====================================================
+ASSET_SYMBOLS: Dict[str, str] = {
     # --- 優先度S, A, Bアセット ---
     "USDJPY": "JPY=X",
     "SP500": "^GSPC",
@@ -47,87 +51,121 @@ ASSET_SYMBOLS = {
     "RUSSELL": "^RUT",
 }
 
+# FRED シリーズ（出力はすべて *_value の snake_case）
 FRED_SERIES = {
-    "UNRATE": "UNRATE",
-    "FEDFUNDS": "FEDFUNDS",
-    "CPI": "CPIAUCSL",
+    "UNRATE": "UNRATE",       # 失業率
+    "FEDFUNDS": "FEDFUNDS",   # 政策金利
+    "CPI": "CPIAUCSL",        # CPI
 }
 
-def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
-    columns = FEATURE_SPEC  # FEATURE_SPECはリストなのでそのまま使う
 
-    # 欠損カラムはNaNで追加
-    for col in columns:
-        if col not in df.columns:
-            df[col] = pd.NA
+def _ensure_datetime_series(s: pd.Series) -> pd.Series:
+    """pandas の日時列を安全に変換（tz情報は落として日付だけに寄せやすく）"""
+    s = pd.to_datetime(s, errors="coerce", utc=False)
+    return s
 
-    # 型変換は不要または個別実装
 
-    return df[columns]
+def _numericify(df: pd.DataFrame, cols: list) -> pd.DataFrame:
+    """指定列を to_numeric で数値化（errors='coerce'）"""
+    for c in cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    return df
+
 
 class PlanDataCollector:
-    def __init__(self, fred_api_key: Optional[str] = None, event_calendar_csv: Optional[str] = None):
+    def __init__(
+        self,
+        fred_api_key: Optional[str] = None,
+        event_calendar_csv: Optional[str] = None,
+    ):
         self.fred_api_key = fred_api_key or os.getenv("FRED_API_KEY")
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEYが未設定です")
-        self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
+
         self.newsapi_key = os.getenv("NEWSAPI_KEY")
         if not self.newsapi_key:
             print("[collector] ⚠️ NEWSAPI_KEYが未設定です")
 
-    def fetch_multi_assets(self, start: str, end: str, interval: str = "1d", symbols: Optional[Dict] = None) -> pd.DataFrame:
+        # 経済カレンダー（任意）
+        self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
+
+    # -------------------------------------------------
+    # マーケットデータ（Yahoo Finance）
+    # -------------------------------------------------
+    def fetch_multi_assets(
+        self,
+        start: str,
+        end: str,
+        interval: str = "1d",
+        symbols: Optional[Dict[str, str]] = None,
+    ) -> pd.DataFrame:
         if symbols is None:
             symbols = ASSET_SYMBOLS
+
         dfs = []
         for key, ticker in symbols.items():
             try:
-                df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
-                if df.empty:
+                df = yf.download(
+                    ticker, start=start, end=end, interval=interval, progress=False
+                )
+                if df is None or df.empty:
                     print(f"[collector] {ticker} のデータなし")
                     continue
+
                 df = df.reset_index()
+                # 必要カラム抽出
                 cols = ["Date", "Close"]
                 if "Volume" in df.columns:
                     cols.append("Volume")
-                # カラム名統一（小文字/アンダースコア、feature_spec側で調整）
-                df = df[cols].rename(
-                    columns={
-                        "Date": "date",
-                        "Close": f"{key.lower()}_close",
-                        "Volume": f"{key.lower()}_volume"
-                    }
-                )
+                df = df[cols]
+
+                # rename -> snake_case
+                base = key.lower()
+                rename_map = {
+                    "Date": "date",
+                    "Close": f"{base}_close",
+                }
+                if "Volume" in cols:
+                    rename_map["Volume"] = f"{base}_volume"
+                df = df.rename(columns=rename_map)
+
+                # 型整形
+                df["date"] = _ensure_datetime_series(df["date"])
+                num_cols = [c for c in df.columns if c != "date"]
+                df = _numericify(df, num_cols)
+
                 dfs.append(df)
             except Exception as e:
                 print(f"[collector] {ticker} の取得中エラー: {e}")
-        # 日付でマージ
-        merged = None
-        for df in dfs:
-            if merged is None:
-                merged = df
-            else:
-                merged = pd.merge(merged, df, on="date", how="outer")
-        if merged is not None:
-            merged = merged.sort_values("date")
-            merged = merged.fillna(method="ffill")
 
-            # MultiIndexならフラット化（例: ('usdjpy_close', 'JPY=X') -> 'usdjpy_close_JPY=X'）
-            if isinstance(merged.columns, pd.MultiIndex):
-                merged.columns = ['_'.join(filter(None, col)) for col in merged.columns]
+        if not dfs:
+            return pd.DataFrame()
 
-            key = "usdjpy_close"
-            if key in merged.columns:
-                merged = merged.dropna(subset=[key])
-            else:
-                print(f"DEBUG: {key} はカラムに存在しません。dropnaをスキップします。")
+        # 日付で順次マージ
+        merged = dfs[0]
+        for i in range(1, len(dfs)):
+            merged = pd.merge(merged, dfs[i], on="date", how="outer")
 
-            merged = merged.reset_index(drop=True)
+        # クレンジング
+        merged = merged.sort_values("date")
+        merged = merged.ffill()
+        merged = merged.drop_duplicates(subset=["date"]).reset_index(drop=True)
+
+        # usdjpy_close が取れていないと下流が空振りするので早期に気づけるよう警告
+        if "usdjpy_close" not in merged.columns:
+            print("DEBUG: usdjpy_close が存在しません（USDJPYのダウンロード失敗の可能性）。")
+
         return merged
 
+    # -------------------------------------------------
+    # FRED（任意）
+    # -------------------------------------------------
     def fetch_fred_data(self, series_id: str, start_date: str, end_date: str) -> pd.DataFrame:
         if not self.fred_api_key:
-            print("[collector] ⚠️ FRED_API_KEY未設定。FREDデータをスキップ")
+            # 既に初期化時に警告は出しているので静かにスキップ
             return pd.DataFrame()
+
         url = "https://api.stlouisfed.org/fred/series/observations"
         params = {
             "series_id": series_id,
@@ -139,100 +177,150 @@ class PlanDataCollector:
         try:
             r = requests.get(url, params=params, timeout=10)
             r.raise_for_status()
-            obs = r.json()["observations"]
+            obs = r.json().get("observations", [])
+            if not obs:
+                return pd.DataFrame()
+
             df = pd.DataFrame(obs)
-            # カラム名統一
             df = df.rename(columns={"date": "date", "value": f"{series_id.lower()}_value"})
-            df["date"] = pd.to_datetime(df["date"])
+            df["date"] = _ensure_datetime_series(df["date"])
             df[f"{series_id.lower()}_value"] = pd.to_numeric(df[f"{series_id.lower()}_value"], errors="coerce")
-            return df[["date", f"{series_id.lower()}_value"]]
+
+            # 日付ごとに最新観測のみ（重複除去）
+            df = df[["date", f"{series_id.lower()}_value"]].drop_duplicates(subset=["date"])
+            return df
         except Exception as e:
             print(f"[collector] FREDデータ({series_id})取得失敗: {e}")
             return pd.DataFrame()
 
+    # -------------------------------------------------
+    # 経済カレンダー（任意のCSV）
+    # -------------------------------------------------
     def fetch_event_calendar(self) -> pd.DataFrame:
-        """経済カレンダーCSV（カラム例: date, fomc, cpi, nfp, ...）"""
         try:
             df = pd.read_csv(self.event_calendar_csv)
-            # カラム名統一
-            df.columns = [col.lower() for col in df.columns]
-            if "date" in df.columns:
-                df["date"] = pd.to_datetime(df["date"])
-            return df
         except Exception as e:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
-    def fetch_newsapi_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
-        """NewsAPIで日次ニュース件数＋ポジ/ネガワード件数を返す"""
+        # カラム名を snake_case に（最低限 date は必須）
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        if "date" not in df.columns:
+            print("[collector] 経済カレンダーCSVに 'date' 列がありません。スキップします。")
+            return pd.DataFrame()
+
+        df["date"] = _ensure_datetime_series(df["date"])
+        # 0/1/True/False を int に寄せる（イベントフラグ扱い想定）
+        for c in df.columns:
+            if c == "date":
+                continue
+            if df[c].dropna().isin([0, 1, True, False]).all():
+                df[c] = df[c].astype("Int64")
+
+        df = df.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+        return df
+
+    # -------------------------------------------------
+    # NewsAPI（任意）— キー未設定なら何もしない
+    # -------------------------------------------------
+    def fetch_newsapi_counts(self, start_date: str, end_date: str, query: str = "usd jpy") -> pd.DataFrame:
         api_key = self.newsapi_key
         if not api_key:
-            print("[collector] NEWSAPI_KEYが未設定です")
+            # 明示的にスキップ
             return pd.DataFrame()
-        dfs = []
+
         dt_start = datetime.strptime(start_date, "%Y-%m-%d")
         dt_end = datetime.strptime(end_date, "%Y-%m-%d")
+
+        rows = []
         for d in pd.date_range(dt_start, dt_end):
             day_str = d.strftime("%Y-%m-%d")
             url = (
-                f"https://newsapi.org/v2/everything?"
+                "https://newsapi.org/v2/everything?"
                 f"q={query}&from={day_str}&to={day_str}&language=en&pageSize=100"
                 f"&apiKey={api_key}"
             )
             try:
                 r = requests.get(url, timeout=10)
                 r.raise_for_status()
-                data = r.json()
+                data = r.json() or {}
                 n_total = data.get("totalResults", 0)
-                articles = data.get("articles", [])
+                articles = data.get("articles", []) or []
+
                 pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
                 neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
-                pos_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in pos_words)
-                    for a in articles
-                )
-                neg_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in neg_words)
-                    for a in articles
-                )
-                dfs.append(
-                    {"date": pd.to_datetime(day_str), "news_count": n_total,
-                     "news_positive": pos_count, "news_negative": neg_count}
+
+                def _count(words):
+                    cnt = 0
+                    for a in articles:
+                        t = (a.get("title") or "").lower()
+                        if any(w in t for w in words):
+                            cnt += 1
+                    return cnt
+
+                rows.append(
+                    {
+                        "date": pd.to_datetime(day_str),
+                        "news_count": int(n_total) if isinstance(n_total, int) else 0,
+                        "news_positive": _count(pos_words),
+                        "news_negative": _count(neg_words),
+                    }
                 )
             except Exception as e:
                 print(f"[collector] NewsAPI {day_str}取得失敗: {e}")
-        if dfs:
-            return pd.DataFrame(dfs)
-        return pd.DataFrame()
 
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows).drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+        return df
+
+    # -------------------------------------------------
+    # すべて集約
+    # -------------------------------------------------
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
-        end = datetime.today()
-        start = end - timedelta(days=lookback_days)
-        start_str = start.strftime("%Y-%m-%d")
-        end_str = end.strftime("%Y-%m-%d")
+        end_dt = datetime.today()
+        start_dt = end_dt - timedelta(days=lookback_days)
+        start_str = start_dt.strftime("%Y-%m-%d")
+        end_str = end_dt.strftime("%Y-%m-%d")
+
+        # 1) マーケット
         df = self.fetch_multi_assets(start=start_str, end=end_str)
-        # FREDデータ
+
+        if df is None or df.empty:
+            print("[collector] ⚠️ マーケットデータが空です。以降の結合はスキップします。")
+            return pd.DataFrame()
+
+        # 2) FRED（任意・あれば left join）
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
-            if not fred_df.empty and df is not None:
+            if not fred_df.empty:
                 df = pd.merge(df, fred_df, on="date", how="left")
-                df = df.sort_values("date").fillna(method="ffill")
-        # イベントカレンダー
+                df = df.sort_values("date").ffill()
+
+        # 3) イベントカレンダー（任意）
         event_df = self.fetch_event_calendar()
-        if not event_df.empty and df is not None:
+        if not event_df.empty:
             df = pd.merge(df, event_df, on="date", how="left")
-        # NewsAPI（日次ニュース件数・ポジネガ件数）
+
+        # 4) NewsAPI（任意）
         news_df = self.fetch_newsapi_counts(start_str, end_str)
-        if not news_df.empty and df is not None:
+        if not news_df.empty:
             df = pd.merge(df, news_df, on="date", how="left")
-        if df is not None:
-            df = df.reset_index(drop=True)
-            df = align_to_feature_spec(df)  # ★ ここで標準仕様に整形
+
+        # 最終クレンジング
+        df = df.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+
+        # 代表カラムの存在チェック（下流が使う想定の一部）
+        for must in ["usdjpy_close", "sp500_close", "vix_close"]:
+            if must not in df.columns:
+                print(f"[collector] ⚠️ 代表カラムが欠落しています: {must}")
+
         return df
+
 
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
     df = collector.collect_all(lookback_days=7)
-    # テスト時はfeature_specにあるカラム名でアクセス
-    print(df[[col for col in df.columns if "news" in col or "date" in col]].tail())
+    print("columns:", df.columns.tolist())
+    print(df.tail())
