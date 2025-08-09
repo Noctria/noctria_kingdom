@@ -16,7 +16,7 @@ from airflow.utils.session import provide_session
 from airflow.utils.context import get_current_context
 
 from src.core.path_config import LOGS_DIR, DATA_DIR
-from src.core.data_loader import MarketDataFetcher  # 実装があれば使用
+from src.core.data.market_data_fetcher import MarketDataFetcher
 from src.core.king_noctria import KingNoctria
 
 JST = pendulum.timezone("Asia/Tokyo")
