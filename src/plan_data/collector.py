@@ -3,6 +3,7 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict
+from urllib.parse import urlencode
 
 import pandas as pd
 import requests
@@ -80,9 +81,11 @@ class PlanDataCollector:
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEYが未設定です")
         self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
-        self.newsapi_key = os.getenv("NEWSAPI_KEY")
-        if not self.newsapi_key:
-            print("[collector] ⚠️ NEWSAPI_KEYが未設定です")
+
+        # 🔁 NewsAPI → GNews へ切替
+        self.gnews_key = os.getenv("GNEWS_API_KEY")
+        if not self.gnews_key:
+            print("[collector] ⚠️ GNEWS_API_KEYが未設定です")
 
     # --------- ヘルパ群 ---------
 
@@ -182,7 +185,7 @@ class PlanDataCollector:
                 volume_col = self._pick_first_matching(df, "Volume")
 
                 if close_col is None:
-                    print(f"[collector] {ticker} の Close 列が見つからずスキップ: cols={df.columns.tolist()}")
+                    print(f"[collector] {ticker} の Close 列が見つからずスキップ: cols={df.columns.tolist()]}")
                     continue
 
                 out_cols = ["date", close_col]
@@ -227,7 +230,7 @@ class PlanDataCollector:
             merged = merged.drop_duplicates().reset_index(drop=True)
 
         # 前方補完（経済指標など週次・月次と価格の粒度差をならすため）
-        merged = merged.fillna(method="ffill")
+        merged = merged.ffill()
 
         if "usdjpy_close" not in merged.columns:
             print("DEBUG: usdjpy_close はカラムに存在しません。続行します。")
@@ -273,51 +276,78 @@ class PlanDataCollector:
             print(f"[collector] イベントカレンダー取得失敗: {e}")
             return pd.DataFrame()
 
-    def fetch_newsapi_counts(self, start_date: str, end_date: str, query="usd jpy") -> pd.DataFrame:
-        """NewsAPIで日次ニュース件数＋ポジ/ネガワード件数を返す"""
-        api_key = self.newsapi_key
+    # ===== GNews 版（日次件数の簡易集計） =====
+    def fetch_gnews_counts(
+        self,
+        start_date: str,
+        end_date: str,
+        query: str = '(USD AND JPY) OR ("dollar" AND "yen") OR USDJPY',
+        lang: str = "en",
+        max_per_day: int = 100,
+    ) -> pd.DataFrame:
+        """
+        GNews v4 で日次ニュース件数＋簡易ポジ/ネガ件数を集計
+        返却: [date, news_count, news_positive, news_negative]
+        """
+        api_key = self.gnews_key
         if not api_key:
-            print("[collector] NEWSAPI_KEYが未設定です")
+            print("[collector] GNEWS_API_KEYが未設定です")
             return pd.DataFrame()
-        dfs = []
+
         dt_start = datetime.strptime(start_date, "%Y-%m-%d")
         dt_end = datetime.strptime(end_date, "%Y-%m-%d")
+        rows = []
+
+        pos_words = ["gain", "rise", "surge", "record high", "bull", "up", "strong", "beat"]
+        neg_words = ["fall", "drop", "crash", "bear", "loss", "down", "weak", "miss"]
+
+        base_url = "https://gnews.io/api/v4/search"
+
         for d in pd.date_range(dt_start, dt_end):
             day_str = d.strftime("%Y-%m-%d")
-            url = (
-                f"https://newsapi.org/v2/everything?"
-                f"q={query}&from={day_str}&to={day_str}&language=en&pageSize=100"
-                f"&apiKey={api_key}"
-            )
+            params = {
+                "q": query,
+                "from": day_str,
+                "to": day_str,
+                "lang": lang,
+                "max": max_per_day,
+                "sortby": "publishedAt",
+                "token": api_key,
+            }
+            url = base_url + "?" + urlencode(params)
+
             try:
                 r = requests.get(url, timeout=10)
                 r.raise_for_status()
                 data = r.json()
-                n_total = data.get("totalResults", 0)
+
+                total = data.get("totalArticles", 0)
                 articles = data.get("articles", [])
-                pos_words = ["gain", "rise", "surge", "record high", "bull", "up"]
-                neg_words = ["fall", "drop", "crash", "bear", "loss", "down"]
-                pos_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in pos_words)
-                    for a in articles
-                )
-                neg_count = sum(
-                    any(w in (a.get("title") or "").lower() for w in neg_words)
-                    for a in articles
-                )
-                dfs.append(
-                    {
-                        "date": pd.to_datetime(day_str),
-                        "news_count": n_total,
-                        "news_positive": pos_count,
-                        "news_negative": neg_count,
-                    }
-                )
+
+                def get_text(a):
+                    t = (a.get("title") or "")
+                    dsc = (a.get("description") or "")
+                    return (t + " " + dsc).lower()
+
+                pos_count = 0
+                neg_count = 0
+                for a in articles:
+                    text = get_text(a)
+                    if any(w in text for w in pos_words):
+                        pos_count += 1
+                    if any(w in text for w in neg_words):
+                        neg_count += 1
+
+                rows.append({
+                    "date": pd.to_datetime(day_str),
+                    "news_count": int(total),
+                    "news_positive": int(pos_count),
+                    "news_negative": int(neg_count),
+                })
             except Exception as e:
-                print(f"[collector] NewsAPI {day_str}取得失敗: {e}")
-        if dfs:
-            return pd.DataFrame(dfs)
-        return pd.DataFrame()
+                print(f"[collector] GNews {day_str}取得失敗: {e}")
+
+        return pd.DataFrame(rows) if rows else pd.DataFrame()
 
     def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
         end = datetime.today()
@@ -333,22 +363,24 @@ class PlanDataCollector:
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and df is not None and not df.empty:
                 df = pd.merge(df, fred_df, on="date", how="left")
-                df = df.sort_values("date").fillna(method="ffill")
+                df = df.sort_values("date").ffill()
 
         # 経済カレンダー
         event_df = self.fetch_event_calendar()
         if not event_df.empty and df is not None and not df.empty:
             df = pd.merge(df, event_df, on="date", how="left")
 
-        # NewsAPI（日次ニュース件数・ポジ/ネガ件数）
-        news_df = self.fetch_newsapi_counts(start_str, end_str)
-        if not news_df.empty and df is not None and not df.empty:
-            df = pd.merge(df, news_df, on="date", how="left")
+        # 🔁 GNews（日次ニュース件数・ポジネガ件数）
+        news_df = self.fetch_gnews_counts(start_str, end_str)
+        if not news_df.empty and df is not None:
+            if df.empty:
+                df = news_df.copy()
+            else:
+                df = pd.merge(df, news_df, on="date", how="left")
 
         if df is not None:
             df = df.reset_index(drop=True)
-            # collector 側では最終的に標準仕様へ合わせない場合は以下をコメントアウト
-            # ただし pipeline 的にここで揃えておくのが安全
+            # collector 側で標準仕様に整形
             df = align_to_feature_spec(df)
 
         return df
