@@ -1,66 +1,90 @@
-import yfinance as yf
-import pandas as pd
+# src/core/data/market_data_fetcher.py
 import time
-from core.logger import setup_logger
+from datetime import timezone
+from typing import Optional, Dict, Any
+
+import pandas as pd
+import yfinance as yf
+
+from src.core.logger import setup_logger  # ← src. に統一
+
 
 class MarketDataFetcher:
     """
-    📡 Noctria Kingdomの市場情報通信塔：Yahoo Finance経由でUSDJPYの市場情報を取得。
+    📡 Noctria Kingdom 市場データ取得（Yahoo Finance）
+    - 正規API: fetch(symbol, interval, period)
+    - 互換API: get_usdjpy_historical_data / get_usdjpy_latest_price
     """
-    # ❗️【修正点】'alphavantage_api_key'を引数として受け取れるように追加
-    def __init__(self, alphavantage_api_key=None, retries=3, wait_sec=2):
+    def __init__(self, alphavantage_api_key: Optional[str] = None, retries: int = 3, wait_sec: float = 2.0):
         self.logger = setup_logger("MarketDataFetcher")
-        self.alphavantage_api_key = alphavantage_api_key # APIキーをインスタンス変数として保持
-        self.retries = retries
-        self.wait_sec = wait_sec
+        self.alphavantage_api_key = alphavantage_api_key  # いまは未使用（将来拡張用）
+        self.retries = max(1, retries)
+        self.wait_sec = max(0.5, float(wait_sec))
 
-    def get_usdjpy_historical_data(self, interval="1h", period="1mo"):
+    def fetch(self, symbol: str, interval: str = "1h", period: str = "1mo") -> Optional[pd.DataFrame]:
         """
-        ドル円のヒストリカルデータを取得
+        汎用取得API（推奨）
+        Returns:
+            tz-aware(UTC) index の DataFrame(columns=["open","high","low","close","volume"])
+            取得失敗時は None
         """
-        symbol = "USDJPY=X"
-        self.logger.info(f"📥 市場通信開始: {symbol}, interval={interval}, period={period}")
-
+        self.logger.info(f"📥 fetch: symbol={symbol}, interval={interval}, period={period}")
         df = None
+        backoff = self.wait_sec
+
         for attempt in range(1, self.retries + 1):
             try:
-                df = yf.download(symbol, interval=interval, period=period, progress=False)
-                if not df.empty:
+                tmp = yf.download(symbol, interval=interval, period=period, progress=False, threads=False)
+                if tmp is not None and not tmp.empty:
+                    df = tmp.copy()
                     break
+                self.logger.warning(f"空データ受信（{attempt}/{self.retries}）")
             except Exception as e:
                 self.logger.warning(f"⚠️ 通信失敗（{attempt}/{self.retries}）: {e}")
-                time.sleep(self.wait_sec)
+            time.sleep(backoff)
+            backoff *= 1.6  # 簡易指数バックオフ
 
         if df is None or df.empty:
-            self.logger.error("🚫 USDJPYの市場情報取得に失敗しました")
+            self.logger.error("🚫 データ取得に失敗しました")
             return None
 
-        df.fillna(method="ffill", inplace=True)
-        df = df[["Open", "High", "Low", "Close", "Volume"]]
-        self.logger.info(f"✅ データ取得成功: {df.shape}")
+        # 正規化：欠損前埋め＋列名＋TZ
+        df = df.fillna(method="ffill")
+        cols_map = {"Open": "open", "High": "high", "Low": "low", "Close": "close", "Adj Close": "close", "Volume": "volume"}
+        df = df.rename(columns=cols_map)
+        # 必要列だけに絞る（不足があれば raise せずスキップ）
+        keep = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
+        df = df[keep]
+
+        # tz-aware (UTC)
+        if df.index.tz is None:
+            df.index = df.index.tz_localize("UTC")
+        else:
+            df.index = df.index.tz_convert("UTC")
+
+        self.logger.info(f"✅ 取得成功: shape={df.shape}, from={df.index.min()} to={df.index.max()}")
         return df
 
-    def get_usdjpy_latest_price(self):
-        """
-        USDJPYの直近の終値を取得
-        """
-        df = self.get_usdjpy_historical_data(interval="1d", period="1d")
-        if df is not None and not df.empty:
-            latest_close = df.iloc[-1]["Close"]
-            self.logger.info(f"💰 直近終値（Close）: {latest_close}")
-            return latest_close
+    # ---- 互換API（既存呼び出しの維持） ----
+    def get_usdjpy_historical_data(self, interval: str = "1h", period: str = "1mo") -> Optional[pd.DataFrame]:
+        """互換：USDJPYヒストリカル"""
+        return self.fetch(symbol="USDJPY=X", interval=interval, period=period)
+
+    def get_usdjpy_latest_price(self) -> Optional[float]:
+        """互換：USDJPYの直近終値"""
+        df = self.fetch(symbol="USDJPY=X", interval="1d", period="5d")
+        if df is not None and not df.empty and "close" in df.columns:
+            latest = float(df["close"].iloc[-1])
+            self.logger.info(f"💰 直近終値: {latest}")
+            return latest
         return None
 
+
 if __name__ == "__main__":
-    fetcher = MarketDataFetcher()
-    df = fetcher.get_usdjpy_historical_data()
-    if df is not None:
-        # データを保存
-        df.to_csv("USDJPY_M1_recent.csv", index=False)
-        print("✅ USDJPYデータをCSVに保存しました: USDJPY_M1_recent.csv")
-
-        print("🔎 USDJPY直近データ:")
-        print(df.tail(5).values)
-
-    latest_price = fetcher.get_usdjpy_latest_price()
-    print("USDJPY 最新終値:", latest_price)
+    f = MarketDataFetcher()
+    d = f.get_usdjpy_historical_data()
+    if d is not None:
+        d.tail().to_csv("USDJPY_recent.csv")
+        print("✅ saved: USDJPY_recent.csv")
+        print(d.tail())
+    print("latest:", f.get_usdjpy_latest_price())
