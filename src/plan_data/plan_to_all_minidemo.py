@@ -18,8 +18,17 @@ from src.strategies.hermes_cognitor import HermesCognitorStrategy
 from src.veritas.veritas_machina import VeritasMachina
 
 
+def _safe_float(x, default=0.0):
+    try:
+        if pd.isna(x):
+            return float(default)
+        return float(x)
+    except Exception:
+        return float(default)
+
+
 def main():
-    # 1. 特徴量生成
+    # 1) 収集 → 特徴量化
     collector = PlanDataCollector()
     base_df = collector.collect_all(lookback_days=60)
     fe = FeatureEngineer(ASSET_SYMBOLS)
@@ -28,49 +37,69 @@ def main():
     print("=== feat_df columns ===")
     print(feat_df.columns.tolist())
 
-    # ---------- ここから堅牢化ブロック ----------
-    # STANDARD_FEATURE_ORDER と実データの交差のみを対象
-    available_cols = [c for c in STANDARD_FEATURE_ORDER if c in feat_df.columns]
+    # ---------- データ堅牢化（末尾NaN対策） ----------
+    feat_df = feat_df.sort_values("date")
 
-    # 前方埋めで営業日/公表日ギャップを緩和（存在する列のみ）
+    # 月次マクロは前方→後方で埋める（末尾NaNつぶし）
+    for col in ["cpiaucsl_value", "unrate_value", "fedfunds_value"]:
+        if col in feat_df.columns:
+            feat_df[col] = pd.to_numeric(feat_df[col], errors="coerce").ffill().bfill()
+
+    # NewsAPI 未設定時は NaN になりやすいので 0 埋め
+    news_cols = [
+        "news_count", "news_positive", "news_negative",
+        "news_positive_ratio", "news_negative_ratio",
+        "news_spike_flag", "news_count_change",
+        "news_positive_lead", "news_negative_lead",
+    ]
+    for col in news_cols:
+        if col in feat_df.columns:
+            feat_df[col] = pd.to_numeric(feat_df[col], errors="coerce").fillna(0.0)
+
+    # 標準特徴量のうち存在する列のみを対象に前方埋め
+    available_cols = [c for c in STANDARD_FEATURE_ORDER if c in feat_df.columns]
     if available_cols:
         feat_df[available_cols] = feat_df[available_cols].ffill()
 
-    # コア必須列（段階的に緩和）
+    # コア（USDJPY/先物指数/ボラ）で最小限の行を確保
     core_candidates = ["usdjpy_close", "sp500_close", "vix_close"]
     core_subset = [c for c in core_candidates if c in available_cols]
 
     if core_subset:
         valid_df = feat_df.dropna(subset=core_subset, how="any")
     else:
-        # 最低限 USDJPY がなければ実行不可
         if "usdjpy_close" in feat_df.columns:
             valid_df = feat_df.dropna(subset=["usdjpy_close"], how="any")
         else:
-            raise RuntimeError(
-                "必要なコア列が存在しません（usdjpy_close も見つかりませんでした）。"
-            )
+            raise RuntimeError("必要なコア列が存在しません（usdjpy_close が見つかりません）。")
 
-    # それでも空ならフォールバックして最終行を使う
+    # それでも空なら全体から最終行を使う
     if valid_df.empty:
         valid_df = feat_df.copy()
 
     latest_row = valid_df.iloc[-1]
 
-    # 出力順は「存在する列」のみ
+    # 実在する列のみを order にする（順序は STANDARD_FEATURE_ORDER 準拠）
     feature_order = available_cols if available_cols else [c for c in STANDARD_FEATURE_ORDER if c in valid_df.columns]
 
-    # 値は存在しない列は 0.0 で埋める（必要に応じて np.nan に変更可）
-    feature_dict = {
-        col: (latest_row[col] if col in valid_df.columns else 0.0)
-        for col in feature_order
-    }
-    # ---------- ここまで堅牢化ブロック ----------
+    # 値が NaN ならその列の直近値で補完、無ければ 0.0
+    feature_dict = {}
+    for col in feature_order:
+        if col in valid_df.columns:
+            val = latest_row[col]
+            if pd.isna(val):
+                non_na = valid_df[col].dropna()
+                feature_dict[col] = _safe_float(non_na.iloc[-1] if not non_na.empty else 0.0)
+            else:
+                feature_dict[col] = _safe_float(val)
+        else:
+            feature_dict[col] = 0.0
+    # ---------- ここまで堅牢化 ----------
 
     print("📝 Plan層標準特徴量セット:", feature_order)
     print("特徴量（最新ターン）:", feature_dict)
 
-    # 2. Aurus
+    # 2) Aurus
     aurus_ai = AurusSingularis(feature_order=feature_order)
     aurus_out = aurus_ai.propose(
         feature_dict,
@@ -80,7 +109,7 @@ def main():
     )
     print("\n🎯 Aurus進言:", aurus_out)
 
-    # 3. Levia
+    # 3) Levia
     levia_ai = LeviaTempest(feature_order=feature_order)
     levia_out = levia_ai.propose(
         feature_dict,
@@ -90,13 +119,13 @@ def main():
     )
     print("\n⚡ Levia進言:", levia_out)
 
-    # 4. Noctus
+    # 4) Noctus
     noctus_ai = NoctusSentinella()
     noctus_out = noctus_ai.calculate_lot_and_risk(
         feature_dict=feature_dict,
         side="BUY",
-        entry_price=feature_dict.get("usdjpy_close", 150),
-        stop_loss_price=feature_dict.get("usdjpy_close", 150) - 0.3,
+        entry_price=feature_dict.get("usdjpy_close", 150.0),
+        stop_loss_price=feature_dict.get("usdjpy_close", 150.0) - 0.3,
         capital=10000,
         risk_percent=0.007,
         decision_id="ALLDEMO-003",
@@ -105,14 +134,14 @@ def main():
     )
     print("\n🛡️ Noctus判定:", noctus_out)
 
-    # 5. Prometheus
+    # 5) Prometheus（入力NaNは内部でも落とすが念のため valid_df を渡す）
     prometheus_ai = PrometheusOracle(feature_order=feature_order)
     pred_df = prometheus_ai.predict_future(
         valid_df, n_days=5, decision_id="ALLDEMO-004", caller="plan_to_all", reason="一括デモ"
     )
     print("\n🔮 Prometheus予測:\n", pred_df.head(5))
 
-    # 6. Hermes
+    # 6) Hermes
     analyzer = PlanAnalyzer(valid_df)
     explain_features = analyzer.extract_features()
     labels = analyzer.make_explanation_labels(explain_features)
@@ -124,7 +153,7 @@ def main():
     )
     print("\n🦉 Hermes要約:\n", json.dumps(hermes_out, indent=2, ensure_ascii=False))
 
-    # 7. Veritas
+    # 7) Veritas（別プロセス/別モジュールの import 経路は別途修正推奨）
     veritas_ai = VeritasMachina()
     veritas_out = veritas_ai.propose(
         top_n=2,
@@ -135,7 +164,7 @@ def main():
     )
     print("\n🧠 Veritas戦略:\n", json.dumps(veritas_out, indent=2, ensure_ascii=False))
 
-    # --- まとめて保存 ---
+    # --- 保存 ---
     out = dict(
         aurus=aurus_out,
         levia=levia_out,
