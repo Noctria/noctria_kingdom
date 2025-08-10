@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-
+import inspect
 import numpy as np
 
 log = logging.getLogger("Noctria")
 
-# 依存は“あれば使う”方針（無ければスキップ）
+# 依存は“あれば使う”
 try:
-    from src.core.data_loader import MarketDataFetcher  # 実在すれば使用（Deprecated表記は別PRで対応）
+    from src.core.data_loader import MarketDataFetcher  # Deprecated表記は別対応
 except Exception:
     MarketDataFetcher = None  # type: ignore
 
@@ -81,17 +81,14 @@ class Noctria:
         self._maybe_add_strategy("Levia", LeviaTempest, enabled, key="levia")
         self._maybe_add_strategy("Noctus", NoctusSentinella, enabled, key="noctus")
 
-        # Prometheus はモデルファイルの存在を確認の上で組み込む（Path.exists を使用）
+        # Prometheus はモデルファイルの存在を確認の上で組み込む（Pathを渡す）
         if "prometheus" in enabled and PrometheusOracle:
-            model_path = os.environ.get("NOCTRIA_MODEL_PATH", self._DEFAULT_PROMETHEUS_PATH)
-            p = Path(model_path) if model_path else None
+            model_path_env = os.environ.get("NOCTRIA_MODEL_PATH", self._DEFAULT_PROMETHEUS_PATH)
+            p = Path(model_path_env) if model_path_env else None
             if p and p.exists():
-                try:
-                    self.strategies.append(("Prometheus", PrometheusOracle(model_path=str(p))))
-                except Exception as e:
-                    log.warning("PrometheusOracle 初期化に失敗: %s", e)
+                self._try_add_prometheus(p)
             else:
-                log.info("PrometheusOracle 無効化（モデルファイル未検出）: %s", model_path)
+                log.info("PrometheusOracle 無効化（モデルファイル未検出）: %s", model_path_env)
 
         if not self.strategies:
             log.info("有効な戦略が見つからなかったため、ダミー決断にフォールバックします。")
@@ -104,6 +101,29 @@ class Noctria:
         except Exception as e:
             # 戦略の __init__ でコケても全体は止めない
             log.warning("strategy %s 初期化失敗: %s", name, e)
+
+    def _try_add_prometheus(self, path_obj: Path) -> None:
+        """PrometheusOracle のコンストラクタ差異に耐える初期化（Path優先、だめならstr等も試す）"""
+        try:
+            sig = inspect.signature(PrometheusOracle)  # type: ignore[arg-type]
+            # 1) model_path キーワードに Path
+            if "model_path" in sig.parameters:
+                self.strategies.append(("Prometheus", PrometheusOracle(model_path=path_obj)))  # type: ignore[misc]
+                return
+            # 2) 位置引数に Path
+            try:
+                self.strategies.append(("Prometheus", PrometheusOracle(path_obj)))  # type: ignore[misc]
+                return
+            except Exception:
+                pass
+            # 3) キーワードに str
+            if "model_path" in sig.parameters:
+                self.strategies.append(("Prometheus", PrometheusOracle(model_path=str(path_obj))))  # type: ignore[misc]
+                return
+            # 4) 位置引数に str
+            self.strategies.append(("Prometheus", PrometheusOracle(str(path_obj))))  # type: ignore[misc]
+        except Exception as e:
+            log.warning("PrometheusOracle 初期化に失敗: %s", e)
 
     # ---- 決断ロジック ----
     def analyze_market(self) -> Decision:
@@ -119,8 +139,7 @@ class Noctria:
             if not callable(decide):
                 continue
             try:
-                # 実装によっては引数が必要な場合がある。簡易版は引数なし呼び。
-                act = decide()
+                act = decide()  # 必要に応じて引数は実装へ合わせる
                 if act in candidates:
                     votes.append((name, act, 0.6))
             except Exception as e:
