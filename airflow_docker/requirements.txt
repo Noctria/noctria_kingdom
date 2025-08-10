@@ -47,3 +47,5 @@ shimmy==1.2.0
 yfinance==0.2.65
 multitasking==0.0.11
 statsmodels==0.14.1
+
+psycopg2-binary==2.9.9
