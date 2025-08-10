@@ -80,9 +80,10 @@ class Noctria:
         # Prometheus はモデルファイルの存在を確認の上で組み込む
         if "prometheus" in enabled and PrometheusOracle:
             model_path = os.environ.get("NOCTRIA_MODEL_PATH", self._DEFAULT_PROMETHEUS_PATH)
-            if model_path and Path(model_path).exists():
+            p = Path(model_path) if model_path else None
+            if p and p.exists():
                 try:
-                    self.strategies.append(("Prometheus", PrometheusOracle(model_path=model_path)))
+                    self.strategies.append(("Prometheus", PrometheusOracle(model_path=str(p))))
                 except Exception as e:
                     log.warning("PrometheusOracle 初期化に失敗: %s", e)
             else:
