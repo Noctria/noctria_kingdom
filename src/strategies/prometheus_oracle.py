@@ -14,7 +14,7 @@ import logging
 import os
 from importlib import import_module
 from pathlib import Path
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -69,7 +69,7 @@ class PrometheusOracle:
     ):
         self.feature_order = feature_order or STANDARD_FEATURE_ORDER
         default_path = VERITAS_MODELS_DIR / "prometheus_oracle.keras"
-        self.model_path: Path = Path(model_path) if model_path else default_path  # ← strでもOKに
+        self.model_path: Path = Path(model_path) if model_path else default_path  # ← strでもOK
         self.backend: str = ""  # "keras" | "sb3"
         self.model: Any = self._load_model(self.model_path)
 
@@ -86,7 +86,8 @@ class PrometheusOracle:
                 raise RuntimeError("stable-baselines3 が見つかりません（SB3モデル読込に必要）")
             log.info("神託モデル読込(SB3): %s", p)
             try:
-                model = PPO.load(str(p))
+                # device は CPU 固定（推論のみ）
+                model = PPO.load(str(p), device="cpu")
             except Exception as e:
                 log.error("SB3モデル読込失敗: %s", e)
                 raise
@@ -101,7 +102,6 @@ class PrometheusOracle:
             model = tf.keras.models.load_model(p)
         except Exception as e:
             log.error("Kerasモデル読込失敗: %s", e)
-            # “存在しない”わけではないので FileNotFound にせずそのまま例外送出
             raise
         self.backend = "keras"
         return model
@@ -123,7 +123,6 @@ class PrometheusOracle:
             .fillna(0.0)
             .astype(np.float32)
         )
-
         return work[self.feature_order]
 
     # ---------- Keras forecast API ----------
@@ -215,7 +214,6 @@ class PrometheusOracle:
         """
         if self.backend == "sb3":
             return self._decide_with_sb3()
-        # Keras はここでは行動決定の仕様がないため HOLD
         return "HOLD"
 
     def _decide_with_sb3(self) -> str:
@@ -223,11 +221,16 @@ class PrometheusOracle:
             log.warning("gymnasium が無いため SB3 推論不可。HOLDを返します。")
             return "HOLD"
 
+        # --- Env 構築 ---
         env_spec = os.environ.get("PROMETHEUS_ENV", "")
         env_kwargs_text = os.environ.get("PROMETHEUS_ENV_KWARGS", "{}")
-
         try:
             env_kwargs: Dict[str, Any] = json.loads(env_kwargs_text) if env_kwargs_text.strip() else {}
+        except Exception:
+            env_kwargs = {}
+            log.warning("PROMETHEUS_ENV_KWARGS の JSON 解析に失敗。空dictを使用します。")
+
+        try:
             if env_spec:
                 EnvCls = _import_from_module_class(env_spec)
                 env = EnvCls(**env_kwargs)
@@ -238,6 +241,33 @@ class PrometheusOracle:
             log.warning("SB3環境初期化に失敗。HOLDを返します。理由: %s", e)
             return "HOLD"
 
+        # --- 形状ガード（モデル観測次元 vs Env観測次元の突合）---
+        try:
+            model_obs_space = getattr(getattr(self.model, "policy", None), "observation_space", None) \
+                              or getattr(self.model, "observation_space", None)
+            obs_shape_model: Tuple[int, ...] = tuple(getattr(model_obs_space, "shape", ()) or ())
+            obs_shape_env: Tuple[int, ...] = tuple(getattr(env.observation_space, "shape", ()) or ())
+
+            if obs_shape_model and obs_shape_env and (obs_shape_model != obs_shape_env):
+                log.warning(
+                    "SB3 形状不一致につき HOLD: model_obs=%s, env_obs=%s. "
+                    "学習時と同一のEnv / 特徴次元に揃えてください。",
+                    obs_shape_model, obs_shape_env
+                )
+                try:
+                    env.close()
+                except Exception:
+                    pass
+                return "HOLD"
+        except Exception as e:
+            log.warning("SB3 形状ガード実行中に例外。安全のため HOLD: %s", e)
+            try:
+                env.close()
+            except Exception:
+                pass
+            return "HOLD"
+
+        # --- 推論 ---
         try:
             obs, _ = env.reset(seed=42)
             action, _ = self.model.predict(obs, deterministic=True)
