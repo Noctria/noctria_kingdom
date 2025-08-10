@@ -1,141 +1,166 @@
+# airflow_docker/dags/noctria_kingdom_dag.py
 #!/usr/bin/env python3
 # coding: utf-8
+
+"""
+👑 Noctria Kingdom Royal Council DAG (Airflow 2.6 互換版)
+- 市場観測 → 御前会議 → 王命記録
+- GUI/REST の conf（reason 等）を kwargs から受け取る
+- get_current_context は使わず、kwargs の context を参照
+"""
+
+import os
 import json
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pendulum
-from airflow.models.dag import DAG
-try:
-    # Airflow 2.3+ 推奨
-    from airflow.operators.python import PythonOperator
-except Exception:
-    # 旧系の一部環境
-    from airflow.operators.python_operator import PythonOperator
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.utils.session import provide_session
-from airflow.utils.context import get_current_context
+from airflow import DAG
+from airflow.operators.python import PythonOperator
 
-from src.core.path_config import LOGS_DIR, DATA_DIR
-from src.core.data.market_data_fetcher import MarketDataFetcher
+# ---- src パスの前提下での正規 import ----
+from src.core.path_config import LOGS_DIR
 from src.core.king_noctria import KingNoctria
 
-JST = pendulum.timezone("Asia/Tokyo")
+default_args = {
+    'owner': 'KingNoctria',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
 
-default_args = dict(
-    owner="KingNoctria",
-    depends_on_past=False,
-    email_on_failure=False,
-    email_on_retry=False,
-    retries=1,
-    retry_delay=timedelta(minutes=5),
-)
+def _serialize_for_json(obj):
+    if isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient="records")
+    if isinstance(obj, dict):
+        return {k: _serialize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_serialize_for_json(x) for x in obj]
+    return obj
+
+def _get_reason_from_conf(kwargs) -> str:
+    dag_run = kwargs.get("dag_run")
+    if dag_run and getattr(dag_run, "conf", None):
+        return dag_run.conf.get("reason", "理由未指定")
+    return "理由未指定"
 
 with DAG(
-    dag_id="noctria_kingdom_royal_council_dag",
+    dag_id='noctria_kingdom_royal_council_dag',
     default_args=default_args,
-    description="市場観測→御前会議→王命記録の統合DAG",
-    schedule="0 * * * *",          # ← Airflow 2.7+ では schedule推奨
-    start_date=datetime(2025, 7, 1, tzinfo=JST),
+    description='市場を観測し、御前会議を開き、王の最終判断を下すための中心DAG',
+    schedule_interval=timedelta(hours=1),
+    start_date=datetime(2025, 7, 1),
     catchup=False,
-    tags=["noctria", "kingdom", "royal_council"],
+    tags=['noctria', 'kingdom', 'royal_council'],
 ) as dag:
 
-    def fetch_market_data_task(**_):
-        ctx = get_current_context()
-        conf = ctx.get("dag_run").conf if ctx.get("dag_run") else {}
-        reason = conf.get("reason", "理由未指定")
+    def fetch_market_data_task(**kwargs):
         logger = logging.getLogger("MarketObserver")
-        logger.info("【市場観測・発令理由】%s", reason)
+        logger.setLevel(logging.INFO)
+        reason = _get_reason_from_conf(kwargs)
+        logger.info(f"【市場観測・発令理由】{reason}")
 
-        # ① 実装があればこちらを使う
-        # df_hist = MarketDataFetcher(symbol="USDJPY", lookback=100).fetch()
-        # ダミー：将来Fetcherに置換
-        df_hist = pd.DataFrame({"Close": np.random.normal(loc=150, scale=2, size=100)})
-        df_hist["returns"] = df_hist["Close"].pct_change()
-        df_hist = df_hist.dropna().reset_index(drop=True)
+        # ダミーデータ（本番は fetcher へ置換可）
+        dummy_hist = pd.DataFrame({'Close': np.random.normal(loc=150, scale=2, size=100)})
+        dummy_hist['returns'] = dummy_hist['Close'].pct_change()
 
-        market_data = dict(
-            price=float(150.5 + np.random.randn()),
-            previous_price=float(150.48 + np.random.randn()),
-            volume=int(np.random.randint(100, 300)),
-            volatility=float(np.random.uniform(0.1, 0.3)),
-            sma_5_vs_20_diff=float(np.random.uniform(-0.1, 0.1)),
-            macd_signal_diff=float(np.random.uniform(-0.05, 0.05)),
-            trend_strength=float(np.random.uniform(0.3, 0.8)),
-            trend_prediction=str(np.random.choice(["bullish", "bearish", "neutral"])),
-            rsi_14=float(np.random.uniform(30, 70)),
-            stoch_k=float(np.random.uniform(20, 80)),
-            momentum=float(np.random.uniform(0.4, 0.9)),
-            bollinger_upper_dist=float(np.random.uniform(-0.05, 0.05)),
-            bollinger_lower_dist=float(np.random.uniform(-0.05, 0.05)),
-            sentiment=float(np.random.uniform(0.3, 0.9)),
-            order_block=float(np.random.uniform(0.2, 0.8)),
-            liquidity_ratio=float(np.random.uniform(0.8, 1.5)),
-            symbol="USDJPY",
-            interest_rate_diff=0.05,
-            cpi_change_rate=0.03,
-            news_sentiment_score=float(np.random.uniform(0.4, 0.8)),
-            spread=float(np.random.uniform(0.01, 0.02)),
-        )
+        market_data = {
+            "price": float(150.50 + np.random.randn()),
+            "previous_price": float(150.48 + np.random.randn()),
+            "volume": int(np.random.randint(100, 300)),
+            "volatility": float(np.random.uniform(0.1, 0.3)),
+            "sma_5_vs_20_diff": float(np.random.uniform(-0.1, 0.1)),
+            "macd_signal_diff": float(np.random.uniform(-0.05, 0.05)),
+            "trend_strength": float(np.random.uniform(0.3, 0.8)),
+            "trend_prediction": str(np.random.choice(["bullish", "bearish", "neutral"])),
+            "rsi_14": float(np.random.uniform(30, 70)),
+            "stoch_k": float(np.random.uniform(20, 80)),
+            "momentum": float(np.random.uniform(0.4, 0.9)),
+            "bollinger_upper_dist": float(np.random.uniform(-0.05, 0.05)),
+            "bollinger_lower_dist": float(np.random.uniform(-0.05, 0.05)),
+            "sentiment": float(np.random.uniform(0.3, 0.9)),
+            "order_block": float(np.random.uniform(0.2, 0.8)),
+            "liquidity_ratio": float(np.random.uniform(0.8, 1.5)),
+            "symbol": "USDJPY",
+            "interest_rate_diff": 0.05,
+            "cpi_change_rate": 0.03,
+            "news_sentiment_score": float(np.random.uniform(0.4, 0.8)),
+            "spread": float(np.random.uniform(0.01, 0.02)),
+            "historical_data": dummy_hist.to_json(date_format="iso"),
+            "trigger_reason": reason,
+        }
 
-        # ② XComに大きなDFを載せない：ファイルに保存しパスだけ渡す
-        data_dir = (DATA_DIR / "royal_council").resolve()
-        data_dir.mkdir(parents=True, exist_ok=True)
-        ts = pendulum.now("UTC").to_datetime_string().replace(":", "-").replace(" ", "_")
-        hist_path = data_dir / f"{ts}_historical.parquet"
-        df_hist.to_parquet(hist_path)
+        kwargs['ti'].xcom_push(key='market_data', value=market_data)
+        logger.info("市場の観測完了。データを御前会議に提出します。")
+        return market_data
 
-        # ③ XComには軽量データ＋パス
-        xcom_payload = dict(market_data=market_data, historical_path=str(hist_path))
-        return xcom_payload
-
-    def hold_council_task(**_):
-        ctx = get_current_context()
+    def hold_council_task(**kwargs):
         logger = logging.getLogger("RoyalCouncil")
+        logger.setLevel(logging.INFO)
+        reason = _get_reason_from_conf(kwargs)
+        logger.info(f"【御前会議・発令理由】{reason}")
 
-        x = ctx["ti"].xcom_pull(task_ids="fetch_market_data")
-        if not x:
-            raise ValueError("Market data XCom missing.")
-        market_data = x["market_data"]
-        hist_path = Path(x["historical_path"])
-        df_hist = pd.read_parquet(hist_path)
+        ti = kwargs['ti']
+        market_data = ti.xcom_pull(key='market_data', task_ids='fetch_market_data')
+        if not market_data:
+            logger.error("市場データが取得できなかったため、会議を中止します。")
+            raise ValueError("Market data not found in XComs.")
+
+        # 復元
+        hist_json = market_data.get('historical_data')
+        if hist_json:
+            try:
+                market_data['historical_data'] = pd.read_json(hist_json)
+            except Exception:
+                # 壊れていても続行（会議は可能）
+                market_data['historical_data'] = pd.DataFrame()
 
         king = KingNoctria()
-        council_report = king.hold_council({**market_data, "historical_data": df_hist})
-
-        # ④ 将来：ここでP層PreTradeValidatorへ送る/VRをC層にログ…のフックを用意
+        council_report = king.hold_council(market_data)
+        logger.info(f"会議終了。王の最終判断: {council_report.get('final_decision', 'N/A')}")
+        ti.xcom_push(key='council_report', value=council_report)
         return council_report
 
-    def log_decision_task(**_):
-        ctx = get_current_context()
+    def log_decision_task(**kwargs):
         logger = logging.getLogger("RoyalScribe")
-        conf = ctx.get("dag_run").conf if ctx.get("dag_run") else {}
-        reason = conf.get("reason", "理由未指定")
+        logger.setLevel(logging.INFO)
+        reason = _get_reason_from_conf(kwargs)
+        logger.info(f"【王命記録・発令理由】{reason}")
 
-        report = ctx["ti"].xcom_pull(task_ids="hold_council")
+        ti = kwargs['ti']
+        report = ti.xcom_pull(key='council_report', task_ids='hold_council')
         if not report:
-            logger.warning("記録対象の報告書なし。")
+            logger.warning("記録すべき報告書が存在しませんでした。")
             return
 
-        # DataFrame等はここでは来ない想定（council_reportはシリアライズ済みを前提）
-        report["trigger_reason"] = reason
+        report['trigger_reason'] = reason
+        serializable = _serialize_for_json(report)
 
-        out_dir = (LOGS_DIR / "kingdom_council_reports").resolve()
-        out_dir.mkdir(parents=True, exist_ok=True)
-        fp = out_dir / f"{pendulum.now('Asia/Tokyo').format('YYYY-MM-DD_HH-mm-ss')}_report.json"
-        with fp.open("w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
-        logger.info("王命を記録: %s", fp)
+        log_file_path = LOGS_DIR / "kingdom_council_reports" / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_report.json"
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_file_path, 'w', encoding='utf-8') as f:
+            json.dump(serializable, f, ensure_ascii=False, indent=4)
+        logger.info(f"王命を公式記録として書庫に納めました: {log_file_path}")
 
-    start = EmptyOperator(task_id="start")
-    task_fetch = PythonOperator(task_id="fetch_market_data", python_callable=fetch_market_data_task)
-    task_council = PythonOperator(task_id="hold_council", python_callable=hold_council_task)
-    task_log = PythonOperator(task_id="log_decision", python_callable=log_decision_task)
-    end = EmptyOperator(task_id="end")
+    task_fetch_data = PythonOperator(
+        task_id='fetch_market_data',
+        python_callable=fetch_market_data_task,
+        provide_context=True,  # Airflow 2.6系でも安全に kwargs を渡す
+    )
 
-    start >> task_fetch >> task_council >> task_log >> end
+    task_hold_council = PythonOperator(
+        task_id='hold_council',
+        python_callable=hold_council_task,
+        provide_context=True,
+    )
+
+    task_log_decision = PythonOperator(
+        task_id='log_decision',
+        python_callable=log_decision_task,
+        provide_context=True,
+    )
+
+    task_fetch_data >> task_hold_council >> task_log_decision
