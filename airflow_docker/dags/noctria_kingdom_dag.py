@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pendulum
 from airflow.models.dag import DAG
-from airflow.operators.python import PythonOperator
+from airflow.operators.python import get_current_context
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.session import provide_session
