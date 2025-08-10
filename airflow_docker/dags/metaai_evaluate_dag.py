@@ -4,7 +4,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 
-from core.path_config import SCRIPTS_DIR
+from src.core.path_config import DATA_DIR, LOGS_DIR, STRATEGIES_VERITAS_GENERATED_DIR, VERITAS_EVAL_LOG
 
 from scripts.evaluate_metaai_model import evaluate_metaai_model
 
