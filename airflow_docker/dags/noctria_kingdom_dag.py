@@ -11,10 +11,10 @@ import pendulum
 from airflow.models.dag import DAG
 try:
     # Airflow 2.3+ 推奨
-    from airflow.operators.python import get_current_context
+    from airflow.operators.python import PythonOperator
 except Exception:
     # 旧系の一部環境
-    from airflow.operators.python_operator import get_current_context
+    from airflow.operators.python_operator import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.session import provide_session
