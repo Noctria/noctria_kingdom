@@ -18,6 +18,8 @@ x-airflow-common: &airflow-common
     - PYTHONPATH=/opt/airflow/src:/opt/airflow
     # ---- Optuna RDB storage (Airflow上での既定). DAG内paramsで上書き可 ----
     - OPTUNA_STORAGE=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${OPTUNA_DB:-optuna}
+    - PROMETHEUS_ENV=src.envs.noctria_fx_trading_env:NoctriaFXTradingEnv
+    - PROMETHEUS_ENV_KWARGS={"window":128,"fee":0.0002,"reward_mode":"pnl","max_episode_steps":200}
   volumes:
     - ./dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
