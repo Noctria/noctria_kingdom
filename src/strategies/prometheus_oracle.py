@@ -2,44 +2,111 @@
 # coding: utf-8
 
 """
-🔮 Prometheus Oracle (推論専用)
-- 学習は train_prometheus.py に分離
-- Plan層で生成した標準特徴量DataFrameから未来予測
+🔮 Prometheus Oracle (推論専用 / 二刀流)
+- Keras モデル(.keras/.h5/SavedModel): DataFrame からの将来予測 (predict_future)
+- SB3 モデル(.zip): 環境1ステップの推論で売買シグナル (decide)
 """
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from importlib import import_module
+from pathlib import Path
+from typing import Optional, List, Any, Dict
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
+
+# Optional deps
+try:
+    import tensorflow as tf  # type: ignore
+except Exception:
+    tf = None  # type: ignore
+
+try:
+    from stable_baselines3 import PPO  # type: ignore
+except Exception:
+    PPO = None  # type: ignore
+
+try:
+    import gymnasium as gym  # type: ignore
+except Exception:
+    gym = None  # type: ignore
+
 from datetime import datetime, timedelta
-from typing import Optional, List
-from pathlib import Path
-import logging
 
 from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON
 from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
+log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 
+def _import_from_module_class(spec: str):
+    """
+    "pkg.mod:ClassName" を import して Class を返す。
+    例: "src.envs.noctria_fx_trading_env:NoctriaFXTradingEnv"
+    """
+    if ":" not in spec:
+        raise ValueError(f"Invalid module:Class spec: {spec}")
+    mod, cls = spec.split(":", 1)
+    m = import_module(mod)
+    return getattr(m, cls)
+
+
 class PrometheusOracle:
+    """
+    - Keras: DataFrame → 連続値予測（既存仕様）
+    - SB3  : env 1ステップ推論 → "BUY"/"SELL"/"HOLD"
+    """
+
     def __init__(
         self,
-        model_path: Optional[Path] = None,
+        model_path: Optional[Path | str] = None,
         feature_order: Optional[List[str]] = None,
     ):
         self.feature_order = feature_order or STANDARD_FEATURE_ORDER
-        self.model_path = model_path or (VERITAS_MODELS_DIR / "prometheus_oracle.keras")
-        self.model = self._load_model()
+        default_path = VERITAS_MODELS_DIR / "prometheus_oracle.keras"
+        self.model_path: Path = Path(model_path) if model_path else default_path  # ← strでもOKに
+        self.backend: str = ""  # "keras" | "sb3"
+        self.model: Any = self._load_model(self.model_path)
 
-    def _load_model(self) -> tf.keras.Model:
-        if self.model_path.exists():
-            logging.info(f"神託モデル読込: {self.model_path}")
+    # ---------- Loaders ----------
+    def _load_model(self, p: Path) -> Any:
+        if not p.exists():
+            raise FileNotFoundError(f"モデルが存在しません: {p}")
+
+        suffix = p.suffix.lower()
+
+        # SB3 (.zip)
+        if suffix == ".zip":
+            if PPO is None:
+                raise RuntimeError("stable-baselines3 が見つかりません（SB3モデル読込に必要）")
+            log.info("神託モデル読込(SB3): %s", p)
             try:
-                return tf.keras.models.load_model(self.model_path)
+                model = PPO.load(str(p))
             except Exception as e:
-                logging.error(f"神託モデル読込失敗: {e}")
-        raise FileNotFoundError(f"モデルが存在しません: {self.model_path}")
+                log.error("SB3モデル読込失敗: %s", e)
+                raise
+            self.backend = "sb3"
+            return model
 
+        # それ以外は Keras 想定（.keras/.h5/ディレクトリSavedModelなど）
+        if tf is None:
+            raise RuntimeError("TensorFlow が見つかりません（Kerasモデル読込に必要）")
+        log.info("神託モデル読込(Keras): %s", p)
+        try:
+            model = tf.keras.models.load_model(p)
+        except Exception as e:
+            log.error("Kerasモデル読込失敗: %s", e)
+            # “存在しない”わけではないので FileNotFound にせずそのまま例外送出
+            raise
+        self.backend = "keras"
+        return model
+
+    # ---------- Preprocess for Keras ----------
     def _align_and_clean(self, df: pd.DataFrame) -> pd.DataFrame:
         work = df.copy()
 
@@ -47,16 +114,19 @@ class PrometheusOracle:
             if col not in work.columns:
                 work[col] = 0.0
 
-        work[self.feature_order] = work[self.feature_order].apply(
-            pd.to_numeric, errors="coerce"
-        ).ffill().bfill()
-
-        work[self.feature_order] = work[self.feature_order].replace(
-            [np.inf, -np.inf], np.nan
-        ).fillna(0.0).astype(np.float32)
+        work[self.feature_order] = (
+            work[self.feature_order]
+            .apply(pd.to_numeric, errors="coerce")
+            .ffill()
+            .bfill()
+            .replace([np.inf, -np.inf], np.nan)
+            .fillna(0.0)
+            .astype(np.float32)
+        )
 
         return work[self.feature_order]
 
+    # ---------- Keras forecast API ----------
     def predict_future(
         self,
         features_df: pd.DataFrame,
@@ -65,11 +135,23 @@ class PrometheusOracle:
         caller: Optional[str] = "king_noctria",
         reason: Optional[str] = None,
     ) -> pd.DataFrame:
+        if self.backend != "keras":
+            log.warning("predict_future は Keras バックエンド専用です（現在: %s）。ダミーを返します。", self.backend)
+            return pd.DataFrame({
+                "date": [str(datetime.today())[:10]],
+                "forecast": [np.nan],
+                "lower": [np.nan],
+                "upper": [np.nan],
+                "decision_id": [decision_id],
+                "caller": [caller],
+                "reason": [f"backend={self.backend} is not keras"],
+            })
+
         clean = self._align_and_clean(features_df)
         n = min(n_days, len(clean))
 
         if n == 0:
-            logging.warning("predict_future: 入力行が0のためダミー行を返します。")
+            log.warning("predict_future: 入力行が0のためダミー行を返します。")
             return pd.DataFrame({
                 "date": [str(datetime.today())[:10]],
                 "forecast": [np.nan],
@@ -120,6 +202,77 @@ class PrometheusOracle:
         try:
             ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
             df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=4)
-            logging.info(f"予測結果保存: {ORACLE_FORECAST_JSON}")
+            log.info("予測結果保存: %s", ORACLE_FORECAST_JSON)
         except Exception as e:
-            logging.error(f"予測JSON保存失敗: {e}")
+            log.error("予測JSON保存失敗: %s", e)
+
+    # ---------- SB3 decision API ----------
+    def decide(self) -> str:
+        """
+        "BUY" | "SELL" | "HOLD" を返す。
+        - backend=sb3 のときのみ環境1ステップで推論
+        - backend=keras のときは、ドメイン結線が未定のため安全に "HOLD"
+        """
+        if self.backend == "sb3":
+            return self._decide_with_sb3()
+        # Keras はここでは行動決定の仕様がないため HOLD
+        return "HOLD"
+
+    def _decide_with_sb3(self) -> str:
+        if gym is None:
+            log.warning("gymnasium が無いため SB3 推論不可。HOLDを返します。")
+            return "HOLD"
+
+        env_spec = os.environ.get("PROMETHEUS_ENV", "")
+        env_kwargs_text = os.environ.get("PROMETHEUS_ENV_KWARGS", "{}")
+
+        try:
+            env_kwargs: Dict[str, Any] = json.loads(env_kwargs_text) if env_kwargs_text.strip() else {}
+            if env_spec:
+                EnvCls = _import_from_module_class(env_spec)
+                env = EnvCls(**env_kwargs)
+            else:
+                env_id = os.environ.get("PROMETHEUS_GYM_ID", "CartPole-v1")
+                env = gym.make(env_id, **env_kwargs)
+        except Exception as e:
+            log.warning("SB3環境初期化に失敗。HOLDを返します。理由: %s", e)
+            return "HOLD"
+
+        try:
+            obs, _ = env.reset(seed=42)
+            action, _ = self.model.predict(obs, deterministic=True)
+        except Exception as e:
+            log.warning("SB3推論に失敗。HOLDを返します。理由: %s", e)
+            try:
+                env.close()
+            except Exception:
+                pass
+            return "HOLD"
+
+        signal = self._map_action_to_signal(action, env)
+        try:
+            env.close()
+        except Exception:
+            pass
+        return signal
+
+    @staticmethod
+    def _map_action_to_signal(action: Any, env: Any) -> str:
+        """
+        離散アクションの簡易マッピング：
+          n=3 → {0: SELL, 1: HOLD, 2: BUY}
+          n=2 → {0: SELL, 1: BUY}
+        それ以外/連続は HOLD。
+        """
+        try:
+            space = env.action_space
+            if hasattr(space, "n"):
+                n = int(space.n)
+                a = int(action)
+                if n == 3:
+                    return {0: "SELL", 1: "HOLD", 2: "BUY"}.get(a, "HOLD")
+                if n == 2:
+                    return {0: "SELL", 1: "BUY"}.get(a, "HOLD")
+        except Exception:
+            pass
+        return "HOLD"
