@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-from pathlib import Path
 from __future__ import annotations
+
 import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Any, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
@@ -71,13 +72,16 @@ class Noctria:
 
         # 使用する戦略の選択（環境変数でON/OFF可能）
         # 例: NOCTRIA_STRATEGIES="aurus,levia,noctus,prometheus"
-        enabled = set(os.environ.get("NOCTRIA_STRATEGIES", "aurus,levia,noctus,prometheus")
-                      .replace(" ", "").split(","))
+        enabled = set(
+            os.environ.get("NOCTRIA_STRATEGIES", "aurus,levia,noctus,prometheus")
+            .replace(" ", "")
+            .split(",")
+        )
         self._maybe_add_strategy("Aurus", AurusSingularis, enabled, key="aurus")
         self._maybe_add_strategy("Levia", LeviaTempest, enabled, key="levia")
         self._maybe_add_strategy("Noctus", NoctusSentinella, enabled, key="noctus")
 
-        # Prometheus はモデルファイルの存在を確認の上で組み込む
+        # Prometheus はモデルファイルの存在を確認の上で組み込む（Path.exists を使用）
         if "prometheus" in enabled and PrometheusOracle:
             model_path = os.environ.get("NOCTRIA_MODEL_PATH", self._DEFAULT_PROMETHEUS_PATH)
             p = Path(model_path) if model_path else None
