@@ -2,16 +2,22 @@ version: "3.6"
 
 x-airflow-common: &airflow-common
   build:
-    context: ..                    # docker-composeをairflow_dockerディレクトリで実行前提
+    context: ..                                  # airflow_docker/ で実行前提
     dockerfile: ./airflow_docker/docker/Dockerfile
   image: noctria-airflow:latest
+  container_name: ""                              # 子で個別指定
   env_file: ../.env
   environment:
-    - AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=120
+    # ---- Airflow core ----
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    - AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=180
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
     - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-YourSecretKeyForWebServerSession}
-    - PYTHONPATH=/opt/airflow:/opt/airflow/src
+    # ---- Python path so that "from src...." works everywhere ----
+    - PYTHONPATH=/opt/airflow/src:/opt/airflow
+    # ---- Optuna RDB storage (Airflow上での既定). DAG内paramsで上書き可 ----
+    - OPTUNA_STORAGE=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
   volumes:
     - ./dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
@@ -48,13 +54,13 @@ services:
     container_name: noctria_airflow_webserver
     command: >
       bash -c "
-        airflow db upgrade;
-        airflow users create \
-          --username admin \
-          --password admin \
-          --firstname Noctria \
-          --lastname King \
-          --role Admin \
+        airflow db upgrade &&
+        airflow users create
+          --username ${AIRFLOW_USER:-admin}
+          --password ${AIRFLOW_PASSWORD:-admin}
+          --firstname Noctria
+          --lastname King
+          --role Admin
           --email admin@noctria.com || true;
         exec airflow webserver
       "
