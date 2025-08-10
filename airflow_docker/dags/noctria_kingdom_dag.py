@@ -21,7 +21,6 @@ from airflow.operators.python import PythonOperator
 
 # ---- src パスの前提下での正規 import ----
 from src.core.path_config import LOGS_DIR
-from src.core.king_noctria import KingNoctria
 
 default_args = {
     'owner': 'KingNoctria',
@@ -98,6 +97,8 @@ with DAG(
         return market_data
 
     def hold_council_task(**kwargs):
+        # 遅延 import（DAGパースを軽くする）
+        from src.core.king_noctria import KingNoctria
         logger = logging.getLogger("RoyalCouncil")
         logger.setLevel(logging.INFO)
         reason = _get_reason_from_conf(kwargs)
