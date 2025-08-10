@@ -34,7 +34,7 @@ default_args = {
     dag_id="veritas_recheck_dag",
     default_args=default_args,
     description="特定の戦略を個別に再評価する（統治ID・呼出元必須）",
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=["veritas", "recheck"],
 )

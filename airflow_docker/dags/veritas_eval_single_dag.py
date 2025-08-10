@@ -25,7 +25,7 @@ dag = DAG(
     dag_id='veritas_eval_single_dag',
     default_args=default_args,
     description='🔁 単一戦略を評価（スクリプト経由）',
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=['veritas', 'pdca', 'single_eval'],
 )

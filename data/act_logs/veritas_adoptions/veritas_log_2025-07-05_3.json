@@ -1,0 +1,12 @@
+{
+  "date": "2025-07-05",
+  "strategy_name": "strategy_3",
+  "status": "rejected",
+  "pushed_to_github": false,
+  "pdca_cycle": "pdca-cycle-3",
+  "tags": [],
+  "score": {
+    "win_rate": 42.2,
+    "max_drawdown": 8.8
+  }
+}

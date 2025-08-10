@@ -39,7 +39,7 @@ default_args = {
     dag_id="veritas_to_order_pipeline",
     default_args=default_args,
     description="Veritas戦略評価からEA命令JSON生成までの完全自動化パイプライン",
-    schedule_interval=None,  # 手動実行を基本とする
+    schedule=None,  # 手動実行を基本とする
     catchup=False,
     tags=["veritas", "pdca", "auto-ea"],
 )

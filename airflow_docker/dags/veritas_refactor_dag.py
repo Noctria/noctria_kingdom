@@ -20,7 +20,7 @@ default_args = {
 with DAG(
     dag_id="veritas_refactor_dag",
     default_args=default_args,
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     description="🔧 Veritas構造の段階的リファクタリングDAG（v2.0準拠）",
 ) as dag:

@@ -1,0 +1,12 @@
+{
+  "date": "2025-07-03",
+  "strategy_name": "strategy_5",
+  "status": "rejected",
+  "pushed_to_github": true,
+  "pdca_cycle": null,
+  "tags": [],
+  "score": {
+    "win_rate": 47.7,
+    "max_drawdown": 6.5
+  }
+}

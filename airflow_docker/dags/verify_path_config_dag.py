@@ -12,7 +12,7 @@ with DAG(
     dag_id="verify_path_config_dag",
     description="🛡️ Noctria Kingdom 構成検査用DAG",
     default_args=default_args,
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2025, 7, 1),
     catchup=False,
     tags=["noctria", "integrity", "structure"],

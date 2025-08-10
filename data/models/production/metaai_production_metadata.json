@@ -1,0 +1,8 @@
+{
+  "model_path": "/opt/airflow/data/models/production/metaai_model_20250810-180817.zip",
+  "score": 0.0,
+  "version": "20250810-180817",
+  "promoted_at_utc": "2025-08-10T18:09:10.691053",
+  "source_model": "/opt/airflow/data/models/metaai_model_20250810-180817.zip",
+  "latest_alias": "/opt/airflow/data/models/production/metaai_production_latest.zip"
+}

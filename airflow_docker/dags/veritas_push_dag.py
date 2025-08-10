@@ -43,7 +43,7 @@ default_args = {
 with DAG(
     dag_id="veritas_push_dag",
     description="PDCA戦略をGitHubにPushするDAG（統治ID・理由・呼出元必須）",
-    schedule_interval=None,
+    schedule=None,
     default_args=default_args,
     catchup=False,
     tags=["veritas", "strategy", "push"]

@@ -65,7 +65,7 @@ with DAG(
         'retries': 3,
         'retry_delay': timedelta(minutes=5),
     },
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=["veritas", "ml", "generator"]
 ) as dag:

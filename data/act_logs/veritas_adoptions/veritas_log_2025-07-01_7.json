@@ -1,0 +1,14 @@
+{
+  "date": "2025-07-01",
+  "strategy_name": "strategy_7",
+  "status": "rejected",
+  "pushed_to_github": true,
+  "pdca_cycle": null,
+  "tags": [
+    "moderate_winrate"
+  ],
+  "score": {
+    "win_rate": 59.4,
+    "max_drawdown": 17.0
+  }
+}

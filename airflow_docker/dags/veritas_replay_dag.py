@@ -17,7 +17,7 @@ with DAG(
     dag_id="veritas_replay_dag",
     description="PDCAログから再送実行する専用DAG（統治ID・理由・呼出元必須）",
     start_date=days_ago(1),
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     default_args=default_args,
     params={

@@ -1,0 +1,14 @@
+{
+  "date": "2025-06-29",
+  "strategy_name": "strategy_9",
+  "status": "rejected",
+  "pushed_to_github": false,
+  "pdca_cycle": "pdca-cycle-9",
+  "tags": [
+    "high_winrate"
+  ],
+  "score": {
+    "win_rate": 62.0,
+    "max_drawdown": 13.2
+  }
+}

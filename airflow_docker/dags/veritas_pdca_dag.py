@@ -62,7 +62,7 @@ default_args = {
     dag_id="veritas_pdca_loop_v2",
     default_args=default_args,
     description="Veritas PDCA Loop DAG（リトライ＆ログ強化版）",
-    schedule_interval=None,  # 手動実行 or 外部トリガのみ
+    schedule=None,  # 手動実行 or 外部トリガのみ
     catchup=False,
     tags=['veritas', 'pdca', 'master'],
 )

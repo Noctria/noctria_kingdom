@@ -1,0 +1,15 @@
+{
+  "date": "2025-06-30",
+  "strategy_name": "strategy_8",
+  "status": "promoted",
+  "pushed_to_github": false,
+  "pdca_cycle": null,
+  "tags": [
+    "high_winrate",
+    "adopted"
+  ],
+  "score": {
+    "win_rate": 67.8,
+    "max_drawdown": 17.5
+  }
+}

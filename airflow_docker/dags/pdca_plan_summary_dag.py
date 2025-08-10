@@ -15,7 +15,7 @@ default_args = {
 with DAG(
     dag_id="pdca_plan_summary_dag",
     description="PDCA-Plan自動要因分析＆根拠サマリー自動生成バッチ",
-    schedule_interval="0 7 * * *",  # 毎日7時
+    schedule="0 7 * * *",  # 毎日7時
     default_args=default_args,
     catchup=False,
     tags=["pdca", "plan", "ai", "summary"],

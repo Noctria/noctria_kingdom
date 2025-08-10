@@ -1,0 +1,137 @@
+{
+  "aurus": {
+    "name": "AurusSingularis",
+    "type": "comprehensive_analysis_report",
+    "signal": "SELL",
+    "confidence": 1.0,
+    "priority": "high",
+    "decision_id": "ALLDEMO-001",
+    "caller": "plan_to_all",
+    "reason": "一括デモ"
+  },
+  "levia": {
+    "name": "LeviaTempest",
+    "type": "scalping_signal",
+    "signal": "HOLD",
+    "confidence": 0.0,
+    "symbol": "USDJPY",
+    "priority": "very_high",
+    "decision_id": "ALLDEMO-002",
+    "caller": "plan_to_all",
+    "reason": "一括デモ"
+  },
+  "noctus": {
+    "name": "NoctusSentinella",
+    "type": "risk_calc",
+    "decision": "VETO",
+    "reason": "特徴量不足/異常: リスク評価に必要な特徴量が不足または不正。",
+    "lot": 0,
+    "risk_amount": 70.0,
+    "risk_percent": 0.007,
+    "entry_price": 147.6929931640625,
+    "stop_loss": 147.3929931640625,
+    "capital": 10000,
+    "decision_id": "ALLDEMO-003",
+    "caller": "plan_to_all",
+    "action_reason": "一括デモ"
+  },
+  "prometheus": [
+    {
+      "date": "2025-08-05",
+      "forecast": 486.3232116699219,
+      "lower": 482.3667907714844,
+      "upper": 490.2796936035156,
+      "decision_id": "ALLDEMO-004",
+      "caller": "plan_to_all",
+      "reason": "一括デモ"
+    },
+    {
+      "date": "2025-08-06",
+      "forecast": 489.9661865234375,
+      "lower": 486.0096130371094,
+      "upper": 493.922607421875,
+      "decision_id": "ALLDEMO-004",
+      "caller": "plan_to_all",
+      "reason": "一括デモ"
+    },
+    {
+      "date": "2025-08-07",
+      "forecast": 489.5692138671875,
+      "lower": 485.61279296875,
+      "upper": 493.5257873535156,
+      "decision_id": "ALLDEMO-004",
+      "caller": "plan_to_all",
+      "reason": "一括デモ"
+    },
+    {
+      "date": "2025-08-08",
+      "forecast": 493.3456115722656,
+      "lower": 489.3890075683594,
+      "upper": 497.302001953125,
+      "decision_id": "ALLDEMO-004",
+      "caller": "plan_to_all",
+      "reason": "一括デモ"
+    },
+    {
+      "date": "2025-08-09",
+      "forecast": 493.34478759765625,
+      "lower": 489.3883056640625,
+      "upper": 497.30120849609375,
+      "decision_id": "ALLDEMO-004",
+      "caller": "plan_to_all",
+      "reason": "一括デモ"
+    }
+  ],
+  "hermes": {
+    "name": "HermesCognitor",
+    "type": "llm_explanation_report",
+    "explanation": "[ダミー要約] 特徴量・要因から戦略説明",
+    "feature_order": [
+      "usdjpy_close",
+      "usdjpy_volatility_5d",
+      "sp500_close",
+      "vix_close",
+      "news_count",
+      "cpiaucsl_value",
+      "fedfunds_value",
+      "unrate_value"
+    ],
+    "source_features": {
+      "win_rate": NaN,
+      "win_rate_delta7": NaN,
+      "win_rate_rapid_increase": false,
+      "max_dd": NaN,
+      "dd_worse_than_10": false,
+      "num_trades": NaN,
+      "active_market": false,
+      "usdjpy_close": 147.6929931640625,
+      "sp500_close": 6389.4501953125,
+      "vix_close": 15.149999618530273,
+      "news_count": 0.0,
+      "news_spike_recent": false,
+      "cpiaucsl_value": NaN,
+      "fedfunds_value": 4.33,
+      "unrate_value": 4.2
+    },
+    "labels": [],
+    "reason": "Plan層全AI連携要約",
+    "llm_model": "gpt-4o",
+    "decision_id": "ALLDEMO-005",
+    "caller": "plan_to_all"
+  },
+  "veritas": {
+    "name": "VeritasMachina",
+    "ai_source": "veritas",
+    "decision_id": "ALLDEMO-006",
+    "caller": "plan_to_all",
+    "type": "strategy_proposal",
+    "status": "REJECTED",
+    "detail": "全ての戦略が評価基準を満たしませんでした。",
+    "strategy_rankings": [],
+    "explanation": "",
+    "params": {
+      "lookback": 60,
+      "symbol": "USDJPY"
+    }
+  }
+}

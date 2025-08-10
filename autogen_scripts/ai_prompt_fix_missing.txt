@@ -1,0 +1,177 @@
+
+【Noctria Kingdom自動補完指示】【生成日時: 2025-08-04T03:24:18.551182】
+- 【重要】既に生成済みコードは最新のリポジトリに反映されている。  
+  重複定義や同一シンボルの二重実装は禁止。絶対に繰り返してはならない。  
+- 未定義シンボルはすべてまとめて正確に定義・実装し、途中で部分的に終わらせないこと。  
+- すべての生成コードはpytestで必ず通ることを最優先する。  
+- 下記「knowledge.md」（開発ルール）を厳守せよ。  
+- pytestの「未定義/未実装」クラス・関数・変数をすべて定義/実装せよ。  
+- 各コードは「# ファイル名: xxx.py」ヘッダー必須。  
+- path_config.pyのみ src/core/path_config.py に、他は generated_code/直下に必ず上書き。  
+- 生成先ディレクトリは絶対にネスト禁止（generated_code/generated_code等を作らないこと）。  
+- 新たな説明文や余計なコメント、Markdown囲みは絶対に書かない。  
+- すべてPEP8/型アノテーション・命名規則厳守。  
+- テストコードはtest_*.py、本体コードは*.py、ドキュメントは絶対.py化しない。  
+- コード定義がpytestで通るまで正確に補完せよ。命名ブレや型違反がないかも点検。  
+- OSや環境依存の記述は排除すること。  
+
+
+---
+【knowledge.md】
+# Noctria Kingdom 開発ナレッジベース
+
+## 開発環境・実行基盤
+- Windows PC上でWSL2（Ubuntu）を利用している。
+- `noctria_kingdom/airflow_docker/` 内は **AirflowのDockerコンテナ**（Linux）で動作。
+- `noctria_kingdom/noctria_gui/` 内は **WSL側 venv（venv_gui）** で動作。
+- `noctria_kingdom/` 本体は **WSL側 venv（venv_noctria）** で動作。
+- このAI自動化スクリプトは **WSL側 venv（autogen_venv）** で稼働。
+- Docker（Airflow）とWSL側Pythonはファイル共有できる部分とできない部分がある。設計時は**パス・データ連携方法・依存管理**を明確にする。
+- venvごとのpip依存（venv_noctria, venv_gui, autogen_venv等）が混じらないよう注意。
+
+## パス管理
+- すべてのパス定義（ディレクトリやファイルパス等）は **`src/core/path_config.py`** で集中管理する。
+- **`path_config.py`は`src/core/`ディレクトリ配下のひとつのみ**に厳密に置くこと。  
+  他ディレクトリや`generated_code/`配下などへの複製・新規生成は絶対に禁止。
+- 他のPythonファイルではパス文字列を直書き禁止。必ず`path_config.py`からimportして利用すること。
+- 既存コードで分散しているパス直書きや`os.path.join`での動的パス生成も、すべて`src/core/path_config.py`に統合し一元管理する。
+- **AI自動生成コードでも、`src/core/path_config.py`以外にパス定義ファイルを生成してはならない。**  
+  自動補完や修正サイクル中に誤って複数ファイルが生まれた場合は手動で削除し、`src/core/path_config.py`だけを最新状態に保つこと。
+- **自動生成ファイルの出力先ディレクトリは必ず `generated_code/`直下に限定し、`generated_code/generated_code/`のような多重ネストは厳禁。**
+- AIへのプロンプトや開発ドキュメント、レビュー時にもこのパス管理ルールを必ず遵守するよう明示し、運用ルールに組み込む。
+
+## コード実装ルール
+- 複数ファイルに分割する場合は **先頭に必ず `# ファイル名: filename.py` を記載**。
+- PEP8準拠・型アノテーション必須。
+- 例外処理を適切に実装。
+- コードはUTF-8で保存。
+- Black/isortでコード整形を想定。
+
+## 自動生成ファイル分類・出力ルール
+
+- すべてのAI自動生成Pythonファイル（実装・テスト・補完）は**必ず `generated_code/` ディレクトリ直下に「flat構造」で出力すること**。  
+- **サブディレクトリや「generated_code/」の二重三重ネストを絶対に作らないこと。**  
+- **ファイル名にはディレクトリ名やパスを含めず、「data_collector.py」などbasename（拡張子含むファイル名のみ）で一意に指定すること。**  
+    - NG例: generated_code/generated_code/data_collector.py  
+    - NG例: generated_code/test/test_data_collector.py  
+    - OK例: data_collector.py  
+- テストファイルはpytest/unittest形式の**Pythonコード（`def test_...():`を含む）**として`generated_code/`ディレクトリに`test_*.py`形式で出力する。  
+- **設計や解説・説明・README・設計方針などのドキュメントは、Pythonファイルではなく.md（Markdown）や.txtで`docs/`ディレクトリへ出力する。**  
+- テストディレクトリ内に設計説明や仕様ドキュメントを.pyで混在させてはならない。  
+- AI出力時は「これはテストなのか、ドキュメントなのか」を厳密に判定し、適切なファイル名・拡張子・ディレクトリを指定すること。
+
+## 中央統治・注文執行ルール
+- Noctria Kingdomにおける**最終的な意思決定・注文の実行は必ず `src/core/king_noctria.py` を唯一のエントリーポイントとして実施すること**。
+- 各AIエージェント・コンポーネントは king_noctria.py を経由せずに直接注文・アクションを発行してはならない。
+- 新規機能や拡張時も必ず king_noctria.py への集約設計・統治フローを守ること。
+- GUIやAPI、Airflowからの注文・アクション要求も、king_noctria.py を通じて判断・執行される構造に統一すること。
+
+## GUIスタイル・HUD統一ルール
+- Noctria KingdomのGUI管理ツール（`noctria_kingdom/noctria_gui/`配下）は**すべてのHTMLテンプレート・ページを `noctria_gui/static/hud_style.css` に準拠したHUDスタイルで開発・統一すること**。
+- デザインやレイアウトを修正・追加する際は、**必ずhud_style.cssの定義・トークンを優先利用し、HUDデザインと一貫性を保つ**。
+- 独自CSSやインラインスタイルの利用は原則避け、hud_style.cssのカスタムプロパティ・クラスを活用すること。
+- HUDデザインに則ったパネル・グロー・ダークテーマ・モノスペースフォント・グリッド背景などを標準とする。
+
+## Veritas MLクラウド運用ポリシー
+- Veritas（ML/AI関連機能）は**将来的にAWS/GCP/AzureなどのGPUクラウドサービス上でトレーニング・推論を行うことを前提**に設計・実装すること。
+- コードは「ローカル/WSL環境」だけでなく「GPUクラウド（JupyterHub, Sagemaker, Vertex AI等）」での利用や拡張を常に意識。
+- ハードウェア・クラウド環境依存を避け、**パス・依存・データ転送等は分離設計**とする。
+- 学習・推論ジョブは将来的にAirflow/Dockerから外部クラウドにトリガーできる構造も想定すること。
+- モデル出力/成果物のパスもクラウド/オンプレ両対応設計。
+
+## テスト・レビュー
+- テストファイルにはPythonコードだけを含めてください。マークダウンの\`\`\`や余計な囲みは絶対に使わないこと。
+- テストはunittestまたはpytest形式で統一。
+- テストファイルでもパスは必ず `path_config.py` からimport。
+- 正常系/異常系/連携系のテストもカバー。
+- 生成物（コード・テスト）が全て `path_config.py` のパス集中管理ルールを守っているかレビュー時に厳格にチェック。
+
+## ドキュメント
+- path_config.pyによるパス集中管理の意義・設計思想・利用例はREADMEやドキュメントで明記。
+
+## その他・運用
+- Git連携（add/commit/push）は自動スクリプト内で実施（失敗時は手動確認）。
+- ユーザーコマンドでワークフロー一時停止・終了可能。
+
+## AI自動生成サイクル運用ルール
+
+- 各AI（設計・実装・テスト・レビュー・ドキュメント）は、knowledge.md・Noctria連携図.mmd・環境定義を毎ターン参照し、**常に最新ルールを反映**して自己進化する。
+- 生成物（コード・テスト・ドキュメント）は**各ターンごとにDBまたは履歴ファイルへ記録**し、進捗・合格率・失敗理由を定量的に保存する。
+- エラーや失敗事例も自動でナレッジ化し、**AI自身が次回以降の生成/修正プロンプトで活用**する。
+- 自己評価・改善案（例：「設計見直し案」「リファクタ提案」）もAIの責任で履歴に残し、進化の証跡とする。
+
+### 🔹 **未定義シンボル自動補完・自己修復サイクル**
+- pytestやビルド時に「未定義」「未実装」エラーが出た場合、AIは該当クラス・関数・変数の**自動補完プロンプト**を生成・投入し、必要な定義・実装を自律的に補完するサイクルを回す。
+- **この補完サイクルでは「`src/core/path_config.py`だけが唯一の正しいパス定義ファイル」であり、絶対に`generated_code/`以下や他パスにpath_config.pyを生成してはならない。**  
+  もし補完AIの出力に誤った場所へのpath_config.py生成が含まれていた場合は必ず修正・削除し、`src/core/path_config.py`のみ最新に更新すること。
+- この補完サイクルでも**3ターン連続で失敗（エラー解消できない等）**した場合は、自動的に人間承認・レビュー待ちへ移行し、手動判断に切り替える。
+- すべての自動補完実装にも**バージョン・説明責任・型注釈・パス集中管理ルール**を厳格に適用すること。
+
+### 🔹 **AIプロンプト自体の自己進化・メタ最適化**
+- プロンプトやナレッジもAIが定期的（月次等）に自動読み込みし、運用履歴・エラー傾向・改善案に基づき“自律的にルール進化・最適化”を行うサイクルを推奨。
+- プロンプトの自動修正・メタ設計も「バージョン履歴・説明責任」原則を順守し、履歴を残す。
+
+## セキュリティ・認証情報運用
+- **APIキーやDBパスワード等の機密情報は`.env.local`等の環境変数に必ず保存し、リポジトリやknowledge.mdには直書き禁止。**
+- `.gitignore`には`.env`, `.env.local`, `.env.*`を必ず記載し、誤ってコミットしないよう**pre-commit等で自動検査**する。
+- 環境ごとにAPIキー/接続情報が切り替わるよう、起動時に環境変数・.envファイルを必ず読み込む実装に統一する。
+- 機密情報の自動更新・失効ジョブや、不要時の即時削除/ローテーション運用も導入。
+- AI開発者/運用者の権限分離・操作履歴監査を実施し、誰がどの機密にアクセス・更新したかを記録。
+
+## Airflow/DAG自動化・可視化運用
+- **Airflow DAG・Operatorも`path_config.py`のパス集中管理を厳守し、パス直書き禁止。**
+- DAG/Operator/スクリプトは`airflow_docker/dags`や`airflow_docker/scripts`など**ディレクトリ構成と命名規則を必ず守る**。
+- DAGの実行結果・進捗・失敗はDB/ログで記録し、noctria_guiダッシュボードなどで**可視化できるよう統合設計**する。
+- DAG構成例や運用上のTips/アンチパターンはknowledge.mdに随時追記する。
+
+## バージョン管理・自動履歴化
+- **AI自動生成ファイル（コード・テスト・ドキュメント等）には必ず「生成AI名・生成日時・バージョン・UUID」等のヘッダーを付与**し、全履歴・責任の所在を明確化する。
+- **レビューAIは、過去バージョンとの差分(diff)や品質低下（退行）も自動で検知し、リファクタ案や修正案を出す。**
+- 主要な設計変更やバージョンはコミットログ・履歴DB・GUIダッシュボードから**トレース可能に設計**する。
+
+## ナレッジ/プロンプトの運用ルール
+- **knowledge.md, Noctria連携図.mmd, 各AIプロンプトはバージョン管理の対象とし、重要な変更は必ず履歴・コミットメッセージで明示する。**
+- AIが定期的（月次等）にknowledge.md・主要プロンプトを自動読み込みし、**自律的にルールアップデート・プロンプト進化**を行うサイクルを推奨。
+- READMEや開発ドキュメントにはパス集中管理・AI自動化ルール・バージョン管理手順等の**記載例を明記**する。
+
+## 人間の承認フロー・運用管理
+- 全自動運用を原則としつつ、**設計/構成変更・本番リリース・GitHubプッシュ等は「人間承認」ステップを設ける**。
+- 異常時や緊急時は手動でAI自動生成サイクルを一時停止・巻き戻しできるように運用設計する。
+
+## AI倫理・説明責任・ガイドライン
+- Noctria Kingdom内でAIが生成したコード・判断には**必ず説明責任（Explainability）**を持たせ、設計理由やロジックもDB履歴に記録。
+- バイアスや逸脱生成を防ぐため、レビューAI/人間レビューによる多重チェック体制を維持。
+- AI生成物の「説明要求」や「根拠説明」には全AIが応答可能とし、不明点はダッシュボードから問い合わせ可能にする。
+- 重大な設計ミス・倫理的逸脱が発覚した場合の通報・是正フローを設ける。
+
+## AIモデル・プロンプトのA/Bテスト・実験管理
+- 新規AIモデルやプロンプトの改良案は、**A/Bテスト運用（例：ターンごと/機能単位で並列実行）**し、その履歴・合格率・品質をDBで管理する。
+- GUI・CLIから現在有効なAI/プロンプトバージョンの切り替えや「過去バージョンへの復元」が可能。.
+- テスト結果・比較レポートは自動で記録し、ベストプラクティスをknowledge.mdに随時反映する。
+- 実験時は「ABテスト」タグやラベルで履歴がフィルタ・可視化できるように設計する。
+
+## 障害対応・ロールバック方針
+- AI自動生成が**3ターン以上連続でエラー/退行（品質低下・合格率低下・例外発生）**を記録した場合、人間レビュー/一時停止フローに自動遷移する。
+- 自動生成ファイル・DB履歴にはロールバック（任意ターンへの復旧）機能を持たせ、noctria_guiダッシュボードやCLIから復旧可能とする。
+- ロールバックや緊急修正を行った場合は、操作者・時刻・差分内容・理由を自動記録し、次回AIプロンプトやナレッジに反映させる。
+- 緊急時は「AI自動生成禁止」フラグをセットし、手動運用や人間のみでの開発フェーズへ切り替えられる設計とする。
+
+---
+
+**この追記も含め、ナレッジベース全体の内容はNoctria Kingdomの全AI・開発者が最優先で遵守すること。**
+
+
+---
+【未定義シンボル/未実装クラス・関数・変数リスト】
+=== Missing class/function definitions ===
+test_data_collection.py: 'DATA_SOURCE_URL' not defined in path_config.py
+test_data_collection.py: 'LOCAL_DATA_PATH' not defined in path_config.py
+test_data_preprocessing.py: 'DataPreprocessing' not defined in data_preprocessing.py
+test_feature_engineering.py: 'LOCAL_DATA_PATH' not defined in path_config.py
+test_feature_engineering.py: 'FEATURES_PATH' not defined in path_config.py
+test_model_training.py: 'train_model' not defined in model_training.py
+test_model_training.py: 'FEATURES_PATH' not defined in path_config.py
+test_order_execution.py: 'execute_trade' not defined in order_execution.py
+test_order_execution.py: 'MODEL_PATH' not defined in path_config.py
+test_order_execution.py: 'FEATURES_PATH' not defined in path_config.py
+---

@@ -37,7 +37,7 @@ with DAG(
     dag_id="veritas_act_record_dag",
     default_args=default_args,
     description="Veritas: 採用戦略をActログに記録（統治ID必須）",
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["veritas", "act", "pdca"],

@@ -37,7 +37,7 @@ default_args = {
     dag_id='veritas_evaluation_pipeline',
     default_args=default_args,
     description='Veritas生成戦略の評価・採用判定DAG（decision_id等対応版）',
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=['veritas', 'evaluation', 'pdca'],
 )

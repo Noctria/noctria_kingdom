@@ -59,7 +59,7 @@ with DAG(
     dag_id="simulate_strategy_dag",
     default_args=default_args,
     description="📊 昇格済み戦略モデルのシミュレーションDAG",
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2025, 7, 1),
     catchup=False,
     tags=["metaai", "simulation", "noctria"],

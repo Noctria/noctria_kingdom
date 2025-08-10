@@ -1,0 +1,10 @@
+ccxt
+flask
+keras
+numpy
+pandas
+requests
+scikit-learn
+tensorflow-cpu
+
+

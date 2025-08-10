@@ -105,7 +105,7 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     description=DESCRIPTION,
-    schedule_interval=None,  # 必要に応じて「@daily」等に変更
+    schedule=None,  # 必要に応じて「@daily」等に変更
     start_date=datetime(2025, 7, 21),
     catchup=False,
     tags=["noctria", "llm", "explanation"],

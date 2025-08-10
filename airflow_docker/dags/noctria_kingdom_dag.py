@@ -50,7 +50,7 @@ with DAG(
     dag_id='noctria_kingdom_royal_council_dag',
     default_args=default_args,
     description='市場を観測し、御前会議を開き、王の最終判断を下すための中心DAG',
-    schedule_interval=timedelta(hours=1),
+    schedule=timedelta(hours=1),
     start_date=datetime(2025, 7, 1),
     catchup=False,
     tags=['noctria', 'kingdom', 'royal_council'],

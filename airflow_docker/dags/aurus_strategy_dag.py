@@ -110,7 +110,7 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     description=DESCRIPTION,
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
     tags=["noctria", "trend-analysis"],
