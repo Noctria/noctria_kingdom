@@ -1,147 +1,76 @@
-#!/usr/bin/env python3
-# coding: utf-8
 """
-Noctria Kingdom - Optuna最適化 実行スクリプト（Airflow/CLI両対応・遅延インポート版）
-
-特徴:
-- 0.0 固定スコア対策（評価ラッパ、NaN/Inf 防御、早期終了例外の健全化）
-- サンプラー/プルーナー適正化（TPESampler + MedianPruner 既定）
-- エピソード複数回の安定評価
-- 分散実行（RDBストレージ）: PostgreSQL想定
-- 重い依存は遅延インポートでDagBagタイムアウト回避
-- Airflowから呼べる optimize_main() を提供（XComで返却）
+直インスタンス方式対応版:
+- env_id が "module.path:ClassName" ならクラスを import して **直接インスタンス化**
+- それ以外（例: "CartPole-v1"）は従来どおり gym.make()
+- Airflow context から params / conf を安全に吸い上げ
+- 戻り値は {study_name, best_value, best_params, n_trials, datetime_utc, worker_tag}
 """
 
 from __future__ import annotations
-import os
-import sys
-import math
-import json
-import random
-import argparse
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Callable
+import os
 from datetime import datetime
-from pathlib import Path
+from importlib import import_module
 
-# --- プロジェクトルート解決（/src 絶対インポート統一） ---
-PROJECT_ROOT = Path(__file__).resolve().parents[2]  # .../noctria_kingdom
-SRC_ROOT = PROJECT_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
-
+# --------- 軽量ログ ---------
 def _log(msg: str) -> None:
-    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts} UTC] {msg}", flush=True)
+    print(f"[{datetime.utcnow():%Y-%m-%d %H:%M:%S} UTC] {msg}", flush=True)
 
-@dataclass
-class OptunaConfig:
-    study_name: str
-    storage_url: Optional[str]
-    n_trials: int
-    timeout_sec: Optional[int]
-    n_startup_trials: int
-    n_eval_episodes: int
-    max_train_steps: int
-    sampler: str
-    pruner: str
-    seed: int
-    tb_logdir: Optional[str]
-    env_id: str
-    reward_clip: Optional[float]
-    minimize: bool
-    allow_prune_after: int
-    worker_tag: str
-
-def build_config(args: argparse.Namespace) -> OptunaConfig:
-    def env_or_arg(key: str, default: Any):
-        return os.getenv(key, getattr(args, key, default)) or default
-
-    storage = env_or_arg("OPTUNA_STORAGE", args.storage_url)
-    if isinstance(storage, str) and storage.strip() == "":
-        storage = None
-
-    return OptunaConfig(
-        study_name=env_or_arg("STUDY_NAME", args.study_name),
-        storage_url=storage,
-        n_trials=int(env_or_arg("N_TRIALS", args.n_trials)),
-        timeout_sec=int(env_or_arg("TIMEOUT_SEC", args.timeout_sec)) if env_or_arg("TIMEOUT_SEC", args.timeout_sec) else None,
-        n_startup_trials=int(env_or_arg("N_STARTUP_TRIALS", args.n_startup_trials)),
-        n_eval_episodes=int(env_or_arg("N_EVAL_EPISODES", args.n_eval_episodes)),
-        max_train_steps=int(env_or_arg("MAX_TRAIN_STEPS", args.max_train_steps)),
-        sampler=str(env_or_arg("SAMPLER", args.sampler)).lower(),
-        pruner=str(env_or_arg("PRUNER", args.pruner)).lower(),
-        seed=int(env_or_arg("SEED", args.seed)),
-        tb_logdir=env_or_arg("TB_LOGDIR", args.tb_logdir),
-        env_id=str(env_or_arg("ENV_ID", args.env_id)),
-        reward_clip=float(env_or_arg("REWARD_CLIP", args.reward_clip)) if env_or_arg("REWARD_CLIP", args.reward_clip) else None,
-        minimize=bool(str(env_or_arg("MINIMIZE", args.minimize)).lower() in ("1","true","yes")),
-        allow_prune_after=int(env_or_arg("ALLOW_PRUNE_AFTER", args.allow_prune_after)),
-        worker_tag=str(env_or_arg("WORKER_TAG", args.worker_tag)),
-    )
-
-# --- 遅延インポート（重い依存はここで） ---
+# --------- 遅延import（重い依存は遅延で） ---------
 def _lazy_imports():
-    import numpy as np  # noqa
-    import optuna  # noqa
-    from optuna import Trial  # noqa
-    from optuna.samplers import TPESampler, RandomSampler  # noqa
-    from optuna.pruners import MedianPruner, SuccessiveHalvingPruner, NopPruner  # noqa
-
-    try:
-        from stable_baselines3 import PPO
-        from stable_baselines3.common.vec_env import DummyVecEnv
-        from stable_baselines3.common.evaluation import evaluate_policy
-    except Exception as e:
-        _log(f"⚠️ SB3 importに失敗: {e}. 'pip install stable-baselines3' を実行してください。")
-        raise
-
+    import numpy as np
     try:
         import gymnasium as gym
     except Exception:
-        import gym
-        gym.logger.set_level(40)
+        import gymnasium as gym  # gymではなくgymnasiumに統一
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+    from stable_baselines3.common.evaluation import evaluate_policy
+    import optuna
+    return dict(np=np, gym=gym, PPO=PPO, DummyVecEnv=DummyVecEnv,
+                evaluate_policy=evaluate_policy, optuna=optuna)
 
-    return {
-        "np": __import__("numpy"),
-        "optuna": __import__("optuna"),
-        "TPESampler": __import__("optuna.samplers", fromlist=["TPESampler"]).TPESampler,
-        "RandomSampler": __import__("optuna.samplers", fromlist=["RandomSampler"]).RandomSampler,
-        "MedianPruner": __import__("optuna.pruners", fromlist=["MedianPruner"]).MedianPruner,
-        "SuccessiveHalvingPruner": __import__("optuna.pruners", fromlist=["SuccessiveHalvingPruner"]).SuccessiveHalvingPruner,
-        "NopPruner": __import__("optuna.pruners", fromlist=["NopPruner"]).NopPruner,
-        "PPO": __import__("stable_baselines3", fromlist=["PPO"]).PPO,
-        "DummyVecEnv": __import__("stable_baselines3.common.vec_env", fromlist=["DummyVecEnv"]).DummyVecEnv,
-        "evaluate_policy": __import__("stable_baselines3.common.evaluation", fromlist=["evaluate_policy"]).evaluate_policy,
-        "gym": __import__("gymnasium") if "gymnasium" in sys.modules else __import__("gym"),
-    }
+# --------- 直インスタンス解決 ---------
+def _resolve_env_factory(env_target: str, env_kwargs: Optional[dict] = None) -> Optional[Callable[[], Any]]:
+    """
+    env_target が 'module.path:ClassName' 形式なら、そのクラスを import して
+    kwargsを渡してインスタンス化する factory を返す。違うなら None。
+    """
+    if ":" not in env_target:
+        return None
+    module_path, class_name = env_target.split(":", 1)
+    cls = getattr(import_module(module_path), class_name)
 
-def _make_sampler_pruner(cfg: OptunaConfig, _optuna) -> Tuple[Any, Any]:
-    Samplers = {
-        "tpe": __import__("optuna.samplers", fromlist=["TPESampler"]).TPESampler,
-        "random": __import__("optuna.samplers", fromlist=["RandomSampler"]).RandomSampler,
-    }
-    Pruners = {
-        "median": __import__("optuna.pruners", fromlist=["MedianPruner"]).MedianPruner,
-        "sha": __import__("optuna.pruners", fromlist=["SuccessiveHalvingPruner"]).SuccessiveHalvingPruner,
-        "none": __import__("optuna.pruners", fromlist=["NopPruner"]).NopPruner,
-    }
-    sampler_cls = Samplers.get(cfg.sampler, Samplers["tpe"])
-    pruner_cls = Pruners.get(cfg.pruner, Pruners["median"])
+    def _factory():
+        kwargs = env_kwargs or {}
+        return cls(**kwargs)
 
-    sampler = sampler_cls(seed=cfg.seed)
-    if pruner_cls.__name__ == "MedianPruner":
-        pruner = pruner_cls(n_startup_trials=cfg.n_startup_trials, n_warmup_steps=0)
-    elif pruner_cls.__name__ == "SuccessiveHalvingPruner":
-        pruner = pruner_cls(min_resource=cfg.allow_prune_after, reduction_factor=3)
-    else:
-        pruner = pruner_cls()
-    return sampler, pruner
+    return _factory
 
-def _safe_mean(xs):
-    xs = [x for x in xs if x is not None and not math.isnan(x) and math.isfinite(x)]
-    return float(sum(xs) / len(xs)) if xs else 0.0
+# --------- 設定 ---------
+@dataclass
+class OptunaConfig:
+    study_name: str = "noctria_rl_ppo"
+    storage_url: Optional[str] = None   # 省略時はENV OPTUNA_STORAGE
+    sampler: str = "tpe"                # tpe|random|cmaes
+    pruner: str = "median"              # median|none
+    direction: str = "maximize"         # maximize|minimize
+    n_trials: int = 20
+    timeout_sec: Optional[int] = None
 
+    # 環境
+    env_id: str = "CartPole-v1"         # 例: "src.envs.your_custom_trading_env:YourCustomTradingEnv"
+    env_kwargs: Optional[dict] = None
+    seed: Optional[int] = None
+
+    # PPO/学習
+    max_train_steps: int = 100_000
+    n_eval_episodes: int = 5
+    allow_prune_after: int = 2_000
+    tb_logdir: Optional[str] = None
+
+# --------- 目的関数 ---------
 def make_objective(cfg: OptunaConfig):
     mods = _lazy_imports()
     np = mods["np"]
@@ -151,192 +80,179 @@ def make_objective(cfg: OptunaConfig):
     evaluate_policy = mods["evaluate_policy"]
     optuna_mod = mods["optuna"]
 
-    random.seed(cfg.seed)
-    np.random.seed(cfg.seed)
-    try:
-        import torch
-        torch.manual_seed(cfg.seed)
-    except Exception:
-        pass
+    # env factory（直インスタンス or gym.make）
+    def _make_env():
+        factory = _resolve_env_factory(cfg.env_id, cfg.env_kwargs)
+        if factory:
+            return factory()
+        return gym.make(cfg.env_id)
 
     def objective(trial: "optuna.trial.Trial") -> float:
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-3, log=True)
-        n_steps = trial.suggest_int("n_steps", 128, 2048, step=128)
-        gamma = trial.suggest_float("gamma", 0.90, 0.999, step=0.001)
-        ent_coef = trial.suggest_float("ent_coef", 0.0, 0.02, step=0.0005)
-        clip_range = trial.suggest_float("clip_range", 0.1, 0.4, step=0.02)
-        gae_lambda = trial.suggest_float("gae_lambda", 0.8, 0.99, step=0.01)
+        # Hyperparameter Search Space
+        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
+        n_steps = trial.suggest_categorical("n_steps", [128, 384, 768, 896, 1536, 1792, 2048])
+        gamma = trial.suggest_float("gamma", 0.90, 0.99, step=0.001)
+        ent_coef = trial.suggest_float("ent_coef", 5e-4, 2e-2, step=5e-4)
+        clip_range = trial.suggest_float("clip_range", 0.12, 0.4, step=0.02)
+        gae_lambda = trial.suggest_float("gae_lambda", 0.80, 0.97, step=0.01)
         vf_coef = trial.suggest_float("vf_coef", 0.2, 1.0, step=0.05)
-        batch_size = trial.suggest_categorical("batch_size", [64, 128, 256, 512])
+        batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
-        def _make_env():
-            env = gym.make(cfg.env_id)
-            try:
-                env.reset(seed=cfg.seed)
-            except Exception:
-                pass
-            return env
-        env = DummyVecEnv([_make_env])
-
-        model = PPO(
-            "MlpPolicy",
-            env,
-            learning_rate=learning_rate,
-            n_steps=n_steps,
-            batch_size=batch_size,
-            gamma=gamma,
-            ent_coef=ent_coef,
-            clip_range=clip_range,
-            gae_lambda=gae_lambda,
-            vf_coef=vf_coef,
-            verbose=0,
-            seed=cfg.seed,
-            tensorboard_log=cfg.tb_logdir,
-        )
-
+        # VecEnv 準備
         try:
-            model.learn(total_timesteps=cfg.max_train_steps, progress_bar=False)
+            def _env_fn():
+                env = _make_env()
+                if cfg.seed is not None:
+                    try:
+                        env.reset(seed=cfg.seed)
+                    except TypeError:
+                        pass
+                return env
+
+            vec_env = DummyVecEnv([_env_fn])
         except Exception as e:
-            _log(f"⚠️ learn中に例外: {e}")
-            try:
-                env.close()
-            except Exception:
-                pass
-            return 1e9 if cfg.minimize else -1e9
+            _log(f"❌ 環境作成に失敗: {e}")
+            raise
 
-        rets = []
-        for _ in range(cfg.n_eval_episodes):
-            try:
-                mean_r, _ = evaluate_policy(model, env, n_eval_episodes=1, deterministic=True, warn=False)
-                if cfg.reward_clip:
-                    mean_r = max(-cfg.reward_clip, min(cfg.reward_clip, mean_r))
-                rets.append(float(mean_r))
-            except Exception as e:
-                _log(f"⚠️ evaluate中に例外: {e}")
-                rets.append(0.0)
-
-        score = _safe_mean(rets)
-
-        if abs(score) < 1e-12:
-            _log("⚠️ 評価が0.0に張り付いています。trial params=" + json.dumps(trial.params, ensure_ascii=False))
-
-        trial.report(score, step=cfg.max_train_steps)
-        if trial.should_prune():
-            if cfg.max_train_steps >= cfg.allow_prune_after:
-                try:
-                    env.close()
-                except Exception:
-                    pass
-                raise optuna_mod.TrialPruned()
-
+        # PPO モデル
         try:
-            env.close()
-        except Exception:
-            pass
-        return float(score)
+            model = PPO(
+                "MlpPolicy",
+                vec_env,
+                learning_rate=learning_rate,
+                n_steps=n_steps,
+                gamma=gamma,
+                ent_coef=ent_coef,
+                clip_range=clip_range,
+                gae_lambda=gae_lambda,
+                vf_coef=vf_coef,
+                batch_size=batch_size,
+                verbose=0,
+                tensorboard_log=cfg.tb_logdir,
+                seed=cfg.seed,
+            )
+        except Exception as e:
+            _log(f"❌ モデル初期化失敗: {e}")
+            vec_env.close()
+            raise
+
+        # 学習（途中打ち切りのための簡易コールバック）
+        train_steps = int(cfg.max_train_steps)
+        try:
+            model.learn(total_timesteps=train_steps, progress_bar=False, tb_log_name=f"trial_{trial.number}")
+        except Exception as e:
+            _log(f"⚠️ 学習中に例外: {e}")
+            # 失敗扱い（OptunaがFailにする）
+            vec_env.close()
+            raise
+
+        # 評価
+        try:
+            mean_reward, _ = evaluate_policy(model, vec_env, n_eval_episodes=int(cfg.n_eval_episodes),
+                                             deterministic=True, warn=False)
+        except Exception as e:
+            _log(f"⚠️ 評価中に例外: {e}")
+            vec_env.close()
+            raise
+        finally:
+            vec_env.close()
+
+        # maximize 前提（minimizeなら符号反転も可）
+        value = float(mean_reward)
+        return value
 
     return objective
 
+# --------- 実行ロジック ---------
 def run(cfg: OptunaConfig) -> Dict[str, Any]:
     mods = _lazy_imports()
     optuna_mod = mods["optuna"]
-    sampler, pruner = _make_sampler_pruner(cfg, optuna_mod)
 
-    direction = "minimize" if cfg.minimize else "maximize"
-    _log(f"🎯 Study: {cfg.study_name} ({direction}), storage={cfg.storage_url}, worker={cfg.worker_tag}")
+    storage = cfg.storage_url or os.getenv("OPTUNA_STORAGE") or None
+    _log(f"🎯 Study: {cfg.study_name} ({cfg.direction}), storage={storage or 'None'}, worker={os.getenv('HOSTNAME','worker')}")
+
+    # Sampler
+    sampler: "optuna.samplers.BaseSampler"
+    if cfg.sampler.lower() == "tpe":
+        sampler = optuna_mod.samplers.TPESampler(seed=cfg.seed)
+    elif cfg.sampler.lower() == "cmaes":
+        sampler = optuna_mod.samplers.CmaEsSampler(seed=cfg.seed)
+    else:
+        sampler = optuna_mod.samplers.RandomSampler(seed=cfg.seed)
+
+    # Pruner
+    pruner: Optional["optuna.pruners.BasePruner"]
+    if cfg.pruner.lower() == "median":
+        pruner = optuna_mod.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=cfg.allow_prune_after)
+    else:
+        pruner = None
+
+    # Study 作成/取得
     study = optuna_mod.create_study(
         study_name=cfg.study_name,
-        storage=cfg.storage_url,
-        direction=direction,
+        storage=storage,
+        load_if_exists=True,
+        direction=cfg.direction,
         sampler=sampler,
         pruner=pruner,
-        load_if_exists=True,
     )
 
     objective = make_objective(cfg)
-    study.optimize(
-        objective,
-        n_trials=cfg.n_trials,
-        timeout=cfg.timeout_sec,
-        gc_after_trial=True,
-        n_jobs=1,
-        catch=(Exception,),
-    )
+    study.optimize(objective, n_trials=int(cfg.n_trials), timeout=cfg.timeout_sec)
 
-    best_value = study.best_value if study.best_trial else (math.inf if cfg.minimize else -math.inf)
-    best_params = study.best_trial.params if study.best_trial else {}
-    _log(f"✅ 最適化完了: best_value={best_value}, best_params={best_params}")
-
-    return {
+    best_value = float(study.best_value)
+    best_params = dict(study.best_trial.params)
+    result = {
         "study_name": cfg.study_name,
         "best_value": best_value,
         "best_params": best_params,
         "n_trials": len(study.trials),
         "datetime_utc": datetime.utcnow().isoformat(),
-        "worker_tag": cfg.worker_tag,
+        "worker_tag": f"worker-{os.getenv('HOSTNAME','worker')}",
     }
-
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Noctria - Optuna最適化実行")
-    p.add_argument("--study_name", type=str, default="noctria_rl_ppo")
-    p.add_argument("--storage_url", type=str, default=os.getenv("OPTUNA_STORAGE", ""))
-    p.add_argument("--n_trials", type=int, default=100)
-    p.add_argument("--timeout_sec", type=int, default=None)
-    p.add_argument("--n_startup_trials", type=int, default=10)
-    p.add_argument("--n_eval_episodes", type=int, default=5)
-    p.add_argument("--max_train_steps", type=int, default=100_000)
-    p.add_argument("--sampler", type=str, default="tpe", choices=["tpe", "random"])
-    p.add_argument("--pruner", type=str, default="median", choices=["median", "sha", "none"])
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--tb_logdir", type=str, default=None)
-    p.add_argument("--env_id", type=str, default="CartPole-v1")
-    p.add_argument("--reward_clip", type=float, default=None)
-    p.add_argument("--minimize", action="store_true")
-    p.add_argument("--allow_prune_after", type=int, default=2_000)
-    p.add_argument("--worker_tag", type=str, default=f"worker-{os.getenv('HOSTNAME','local')}")
-    return p.parse_args()
-
-# ===== Airflow/PythonOperator 用の公開関数 =====
-def optimize_main(**context):
-    """
-    Airflow から直接 import されるエントリポイント。
-    - PythonOperator の python_callable に指定可能
-    - return 値は XCom に保存される
-    """
-    # Airflowのparams/op_kwargsのどちらでも拾えるように
-    params = (context.get("params") or {}) if isinstance(context, dict) else {}
-    # argparse.Namespace を作って既定値＋paramsを適用
-    args = argparse.ArgumentParser().parse_args(args=[])
-    args.study_name = params.get("study_name", "noctria_rl_ppo")
-    args.storage_url = os.environ.get("OPTUNA_STORAGE", params.get("storage_url", ""))
-    args.n_trials = int(params.get("n_trials", 100))
-    args.timeout_sec = int(params["timeout_sec"]) if "timeout_sec" in params and params["timeout_sec"] is not None else None
-    args.n_startup_trials = int(params.get("n_startup_trials", 10))
-    args.n_eval_episodes = int(params.get("n_eval_episodes", 5))
-    args.max_train_steps = int(params.get("max_train_steps", 100000))
-    args.sampler = params.get("sampler", "tpe")
-    args.pruner = params.get("pruner", "median")
-    args.seed = int(params.get("seed", 42))
-    args.tb_logdir = params.get("tb_logdir", None)
-    args.env_id = params.get("env_id", "CartPole-v1")
-    args.reward_clip = float(params["reward_clip"]) if "reward_clip" in params and params["reward_clip"] is not None else None
-    args.minimize = bool(str(params.get("minimize", "false")).lower() in ("1", "true", "yes"))
-    args.allow_prune_after = int(params.get("allow_prune_after", 2000))
-    # ワーカータグ（task_id を活用してユニーク化）
-    ti = context.get("ti")
-    task_id = getattr(ti, "task_id", "worker")
-    args.worker_tag = params.get("worker_tag", f"worker-{task_id}")
-
-    cfg = build_config(args)
-    result = run(cfg)
-    # PythonOperator は return を XCom に保存する
+    _log(f"✅ 最適化完了: best_value={best_value}, best_params={best_params}")
     return result
 
-def main():
-    args = parse_args()
-    cfg = build_config(args)
-    result = run(cfg)
-    print(json.dumps(result, ensure_ascii=False))
+# --------- Airflow / CLI エントリ ---------
+def optimize_main(*args, **kwargs) -> Dict[str, Any]:
+    """
+    Airflow の PythonOperator から context を受け取り、params/conf を束ねる。
+    """
+    # Airflow context 経由で params / conf を吸い上げ
+    params = {}
+    if "dag_run" in kwargs and getattr(kwargs["dag_run"], "conf", None):
+        params.update(kwargs["dag_run"].conf)
+    if "params" in kwargs and kwargs["params"]:
+        params.update(kwargs["params"])
 
+    # マージ（params側が優先）
+    cfg = OptunaConfig(
+        study_name=str(params.get("study_name", "noctria_rl_ppo")),
+        storage_url=params.get("storage_url", None),
+        sampler=str(params.get("sampler", "tpe")),
+        pruner=str(params.get("pruner", "median")),
+        direction=str(params.get("direction", "maximize")),
+        n_trials=int(params.get("n_trials", 20)),
+        timeout_sec=int(params.get("timeout_sec")) if params.get("timeout_sec") is not None else None,
+        env_id=str(params.get("env_id", "CartPole-v1")),
+        env_kwargs=params.get("env_kwargs"),
+        seed=int(params.get("seed")) if params.get("seed") is not None else None,
+        max_train_steps=int(params.get("max_train_steps", 100_000)),
+        n_eval_episodes=int(params.get("n_eval_episodes", 5)),
+        allow_prune_after=int(params.get("allow_prune_after", 2_000)),
+        tb_logdir=params.get("tb_logdir"),
+    )
+    return run(cfg)
+
+# CLI 実行も可（任意）
 if __name__ == "__main__":
-    main()
+    # 簡易デモ: CartPole
+    res = optimize_main(params={
+        "study_name": "demo_cartpole",
+        "env_id": "CartPole-v1",
+        "n_trials": 2,
+        "max_train_steps": 20_000,
+        "n_eval_episodes": 2,
+        "timeout_sec": 120,
+    })
+    print(res)
