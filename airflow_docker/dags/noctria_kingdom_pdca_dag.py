@@ -202,8 +202,13 @@ with DAG(
 
     # --- 共通パラメータ（Pattern A 用） ---
     common_params = {
-        "study_name": "noctria_rl_ppo_fx",
-        "env_id": "YourCustomTradingEnv-v0",
+        "study_name": "noctria_rl_ppo_fx_v2",  # CartPoleの履歴と混ざらないよう新名推奨
+        "env_id": "src.envs.noctria_fx_trading_env:NoctriaFXTradingEnv",  # ← module:Class
+        "env_kwargs": {  # ← 任意。コンストラクタ引数を渡したい場合
+            "window": 128,
+            "fee": 0.0002,
+            "reward_mode": "pnl"
+        },
         "n_trials": 50,
         "max_train_steps": 120_000,
         "n_eval_episodes": 8,
@@ -211,7 +216,6 @@ with DAG(
         "pruner": "median",
         "allow_prune_after": 2000,
         "tb_logdir": "/opt/airflow/logs/tb/optuna_ppo",
-        # minimize / reward_clip などは conf で上書き可
     }
 
     # --- Workers（optimize_main を直接呼ぶ：Pattern A） ---
