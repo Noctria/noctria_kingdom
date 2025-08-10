@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 import pendulum
 from airflow.models.dag import DAG
-from airflow.operators.python import get_current_context
+try:
+    # Airflow 2.3+ 推奨
+    from airflow.operators.python import get_current_context
+except Exception:
+    # 旧系の一部環境
+    from airflow.operators.python_operator import get_current_context
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.session import provide_session
