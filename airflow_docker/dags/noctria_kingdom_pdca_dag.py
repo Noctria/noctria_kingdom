@@ -6,6 +6,7 @@
 # ④ provide_context削除
 # ⑤ conf/paramsの参照整理
 # ⑥ 各主要タスク終了時に log_event() でDBロギング追加
+# ⑦ default_args を DAG へ適用（リトライ/失敗時CBを有効化）
 
 from datetime import datetime, timedelta
 import logging
@@ -26,8 +27,11 @@ logger = setup_logger("NoctriaPDCA_DAG", dag_log_path)
 
 
 def task_failure_alert(context):
-    # 必要なら失敗通知実装
-    pass
+    # 必要なら失敗通知実装（Slack等）
+    ti = context.get("task_instance")
+    exc = context.get("exception")
+    logger.error(f"[TaskFailed] dag={context.get('dag').dag_id} task={ti.task_id} "
+                 f"run_id={ti.run_id} err={exc}")
 
 
 default_args = {
@@ -45,6 +49,7 @@ with DAG(
     schedule_interval="@daily",
     start_date=datetime(2025, 6, 1),
     catchup=False,
+    default_args=default_args,  # ← 追加
     tags=["noctria", "kingdom", "pdca", "metaai", "royal"],
     params={"worker_count": 3, "n_trials": 100},
 ) as dag:
@@ -63,11 +68,15 @@ with DAG(
             logger.warning(f"worker_{worker_id}: ベストなし")
             return None
 
-        # DBロギング
+        # DBロギング（最小差分）
         log_event(
             table="pdca_events",
             event_type="OPTIMIZE_COMPLETED",
-            payload={"worker_id": worker_id, "best_params": best_params, "reason": _conf_reason()}
+            payload={
+                "worker_id": worker_id,
+                "best_params": best_params,
+                "reason": _conf_reason(),
+            },
         )
         return best_params
 
@@ -76,6 +85,7 @@ with DAG(
         ti = ctx["ti"]
         worker_count = ctx["params"].get("worker_count", 3)
         logger.info(f"【選定理由】{_conf_reason()}")
+
         results = [ti.xcom_pull(task_ids=f"optimize_worker_{i}") for i in range(1, worker_count + 1)]
         results = [r for r in results if r]
 
@@ -86,11 +96,11 @@ with DAG(
         best = max(results, key=lambda p: p.get("score", 0))
         ti.xcom_push(key="best_params", value=best)
 
-        # DBロギング
+        # DBロギング（最小差分）
         log_event(
             table="pdca_events",
             event_type="BEST_PARAMS_SELECTED",
-            payload={"best_params": best, "reason": _conf_reason()}
+            payload={"best_params": best, "reason": _conf_reason()},
         )
         return best
 
@@ -105,11 +115,15 @@ with DAG(
 
         result = apply_best_params_to_metaai(best_params=best_params)
 
-        # DBロギング
+        # DBロギング（最小差分）
         log_event(
             table="pdca_events",
             event_type="META_AI_APPLIED",
-            payload={"best_params": best_params, "result": result, "reason": _conf_reason()}
+            payload={
+                "best_params": best_params,
+                "result": result,
+                "reason": _conf_reason(),
+            },
         )
         return result
 
@@ -124,11 +138,15 @@ with DAG(
 
         result = apply_best_params_to_kingdom(model_info=model_info)
 
-        # DBロギング
+        # DBロギング（最小差分）
         log_event(
             table="pdca_events",
             event_type="KINGDOM_PROMOTED",
-            payload={"model_info": model_info, "result": result, "reason": _conf_reason()}
+            payload={
+                "model_info": model_info,
+                "result": result,
+                "reason": _conf_reason(),
+            },
         )
         return result
 
@@ -138,11 +156,11 @@ with DAG(
         try:
             result = Noctria().execute_trade()
 
-            # DBロギング
+            # DBロギング（最小差分）
             log_event(
                 table="pdca_events",
                 event_type="ROYAL_DECISION",
-                payload={"result": result, "reason": _conf_reason()}
+                payload={"result": result, "reason": _conf_reason()},
             )
             return result
         except Exception as e:
@@ -150,7 +168,7 @@ with DAG(
             log_event(
                 table="pdca_events",
                 event_type="ROYAL_DECISION_ERROR",
-                payload={"error": str(e), "reason": _conf_reason()}
+                payload={"error": str(e), "reason": _conf_reason()},
             )
             return {"status": "error", "message": str(e)}
 
@@ -158,7 +176,7 @@ with DAG(
         PythonOperator(
             task_id=f"optimize_worker_{i}",
             python_callable=optimize_worker_task,
-            op_kwargs={"worker_id": i}
+            op_kwargs={"worker_id": i},
         )
         for i in range(1, dag.params["worker_count"] + 1)
     ]
