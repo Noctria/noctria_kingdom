@@ -11,7 +11,11 @@ from datetime import datetime, timedelta
 import logging
 
 from airflow.models.dag import DAG
-from airflow.operators.python import get_current_context
+try:
+    from airflow.operators.python import PythonOperator, get_current_context
+except Exception:
+    from airflow.operators.python_operator import PythonOperator
+    from airflow.operators.python_operator import get_current_context  # 古い環境向け
 from src.core.path_config import LOGS_DIR
 from src.core.logger import setup_logger
 from src.core.db_logging import log_event
