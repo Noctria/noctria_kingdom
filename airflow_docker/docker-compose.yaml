@@ -17,7 +17,7 @@ x-airflow-common: &airflow-common
     # ---- Python path so that "from src...." works everywhere ----
     - PYTHONPATH=/opt/airflow/src:/opt/airflow
     # ---- Optuna RDB storage (Airflow上での既定). DAG内paramsで上書き可 ----
-    - OPTUNA_STORAGE=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
+    - OPTUNA_STORAGE=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${OPTUNA_DB:-optuna}
   volumes:
     - ./dags:/opt/airflow/dags
     - ../logs:/opt/airflow/logs
