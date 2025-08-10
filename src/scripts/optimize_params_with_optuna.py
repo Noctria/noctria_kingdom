@@ -6,10 +6,10 @@ Noctria Kingdom - Optuna最適化 実行スクリプト（Airflow/CLI両対応�
 特徴:
 - 0.0 固定スコア対策（評価ラッパ、NaN/Inf 防御、早期終了例外の健全化）
 - サンプラー/プルーナー適正化（TPESampler + MedianPruner 既定）
-- エピソード複数回の安定評価 + ウォームアップ
+- エピソード複数回の安定評価
 - 分散実行（RDBストレージ）: PostgreSQL想定
 - 重い依存は遅延インポートでDagBagタイムアウト回避
-- 完全自己完結: CLI引数 & 環境変数両対応
+- Airflowから呼べる optimize_main() を提供（XComで返却）
 """
 
 from __future__ import annotations
@@ -17,28 +17,23 @@ import os
 import sys
 import math
 import json
-import time
 import random
 import argparse
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
-
-# --- できる限り軽量な標準ライブラリのみをトップレベルで import ---
 from datetime import datetime
 from pathlib import Path
 
-# --- 既存プロジェクトのパス解決（src/絶対インポート統一） ---
-PROJECT_ROOT = Path(__file__).resolve().parents[2]  # .../noctria_kingdom/src/metaai/.. -> /noctria_kingdom
+# --- プロジェクトルート解決（/src 絶対インポート統一） ---
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # .../noctria_kingdom
 SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-# ログ出力
 def _log(msg: str) -> None:
     ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{ts} UTC] {msg}", flush=True)
 
-# ---- 設定データクラス ----
 @dataclass
 class OptunaConfig:
     study_name: str
@@ -56,11 +51,9 @@ class OptunaConfig:
     reward_clip: Optional[float]
     minimize: bool
     allow_prune_after: int
-    # 分散ワーカーIDENT
     worker_tag: str
 
 def build_config(args: argparse.Namespace) -> OptunaConfig:
-    # env優先→引数の順で解決
     def env_or_arg(key: str, default: Any):
         return os.getenv(key, getattr(args, key, default)) or default
 
@@ -87,7 +80,7 @@ def build_config(args: argparse.Namespace) -> OptunaConfig:
         worker_tag=str(env_or_arg("WORKER_TAG", args.worker_tag)),
     )
 
-# --- 遅延インポート（重い依存） ---
+# --- 遅延インポート（重い依存はここで） ---
 def _lazy_imports():
     import numpy as np  # noqa
     import optuna  # noqa
@@ -95,20 +88,18 @@ def _lazy_imports():
     from optuna.samplers import TPESampler, RandomSampler  # noqa
     from optuna.pruners import MedianPruner, SuccessiveHalvingPruner, NopPruner  # noqa
 
-    # Stable-Baselines3 は遅延
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
         from stable_baselines3.common.evaluation import evaluate_policy
     except Exception as e:
-        _log(f"⚠️ SB3 importに失敗: {e}. 必要なら 'pip install stable-baselines3' を実行してください。")
+        _log(f"⚠️ SB3 importに失敗: {e}. 'pip install stable-baselines3' を実行してください。")
         raise
 
-    # Gymnasiumや環境
     try:
         import gymnasium as gym
     except Exception:
-        import gym  # 旧gym fallback
+        import gym
         gym.logger.set_level(40)
 
     return {
@@ -125,8 +116,7 @@ def _lazy_imports():
         "gym": __import__("gymnasium") if "gymnasium" in sys.modules else __import__("gym"),
     }
 
-# --- サンプラー/プルーナーの選択 ---
-def _make_sampler_pruner(cfg: OptunaConfig, optuna_mod) -> Tuple[Any, Any]:
+def _make_sampler_pruner(cfg: OptunaConfig, _optuna) -> Tuple[Any, Any]:
     Samplers = {
         "tpe": __import__("optuna.samplers", fromlist=["TPESampler"]).TPESampler,
         "random": __import__("optuna.samplers", fromlist=["RandomSampler"]).RandomSampler,
@@ -148,7 +138,6 @@ def _make_sampler_pruner(cfg: OptunaConfig, optuna_mod) -> Tuple[Any, Any]:
         pruner = pruner_cls()
     return sampler, pruner
 
-# --- 評価関数 ---
 def _safe_mean(xs):
     xs = [x for x in xs if x is not None and not math.isnan(x) and math.isfinite(x)]
     return float(sum(xs) / len(xs)) if xs else 0.0
@@ -162,7 +151,6 @@ def make_objective(cfg: OptunaConfig):
     evaluate_policy = mods["evaluate_policy"]
     optuna_mod = mods["optuna"]
 
-    # 乱数固定
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
     try:
@@ -172,7 +160,6 @@ def make_objective(cfg: OptunaConfig):
         pass
 
     def objective(trial: "optuna.trial.Trial") -> float:
-        # --- 探索空間（必要に応じて調整） ---
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-3, log=True)
         n_steps = trial.suggest_int("n_steps", 128, 2048, step=128)
         gamma = trial.suggest_float("gamma", 0.90, 0.999, step=0.001)
@@ -182,7 +169,6 @@ def make_objective(cfg: OptunaConfig):
         vf_coef = trial.suggest_float("vf_coef", 0.2, 1.0, step=0.05)
         batch_size = trial.suggest_categorical("batch_size", [64, 128, 256, 512])
 
-        # --- 環境構築（VecEnv） ---
         def _make_env():
             env = gym.make(cfg.env_id)
             try:
@@ -192,7 +178,6 @@ def make_objective(cfg: OptunaConfig):
             return env
         env = DummyVecEnv([_make_env])
 
-        # --- モデル ---
         model = PPO(
             "MlpPolicy",
             env,
@@ -209,20 +194,16 @@ def make_objective(cfg: OptunaConfig):
             tensorboard_log=cfg.tb_logdir,
         )
 
-        # --- 学習 ---
         try:
             model.learn(total_timesteps=cfg.max_train_steps, progress_bar=False)
         except Exception as e:
-            # 早期終了やNaNで落ちた場合はペナルティ
             _log(f"⚠️ learn中に例外: {e}")
             try:
                 env.close()
             except Exception:
                 pass
-            # 極端な悪評価を返して継続（0張り付き回避）
             return 1e9 if cfg.minimize else -1e9
 
-        # --- 評価（複数エピソード平均 + クリップ） ---
         rets = []
         for _ in range(cfg.n_eval_episodes):
             try:
@@ -236,15 +217,11 @@ def make_objective(cfg: OptunaConfig):
 
         score = _safe_mean(rets)
 
-        # --- 0.0固定の検知と回避（差分ログ） ---
         if abs(score) < 1e-12:
-            _log("⚠️ 評価が0.0に張り付いています。環境/報酬を確認してください。trial params="
-                 + json.dumps(trial.params, ensure_ascii=False))
+            _log("⚠️ 評価が0.0に張り付いています。trial params=" + json.dumps(trial.params, ensure_ascii=False))
 
-        # --- 途中経過をreportしてprune可能に ---
         trial.report(score, step=cfg.max_train_steps)
         if trial.should_prune():
-            # 許容ステップ前は無視（MedianPrunerの過剰発火抑制）
             if cfg.max_train_steps >= cfg.allow_prune_after:
                 try:
                     env.close()
@@ -256,8 +233,6 @@ def make_objective(cfg: OptunaConfig):
             env.close()
         except Exception:
             pass
-
-        # Optunaは「最小化」が既定。maximize時は負にして返すか、方向を設定する（後者を採用）
         return float(score)
 
     return objective
@@ -265,11 +240,8 @@ def make_objective(cfg: OptunaConfig):
 def run(cfg: OptunaConfig) -> Dict[str, Any]:
     mods = _lazy_imports()
     optuna_mod = mods["optuna"]
-
-    # サンプラー/プルーナー
     sampler, pruner = _make_sampler_pruner(cfg, optuna_mod)
 
-    # Study作成（方向を設定）
     direction = "minimize" if cfg.minimize else "maximize"
     _log(f"🎯 Study: {cfg.study_name} ({direction}), storage={cfg.storage_url}, worker={cfg.worker_tag}")
     study = optuna_mod.create_study(
@@ -282,15 +254,13 @@ def run(cfg: OptunaConfig) -> Dict[str, Any]:
     )
 
     objective = make_objective(cfg)
-
-    # 実行
     study.optimize(
         objective,
         n_trials=cfg.n_trials,
         timeout=cfg.timeout_sec,
         gc_after_trial=True,
-        n_jobs=1,  # 分散はプロセス/コンテナを増やす（RDBで同期）
-        catch=(Exception,),  # 評価側の例外を潰して進行
+        n_jobs=1,
+        catch=(Exception,),
     )
 
     best_value = study.best_value if study.best_trial else (math.inf if cfg.minimize else -math.inf)
@@ -309,7 +279,7 @@ def run(cfg: OptunaConfig) -> Dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Noctria - Optuna最適化実行")
     p.add_argument("--study_name", type=str, default="noctria_rl_ppo")
-    p.add_argument("--storage_url", type=str, default=os.getenv("OPTUNA_STORAGE", ""))  # e.g. postgresql+psycopg2://airflow:airflow@noctria_postgres:5432/airflow
+    p.add_argument("--storage_url", type=str, default=os.getenv("OPTUNA_STORAGE", ""))
     p.add_argument("--n_trials", type=int, default=100)
     p.add_argument("--timeout_sec", type=int, default=None)
     p.add_argument("--n_startup_trials", type=int, default=10)
@@ -319,12 +289,48 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pruner", type=str, default="median", choices=["median", "sha", "none"])
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--tb_logdir", type=str, default=None)
-    p.add_argument("--env_id", type=str, default="CartPole-v1")  # 実プロジェクトのENVに置換する
+    p.add_argument("--env_id", type=str, default="CartPole-v1")
     p.add_argument("--reward_clip", type=float, default=None)
-    p.add_argument("--minimize", action="store_true", help="目的関数を最小化する（デフォルトは最大化）")
+    p.add_argument("--minimize", action="store_true")
     p.add_argument("--allow_prune_after", type=int, default=2_000)
     p.add_argument("--worker_tag", type=str, default=f"worker-{os.getenv('HOSTNAME','local')}")
     return p.parse_args()
+
+# ===== Airflow/PythonOperator 用の公開関数 =====
+def optimize_main(**context):
+    """
+    Airflow から直接 import されるエントリポイント。
+    - PythonOperator の python_callable に指定可能
+    - return 値は XCom に保存される
+    """
+    # Airflowのparams/op_kwargsのどちらでも拾えるように
+    params = (context.get("params") or {}) if isinstance(context, dict) else {}
+    # argparse.Namespace を作って既定値＋paramsを適用
+    args = argparse.ArgumentParser().parse_args(args=[])
+    args.study_name = params.get("study_name", "noctria_rl_ppo")
+    args.storage_url = os.environ.get("OPTUNA_STORAGE", params.get("storage_url", ""))
+    args.n_trials = int(params.get("n_trials", 100))
+    args.timeout_sec = int(params["timeout_sec"]) if "timeout_sec" in params and params["timeout_sec"] is not None else None
+    args.n_startup_trials = int(params.get("n_startup_trials", 10))
+    args.n_eval_episodes = int(params.get("n_eval_episodes", 5))
+    args.max_train_steps = int(params.get("max_train_steps", 100000))
+    args.sampler = params.get("sampler", "tpe")
+    args.pruner = params.get("pruner", "median")
+    args.seed = int(params.get("seed", 42))
+    args.tb_logdir = params.get("tb_logdir", None)
+    args.env_id = params.get("env_id", "CartPole-v1")
+    args.reward_clip = float(params["reward_clip"]) if "reward_clip" in params and params["reward_clip"] is not None else None
+    args.minimize = bool(str(params.get("minimize", "false")).lower() in ("1", "true", "yes"))
+    args.allow_prune_after = int(params.get("allow_prune_after", 2000))
+    # ワーカータグ（task_id を活用してユニーク化）
+    ti = context.get("ti")
+    task_id = getattr(ti, "task_id", "worker")
+    args.worker_tag = params.get("worker_tag", f"worker-{task_id}")
+
+    cfg = build_config(args)
+    result = run(cfg)
+    # PythonOperator は return を XCom に保存する
+    return result
 
 def main():
     args = parse_args()
