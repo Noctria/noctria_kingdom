@@ -31,7 +31,7 @@ KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"  # 1行1レコード型を推奨
 logger = logging.getLogger("king_routes")
 
 # ====== Airflow REST API 設定（.env で上書き可） ======
-AIRFLOW_BASE_URL = os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080")
+AIRFLOW_BASE_URL = os.getenv("AIRFLOW_API_BASE", os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"))
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 TRAIN_DAG_ID = "train_prometheus_obs8"
