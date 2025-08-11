@@ -5,9 +5,9 @@ Observation Adapter
 -------------------
 Plan層のDataFrame -> 学習/Env向けの観測ベクトル(np.float32)に整形するユーティリティ。
 
-- 既定: 6次元（既存SB3モデル互換）
-- 標準: 8次元（STANDARD_FEATURE_ORDERに準拠）
-- >8次元: feature_spec.get_plan_feature_order() に従って拡張（後方互換）
+- 既定: 8次元（STANDARD_FEATURE_ORDERに準拠）
+- 互換: 6次元（環境変数で切替可）
+- >8次元: feature_spec.get_plan_feature_order() に従って拡張
 - 環境変数で次元や列セットを上書き可能
     NOCTRIA_ENV_OBS_DIM / PROMETHEUS_OBS_DIM   ... 観測次元
     PROMETHEUS_OBS_COLUMNS_6 (JSON配列)        ... 6次元時の列選択
@@ -24,10 +24,9 @@ import pandas as pd
 
 from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 from src.plan_data.feature_spec import (
-    align_to_plan_features,  # 後方互換ラッパ（snake化・数値化・欠損処理）
+    align_to_plan_features,  # snake化・数値化・欠損処理
     get_plan_feature_order,  # obs_dimに応じた列順を返す
 )
-
 
 # ---- 環境変数ヘルパ ---------------------------------------------------------
 
@@ -40,7 +39,7 @@ def _to_int_or_none(x: Optional[str]) -> Optional[int]:
         return None
 
 
-def _get_obs_dim(default: int = 6) -> int:
+def _get_obs_dim(default: int = 8) -> int:  # ★ 既定を8へ
     """
     観測次元の決定（環境変数 → 既定）。
     """
@@ -70,7 +69,7 @@ def _get_override_obs6() -> Optional[List[str]]:
 
 # ---- 列セットの解決 ---------------------------------------------------------
 
-# 6次元のデフォルト（既存モデル互換を想定、必要なら環境変数で調整可）
+# 6次元のデフォルト（互換運用用。必要なら環境変数で調整可）
 DEFAULT_OBS6: List[str] = [
     "usdjpy_close",
     "usdjpy_volatility_5d",
@@ -113,29 +112,14 @@ def adapt_observation(
 ) -> np.ndarray:
     """
     Plan層DataFrameから「1サンプル」の観測ベクトル(np.float32, shape=(obs_dim,))を作る。
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Plan層の生/混在DataFrame（カラム名の大文字/スネーク混在OK）
-    obs_dim : Optional[int]
-        観測次元。未指定なら環境変数→既定6。
-    row : str | int | None
-        どの行を使うか。-1 なら末尾、"latest" でも末尾扱い、intで0起点indexも可。
-    ensure_float32 : bool
-        True なら np.float32 に強制変換。
     """
-    k = obs_dim or _get_obs_dim(default=6)
+    k = obs_dim or _get_obs_dim(default=8)  # ★ 既定を8へ
     if df is None or len(df) == 0:
         raise ValueError("adapt_observation: empty DataFrame given.")
 
-    # 列セット決定（>8 次元も get_plan_feature_order が返す）
     cols = resolve_observation_columns(k)
-
-    # Plan仕様へ正規化（必要列のみ・順序通り）
     aligned = align_to_plan_features(df, required_features=cols)
 
-    # 行の決定
     if row in (-1, "latest", None):
         series = aligned.iloc[-1]
     else:
@@ -144,12 +128,9 @@ def adapt_observation(
             raise IndexError(f"adapt_observation: row index out of range: {row}")
         series = aligned.iloc[idx]
 
-    # 値の抽出
     values = [_coerce_float_safe(series.get(c, 0.0)) for c in cols]
-
     vec = np.array(values, dtype=np.float32 if ensure_float32 else np.float64)
 
-    # 念のため長さ調整（通常は cols と一致する）
     if vec.shape[0] < k:
         pad = np.zeros(k - vec.shape[0], dtype=vec.dtype)
         vec = np.concatenate([vec, pad], axis=0)
@@ -171,15 +152,13 @@ def adapt_batch(
     Plan層DataFrameから「複数行」を観測行列にする。
     shape=(N, obs_dim)
     """
-    k = obs_dim or _get_obs_dim(default=6)
+    k = obs_dim or _get_obs_dim(default=8)  # ★ 既定を8へ
     if df is None or len(df) == 0:
-        # 空行列（0, k）を返す方が扱いやすい
         return np.zeros((0, k), dtype=np.float32 if ensure_float32 else np.float64)
 
     cols = resolve_observation_columns(k)
     aligned = align_to_plan_features(df, required_features=cols)
 
-    # 欠損/非数は 0.0、float32/64
     X = (
         aligned.reindex(columns=cols, fill_value=0.0)
         .apply(pd.to_numeric, errors="coerce")
@@ -188,7 +167,6 @@ def adapt_batch(
     )
     mat = X.to_numpy(dtype=np.float32 if ensure_float32 else np.float64)
 
-    # 念のため列長調整
     if mat.shape[1] < k:
         pad = np.zeros((mat.shape[0], k - mat.shape[1]), dtype=mat.dtype)
         mat = np.concatenate([mat, pad], axis=1)
@@ -209,7 +187,7 @@ def adapt_sequence(
     """
     複数のDataFrame（ウィンドウ分割等）を連結して1本の観測行列にする。
     """
-    k = obs_dim or _get_obs_dim(default=6)
+    k = obs_dim or _get_obs_dim(default=8)  # ★ 既定を8へ
     cols = resolve_observation_columns(k)
 
     mats: List[np.ndarray] = []
