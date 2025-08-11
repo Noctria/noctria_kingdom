@@ -1,25 +1,34 @@
-version: "3.6"
+# airflow_docker/docker-compose.yaml
 
 x-airflow-common: &airflow-common
   build:
-    context: ..                                  # airflow_docker/ で実行前提
+    context: ..                                  # 実行ディレクトリ: airflow_docker/
     dockerfile: ./airflow_docker/docker/Dockerfile
   image: noctria-airflow:latest
-  container_name: ""                              # 子で個別指定
   env_file: ../.env
   environment:
     # ---- Airflow core ----
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - AIRFLOW__CORE__LOAD_EXAMPLES=False
     - AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=180
+    - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
     - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-YourSecretKeyForWebServerSession}
+    # APIのFutureWarning解消（UI用sessionを明示）
+    - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+
     # ---- Python path so that "from src...." works everywhere ----
     - PYTHONPATH=/opt/airflow/src:/opt/airflow
-    # ---- Optuna RDB storage (Airflow上での既定). DAG内paramsで上書き可 ----
+
+    # ---- Optuna RDB storage (DAG側で上書き可) ----
     - OPTUNA_STORAGE=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${OPTUNA_DB:-optuna}
+
+    # ---- Prometheus 環境設定（学習DAG用）----
     - PROMETHEUS_ENV=src.envs.noctria_fx_trading_env:NoctriaFXTradingEnv
-    - PROMETHEUS_ENV_KWARGS={"window":128,"fee":0.0002,"reward_mode":"pnl","max_episode_steps":200,"obs_dim":8}
+    - 'PROMETHEUS_ENV_KWARGS={"window":128,"fee":0.0002,"reward_mode":"pnl","max_episode_steps":200,"obs_dim":8}'
+    # 既定の timesteps（trigger --conf で上書き可）
+    - TOTAL_TIMESTEPS=10000
+
     # ---- Noctria標準観測次元（8に統一）----
     - NOCTRIA_ENV_OBS_DIM=8
   volumes:
@@ -57,7 +66,7 @@ services:
     <<: *airflow-common
     container_name: noctria_airflow_webserver
     command: >
-      bash -c "
+      bash -lc "
         airflow db upgrade &&
         airflow users create
           --username ${AIRFLOW_USER:-admin}
@@ -79,7 +88,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     container_name: noctria_airflow_scheduler
-    command: scheduler
+    command: bash -lc "exec airflow scheduler"
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
       interval: 30s
