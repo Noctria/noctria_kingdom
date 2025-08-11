@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # coding: utf-8
+
 """
-👑 /api/king - 中央統治AI NoctriaのAPIルート（理想形・decision_id一元管理）
-- 既存のコマンド系に加えて、Prometheus(学習→評価DAG)の
-  ダッシュボード & 1クリック学習トリガを提供
+👑 /api/king - 中央統治AI NoctriaのAPIルート
+- 既存の王コマンドに加え、Prometheus(学習→評価)のGUIと操作を統合
+- 新規ファイルは作らず、このルータと既存テンプレのみで完結
 """
 
 from fastapi import APIRouter, Request, HTTPException, Form
@@ -18,16 +19,17 @@ from pathlib import Path
 import os
 import json
 import logging
+import shutil
 from typing import Dict, Any, Optional, Tuple
 
-# 追加: Airflow REST API を叩くため
+# Airflow REST API
 import requests
 from requests.auth import HTTPBasicAuth
 
 router = APIRouter(prefix="/api/king", tags=["King"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"  # 1行1レコード型を推奨
+KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"
 logger = logging.getLogger("king_routes")
 
 # ====== Airflow REST API 設定（.env で上書き可） ======
@@ -36,8 +38,7 @@ AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 TRAIN_DAG_ID = "train_prometheus_obs8"
 
-# ====== モデル格納ルート（.env で上書き可） ======
-# path_config に DATA_DIR があるならそれを尊重。無い環境でも動くようにフォールバック。
+# ====== モデルルート ======
 try:
     from src.core.path_config import DATA_DIR as _DATA_DIR  # type: ignore
 except Exception:
@@ -48,10 +49,9 @@ PROJECT = "prometheus"
 ALGO = "PPO"
 OBS_DIM = 8
 
-# =========================================
-# 既存機能
-# =========================================
-
+# ----------------------------------------
+# 既存：ログ/王コマンド
+# ----------------------------------------
 def load_logs() -> list[Dict[str, Any]]:
     try:
         if KING_LOG_PATH.exists():
@@ -62,23 +62,16 @@ def load_logs() -> list[Dict[str, Any]]:
         logger.error(f"🔴 load_logs失敗: {e}")
         return []
 
-# KingNoctriaのインスタンスをグローバルに生成し共有
 king_instance = KingNoctria()
 
 @router.post("/command")
 async def king_command_api(request: Request):
-    """
-    👑 王Noctriaによる統治コマンドAPI（全PDCA/DAG/AI指令を統一集約）
-    """
     try:
         data = await request.json()
         command = data.get("command")
         if not command:
             raise HTTPException(status_code=400, detail="commandパラメータが必要です。")
-        args = data.get("args", {})
-        if not isinstance(args, dict):
-            args = {}
-        ai = data.get("ai", None)  # 将来対応用
+        args = data.get("args", {}) or {}
         caller = "king_routes"
         reason = data.get("reason", f"APIコマンド[{command}]実行")
 
@@ -99,70 +92,46 @@ async def king_command_api(request: Request):
             return JSONResponse(content={"error": f"未知コマンド: {command}"}, status_code=400)
 
         return JSONResponse(content=result)
-
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"King command failed: {e}", exc_info=True)
-        return JSONResponse(
-            content={"error": f"King command failed: {str(e)}"},
-            status_code=500
-        )
+        return JSONResponse(content={"error": f"King command failed: {str(e)}"}, status_code=500)
 
 @router.get("/history", response_class=HTMLResponse)
 async def show_king_history(request: Request):
-    """
-    📜 KingNoctriaによる過去の評議会（全統治コマンド）履歴GUI
-    """
     try:
         logs = load_logs()
         logs = sorted(logs, key=lambda x: x.get("timestamp", ""), reverse=True)
-        return templates.TemplateResponse("king_history.html", {
-            "request": request,
-            "logs": logs
-        })
+        return templates.TemplateResponse("king_history.html", {"request": request, "logs": logs})
     except Exception as e:
         logger.error(f"ログ読み込みエラー: {e}", exc_info=True)
         return templates.TemplateResponse("king_history.html", {
-            "request": request,
-            "logs": [],
-            "error": f"ログ読み込みエラー: {str(e)}"
+            "request": request, "logs": [], "error": f"ログ読み込みエラー: {str(e)}"
         })
 
-# =========================================
-# 追加: Prometheus ダッシュボード & 1クリック学習
-# =========================================
-
+# ----------------------------------------
+# Prometheus: 最新＆履歴（同一テンプレで表示）
+# ----------------------------------------
 def _resolve_latest_dir(base: Path) -> Optional[Path]:
-    """
-    base/obs8/ 配下の最新ディレクトリを返す。latest シンボリックリンクがあればそれを優先。
-    """
     obs_dir = base / PROJECT / ALGO / f"obs{OBS_DIM}"
     if not obs_dir.exists():
         return None
-
     latest = obs_dir / "latest"
     try:
         if latest.exists():
-            # シンボリックリンクの実体を解決
             return Path(os.path.realpath(str(latest)))
     except Exception:
         pass
-
-    # latest が無い場合は mtime の新しいディレクトリを選ぶ
-    candidates = [p for p in obs_dir.iterdir() if p.is_dir()]
+    candidates = [p for p in obs_dir.iterdir() if p.is_dir() and p.name != "latest"]
     if not candidates:
         return None
     return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)[0]
 
 def _load_latest_model_info() -> Tuple[Optional[Path], Dict[str, Any]]:
-    """
-    最新モデルディレクトリと metadata.json を返す（無ければ空）
-    """
     latest_dir = _resolve_latest_dir(MODELS_DIR)
     if not latest_dir:
         return None, {}
-
     meta_path = latest_dir / "metadata.json"
     meta: Dict[str, Any] = {}
     try:
@@ -172,66 +141,82 @@ def _load_latest_model_info() -> Tuple[Optional[Path], Dict[str, Any]]:
         logger.warning(f"metadata.json 読み込み失敗: {e}")
     return latest_dir, meta
 
-def _airflow_trigger_train(conf: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Airflow REST API: POST /api/v1/dags/{dag_id}/dagRuns
-    """
-    url = f"{AIRFLOW_BASE_URL}/api/v1/dags/{TRAIN_DAG_ID}/dagRuns"
-    payload = {"conf": conf}
+def _scan_model_history(limit: int = 30) -> list[Dict[str, Any]]:
+    base = MODELS_DIR / PROJECT / ALGO / f"obs{OBS_DIM}"
+    if not base.exists():
+        return []
+    rows: list[Dict[str, Any]] = []
+    for p in base.iterdir():
+        if not p.is_dir() or p.name == "latest":
+            continue
+        meta = {}
+        try:
+            mp = p / "metadata.json"
+            if mp.exists():
+                meta = json.loads(mp.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"metadata read failed: {p} -> {e}")
+        rows.append({"dir": str(p), "name": p.name, "mtime": p.stat().st_mtime, "meta": meta})
+    rows.sort(key=lambda r: r["mtime"], reverse=True)
+    return rows[:limit]
+
+def _safe_promote_to_latest(target_dir: Path) -> None:
+    base = MODELS_DIR / PROJECT / ALGO / f"obs{OBS_DIM}"
+    latest = base / "latest"
+    target_dir = target_dir.resolve()
+    if base.resolve() not in target_dir.parents:
+        raise ValueError("target_dir is outside the models base")
     try:
-        r = requests.post(
-            url,
-            json=payload,
-            auth=HTTPBasicAuth(AIRFLOW_USER, AIRFLOW_PASSWORD),
-            timeout=15,
-        )
-        if r.status_code >= 300:
-            raise RuntimeError(f"Airflow API error {r.status_code}: {r.text}")
-        return r.json()
-    except Exception as e:
-        logger.error(f"Airflow trigger failed: {e}")
-        raise
+        if latest.exists() or latest.is_symlink():
+            try:
+                latest.unlink()
+            except Exception:
+                try:
+                    shutil.rmtree(latest)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        latest.symlink_to(target_dir, target_is_directory=True)
+    except Exception:
+        shutil.copytree(target_dir, latest)
 
 def _to_bool(v: Any, default: bool = True) -> bool:
-    if isinstance(v, bool):
-        return v
-    if isinstance(v, str):
-        return v.strip().lower() in ("1", "true", "yes", "y", "on")
+    if isinstance(v, bool): return v
+    if isinstance(v, str): return v.strip().lower() in ("1","true","yes","y","on")
     return default
 
-def _maybe_cast(v: str, caster, default=None):
-    if v is None or v == "":
-        return default
-    try:
-        return caster(v)
-    except Exception:
-        return default
+def _maybe_cast(v: Optional[str], caster, default=None):
+    if v is None or v == "": return default
+    try: return caster(v)
+    except Exception: return default
+
+def _airflow_trigger_train(conf: Dict[str, Any]) -> Dict[str, Any]:
+    url = f"{AIRFLOW_BASE_URL}/api/v1/dags/{TRAIN_DAG_ID}/dagRuns"
+    r = requests.post(url, json={"conf": conf}, auth=HTTPBasicAuth(AIRFLOW_USER, AIRFLOW_PASSWORD), timeout=15)
+    if r.status_code >= 300:
+        raise RuntimeError(f"Airflow API error {r.status_code}: {r.text}")
+    return r.json()
 
 @router.get("/prometheus", response_class=HTMLResponse)
 async def king_prometheus_dashboard(request: Request):
-    """
-    👑 Prometheus 学習ダッシュボード
-    - 最新モデルのメタ＆評価結果の表示
-    - 学習＆評価の1クリックトリガフォーム
-    """
     latest_dir, meta = _load_latest_model_info()
-    return templates.TemplateResponse(
-        "king_prometheus.html",
-        {
-            "request": request,
-            "latest_dir": str(latest_dir) if latest_dir else None,
-            "meta": meta,
-            "message": None,
-            "error": None,
-            "airflow_base": AIRFLOW_BASE_URL,
-            "train_dag_id": TRAIN_DAG_ID,
-        },
-    )
+    history_rows = _scan_model_history(limit=30)
+    return templates.TemplateResponse("king_prometheus.html", {
+        "request": request,
+        "latest_dir": str(latest_dir) if latest_dir else None,
+        "meta": meta,
+        "history_rows": history_rows,
+        "message": None,
+        "error": None,
+        "airflow_base": AIRFLOW_BASE_URL,
+        "train_dag_id": TRAIN_DAG_ID,
+    })
 
 @router.post("/prometheus/train", response_class=HTMLResponse)
 async def king_prometheus_train(
     request: Request,
-    # --- フォームの各フィールド（未入力はNoneで受け取り、サーバ側で省略） ---
     TOTAL_TIMESTEPS: Optional[str] = Form(default=None),
     learning_rate: Optional[str] = Form(default=None),
     n_steps: Optional[str] = Form(default=None),
@@ -248,11 +233,7 @@ async def king_prometheus_train(
     eval_n_episodes: Optional[str] = Form(default=None),
     eval_deterministic: Optional[str] = Form(default="true"),
 ):
-    """
-    フォーム値を --conf に変換して Airflow の train_prometheus_obs8 をトリガ
-    """
     conf: Dict[str, Any] = {}
-    # 数値系は安全にキャスト（未入力は省略）
     if (v := _maybe_cast(TOTAL_TIMESTEPS, int)) is not None: conf["TOTAL_TIMESTEPS"] = v
     if (v := _maybe_cast(learning_rate, float)) is not None: conf["learning_rate"] = v
     if (v := _maybe_cast(n_steps, int)) is not None: conf["n_steps"] = v
@@ -272,22 +253,46 @@ async def king_prometheus_train(
     message, error = None, None
     try:
         api_res = _airflow_trigger_train(conf)
-        # Airflow 2.x は dag_run_id などを返す
         dag_run_id = api_res.get("dag_run_id", "(unknown)")
         message = f"🚀 Triggered DAG: {TRAIN_DAG_ID} (run_id={dag_run_id})"
     except Exception as e:
         error = f"Airflow trigger failed: {e}"
 
     latest_dir, meta = _load_latest_model_info()
-    return templates.TemplateResponse(
-        "king_prometheus.html",
-        {
-            "request": request,
-            "latest_dir": str(latest_dir) if latest_dir else None,
-            "meta": meta,
-            "message": message,
-            "error": error,
-            "airflow_base": AIRFLOW_BASE_URL,
-            "train_dag_id": TRAIN_DAG_ID,
-        },
-    )
+    history_rows = _scan_model_history(limit=30)
+    return templates.TemplateResponse("king_prometheus.html", {
+        "request": request,
+        "latest_dir": str(latest_dir) if latest_dir else None,
+        "meta": meta,
+        "history_rows": history_rows,
+        "message": message,
+        "error": error,
+        "airflow_base": AIRFLOW_BASE_URL,
+        "train_dag_id": TRAIN_DAG_ID,
+    })
+
+@router.post("/prometheus/promote", response_class=HTMLResponse)
+async def king_prometheus_promote(request: Request):
+    form = await request.form()
+    dir_str = (form.get("dir") or "").strip()
+    message, error = None, None
+    try:
+        if not dir_str:
+            raise ValueError("dir is required")
+        _safe_promote_to_latest(Path(dir_str))
+        message = f"✅ Promoted to latest: {Path(dir_str).name}"
+    except Exception as e:
+        error = f"⚠️ Promote failed: {e}"
+
+    latest_dir, meta = _load_latest_model_info()
+    history_rows = _scan_model_history(limit=30)
+    return templates.TemplateResponse("king_prometheus.html", {
+        "request": request,
+        "latest_dir": str(latest_dir) if latest_dir else None,
+        "meta": meta,
+        "history_rows": history_rows,
+        "message": message,
+        "error": error,
+        "airflow_base": AIRFLOW_BASE_URL,
+        "train_dag_id": TRAIN_DAG_ID,
+    })
