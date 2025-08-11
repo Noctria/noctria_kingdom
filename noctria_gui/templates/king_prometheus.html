@@ -1,0 +1,122 @@
+{% extends "base_hud.html" %}
+
+{% block title %}👑 Noctria King — Prometheus ダッシュボード{% endblock %}
+{% block header_icon %}<i class="fas fa-flask"></i>{% endblock %}
+{% block header_title %}<span class="text-normal">PROMETHEUS / TRAINING & EVAL</span>{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}HUDへ{% endblock %}
+
+{% block content %}
+  {% if message %}
+    <p class="ok">✅ {{ message }}</p>
+  {% endif %}
+  {% if error %}
+    <p class="warn">⚠️ {{ error }}</p>
+  {% endif %}
+
+  <section class="hud-panel">
+    <h2 class="panel-title text-normal"><i class="fas fa-cube"></i> 最新モデル</h2>
+    {% if latest_dir %}
+      <div class="kv"><div>ディレクトリ</div><div class="mono">{{ latest_dir }}</div></div>
+      <div class="kv"><div>プロジェクト</div><div>{{ meta.project or "-" }}</div></div>
+      <div class="kv"><div>アルゴリズム</div><div>{{ meta.algo or "-" }}</div></div>
+      <div class="kv"><div>保存UTC</div><div>{{ meta.saved_at_utc or "-" }}</div></div>
+      <div class="kv"><div>obs_dim</div><div>{{ meta.obs_dim or "-" }}</div></div>
+      <div class="kv"><div>total_timesteps</div><div>{{ meta.total_timesteps or "-" }}</div></div>
+      <div class="hr"></div>
+      <div class="kv"><div>Env</div><div class="mono">{{ meta.environment.env_class if meta.environment else "-" }}</div></div>
+      <div class="kv"><div>Action space</div><div class="mono">{{ meta.environment.action_space if meta.environment else "-" }}</div></div>
+      <div class="kv"><div>Observation space</div><div class="mono">{{ meta.environment.observation_space if meta.environment else "-" }}</div></div>
+      <div class="hr"></div>
+      <h3 class="panel-title text-normal" style="font-size:16px;"><i class="fas fa-clipboard-check"></i> 評価結果</h3>
+      {% if meta.evaluation %}
+        <div class="kv"><div>evaluated_at_utc</div><div>{{ meta.evaluation.evaluated_at_utc }}</div></div>
+        <div class="kv"><div>n_episodes</div><div>{{ meta.evaluation.n_episodes }}</div></div>
+        <div class="kv"><div>deterministic</div><div>{{ meta.evaluation.deterministic }}</div></div>
+        <div class="kv"><div>avg_reward</div><div>{{ meta.evaluation.avg_reward }}</div></div>
+        <div class="kv"><div>std_reward</div><div>{{ meta.evaluation.std_reward }}</div></div>
+        <div class="kv"><div>win_rate</div><div>{{ meta.evaluation.win_rate }}</div></div>
+        <div class="kv"><div>ep_len_mean</div><div>{{ meta.evaluation.ep_len_mean }}</div></div>
+      {% else %}
+        <p class="text-light">（評価結果未登録）</p>
+      {% endif %}
+    {% else %}
+      <p>まだ学習済みモデルが見つかりません。</p>
+    {% endif %}
+  </section>
+
+  <section class="hud-panel">
+    <h2 class="panel-title text-normal"><i class="fas fa-rocket"></i> 学習をトリガー</h2>
+    <form method="post" action="/api/king/prometheus/train"
+          style="display:grid; gap:.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div>
+        <label class="text-light">TOTAL_TIMESTEPS</label>
+        <input name="TOTAL_TIMESTEPS" type="number" placeholder="10000" />
+      </div>
+      <div>
+        <label class="text-light">learning_rate</label>
+        <input name="learning_rate" type="text" placeholder="0.0003" />
+      </div>
+      <div>
+        <label class="text-light">n_steps</label>
+        <input name="n_steps" type="number" placeholder="2048" />
+      </div>
+      <div>
+        <label class="text-light">batch_size</label>
+        <input name="batch_size" type="number" placeholder="256" />
+      </div>
+      <div>
+        <label class="text-light">n_epochs</label>
+        <input name="n_epochs" type="number" placeholder="10" />
+      </div>
+      <div>
+        <label class="text-light">gamma</label>
+        <input name="gamma" type="text" placeholder="0.99" />
+      </div>
+      <div>
+        <label class="text-light">gae_lambda</label>
+        <input name="gae_lambda" type="text" placeholder="0.95" />
+      </div>
+      <div>
+        <label class="text-light">ent_coef</label>
+        <input name="ent_coef" type="text" placeholder="0.0" />
+      </div>
+      <div>
+        <label class="text-light">vf_coef</label>
+        <input name="vf_coef" type="text" placeholder="0.5" />
+      </div>
+      <div>
+        <label class="text-light">max_grad_norm</label>
+        <input name="max_grad_norm" type="text" placeholder="0.5" />
+      </div>
+      <div>
+        <label class="text-light">clip_range</label>
+        <input name="clip_range" type="text" placeholder="0.2" />
+      </div>
+      <div>
+        <label class="text-light">clip_range_vf</label>
+        <input name="clip_range_vf" type="text" placeholder="" />
+      </div>
+      <div>
+        <label class="text-light">seed</label>
+        <input name="seed" type="number" placeholder="" />
+      </div>
+      <div>
+        <label class="text-light">eval_n_episodes</label>
+        <input name="eval_n_episodes" type="number" placeholder="5" />
+      </div>
+      <div>
+        <label class="text-light">eval_deterministic</label>
+        <select name="eval_deterministic">
+          <option value="true" selected>True</option>
+          <option value="false">False</option>
+        </select>
+      </div>
+      <div style="grid-column:1 / -1; display:flex; gap:.5rem; margin-top:.25rem;">
+        <button class="btn" type="submit"><i class="fas fa-paper-plane"></i> 学習を開始</button>
+        <a class="btn btn--ghost" href="/dashboard"><i class="fas fa-external-link-alt"></i> HUDへ戻る</a>
+      </div>
+      <p class="text-light" style="grid-column:1/-1; margin:0;">未入力項目は既定値（DAG/ENV）を使用します。</p>
+    </form>
+  </section>
+{% endblock %}
