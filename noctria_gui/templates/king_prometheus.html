@@ -7,12 +7,8 @@
 {% block header_nav_text %}HUDへ{% endblock %}
 
 {% block content %}
-  {% if message %}
-    <p class="ok">✅ {{ message }}</p>
-  {% endif %}
-  {% if error %}
-    <p class="warn">⚠️ {{ error }}</p>
-  {% endif %}
+  {% if message %}<p class="ok">✅ {{ message }}</p>{% endif %}
+  {% if error %}<p class="warn">⚠️ {{ error }}</p>{% endif %}
 
   <section class="hud-panel">
     <h2 class="panel-title text-normal"><i class="fas fa-cube"></i> 最新モデル</h2>
@@ -49,68 +45,23 @@
     <h2 class="panel-title text-normal"><i class="fas fa-rocket"></i> 学習をトリガー</h2>
     <form method="post" action="/api/king/prometheus/train"
           style="display:grid; gap:.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-      <div>
-        <label class="text-light">TOTAL_TIMESTEPS</label>
-        <input name="TOTAL_TIMESTEPS" type="number" placeholder="10000" />
-      </div>
-      <div>
-        <label class="text-light">learning_rate</label>
-        <input name="learning_rate" type="text" placeholder="0.0003" />
-      </div>
-      <div>
-        <label class="text-light">n_steps</label>
-        <input name="n_steps" type="number" placeholder="2048" />
-      </div>
-      <div>
-        <label class="text-light">batch_size</label>
-        <input name="batch_size" type="number" placeholder="256" />
-      </div>
-      <div>
-        <label class="text-light">n_epochs</label>
-        <input name="n_epochs" type="number" placeholder="10" />
-      </div>
-      <div>
-        <label class="text-light">gamma</label>
-        <input name="gamma" type="text" placeholder="0.99" />
-      </div>
-      <div>
-        <label class="text-light">gae_lambda</label>
-        <input name="gae_lambda" type="text" placeholder="0.95" />
-      </div>
-      <div>
-        <label class="text-light">ent_coef</label>
-        <input name="ent_coef" type="text" placeholder="0.0" />
-      </div>
-      <div>
-        <label class="text-light">vf_coef</label>
-        <input name="vf_coef" type="text" placeholder="0.5" />
-      </div>
-      <div>
-        <label class="text-light">max_grad_norm</label>
-        <input name="max_grad_norm" type="text" placeholder="0.5" />
-      </div>
-      <div>
-        <label class="text-light">clip_range</label>
-        <input name="clip_range" type="text" placeholder="0.2" />
-      </div>
-      <div>
-        <label class="text-light">clip_range_vf</label>
-        <input name="clip_range_vf" type="text" placeholder="" />
-      </div>
-      <div>
-        <label class="text-light">seed</label>
-        <input name="seed" type="number" placeholder="" />
-      </div>
-      <div>
-        <label class="text-light">eval_n_episodes</label>
-        <input name="eval_n_episodes" type="number" placeholder="5" />
-      </div>
+      <div><label class="text-light">TOTAL_TIMESTEPS</label><input name="TOTAL_TIMESTEPS" type="number" placeholder="10000" /></div>
+      <div><label class="text-light">learning_rate</label><input name="learning_rate" type="text" placeholder="0.0003" /></div>
+      <div><label class="text-light">n_steps</label><input name="n_steps" type="number" placeholder="2048" /></div>
+      <div><label class="text-light">batch_size</label><input name="batch_size" type="number" placeholder="256" /></div>
+      <div><label class="text-light">n_epochs</label><input name="n_epochs" type="number" placeholder="10" /></div>
+      <div><label class="text-light">gamma</label><input name="gamma" type="text" placeholder="0.99" /></div>
+      <div><label class="text-light">gae_lambda</label><input name="gae_lambda" type="text" placeholder="0.95" /></div>
+      <div><label class="text-light">ent_coef</label><input name="ent_coef" type="text" placeholder="0.0" /></div>
+      <div><label class="text-light">vf_coef</label><input name="vf_coef" type="text" placeholder="0.5" /></div>
+      <div><label class="text-light">max_grad_norm</label><input name="max_grad_norm" type="text" placeholder="0.5" /></div>
+      <div><label class="text-light">clip_range</label><input name="clip_range" type="text" placeholder="0.2" /></div>
+      <div><label class="text-light">clip_range_vf</label><input name="clip_range_vf" type="text" placeholder="" /></div>
+      <div><label class="text-light">seed</label><input name="seed" type="number" placeholder="" /></div>
+      <div><label class="text-light">eval_n_episodes</label><input name="eval_n_episodes" type="number" placeholder="5" /></div>
       <div>
         <label class="text-light">eval_deterministic</label>
-        <select name="eval_deterministic">
-          <option value="true" selected>True</option>
-          <option value="false">False</option>
-        </select>
+        <select name="eval_deterministic"><option value="true" selected>True</option><option value="false">False</option></select>
       </div>
       <div style="grid-column:1 / -1; display:flex; gap:.5rem; margin-top:.25rem;">
         <button class="btn" type="submit"><i class="fas fa-paper-plane"></i> 学習を開始</button>
@@ -118,5 +69,51 @@
       </div>
       <p class="text-light" style="grid-column:1/-1; margin:0;">未入力項目は既定値（DAG/ENV）を使用します。</p>
     </form>
+  </section>
+
+  <section class="hud-panel">
+    <h2 class="panel-title text-normal"><i class="fas fa-database"></i> モデル履歴（最新順）</h2>
+    {% if history_rows and history_rows|length > 0 %}
+      <div style="overflow:auto;">
+        <table class="mono" style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid #e5e7eb;">
+              <th style="text-align:left; padding:.5rem;">saved_at_utc</th>
+              <th style="text-align:left; padding:.5rem;">dir</th>
+              <th style="text-align:left; padding:.5rem;">timesteps</th>
+              <th style="text-align:left; padding:.5rem;">avg_reward</th>
+              <th style="text-align:left; padding:.5rem;">win_rate</th>
+              <th style="text-align:left; padding:.5rem;">ep_len_mean</th>
+              <th style="text-align:left; padding:.5rem;">run_id</th>
+              <th style="text-align:left; padding:.5rem;">actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in history_rows %}
+              {% set m = r.meta %}
+              <tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:.5rem;">{{ m.saved_at_utc or "-" }}</td>
+                <td style="padding:.5rem;">{{ r.dir }}</td>
+                <td style="padding:.5rem;">{{ m.total_timesteps or "-" }}</td>
+                <td style="padding:.5rem;">{{ (m.evaluation.avg_reward if m.evaluation else "-") }}</td>
+                <td style="padding:.5rem;">{{ (m.evaluation.win_rate if m.evaluation else "-") }}</td>
+                <td style="padding:.5rem;">{{ (m.evaluation.ep_len_mean if m.evaluation else "-") }}</td>
+                <td style="padding:.5rem;">{{ m.airflow_dag_run_id or "-" }}</td>
+                <td style="padding:.5rem;">
+                  <form method="post" action="/api/king/prometheus/promote" style="display:inline;">
+                    <input type="hidden" name="dir" value="{{ r.dir }}" />
+                    <button class="btn btn--ghost" type="submit" title="Set as latest">
+                      <i class="fas fa-star"></i> 最新にする
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p>履歴がありません。</p>
+    {% endif %}
   </section>
 {% endblock %}
