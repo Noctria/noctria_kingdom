@@ -32,24 +32,24 @@ COPY airflow_docker/requirements_extra.txt /requirements_extra.txt
 # pip のノイズ・キャッシュ抑制
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_NO_CACHE_DIR=1
-# TensorFlow等の冗長ログ抑制（必要に応じてcompose側で上書き可）
+# TensorFlow 等の冗長ログ抑制（必要に応じて compose 側で上書き可）
 ENV TF_CPP_MIN_LOG_LEVEL=2
 
 # 依存パッケージをインストール
 # * requirements_* に未記載でも最低限の最適化依存が入るよう fallback を併用
 RUN set -eux; \
-    python -m pip install --upgrade pip setuptools wheel; \
-    pip install --no-cache-dir -r /requirements.txt; \
-    pip install --no-cache-dir -r /requirements_extra.txt || true; \
-    # 旧gymはSB3 2.xでは不要＆警告原因。存在しても削除
-    pip uninstall -y gym || true; \
-    # 必要最低限のRL依存を確保（バージョンはSB3 2.x系を前提）
+    python -m pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /requirements.txt && \
+    pip install --no-cache-dir -r /requirements_extra.txt || true && \
+    # 旧 gym は SB3 2.x では不要（警告の原因）。存在しても削除
+    pip uninstall -y gym || true && \
+    # 必要最低限の RL 依存を明示（SB3 2.x 前提）
     pip install --no-cache-dir \
       "gymnasium>=0.29" \
       "stable-baselines3>=2.2" \
-      "sb3-contrib>=2.2"; \
-    # CPU版 PyTorch（GPU不要な想定。GPUを使うならcompose側で差し替え）
-    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu || true; \
+      "sb3-contrib>=2.2" && \
+    # CPU 版 PyTorch（GPU を使う場合は compose 側で差し替え）
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu || true && \
     pip check || true
 
 # ---------- 環境変数（ランタイムでも上書き可） ----------
@@ -65,9 +65,9 @@ ENV AIRFLOW__CORE__LOAD_EXAMPLES="False"
 # ---------- ディレクトリ作成（実運用はボリュームでマウント想定） ----------
 # * コピーはせず、マウント受け側の空ディレクトリのみ用意
 RUN set -eux; \
-    mkdir -p /opt/airflow/dags; \
-    mkdir -p /opt/airflow/src; \
-    mkdir -p /opt/airflow/logs; \
+    mkdir -p /opt/airflow/dags && \
+    mkdir -p /opt/airflow/src && \
+    mkdir -p /opt/airflow/logs && \
     mkdir -p /opt/airflow/plugins
 
 # 以降は docker-compose 側で:
