@@ -11,9 +11,13 @@ Noctria Kingdom - Plan層 標準特徴量セット・サンプルDataFrame
 ★ 実データ → “標準8列(STANDARD_FEATURE_ORDER)” にそろえるユーティリティも収録
   - align_to_feature_spec(df, required=STANDARD_FEATURE_ORDER)
   - select_standard_8(df)  # 8列に一発で揃えるショートカット
+
+★ 後方互換ラッパ（observation_adapter 対応）
+  - align_to_plan_features(df, required_features=None, ...)
+  - get_plan_feature_order(obs_dim)
 """
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -129,7 +133,7 @@ _SNAKE_RENAMES = {
     "FEDFUNDS_Spike_Flag": "fedfunds_spike_flag",
     "FOMC": "fomc",
     "NFP": "nfp",
-    # すでに snake_case なもの（sp500_close, vix_close など）はそのまま使える
+    # すでに snake_case なもの（sp500_close, vix_close など）はそのまま
 }
 
 
@@ -145,20 +149,6 @@ def align_to_feature_spec(
     2) required で指定した列を補完（不足は fill_value で埋める）
     3) required の順序に並べ替え
     4) required 列のみ数値化（float32）し、NaN/Inf を安全に除去
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        元データ（Plan側の Collector/Features/Analyzer 出力など）。
-    required : Iterable[str] | None
-        欲しい列の集合と順序。None の場合は STANDARD_FEATURE_ORDER（標準8列）。
-    fill_value : float
-        不足列の埋め値、NaN/Inf 除去時の埋め値。
-
-    Returns
-    -------
-    pd.DataFrame
-        required で指定した列だけ・順序通り・float32・数値安全化済みの DataFrame
     """
     work = df.copy()
 
@@ -199,6 +189,72 @@ def select_standard_8(df: pd.DataFrame) -> pd.DataFrame:
     return align_to_feature_spec(df, required=STANDARD_FEATURE_ORDER, fill_value=0.0)
 
 
+# === 後方互換：observation_adapter からの参照関数 ============================
+
+# “標準8列”の後に、よく使う補助指標を優先的に連結した拡張候補。
+# ※ obs_dim が 8 を超える場合の拡張用（必要に応じてここを増減）。
+_FALLBACK_NUMERIC_ORDER: List[str] = [
+    # 市況系
+    "sp500_close", "vix_close",
+    # ニュース/マクロの代表
+    "news_count", "cpiaucsl_value", "fedfunds_value", "unrate_value",
+]
+
+# 文字列・メタ系は除外
+_EXCLUDE_FROM_NUMERIC = {"date", "tag", "strategy"}
+
+
+def get_plan_feature_order(obs_dim: int) -> List[str]:
+    """
+    観測次元に応じて使用する特徴量の順序（snake_case）を返す。
+    - 基本は STANDARD_FEATURE_ORDER（“標準8列”）
+    - 8を超える場合は _FALLBACK_NUMERIC_ORDER から順に拡張
+    - それでも足りなければ PLAN_FEATURE_COLUMNS から数値候補を追加
+    """
+    if obs_dim < 1:
+        raise ValueError(f"obs_dim must be >= 1 (got {obs_dim})")
+
+    base: List[str] = list(STANDARD_FEATURE_ORDER)
+
+    if obs_dim <= len(base):
+        return base[:obs_dim]
+
+    # 追加候補で拡張
+    extended = base + [c for c in _FALLBACK_NUMERIC_ORDER if c not in base]
+    if obs_dim <= len(extended):
+        return extended[:obs_dim]
+
+    # さらに足りなければ、仕様カタログから数値らしいカラムを追加
+    for col in PLAN_FEATURE_COLUMNS:
+        if col in extended or col in _EXCLUDE_FROM_NUMERIC:
+            continue
+        extended.append(col)
+        if len(extended) >= obs_dim:
+            break
+
+    if len(extended) < obs_dim:
+        raise ValueError(
+            f"Requested obs_dim={obs_dim} exceeds available numeric features ({len(extended)}). "
+            f"Consider extending _FALLBACK_NUMERIC_ORDER or PLAN_FEATURE_COLUMNS."
+        )
+
+    return extended[:obs_dim]
+
+
+def align_to_plan_features(
+    df: pd.DataFrame,
+    required_features: Optional[Iterable[str]] = None,
+    **kwargs,
+) -> pd.DataFrame:
+    """
+    後方互換ラッパ：
+    - `align_to_feature_spec` を呼び出し、列名は snake_case ベースで揃える
+    - `required_features` が None の場合は STANDARD_FEATURE_ORDER（標準8列）
+    """
+    req = list(required_features) if required_features is not None else list(STANDARD_FEATURE_ORDER)
+    return align_to_feature_spec(df, required=req, fill_value=float(kwargs.pop("fill_value", 0.0)))
+
+
 # --- ドキュメント出力例（スクリプト実行時） ---
 if __name__ == "__main__":
     print("■ Plan層 標準特徴量セット（仕様）")
@@ -209,3 +265,9 @@ if __name__ == "__main__":
 
     print("\n■ サンプル → 標準8列への整形結果（先頭2行）")
     print(select_standard_8(SAMPLE_PLAN_DF).head(2))
+
+    print("\n■ get_plan_feature_order(6):")
+    print(get_plan_feature_order(6))
+
+    print("\n■ get_plan_feature_order(10):")
+    print(get_plan_feature_order(10))
