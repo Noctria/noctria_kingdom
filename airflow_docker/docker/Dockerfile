@@ -46,6 +46,7 @@ RUN set -eux; \
     ; \
     # CPU版 PyTorch（GPU不要な想定。GPUを使うならcompose側で差し替え）
     pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu || true
+    pip uninstall -y gym || true
 
 # ---------- 環境変数（ランタイムでも上書き可） ----------
 # src の絶対インポートを保証
