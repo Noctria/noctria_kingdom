@@ -124,6 +124,6 @@ flowchart TD
 - [⚔️ DO層 詳細図](diagrams/do_layer.mmd)
 - [🔍 CHECK層 詳細図](diagrams/check_layer.mmd)
 - [♻️ ACT層 詳細図](diagrams/act_layer.mmd)
-```
+```mermaid
 
 > 各 `.mmd` は Mermaid Live Editor または mermaid-cli で SVG/PNG 化して利用できます。
