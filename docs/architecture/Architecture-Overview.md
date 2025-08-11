@@ -117,3 +117,13 @@ flowchart TD
   STATS --> PROM
   STATS --> VERITAS
   ANALYZER --> HERMES
+```
+
+## 6. 層別詳細図
+
+- [🗺️ PLAN層 詳細図](diagrams/plan_layer.mmd)
+- [⚔️ DO層 詳細図](diagrams/do_layer.mmd)
+- [🔍 CHECK層 詳細図](diagrams/check_layer.mmd)
+- [♻️ ACT層 詳細図](diagrams/act_layer.mmd)
+
+> 各 `.mmd` は Mermaid Live Editor または mermaid-cli で SVG/PNG 化して利用できます。
