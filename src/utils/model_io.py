@@ -1,202 +1,359 @@
 # src/utils/model_io.py
-# coding: utf-8
+# -*- coding: utf-8 -*-
 """
-SB3モデルの保存/読込を、安全&一貫した規約で行うユーティリティ。
-- 保存パスに obs_dim を刻む: .../prometheus/obs{obs_dim}/{algo}/model_obs{obs_dim}d_{algo}_{ts}[_{tag}].zip
-- サイドカーのメタ情報: 同名 .meta.json （obs_dim, algo, env情報, git情報 など）
-- "latest" シンボリックリンクを更新（同ディレクトリ内）
-
-使い方（学習コード側）:
-    from pathlib import Path
-    from src.utils.model_io import (
-        infer_obs_dim_from_env, build_model_path, atomic_save_model
-    )
-
-    obs_dim = infer_obs_dim_from_env(env)  # env から推定（無ければ環境変数/8にフォールバック）
-    save_path = build_model_path(
-        base_dir=Path("/opt/airflow/data/models"),  # マウント済みの永続領域
-        project="prometheus",
-        algo=model.__class__.__name__,             # 例: "PPO" / "A2C" / "DQN"
-        obs_dim=obs_dim,
-        tag=run_id_or_trial_id,                    # 任意
-    )
-    atomic_save_model(model, save_path, metadata_extra={"train_params": params})
+モデル保存ユーティリティ
+- build_model_path: 保存先ディレクトリの構築
+- infer_obs_dim_from_env: 環境から観測次元を推定
+- atomic_save_model: SB3モデルのアトミック保存＋メタデータ出力＋latest更新
 """
 
 from __future__ import annotations
+
 import json
+import math
 import os
-import subprocess
+import shutil
+import tempfile
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-def _safe_int(x: Optional[str]) -> Optional[int]:
-    if not x:
-        return None
-    try:
-        return int(str(x).strip())
-    except Exception:
-        return None
+# gymnasium がある前提だが、保険で try
+try:
+    from gymnasium import spaces as gym_spaces  # type: ignore
+except Exception:  # pragma: no cover
+    gym_spaces = None  # type: ignore
 
-def infer_obs_dim_from_env(env: Any = None, *, default: int = 8) -> int:
-    """
-    Env があれば observation_space から、無ければ環境変数から obs_dim を推定。
-    最後の手段として default を返す（標準は8）。
-    """
-    # 1) Env から推定
+# numpy もJSON安全化に使う
+try:
+    import numpy as np
+except Exception:  # pragma: no cover
+    np = None  # type: ignore
+
+
+# ========== JSON セーフ化ユーティリティ ==========
+
+def _finite_to_string(x: float) -> Union[float, str]:
+    """inf/NaN を JSON セーフな文字列に変換（規格準拠）。"""
+    if isinstance(x, float):
+        if math.isnan(x):
+            return "NaN"
+        if math.isinf(x):
+            return "Infinity" if x > 0 else "-Infinity"
+    return x
+
+
+def _np_to_base(obj: Any) -> Any:
+    """numpy 型を素の Python に変換。"""
+    if np is None:
+        return obj
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        # 配列は大きくなる可能性があるため、サイズが大きい場合は要約
+        if obj.size <= 64:
+            return [_finite_to_string(float(v)) if isinstance(v, (float, np.floating)) else _np_to_base(v) for v in obj.tolist()]
+        # 要約（min/max/shape）
+        try:
+            _min = float(np.nanmin(obj))
+            _max = float(np.nanmax(obj))
+        except Exception:
+            _min, _max = None, None
+        return {
+            "summary": True,
+            "shape": list(obj.shape),
+            "dtype": str(obj.dtype),
+            "min": _finite_to_string(_min) if _min is not None else None,
+            "max": _finite_to_string(_max) if _max is not None else None,
+        }
+    return obj
+
+
+def _space_to_spec(space: Any) -> Dict[str, Any]:
+    """Gym/Gymnasium の Space を JSON セーフな辞書へ."""
+    if gym_spaces is None:
+        return {"space": str(space)}
+
+    if isinstance(space, gym_spaces.Box):
+        low = getattr(space, "low", None)
+        high = getattr(space, "high", None)
+        if np is not None:
+            if isinstance(low, np.ndarray):
+                low = _np_to_base(low)
+            if isinstance(high, np.ndarray):
+                high = _np_to_base(high)
+        return {
+            "space": "Box",
+            "shape": list(space.shape),
+            "dtype": str(space.dtype),
+            "low": low,
+            "high": high,
+        }
+    if isinstance(space, gym_spaces.Discrete):
+        return {"space": "Discrete", "n": int(space.n)}
+    if hasattr(gym_spaces, "MultiBinary") and isinstance(space, gym_spaces.MultiBinary):
+        return {"space": "MultiBinary", "n": int(space.n)}
+    if hasattr(gym_spaces, "MultiDiscrete") and isinstance(space, gym_spaces.MultiDiscrete):
+        nvec = getattr(space, "nvec", None)
+        if np is not None and isinstance(nvec, np.ndarray):
+            nvec = [int(v) for v in nvec.tolist()]
+        return {"space": "MultiDiscrete", "nvec": nvec}
+    if isinstance(space, gym_spaces.Dict):
+        return {"space": "Dict", "spaces": {k: _space_to_spec(v) for k, v in space.spaces.items()}}
+    if isinstance(space, gym_spaces.Tuple):
+        return {"space": "Tuple", "spaces": [_space_to_spec(s) for s in space.spaces]}
+    # その他は文字列で
+    return {"space": str(space)}
+
+
+def _to_jsonsafe(obj: Any) -> Any:
+    """さまざまなオブジェクトを JSON セーフへ変換する default callable."""
+    # dataclass
+    if is_dataclass(obj):
+        return asdict(obj)
+
+    # numpy 系
     try:
-        if env is not None and hasattr(env, "observation_space"):
-            shp = getattr(env.observation_space, "shape", None)
-            if shp and len(shp) == 1 and shp[0] > 0:
-                return int(shp[0])
+        if np is not None:
+            if isinstance(obj, np.generic):
+                return obj.item()
+            if isinstance(obj, np.ndarray):
+                return _np_to_base(obj)
     except Exception:
         pass
 
-    # 2) 環境変数から
-    for key in ("NOCTRIA_ENV_OBS_DIM", "PROMETHEUS_OBS_DIM"):
-        v = _safe_int(os.environ.get(key))
-        if v and v > 0:
-            return v
+    # Gym/Gymnasium Space
+    try:
+        if gym_spaces is not None and isinstance(obj, gym_spaces.Space):  # type: ignore
+            return _space_to_spec(obj)
+    except Exception:
+        pass
 
-    return int(default)
+    # Path
+    if isinstance(obj, (Path, )):
+        return str(obj)
 
-def _git_info() -> Dict[str, Optional[str]]:
-    """
-    コンテナ内で /opt/airflow がgitワークツリーならコミットID等を拾う。
-    取れなくてもエラーにはしない。
-    """
-    def _run(cmd):
-        try:
-            out = subprocess.check_output(cmd, cwd="/opt/airflow", text=True, stderr=subprocess.DEVNULL)
-            return out.strip()
-        except Exception:
-            return None
+    # datetime
+    if isinstance(obj, datetime):
+        return obj.isoformat()
 
-    return {
-        "commit": _run(["git", "rev-parse", "HEAD"]),
-        "branch": _run(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
-        "status": _run(["git", "status", "--porcelain"]),
-        "remote": _run(["git", "remote", "get-url", "origin"]),
-    }
+    # 基本型 or 反復可能
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return _finite_to_string(obj) if isinstance(obj, float) else obj
+
+    # dict
+    if isinstance(obj, dict):
+        return {str(k): _to_jsonsafe(v) for k, v in obj.items()}
+
+    # list/tuple/set
+    if isinstance(obj, (list, tuple, set)):
+        return [_to_jsonsafe(v) for v in obj]
+
+    # fallback: 文字列化
+    return str(obj)
+
+
+# ========== パス構築/観測次元推定 ==========
 
 def build_model_path(
-    *,
-    base_dir: Path,
+    base_dir: Union[str, Path],
     project: str,
     algo: str,
     obs_dim: int,
     tag: Optional[str] = None,
-    timestamp: Optional[datetime] = None,
 ) -> Path:
     """
-    保存先パスを組み立てる（まだ作成はしない）。
-    例: /opt/airflow/data/models/prometheus/obs8/PPO/model_obs8d_PPO_20250811_071530_trial123.zip
+    例: /opt/airflow/data/models/prometheus/PPO/obs8/<tag or timestamp>/
     """
-    ts = (timestamp or datetime.now()).strftime("%Y%m%d_%H%M%S")
-    safe_algo = str(algo).upper()
-    parts = [f"model_obs{obs_dim}d_{safe_algo}_{ts}"]
-    if tag:
-        parts.append(str(tag))
-    fname = "_".join(parts) + ".zip"
+    base = Path(base_dir)
+    stamp = tag or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    return base / project / str(algo) / f"obs{obs_dim}" / stamp
 
-    model_dir = base_dir / project / f"obs{obs_dim}" / safe_algo
-    return model_dir / fname
 
-def _write_metadata(meta_path: Path, payload: Dict[str, Any]) -> None:
+def _flatten_obs_dim(space: Any) -> int:
+    """観測空間の一次元サイズを推定。Dictは総和、Boxはshape積。"""
+    if gym_spaces is None:
+        # 最低限のフォールバック
+        shape = getattr(space, "shape", None)
+        if shape:
+            n = 1
+            for s in shape:
+                n *= int(s)
+            return int(n)
+        return int(getattr(space, "n", 0))
+
+    if isinstance(space, gym_spaces.Box):
+        n = 1
+        for s in space.shape:
+            n *= int(s)
+        return int(n)
+    if isinstance(space, gym_spaces.Discrete):
+        return 1
+    if hasattr(gym_spaces, "MultiBinary") and isinstance(space, gym_spaces.MultiBinary):
+        return int(space.n)
+    if hasattr(gym_spaces, "MultiDiscrete") and isinstance(space, gym_spaces.MultiDiscrete):
+        # 各離散次元を one-hot 等と仮定するなら要件に応じて調整
+        # ここでは次元数（長さ）を返す
+        return int(len(space.nvec))
+    if isinstance(space, gym_spaces.Dict):
+        return int(sum(_flatten_obs_dim(s) for s in space.spaces.values()))
+    if isinstance(space, gym_spaces.Tuple):
+        return int(sum(_flatten_obs_dim(s) for s in space.spaces))
+    # fallback
+    shape = getattr(space, "shape", None)
+    if shape:
+        n = 1
+        for s in shape:
+            n *= int(s)
+        return int(n)
+    return int(getattr(space, "n", 0))
+
+
+def infer_obs_dim_from_env(env: Any) -> int:
+    """
+    環境から観測次元を推定。env.observation_space を想定。
+    SB3でVector化される前の生envを渡す想定。
+    """
+    space = getattr(env, "observation_space", None)
+    if space is None:
+        # 一部のEnvは属性名が違う可能性
+        space = getattr(getattr(env, "unwrapped", env), "observation_space", None)
+    if space is None:
+        raise ValueError("env has no observation_space")
+    return _flatten_obs_dim(space)
+
+
+# ========== メタデータ書き込み/アトミック保存 ==========
+
+def _write_metadata(meta_path: Union[str, Path], payload: Dict[str, Any]) -> None:
+    meta_path = Path(meta_path)
     meta_path.parent.mkdir(parents=True, exist_ok=True)
     with meta_path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+        json.dump(payload, f, ensure_ascii=False, indent=2, default=_to_jsonsafe)
 
-def _symlink_latest(target: Path) -> None:
+
+def _safe_symlink_latest(latest_link: Path, target_dir: Path) -> None:
     """
-    同ディレクトリに latest.zip / latest.meta.json のシンボリックリンクを張り直す。
-    Windows ホストでも、コンテナ内（Linux）なら symlink 可能。
-    失敗しても致命ではないので握り潰す。
+    latest シンボリックリンクを更新（失敗したらコピーにフォールバック）
     """
     try:
-        d = target.parent
-        latest_zip = d / "latest.zip"
-        latest_meta = d / "latest.meta.json"
-        for p in (latest_zip, latest_meta):
-            if p.exists() or p.is_symlink():
-                p.unlink(missing_ok=True)
-        # zip
-        latest_zip.symlink_to(target.name)
-        # meta
-        meta = target.with_suffix(".meta.json")
-        if meta.exists():
-            latest_meta.symlink_to(meta.name)
+        if latest_link.exists() or latest_link.is_symlink():
+            try:
+                latest_link.unlink()
+            except Exception:
+                pass
+        latest_link.parent.mkdir(parents=True, exist_ok=True)
+        latest_link.symlink_to(target_dir, target_is_directory=True)
     except Exception:
-        pass
+        # Windows/FS都合でsymlink不可の場合は shallow copy
+        try:
+            if latest_link.exists():
+                shutil.rmtree(latest_link)
+        except Exception:
+            pass
+        try:
+            shutil.copytree(target_dir, latest_link)
+        except Exception:
+            # どうしてもダメなら諦める
+            pass
+
 
 def atomic_save_model(
     model: Any,
-    save_path: Path,
-    *,
+    save_path: Union[str, Path],
     metadata_extra: Optional[Dict[str, Any]] = None,
-    env: Any = None,
-    project: str = "prometheus",
+    env: Optional[Any] = None,
+    project: Optional[str] = None,
 ) -> Path:
     """
-    SB3モデルを安全に保存:
-      1) 一時ファイルに保存 → rename
-      2) 同名 .meta.json を出力
-      3) latest シンボリックリンクを更新
+    SB3モデルを一時ディレクトリに保存 → 最終ディレクトリへアトミック移動。
+    併せて metadata.json を JSON セーフで書き出し、latest を更新する。
 
-    Returns: 実際に保存した ZIP の Path
+    Returns:
+        final_dir (Path): 保存先ディレクトリ
     """
-    save_path = Path(save_path)
-    save_path.parent.mkdir(parents=True, exist_ok=True)
+    save_dir = Path(save_path)
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1) モデル保存（atomicに近い運用: tmp名→rename）
-    tmp_path = save_path.with_suffix(".zip.tmp")
-    if tmp_path.exists():
-        tmp_path.unlink()
-    model.save(str(tmp_path))
-    tmp_path.replace(save_path)
+    # 一時領域
+    tmp_root = save_dir.parent
+    tmp_dir = Path(tempfile.mkdtemp(prefix="model_tmp_", dir=str(tmp_root)))
 
-    # 2) メタ情報
-    obs_dim = infer_obs_dim_from_env(env)
-    meta = {
-        "created_at": datetime.now().isoformat(),
-        "project": project,
-        "algo": getattr(model, "__class__", type("X",(object,),{})).__name__ if model else None,
-        "obs_dim": obs_dim,
-        "env_class": env.__class__.__name__ if env is not None else None,
-        "env_kwargs": getattr(env, "__dict__", None),
-        "git": _git_info(),
-        "file": save_path.name,
-    }
-    if metadata_extra:
-        meta.update(metadata_extra)
+    try:
+        # --- モデル本体保存（SB3は .zip を作る） ---
+        tmp_model_stem = tmp_dir / "model"
+        # SB3: model.save("path_without_ext") → "path_without_ext.zip" を出力
+        if hasattr(model, "save"):
+            model.save(str(tmp_model_stem))
+        else:
+            raise RuntimeError("model has no .save() method compatible with SB3")
 
-    meta_path = save_path.with_suffix(".meta.json")
-    _write_metadata(meta_path, meta)
+        # --- メタ生成（JSON セーフ） ---
+        algo_name = getattr(model, "__class__", type(model)).__name__
+        obs_dim = None
+        env_info: Dict[str, Any] = {}
+        if env is not None:
+            try:
+                obs_dim = infer_obs_dim_from_env(env)
+            except Exception as e:
+                obs_dim = None
+                env_info["obs_dim_error"] = str(e)
 
-    # 3) latest リンク
-    _symlink_latest(save_path)
+            env_info.update({
+                "env_class": f"{env.__class__.__module__}:{env.__class__.__name__}",
+                "observation_space": _to_jsonsafe(getattr(env, "observation_space", None)),
+                "action_space": _to_jsonsafe(getattr(env, "action_space", None)),
+            })
 
-    return save_path
+            # 任意で env 側に config があれば拾う
+            for k in ("config", "kwargs", "params"):
+                if hasattr(env, k):
+                    try:
+                        env_info[k] = _to_jsonsafe(getattr(env, k))
+                    except Exception:
+                        pass
 
-def read_metadata(path: Path) -> Dict[str, Any]:
-    """
-    メタを読む。path は .zip でも .meta.json でも可。
-    """
-    p = Path(path)
-    if p.suffix == ".zip":
-        p = p.with_suffix(".meta.json")
-    with p.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        meta: Dict[str, Any] = {
+            "project": project,
+            "algo": algo_name,
+            "saved_at_utc": datetime.utcnow().isoformat(),
+            "save_dir": str(save_dir),
+            "files": {
+                "model_zip": "model.zip",
+                "metadata": "metadata.json",
+            },
+            "environment": env_info,
+        }
+        if obs_dim is not None:
+            meta["obs_dim"] = int(obs_dim)
+        if metadata_extra:
+            # ユーザ追加情報を上書きマージ
+            meta.update(metadata_extra)
 
-def assert_obs_dim_compatible(path: Path, required_obs_dim: int) -> None:
-    """
-    ロード前の互換チェック。obs_dim が一致しなければ ValueError。
-    """
-    meta = read_metadata(path)
-    have = int(meta.get("obs_dim", -1))
-    if have != int(required_obs_dim):
-        raise ValueError(
-            f"Model obs_dim mismatch: required {required_obs_dim}, but model has {have} "
-            f"({path})"
-        )
+        # --- 最終配置 ---
+        # 1) tmp から final へ model.zip を移動
+        final_model_zip = save_dir / "model.zip"
+        tmp_model_zip = tmp_model_stem.with_suffix(".zip")
+        shutil.move(str(tmp_model_zip), str(final_model_zip))
+
+        # 2) metadata.json を書き込み（JSONセーフ）
+        _write_metadata(save_dir / "metadata.json", meta)
+
+        # 3) latest 更新（<base>/project/<algo>/obsX/latest → save_dir）
+        try:
+            # 推奨パス構造: .../<project>/<algo>/obs<obs_dim>/<tag>/
+            # obs_dim が None の場合も、親から latest を張る
+            latest_link = save_dir.parent / "latest"
+            _safe_symlink_latest(latest_link, save_dir)
+        except Exception:
+            pass
+
+        return save_dir
+
+    finally:
+        # 一時領域クリーンアップ
+        try:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
