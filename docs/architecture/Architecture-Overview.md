@@ -62,7 +62,7 @@ flowchart TD
   end
 
   %% --- PLAN層 ---
-  subgraph PLAN["🗺️ PLAN層"]
+  subgraph PLAN["🗺️ PLAN層 (src/plan_data)"]
     COLLECT["collector.py<br>市場データ収集"]
     FEATURES["features.py<br>特徴量生成"]
     STATS["statistics.py<br>KPI算出"]
@@ -80,21 +80,21 @@ flowchart TD
   end
 
   %% --- DO層 ---
-  subgraph DO["⚔️ Do層"]
+  subgraph DO["⚔️ Do層 (src/execution)"]
     ORDER["order_execution.py<br>発注API"]
     OPTORDER["optimized_order_execution.py<br>最適化発注"]
     GENORDER["generate_order_json.py<br>発注内容JSON化"]
   end
 
   %% --- CHECK層 ---
-  subgraph CHECK["🔍 Check層"]
+  subgraph CHECK["🔍 Check層 (src/check)"]
     MON["challenge_monitor.py<br>損失監視"]
     EVAL["evaluation.py<br>実績評価"]
     LOGS["pdca_logs/*.json<br>結果記録"]
   end
 
   %% --- ACT層 ---
-  subgraph ACT["♻️ Act層"]
+  subgraph ACT["♻️ Act層 (src/pdca & gui routes)"]
     RECHECK["pdca_recheck.py<br>再評価"]
     PUSH["pdca_push.py<br>戦略採用"]
     SUMMARY["pdca_summary.py<br>集計/ダッシュボード"]
@@ -117,13 +117,3 @@ flowchart TD
   STATS --> PROM
   STATS --> VERITAS
   ANALYZER --> HERMES
-
-## 6. 層別詳細図
-
-- [🗺️ PLAN層 詳細図](diagrams/plan_layer.mmd)
-- [⚔️ DO層 詳細図](diagrams/do_layer.mmd)
-- [🔍 CHECK層 詳細図](diagrams/check_layer.mmd)
-- [♻️ ACT層 詳細図](diagrams/act_layer.mmd)
-```
-
-> 各 `.mmd` は Mermaid Live Editor または mermaid-cli で SVG/PNG 化して利用できます。
