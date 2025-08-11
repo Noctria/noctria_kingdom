@@ -9,15 +9,21 @@ from typing import Optional, Dict, Any, Tuple
 class NoctriaFXTradingEnv(gym.Env):
     """
     最小テンプレ（SB3推論・学習兼用）
-    - 観測: 連続 N 次元（既定は 6。SB3保存済みモデル Box(-inf, inf, (6,), float32) に合わせる）
-      * 将来 8 列仕様で再学習する場合は obs_dim=8 に変更（または環境変数で上書き）
-    - 行動: Discrete(3) = {0: SELL, 1: HOLD, 2: BUY}
-    - 報酬: ダミー（手数料控除つきランダム）
-    - エピソード: max_episode_steps 到達で truncated=True
 
-    ヒント:
-      - 既存モデルで推論する時は obs_dim=6 のまま。
-      - 8列(PlanのSTANDARD_FEATURE_ORDER)で新規学習する時は obs_dim=8 にして再学習→保存したモデルも(8,)で固定される。
+    観測:
+      - 連続 N 次元（既定は 6。既存のSB3モデル: Box(-inf, inf, (6,), float32) に合わせる）
+      - 将来 8 列仕様で再学習する場合は obs_dim=8（または環境変数で上書き）
+        環境変数: NOCTRIA_ENV_OBS_DIM または PROMETHEUS_OBS_DIM
+
+    行動:
+      - Discrete(3) = {0: SELL, 1: HOLD, 2: BUY}
+
+    終了条件:
+      - max_episode_steps 到達で truncated=True（terminated はこのテンプレでは常に False）
+
+    備考:
+      - 既存モデルで推論する時は obs_dim=6 のまま
+      - 8列で新規学習→保存したモデルは Box(..., (8,), float32) 固定になる
     """
     metadata = {"render_modes": ["human"]}
 
@@ -32,7 +38,7 @@ class NoctriaFXTradingEnv(gym.Env):
         # 追加: 観測次元（未指定なら環境変数→既定6）
         obs_dim: Optional[int] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         super().__init__()
         self.window = int(window)
         self.fee = float(fee)
@@ -40,22 +46,23 @@ class NoctriaFXTradingEnv(gym.Env):
         self.max_episode_steps = int(max_episode_steps)
         self.render_mode = render_mode
 
-        # 観測次元の決定（環境変数 NOCTRIA_ENV_OBS_DIM / PROMETHEUS_OBS_DIM でも上書き可）
         env_obs_dim = (
             obs_dim
             or _to_int_or_none(os.environ.get("NOCTRIA_ENV_OBS_DIM"))
             or _to_int_or_none(os.environ.get("PROMETHEUS_OBS_DIM"))
             or 6  # 既定は6（現行SB3モデル互換）
         )
-        if env_obs_dim <= 0:
-            raise ValueError(f"obs_dim must be positive, got {env_obs_dim}")
+        if env_obs_dim is None or env_obs_dim <= 0:
+            raise ValueError(f"obs_dim must be positive int, got {env_obs_dim}")
         self.obs_dim = int(env_obs_dim)
 
+        # 観測/行動空間の定義（SB3要件: dtype=float32）
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(self.obs_dim,), dtype=np.float32
         )
         self.action_space = spaces.Discrete(3)  # 0:SELL / 1:HOLD / 2:BUY
 
+        # 乱数生成器
         self._rng = np.random.default_rng(seed)
         self._state = np.zeros(self.obs_dim, dtype=np.float32)
         self._t = 0
@@ -68,15 +75,17 @@ class NoctriaFXTradingEnv(gym.Env):
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
         if seed is not None:
+            # 独自のGeneratorもseedを反映
             self._rng = np.random.default_rng(seed)
 
-        # 常に (obs_dim,) float32
+        # 常に (obs_dim,) float32 を返す
         self._state = self._rng.normal(0, 0.1, size=(self.obs_dim,)).astype(np.float32)
-        self._state = np.nan_to_num(self._state, nan=0.0, posinf=0.0, neginf=0.0)
+        self._state = np.nan_to_num(self._state, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
         self._t = 0
-        return self._state, {}
+        info: Dict[str, Any] = {}
+        return self._state.astype(np.float32, copy=False), info
 
-    def step(self, action: int):
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         assert self.action_space.contains(action), f"invalid action {action}"
 
         # ダミー遷移（数値安定化）
@@ -93,12 +102,15 @@ class NoctriaFXTradingEnv(gym.Env):
         self._t += 1
         terminated = False
         truncated = self._t >= self.max_episode_steps
-        return self._state, reward, terminated, truncated, {}
+        info: Dict[str, Any] = {}
 
-    def render(self):
+        # SB3互換: 観測は必ず float32 の (obs_dim,)
+        return self._state.astype(np.float32, copy=False), reward, terminated, truncated, info
+
+    def render(self) -> None:
         pass
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
