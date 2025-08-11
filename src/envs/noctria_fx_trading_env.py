@@ -8,11 +8,11 @@ from typing import Optional, Dict, Any, Tuple
 
 class NoctriaFXTradingEnv(gym.Env):
     """
-    最小テンプレ（SB3推論・学習兼用）
+    最小テンプレ（SB3 推論・学習兼用）
 
     観測:
-      - 連続 N 次元（既定は 6。既存のSB3モデル: Box(-inf, inf, (6,), float32) に合わせる）
-      - 将来 8 列仕様で再学習する場合は obs_dim=8（または環境変数で上書き）
+      - 連続 N 次元（既定は 8。標準8列仕様に合わせて Box(-inf, inf, (8,), float32)）
+      - 互換運用で既存の6次元SB3モデルを使う場合は、obs_dim=6 か環境変数で上書き
         環境変数: NOCTRIA_ENV_OBS_DIM または PROMETHEUS_OBS_DIM
 
     行動:
@@ -22,7 +22,7 @@ class NoctriaFXTradingEnv(gym.Env):
       - max_episode_steps 到達で truncated=True（terminated はこのテンプレでは常に False）
 
     備考:
-      - 既存モデルで推論する時は obs_dim=6 のまま
+      - レガシー推論（6次元モデル）は obs_dim=6 を明示
       - 8列で新規学習→保存したモデルは Box(..., (8,), float32) 固定になる
     """
     metadata = {"render_modes": ["human"]}
@@ -35,7 +35,7 @@ class NoctriaFXTradingEnv(gym.Env):
         max_episode_steps: int = 200,
         render_mode: Optional[str] = None,
         seed: Optional[int] = None,
-        # 追加: 観測次元（未指定なら環境変数→既定6）
+        # 観測次元（未指定なら環境変数→既定8）
         obs_dim: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
@@ -50,13 +50,13 @@ class NoctriaFXTradingEnv(gym.Env):
             obs_dim
             or _to_int_or_none(os.environ.get("NOCTRIA_ENV_OBS_DIM"))
             or _to_int_or_none(os.environ.get("PROMETHEUS_OBS_DIM"))
-            or 6  # 既定は6（現行SB3モデル互換）
+            or 8  # ★ 既定を8（標準）
         )
         if env_obs_dim is None or env_obs_dim <= 0:
             raise ValueError(f"obs_dim must be positive int, got {env_obs_dim}")
         self.obs_dim = int(env_obs_dim)
 
-        # 観測/行動空間の定義（SB3要件: dtype=float32）
+        # 観測/行動空間（SB3要件: dtype=float32）
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(self.obs_dim,), dtype=np.float32
         )
