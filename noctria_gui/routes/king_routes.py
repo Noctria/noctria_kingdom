@@ -14,7 +14,6 @@ from fastapi.templating import Jinja2Templates
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, LOGS_DIR
 from src.core.king_noctria import KingNoctria
 
-from datetime import datetime
 from pathlib import Path
 import os
 import json
@@ -33,6 +32,7 @@ KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"
 logger = logging.getLogger("king_routes")
 
 # ====== Airflow REST API 設定（.env で上書き可） ======
+# どちらのENV名でもOK：AIRFLOW_API_BASE or AIRFLOW_BASE_URL
 AIRFLOW_BASE_URL = os.getenv("AIRFLOW_API_BASE", os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"))
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
@@ -48,6 +48,40 @@ MODELS_DIR = Path(os.getenv("NOCTRIA_MODELS_ROOT", str(_DATA_DIR / "models")))
 PROJECT = "prometheus"
 ALGO = "PPO"
 OBS_DIM = 8
+
+# ====== プリセット（GUIで選択可能） ======
+PRESETS: Dict[str, Dict[str, Any]] = {
+    "fast": {
+        "TOTAL_TIMESTEPS": 5000,
+        "learning_rate": 3e-4,
+        "n_steps": 1024,
+        "batch_size": 256,
+        "gamma": 0.99,
+    },
+    "balanced": {
+        "TOTAL_TIMESTEPS": 20000,
+        "learning_rate": 3e-4,
+        "n_steps": 2048,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "gamma": 0.99,
+        "gae_lambda": 0.95,
+        "clip_range": 0.2,
+    },
+    "thorough": {
+        "TOTAL_TIMESTEPS": 100000,
+        "learning_rate": 2.5e-4,
+        "n_steps": 4096,
+        "batch_size": 512,
+        "n_epochs": 20,
+        "gamma": 0.999,
+        "gae_lambda": 0.95,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "max_grad_norm": 0.5,
+        "clip_range": 0.2,
+    },
+}
 
 # ----------------------------------------
 # 既存：ログ/王コマンド
@@ -217,6 +251,10 @@ async def king_prometheus_dashboard(request: Request):
 @router.post("/prometheus/train", response_class=HTMLResponse)
 async def king_prometheus_train(
     request: Request,
+    # ▼ 追加: プリセット＆履歴からの再学習
+    preset: Optional[str] = Form(default=None),
+    from_dir: Optional[str] = Form(default=None),
+    # ▼ 既存ハイパラ（任意）
     TOTAL_TIMESTEPS: Optional[str] = Form(default=None),
     learning_rate: Optional[str] = Form(default=None),
     n_steps: Optional[str] = Form(default=None),
@@ -234,6 +272,27 @@ async def king_prometheus_train(
     eval_deterministic: Optional[str] = Form(default="true"),
 ):
     conf: Dict[str, Any] = {}
+
+    # 1) プリセット
+    if preset and preset in PRESETS:
+        conf.update(PRESETS[preset])
+
+    # 2) 履歴のメタ流用（ppo_hyperparams + total_timesteps）
+    if from_dir:
+        p = Path(from_dir)
+        mp = p / "metadata.json"
+        try:
+            if mp.exists():
+                m = json.loads(mp.read_text(encoding="utf-8"))
+                hp = m.get("ppo_hyperparams", {}) or {}
+                if isinstance(hp, dict):
+                    conf.update(hp)
+                if "total_timesteps" in m:
+                    conf["TOTAL_TIMESTEPS"] = m["total_timesteps"]
+        except Exception as e:
+            logger.warning(f"load meta from {from_dir} failed: {e}")
+
+    # 3) 画面入力（最優先で上書き）
     if (v := _maybe_cast(TOTAL_TIMESTEPS, int)) is not None: conf["TOTAL_TIMESTEPS"] = v
     if (v := _maybe_cast(learning_rate, float)) is not None: conf["learning_rate"] = v
     if (v := _maybe_cast(n_steps, int)) is not None: conf["n_steps"] = v
