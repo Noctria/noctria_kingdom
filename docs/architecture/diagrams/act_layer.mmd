@@ -1,0 +1,51 @@
+%% ACT層 詳細図（再評価・採用・サマリー・フィードバック）
+flowchart TD
+
+  %% 入力（Check/Plan/GUI）
+  subgraph INPUTS["上流入力"]
+    KPI["kpi_summary.json\n(from CHECK)"]
+    ECONF["eval_config.json\n(評価対象/期間/指標)"]
+    GUIACT["GUI: /pdca/act\n(人手による採否/閾値調整)"]
+  end
+
+  %% ACT層
+  subgraph ACT["♻️ Act層 (src/noctria_gui/routes & src/pdca)"]
+    RECHECK["pdca_recheck.py\n・戦略再評価\n・パラメータ再探索(Optuna)\n・A/B比較"]
+    PUSH["pdca_push.py\n・採用/リリース\n・ GitHub Push + Tag\n・ バージョン管理"]
+    SUMMARY["pdca_summary.py\n・期間別/タグ別の要約\n・ダッシュボード素材生成"]
+    FEEDBACK["feedback_adapter.py\n・Plan層への戻し\n(特徴量/閾値/銘柄/期間の更新)"]
+  end
+
+  %% 追加: 学習・再訓練
+  subgraph TRAIN["学習/再訓練 (Airflow)"]
+    TRAINPO["train_prometheus_obs8\nDAG: 学習/検証"]
+    MODELS["/models/prometheus/*\n保存/ロード"]
+  end
+
+  %% 出力（Plan/Do/GUI）
+  subgraph OUTPUTS["下流出力 (to PLAN/DO/GUI)"]
+    PLANUPD["plan_update.json\n(特徴量/閾値の調整案)"]
+    STRATREL["strategy_release.json\n(採用バージョン/設定)"]
+    DASH["dashboard_feed.json\n(可視化用サマリー)"]
+  end
+
+  %% 統治
+  subgraph ORCH["統治/運用"]
+    DAGACT["Airflow DAG: pdca_act_flow.py\n(再評価/採用の自動化)"]
+    GUIROUTE["GUI: /pdca/summary / /pdca/recheck\n(承認・閲覧)"]
+  end
+
+  %% フロー
+  KPI --> RECHECK
+  ECONF --> RECHECK
+  GUIACT --> RECHECK
+  RECHECK --> SUMMARY
+  RECHECK --> PUSH
+  RECHECK -. 学習データ .-> TRAINPO
+  TRAINPO --> MODELS
+  PUSH --> STRATREL
+  SUMMARY --> DASH
+  FEEDBACK --> PLANUPD
+
+  %% フィードバック
+  OUTPUTS -->|Plan層の更新| FEEDBACK
