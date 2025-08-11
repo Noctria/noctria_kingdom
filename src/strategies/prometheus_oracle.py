@@ -10,6 +10,7 @@
 - __init__ でモデルをロードしない（遅延ロード）
 - 既定は SB3 の latest/model.zip を自動検出。無ければ Keras にフォールバック
 - backend 不一致のAPI呼び出しは落とさず安全にダミー/HOLDを返す
+- TensorFlow / SB3 は「必要になった時だけ」import（Gunicorn起動を軽量化）
 """
 
 from __future__ import annotations
@@ -25,18 +26,11 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Optional deps
-try:
-    import tensorflow as tf  # type: ignore
-except Exception:
-    tf = None  # type: ignore
+# ===== Optional deps（遅延importのためダミーを用意） =====
+tf = None          # type: ignore  # TensorFlow: 遅延import
+PPO = None         # type: ignore  # SB3: 遅延import
 
-try:
-    from stable_baselines3 import PPO  # type: ignore
-except Exception:
-    PPO = None  # type: ignore
-
-# gymnasium 推奨（無ければ None）
+# gymnasium は比較的軽量なのでそのまま（無ければ None）
 try:
     import gymnasium as gym  # type: ignore
 except Exception:
@@ -110,6 +104,31 @@ def _safe_json(v: Path) -> Dict[str, Any]:
     return {}
 
 
+def _ensure_tf():
+    """TensorFlow を必要な時だけ import"""
+    global tf
+    if tf is None:
+        os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # INFO抑制
+        try:
+            import tensorflow as _tf  # type: ignore
+        except Exception as e:
+            raise ImportError(f"TensorFlow の import に失敗: {e}")
+        tf = _tf
+    return tf
+
+
+def _ensure_sb3():
+    """stable-baselines3(PPO) を必要な時だけ import"""
+    global PPO
+    if PPO is None:
+        try:
+            from stable_baselines3 import PPO as _PPO  # type: ignore
+        except Exception as e:
+            raise ImportError(f"stable-baselines3 の import に失敗: {e}")
+        PPO = _PPO
+    return PPO
+
+
 class PrometheusOracle:
     """
     - Keras: DataFrame → 連続値予測
@@ -131,7 +150,7 @@ class PrometheusOracle:
         self.lazy = bool(lazy)
         self.deterministic = bool(deterministic)
 
-        # 既定は SB3 latest → 無ければ keras にフォールバック（ロードはしない）
+        # 既定は SB3 latest → 無ければ Keras（ロードはしない）
         if model_path:
             self.model_path = Path(model_path)
             self.backend = self._infer_backend(self.model_path)
@@ -170,20 +189,21 @@ class PrometheusOracle:
         be = self._infer_backend(p)
 
         if be == "sb3":
-            if PPO is None:
-                raise ImportError("stable-baselines3 が見つかりません（SB3モデル読込に必要）")
+            PPO_cls = _ensure_sb3()
             log.info("神託モデル読込(SB3): %s", p)
-            self.model = PPO.load(str(p), device="cpu")
+            self.model = PPO_cls.load(str(p), device="cpu")
             self.backend = "sb3"
         else:
-            if tf is None:
-                raise ImportError("TensorFlow が見つかりません（Kerasモデル読込に必要）")
+            tf_mod = _ensure_tf()
             log.info("神託モデル読込(Keras): %s", p)
-            self.model = tf.keras.models.load_model(p)
+            self.model = tf_mod.keras.models.load_model(p)
             self.backend = "keras"
 
         # メタデータ（SB3のみ期待。Kerasは任意）
-        meta_path = p.parent / "metadata.json" if be == "sb3" else (p.parent / "metadata.json" if p.is_dir() else p.with_name("metadata.json"))
+        if be == "sb3":
+            meta_path = p.parent / "metadata.json"
+        else:
+            meta_path = p.parent / "metadata.json" if p.is_dir() else p.with_name("metadata.json")
         self._meta = _safe_json(meta_path)
         self._loaded_path = p
         return self
