@@ -3,8 +3,13 @@
 
 """
 🔮 Prometheus Oracle (推論専用 / 二刀流)
-- Keras モデル(.keras/.h5/SavedModel): DataFrame からの将来予測 (predict_future)
-- SB3 モデル(.zip): 環境1ステップの推論で売買シグナル (decide)
+- Keras (.keras/.h5/SavedModel): DataFrame からの将来予測 (predict_future)
+- SB3   (.zip)                 : 環境1ステップの推論で売買シグナル (decide)
+
+変更点:
+- __init__ でモデルをロードしない（遅延ロード）
+- 既定は SB3 の latest/model.zip を自動検出。無ければ Keras にフォールバック
+- backend 不一致のAPI呼び出しは落とさず安全にダミー/HOLDを返す
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from typing import Optional, List, Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
+from datetime import datetime, timedelta
 
 # Optional deps
 try:
@@ -30,25 +36,22 @@ try:
 except Exception:
     PPO = None  # type: ignore
 
+# gymnasium 推奨（無ければ None）
 try:
     import gymnasium as gym  # type: ignore
 except Exception:
     gym = None  # type: ignore
 
-from datetime import datetime, timedelta
-
-from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON
+from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON, DATA_DIR
 from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
+if not log.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 
 def _import_from_module_class(spec: str):
-    """
-    "pkg.mod:ClassName" を import して Class を返す。
-    例: "src.envs.noctria_fx_trading_env:NoctriaFXTradingEnv"
-    """
+    """'pkg.mod:ClassName' を import して Class を返す。"""
     if ":" not in spec:
         raise ValueError(f"Invalid module:Class spec: {spec}")
     mod, cls = spec.split(":", 1)
@@ -56,64 +59,151 @@ def _import_from_module_class(spec: str):
     return getattr(m, cls)
 
 
+# ===== SB3 既定パス解決（data/models/prometheus/PPO/obs8/latest/model.zip） =====
+def _sb3_models_root() -> Path:
+    return Path(DATA_DIR) / "models" / "prometheus" / "PPO" / "obs8"
+
+
+def _resolve_latest_dir(base: Path) -> Optional[Path]:
+    """latest シンボリックリンク → 実体。無ければ mtime 降順で最新を返す。"""
+    if not base.exists():
+        return None
+    latest = base / "latest"
+    if latest.exists():
+        try:
+            return latest.resolve()
+        except Exception:
+            pass
+    cands = [p for p in base.iterdir() if p.is_dir() and p.name != "latest"]
+    if not cands:
+        return None
+    return sorted(cands, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
+
+def _autodetect_default_model() -> Tuple[Optional[Path], Optional[str]]:
+    """
+    既定モデルの自動検出:
+      1) SB3: data/models/prometheus/PPO/obs8/latest/model.zip
+      2) Keras: VERITAS_MODELS_DIR/prometheus_oracle.keras
+    戻り値: (path, backend) / (None, None)
+    """
+    # SB3
+    sb3_root = _sb3_models_root()
+    latest = _resolve_latest_dir(sb3_root)
+    if latest:
+        z = latest / "model.zip"
+        if z.exists():
+            return z, "sb3"
+    # Keras fallback
+    keras_path = Path(VERITAS_MODELS_DIR) / "prometheus_oracle.keras"
+    if keras_path.exists():
+        return keras_path, "keras"
+    return None, None
+
+
+def _safe_json(v: Path) -> Dict[str, Any]:
+    try:
+        if v.exists():
+            return json.loads(v.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning("metadata.json 読み込み失敗: %s", e)
+    return {}
+
+
 class PrometheusOracle:
     """
-    - Keras: DataFrame → 連続値予測（既存仕様）
-    - SB3  : env 1ステップ推論 → "BUY"/"SELL"/"HOLD"
+    - Keras: DataFrame → 連続値予測
+    - SB3  : Env 1ステップ推論 → {BUY, SELL, HOLD}
+    備考:
+      * lazy=True なら初回利用時にロード
+      * model_path に .zip を渡せば SB3、.keras/.h5/dir を渡せば Keras と判定
+      * 未配置でもアプリを落とさない（API側で安全にハンドリング）
     """
 
     def __init__(
         self,
         model_path: Optional[Path | str] = None,
         feature_order: Optional[List[str]] = None,
+        lazy: bool = True,
+        deterministic: bool = True,
     ):
         self.feature_order = feature_order or STANDARD_FEATURE_ORDER
-        default_path = VERITAS_MODELS_DIR / "prometheus_oracle.keras"
-        self.model_path: Path = Path(model_path) if model_path else default_path  # ← strでもOK
-        self.backend: str = ""  # "keras" | "sb3"
-        self.model: Any = self._load_model(self.model_path)
+        self.lazy = bool(lazy)
+        self.deterministic = bool(deterministic)
 
-    # ---------- Loaders ----------
-    def _load_model(self, p: Path) -> Any:
-        if not p.exists():
-            raise FileNotFoundError(f"モデルが存在しません: {p}")
+        # 既定は SB3 latest → 無ければ keras にフォールバック（ロードはしない）
+        if model_path:
+            self.model_path = Path(model_path)
+            self.backend = self._infer_backend(self.model_path)
+        else:
+            autod, be = _autodetect_default_model()
+            self.model_path = autod
+            self.backend = be or ""  # "", "sb3", "keras"
 
-        suffix = p.suffix.lower()
+        self.model: Any = None  # 遅延ロード
+        self._meta: Dict[str, Any] = {}
+        self._loaded_path: Optional[Path] = None
 
-        # SB3 (.zip)
-        if suffix == ".zip":
+        # 即ロードが必要ならここで
+        if not self.lazy and self.model_path:
+            self.load()
+
+    # ---------- Backend 判定 ----------
+    @staticmethod
+    def _infer_backend(p: Path) -> str:
+        s = p.suffix.lower()
+        if s == ".zip":
+            return "sb3"
+        # ディレクトリ or keras/h5 は Keras 想定
+        return "keras"
+
+    # ---------- ロード ----------
+    def load(self) -> "PrometheusOracle":
+        if self.model_path is None:
+            # 再度自動検出を試みる
+            autod, be = _autodetect_default_model()
+            self.model_path, self.backend = autod, (be or "")
+            if self.model_path is None:
+                raise FileNotFoundError("既定モデルが見つかりません（SB3 latest も Keras も不在）")
+
+        p = self.model_path
+        be = self._infer_backend(p)
+
+        if be == "sb3":
             if PPO is None:
-                raise RuntimeError("stable-baselines3 が見つかりません（SB3モデル読込に必要）")
+                raise ImportError("stable-baselines3 が見つかりません（SB3モデル読込に必要）")
             log.info("神託モデル読込(SB3): %s", p)
-            try:
-                # device は CPU 固定（推論のみ）
-                model = PPO.load(str(p), device="cpu")
-            except Exception as e:
-                log.error("SB3モデル読込失敗: %s", e)
-                raise
+            self.model = PPO.load(str(p), device="cpu")
             self.backend = "sb3"
-            return model
+        else:
+            if tf is None:
+                raise ImportError("TensorFlow が見つかりません（Kerasモデル読込に必要）")
+            log.info("神託モデル読込(Keras): %s", p)
+            self.model = tf.keras.models.load_model(p)
+            self.backend = "keras"
 
-        # それ以外は Keras 想定（.keras/.h5/ディレクトリSavedModelなど）
-        if tf is None:
-            raise RuntimeError("TensorFlow が見つかりません（Kerasモデル読込に必要）")
-        log.info("神託モデル読込(Keras): %s", p)
+        # メタデータ（SB3のみ期待。Kerasは任意）
+        meta_path = p.parent / "metadata.json" if be == "sb3" else (p.parent / "metadata.json" if p.is_dir() else p.with_name("metadata.json"))
+        self._meta = _safe_json(meta_path)
+        self._loaded_path = p
+        return self
+
+    def _ensure_loaded(self) -> bool:
+        if self.model is not None:
+            return True
         try:
-            model = tf.keras.models.load_model(p)
+            self.load()
+            return True
         except Exception as e:
-            log.error("Kerasモデル読込失敗: %s", e)
-            raise
-        self.backend = "keras"
-        return model
+            log.warning("PrometheusOracle: モデルロードに失敗しました（遅延ロード）。理由: %s", e)
+            return False
 
-    # ---------- Preprocess for Keras ----------
+    # ---------- Keras 前処理 ----------
     def _align_and_clean(self, df: pd.DataFrame) -> pd.DataFrame:
         work = df.copy()
-
         for col in self.feature_order:
             if col not in work.columns:
                 work[col] = 0.0
-
         work[self.feature_order] = (
             work[self.feature_order]
             .apply(pd.to_numeric, errors="coerce")
@@ -135,7 +225,8 @@ class PrometheusOracle:
         reason: Optional[str] = None,
     ) -> pd.DataFrame:
         if self.backend != "keras":
-            log.warning("predict_future は Keras バックエンド専用です（現在: %s）。ダミーを返します。", self.backend)
+            # Keras じゃない時は落とさずダミー返却
+            log.warning("predict_future は Keras 専用です（現在: %s）。ダミーを返します。", self.backend or "(none)")
             return pd.DataFrame({
                 "date": [str(datetime.today())[:10]],
                 "forecast": [np.nan],
@@ -143,12 +234,22 @@ class PrometheusOracle:
                 "upper": [np.nan],
                 "decision_id": [decision_id],
                 "caller": [caller],
-                "reason": [f"backend={self.backend} is not keras"],
+                "reason": [f"backend={self.backend or 'none'} is not keras"],
+            })
+
+        if not self._ensure_loaded():
+            return pd.DataFrame({
+                "date": [str(datetime.today())[:10]],
+                "forecast": [np.nan],
+                "lower": [np.nan],
+                "upper": [np.nan],
+                "decision_id": [decision_id],
+                "caller": [caller],
+                "reason": ["keras model load failed"],
             })
 
         clean = self._align_and_clean(features_df)
         n = min(n_days, len(clean))
-
         if n == 0:
             log.warning("predict_future: 入力行が0のためダミー行を返します。")
             return pd.DataFrame({
@@ -162,7 +263,7 @@ class PrometheusOracle:
             })
 
         df_input = clean.tail(n)
-        y_pred = self.model.predict(df_input.values, verbose=0).astype(np.float32).flatten()
+        y_pred = np.asarray(self.model.predict(df_input.values, verbose=0)).astype(np.float32).flatten()
 
         if len(y_pred) > 1 and not np.allclose(np.std(y_pred), 0.0):
             confidence_margin = float(np.std(y_pred) * 1.5)
@@ -210,11 +311,13 @@ class PrometheusOracle:
         """
         "BUY" | "SELL" | "HOLD" を返す。
         - backend=sb3 のときのみ環境1ステップで推論
-        - backend=keras のときは、ドメイン結線が未定のため安全に "HOLD"
+        - backend=keras のときは安全に "HOLD"
         """
-        if self.backend == "sb3":
-            return self._decide_with_sb3()
-        return "HOLD"
+        if self.backend != "sb3":
+            return "HOLD"
+        if not self._ensure_loaded():
+            return "HOLD"
+        return self._decide_with_sb3()
 
     def _decide_with_sb3(self) -> str:
         if gym is None:
@@ -269,8 +372,12 @@ class PrometheusOracle:
 
         # --- 推論 ---
         try:
-            obs, _ = env.reset(seed=42)
-            action, _ = self.model.predict(obs, deterministic=True)
+            reset_out = env.reset(seed=42)
+            if isinstance(reset_out, tuple) and len(reset_out) == 2:
+                obs, _info = reset_out
+            else:
+                obs = reset_out
+            action, _ = self.model.predict(obs, deterministic=self.deterministic)
         except Exception as e:
             log.warning("SB3推論に失敗。HOLDを返します。理由: %s", e)
             try:
@@ -306,3 +413,32 @@ class PrometheusOracle:
         except Exception:
             pass
         return "HOLD"
+
+    # ---------- 補助 ----------
+    def status(self) -> Dict[str, Any]:
+        """GUI/デバッグ用"""
+        root = str(_sb3_models_root())
+        latest_dir = None
+        ld = _resolve_latest_dir(Path(root))
+        if ld:
+            latest_dir = str(ld)
+        return {
+            "backend": self.backend or "(none)",
+            "ready": self.model is not None,
+            "model_path": str(self._loaded_path or self.model_path) if (self._loaded_path or self.model_path) else None,
+            "sb3_root": root,
+            "latest_dir": latest_dir,
+            "meta": self._meta,
+        }
+
+    def reload(self) -> "PrometheusOracle":
+        """latest を再解決して再ロード（SB3ユーザ向け）"""
+        self.model = None
+        self._meta = {}
+        self._loaded_path = None
+        # 最新を取り直す
+        autod, be = _autodetect_default_model()
+        if autod:
+            self.model_path = autod
+            self.backend = be or self.backend
+        return self.load()
