@@ -26,7 +26,8 @@
       {"href": "/trigger", "icon": "fas fa-gavel", "text": "王命発令"},
       {"href": "/act-history", "icon": "fas fa-file-alt", "text": "Act履歴"},
       {"href": "/push_history", "icon": "fas fa-upload", "text": "Push履歴"},
-      {"href": "/statistics", "icon": "fas fa-chart-bar", "text": "統計ダッシュボード"}
+      {"href": "/statistics", "icon": "fas fa-chart-bar", "text": "統計ダッシュボード"},
+      {"href": "/api/king/prometheus", "icon": "fas fa-flask", "text": "Prometheus学習"}
     ] %}
     {% for item in nav_items %}
       <a href="{{ item.href }}" class="hud-link">
@@ -47,6 +48,52 @@
       </p>
     </div>
   </div>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title text-normal"><i class="fas fa-rocket"></i> Prometheus クイック学習</h2>
+  <p class="text-light" style="margin-bottom: .75rem;">
+    ここから直接、Airflow の <code>train_prometheus_obs8</code> をトリガーします。詳細設定や最新モデルの評価は
+    <a href="/api/king/prometheus">Prometheus専用ダッシュボード</a> へ。
+  </p>
+  <form method="post" action="/api/king/prometheus/train" style="display:grid; gap:.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+    <div>
+      <label for="tt" class="text-light">TOTAL_TIMESTEPS</label>
+      <input id="tt" name="TOTAL_TIMESTEPS" type="number" placeholder="10000" />
+    </div>
+    <div>
+      <label class="text-light">learning_rate</label>
+      <input name="learning_rate" type="text" placeholder="0.0003" />
+    </div>
+    <div>
+      <label class="text-light">n_steps</label>
+      <input name="n_steps" type="number" placeholder="2048" />
+    </div>
+    <div>
+      <label class="text-light">batch_size</label>
+      <input name="batch_size" type="number" placeholder="256" />
+    </div>
+    <div>
+      <label class="text-light">gamma</label>
+      <input name="gamma" type="text" placeholder="0.99" />
+    </div>
+    <div>
+      <label class="text-light">eval_n_episodes</label>
+      <input name="eval_n_episodes" type="number" placeholder="5" />
+    </div>
+    <div>
+      <label class="text-light">eval_deterministic</label>
+      <select name="eval_deterministic">
+        <option value="true" selected>True</option>
+        <option value="false">False</option>
+      </select>
+    </div>
+    <div style="grid-column: 1 / -1; display:flex; gap:.5rem; margin-top:.25rem;">
+      <button class="btn" type="submit"><i class="fas fa-paper-plane"></i> 学習を開始</button>
+      <a class="btn btn--ghost" href="/api/king/prometheus"><i class="fas fa-external-link-alt"></i> 専用ダッシュボードへ</a>
+    </div>
+    <p class="text-light" style="grid-column:1/-1; margin:0;">未入力項目は既定値（DAG/ENV）を使用します。</p>
+  </form>
 </section>
 
 <section class="hud-panel">
