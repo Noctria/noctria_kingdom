@@ -19,8 +19,8 @@ then evaluate N episodes and stamp results into metadata.json.
 - clip_range_vf (float)   # SB3>=2.0
 - seed (int)
 
-- eval_n_episodes (int, default: 5)
-- eval_deterministic (bool or "true"/"false", default: true)
+- eval_n_episodes (int, default: ENV EVAL_N_EPISODES or 5)
+- eval_deterministic (bool or "true"/"false", default: ENV EVAL_DETERMINISTIC or true)
 """
 
 from __future__ import annotations
@@ -87,6 +87,12 @@ with DAG(
 ) as dag:
 
     def train_and_save_model(**context) -> str:
+        """
+        - Build env
+        - Train PPO with kwargs from conf
+        - Save model + metadata (includes: total_timesteps, airflow_dag_run_id, ppo_hyperparams)
+        - Return save_dir (as str) via XCom
+        """
         # delayed imports
         from src.utils.model_io import (
             infer_obs_dim_from_env,
@@ -127,7 +133,7 @@ with DAG(
                 tag=context.get("run_id"),
             )
             meta_extra = {
-                "total_timesteps": total_timesteps,
+                "total_timesteps": int(total_timesteps),
                 "airflow_dag_run_id": context.get("run_id"),
                 "ppo_hyperparams": ppo_kwargs,
             }
@@ -150,8 +156,11 @@ with DAG(
     def evaluate_and_stamp(**context) -> None:
         """
         Load saved model, evaluate N episodes, and update metadata.json.
+        - eval_n_episodes: from conf or ENV EVAL_N_EPISODES or 5
+        - eval_deterministic: from conf or ENV EVAL_DETERMINISTIC or True
         """
         from stable_baselines3 import PPO
+        import numpy as np
 
         # pull model dir from XCom (train task return)
         ti = context["ti"]
@@ -163,10 +172,16 @@ with DAG(
         meta_path = Path(model_dir) / "metadata.json"
         model_zip = Path(model_dir) / "model.zip"
 
-        # read conf
+        # read conf (with ENV fallback)
         conf: Dict[str, Any] = (context.get("dag_run").conf or {}) if context else {}
-        n_episodes = _safe_get(conf, "eval_n_episodes", int, 5)
-        deterministic = _safe_get(conf, "eval_deterministic", bool, True)
+        n_episodes = _safe_get(
+            conf, "eval_n_episodes", int, int(os.environ.get("EVAL_N_EPISODES", 5))
+        )
+        deterministic = _safe_get(
+            conf, "eval_deterministic", bool, os.environ.get("EVAL_DETERMINISTIC", "true")
+        )
+        if isinstance(deterministic, str):
+            deterministic = deterministic.strip().lower() in ("1", "true", "yes", "y", "on")
 
         # rebuild Env with same kwargs
         prom_env = os.environ.get("PROMETHEUS_ENV")
@@ -178,8 +193,6 @@ with DAG(
 
         env = EnvCls(**env_kwargs)
         model = PPO.load(str(model_zip))
-
-        import numpy as np
 
         ep_rewards = []
         ep_lengths = []
@@ -201,13 +214,13 @@ with DAG(
             return out
 
         try:
-            for ep in range(int(n_episodes)):
+            for _ in range(int(n_episodes)):
                 obs = _reset(env)
                 done = False
                 total = 0.0
                 steps = 0
                 while not done:
-                    action, _ = model.predict(obs, deterministic=deterministic)
+                    action, _ = model.predict(obs, deterministic=bool(deterministic))
                     obs, rew, done, _info = _step(env, action)
                     total += float(rew)
                     steps += 1
@@ -221,7 +234,10 @@ with DAG(
             ep_len_mean = float(np.mean(ep_lengths)) if ep_lengths else 0.0
             win_rate = float(wins) / max(1, len(ep_rewards))
 
-            print(f"[eval] episodes={n_episodes} avg={avg:.4f} std={std:.4f} win_rate={win_rate:.3f} len={ep_len_mean:.1f}")
+            print(
+                f"[eval] episodes={n_episodes} "
+                f"avg={avg:.4f} std={std:.4f} win_rate={win_rate:.3f} len={ep_len_mean:.1f}"
+            )
 
             # update metadata.json
             meta = {}
@@ -229,13 +245,13 @@ with DAG(
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta.setdefault("evaluation", {})
             meta["evaluation"].update({
-                "evaluated_at_utc": datetime.utcnow().isoformat(),
+                "evaluated_at_utc": datetime.utcnow().isoformat(timespec="seconds"),
                 "n_episodes": int(n_episodes),
                 "deterministic": bool(deterministic),
-                "avg_reward": avg,
-                "std_reward": std,
-                "win_rate": win_rate,
-                "ep_len_mean": ep_len_mean,
+                "avg_reward": float(avg),
+                "std_reward": float(std),
+                "win_rate": float(win_rate),
+                "ep_len_mean": float(ep_len_mean),
             })
             meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"[OK] stamped evaluation into: {meta_path}")
@@ -249,13 +265,12 @@ with DAG(
     train_task = PythonOperator(
         task_id="train_and_save_model",
         python_callable=train_and_save_model,
-        provide_context=True,
+        # Airflow 2系は関数が **kwargs を受け取れば自動で context を渡す。provide_context は不要。
     )
 
     eval_task = PythonOperator(
         task_id="evaluate_and_stamp",
         python_callable=evaluate_and_stamp,
-        provide_context=True,
     )
 
     train_task >> eval_task
