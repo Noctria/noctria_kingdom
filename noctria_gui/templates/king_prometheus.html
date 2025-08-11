@@ -45,6 +45,17 @@
     <h2 class="panel-title text-normal"><i class="fas fa-rocket"></i> 学習をトリガー</h2>
     <form method="post" action="/api/king/prometheus/train"
           style="display:grid; gap:.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <!-- プリセット -->
+      <div>
+        <label class="text-light">preset</label>
+        <select name="preset">
+          <option value="" selected>— なし —</option>
+          <option value="fast">fast</option>
+          <option value="balanced">balanced</option>
+          <option value="thorough">thorough</option>
+        </select>
+      </div>
+
       <div><label class="text-light">TOTAL_TIMESTEPS</label><input name="TOTAL_TIMESTEPS" type="number" placeholder="10000" /></div>
       <div><label class="text-light">learning_rate</label><input name="learning_rate" type="text" placeholder="0.0003" /></div>
       <div><label class="text-light">n_steps</label><input name="n_steps" type="number" placeholder="2048" /></div>
@@ -100,10 +111,18 @@
                 <td style="padding:.5rem;">{{ (m.evaluation.ep_len_mean if m.evaluation else "-") }}</td>
                 <td style="padding:.5rem;">{{ m.airflow_dag_run_id or "-" }}</td>
                 <td style="padding:.5rem;">
+                  <!-- 最新にする -->
                   <form method="post" action="/api/king/prometheus/promote" style="display:inline;">
                     <input type="hidden" name="dir" value="{{ r.dir }}" />
                     <button class="btn btn--ghost" type="submit" title="Set as latest">
                       <i class="fas fa-star"></i> 最新にする
+                    </button>
+                  </form>
+                  <!-- 同ハイパラで再学習（ppo_hyperparams + total_timesteps を継承） -->
+                  <form method="post" action="/api/king/prometheus/train" style="display:inline; margin-left:.25rem;">
+                    <input type="hidden" name="from_dir" value="{{ r.dir }}" />
+                    <button class="btn" type="submit" title="再学習（この行のハイパラを使用）">
+                      <i class="fas fa-redo"></i> 同ハイパラで再学習
                     </button>
                   </form>
                 </td>
