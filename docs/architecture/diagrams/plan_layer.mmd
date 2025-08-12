@@ -1,2 +1,99 @@
+```mermaid
 graph TD
-  A[collector.py] --> B[features.py]
+
+%% ======= PLAN layer =======
+subgraph PLAN ["PLAN layer (src/plan_data)"]
+  COLLECT["collector.py - market data collection"]
+  FEATURES["features.py - feature engineering"]
+  FEATDF["FeatureBundle output (df + context)  - TODO proposal 2: common signature not implemented"]
+  ANALYZER["analyzer.py - factor extraction"]
+  STATS["statistics.py - KPI aggregation"]
+end
+
+%% ======= AI underlings (Hermes is non-execution) =======
+subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
+  AURUS["Aurus - propose()"]
+  LEVIA["Levia - propose()"]
+  PROM["Prometheus - predict_future()"]
+  VERITAS["Veritas - propose()"]
+  HERMES["Hermes - LLM explain - propose() - non-execution"]
+end
+
+%% ======= Decision integration & risk gate (not implemented) =======
+DECISION["RoyalDecisionEngine - integrate/score  - TODO proposal 1: not implemented"]
+NOCTUSGATE["Noctus Gate - mandatory risk/lot filter  - TODO proposal 4: not implemented"]
+QUALITY["DataQualityGate - missing_ratio / data_lag -> FLAT/Fallback  - TODO proposal 5: not implemented"]
+PROFILES["profiles.yaml - weights / rollout 7->30->100%  - TODO proposal 6: not implemented"]
+CONTRACTS["Contracts: FeatureBundle / StrategyProposal / OrderRequest  - TODO proposal 2: not implemented"]
+TRACEID["Correlation-ID (trace_id) across all hops  - TODO proposal 3: not implemented"]
+
+%% ======= Do layer (handoff) =======
+subgraph DO_LAYER ["Do layer (handoff)"]
+  ORDER["order_execution.py - execution API"]
+end
+
+%% ======= Demo / tests (not implemented) =======
+subgraph DEMO ["Demo / tests"]
+  GOLDEN["plan_to_all_minidemo.py -> golden regression test  - TODO proposal 7: not implemented"]
+end
+
+%% ======= Observability taps (not implemented) =======
+subgraph OBS ["Observability taps (tables)"]
+  OBS_PLAN["obs_plan_runs - phase=collector/features/statistics  - TODO proposal 8: add trace_id"]
+  OBS_INFER["obs_infer_calls - AI propose/predict latency  - TODO proposal 8: add trace_id"]
+  OBS_ORD["obs_orders - decision metrics / reasons  - TODO proposal 8: add trace_id"]
+  OBS_TRD["obs_trades - fill/reject/slippage  - TODO proposal 8: add trace_id"]
+  OBS_ALT["obs_alerts - quality/risk alerts  - TODO proposal 8: add trace_id"]
+end
+
+%% ======= PLAN flow =======
+COLLECT --> FEATURES --> STATS
+FEATURES --> FEATDF
+FEATDF --> ANALYZER
+ANALYZER --> HERMES
+
+%% ======= Contracts (not implemented) =======
+FEATDF -. uses .-> CONTRACTS
+AURUS -. returns .-> CONTRACTS
+LEVIA -. returns .-> CONTRACTS
+PROM  -. returns .-> CONTRACTS
+VERITAS -. returns .-> CONTRACTS
+
+%% ======= Decision integration path (not implemented) =======
+FEATDF --> QUALITY
+QUALITY --> DECISION
+AURUS --> DECISION
+LEVIA --> DECISION
+PROM  --> DECISION
+VERITAS --> DECISION
+PROFILES -. config .-> DECISION
+DECISION --> NOCTUSGATE
+NOCTUSGATE --> ORDER
+
+%% ======= Demo edges =======
+GOLDEN --> FEATDF
+GOLDEN -.-> AURUS
+GOLDEN -.-> LEVIA
+GOLDEN -.-> PROM
+GOLDEN -.-> VERITAS
+GOLDEN -.-> HERMES
+
+%% ======= Observability taps =======
+COLLECT  -->|log| OBS_PLAN
+FEATURES -->|log| OBS_PLAN
+STATS    -->|log| OBS_PLAN
+AURUS    -->|log| OBS_INFER
+LEVIA    -->|log| OBS_INFER
+PROM     -->|log| OBS_INFER
+VERITAS  -->|log| OBS_INFER
+DECISION -->|log| OBS_ORD
+NOCTUSGATE -->|alert| OBS_ALT
+ORDER    -->|log| OBS_TRD
+
+%% ======= trace_id notes (not implemented) =======
+FEATDF -. "[trace_id]" .-> AURUS
+FEATDF -. "[trace_id]" .-> LEVIA
+FEATDF -. "[trace_id]" .-> PROM
+FEATDF -. "[trace_id]" .-> VERITAS
+DECISION -. "[trace_id]" .-> ORDER
+```
