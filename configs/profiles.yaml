@@ -1,0 +1,14 @@
+# 提案⑥: weights/rollout の外部定義（SemVerは運用で）
+version: 1
+default:
+  rollout_percent: 100   # 7 / 30 / 100 の段階導入に対応
+  min_confidence: 0.35
+  combine: "best_one"    # or "weighted_sum"
+  alpha_risk: 0.3        # score = w*confidence + (1-w)*(1 - risk_score) ; w = 1 - alpha_risk
+weights:
+  AURUS:   0.35
+  LEVIA:   0.25
+  PROM:    0.20
+  VERITAS: 0.20
+timeouts_ms:
+  propose: 800
