@@ -1,24 +1,64 @@
+# src/plan_data/statistics.py
 """
 PDCA-Plan用 統計・KPI算出モジュール
 - collector.pyで集約した時系列データや評価ログを多角的に集計
 - 主要な統計情報・傾向分析・ニュース件数・マクロ・タグ分析にも対応
 """
 
+from __future__ import annotations
+
+import time
 from typing import Dict, Any, List, Optional, Union
 from collections import defaultdict, Counter
 from statistics import mean, stdev
+
 import pandas as pd
+
 from plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
-from plan_data.feature_spec import FEATURE_SPEC
+from plan_data.feature_spec import FEATURE_SPEC  # 互換のため残置（本ファイル内では未使用）
+from plan_data.observability import log_plan_run
+from plan_data.trace import new_trace_id
+
+
+def _missing_ratio(df: Optional[pd.DataFrame]) -> float:
+    """全体欠損率（'date' は除外）。空なら 1.0。"""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 1.0
+    cols = [c for c in df.columns if c != "date"]
+    if not cols:
+        return 0.0
+    total = len(df) * len(cols)
+    if total <= 0:
+        return 0.0
+    return float(df[cols].isna().sum().sum()) / float(total)
+
+
+def _rows_count(data: Union[pd.DataFrame, dict, None]) -> int:
+    if isinstance(data, pd.DataFrame):
+        return len(data)
+    if isinstance(data, dict):
+        if "eval_results" in data and isinstance(data["eval_results"], list):
+            return len(data["eval_results"])
+        if "act_logs" in data and isinstance(data["act_logs"], list):
+            return len(data["act_logs"])
+    return 0
+
 
 class PlanStatistics:
-    def __init__(self, collector: Optional[PlanDataCollector] = None, use_timeseries: bool = True, lookback_days: int = 365):
+    def __init__(
+        self,
+        collector: Optional[PlanDataCollector] = None,
+        use_timeseries: bool = True,
+        lookback_days: int = 365,
+        trace_id: Optional[str] = None,
+    ):
         self.collector = collector or PlanDataCollector()
         self._data = self.collector.collect_all(lookback_days=lookback_days)
         # カラム名小文字変換（安全のため）
         if isinstance(self._data, pd.DataFrame):
             self._data.columns = [c.lower() for c in self._data.columns]
         self._is_timeseries = isinstance(self._data, pd.DataFrame) and "date" in self._data.columns
+        self._trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
 
     # --- 評価ログ・戦略系（従来互換） ---
     def win_rate_stats(self) -> Dict[str, Any]:
@@ -37,7 +77,7 @@ class PlanStatistics:
             "mean": round(mean(rates), 2) if rates else None,
             "min": round(min(rates), 2) if rates else None,
             "max": round(max(rates), 2) if rates else None,
-            "std": round(stdev(rates), 2) if len(rates) > 1 else None
+            "std": round(stdev(rates), 2) if len(rates) > 1 else None,
         }
 
     def drawdown_stats(self) -> Dict[str, Any]:
@@ -54,7 +94,7 @@ class PlanStatistics:
             "mean": round(mean(dd), 2) if dd else None,
             "min": round(min(dd), 2) if dd else None,
             "max": round(max(dd), 2) if dd else None,
-            "std": round(stdev(dd), 2) if len(dd) > 1 else None
+            "std": round(stdev(dd), 2) if len(dd) > 1 else None,
         }
 
     def tag_performance(self) -> Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
@@ -66,7 +106,7 @@ class PlanStatistics:
                 tags = e.get("tags", [])
                 for tag in tags:
                     tag_stats[tag].append(e)
-            result = {}
+            result: Dict[str, Dict[str, Any]] = {}
             for tag, lst in tag_stats.items():
                 win_rates = [x.get("win_rate", 0.0) for x in lst]
                 result[tag] = {
@@ -81,7 +121,7 @@ class PlanStatistics:
         else:
             return {}
 
-    def adoption_rate(self) -> float:
+    def adoption_rate(self) -> Optional[float]:
         """評価済み戦略のうちAct採用割合"""
         if isinstance(self._data, dict) and "eval_results" in self._data:
             evals = self._data["eval_results"]
@@ -102,7 +142,7 @@ class PlanStatistics:
     # --- 時系列/マクロ/ニュース・イベント系 ---
     def macro_stats(self) -> Dict[str, Any]:
         """マクロ経済指標（FRED, CPI, etc）ごとの統計量"""
-        result = {}
+        result: Dict[str, Any] = {}
         if self._is_timeseries:
             for col in self._data.columns:
                 if col.endswith("_value"):
@@ -117,7 +157,7 @@ class PlanStatistics:
 
     def news_stats(self) -> Dict[str, Any]:
         """NewsAPI等によるニュース件数やポジ/ネガ件数の統計"""
-        stats = {}
+        stats: Dict[str, Any] = {}
         if self._is_timeseries and "news_count" in self._data.columns:
             nc = self._data["news_count"].dropna()
             stats["news_count"] = {
@@ -146,20 +186,25 @@ class PlanStatistics:
 
     def event_stats(self) -> Dict[str, Any]:
         """主要イベント（fomc等）の日数や発生日一覧"""
-        result = {}
+        result: Dict[str, Any] = {}
         if self._is_timeseries:
             for ev in ["fomc", "cpi", "nfp", "ecb", "boj", "gdp"]:
                 if ev in self._data.columns:
                     days = self._data[self._data[ev] == 1]["date"]
                     result[ev] = {
                         "count": len(days),
-                        "recent": str(days.max()) if not days.empty else None
+                        "recent": str(days.max()) if not days.empty else None,
                     }
         return result
 
     def get_summary(self) -> Dict[str, Any]:
-        """PDCA-Planで使うサマリー統計セットをまとめて返す（複合データ対応）"""
-        return {
+        """
+        PDCA-Planで使うサマリー統計セットをまとめて返す（複合データ対応）
+        ついでに phase="statistics" として観測ログに計測を記録。
+        """
+        t0 = time.time()
+
+        summary = {
             "win_rate_stats": self.win_rate_stats(),
             "drawdown_stats": self.drawdown_stats(),
             "adoption_rate": self.adoption_rate(),
@@ -169,6 +214,23 @@ class PlanStatistics:
             "news_stats": self.news_stats(),
             "event_stats": self.event_stats(),
         }
+
+        # 観測ログ（失敗は握りつぶして継続）
+        try:
+            log_plan_run(
+                None,  # env NOCTRIA_OBS_PG_DSN を使用
+                phase="statistics",
+                rows=_rows_count(self._data),
+                dur_sec=int(time.time() - t0),
+                missing_ratio=_missing_ratio(self._data if isinstance(self._data, pd.DataFrame) else None),
+                error_rate=0.0,  # TODO: 集計失敗件数などを加味
+                trace_id=self._trace_id,
+            )
+        except Exception:
+            pass
+
+        return summary
+
 
 # テスト/手動実行用
 if __name__ == "__main__":
