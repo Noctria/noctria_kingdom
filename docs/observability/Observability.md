@@ -72,7 +72,7 @@ _Noctria Kingdom — 観測・可視化ガイド（最新版 / 2025-08-12）_
 - **c) Airflow タスクからの集計**（DAG状態/ログ→集約テーブル）
 - **d) ログETL**（戦略実行CSV/JSON・Airflowログを5分ごとに取り込み）
 
-```mermaid
+
 flowchart LR
   A[FastAPI ミドルウェア/例外] -->|a: INSERT| DB[(PostgreSQL)]
   C1[Train/Infer フック] -->|a: INSERT| DB
@@ -80,7 +80,6 @@ flowchart LR
   E1[collector/features/statistics] -->|a: INSERT| DB
   L[CSV/JSON/AFログ] -->|d: ETL 5分| ETL[Airflow ETL DAG] -->|c/d: UPSERT| DB
   DB --> HUD[/hud/observability]
-```
 
 ---
 
