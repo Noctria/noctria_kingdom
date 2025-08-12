@@ -1,49 +1,107 @@
-%% DO層 詳細図（発注実行・最適化・JSON化・外部ブローカー）
-flowchart TD
+graph TD
 
-  %% 入力（Plan層からの提案/予測/ロット）
-  subgraph INPUTS["上流入力 (from PLAN/AI)"]
-    REQ["order_request.json\n(提案: シンボル/方向/数量候補/根拠)"]
-    RISKPOL["risk_policy.json\n(リスク上限/ロット規則/ストップ/DD閾値)"]
-  end
+%% ====== styles (GitHub-safe) ======
+classDef inputs fill:#243447,stroke:#4f86c6,color:#e6f0ff;
+classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
+classDef outputs fill:#1f3b2d,stroke:#6bbf59,color:#d7fbe8;
+classDef gov fill:#2e2e2e,stroke:#b7b7b7,color:#ffffff;
+classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
+classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
 
-  %% DO層
-  subgraph DO["⚔️ Do層 (src/execution)"]
-    ORDER["order_execution.py\n・基本発注/キャンセル/修正\n・状態管理"]
-    OPT["optimized_order_execution.py\n・スリッページ/手数料考慮\n・分割発注/タイミング最適化"]
-    GENJSON["generate_order_json.py\n・発注内容JSON化\n・監査ログ用スナップショット"]
-    BROKER["broker_adapter.py\n・外部API I/F抽象化\n(例: MT5/CCXT/自作REST)"]
-    LOG["/data/execution_logs/*.json\n・発注/約定/失敗/再試行"]
-  end
+%% ====== INPUTS from PLAN/AI ======
+subgraph INPUTS ["Upstream inputs (from PLAN / AI)"]
+  REQ["order_request.json - symbol / side / qty candidate / reasons - includes trace_id - TODO proposal 1: add idempotency_key"]
+  RISKPOL["risk_policy.json - risk caps / lot rules / stop / drawdown thresholds"]
+end
 
-  %% 下流（Check/Actへ）
-  subgraph OUTPUTS["下流出力 (to CHECK/ACT)"]
-    EXECRES["exec_result.json\n(約定結果/平均価格/コスト)"]
-    ALERTSRC["risk_event.json\n(DD/連敗/異常約定)"]
-    AUDIT["audit_order.json\n(再現性のための完全記録)"]
-  end
+%% ====== DO layer ======
+subgraph DO_LAYER ["Do layer (src/execution)"]
+  ORDER["order_execution.py - basic place / cancel / replace - state tracking - TODO proposal 2: finite state machine not implemented"]
+  RISK_GATE["risk_gate.py - final risk and lot filter - enforce policy at send time - TODO proposal 3: final gate placement"]
+  OPT["optimized_order_execution.py - slippage and fee aware - split and timing - plugin tactics - TODO proposal 4: strategy plugins"]
+  GENJSON["generate_order_json.py - build immutable envelope for audit - TODO proposal 6: HMAC sign snapshot"]
+  OUTBOX["outbox store - persist before send - retry safe - TODO proposal 1: implement outbox pattern"]
+  BROKER["broker_adapter.py - external API abstraction (mt5 / ccxt / rest) - TODO proposal 5: capabilities and rate limiter"]
+  LOGFILE["/data/execution_logs/*.json - place / fill / failure / retry"]
+end
 
-  %% ガバナンス
-  subgraph ORCH["統治/運用"]
-    GUIDO["GUI: /pdca/do\n(手動発注/停止/再実行)"]
-    DAGDO["Airflow DAG: do_layer_flow.py\n(自動実行/再試行/スケジュール)"]
-  end
+%% ====== OUTPUTS to CHECK / ACT ======
+subgraph OUTPUTS ["Downstream outputs (to CHECK / ACT)"]
+  EXECRES["exec_result.json - fills / avg price / cost - must include idempotency_key and broker_order_ids - TODO proposal 1"]
+  ALERTSRC["risk_event.json - drawdown / streak / abnormal fill - emitted by gate and recon"]
+  AUDIT["audit_order.json - complete reproducibility snapshot"]
+end
 
-  %% フロー
-  REQ --> ORDER
-  RISKPOL --> ORDER
-  ORDER --> OPT
-  OPT --> GENJSON --> BROKER
-  BROKER --> EXECRES
-  EXECRES --> LOG
-  OPT -. 監査 .-> AUDIT
-  ORDER -. 監査 .-> AUDIT
+%% ====== GOVERNANCE / ORCHESTRATION ======
+subgraph GOVERNANCE ["Governance and operations"]
+  GUI_DO["GUI endpoint /pdca/do - manual trigger / stop / cancel - TODO proposal 9: queue and priority"]
+  DAG_DO["Airflow DAG do_layer_flow.py - schedule / retry - TODO proposal 9: service vs DAG boundary"]
+end
 
-  %% 連携
-  EXECRES -->|評価素材| ALERTSRC
-  EXECRES -->|評価素材| OUTPUTS
-  ALERTSRC --> OUTPUTS
+%% ====== OBSERVABILITY TAPS ======
+subgraph OBS ["Observability taps (tables)"]
+  OBS_ORD["obs_orders - placement latency / gate reasons / decision metrics - TODO proposal 7: add trace_id"]
+  OBS_TRD["obs_trades - fills / rejects / slippage - TODO proposal 7: add trace_id"]
+  OBS_ALT["obs_alerts - policy blocks / broker issues - TODO proposal 7: add trace_id"]
+  OBS_DO["obs_do_metrics - child_orders / retry_counts - TODO proposal 7: add trace_id"]
+end
 
-  %% 管理
-  GUIDO --> DAGDO
-  DAGDO --> ORDER
+%% ====== AUX: broker hardening ======
+subgraph AUX ["Broker hardening"]
+  CAPS["capabilities handshake - partial fill / replace / tif / min qty - TODO proposal 5"]
+  RLIM["rate limiter and backoff - 429 and 5xx handling - TODO proposal 5"]
+  RECON["reconciliation - positions and trades match - emit risk_event on mismatch - TODO proposal 5"]
+end
+
+%% ====== FLOW ======
+REQ --> ORDER
+RISKPOL --> ORDER
+ORDER --> RISK_GATE
+RISK_GATE --> OPT
+OPT --> GENJSON
+GENJSON --> OUTBOX
+OUTBOX --> BROKER
+BROKER --> EXECRES
+EXECRES --> LOGFILE
+
+%% ====== AUDIT PATHS ======
+GENJSON --> AUDIT
+ORDER -. audit .-> AUDIT
+OPT -. audit .-> AUDIT
+
+%% ====== GOVERNANCE LINKS ======
+GUI_DO --> ORDER
+DAG_DO --> ORDER
+
+%% ====== DOWNSTREAM LINKS ======
+EXECRES --> ALERTSRC
+EXECRES --> OUTPUTS
+ALERTSRC --> OUTPUTS
+
+%% ====== OBS LINKS ======
+ORDER -->|log| OBS_ORD
+RISK_GATE -->|alert| OBS_ALT
+OPT -->|log| OBS_DO
+BROKER -->|log| OBS_DO
+EXECRES -->|log| OBS_TRD
+
+%% ====== AUX LINKS ======
+BROKER --> CAPS
+BROKER --> RLIM
+BROKER --> RECON
+RECON --> ALERTSRC
+
+%% ====== IDENTITY / CORRELATION (not implemented) ======
+REQ -. trace_id .-> ORDER
+ORDER -. trace_id .-> RISK_GATE
+RISK_GATE -. trace_id .-> OPT
+OPT -. trace_id .-> GENJSON
+GENJSON -. trace_id .-> OUTBOX
+OUTBOX -. trace_id .-> BROKER
+BROKER -. trace_id .-> EXECRES
+EXECRES -. trace_id .-> AUDIT
+
+%% ====== IDEMPOTENCY (not implemented) ======
+GENJSON -. idempotency_key .-> OUTBOX
+OUTBOX -. idempotency_key .-> BROKER
+EXECRES -. idempotency_key .-> AUDIT
