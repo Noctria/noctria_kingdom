@@ -22,6 +22,8 @@ load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
 
 # FEATURE_SPEC はリスト（標準カラム順）。snake_case で運用。
 from plan_data.feature_spec import FEATURE_SPEC
+from plan_data.observability import log_plan_run
+from plan_data.trace import new_trace_id
 
 
 # =========================
@@ -114,7 +116,6 @@ class PlanDataCollector:
         self._session.headers.update({"User-Agent": "noctria-collector/1.0"})
 
     # ---------- ヘルパ ----------
-
     @staticmethod
     def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
         """yfinance の MultiIndex 列などをフラット化。"""
@@ -156,8 +157,22 @@ class PlanDataCollector:
                 return c
         return None
 
-    # ---------- yfinance ----------
+    @staticmethod
+    def _missing_ratio(df: Optional[pd.DataFrame]) -> float:
+        """
+        データ全体の欠損率。'date' 列は除外。空なら 1.0（全欠損扱い）。
+        """
+        if df is None or df.empty:
+            return 1.0
+        cols = [c for c in df.columns if c != "date"]
+        if not cols:
+            return 0.0
+        total = len(df) * len(cols)
+        if total <= 0:
+            return 0.0
+        return float(df[cols].isna().sum().sum()) / float(total)
 
+    # ---------- yfinance ----------
     def fetch_multi_assets(
         self,
         start: str,
@@ -230,7 +245,6 @@ class PlanDataCollector:
         return merged
 
     # ---------- FRED ----------
-
     def fetch_fred_data(self, series_id: str, start_date: str, end_date: str) -> pd.DataFrame:
         if not self.fred_api_key:
             print("[collector] ⚠️ FRED_API_KEY未設定。FREDデータをスキップ")
@@ -260,7 +274,6 @@ class PlanDataCollector:
             return pd.DataFrame()
 
     # ---------- 経済カレンダー ----------
-
     def fetch_event_calendar(self) -> pd.DataFrame:
         try:
             df = pd.read_csv(self.event_calendar_csv)
@@ -273,7 +286,6 @@ class PlanDataCollector:
             return pd.DataFrame()
 
     # ---------- GNews（最適化・キャッシュつき） ----------
-
     def _respect_rate_limit(self):
         """1分あたりのコール上限をだいたい守る（簡易実装）。"""
         if self.gnews_rate_per_min <= 0:
@@ -461,32 +473,91 @@ class PlanDataCollector:
         return df[["date", "news_count", "news_positive", "news_negative"]].sort_values("date")
 
     # ---------- 収集一括 ----------
-
-    def collect_all(self, lookback_days: int = 365) -> pd.DataFrame:
+    def collect_all(self, lookback_days: int = 365, trace_id: Optional[str] = None) -> pd.DataFrame:
+        """
+        収集一括。各フェーズ末尾で obs_plan_runs に計測を記録（失敗しても本処理は継続）。
+        phase: collector / fred / events / news
+        """
         end = datetime.today()
         start = end - timedelta(days=lookback_days)
         start_str = start.strftime("%Y-%m-%d")
         end_str = end.strftime("%Y-%m-%d")
 
+        # trace_id（未指定なら自動生成：P層のバッチ想定で "MULTI","1d" 固定）
+        trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
+
         # 1) マーケット価格群
+        t0 = time.time()
         df = self.fetch_multi_assets(start=start_str, end=end_str)
+        try:
+            log_plan_run(
+                None,  # DSNは NOCTRIA_OBS_PG_DSN を既定に
+                phase="collector",
+                rows=len(df) if df is not None else 0,
+                dur_sec=int(time.time() - t0),
+                missing_ratio=self._missing_ratio(df),
+                error_rate=0.0,  # TODO: 取得失敗カウントから算出
+                trace_id=trace_id,
+            )
+        except Exception:
+            # 観測ログの失敗は握りつぶす（処理継続）
+            pass
 
         # 2) FRED（CPI/失業率/FF金利など）
+        t1 = time.time()
         for sid in FRED_SERIES.values():
             fred_df = self.fetch_fred_data(sid, start_str, end_str)
             if not fred_df.empty and not df.empty:
                 df = pd.merge(df, fred_df, on="date", how="left")
                 df = df.sort_values("date").ffill()
+        try:
+            log_plan_run(
+                None,
+                phase="fred",
+                rows=len(df) if df is not None else 0,
+                dur_sec=int(time.time() - t1),
+                missing_ratio=self._missing_ratio(df),
+                error_rate=0.0,
+                trace_id=trace_id,
+            )
+        except Exception:
+            pass
 
         # 3) 経済カレンダー
+        t2 = time.time()
         event_df = self.fetch_event_calendar()
         if not event_df.empty and not df.empty:
             df = pd.merge(df, event_df, on="date", how="left")
+        try:
+            log_plan_run(
+                None,
+                phase="events",
+                rows=len(df) if df is not None else 0,
+                dur_sec=int(time.time() - t2),
+                missing_ratio=self._missing_ratio(df),
+                error_rate=0.0,
+                trace_id=trace_id,
+            )
+        except Exception:
+            pass
 
         # 4) GNews（日次ニュース件数・ポジネガ件数）
+        t3 = time.time()
         news_df = self.fetch_gnews_counts(start_str, end_str)
         if not news_df.empty and not df.empty:
             df = pd.merge(df, news_df, on="date", how="left")
+        try:
+            log_plan_run(
+                None,
+                phase="news",
+                rows=len(df) if df is not None else 0,
+                dur_sec=int(time.time() - t3),
+                missing_ratio=self._missing_ratio(df),
+                error_rate=0.0,
+                trace_id=trace_id,
+            )
+        except Exception:
+            pass
 
         if df is not None:
             df = df.reset_index(drop=True)
