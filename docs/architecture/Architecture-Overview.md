@@ -64,75 +64,117 @@ Noctria Kingdom は、AI による自動売買戦略の**生成 → 実行 → �
 > GitHub 互換のため、ラベルは**二重引用符**で囲み、特殊記号は ASCII を使用。
 
 ```mermaid
-flowchart TD
+graph TD
 
-  %% --- GUI ---
-  subgraph GUI["🎛️ Noctria GUI (FastAPI)"]
-    ROUTES["routes/*.py<br/>戦略比較 / PDCA / AI 一覧"]
-    TEMPLATES["templates/*.html<br/>HUD ダッシュボード"]
-  end
+%% ===== styles (GitHub safe) =====
+classDef gui fill:#eaecff,stroke:#6c6fdb,color:#1f235a;
+classDef orch fill:#e9f7ff,stroke:#57a3c7,color:#0d3a4a;
+classDef plan fill:#eef7ee,stroke:#66a06a,color:#1f3a22;
+classDef ai fill:#fff4e6,stroke:#d9a441,color:#5a3a0a;
+classDef do fill:#ffecec,stroke:#d97a7a,color:#5a1f1f;
+classDef check fill:#f3f3f3,stroke:#8f8f8f,color:#222222;
+classDef act fill:#f6ecff,stroke:#a178d1,color:#2e1f3a;
+classDef assets fill:#e8fbff,stroke:#4fb3bf,color:#113b40;
+classDef obs fill:#e8f1ff,stroke:#5d8fef,color:#0f2a6a;
+classDef todo fill:#f8f0e0,stroke:#ff9f43,color:#4a3000;
 
-  %% --- Airflow ---
-  subgraph ORCH["🪄 Airflow Orchestrator"]
-    DAGS["/airflow_docker/dags/*.py<br/>PDCA / 戦略生成 / 評価 DAG"]
-  end
+%% ===== GUI =====
+subgraph GUI ["Noctria GUI (FastAPI)"]
+  ROUTES["routes/*.py"]:::gui
+  TEMPLATES["templates/*.html"]:::gui
+end
 
-  %% --- PLAN 層 ---
-  subgraph PLAN["🗺️ PLAN 層 (src/plan_data)"]
-    COLLECT["collector.py<br/>市場データ収集"]
-    FEATURES["features.py<br/>特徴量生成"]
-    STATS["statistics.py<br/>KPI 算出"]
-    ANALYZER["analyzer.py<br/>要因抽出"]
-  end
+%% ===== Airflow Orchestrator =====
+subgraph ORCH ["Airflow Orchestrator"]
+  DAGS["dags/*.py"]:::orch
+end
 
-  %% --- AI 臣下 ---
-  subgraph AI["🤖 臣下 AI (src/strategies/)"]
-    AURUS["aurus_singularis.py<br/>総合分析"]
-    LEVIA["levia_tempest.py<br/>スキャルピング"]
-    NOCTUS["noctus_sentinella.py<br/>リスク管理"]
-    PROM["prometheus_oracle.py<br/>未来予測"]
-    VERITAS["veritas_machina.py<br/>ML 戦略生成"]
-    HERMES["hermes_cognitor.py<br/>LLM 戦略説明"]
-  end
+%% ===== PLAN layer =====
+subgraph PLAN ["PLAN layer (src/plan_data)"]
+  COLLECT["collector.py"]:::plan
+  FEATURES["features.py"]:::plan
+  STATS["statistics.py"]:::plan
+  ANALYZER["analyzer.py"]:::plan
+  FEAT_STORE["features/ store - NEW - TODO: SLO enforcement not implemented"]:::todo
+end
 
-  %% --- DO 層 ---
-  subgraph DO["⚔️ Do 層 (src/execution)"]
-    ORDER["order_execution.py<br/>発注 API"]
-    OPTORDER["optimized_order_execution.py<br/>最適化発注"]
-    GENORDER["generate_order_json.py<br/>発注内容 JSON 化"]
-  end
+%% ===== AI underlings =====
+subgraph AI ["AI underlings (src/strategies)"]
+  AURUS["aurus_singularis.py"]:::ai
+  LEVIA["levia_tempest.py"]:::ai
+  PROM["prometheus_oracle.py"]:::ai
+  VERITAS["veritas_machina.py"]:::ai
+  HERMES["hermes_cognitor.py - explain only (non-execution)"]:::ai
+end
 
-  %% --- CHECK 層 ---
-  subgraph CHECK["🔍 Check 層 (src/check)"]
-    MON["challenge_monitor.py<br/>損失監視"]
-    EVAL["evaluation.py<br/>実績評価"]
-    LOGS["pdca_logs/*.json<br/>結果記録"]
-  end
+%% ===== Decision and risk (between AI and DO) =====
+DECISION["RoyalDecisionEngine - integrate and score - NEW - TODO: not implemented"]:::todo
+RISK_GATE["Noctus Gate - final risk and lot filter - NEW - TODO: not implemented"]:::todo
 
-  %% --- ACT 層 ---
-  subgraph ACT["♻️ Act 層 (src/act)"]
-    RECHECK["pdca_recheck.py<br/>再評価"]
-    PUSH["pdca_push.py<br/>戦略採用"]
-    SUMMARY["pdca_summary.py<br/>集計 / ダッシュボード"]
-  end
+%% ===== DO layer =====
+subgraph DO ["Do layer (src/execution)"]
+  ORDER["order_execution.py"]:::do
+  OPT["optimized_order_execution.py"]:::do
+  GENJSON["generate_order_json.py"]:::do
+  BROKER["broker_adapter.py"]:::do
+end
 
-  %% --- Connections ---
-  GUI --> ORCH
-  ORCH --> PLAN
-  PLAN --> AI
-  AI --> DO
-  DO --> CHECK
-  CHECK --> ACT
-  ACT --> PLAN
+OUTBOX["outbox - persist before send and retry - NEW - TODO: not implemented"]:::todo
 
-  %% --- Internal flows ---
-  COLLECT --> FEATURES --> STATS --> ANALYZER
-  STATS --> AURUS
-  STATS --> LEVIA
-  STATS --> NOCTUS
-  STATS --> PROM
-  STATS --> VERITAS
-  ANALYZER --> HERMES
+%% ===== CHECK layer =====
+subgraph CHECK ["Check layer (src/check)"]
+  MON["challenge_monitor.py"]:::check
+  EVAL["evaluation.py"]:::check
+  LOGS["pdca_logs/*.json"]:::check
+end
+
+%% ===== ACT layer =====
+subgraph ACT ["Act layer (src/act)"]
+  RECHECK["pdca_recheck.py"]:::act
+  PUSH["pdca_push.py"]:::act
+  SUMMARY["pdca_summary.py"]:::act
+end
+
+%% ===== Assets (source of truth) =====
+subgraph ASSETS ["Assets (source of truth)"]
+  MODEL_REG["models/registry - NEW - TODO: enforcement not implemented"]:::todo
+end
+
+%% ===== Observability =====
+OBS["Observability (obs_* tables) - NEW - TODO: trace_id propagation not fully implemented"]:::obs
+
+%% ===== Main flows =====
+GUI --> ORCH
+ORCH --> PLAN
+PLAN --> AI
+AI --> DECISION
+DECISION --> RISK_GATE
+RISK_GATE --> DO
+HERMES -- explain --> GUI
+DO --> CHECK
+CHECK --> ACT
+ACT --> PLAN
+
+%% ===== DO internals (idempotency via outbox) =====
+OPT --> GENJSON
+GENJSON --> OUTBOX
+OUTBOX --> BROKER
+
+%% ===== Registries / SoT links =====
+RECHECK -. use .-> MODEL_REG
+PUSH -. write .-> MODEL_REG
+
+%% ===== Observability taps (high level) =====
+PLAN -. log .-> OBS
+DO -. log .-> OBS
+CHECK -. log .-> OBS
+ACT -. log .-> OBS
+
+%% ===== Optional annotations (identity) =====
+%% NOTE: keep labels short to avoid parser issues
+PLAN -. trace_id .-> AI
+DECISION -. trace_id .-> RISK_GATE
+GENJSON -. idempotency_key .-> OUTBOX
 ```
 
 ---
