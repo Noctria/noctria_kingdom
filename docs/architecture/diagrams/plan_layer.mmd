@@ -1,117 +1,109 @@
 ```mermaid
 flowchart TD
 
-  %% ======= STYLES =======
-  classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7;
-  classDef ai fill:#2f3136,stroke:#a97e2c,color:#ffe476;
-  classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
-  classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8,stroke-dasharray: 5 4;
-  classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
+%% ======= STYLES (GitHub-safe) =======
+classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7;
+classDef ai fill:#2f3136,stroke:#a97e2c,color:#ffe476;
+classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
+classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
+classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
 
-  %% ======= PLAN 層 =======
-  subgraph PLAN["🗺️ PLAN層 (src/plan_data)"]
-    COLLECT["collector.py<br/>市場データ収集"]:::plan
-    FEATURES["features.py<br/>特徴量生成"]:::plan
-    FEATDF["FeatureBundle 出力<br/>(df + context)<br/>※提案②: 共通シグネチャ対応は未実装"]:::plan
-    ANALYZER["analyzer.py<br/>要因抽出"]:::plan
-    STATS["statistics.py<br/>KPI 集計"]:::plan
-  end
+%% ======= PLAN 層 =======
+subgraph PLAN["🗺️ PLAN層 (src/plan_data)"]
+  COLLECT["collector.py<br/>市場データ収集"]:::plan
+  FEATURES["features.py<br/>特徴量生成"]:::plan
+  FEATDF["FeatureBundle 出力<br/>(df + context)<br/>※提案②: 共通シグネチャ対応は未実装"]:::plan
+  ANALYZER["analyzer.py<br/>要因抽出"]:::plan
+  STATS["statistics.py<br/>KPI 集計"]:::plan
+end
 
-  %% ======= AI 臣下（実行非介入の Hermes を含む） =======
-  subgraph AI_UNDERLINGS["🤖 臣下AI群 (src/strategies/)"]
-    AURUS["🎯 Aurus<br/><b>propose()</b>"]:::ai
-    LEVIA["⚡ Levia<br/><b>propose()</b>"]:::ai
-    PROM["🔮 Prometheus<br/><b>predict_future()</b>"]:::ai
-    VERITAS["🧠 Veritas<br/><b>propose()</b>"]:::ai
-    HERMES["🦉 Hermes<br/>LLM説明<br/><b>propose()</b><br/><i>(実行非介入)</i>"]:::ai
-  end
+%% ======= AI 臣下（Hermesは実行非介入） =======
+subgraph AI_UNDERLINGS["🤖 臣下AI群 (src/strategies/)"]
+  AURUS["🎯 Aurus<br/><b>propose()</b>"]:::ai
+  LEVIA["⚡ Levia<br/><b>propose()</b>"]:::ai
+  PROM["🔮 Prometheus<br/><b>predict_future()</b>"]:::ai
+  VERITAS["🧠 Veritas<br/><b>propose()</b>"]:::ai
+  HERMES["🦉 Hermes<br/>LLM説明<br/><b>propose()</b><br/><i>(実行非介入)</i>"]:::ai
+end
 
-  %% ======= 決定統合＆リスクゲート（未実装） =======
-  DECISION["RoyalDecisionEngine<br/>提案統合・スコアリング<br/>(提案① 未実装)"]:::todo
-  NOCTUSGATE["Noctus Gate<br/>必須リスクフィルタ/ロット制限<br/>(提案④ 未実装)"]:::todo
-  QUALITY["DataQualityGate<br/>missing_ratio / data_lag 監視 → FLAT/Fallback<br/>(提案⑤ 未実装)"]:::todo
-  PROFILES["profiles.yaml<br/>重み/導入率(7→30→100%) 設定<br/>(提案⑥ 未実装)"]:::todo
-  CONTRACTS["Contracts:<br/>FeatureBundle / StrategyProposal / OrderRequest<br/>(提案② 未実装)"]:::todo
-  TRACEID["Correlation-ID (trace_id) を全経路で継承<br/>(提案③ 未実装)"]:::todo
+%% ======= 決定統合＆リスクゲート（未実装） =======
+DECISION["RoyalDecisionEngine<br/>提案統合・スコアリング<br/>(提案① 未実装)"]:::todo
+NOCTUSGATE["Noctus Gate<br/>必須リスクフィルタ/ロット制限<br/>(提案④ 未実装)"]:::todo
+QUALITY["DataQualityGate<br/>missing_ratio / data_lag 監視 → FLAT/Fallback<br/>(提案⑤ 未実装)"]:::todo
+PROFILES["profiles.yaml<br/>重み/導入率(7→30→100%) 設定<br/>(提案⑥ 未実装)"]:::todo
+CONTRACTS["Contracts:<br/>FeatureBundle / StrategyProposal / OrderRequest<br/>(提案② 未実装)"]:::todo
+TRACEID["Correlation-ID (trace_id) を全経路で継承<br/>(提案③ 未実装)"]:::todo
 
-  %% ======= Do 層（受け渡し先） =======
-  subgraph DO_LAYER["⚔️ Do層（受け渡し先）"]
-    ORDER["order_execution.py<br/>発注API本体"]:::do
-  end
+%% ======= Do 層（受け渡し先） =======
+subgraph DO_LAYER["⚔️ Do層（受け渡し先）"]
+  ORDER["order_execution.py<br/>発注API本体"]:::do
+end
 
-  %% ======= Demo / 回帰テスト化（未実装） =======
-  subgraph DEMO["Demo / Tests"]
-    GOLDEN["plan_to_all_minidemo.py<br/>→ ゴールデン回帰テスト化 (提案⑦ 未実装)"]:::todo
-  end
+%% ======= Demo / 回帰テスト化（未実装） =======
+subgraph DEMO["Demo / Tests"]
+  GOLDEN["plan_to_all_minidemo.py<br/>→ ゴールデン回帰テスト化 (提案⑦ 未実装)"]:::todo
+end
 
-  %% ======= Observability（計測ポイント抜粋） =======
-  subgraph OBS["🔭 Observability（計測ポイント抜粋）"]
-    OBS_PLAN["obs_plan_runs<br/>phase=collector/features/statistics<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
-    OBS_INFER["obs_infer_calls<br/>AI propose/predict latency<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
-    OBS_ORD["obs_orders<br/>decision metrics / reasons<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
-    OBS_TRD["obs_trades<br/>fill/reject/slippage<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
-    OBS_ALT["obs_alerts<br/>quality/risk alerts<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
-  end
+%% ======= Observability（計測ポイント抜粋） =======
+subgraph OBS["🔭 Observability（計測ポイント抜粋）"]
+  OBS_PLAN["obs_plan_runs<br/>phase=collector/features/statistics<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
+  OBS_INFER["obs_infer_calls<br/>AI propose/predict latency<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
+  OBS_ORD["obs_orders<br/>decision metrics / reasons<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
+  OBS_TRD["obs_trades<br/>fill/reject/slippage<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
+  OBS_ALT["obs_alerts<br/>quality/risk alerts<br/>※trace_id 列 追加 (提案⑧ 未実装)"]:::obs
+end
 
-  %% ======= 将来拡張（中期〜 長期、未実装） =======
-  subgraph FUTURE["⏭️ 将来拡張（中期〜）"]
-    FEAST["Feature Store / 鮮度SLO<br/>(提案⑩ 未実装)"]:::todo
-    REGISTRY["Model Registry / 署名・指紋<br/>(提案⑩ 未実装)"]:::todo
-    EVENTBUS["Event Bus (Kafka 等) 非同期化<br/>(提案⑩ 未実装)"]:::todo
-    SIM["執行シミュレータ / 紙取引<br/>(提案⑩ 未実装)"]:::todo
-  end
+%% ======= PLAN フロー =======
+COLLECT --> FEATURES --> STATS
+FEATURES --> FEATDF
+FEATDF --> ANALYZER
+ANALYZER --> HERMES
 
-  %% ======= PLAN フロー =======
-  COLLECT --> FEATURES --> STATS
-  FEATURES --> FEATDF
-  FEATDF --> ANALYZER
-  ANALYZER --> HERMES
+%% ======= Contracts（未実装の連携） =======
+FEATDF -. "uses" .-> CONTRACTS
+AURUS -. "returns" .-> CONTRACTS
+LEVIA -. "returns" .-> CONTRACTS
+PROM  -. "returns" .-> CONTRACTS
+VERITAS -. "returns" .-> CONTRACTS
 
-  %% ======= Contracts（未実装の連携） =======
-  FEATDF -. uses .-> CONTRACTS
-  AURUS -. returns .-> CONTRACTS
-  LEVIA -. returns .-> CONTRACTS
-  PROM  -. returns .-> CONTRACTS
-  VERITAS -. returns .-> CONTRACTS
+%% ======= 決定統合パス（未実装） =======
+FEATDF --> QUALITY
+QUALITY --> DECISION
+AURUS --> DECISION
+LEVIA --> DECISION
+PROM --> DECISION
+VERITAS --> DECISION
+PROFILES -. "config" .-> DECISION
+DECISION --> NOCTUSGATE
+NOCTUSGATE --> ORDER
 
-  %% ======= 決定統合パス（未実装） =======
-  FEATDF --> QUALITY
-  QUALITY --> DECISION
-  AURUS --> DECISION
-  LEVIA --> DECISION
-  PROM --> DECISION
-  VERITAS --> DECISION
-  PROFILES -. config .-> DECISION
-  DECISION --> NOCTUSGATE
-  NOCTUSGATE --> ORDER
+%% ======= Demo 経路 =======
+GOLDEN --> FEATDF
+GOLDEN -.-> AURUS
+GOLDEN -.-> LEVIA
+GOLDEN -.-> PROM
+GOLDEN -.-> VERITAS
+GOLDEN -.-> HERMES
 
-  %% ======= Demo 経路 =======
-  GOLDEN --> FEATDF
-  GOLDEN -.-> AURUS
-  GOLDEN -.-> LEVIA
-  GOLDEN -.-> PROM
-  GOLDEN -.-> VERITAS
-  GOLDEN -.-> HERMES
+%% ======= Observability タップ =======
+COLLECT  -->|log| OBS_PLAN
+FEATURES -->|log| OBS_PLAN
+STATS    -->|log| OBS_PLAN
+AURUS    -->|log| OBS_INFER
+LEVIA    -->|log| OBS_INFER
+PROM     -->|log| OBS_INFER
+VERITAS  -->|log| OBS_INFER
+DECISION -->|log| OBS_ORD
+NOCTUSGATE -->|alert| OBS_ALT
+ORDER    -->|log| OBS_TRD
 
-  %% ======= Observability タップ =======
-  COLLECT  -->|log| OBS_PLAN
-  FEATURES -->|log| OBS_PLAN
-  STATS    -->|log| OBS_PLAN
-  AURUS    -->|log| OBS_INFER
-  LEVIA    -->|log| OBS_INFER
-  PROM     -->|log| OBS_INFER
-  VERITAS  -->|log| OBS_INFER
-  DECISION -->|log| OBS_ORD
-  NOCTUSGATE -->|alert| OBS_ALT
-  ORDER    -->|log| OBS_TRD
+%% ======= trace_id 注釈（未実装） =======
+FEATDF -. "[trace_id]" .-> AURUS
+FEATDF -. "[trace_id]" .-> LEVIA
+FEATDF -. "[trace_id]" .-> PROM
+FEATDF -. "[trace_id]" .-> VERITAS
+DECISION -. "[trace_id]" .-> ORDER
 
-  %% ======= trace_id 注釈（未実装） =======
-  FEATDF -. "[trace_id]" .-> AURUS
-  FEATDF -. "[trace_id]" .-> LEVIA
-  FEATDF -. "[trace_id]" .-> PROM
-  FEATDF -. "[trace_id]" .-> VERITAS
-  DECISION -. "[trace_id]" .-> ORDER
-
-  %% ======= クリック参照 =======
-  click GOLDEN "https://github.com/your_repo/src/plan_data/plan_to_all_minidemo.py" "サンプル実装ファイル"
+%% NOTE: クリックリンクは一部レンダラで弾かれるため無効化
+%% click GOLDEN "https://github.com/your_repo/src/plan_data/plan_to_all_minidemo.py" "サンプル実装ファイル"
 ```
