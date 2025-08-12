@@ -43,14 +43,12 @@
 - **オプション**：`LSTM(64)` を先頭に付与可能（`use_recurrence: true`）。  
 - **正則化**：PPO クリッピング + Entropy、価値関数係数。
 
-```mermaid
 flowchart LR
-  IN[Features (T x D)] --> ENC[Encoder (MLP/LSTM)]
-  ENC --> ACT[Actor Head (μ, logσ) → tanh]
-  ENC --> CRT[Critic Head (V)]
-  ACT --> A[action ∈ [-1,1]]
-  CRT --> V[value]
-```
+  IN["Features (T × D)"] --> ENC["Encoder (MLP/LSTM)"]
+  ENC --> ACT["Actor Head (mu, log_sigma) -> tanh"]
+  ENC --> CRT["Critic Head (V)"]
+  ACT --> A["action in [-1, 1]"]
+  CRT --> V["value"]
 
 ---
 
