@@ -1,6 +1,13 @@
 graph TD
 
-%% ======= PLAN layer =======
+%% ====== styles (GitHub-safe) ======
+classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7;
+classDef ai fill:#2f3136,stroke:#a97e2c,color:#ffe476;
+classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
+classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
+classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
+
+%% ====== PLAN layer ======
 subgraph PLAN ["PLAN layer (src/plan_data)"]
   COLLECT["collector.py - market data collection"]
   FEATURES["features.py - feature engineering"]
@@ -9,7 +16,7 @@ subgraph PLAN ["PLAN layer (src/plan_data)"]
   STATS["statistics.py - KPI aggregation"]
 end
 
-%% ======= AI underlings (Hermes is non-execution) =======
+%% ====== AI underlings (Hermes is non-execution) ======
 subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
   AURUS["Aurus - propose()"]
   LEVIA["Levia - propose()"]
@@ -18,7 +25,7 @@ subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
   HERMES["Hermes - LLM explain - propose() - non-execution"]
 end
 
-%% ======= Decision integration & risk gate (not implemented) =======
+%% ====== Decision integration & risk gate (not implemented) ======
 DECISION["RoyalDecisionEngine - integrate / score - TODO proposal 1: not implemented"]
 NOCTUSGATE["Noctus Gate - mandatory risk and lot filter - TODO proposal 4: not implemented"]
 QUALITY["DataQualityGate - missing_ratio and data_lag to FLAT or Fallback - TODO proposal 5: not implemented"]
@@ -26,17 +33,17 @@ PROFILES["profiles.yaml - weights and rollout 7 to 30 to 100 percent - TODO prop
 CONTRACTS["Contracts: FeatureBundle / StrategyProposal / OrderRequest - TODO proposal 2: not implemented"]
 TRACEID["Correlation-ID (trace_id) across all hops - TODO proposal 3: not implemented"]
 
-%% ======= Do layer (handoff) =======
+%% ====== Do layer (handoff) ======
 subgraph DO_LAYER ["Do layer (handoff)"]
   ORDER["order_execution.py - execution API"]
 end
 
-%% ======= Demo / tests (not implemented) =======
+%% ====== Demo / tests (not implemented) ======
 subgraph DEMO ["Demo and tests"]
   GOLDEN["plan_to_all_minidemo.py to golden regression test - TODO proposal 7: not implemented"]
 end
 
-%% ======= Observability taps (not implemented) =======
+%% ====== Observability taps (not implemented) ======
 subgraph OBS ["Observability taps (tables)"]
   OBS_PLAN["obs_plan_runs - phase = collector / features / statistics - TODO proposal 8: add trace_id"]
   OBS_INFER["obs_infer_calls - AI propose or predict latency - TODO proposal 8: add trace_id"]
@@ -45,20 +52,20 @@ subgraph OBS ["Observability taps (tables)"]
   OBS_ALT["obs_alerts - quality or risk alerts - TODO proposal 8: add trace_id"]
 end
 
-%% ======= PLAN flow =======
+%% ====== PLAN flow ======
 COLLECT --> FEATURES --> STATS
 FEATURES --> FEATDF
 FEATDF --> ANALYZER
 ANALYZER --> HERMES
 
-%% ======= Contracts (not implemented) =======
+%% ====== Contracts (not implemented) ======
 FEATDF -. uses .-> CONTRACTS
 AURUS -. returns .-> CONTRACTS
 LEVIA -. returns .-> CONTRACTS
 PROM  -. returns .-> CONTRACTS
 VERITAS -. returns .-> CONTRACTS
 
-%% ======= Decision integration path (not implemented) =======
+%% ====== Decision integration path (not implemented) ======
 FEATDF --> QUALITY
 QUALITY --> DECISION
 AURUS --> DECISION
@@ -69,7 +76,7 @@ PROFILES -. config .-> DECISION
 DECISION --> NOCTUSGATE
 NOCTUSGATE --> ORDER
 
-%% ======= Demo edges =======
+%% ====== Demo edges ======
 GOLDEN --> FEATDF
 GOLDEN -.-> AURUS
 GOLDEN -.-> LEVIA
@@ -77,7 +84,7 @@ GOLDEN -.-> PROM
 GOLDEN -.-> VERITAS
 GOLDEN -.-> HERMES
 
-%% ======= Observability taps =======
+%% ====== Observability taps ======
 COLLECT  -->|log| OBS_PLAN
 FEATURES -->|log| OBS_PLAN
 STATS    -->|log| OBS_PLAN
@@ -89,9 +96,16 @@ DECISION -->|log| OBS_ORD
 NOCTUSGATE -->|alert| OBS_ALT
 ORDER    -->|log| OBS_TRD
 
-%% ======= trace_id notes (not implemented) =======
+%% ====== trace_id notes (not implemented) ======
 FEATDF -. trace_id .-> AURUS
 FEATDF -. trace_id .-> LEVIA
 FEATDF -. trace_id .-> PROM
 FEATDF -. trace_id .-> VERITAS
 DECISION -. trace_id .-> ORDER
+
+%% ====== class bindings ======
+class COLLECT,FEATURES,FEATDF,ANALYZER,STATS plan;
+class AURUS,LEVIA,PROM,VERITAS,HERMES ai;
+class ORDER do;
+class DECISION,NOCTUSGATE,QUALITY,PROFILES,CONTRACTS,TRACEID,GOLDEN todo;
+class OBS_PLAN,OBS_INFER,OBS_ORD,OBS_TRD,OBS_ALT obs;
