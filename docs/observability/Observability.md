@@ -1,305 +1,269 @@
-# 👁️ Observability — Noctria Kingdom
+# 🔭 Observability — Noctria Kingdom
 
 **Version:** 1.0  
-**Status:** Draft → Adopted (when merged)  
+**Status:** Adopted  
 **Last Updated:** 2025-08-12 (JST)
 
-> 目的：Noctria の PDCA（Plan/Do/Check/Act）および運用全体を、**見える・わかる・直せる**状態に保つ。  
-> 参照：`../governance/Vision-Governance.md` / `../operations/Runbooks.md` / `../operations/Airflow-DAGs.md` / `../operations/Config-Registry.md` / `../security/Security-And-Access.md` / `../apis/API.md` / `../apis/Do-Layer-Contract.md`
+> 目的：Noctria の PDCA（Plan/Do/Check/Act）と統治基盤（GUI/Airflow/API）の**状態を可視化**し、**逸脱を即検知**・**根因追跡**・**説明可能性**を担保する。  
+> 参照：`../architecture/Architecture-Overview.md` / `../apis/API.md` / `../apis/Do-Layer-Contract.md` / `../qa/Testing-And-QA.md` / `../operations/Runbooks.md` / `../security/Security-And-Access.md`
 
 ---
 
-## 1. スコープ & ゴール
-- **Signals**：Logs（構造化JSON）、Metrics（Prometheus）、Traces（OpenTelemetry）を**三本柱**で収集。  
-- **Coverage**：Airflow（DAG/Task）, Plan/Do/Check/Act, GUI/API, Broker I/F, 評価/KPI パイプライン。  
-- **Goals**  
-  1) 失敗・遅延・逸脱を**5分以内に検知**（p95）  
-  2) 問題の**原因箇所を1 hop以内**に特定（correlation_id）  
-  3) インシデントの**再発防止**に繋がる証跡（audit & KPI）
+## 1. スタック & 原則
+- **スタック**：Prometheus（メトリクス）/ Loki（構造化ログ）/ Grafana（可視化）/ OTel → Tempo or Jaeger（トレース）。  
+- **原則**：
+  1) **Guardrails First**：Noctus 境界と KPI の逸脱を**最優先**で検知。  
+  2) **Correlation**：`X-Correlation-ID` を**メトリクス・ログ・トレース**に横断付与。  
+  3) **SLO/SLA as Code**：Prometheus ルール・SLO を Git 管理（PR で改訂）。  
+  4) **低ノイズ**：Alert は**少数・高精度**（Multi-window burn rate + 抑制条件）。  
+  5) **WORM**：`audit_order.json` は監査専用ストア（改変不可）。
 
----
-
-## 2. スタック構成（概念図）
-```mermaid
-flowchart LR
-  subgraph Apps[Noctria Apps]
-    GUI[FastAPI GUI] -->|OTel| COL[OTel Collector]
-    API[API Service] -->|OTel| COL
-    PDCA[Airflow Tasks: Plan/Do/Check/Act] -->|Stats/Logs| COL
-    DO[Do Layer] -->|audit/logs| LOGQ[(Loki/ELK)]
-  end
-
-  COL -->|metrics| PROM[(Prometheus)]
-  COL -->|traces| TEMPO[(Tempo/Jaeger)]
-  LOGQ --> GRAF[Grafana]
-
-  PROM --> GRAF
-  TEMPO --> GRAF
-
-  PROM -->|alerts| ALERT[Alertmanager]
-  ALERT --> SLACK[(Slack #ops-alerts/#risk-duty)]
-  ALERT --> PD[PagerDuty]
+**ディレクトリ**
+```
+deploy/observability/
+  prometheus/
+    rules/          # recording/alerting rules (YAML)
+  loki/
+    pipeline/       # labels, parsers
+dashboards/
+  grafana/*.json    # provisioned dashboards
 ```
 
 ---
 
-## 3. シグナルの定義（Logs / Metrics / Traces）
+## 2. 計測ドメイン & メトリクス規約
+- **命名**：`<layer>_<subject>_<metric>_{seconds|total|pct|gauge}`  
+  - 例：`do_order_latency_seconds`（Histogram）、`plan_features_recency_seconds`（Gauge）  
+- **ラベル**（最小）：`env`, `layer`, `component`, `symbol`, `strategy`, `status`, `broker`, `dag_id`, `task_id`, `tf`  
+- **ヒストグラム既定バケット**
+  - レイテンシ（秒）：`[0.05,0.1,0.2,0.3,0.5,0.75,1,1.5,2,3,5]`
+  - スリッページ（%）：`[0.05,0.1,0.2,0.3,0.5,0.75,1,1.5,2]`
 
-### 3.1 Logs（構造化 JSON）
-- **必須フィールド**：`ts, level, msg, component, correlation_id, env, git`  
-- **推奨フィールド**：`order_id, dag_id, task_id, strategy, symbol, duration_ms, status, user`  
-- **例（Do層: 発注成功）**
+**主要メトリクス（抜粋）**
+| 名称 | 種別 | 説明 |
+|---|---|---|
+| `do_order_requests_total{status}` | Counter | 成功/失敗/拒否 |
+| `do_order_latency_seconds` | Hist | Do 層 API〜結果まで |
+| `do_slippage_pct` | Hist | 滑り率（約定ごと） |
+| `risk_events_total{kind,severity}` | Counter | Noctus 発火件数 |
+| `plan_features_recency_seconds` | Gauge | 最新特徴量の遅延 |
+| `airflow_dag_sla_miss_total{dag_id}` | Counter | SLA 違反 |
+| `kpi_win_rate` / `kpi_max_dd_pct` / `kpi_sharpe_adj` | Gauge | Check 層 KPI スナップ |
+| `api_http_requests_total{route,status}` | Counter | API 呼出し数 |
+| `api_http_request_duration_seconds` | Hist | API レイテンシ |
+
+---
+
+## 3. SLO/SLA（数値確定）
+**対象：prod（stg は +20% 緩和）**
+
+| SLO 名 | 目標 | 説明 |
+|---|---|---|
+| Do レイテンシ p95 | ≤ **0.50s** | `do_order_latency_seconds{env="prod"}` |
+| Do エラー率 | ≤ **0.5%** | `rate(do_order_requests_total{status=~"5..|REJECTED"}[5m]) / rate(do_order_requests_total[5m])` |
+| スリッページ p90 | ≤ **0.30%** | `histogram_quantile(0.90, sum by (le) (rate(do_slippage_pct_bucket[10m])))` |
+| 特徴量遅延 | ≤ **120s** | `plan_features_recency_seconds` |
+| DAG SLA 違反率 | ≤ **0.5%/day** | `increase(airflow_dag_sla_miss_total[1d]) / total_dag_runs` |
+| KPI 安定 | `win_rate≥0.50` & `max_dd≤8%` | 7d 移動窓 |
+
+**SLI 記録ルール（例）**
+```yaml
+# deploy/observability/prometheus/rules/sli.yaml
+groups:
+- name: noctria_sli
+  rules:
+  - record: do:latency:p95
+    expr: |
+      histogram_quantile(0.95, sum by (le) (rate(do_order_latency_seconds_bucket{env="prod"}[5m])))
+  - record: do:error_rate
+    expr: |
+      sum(rate(do_order_requests_total{env="prod",status=~"5..|REJECTED"}[5m]))
+      /
+      sum(rate(do_order_requests_total{env="prod"}[5m]))
+  - record: do:slippage:p90
+    expr: |
+      histogram_quantile(0.90, sum by (le) (rate(do_slippage_pct_bucket{env="prod"}[10m])))
+```
+
+---
+
+## 4. アラート（PromQL, Loki）— Multi-window/Burn-rate
+**Severity 基準**：`CRITICAL`=即時人間対応 / `HIGH`=当日中 / `MEDIUM`=業務時間 / `LOW`=週次レビュー
+
+```yaml
+# deploy/observability/prometheus/rules/alerts.yaml
+groups:
+- name: do_layer_alerts
+  rules:
+  # A) エラー率 SLO 逸脱（多窓バーン：2h と 15m）
+  - alert: DoErrorBudgetBurn
+    expr: |
+      (sum(rate(do_order_requests_total{env="prod",status=~"5..|REJECTED"}[2h])) 
+       / sum(rate(do_order_requests_total{env="prod"}[2h])) > 0.01)
+      and
+      (sum(rate(do_order_requests_total{env="prod",status=~"5..|REJECTED"}[15m])) 
+       / sum(rate(do_order_requests_total{env="prod"}[15m])) > 0.02)
+    for: 5m
+    labels: {severity: "CRITICAL", team: "do"}
+    annotations:
+      summary: "Do error-rate burn (2h/15m)"
+      runbook_url: "/docs/operations/Runbooks.md#8-ロールバック"
+
+  # B) レイテンシ p95 劣化
+  - alert: DoLatencyP95High
+    expr: do:latency:p95{env="prod"} > 0.5
+    for: 10m
+    labels: {severity: "HIGH", team: "do"}
+    annotations:
+      summary: "Do p95 latency > 0.5s (10m)"
+      runbook_url: "/docs/operations/Runbooks.md#7-遅延スパイク対応"
+
+  # C) スリッページスパイク
+  - alert: SlippageSpike
+    expr: do:slippage:p90{env="prod"} > 0.3
+    for: 10m
+    labels: {severity: "HIGH", team: "risk"}
+    annotations:
+      summary: "p90 slippage > 0.30% (10m)"
+      runbook_url: "/docs/operations/Runbooks.md#6-スリッページ急騰"
+
+- name: plan_check_alerts
+  rules:
+  # D) 特徴量遅延
+  - alert: PlanFeaturesStale
+    expr: plan_features_recency_seconds{env="prod"} > 120
+    for: 5m
+    labels: {severity: "MEDIUM", team: "plan"}
+    annotations:
+      summary: "Features recency > 120s"
+      runbook_url: "/docs/architecture/Plan-Layer.md#データ新鮮度"
+
+  # E) KPI 劣化（7d）
+  - alert: KpiDegradation
+    expr: (kpi_win_rate{env="prod"} < 0.50) or (kpi_max_dd_pct{env="prod"} > 8)
+    for: 12h
+    labels: {severity: "MEDIUM", team: "models"}
+    annotations:
+      summary: "KPI degradation 7d (win_rate or max_dd)"
+      runbook_url: "/docs/models/Strategy-Lifecycle.md#降格条件"
+```
+
+**Loki（構造化ログ）例**
+```logql
+# エラー多発の相関（Do 層）
+{component="do.order_execution", env="prod", level="ERROR"}
+| json
+| count_over_time({component="do.order_execution"}[15m])
+```
+
+---
+
+## 5. ログ（構造化 JSON）& トレース（OTel）
+**JSON ログ共通フィールド**
 ```json
 {
-  "ts": "2025-08-12T06:58:05Z",
-  "level": "INFO",
-  "component": "do.order_execution",
-  "msg": "order filled",
-  "correlation_id": "6f1d3b34-...-a9f7",
-  "order_id": "SIM-20250812-0001",
-  "symbol": "BTCUSDT",
-  "side": "BUY",
-  "filled_qty": 0.5,
-  "avg_price": 59001.0,
-  "slippage_pct": 0.18,
-  "env": "prod",
-  "git": "abc1234"
+  "ts":"2025-08-12T06:58:03Z",
+  "level":"INFO",
+  "component":"do.order_execution",
+  "msg":"order filled",
+  "env":"prod",
+  "correlation_id":"6f1d3b34-...",
+  "order_id":"SIM-12345",
+  "symbol":"BTCUSDT",
+  "strategy":"Prometheus-PPO",
+  "duration_ms":190
 }
 ```
-> **PII/Secrets 禁止**。必要なら**ハッシュ化**または**伏字**（`Security-And-Access.md`）。
+- **禁止**：Secrets/PII。詳細は `../security/Security-And-Access.md`。  
+- **Loki ラベル**：`{env,component,level,strategy,symbol}`（カードinality を制御）。  
 
-### 3.2 Metrics（Prometheus）
-- **名前規約**：`<domain>_<object>_<measure>[_seconds/_total/_gauge]`  
-- **共通ラベル**：`env, service, component, strategy, symbol, dag_id, task_id`  
-- **例**  
-  - `airflow_dag_sla_miss_total{dag_id="pdca_check_flow"}`  
-  - `do_orders_submitted_total{strategy="Prometheus-PPO",symbol="BTCUSDT"}`  
-  - `do_order_latency_seconds_bucket{le="0.5"}`（Histogram）  
-  - `risk_events_total{kind="LOSING_STREAK",severity="HIGH"}`  
-  - `broker_api_errors_total{exchange="example"}`
-
-### 3.3 Traces（OpenTelemetry）
-- **Span 名**：`plan.collect`, `plan.features`, `do.execute_order`, `do.wait_fill`, `check.evaluate_kpis`, `api.POST /do/orders`  
-- **Span 属性**：`correlation_id, order_id, strategy, symbol, dag_id, task_id, env`  
-- **伝播**：HTTP `traceparent` + `X-Correlation-ID` を**全Hopで引継ぎ**。
+**OTel（トレース）**
+- **必須属性**：`service.name`, `noctria.env`, `order.id`, `correlation.id`, `strategy`, `symbol`, `risk.boundary_hit`。  
+- **サンプリング**：標準 10%、`ERROR`/`risk_event` 伴う span は**必ず 100%**。
 
 ---
 
-## 4. メトリクス・リファレンス（抜粋）
-| Metric | Type | Labels（抜粋） | 意味/用途 |
-|---|---|---|---|
-| `airflow_dag_runs_total` | counter | `dag_id,status` | DAG 実行回数（status: success/failed） |
-| `airflow_dag_sla_miss_total` | counter | `dag_id` | SLAミス回数（Alert対象） |
-| `airflow_task_duration_seconds` | histogram | `dag_id,task_id,status` | タスク所要時間 |
-| `plan_features_duration_seconds` | histogram | `symbol,tf` | 特徴量生成のレイテンシ |
-| `do_orders_submitted_total` | counter | `strategy,symbol,side` | 発注受付数 |
-| `do_order_latency_seconds` | histogram | `strategy,symbol` | Do層のp95監視 |
-| `do_slippage_pct` | histogram | `strategy,symbol` | スリッページ分布（Alert対象） |
-| `risk_events_total` | counter | `kind,severity` | リスクイベント件数 |
-| `check_kpi_jobs_total` | counter | `status` | KPI集計の実行状況 |
-| `kpi_win_rate` | gauge | `strategy` | 直近期間の勝率（GUI注釈用） |
-| `kpi_max_dd_pct` | gauge | `strategy` | 直近期間の最大DD |
-| `broker_api_latency_seconds` | histogram | `exchange,endpoint` | ブローカーAPIの遅延 |
-| `broker_api_errors_total` | counter | `exchange,code` | ブローカーエラー発生数 |
+## 6. ダッシュボード（Grafana）
+- **Do Layer Overview**：レイテンシヒスト/エラー率/スリッページ p90・p99 / ブローカー別。  
+- **Plan/Features Freshness**：`plan_features_recency_seconds`（シンボル×TF）、欠損・重複。  
+- **KPI & Adoption**：`kpi_*` と段階導入（7%→30%→100%）の**注釈**。  
+- **Airflow Health**：DAG 実行数/SLA 違反/キュー滞留。  
+- **Audit Explorer**：`audit_order.json` の件数/遅延/境界ヒット率。  
 
-> アラート閾値は原則 `../operations/Config-Registry.md` の `observability.alerts` を**正**とする。
+**注釈（自動）**
+- リリース/段階導入/抑制ON/OFF/リスク境界改訂は**必ず注釈**（`howto-start-canary.md` / `howto-trading-pause.md`）。
 
 ---
 
-## 5. アラートポリシー（Prometheus Rules）
-- 方針：**短期ノイズに鈍感 / 本質的逸脱に敏感**（rate, percentile, for: を活用）。  
-- 送信先：Slack `#ops-alerts`（運用）, `#risk-duty`（リスク）, PagerDuty（重大）。
+## 7. 合成監視（Synthetics）
+- `/api/v1/healthz`：60 秒間隔。SLO：連続失敗 3 回で `CRITICAL`。  
+- `/api/v1/version`：Git SHA 差替時に**注釈**。  
+- `/api/v1/alerts/stream`（SSE）：再接続（`Last-Event-ID`）動作を**外形監視**。  
 
-```yaml
-# deploy/alerts/noctria.rules.yml
-groups:
-  - name: airflow
-    rules:
-      - alert: DAGFailureRateHigh
-        expr: |
-          (sum(increase(airflow_dag_runs_total{status="failed"}[5m])) by (dag_id))
-          /
-          clamp_min(sum(increase(airflow_dag_runs_total[5m])) by (dag_id), 1)
-          > (0.05)  # Config-Registry: observability.alerts.dag_fail_rate_pct
-        for: 10m
-        labels: {severity: warning}
-        annotations:
-          summary: "Airflow DAG failure rate > 5% ({{ $labels.dag_id }})"
-          runbook: "docs/operations/Runbooks.md#9-1-airflow-スケジューラ停止"
+---
 
-  - name: do-layer
-    rules:
-      - alert: DoLayerLatencyHigh
-        expr: histogram_quantile(0.95, sum(rate(do_order_latency_seconds_bucket[5m])) by (le)) > 0.5
-        for: 5m
-        labels: {severity: critical}
-        annotations:
-          summary: "Do-layer p95 latency > 0.5s"
-          runbook: "docs/operations/Runbooks.md#5-airflow-運用dag操作の定石"
+## 8. コスト & 保持
+- **Prometheus**：原則 30 日（Recording で集約）。  
+- **Loki**：アプリログ 30 日、`audit_order` 参照ログは 90 日（監査 WORM は長期別保管）。  
+- **Traces**：7〜14 日（`ERROR`/`risk_event` 関連は 30 日）。  
+- ラベル爆増の抑制：`strategy` は主要のみに限定、テナント/テストは `env` で分離。
 
-      - alert: SlippageSpike
-        expr: histogram_quantile(0.90, sum(rate(do_slippage_pct_bucket[10m])) by (le)) > 0.3
-        for: 10m
-        labels: {severity: critical}
-        annotations:
-          summary: "Slippage 90p > 0.3% (spike)"
-          action: "必要に応じて global_trading_pause を検討（Config-Registry.flags）"
+---
 
-      - alert: TradingPausedUnexpected
-        expr: |
-          max_over_time(flags_global_trading_pause[15m]) == 1
-          and on() (hour() >= 1 and hour() <= 23)  # 時間帯は環境に応じ調整
-        for: 15m
-        labels: {severity: warning}
-        annotations:
-          summary: "Trading pause が継続中"
-          action: "再開判断 or インシデント起票"
+## 9. 運用（アラートルーティング）
+| 種別 | 送信先 | 付記 |
+|---|---|---|
+| CRITICAL | PagerDuty/電話 | 24/7 候補者 2 名（エスカレーション） |
+| HIGH | Slack `#ops-alerts` + メール | 10 分ごとに再通知 |
+| MEDIUM | Slack `#ops` | 営業時間内で対応 |
+| LOW | 週次レポート | 週次レビュー |
 
-  - name: risk
-    rules:
-      - alert: LosingStreakThreshold
-        expr: sum(increase(risk_events_total{kind="LOSING_STREAK"}[30m])) by (severity) > 0
-        for: 0m
-        labels: {severity: critical}
-        annotations:
-          summary: "Losing streak detected"
-          action: "Safemode維持/強化、Runbooks参照"
+**メンテナンス/抑制**
+- デプロイ直後 10 分、カナリア移行 10 分は**アラート抑制**（メタラベル `annotation=deploy|canary`）。
 
-  - name: kpi
-    rules:
-      - alert: KpiSummaryStale
-        expr: time() - max(kpi_summary_timestamp_seconds) > 3600
-        for: 10m
-        labels: {severity: warning}
-        annotations:
-          summary: "KPI summary not updated > 1h"
-          runbook: "docs/operations/Runbooks.md#9-3-kpi-未生成check層"
+---
+
+## 10. Runbooks 連携（一次対応）
+- `DoErrorBudgetBurn` → `Runbooks.md §8 （ロールバック/停止→復帰）`  
+- `DoLatencyP95High` → `Runbooks.md §7 （遅延スパイク）`  
+- `SlippageSpike` → `Runbooks.md §6 （スリッページ）`  
+- `PlanFeaturesStale` → `Plan-Layer.md §6 （再収集/バックフィル）`  
+- `KpiDegradation` → `Strategy-Lifecycle.md §4.5 （降格/再評価）`
+
+---
+
+## 11. 実装ガイド（インスツルメンテーション）
+**Python（OTel + Prometheus クライアント）**
+```python
+from prometheus_client import Histogram, Counter
+order_latency = Histogram("do_order_latency_seconds", "Do end-to-end latency",
+                          buckets=[0.05,0.1,0.2,0.3,0.5,0.75,1,1.5,2,3,5])
+orders_total = Counter("do_order_requests_total", "Do orders", ["status"])
+
+# usage
+with order_latency.time():
+    status = process_order(req)
+orders_total.labels(status=status).inc()
+```
+
+**FastAPI（Correlation ID 中継）**
+```python
+async def correlation_mw(request, call_next):
+    cid = request.headers.get("X-Correlation-ID") or str(uuid4())
+    response = await call_next(request)
+    response.headers["X-Correlation-ID"] = cid
+    return response
 ```
 
 ---
 
-## 6. ダッシュボード設計（Grafana）
-- **Top: PDCA Overview**  
-  - PDCA DAG 状況（成功/失敗, SLAミス, 実行時間p95）  
-  - Do-layer Latency p95 / Slippage p90  
-  - Risk Events（kind×severity の heatmap）  
-  - KPI（win_rate, max_dd_pct） by strategy  
-- **ページ別**  
-  - **Airflow**：DAG/Task Durations, Failures, Backfills  
-  - **Do**：Latency・Slippage・Broker API Latency/Errors  
-  - **Models**：推論レイテンシ/σ分布、モデルID別  
-  - **KPI**：期間選択（7d/30d）で戦略横断比較
-
-**PromQL 例**
-```promql
-# Do-layer latency p95
-histogram_quantile(0.95, sum(rate(do_order_latency_seconds_bucket[5m])) by (le, strategy))
-
-# Slippage p90 by symbol
-histogram_quantile(0.90, sum(rate(do_slippage_pct_bucket{symbol=~"BTCUSDT|ETHUSDT"}[10m])) by (le, symbol))
-
-# Airflow DAG SLA misses (last 24h, top 5)
-topk(5, increase(airflow_dag_sla_miss_total[24h]))
-```
-
-**Grafana 注釈（インシデント/採用リリース）**
-- `annotations` を API から投入：`/api/annotations`（内容：release_id, strategy, version, incident_id）  
-- 例：Adopt 7%→30%→100% の**段階導入**ラインをタイムチャートへ表示。
+## 12. 品質基準（DoD）
+- SLO 定義済 & ダッシュボード/ルールが**Git に存在**。  
+- 主要メトリクス & ログ & トレースが**相互に辿れる**（Correlation ID）。  
+- Alert は Runbooks へリンク済、**誤検知率 < 2%** を目標。  
+- 変更は **同一PR** で `Testing-And-QA.md` とゲート条件を更新。
 
 ---
 
-## 7. ログ収集 & クエリ（Loki/ELK）
-- **取り込み**：アプリから `stdout` JSON を収集（Docker driver / Promtail）。  
-- **保存**：`/data/logs/YYYYMMDD/*.log`（ローカル）＋ 集約基盤（Loki/ELK）。  
-- **LogQL 例**
-```bash
-# 直近のDo層エラー
-{component="do.order_execution", level="ERROR"} |= "RISK_BOUNDARY_EXCEEDED"
-
-# 戦略ごとの発注ログ集計
-sum by (strategy) (count_over_time({component="do.order_execution"}[1h]))
-```
-
----
-
-## 8. トレーシング（OTel）
-**コンフィグ例（Collector）**
-```yaml
-receivers:
-  otlp:
-    protocols: {http: {}, grpc: {}}
-
-exporters:
-  prometheus: {endpoint: "0.0.0.0:9464"}
-  otlp:
-    endpoint: "tempo:4317"
-    tls: {insecure: true}
-
-processors:
-  batch: {}
-  attributes:
-    actions:
-      - key: correlation_id
-        from_context: X-Correlation-ID
-        action: upsert
-
-service:
-  pipelines:
-    traces: {receivers: [otlp], processors: [batch, attributes], exporters: [otlp]}
-    metrics: {receivers: [otlp], processors: [batch], exporters: [prometheus]}
-```
-- **実装要点**：API/GUI/タスク内で `X-Correlation-ID` を**生成→伝播**。ログにも同値を出力して**相互参照**可能にする。
-
----
-
-## 9. Airflow 連携
-- **メトリクス**：Airflow の Prometheus エクスポートを**有効**にし、`/metrics` を収集。  
-- **タグ**：`dag_id, task_id, owner` を**ラベル化**。  
-- **Runbook**：失敗→ `Runbooks.md §9.1`、バックフィル→ `§12`。
-
----
-
-## 10. KPI パイプラインの観測
-- **Input**：`/data/execution_logs/*.json`（Do → Check）  
-- **Process**：`check.evaluate_kpis` → `kpi_summary.json`（timestamp を**メトリクス化**：`kpi_summary_timestamp_seconds`）  
-- **Output**：GUI / ダッシュボード。  
-- **アラート**：`KpiSummaryStale`（§5）。
-
----
-
-## 11. SLO / Error Budget（例）
-| サービス | 指標 | 目標（30日） | 計測方法 |
-|---|---|---|---|
-| Do-layer | p95 latency | ≤ 500ms | `do_order_latency_seconds` |
-| Airflow | DAG成功率 | ≥ 99% | `airflow_dag_runs_total`（成功/失敗） |
-| KPI更新 | 更新遅延 | ≤ 60分 | `kpi_summary_timestamp_seconds` |
-| Broker I/F | エラー率 | ≤ 1% | `broker_api_errors_total / requests_total` |
-
-> 逸脱時は**エラーバジェット消費**を可視化し、変更凍結や Safemode 維持を検討。
-
----
-
-## 12. セキュリティ & プライバシー
-- Logs へ**Secrets/PII を出力禁止**。必要なら**hash/伏字**。  
-- 監査ログ（`audit_order.json`）は**完全性維持**（改変不可ストレージ推奨）。  
-- 可観測基盤へのアクセスは `Security-And-Access.md` の最小権限/監査を適用。
-
----
-
-## 13. テスト / 変更管理
-- **テスト**：ダミー生成器でメトリクス/ログ/アラートを**リハーサル**。  
-- **CI**：Prometheus Rule/Loki LogQL の**静的チェック**。  
-- **変更**：ダッシュボード/ルール更新は**同一PR**で `Runbooks.md` の運用差分を更新。
-
----
-
-## 14. よくある質問（FAQ）
-- **Q:** KPIが更新されないのにメトリクスは正常？  
-  **A:** `check.evaluate_kpis` タスクのログと `kpi_*` メトリクスを参照。`KpiSummaryStale` ルールを確認。  
-- **Q:** 取引停止フラグが自動でONになった？  
-  **A:** `SlippageSpike`/`LosingStreakThreshold` の発火履歴と `flags_global_trading_pause` を確認。
-
----
-
-## 15. 変更履歴（Changelog）
-- **2025-08-12**: 初版作成（Signals/Rules/Dashboards/Tracing/SLO/セキュリティ）
+## 13. 変更履歴（Changelog）
+- **2025-08-12**: 初版作成（SLO 数値確定／記録ルール／Multi-window アラート／ログ・トレース規約／ダッシュボード＆Runbooks 連携）
