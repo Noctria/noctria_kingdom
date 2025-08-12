@@ -1,317 +1,339 @@
-# 🔭 Observability — Noctria Kingdom（HUD版 / Grafanaなし）
+# Observability.md
+_Noctria Kingdom — 観測・可視化ガイド（最新版 / 2025-08-12）_
 
-**Version:** 1.1  
-**Status:** Adopted  
-**Last Updated:** 2025-08-12 (JST)
-
-> 目的：Noctria の PDCA（Plan/Do/Check/Act）と統治基盤（GUI/Airflow/API）の**状態を可視化**し、**逸脱を即検知**・**根因追跡**・**説明可能性**を担保する。  
-> 前提：**FastAPI + Gunicorn（Uvicorn workers）** を標準。Prometheus は**任意**（/metrics が出せるなら利用、無ければ /metrics.json で代替）。  
-> 参照：`../apis/API.md` / `../apis/Do-Layer-Contract.md` / `../qa/Testing-And-QA.md` / `../operations/Runbooks.md` / `../security/Security-And-Access.md`
+本ドキュメントは `/hud/observability` および関連ETL/計測の**決定事項**を一問一答の結果に基づき集約したものです。未決事項は「要検討」と明記します。
 
 ---
 
-## 1. スタック & 原則（Grafanaなし構成）
-- **可視化**：FastAPI GUI 内の **HUD**（`/hud/observability`）。ECharts/Chart.js 等で描画。
-- **収集**：
-  - A) **Prometheusあり**：`prometheus_client` で `/metrics` を公開（推奨）。  
-  - B) **Prometheusなし**：アプリ内でカウンタ/ヒストグラムを集計し、`/metrics.json` を返す。
-- **アラート**：FastAPI 内の **スケジューラ（APScheduler or 自作）** が SLI/SLO を定期判定し、**Slack Webhook** へ通知。
-- **ログ**：Gunicorn/Uvicorn の**構造化JSON**を標準出力。`correlation_id`, `env`, `component`, `latency_ms` は必須。
-- **原則**：
-  1) **Guardrails First**：Noctus 境界と KPI の逸脱を最優先で検知。  
-  2) **Correlation**：`X-Correlation-ID` を**メトリクス・ログ**に横断付与。  
-  3) **SLO as Code**：しきい値/判定式をコードと本書で**単一情報源**化。  
-  4) **低ノイズ**：アラートは**多窓（長窓×短窓）**で誤検知を抑制。  
+## 0. TL;DR（確定事項）
+- **対象範囲**: A) FastAPI（GUI）, C) 学習/推論, D) 戦略実行, E) Plan層（collector/features/statistics）
+- **収集/保存**: a) アプリ内計測→DB, c) Airflowタスク集約, d) ログETL集約
+- **計測仕込み（要点）**  
+  - A: ASGIミドルウェア＋例外ハンドラ＋テンプレ描画計測  
+  - C: 学習ループ, モデル保存直後, 推論の入口/出口, 特徴量変換完了  
+  - D: 注文発行前後, 約定イベント, リスクチェック前後, 日次/戦略単位集計  
+  - E: collector, features, statistics の開始/終了＋異常検知
+- **保存先テーブル**: `obs_api_requests`, `obs_train_jobs`, `obs_infer_calls`, `obs_orders`, `obs_trades`, `obs_plan_runs`, `obs_alerts`（全採用）
+- **保持期間**: 生データ30日→日次ロールアップ、重要KPI180日、アラート90日（Criticalは180日）
+- **アラート閾値**: 下記 §6 に定義（採用）
+- **通知チャネル**: GUI内バナーのみ（外部通知なし）
+- **ETL頻度/方式**: 5分ごと / AirflowのETL DAGで集約
+- **権限**: 全員閲覧可（ログイン不要）
+- **HUDレイアウト**: **要検討（保留）**
 
-**ディレクトリ（推奨）**
+---
+
+## 1. 目的と非目的
+### 1.1 目的
+- 運用判断に必要な**レイテンシ/エラー/学習精度/執行KPI/データ品質**の一元可視化
+- 事後解析のための**最低限の生ログ**と**集約KPI**の確保
+- PDCAにおける **Plan→Do→Check** の循環を支える観測基盤
+
+### 1.2 非目的
+- フル機能のAPMや外部ダッシュボード（Grafana等）の代替は目指さない
+- 高頻度の外部通知（Slack/Email）— 今回は採用しない
+
+---
+
+## 2. 対象コンポーネント（Scope）
+- **A. FastAPI（GUI）**
+- **C. 学習/推論（例: Prometheus Oracle）**
+- **D. 戦略実行（オーダー執行・リスク監視）**
+- **E. Plan層（collector / features / statistics）**
+
+---
+
+## 3. メトリクス・KPI（推奨セット）
+### 3.1 A: FastAPI（GUI）
+- `http_requests_total`（メソッド/パス）
+- `http_request_duration_ms`（p50/p90/p99）
+- `http_error_rate`（4xx/5xx）
+- `template_render_time_ms`（Jinja描画）
+- `process_cpu_percent`, `process_rss_mb`（任意）
+
+### 3.2 C: 学習/推論
+- 学習: `train_jobs_count`, `train_success_rate`, `train_duration_min`, `eval_rmse/mae/mape`, `model_version`, `model_updated_at`
+- 推論: `inference_latency_ms`（p50/p90/p99）, `inference_qps`, `feature_staleness_min`
+
+### 3.3 D: 戦略実行
+- KPI: `win_rate`, `max_drawdown`, `trade_count`, `avg_holding_time_min`, `pnl_realized`, `pnl_unrealized`
+- 品質: `slippage_bps`, `order_fill_rate`, `order_reject_rate`, `latency_placement_ms`
+- リスク: `risk_limit_breaches`, `circuit_breaker_triggers`
+
+### 3.4 E: Plan層
+- 取得: `collector_run_duration_sec`, `records_fetched`, `api_error_rate`, `data_lag_min`
+- 特徴量: `feature_pipeline_duration_sec`, `missing_ratio`, `feature_drift_score`（要検討）
+- 統計: `outlier_rate`, `schema_changes_detected`
+
+---
+
+## 4. 収集方式とデータフロー
+- **a) アプリ内計測 → DB挿入**（FastAPIミドルウェア、学習/推論のフック、戦略実行ハンドラ等）
+- **c) Airflow タスクからの集計**（DAG状態/ログ→集約テーブル）
+- **d) ログETL**（戦略実行CSV/JSON・Airflowログを5分ごとに取り込み）
+
+```mermaid
+flowchart LR
+  A[FastAPI ミドルウェア/例外] -->|a: INSERT| DB[(PostgreSQL)]
+  C1[Train/Infer フック] -->|a: INSERT| DB
+  D1[注文/約定/リスク処理] -->|a: INSERT| DB
+  E1[collector/features/statistics] -->|a: INSERT| DB
+  L[CSV/JSON/AFログ] -->|d: ETL 5分| ETL[Airflow ETL DAG] -->|c/d: UPSERT| DB
+  DB --> HUD[/hud/observability]
 ```
-app/
-  observability/                     # 本章の実装一式
-    hud.py                           # /hud/observability ルート
-    metrics.py                       # /metrics or /metrics.json とカウンタ類
-    alerts.py                        # APScheduler ベースの SLx 判定 + Slack 通知
-deploy/
-  logging/uvicorn_gunicorn.conf      # Gunicorn 起動オプション（JSON ログ）
+
+---
+
+## 5. 計測の仕込みポイント（確定）
+### 5.1 A: FastAPI
+- **ASGIミドルウェア（必須）**: リクエスト開始/終了・除外ルート（/static, /health）
+- **例外ハンドラ（必須）**: 未捕捉例外/5xxの分類と計上
+- **テンプレ描画計測（推奨）**: Jinja描画時間の追加記録
+
+### 5.2 C: 学習/推論
+- **学習ループ（必須）**: 各試行/エポック終了時 `loss/rmse/mae/経過秒/ステータス`
+- **モデル保存直後（必須）**: `model_version/updated_at/評価指標`
+- **推論入口/出口（必須）**: `latency_ms/success/feature_staleness_min`
+- **特徴量変換完了（推奨）**: `pipeline_duration/rows/missing_ratio`
+
+### 5.3 D: 戦略実行
+- **注文発行前後（必須）**: 発行→約定までのレイテンシ、スリッページ
+- **約定イベント（必須）**: 約定価格/数量/PNL/勝敗、リジェクト理由
+- **リスクチェック前後（推奨）**: DDや上限超過、ブレーカー発動
+- **日次・戦略単位集計（推奨）**: KPI集約をテーブル/ビューとして更新
+
+### 5.4 E: Plan層
+- **collector開始/終了（必須）**: 件数/時間/遅延/エラー率
+- **features完了（必須）**: 所要時間/生成行数/欠損率
+- **statistics完了（推奨）**: 集計時間/外れ値率/スキーマ変更
+- **異常検知（推奨）**: 閾値越え時 `obs_alerts` に記録
+
+---
+
+## 6. アラート設計（採用）
+- **A: FastAPI**  
+  - p99レスポンス > **1500ms**（5分連続）  
+  - 5xx率 > **2%**（10分平均）
+- **C: 学習/推論**  
+  - RMSE 前回比 > **+10%**  
+  - 推論 p99 > **800ms**（5分連続）  
+  - 特徴量鮮度 > **60分**
+- **D: 戦略実行**  
+  - MaxDD（30日ローリング） > **10%**  
+  - Reject率 > **1%**（当日）  
+  - 連敗数 ≥ **8**
+- **E: Plan層**  
+  - collector遅延 > **30分**  
+  - 欠損率 > **5%**（重要列）
+
+> **通知チャネル**: GUI内バナーのみ（Slack/Email等は**使わない**）
+
+---
+
+## 7. スキーマ（採用テーブル / 推奨DDL）
+> **注意**: 実デプロイではプロジェクトの`core.path_config`に合わせたスキーマ名/インデックス名へ修正してください。
+
+```sql
+-- A: FastAPI
+CREATE TABLE IF NOT EXISTS obs_api_requests (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  path TEXT NOT NULL,
+  method TEXT NOT NULL,
+  status INT NOT NULL,
+  dur_ms INT NOT NULL,
+  user_agent TEXT,
+  err_flag BOOLEAN NOT NULL DEFAULT FALSE,
+  template_render_ms INT
+);
+CREATE INDEX IF NOT EXISTS idx_obs_api_requests_ts ON obs_api_requests (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_api_requests_path ON obs_api_requests (path);
+
+-- C: 学習ジョブ
+CREATE TABLE IF NOT EXISTS obs_train_jobs (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  job_id TEXT,
+  model TEXT,
+  ver TEXT,
+  status TEXT,       -- success/fail/interrupt
+  dur_sec INT,
+  rmse DOUBLE PRECISION,
+  mae DOUBLE PRECISION,
+  mape DOUBLE PRECISION
+);
+CREATE INDEX IF NOT EXISTS idx_obs_train_jobs_ts ON obs_train_jobs (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_train_jobs_model_ver ON obs_train_jobs (model, ver);
+
+-- C: 推論
+CREATE TABLE IF NOT EXISTS obs_infer_calls (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  model TEXT,
+  ver TEXT,
+  dur_ms INT,
+  success BOOLEAN,
+  feature_staleness_min INT
+);
+CREATE INDEX IF NOT EXISTS idx_obs_infer_calls_ts ON obs_infer_calls (ts);
+
+-- D: 注文発行
+CREATE TABLE IF NOT EXISTS obs_orders (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  strategy TEXT,
+  type TEXT,         -- market/limit/...
+  qty DOUBLE PRECISION,
+  price DOUBLE PRECISION,
+  lat_ms INT,
+  filled BOOLEAN,
+  rejected BOOLEAN,
+  reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_obs_orders_ts ON obs_orders (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_orders_strategy ON obs_orders (strategy);
+
+-- D: 約定
+CREATE TABLE IF NOT EXISTS obs_trades (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  strategy TEXT,
+  side TEXT,         -- buy/sell
+  qty DOUBLE PRECISION,
+  price DOUBLE PRECISION,
+  pnl DOUBLE PRECISION,
+  win_flag BOOLEAN,
+  slippage_bps DOUBLE PRECISION
+);
+CREATE INDEX IF NOT EXISTS idx_obs_trades_ts ON obs_trades (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_trades_strategy ON obs_trades (strategy);
+
+-- E: Plan層（collector/features/statistics）
+CREATE TABLE IF NOT EXISTS obs_plan_runs (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  phase TEXT,              -- collector|features|statistics
+  dur_sec INT,
+  rows BIGINT,
+  missing_ratio DOUBLE PRECISION,
+  error_rate DOUBLE PRECISION
+);
+CREATE INDEX IF NOT EXISTS idx_obs_plan_runs_ts ON obs_plan_runs (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_plan_runs_phase ON obs_plan_runs (phase);
+
+-- 共通: アラート
+CREATE TABLE IF NOT EXISTS obs_alerts (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  severity TEXT,           -- Info/Warning/Critical
+  source TEXT,             -- A|C|D|E
+  key TEXT,                -- 例: p99_latency_ms
+  value DOUBLE PRECISION,
+  threshold DOUBLE PRECISION,
+  message TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_obs_alerts_ts ON obs_alerts (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_alerts_source ON obs_alerts (source);
 ```
 
 ---
 
-## 2. メトリクス規約（名前・ラベル・バケット）
-- **命名**：`<layer>_<subject>_<metric>_{seconds|total|pct|gauge}`  
-  - 例：`do_order_latency_seconds`（ヒスト） / `do_slippage_pct`（ヒスト） / `plan_features_recency_seconds`（ゲージ）
-- **最低ラベル**：`env`, `layer`, `component`, `symbol`, `strategy`, `status`, `broker`, `tf`
-- **ヒストグラム既定バケット**  
-  - レイテンシ（秒）：`[0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 5]`  
-  - スリッページ（%）：`[0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2]`
+## 8. データ保持とロールアップ（採用）
+- **生データ**（`obs_api_requests`, `obs_orders`, `obs_trades`, `obs_infer_calls`, `obs_plan_runs`）  
+  - **30日保持** → 以降は**日次集約**（平均/最大/分位など）にロールアップ
+- **重要KPI**（`win_rate`, `max_drawdown`, `rmse`, `mae`, `mape`）  
+  - **180日保持**
+- **アラート**（`obs_alerts`）  
+  - **90日保持**（Criticalは**180日**）
 
-**主要メトリクス（抜粋）**
-| 名称 | 種別 | 説明 |
-|---|---|---|
-| `do_order_requests_total{status}` | Counter | 成功/失敗/拒否件数 |
-| `do_order_latency_seconds` | Histogram | Do 層 E2E レイテンシ |
-| `do_slippage_pct` | Histogram | 取引ごとの滑り率（%） |
-| `risk_events_total{kind,severity}` | Counter | Noctus の境界発火件数 |
-| `plan_features_recency_seconds` | Gauge | 最新特徴量の遅延（秒） |
-| `kpi_win_rate` / `kpi_max_dd_pct` | Gauge | Check 層 KPI スナップ |
+> 実装案: `*_daily` 集約テーブル（例: `obs_api_requests_daily`）＋Airflowの日次ロールアップDAG
 
 ---
 
-## 3. SLO/SLA（数値確定：prod／stg は +20% 緩和）
-| SLO 名 | 目標 | 説明 |
-|---|---|---|
-| Do レイテンシ p95 | ≤ **0.50s** | `do_order_latency_seconds` |
-| Do エラー率 | ≤ **0.5%** | `5xx + REJECTED` / 全リクエスト（5分窓） |
-| スリッページ p90 | ≤ **0.30%** | 10分窓 |
-| 特徴量遅延 | ≤ **120s** | `plan_features_recency_seconds` |
-| KPI 安定 | `win_rate ≥ 0.50` & `max_dd ≤ 8%` | 7日窓 |
-
-**SLI 算出（Prometheus ありの場合の式イメージ）**  
-- p95 レイテンシ：`histogram_quantile(0.95, sum by (le) (rate(do_order_latency_seconds_bucket[5m])))`  
-- エラー率：`sum(rate(do_order_requests_total{status=~"5..|REJECTED"}[5m])) / sum(rate(do_order_requests_total[5m]))`  
-- p90 スリッページ：`histogram_quantile(0.90, sum by (le) (rate(do_slippage_pct_bucket[10m])))`
-
-**Prometheus がない場合**：アプリ内で p 分位（p95/p90）と比率を計算し、`/metrics.json` に載せる。
+## 9. HUD ルート `/hud/observability`
+- **公開範囲**: **全員閲覧可（ログイン不要）**
+- **レイアウト**: **要検討（保留）**  
+  - 既存GUIにレイアウト/HTMLが生成済みのため、本ドキュメントでは拘束しない
+- **バナー通知**: アラートはGUI内バナーで提示（外部通知なし）
 
 ---
 
-## 4. アラート（HUD版：アプリ内スケジューラ）
-**判定ルール（長窓 × 短窓 の多窓バーン）**
-- **DoErrorBudgetBurn**：2h 窓 > 1% **かつ** 15m 窓 > 2%（5分連続）→ **CRITICAL**  
-- **DoLatencyP95High**：p95 > 0.5s（10分連続）→ **HIGH**  
-- **SlippageSpike**：p90 > 0.30%（10分連続）→ **HIGH**  
-- **PlanFeaturesStale**：`recency > 120s`（5分連続）→ **MEDIUM**  
-- **KpiDegradation**：`win_rate < 0.50` **or** `max_dd > 8`（12h）→ **MEDIUM**
-
-**通知**：Slack `#ops-alerts`（Webhook）。Runbooks の該当章リンクを必ず添付。  
-**抑制**：デプロイ直後 / 段階導入切替の 10 分は抑制（HUD トーストで注釈表示）。
+## 10. 取り込み頻度と方式（採用）
+- **頻度**: **5分ごと**
+- **方式**: **Airflow のETL DAG**で集約実行  
+  - 戦略実行ログ / Airflowログ → 5分ごとにETLし、UPSERTでDB更新  
+  - FastAPI/学習・推論はアプリ側で**即時INSERT**（イベント駆動）
 
 ---
 
-## 5. 実装（抜粋スニペット）
-### 5.1 メトリクス（/metrics or /metrics.json）
+## 11. ランブック（運用手順・抜粋）
+1. **初期化**
+   - 本ドキュメントのDDLをPostgreSQLに適用
+   - Airflowに「obs_etl_5min」「obs_rollup_daily」DAGを登録（要プロジェクト標準化）
+2. **アプリ組み込み**
+   - FastAPIミドルウェア/例外ハンドラ/テンプレ計測をON
+   - 学習/推論/戦略実行/Plan層にフックを配置
+3. **監視**
+   - `/hud/observability` を常用
+   - GUIバナーに重要アラートを露出
+4. **保守**
+   - 30日ごとにロールアップ結果のサイズ/性能確認
+   - 閾値は四半期ごとに見直し（要検討）
+
+---
+
+## 12. 未決事項（要検討リスト）
+- HUDの詳細レイアウト/画面分割、チャート構成、テーブルUI
+- `feature_drift_score` の具体指標（PSI/KL/他）と閾値
+- モデル/戦略ごとのタグ設計（モデル名・通貨ペア・期間など）
+- 既存スキーマとの統合方針（スキーマ名、外部キーの付与）
+
+---
+
+## 13. 参考（実装スニペット / 任意）
+> 実コードはプロジェクトに合わせて調整すること。
+
+**FastAPI ミドルウェア概略**
 ```python
-# app/observability/metrics.py
-from fastapi import APIRouter
-from datetime import datetime, timezone
-from collections import deque
-from typing import Optional
-
-router = APIRouter()
-BUCKETS_LAT = [0.05,0.1,0.2,0.3,0.5,0.75,1,1.5,2,3,5]
-
-# 環境に Prometheus がある場合は自動利用（無ければ JSON 返却）
+start = time.perf_counter()
 try:
-    from prometheus_client import Histogram, Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
-    PROM = True
-    do_latency = Histogram("do_order_latency_seconds", "Do latency (E2E)", buckets=BUCKETS_LAT)
-    do_total = Counter("do_order_requests_total", "Do requests", ["status"])
-    do_slip = Histogram("do_slippage_pct", "Slippage pct", buckets=[0.05,0.1,0.2,0.3,0.5,0.75,1,1.5,2])
-    features_recency = Gauge("plan_features_recency_seconds", "Features recency (s)")
-    kpi_win_rate = Gauge("kpi_win_rate", "Win rate (0..1)")
-    kpi_max_dd = Gauge("kpi_max_dd_pct", "Max drawdown (%)")
-except Exception:
-    PROM = False
-
-# Prometheus が無い場合の軽量集計（直近10分）
-WINDOW = deque(maxlen=600)  # 1秒サンプル * 600 = 10分
-STATE = {"errors":0, "total":0, "features_recency":0.0, "kpi":{"win_rate":None,"max_dd_pct":None}}
-
-def pct(xs, q):
-    if not xs: return None
-    s = sorted(xs); i = max(0, min(len(s)-1, int(q*(len(s)-1))))
-    return s[i]
-
-@router.get("/metrics")
-def metrics():
-    if PROM:
-        from fastapi.responses import Response
-        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-    # Prometheus 無し：JSON を返す
-    now = datetime.now(timezone.utc).isoformat()
-    lat = [x["lat"] for x in WINDOW if "lat" in x]
-    slip = [x["slip"] for x in WINDOW if "slip" in x]
-    err_rate = (STATE["errors"]/STATE["total"]) if STATE["total"] else 0.0
-    return {
-        "ts": now,
-        "latency_p95": pct(lat, 0.95),
-        "error_rate": err_rate,
-        "slippage_p90": pct(slip, 0.90),
-        "features_recency_s": STATE["features_recency"],
-        "kpi": STATE["kpi"]
-    }
-
-#（アプリの処理側で do_latency.time() や WINDOW.append(...) を呼び出して集計する）
+    resp = await call_next(request)
+    err = resp.status_code >= 500
+finally:
+    dur_ms = int((time.perf_counter() - start) * 1000)
+    if not request.url.path.startswith(("/static", "/health")):
+        insert_obs_api_request(ts=now(), path=norm(request.url.path),
+                               method=request.method, status=resp.status_code,
+                               dur_ms=dur_ms, ua=request.headers.get("user-agent"),
+                               err_flag=err, template_render_ms=getattr(request.state, "tpl_ms", None))
 ```
 
-### 5.2 HUD ルート（/hud/observability）
+**学習ループ内ログ概略**
 ```python
-# app/observability/hud.py
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-router = APIRouter()
-
-@router.get("/hud/observability", response_class=HTMLResponse)
-def hud():
-    # 最小のカード表示（CSS/JS はプロジェクト共通の HUD を想定）
-    return """
-    <section class="grid grid-cols-2 gap-4">
-      <div class="card"><h3>Do p95 latency</h3><div id="lat_p95">--</div><small>SLO ≤ 0.50s</small></div>
-      <div class="card"><h3>Do error-rate</h3><div id="err">--</div><small>SLO ≤ 0.5%</small></div>
-      <div class="card"><h3>p90 slippage</h3><div id="slip">--</div><small>SLO ≤ 0.30%</small></div>
-      <div class="card"><h3>Features recency</h3><div id="rec">--</div><small>≤ 120s</small></div>
-    </section>
-    <script>
-    async function refresh(){
-      const res = await fetch('/metrics'); const m = await res.json();
-      const p95 = (m.latency_p95 ?? 0).toFixed(3)+'s';
-      const er  = ((m.error_rate ?? 0)*100).toFixed(2)+'%';
-      const p90 = (m.slippage_p90 ?? 0).toFixed(2)+'%';
-      const fr  = (m.features_recency_s ?? 0).toFixed(0)+'s';
-      document.getElementById('lat_p95').innerText = p95;
-      document.getElementById('err').innerText = er;
-      document.getElementById('slip').innerText = p90;
-      document.getElementById('rec').innerText = fr;
-    }
-    setInterval(refresh, 5000); refresh();
-    </script>
-    """
+log_train(job_id, model, ver, status="success", dur_sec=elapsed, rmse=rmse, mae=mae, mape=mape)
 ```
 
-### 5.3 アラート（APScheduler + Slack）
+**推論入口/出口概略**
 ```python
-# app/observability/alerts.py
-import os, json, httpx, asyncio
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, timezone
-
-SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK_URL")
-
-def within(v, hi): return v is not None and v > hi
-def below(v, lo): return v is not None and v < lo
-
-async def notify(kind, text, runbook="#"):
-    if not SLACK_WEBHOOK: return
-    payload = {"text": f"[{kind}] {text}\nRunbook: {runbook}"}
-    async with httpx.AsyncClient(timeout=10) as c:
-        await c.post(SLACK_WEBHOOK, json=payload)
-
-async def poll_metrics():
-    # Prometheus 無し前提の /metrics.json 取得（/metrics でもOK）
-    try:
-        async with httpx.AsyncClient(timeout=5) as c:
-            r = await c.get("http://127.0.0.1:8000/metrics")
-            m = r.json() if r.headers.get("content-type","").startswith("application/json") else {}
-    except Exception:
-        return
-    # 多窓バーン：ここでは簡略化（短窓のみ）。実運用はリングバッファで短窓/長窓を併記。
-    if within(m.get("latency_p95"), 0.5):
-        await notify("HIGH", f"Do p95 latency {m['latency_p95']:.3f}s > 0.50s", "/docs/operations/Runbooks.md#7-遅延スパイク対応")
-    if within(m.get("slippage_p90"), 0.30):
-        await notify("HIGH", f"p90 slippage {m['slippage_p90']:.2f}% > 0.30%", "/docs/operations/Runbooks.md#6-スリッページ急騰")
-    if within(m.get("features_recency_s"), 120):
-        await notify("MEDIUM", f"Features recency {m['features_recency_s']}s > 120s", "/docs/architecture/Plan-Layer.md#データ新鮮度")
-    kpi = m.get("kpi") or {}
-    if below(kpi.get("win_rate"), 0.50) or within(kpi.get("max_dd_pct"), 8.0):
-        await notify("MEDIUM", f"KPI degradation win_rate={kpi.get('win_rate')} max_dd={kpi.get('max_dd_pct')}%", "/docs/models/Strategy-Lifecycle.md#降格条件")
-
-def start_scheduler(loop):
-    sch = AsyncIOScheduler(event_loop=loop, timezone="UTC")
-    sch.add_job(poll_metrics, "interval", seconds=60, id="hud_alerts")
-    sch.start()
-    return sch
+t0 = now_ms()
+y = model.predict(x)
+lat_ms = now_ms() - t0
+log_infer(model, ver, dur_ms=lat_ms, success=True, feature_staleness_min=stale_min)
 ```
 
----
-
-## 6. ログ（構造化 JSON）
-**共通フィールド例**
-```json
-{
-  "ts":"2025-08-12T06:58:03Z",
-  "level":"INFO",
-  "component":"do.order_execution",
-  "msg":"order filled",
-  "env":"prod",
-  "correlation_id":"6f1d3b34-...",
-  "order_id":"SIM-12345",
-  "symbol":"BTCUSDT",
-  "strategy":"Prometheus-PPO",
-  "duration_ms":190
-}
-```
-- **禁止**：Secrets/PII。詳細は `../security/Security-And-Access.md`。  
-- **Gunicorn 起動例（JSONアクセスログ）**
-```bash
-gunicorn app.main:app -k uvicorn.workers.UvicornWorker \
-  --workers 4 --log-level info \
-  --access-logformat '{"ts":"%(t)s","ip":"%(h)s","method":"%(m)s","path":"%(U)s","status":"%(s)s","latency":"%(L)s","ref":"%(f)s","ua":"%(a)s"}' \
-  --access-logfile -
-```
-
----
-
-## 7. HUD（ダッシュボード）設計
-- **カード**：Do p95 レイテンシ / Do エラー率 / p90 スリッページ / 特徴量遅延 / KPI（win_rate・max_dd）  
-- **時系列**：直近 10 分・1 時間の p95/p90 を折れ線で。  
-- **注釈**：採用開始・段階移行・抑制ON/OFF・境界改訂は HUD 上部にトースト表示（Runbooks 連携）。  
-- **SLO 表示**：各カードに SLO を併記。逸脱時に赤色・点滅などの視覚強調。
-
----
-
-## 8. コスト & 保持
-- **ログ**：標準出力（コンテナ基盤のログドライバまたは logrotate）。  
-- **メトリクス**：Prometheus なしの場合、HUD 用の**短期（10分〜数時間）**のみ保持。  
-- **監査**：`audit_order.json` は**WORM ストレージ**に長期保管（90日以上）。
-
----
-
-## 9. 運用（アラートルーティング）
-| 種別 | 送信先 | 付記 |
-|---|---|---|
-| CRITICAL | 電話/Pager（任意） + Slack | 24/7 当番 |
-| HIGH | Slack `#ops-alerts` | 10 分ごと再通知 |
-| MEDIUM | Slack `#ops` | 営業時間対応 |
-| LOW | 週次レポート | 定例レビュー |
-
-**抑制度合**：デプロイ直後/段階導入（7%→30%→100%）の 10 分は自動抑制。
-
----
-
-## 10. Runbooks 連携（一次対応）
-- `DoErrorBudgetBurn` → `Runbooks.md §8（ロールバック/停止→復帰）`  
-- `DoLatencyP95High` → `Runbooks.md §7（遅延スパイク）`  
-- `SlippageSpike` → `Runbooks.md §6（スリッページ）`  
-- `PlanFeaturesStale` → `Plan-Layer.md §6（再収集/バックフィル）`  
-- `KpiDegradation` → `Strategy-Lifecycle.md §4.5（降格/再評価）`
-
----
-
-## 11. 実装統合メモ
-- **FastAPI 立ち上げ**で `metrics.router` と `hud.router` を include。  
-- **イベントループ取得**後に `alerts.start_scheduler(loop)` を呼ぶ。  
-- **Correlation-ID 中継ミドルウェア**を入れて、各ログ/メトリクスへ付与。
-
-**Correlation-ID（FastAPI ミドルウェア例）**
+**戦略実行（注文→約定）概略**
 ```python
-# app/middleware/correlation.py
-from uuid import uuid4
-async def correlation_mw(request, call_next):
-    cid = request.headers.get("X-Correlation-ID") or str(uuid4())
-    response = await call_next(request)
-    response.headers["X-Correlation-ID"] = cid
-    return response
+log_order(strategy, type, qty, price, lat_ms, filled, rejected, reason)
+log_trade(strategy, side, qty, price, pnl, win_flag, slippage_bps)
+```
+
+**Plan層フェーズ**
+```python
+log_plan_run(phase="collector", dur_sec=sec, rows=n, missing_ratio=mr, error_rate=er)
 ```
 
 ---
 
-## 12. 品質基準（DoD）
-- HUD（/hud/observability）が**正しく表示**され、p95/p90/比率が更新される。  
-- アラートが Slack に送れて、Runbooks 章へ**直リンク**できる。  
-- 主要メトリクス・ログに `correlation_id` が入る。  
-- 本書の SLO 値と実装のしきい値が**一致**（単一情報源）。
+## 14. 変更履歴
+- **2025-08-12**: 一問一答の決定を反映して全面更新。HUDレイアウトは保留。
 
----
-
-## 13. 変更履歴（Changelog）
-- **2025-08-12**: **v1.1** Grafana 非依存の HUD 構成に刷新。APScheduler/Slack による内製アラートを追加。Prometheus あり/なしの二系統に対応。
-- **2025-08-12**: v1.0 初版（PromQL 中心の記述）
