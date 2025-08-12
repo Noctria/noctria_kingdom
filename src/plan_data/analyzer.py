@@ -1,10 +1,21 @@
 # src/plan_data/analyzer.py
 
+import time
+from typing import Optional, List, Dict
+
 import numpy as np
 import pandas as pd
 
+from plan_data.observability import log_plan_run
+from plan_data.trace import new_trace_id
+
+
 class PlanAnalyzer:
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, *, trace_id: Optional[str] = None):
+        """
+        df: P層の特徴量DataFrame（snake_case想定）
+        trace_id: 未指定なら自動生成（symbol="MULTI", timeframe="1d"）
+        """
         # 数値列をできるだけ数値化（失敗はNaNに）
         self.df = df.copy()
         for c in self.df.columns:
@@ -12,6 +23,8 @@ class PlanAnalyzer:
                 continue
             if self.df[c].dtype == "object":
                 self.df[c] = pd.to_numeric(self.df[c], errors="coerce")
+
+        self._trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
 
     # 安全に末尾値を取得
     def _last(self, s: pd.Series):
@@ -35,8 +48,20 @@ class PlanAnalyzer:
         except Exception:
             return False
 
-    def extract_features(self) -> dict:
-        feats = {}
+    def _missing_ratio(self, df: Optional[pd.DataFrame]) -> float:
+        """全体欠損率（'date' は除外）。空なら 1.0。"""
+        if df is None or df.empty:
+            return 1.0
+        cols = [c for c in df.columns if c != "date"]
+        if not cols:
+            return 0.0
+        total = len(df) * len(cols)
+        if total <= 0:
+            return 0.0
+        return float(df[cols].isna().sum().sum()) / float(total)
+
+    def extract_features(self) -> Dict:
+        feats: Dict = {}
 
         # 例：勝率の変化をみる
         if "win_rate" in self.df.columns:
@@ -79,8 +104,8 @@ class PlanAnalyzer:
 
         return feats
 
-    def make_explanation_labels(self, features: dict) -> list:
-        labels = []
+    def make_explanation_labels(self, features: Dict) -> List[str]:
+        labels: List[str] = []
         if features.get("win_rate_rapid_increase"):
             labels.append("勝率が直近で急上昇しています。")
         if features.get("dd_worse_than_10"):
@@ -90,3 +115,48 @@ class PlanAnalyzer:
         if self._gt(features.get("news_count", np.nan), 200):
             labels.append("ニュース件数の増加が観測されます。")
         return labels
+
+    # 追加：一括実行 + 観測ログ
+    def analyze(self) -> Dict[str, object]:
+        """
+        特徴抽出と説明ラベル生成をまとめて実行し、観測ログ（phase="analyzer"）を残す。
+        戻り値: {"features": dict, "labels": list}
+        """
+        t0 = time.time()
+        feats = self.extract_features()
+        labels = self.make_explanation_labels(feats)
+
+        # 観測ログ（失敗しても本処理は継続）
+        try:
+            log_plan_run(
+                None,  # env NOCTRIA_OBS_PG_DSN を使用
+                phase="analyzer",
+                rows=len(self.df),
+                dur_sec=int(time.time() - t0),
+                missing_ratio=self._missing_ratio(self.df),
+                error_rate=0.0,  # TODO: 例外件数などを集計して反映
+                trace_id=self._trace_id,
+            )
+        except Exception:
+            pass
+
+        return {"features": feats, "labels": labels}
+
+
+# テスト例
+if __name__ == "__main__":
+    # 依存の都合で相対/絶対 import の両方に対応
+    try:
+        from src.plan_data.collector import PlanDataCollector  # type: ignore
+        from src.plan_data.features import FeatureEngineer     # type: ignore
+    except Exception:
+        from plan_data.collector import PlanDataCollector
+        from plan_data.features import FeatureEngineer
+
+    base = PlanDataCollector().collect_all(lookback_days=90)
+    feat = FeatureEngineer().add_technical_features(base)
+    analyzer = PlanAnalyzer(feat)
+    result = analyzer.analyze()
+
+    print("features keys:", list(result["features"].keys())[:20], "...")
+    print("labels:", result["labels"])
