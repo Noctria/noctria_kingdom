@@ -2,9 +2,11 @@
 
 import json
 import time
-import pandas as pd
+from typing import Dict, Any
+from datetime import datetime, date
+
 import numpy as np
-from typing import Any, Dict
+import pandas as pd
 
 from src.core.path_config import DATA_DIR
 from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
@@ -22,6 +24,9 @@ from src.strategies.hermes_cognitor import HermesCognitorStrategy
 from src.veritas.veritas_machina import VeritasMachina
 
 
+# --------------------------
+# Helpers
+# --------------------------
 def _safe_float(x, default=0.0):
     try:
         if pd.isna(x):
@@ -29,6 +34,23 @@ def _safe_float(x, default=0.0):
         return float(x)
     except Exception:
         return float(default)
+
+
+def _json_default(o):
+    """JSONでシリアライズ不能な型を素直な型へ落とす。"""
+    if isinstance(o, (datetime, date)):
+        return o.isoformat()
+    if isinstance(o, pd.Timestamp):
+        return o.isoformat()
+    if isinstance(o, pd.Timedelta):
+        return o.total_seconds()
+    if isinstance(o, np.integer):
+        return int(o)
+    if isinstance(o, np.floating):
+        return float(o)
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    return str(o)
 
 
 def _call_with_obs(*, model: str, version: str, trace_id: str, feature_staleness_min: int, func):
@@ -60,6 +82,9 @@ def _call_with_obs(*, model: str, version: str, trace_id: str, feature_staleness
             pass
 
 
+# --------------------------
+# Main
+# --------------------------
 def main():
     # === 追跡IDを作って、この実行全体で共有 ===
     with with_trace_id(new_trace_id(symbol="USDJPY", timeframe="1d")) as trace_id:
@@ -69,7 +94,8 @@ def main():
         collector = PlanDataCollector()
         base_df = collector.collect_all(lookback_days=60)
         fe = FeatureEngineer(ASSET_SYMBOLS)
-        feat_df = fe.add_technical_features(base_df, trace_id=trace_id)
+        # features.add_technical_features は trace_id 引数を取らない実装
+        feat_df = fe.add_technical_features(base_df)
 
         print(f"trace_id: {trace_id}")
         print("=== feat_df columns ===")
@@ -201,13 +227,17 @@ def main():
                 valid_df, n_days=5, decision_id="ALLDEMO-004", caller="plan_to_all", reason="一括デモ"
             ),
         )
+        # JSON保存のために date を文字列へ
+        if isinstance(pred_df, pd.DataFrame) and "date" in pred_df.columns:
+            pred_df = pred_df.copy()
+            pred_df["date"] = pd.to_datetime(pred_df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+
         print("\n🔮 Prometheus予測:\n", pred_df.head(5))
 
-        # 6) Analyzer → Hermes（Analyzerは analyze() を使うと自動で観測ログが残る）
-        analyzer = PlanAnalyzer(valid_df, trace_id=trace_id)
-        analyzed = analyzer.analyze()
-        explain_features = analyzed["features"]
-        labels = analyzed["labels"]
+        # 6) Analyzer → Hermes（PlanAnalyzer は extract_* API を利用）
+        analyzer = PlanAnalyzer(valid_df)
+        explain_features = analyzer.extract_features()
+        labels = analyzer.make_explanation_labels(explain_features)
 
         hermes_ai = HermesCognitorStrategy()
         hermes_out = _call_with_obs(
@@ -240,8 +270,8 @@ def main():
         )
         print("\n🧠 Veritas戦略:\n", json.dumps(veritas_out, indent=2, ensure_ascii=False))
 
-        # --- 保存 ---
-        out = dict(
+        # --- 保存（JSON互換に調整してダンプ） ---
+        out: Dict[str, Any] = dict(
             trace_id=trace_id,
             aurus=aurus_out,
             levia=levia_out,
@@ -253,7 +283,7 @@ def main():
         out_path = DATA_DIR / "demo" / "plan_to_all_minidemo.json"
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(out, f, ensure_ascii=False, indent=2)
+            json.dump(out, f, ensure_ascii=False, indent=2, default=_json_default)
         print(f"\n📁 進言サマリ保存: {out_path.resolve()}")
 
 
