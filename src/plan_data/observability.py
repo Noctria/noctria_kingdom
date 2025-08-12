@@ -6,15 +6,21 @@ import logging
 from typing import Optional
 from datetime import datetime, timezone
 
-import psycopg2
-from psycopg2.extras import Json
+# ==== DB driver 両対応（psycopg2 → psycopg3 フォールバック） ====
+try:
+    import psycopg2 as _pg  # psycopg2-binary
+    _DB_KIND = "psycopg2"
+except ModuleNotFoundError:  # psycopg3
+    import psycopg as _pg  # type: ignore
+    _DB_KIND = "psycopg3"
 
+_connect = _pg.connect  # 両者で共通
 
 # ---------- logging ----------
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("noctria.observability")
 if not logger.handlers:
-    # 呼び出し側で設定していない場合の簡易設定
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
 # ---------- utils ----------
@@ -25,7 +31,7 @@ def _utcnow() -> datetime:
 def _get_dsn(conn_str: Optional[str]) -> str:
     """
     接続文字列が未指定なら、環境変数 NOCTRIA_OBS_PG_DSN を使う。
-    例: postgresql://noctria:******@postgres:5432/noctria_db
+    例: postgresql://user:pass@localhost:5432/noctria_db
     """
     dsn = conn_str or os.getenv("NOCTRIA_OBS_PG_DSN")
     if not dsn:
@@ -33,7 +39,7 @@ def _get_dsn(conn_str: Optional[str]) -> str:
     return dsn
 
 
-# ---------- schema bootstrap (optional) ----------
+# ---------- schema bootstrap (optional/for dev) ----------
 _CREATE_PLAN_RUNS = """
 CREATE TABLE IF NOT EXISTS obs_plan_runs (
   id                BIGSERIAL PRIMARY KEY,
@@ -68,25 +74,26 @@ CREATE INDEX IF NOT EXISTS idx_infer_calls_trace ON obs_infer_calls(trace_id);
 def ensure_tables(conn_str: Optional[str] = None) -> None:
     """
     観測テーブル（obs_plan_runs / obs_infer_calls）を存在しなければ作る。
-    本番では移行ツール（Alembic等）推奨。開発・PoC向けに用意。
+    本番はマイグレーション（Alembic 等）推奨。開発・PoC向けの補助。
     """
     dsn = _get_dsn(conn_str)
-    with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
-        cur.execute(_CREATE_PLAN_RUNS)
-        cur.execute(_CREATE_INFER_CALLS)
-    logger.info("observability tables ensured.")
+    with _connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(_CREATE_PLAN_RUNS)
+            cur.execute(_CREATE_INFER_CALLS)
+    logger.info("observability tables ensured via %s.", _DB_KIND)
 
 
 # ---------- public API ----------
-def log_plan_run(conn_str: str,
+def log_plan_run(conn_str: Optional[str],
                  phase: str,
                  rows: int,
-                 dur_sec: int,
+                 dur_sec: int | float,
                  missing_ratio: float,
                  error_rate: float,
                  trace_id: Optional[str] = None) -> Optional[int]:
     """
-    P層の各フェーズ（collector/features/statistics）の計測を1件記録。
+    PLAN層の各フェーズ（collector/features/statistics）の計測を1件記録。
     戻り値: 追加行の id（失敗時は None）
     """
     sql = """
@@ -94,20 +101,20 @@ def log_plan_run(conn_str: str,
     VALUES (%s, %s, %s, %s, %s, %s, %s)
     RETURNING id
     """
-    params = (_utcnow(), phase, dur_sec, rows, missing_ratio, error_rate, trace_id)
+    params = (_utcnow(), phase, int(dur_sec), int(rows), float(missing_ratio), float(error_rate), trace_id)
     dsn = _get_dsn(conn_str)
     try:
-        with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
-            cur.execute(sql, params)
-            new_id = cur.fetchone()[0]
-            return new_id
+        with _connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                new_id = cur.fetchone()[0]
+                return int(new_id)
     except Exception as e:
-        # 失敗を飲み込まずログに残す（上位は無視して続行もできる）
         logger.warning("log_plan_run failed: %s (phase=%s, trace_id=%s)", e, phase, trace_id)
         return None
 
 
-def log_infer_call(conn_str: str,
+def log_infer_call(conn_str: Optional[str],
                    model: str,
                    ver: str,
                    dur_ms: int,
@@ -123,27 +130,29 @@ def log_infer_call(conn_str: str,
     VALUES (%s, %s, %s, %s, %s, %s, %s)
     RETURNING id
     """
-    params = (_utcnow(), model, ver, dur_ms, success, feature_staleness_min, trace_id)
+    params = (_utcnow(), model, ver, int(dur_ms), bool(success), int(feature_staleness_min), trace_id)
     dsn = _get_dsn(conn_str)
     try:
-        with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
-            cur.execute(sql, params)
-            new_id = cur.fetchone()[0]
-            return new_id
+        with _connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                new_id = cur.fetchone()[0]
+                return int(new_id)
     except Exception as e:
         logger.warning("log_infer_call failed: %s (model=%s, trace_id=%s)", e, model, trace_id)
         return None
 
 
-# ---------- convenience (optional) ----------
+# ---------- convenience ----------
 def ping(conn_str: Optional[str] = None) -> bool:
     """
     接続ヘルスチェック。接続できれば True。
     """
     dsn = _get_dsn(conn_str)
     try:
-        with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
-            cur.execute("SELECT 1;")
+        with _connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
         return True
     except Exception as e:
         logger.warning("observability ping failed: %s", e)
