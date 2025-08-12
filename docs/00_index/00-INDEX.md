@@ -85,7 +85,7 @@ Noctria Kingdom は、中央統治AI「King Noctria」を頂点とした複数�
 14. [Release-Notes.md](../roadmap/Release-Notes.md) – リリースノート  
 15. [Roadmap-OKRs.md](../roadmap/Roadmap-OKRs.md) – 中長期計画・OKR  
 16. [Coding-Standards.md](../governance/Coding-Standards.md) – コーディング規約  
-17. [ADRs](../adrs/) – 重要な技術選定の記録（Architecture Decision Records）  
+17. [ADRs](../adrs/adr.md) – 重要な技術選定の記録（Architecture Decision Records）  
 18. [Incident-Postmortems.md](../incidents/Incident-Postmortems.md) – インシデント事後分析  
 19. [Do-Layer-Contract.md](../apis/Do-Layer-Contract.md) – Do層API契約仕様  
 20. [Risk-Register.md](../risks/Risk-Register.md) – リスク登録簿  
