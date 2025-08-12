@@ -1,8 +1,13 @@
 # src/plan_data/features.py
 
+import time
 import pandas as pd
 import numpy as np
+from typing import Optional, Dict
+
 from plan_data.collector import ASSET_SYMBOLS  # 既定シンボル（任意で上書き可能）
+from plan_data.observability import log_plan_run
+from plan_data.trace import new_trace_id
 
 
 def _to_numeric(df: pd.DataFrame, cols) -> pd.DataFrame:
@@ -21,8 +26,21 @@ def _safe_pct_change(s: pd.Series) -> pd.Series:
     return s.pct_change(fill_method=None)
 
 
+def _missing_ratio(df: Optional[pd.DataFrame]) -> float:
+    """全体欠損率（'date' は除外）。空なら 1.0。"""
+    if df is None or df.empty:
+        return 1.0
+    cols = [c for c in df.columns if c != "date"]
+    if not cols:
+        return 0.0
+    total = len(df) * len(cols)
+    if total <= 0:
+        return 0.0
+    return float(df[cols].isna().sum().sum()) / float(total)
+
+
 class FeatureEngineer:
-    def __init__(self, symbols: dict = None):
+    def __init__(self, symbols: Dict[str, str] = None):
         """
         symbols: ASSET_SYMBOLS 互換の dict（{"USDJPY": "JPY=X", ...} のキー名を使う）
         """
@@ -40,11 +58,21 @@ class FeatureEngineer:
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def add_technical_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def add_technical_features(
+        self,
+        df: pd.DataFrame,
+        *,
+        trace_id: Optional[str] = None,
+    ) -> pd.DataFrame:
         """
         入力: collector.collect_all() の出力（snake_case）
         出力: 同じ snake_case のまま、各 *_return, *_volatility_*, *_rsi_14d 等を付与
+
+        監視: 処理時間・行数・欠損率を obs_plan_runs に記録（phase="features"）
         """
+        t0 = time.time()
+        trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
+
         newdf = df.copy()
 
         # 1) 市場系アセットの特徴量（close/volume があれば加工）
@@ -141,13 +169,31 @@ class FeatureEngineer:
         if "date" in newdf.columns:
             newdf = newdf.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
 
+        # 観測ログ（失敗しても継続）
+        try:
+            log_plan_run(
+                None,  # env NOCTRIA_OBS_PG_DSN を使用
+                phase="features",
+                rows=len(newdf),
+                dur_sec=int(time.time() - t0),
+                missing_ratio=_missing_ratio(newdf),
+                error_rate=0.0,  # TODO: 個別変換エラーを集計して反映
+                trace_id=trace_id,
+            )
+        except Exception:
+            pass
+
         # FEATURE_SPEC へは寄せず、そのまま snake_case のまま返す
         return newdf
 
 
 # テスト例
 if __name__ == "__main__":
-    from src.plan_data.collector import PlanDataCollector
+    # 直接実行時の依存解決（実行環境により import パスを調整してください）
+    try:
+        from src.plan_data.collector import PlanDataCollector  # type: ignore
+    except Exception:
+        from plan_data.collector import PlanDataCollector
 
     base_df = PlanDataCollector().collect_all(lookback_days=180)
     fe = FeatureEngineer(ASSET_SYMBOLS)
