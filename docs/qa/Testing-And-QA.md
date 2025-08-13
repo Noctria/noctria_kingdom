@@ -1,33 +1,34 @@
 # ✅ Testing & QA — Noctria Kingdom
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Adopted  
-**Last Updated:** 2025-08-12 (JST)
+**Last Updated:** 2025-08-14 (JST)
 
-> 目的：Noctria の **PDCA/AI/実行/運用** をバグから守り、**安全・再現性・説明責任**を満たすためのテスト/QA 標準を定義する。  
+> 目的：Noctria の **PDCA / AI / 実行 / 運用** を欠陥から守り、**安全・再現性・説明責任**を満たすためのテスト/QA 標準を定義する。  
 > 参照：`../governance/Vision-Governance.md` / `../architecture/Architecture-Overview.md` / `../architecture/Plan-Layer.md` / `../operations/Runbooks.md` / `../operations/Config-Registry.md` / `../operations/Airflow-DAGs.md` / `../observability/Observability.md` / `../security/Security-And-Access.md` / `../apis/API.md` / `../apis/Do-Layer-Contract.md`
 
 ---
 
 ## 1. スコープ & ゴール
-- スコープ：**コード**（Python/Configs/DAGs）、**契約**（JSON Schema/API）、**データ品質**、**モデル再現性**、**パフォーマンス/レジリエンス**、**監視/ルール**、**セキュリティ**。  
-- ゴール：
+- **スコープ**：コード（Python / Configs / DAGs）、**契約**（JSON Schema / API）、**データ品質**、**モデル再現性**、**パフォーマンス / レジリエンス**、**監視 / ルール**、**セキュリティ**、**DecisionEngine**（最小版）。  
+- **ゴール**：
   1) **Shift-left**：PR 時点で重大欠陥を検出（契約/スキーマ/静的解析）。  
-  2) **Reproducibility**：学習・推論・評価は **固定シード**と**ゴールデン値**で再現可能。  
+  2) **Reproducibility**：学習・推論・評価を **固定シード**と**ゴールデン値**で再現。  
   3) **Safety**：`risk_policy` 超過なし、**監査/説明**の証跡が残る。  
-  4) **Quality Gates**：数値しきい値で**自動合否**を判定（本書 §5・§15）。
+  4) **Quality Gates**：数値しきい値で**自動合否**（§5・§15）。  
+  5) **Traceable by Design**：`trace_id` が **Plan→Infer→Decision→Do→Exec** の全層を貫通（E2Eで検証）。
 
 ---
 
 ## 2. テスト・ピラミッド（全体像）
 ```mermaid
 flowchart TB
-  U["Unit Tests<br/>関数/小モジュール"] --> C["Contract Tests<br/>JSON Schema / API"]
-  C --> I["Integration Tests<br/>Adapter / Tasks / DB"]
-  I --> E["E2E (PDCA)<br/>最小本流 + 監査/説明"]
-  E --> P["Perf / Resilience<br/>負荷 / スパイク / 故障注入"]
-  U -.-> DQ["Data Quality<br/>欠損 / 外れ / 整合"]
-  E -.-> OBS["Observability Rules<br/>Alert / Loki / PromQL"]
+  U["Unit Tests"] --> C["Contract Tests"]
+  C --> I["Integration Tests"]
+  I --> E["E2E (PDCA)"]
+  E --> P["Perf / Resilience"]
+  U -.-> DQ["Data Quality"]
+  E -.-> OBS["Observability Rules"]
 ```
 
 ---
@@ -35,37 +36,42 @@ flowchart TB
 ## 3. テスト種別 & 最低基準
 
 ### 3.1 Unit（pytest）
-- 目的：純粋ロジック（特徴量、ロット計算、日付・端数・丸め）。  
+- 目的：純粋ロジック（特徴量、ロット計算、丸め/桁、時刻規約）。  
 - 基準：**カバレッジ 80%**（ビジネスロジック領域）。  
 ```bash
 pytest -q tests/unit
 ```
 
 ### 3.2 Contract（JSON Schema / API）
-- 対象：`order_request/exec_result/risk_event/kpi_summary/risk_policy`（`docs/schemas/*.schema.json`）。  
+- 対象：`order_request / exec_result / risk_event / kpi_summary / risk_policy`（`docs/schemas/*.schema.json`）。  
 - 基準：**スキーマ適合 100%**＋**後方互換チェック**（必須プロパティ削除は Fail）。  
 ```bash
 python -m jsonschema -i samples/exec_result_ok.json docs/schemas/exec_result.schema.json
 pytest -q tests/contract
 ```
 
-### 3.3 Integration（Adapter/Tasks/DB/Files）
+### 3.3 Integration（Adapter / Tasks / DB / Files）
 - 対象：`broker_adapter.py`, `order_execution.py`, Plan/Check タスク。  
-- 基準：FILLED / PARTIAL / REJECTED の **3 ケース再現**、丸め・桁・TickSize 合致（`Do-Layer-Contract.md §5.3`）。  
+- 基準：**FILLED / PARTIAL / REJECTED** の 3 ケース再現、丸め・桁・TickSize 合致（`Do-Layer-Contract.md §5.3`）。  
 ```bash
 pytest -q tests/integration -m "not slow"
 ```
 
-### 3.4 E2E（最小本流・監査/説明つき）
-- 対象：`pdca_plan_workflow → do_layer_flow → pdca_check_flow → pdca_act_flow` のスモーク。  
-- 合格：`audit_order.json` 生成、`kpi_summary.json` 更新、Hermes 説明が空でない。  
+### 3.4 E2E（最小本流・監査/説明/トレース）
+- 対象：`pdca_plan_workflow → do_layer_flow → pdca_check_flow → pdca_act_flow`。  
+- 合格：
+  - `audit_order.json` 生成  
+  - `kpi_summary.json` 更新  
+  - Hermes 説明が空でない  
+  - **trace_id が全イベントに存在**し、`obs_plan_runs / obs_infer_calls / obs_decisions / obs_exec_events / obs_alerts` に **同一 trace_id** が連鎖  
+  - `obs_trace_timeline` ビューで **P→D→Decision→Exec** の時系列が可視（最低 1 連鎖）
 ```bash
 pytest -q tests/e2e --maxfail=1
 ```
 
 ### 3.5 Data Quality（Plan）
-- 項目：**欠損/外れ/時間整合/祝日**。  
-- 基準：欠損比 ≤ 1%/日、重複バー=0、時刻整合 OK、統計（平均・分散）安定。  
+- 項目：欠損 / 外れ / 時間整合 / 祝日。  
+- 基準：欠損比 ≤ 1%/日、重複バー 0、UTC 整合 OK、統計の分散変動が範囲内。  
 ```bash
 pytest -q tests/data_quality
 ```
@@ -81,21 +87,21 @@ def test_lot_never_exceeds_policy(sig):
 ```
 
 ### 3.7 再現性（ゴールデン/シード固定）
-- 小区間で学習・推論・評価 → **出力ハッシュ一致**（Git SHA/seed/依存と突合）。  
+- 小区間で学習・推論・評価 → **出力ハッシュ一致**（Git SHA / seed / 依存と突合）。  
 ```bash
-pytest -q tests/repro  # /data/golden/** と比較
+pytest -q tests/repro  # /tests/golden/** と比較
 ```
 
 ### 3.8 パフォーマンス / レジリエンス
 - 目的：Do 層 p95 < 500ms、障害時の**安全停止**。  
-- ツール：`k6`/`locust`、故障注入（遅延/接続切断/429）。  
+- ツール：`k6` / `locust`、故障注入（遅延 / 接続切断 / 429）。  
 ```bash
 k6 run tests/perf/do_orders_p95.js
 pytest -q tests/resilience -m fault_injection
 ```
 
 ### 3.9 セキュリティ
-- SAST/依存脆弱性/シークレットスキャン（PII/Secrets ログ禁止も検査）。  
+- SAST / 依存脆弱性 / シークレットスキャン（PII/Secrets ログ禁止も検査）。  
 ```bash
 bandit -q -r src
 pip-audit -r requirements.txt
@@ -110,17 +116,27 @@ pytest -q tests/observability
 ```
 
 ### 3.11 API 併走性 & Idempotency
-- 同一 `Idempotency-Key` の再送 → **重複実行なし**、24h 保持の検証。  
+- 同一 `Idempotency-Key` 再送 → **重複実行なし**、24h 保持の検証。  
 - PATCH は `If-Match` 必須（ETag 競合 412 を期待）。  
 ```bash
 pytest -q tests/api_idempotency
 ```
 
 ### 3.12 Streaming / Webhook
-- SSE：`Last-Event-ID` 再接続で欠落イベントが補完される。  
-- Webhook：HMAC 署名検証（時刻乖離 ±5分）で Fail/Pass を確認。  
+- SSE：`Last-Event-ID` 再接続で欠落イベントが補完。  
+- Webhook：HMAC 署名検証（時刻乖離 ±5m）で Fail/Pass を確認。  
 ```bash
 pytest -q tests/streaming_webhooks
+```
+
+### 3.13 DecisionEngine（RoyalDecision, 最小版）
+- **検証項目**：
+  - 重み・閾値・ロールアウト比率が **外部設定**（`configs/profiles.yaml`）と一致  
+  - 同一入力で **決定の再現性**（seed 固定）  
+  - **単調性**：ある助言の信頼度が上がると合成スコアが非減少  
+  - 出力に `trace_id` を付与し **obs_decisions** へ記録  
+```bash
+pytest -q tests/decision_engine
 ```
 
 ---
@@ -166,7 +182,7 @@ flowchart LR
 **PR ラベルで追加ゲート**  
 - `breaking-contract`：後方互換テスト強化 + 互換レポート必須  
 - `perf-sensitive`：Perf/Resilience を必須に昇格  
-- `security-impact`：SAST/依存監査の厳格モード
+- `security-impact`：SAST/依存監査を厳格モード
 
 ---
 
@@ -207,7 +223,7 @@ e2e:
 ---
 
 ## 7. フィクスチャ & テストデータ
-- **ディレクトリ**：`tests/fixtures/{plan,do,check,models}/**`  
+- **ディレクトリ**：`tests/fixtures/{plan,do,check,models,decision}/**`  
 - **ゴールデン**：`tests/golden/**`（出力ハッシュ用）  
 - **合成データ**：極端値/欠損/レート制限を再現した疑似ブローカーを同梱  
 - **シード**：`[1337, 1729, 31415]` を基本（`ModelCard-Prometheus-PPO.md` と整合）  
@@ -254,7 +270,7 @@ airflow dags backfill -s 2025-08-11 -e 2025-08-12 pdca_check_flow
 
 ---
 
-## 11. モデル QA（Prometheus/Veritas）
+## 11. モデル QA（Prometheus / Veritas）
 - **推論安定性**：同一入力 → **同一出力**（許容 ε）  
 - **学習再現**：小区間学習 → 指標 ±Δ（閾値 3%）  
 - **過学習**：Train/Test 乖離が**設定範囲内**  
@@ -273,8 +289,8 @@ airflow dags backfill -s 2025-08-11 -e 2025-08-12 pdca_check_flow
 ## 13. バグ管理 & 優先度
 | Severity | 定義 | 例 | 目標応答 |
 |---|---|---|---|
-| S1 | 安全/財務に重大 | 連続発注/境界無視/監査欠落 | 即時対応・抑制ON |
-| S2 | 本番影響大 | p95>0.5s 持続、DAG停止 | 当日内修正/回避 |
+| S1 | 安全/財務に重大 | 連続発注 / 境界無視 / 監査欠落 | 即時対応・抑制 ON |
+| S2 | 本番影響大 | p95>0.5s 持続、DAG 停止 | 当日内修正/回避 |
 | S3 | 影響中 | 一部戦略のみ劣化 | 次リリース |
 | S4 | 低 | UI/文言/軽微ログ | バックログ |
 
@@ -291,7 +307,7 @@ airflow dags backfill -s 2025-08-11 -e 2025-08-12 pdca_check_flow
 - 背景/目的:
 - 影響範囲:
 - テスト対象/除外:
-- テスト種別: Unit/Contract/Integration/E2E/Perf/Sec/Obs
+- テスト種別: Unit / Contract / Integration / E2E / Perf / Sec / Obs / Decision
 - データ/フィクスチャ:
 - 合格基準（メトリクス/しきい値）:
 - リスク/ロールバック:
@@ -327,20 +343,21 @@ repos:
 ---
 
 ## 15. カバレッジ & 品質基準（Quality Gates）
-- **ライン**：総合 75% 以上、コア（Plan/Do/Noctus）**80% 以上**。  
-- **Lint**：`ruff/black` ゼロエラー。`mypy --strict` 合格（型エラー 0）。  
+- **ライン**：総合 75% 以上、コア（Plan / Do / Noctus / Decision）**80% 以上**。  
+- **Lint**：`ruff / black` ゼロエラー。`mypy --strict` 合格（型エラー 0）。  
 - **契約**：スキーマ 100% 準拠、**後方互換 OK**。  
 - **Perf**：Do 層 p95 < **0.5s**（stg）。  
 - **セキュリティ**：`gitleaks` 0 件、`pip-audit` High 以上 0 件。  
 - **再現性**：ゴールデン差分 0（許容 ε は機能別に明記）。  
+- **トレース**：E2E で **trace_id 貫通率 100%**（主要テーブル連鎖で照合）。
 
 > いずれか 1 つでも **Fail → デプロイブロック**。例外は `ADR` による承認が必要。
 
 ---
 
 ## 16. 変更管理（Docs as Code）
-- 仕様変更は **同一PR**で本書と関連ドキュメント（`API / Do-Layer-Contract / Runbooks / Config-Registry / Observability`）を更新。  
-- 重要な QA 変更は `ADRs/` に記録（Decision / Rollout / Consequences）。
+- 仕様変更は **同一 PR**で本書と関連ドキュメント（`API / Do-Layer-Contract / Runbooks / Config-Registry / Observability / Architecture`）を更新。  
+- 重要な QA 変更は `adrs/` に記録（Decision / Rollout / Consequences）。
 
 ---
 
@@ -351,5 +368,10 @@ repos:
 ---
 
 ## 18. 変更履歴（Changelog）
-- **2025-08-12**: v1.1 追記（Idempotency/If-Match/SSE/Webhook、Flaky 対応、ゲート拡充、Mermaid 互換化）
-- **2025-08-12**: v1.0 初版作成（ピラミッド/基準/CI/Airflow/Do契約/モデル/監視/ゲーティング）
+- **2025-08-14**: v1.2  
+  - **trace_id の E2E 検証**（obs_decisions / obs_exec_events / timeline）を追加。  
+  - **DecisionEngine テスト**（外部設定・単調性・再現性）を追加。  
+  - Mermaid 図を GitHub 互換の最小構成に調整。  
+- **2025-08-12**: v1.1  
+  - Idempotency / If-Match / SSE / Webhook、Flaky 対応、ゲート拡充。  
+- **2025-08-12**: v1.0 初版（ピラミッド / 基準 / CI / Airflow / Do 契約 / モデル / 監視 / ゲーティング）
