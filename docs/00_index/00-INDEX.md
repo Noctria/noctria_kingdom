@@ -249,32 +249,32 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
 
 ---
 
-## 10. ドキュメント一覧（1〜21）
-1. `../00_index/00-INDEX.md` – 本ファイル。全体索引  
-2. `../governance/Vision-Governance.md` – プロジェクト理念・統治モデル  
-3. `../architecture/Architecture-Overview.md` – アーキテクチャ概要図  
-4. `../operations/Runbooks.md` – 運用手順書  
-5. `../operations/Config-Registry.md` – 設定管理ポリシー  
-6. `../operations/Airflow-DAGs.md` – DAG構造・運用ガイド  
-7. `../models/ModelCard-Prometheus-PPO.md` – モデル仕様書  
-8. `../models/Strategy-Lifecycle.md` – 戦略ライフサイクル  
-9. `../architecture/Plan-Layer.md` – Plan層詳細  
-10. `../apis/API.md` – API 仕様書  
-11. `../observability/Observability.md` – モニタリングと可観測性  
-12. `../security/Security-And-Access.md` – セキュリティとアクセス制御  
-13. `../qa/Testing-And-QA.md` – テスト戦略と品質保証  
-14. `../roadmap/Release-Notes.md` – リリースノート  
-15. `../roadmap/Roadmap-OKRs.md` – 中長期計画・OKR  
-16. `../governance/Coding-Standards.md` – コーディング規約  
-17. `../adrs/ADRs.md` – Architecture Decision Records  
-18. `../incidents/Incident-Postmortems.md` – 事後分析  
-19. `../apis/Do-Layer-Contract.md` – Do 層 API 契約  
-20. `../risks/Risk-Register.md` – リスク登録簿  
-21. `../howto/` – ハウツー集
+## 10. ドキュメント一覧（1〜21 / **リンクはすべて相対パスで docs/ 直下の現構成に整合**）
+1. [00-INDEX.md](../00_index/00-INDEX.md) – 本ファイル。全体索引  
+2. [Vision-Governance.md](../governance/Vision-Governance.md) – プロジェクト理念・統治モデル  
+3. [Architecture-Overview.md](../architecture/Architecture-Overview.md) – アーキテクチャ概要図  
+4. [Runbooks.md](../operations/Runbooks.md) – 運用手順書  
+5. [Config-Registry.md](../operations/Config-Registry.md) – 設定管理ポリシー  
+6. [Airflow-DAGs.md](../operations/Airflow-DAGs.md) – DAG構造・運用ガイド  
+7. [ModelCard-Prometheus-PPO.md](../models/ModelCard-Prometheus-PPO.md) – モデル仕様書  
+8. [Strategy-Lifecycle.md](../models/Strategy-Lifecycle.md) – 戦略ライフサイクル  
+9. [Plan-Layer.md](../architecture/Plan-Layer.md) – Plan層詳細  
+10. [API.md](../apis/API.md) – API 仕様書  
+11. [Observability.md](../observability/Observability.md) – モニタリングと可観測性  ※APIスコープ版は [`../apis/observability/Observability.md`](../apis/observability/Observability.md)  
+12. [Security-And-Access.md](../security/Security-And-Access.md) – セキュリティとアクセス制御  
+13. [Testing-And-QA.md](../qa/Testing-And-QA.md) – テスト戦略と品質保証  
+14. [Release-Notes.md](../roadmap/Release-Notes.md) – リリースノート  
+15. [Roadmap-OKRs.md](../roadmap/Roadmap-OKRs.md) – 中長期計画・OKR  
+16. [Coding-Standards.md](../governance/Coding-Standards.md) – コーディング規約  
+17. [ADRs.md](../adrs/ADRs.md) – Architecture Decision Records  
+18. [Incident-Postmortems.md](../incidents/Incident-Postmortems.md) – インシデント事後分析  
+19. [Do-Layer-Contract.md](../apis/Do-Layer-Contract.md) – Do 層 API 契約  
+20. [Risk-Register.md](../risks/Risk-Register.md) – リスク登録簿  
+21. [howto/](../howto/) – ハウツー集（`howto-*.md`）
 
 ---
 
 ## 11. 更新履歴
-- **2025-08-14**: GUI ルート（`/pdca/timeline`, `/pdca/latency/daily`）追記／Observability 拡充／systemd 常駐（`/etc/default/noctria-gui` + Shell 展開）明文化／Airflow↔DB のネットワーク手順の要点を追記  
+- **2025-08-14**: GUI ルート（`/pdca/timeline`, `/pdca/latency/daily`）追記／Observability 拡充／systemd 常駐（`/etc/default/noctria-gui` + Shell 展開）明文化／Airflow↔DB のネットワーク手順の要点を追記／**ドキュメント一覧（1〜21）を現行ツリーに合わせてリンク修正**  
 - **2025-08-12**: ドキュメント一覧を 1〜21 へ拡充  
 - **2025-08-12**: 初版作成
