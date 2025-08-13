@@ -1,0 +1,38 @@
+<!-- noctria_gui/templates/pdca_latency_daily.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Noctria PDCA Latency (Daily)</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", Helvetica, Arial; padding: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; border-bottom: 1px solid #e7e7e7; padding: 8px 10px; font-size: 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+</head>
+<body>
+  <h1>⏱️ PDCA Latency (Daily)</h1>
+  <div style="margin-bottom:12px;">obs_latency_daily のサマリ（直近30日）</div>
+  <table>
+    <thead>
+      <tr>
+        <th>day</th><th>p50_ms</th><th>p90_ms</th><th>p95_ms</th><th>max_ms</th><th>traces</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in items %}
+        <tr>
+          <td class="mono">{{ r.day }}</td>
+          <td class="mono">{{ "%.0f"|format(r.p50_ms) }}</td>
+          <td class="mono">{{ "%.0f"|format(r.p90_ms) }}</td>
+          <td class="mono">{{ "%.0f"|format(r.p95_ms) }}</td>
+          <td class="mono">{{ "%.0f"|format(r.max_ms) }}</td>
+          <td class="mono">{{ r.traces }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="margin-top:12px;"><a href="/pdca/timeline">← タイムラインへ</a></div>
+</body>
+</html>
