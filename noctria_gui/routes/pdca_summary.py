@@ -1,151 +1,145 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
 """
-📊 PDCA Summary Route (v2.1)
-- PDCA再評価ログ（ファイル）を集計してサマリーを表示
-- HTML表示 (/pdca/summary) と JSON提供 (/pdca/summary/data) の両方に対応
-- 日付パラメータは YYYY-MM-DD を推奨（未指定時は直近14日を自動設定）
+📊 PDCA Summary Route (v3.0)
+- DBの観測ログ(obs_infer_calls)を集計してサマリーを提供
+- HTML表示 (/pdca/summary) と JSON提供 (/pdca/summary/data)
+- 日付は YYYY-MM-DD を推奨（未指定時は直近30日を自動設定）
+- テンプレートは HUD 準拠の pdca_summary.html を使用
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
-from typing import Optional, Tuple
+import sys
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, PDCA_LOG_DIR
-from src.core.pdca_log_parser import load_and_aggregate_pdca_logs
+from pathlib import Path
+
+# --- sys.path を安全側で補強（<repo_root> を追加: import src.*** を安定化） ---
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # type: ignore
+from src.plan_data.pdca_summary_service import (  # type: ignore
+    fetch_infer_calls,
+    aggregate_kpis,
+    aggregate_by_day,
+)
 
 # -----------------------------------------------------------------------------
 # logger
 # -----------------------------------------------------------------------------
 logger = logging.getLogger("noctria.pdca.summary")
 if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 # -----------------------------------------------------------------------------
 # router / templates
 # -----------------------------------------------------------------------------
-router = APIRouter(prefix="/pdca", tags=["pdca-summary"])
+router = APIRouter(prefix="/pdca", tags=["PDCA"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
+SCHEMA_VERSION = "2025-08-01"
+
 
 # -----------------------------------------------------------------------------
 # helpers
 # -----------------------------------------------------------------------------
-def _parse_ymd(s: Optional[str]) -> Optional[date]:
-    """YYYY-MM-DD を date に。無効時は None。"""
+def _parse_date_ymd(s: Optional[str]) -> Optional[datetime]:
+    """YYYY-MM-DD -> naive datetime（日付のみ）。不正な場合は None。"""
     if not s:
         return None
     try:
-        return date.fromisoformat(s)
+        y, m, d = s.split("-")
+        return datetime(int(y), int(m), int(d))
     except Exception:
         logger.warning("Invalid date format (expected YYYY-MM-DD): %s", s)
         return None
 
-def _default_range(days: int = 14) -> Tuple[date, date]:
-    """直近days日（今日を含む）の日付範囲を返す。"""
-    today = datetime.now(timezone.utc).date()
-    start = today - timedelta(days=days - 1)
-    return start, today
 
-def _to_bounds(frm: Optional[date], to: Optional[date]) -> Tuple[datetime, datetime, str, str]:
+def _default_range_days(days: int = 30) -> tuple[datetime, datetime]:
+    """直近days日（今日を含む）を返す（naive datetime, 00:00:00 と 23:59:59 は下流で設定）。"""
+    today_local = datetime.now(timezone.utc).astimezone().date()
+    start = today_local - timedelta(days=days - 1)
+    return (datetime(start.year, start.month, start.day), datetime(today_local.year, today_local.month, today_local.day))
+
+
+def _normalize_range(frm: Optional[datetime], to: Optional[datetime]) -> tuple[datetime, datetime, str, str]:
     """
-    date → 日付境界の datetime（UTC, 00:00:00〜23:59:59）に変換。
-    文字列（YYYY-MM-DD）も併せて返す。
+    naive datetime（日付のみ）を受け取り、YYYY-MM-DD 文字列も併せて返す。
+    from > to の場合はスワップ。
     """
     if frm is None or to is None:
-        d0, d1 = _default_range(14)
-    else:
-        d0, d1 = (frm, to)
+        frm, to = _default_range_days(30)
 
-    # from > to の場合はスワップ
-    if d0 > d1:
-        d0, d1 = d1, d0
+    if to < frm:
+        frm, to = to, frm
 
-    dt_from = datetime(d0.year, d0.month, d0.day, 0, 0, 0, tzinfo=timezone.utc)
-    dt_to = datetime(d1.year, d1.month, d1.day, 23, 59, 59, tzinfo=timezone.utc)
-    return dt_from, dt_to, d0.isoformat(), d1.isoformat()
+    return frm, to, frm.date().isoformat(), to.date().isoformat()
 
-def _aggregate(mode: str, limit: int, dt_from: datetime, dt_to: datetime) -> dict:
-    """
-    ファイルベースのPDCAログを集計（src.core.pdca_log_parser に委譲）。
-    例外時は空の結果を返す。
-    """
-    try:
-        res = load_and_aggregate_pdca_logs(
-            log_dir=PDCA_LOG_DIR,
-            mode=mode,
-            limit=limit,
-            from_date=dt_from,
-            to_date=dt_to,
-        )
-        logger.info("PDCAログ集計: OK (mode=%s, %s ~ %s)", mode, dt_from.date(), dt_to.date())
-        return res or {}
-    except Exception as e:
-        logger.error("PDCAログ集計エラー: %s", e, exc_info=True)
-        return {"stats": {}, "chart": {"labels": [], "data": [], "dd_data": []}}
 
 # -----------------------------------------------------------------------------
 # routes
 # -----------------------------------------------------------------------------
 @router.get("/summary", response_class=HTMLResponse, summary="PDCAサマリー（HTML）")
-async def show_pdca_summary(
+async def pdca_summary_page(
     request: Request,
     from_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     to_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    mode: str = Query(default="strategy", description="集計モード（例: strategy / tag など）"),
-    limit: int = Query(default=20, ge=1, le=1000, description="上位N件などの制限"),
 ) -> HTMLResponse:
     """
-    サーバーサイド描画。テンプレートに `summary` / `chart` / `filter` を埋め込む。
+    サーバーサイド描画（ページの土台のみ）。実データは /pdca/summary/data から取得。
+    テンプレートに default_from / default_to / schema_version を渡す。
     """
-    frm_d = _parse_ymd(from_date)
-    to_d = _parse_ymd(to_date)
-    dt_from, dt_to, frm_str, to_str = _to_bounds(frm_d, to_d)
+    frm = _parse_date_ymd(from_date)
+    to = _parse_date_ymd(to_date)
+    _, _, default_from, default_to = _normalize_range(frm, to)
 
-    result = _aggregate(mode=mode, limit=limit, dt_from=dt_from, dt_to=dt_to)
-
-    context = {
+    context: Dict[str, Any] = {
         "request": request,
-        "summary": result.get("stats", {}),
-        "chart": result.get("chart", {}),
-        "filter": {"from": frm_str, "to": to_str},
-        "mode": mode,
-        "limit": limit,
-        # 将来的にボタンのフラッシュメッセージ等に利用
-        "recheck_success": None,
-        "recheck_fail": None,
+        "default_from": default_from,
+        "default_to": default_to,
+        "schema_version": SCHEMA_VERSION,
     }
     return templates.TemplateResponse("pdca_summary.html", context)
 
+
 @router.get("/summary/data", response_class=JSONResponse, summary="PDCAサマリー（JSON）")
-async def show_pdca_summary_data(
-    from_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    to_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    mode: str = Query(default="strategy", description="集計モード（例: strategy / tag など）"),
-    limit: int = Query(default=20, ge=1, le=1000, description="上位N件などの制限"),
+async def pdca_summary_data(
+    from_date: str = Query(..., description="YYYY-MM-DD"),
+    to_date: str = Query(..., description="YYYY-MM-DD"),
 ) -> JSONResponse:
     """
-    クライアントサイド描画用のJSON（テンプレートやフロントJSから取得）。
+    観測ログ (obs_infer_calls) を期間で集計した JSON を返す。
+    - totals: KPI（評価件数・再評価件数・採用件数・採用率・平均勝率・最大DD・取引数）
+    - by_day: 日次系列（date, evals, adopted, trades, win_rate）
     """
-    frm_d = _parse_ymd(from_date)
-    to_d = _parse_ymd(to_date)
-    dt_from, dt_to, frm_str, to_str = _to_bounds(frm_d, to_d)
+    frm = _parse_date_ymd(from_date)
+    to = _parse_date_ymd(to_date)
+    if not frm or not to:
+        raise HTTPException(status_code=400, detail="from_date/to_date は YYYY-MM-DD 形式で指定してください。")
 
-    result = _aggregate(mode=mode, limit=limit, dt_from=dt_from, dt_to=dt_to)
+    frm, to, from_str, to_str = _normalize_range(frm, to)
 
-    return JSONResponse(
-        {
-            "from": frm_str,
-            "to": to_str,
-            "mode": mode,
-            "limit": limit,
-            "stats": result.get("stats", {}),
-            "chart": result.get("chart", {"labels": [], "data": [], "dd_data": []}),
-        }
-    )
+    # データ取得＆集計（接続不可・テーブル未作成時は空配列 -> totals/seriesは None/0 で返る）
+    rows = fetch_infer_calls(frm, to)
+    totals = aggregate_kpis(rows)
+    series = aggregate_by_day(rows)
+
+    payload = {
+        "ok": True,
+        "schema_version": SCHEMA_VERSION,
+        "from": from_str,
+        "to": to_str,
+        "totals": totals,
+        "by_day": series,
+        "count_rows": len(rows),
+    }
+    return JSONResponse(payload)
