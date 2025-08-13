@@ -1,4 +1,4 @@
-graph TD
+flowchart TD
 
 %% ====== styles (GitHub-safe) ======
 classDef inputs fill:#243447,stroke:#4f86c6,color:#e6f0ff;
@@ -10,52 +10,51 @@ classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
 
 %% ====== INPUTS from PLAN/AI ======
 subgraph INPUTS ["Upstream inputs (from PLAN / AI)"]
-  REQ["order_request.json - symbol / side / qty candidate / reasons - includes trace_id - TODO proposal 1: add idempotency_key"]
-  RISKPOL["risk_policy.json - risk caps / lot rules / stop / drawdown thresholds"]
+  REQ["order_request.json<br/>symbol / side / qty-candidate / reasons<br/><b>MUST</b> trace_id; <b>SHOULD</b> idempotency_key"]
+  RISKPOL["risk_policy.json<br/>risk caps / lot rules / stops / DD thresholds"]
 end
 
 %% ====== DO layer ======
 subgraph DO_LAYER ["Do layer (src/execution)"]
-  ORDER["order_execution.py - basic place / cancel / replace - state tracking - TODO proposal 2: finite state machine not implemented"]
-  RISK_GATE["risk_gate.py - final risk and lot filter - enforce policy at send time - TODO proposal 3: final gate placement"]
-  OPT["optimized_order_execution.py - slippage and fee aware - split and timing - plugin tactics - TODO proposal 4: strategy plugins"]
-  GENJSON["generate_order_json.py - build immutable envelope for audit - TODO proposal 6: HMAC sign snapshot"]
-  OUTBOX["outbox store - persist before send - retry safe - TODO proposal 1: implement outbox pattern"]
-  BROKER["broker_adapter.py - external API abstraction (mt5 / ccxt / rest) - TODO proposal 5: capabilities and rate limiter"]
-  LOGFILE["/data/execution_logs/*.json - place / fill / failure / retry"]
+  ORDER["order_execution.py<br/>basic place / cancel / replace<br/>state tracking<br/><i>TODO:</i> finite state machine"]
+  RISK_GATE["risk_gate.py<br/>final risk & lot filter<br/>enforce policy at send-time<br/><i>TODO:</i> gate placement review"]
+  OPT["optimized_order_execution.py<br/>slippage & fee aware / split & timing<br/>plugin tactics<br/><i>TODO:</i> strategy plugins"]
+  GENJSON["generate_order_json.py<br/>build immutable envelope for audit<br/><i>TODO:</i> HMAC sign snapshot"]
+  OUTBOX["outbox store<br/>persist before send / retry-safe<br/><i>TODO:</i> implement outbox pattern"]
+  BROKER["broker_adapter.py<br/>external API abstraction (mt5 / ccxt / rest)<br/><i>TODO:</i> capabilities & rate limiter"]
+  LOGFILE["/data/execution_logs/*.json<br/>place / fill / failure / retry"]
 end
 
 %% ====== OUTPUTS to CHECK / ACT ======
 subgraph OUTPUTS ["Downstream outputs (to CHECK / ACT)"]
-  EXECRES["exec_result.json - fills / avg price / cost - must include idempotency_key and broker_order_ids - TODO proposal 1"]
-  ALERTSRC["risk_event.json - drawdown / streak / abnormal fill - emitted by gate and recon"]
-  AUDIT["audit_order.json - complete reproducibility snapshot"]
+  EXECRES["exec_result.json<br/>fills / avg price / cost<br/>include trace_id & (ideally) idempotency_key"]
+  ALERTSRC["risk_event.json<br/>drawdown / streak / abnormal fill<br/>emitted by gate & recon"]
+  AUDIT["audit_order.json<br/>complete reproducibility snapshot"]
 end
 
 %% ====== GOVERNANCE / ORCHESTRATION ======
 subgraph GOVERNANCE ["Governance and operations"]
-  GUI_DO["GUI endpoint /pdca/do - manual trigger / stop / cancel - TODO proposal 9: queue and priority"]
-  DAG_DO["Airflow DAG do_layer_flow.py - schedule / retry - TODO proposal 9: service vs DAG boundary"]
+  GUI_DO["GUI /pdca/do<br/>manual trigger / stop / cancel<br/><i>TODO:</i> queue & priority"]
+  DAG_DO["Airflow DAG do_layer_flow.py<br/>schedule / retry<br/><i>TODO:</i> service vs DAG boundary"]
 end
 
 %% ====== OBSERVABILITY TAPS ======
 subgraph OBS ["Observability taps (tables)"]
-  OBS_ORD["obs_orders - placement latency / gate reasons / decision metrics - TODO proposal 7: add trace_id"]
-  OBS_TRD["obs_trades - fills / rejects / slippage - TODO proposal 7: add trace_id"]
-  OBS_ALT["obs_alerts - policy blocks / broker issues - TODO proposal 7: add trace_id"]
-  OBS_DO["obs_do_metrics - child_orders / retry_counts - TODO proposal 7: add trace_id"]
+  OBS_EXEC["obs_exec_events<br/>send status / provider response<br/><b>trace_id implemented</b>"]
+  OBS_ALT["obs_alerts<br/>policy blocks / broker issues<br/><b>trace_id implemented</b>"]
+  OBS_DO["obs_do_metrics<br/>child_orders / retry_counts<br/><i>TODO:</i> add coverage"]
 end
 
 %% ====== AUX: broker hardening ======
 subgraph AUX ["Broker hardening"]
-  CAPS["capabilities handshake - partial fill / replace / tif / min qty - TODO proposal 5"]
-  RLIM["rate limiter and backoff - 429 and 5xx handling - TODO proposal 5"]
-  RECON["reconciliation - positions and trades match - emit risk_event on mismatch - TODO proposal 5"]
+  CAPS["capabilities handshake<br/>partial fill / replace / tif / min qty<br/><i>TODO</i>"]
+  RLIM["rate limiter & backoff<br/>429 / 5xx handling<br/><i>TODO</i>"]
+  RECON["reconciliation<br/>positions & trades match<br/>emit risk_event on mismatch<br/><i>TODO</i>"]
 end
 
 %% ====== FLOW ======
 REQ --> ORDER
-RISKPOL --> ORDER
+RISKPOL --> RISK_GATE
 ORDER --> RISK_GATE
 RISK_GATE --> OPT
 OPT --> GENJSON
@@ -79,11 +78,11 @@ EXECRES --> OUTPUTS
 ALERTSRC --> OUTPUTS
 
 %% ====== OBS LINKS ======
-ORDER -->|log| OBS_ORD
+ORDER -->|log| OBS_EXEC
 RISK_GATE -->|alert| OBS_ALT
 OPT -->|log| OBS_DO
-BROKER -->|log| OBS_DO
-EXECRES -->|log| OBS_TRD
+BROKER -->|log| OBS_EXEC
+EXECRES -->|log| OBS_EXEC
 
 %% ====== AUX LINKS ======
 BROKER --> CAPS
@@ -91,7 +90,7 @@ BROKER --> RLIM
 BROKER --> RECON
 RECON --> ALERTSRC
 
-%% ====== IDENTITY / CORRELATION (not implemented) ======
+%% ====== IDENTITY / CORRELATION ======
 REQ -. trace_id .-> ORDER
 ORDER -. trace_id .-> RISK_GATE
 RISK_GATE -. trace_id .-> OPT
@@ -101,7 +100,15 @@ OUTBOX -. trace_id .-> BROKER
 BROKER -. trace_id .-> EXECRES
 EXECRES -. trace_id .-> AUDIT
 
-%% ====== IDEMPOTENCY (not implemented) ======
+%% ====== IDEMPOTENCY ======
 GENJSON -. idempotency_key .-> OUTBOX
 OUTBOX -. idempotency_key .-> BROKER
 EXECRES -. idempotency_key .-> AUDIT
+
+%% ====== class bindings ======
+class REQ,RISKPOL inputs;
+class ORDER,RISK_GATE,OPT,GENJSON,OUTBOX,BROKER,LOGFILE do;
+class EXECRES,ALERTSRC,AUDIT outputs;
+class GUI_DO,DAG_DO gov;
+class OBS_EXEC,OBS_ALT,OBS_DO obs;
+class CAPS,RLIM,RECON gov;
