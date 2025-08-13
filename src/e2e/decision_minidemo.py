@@ -12,53 +12,40 @@ Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(実行: DO層 or �
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 import time
 import random
 from typing import Dict, Any
 from datetime import datetime, timezone
 
-# --- robust imports (src.* が無い環境でも動くようにフォールバック) -----------------
-try:
-    from src.plan_data.trace import new_trace_id
-except ModuleNotFoundError:
-    from plan_data.trace import new_trace_id  # type: ignore[no-redef]
+# -----------------------------------------------------------------------------
+# import 安定化:
+#   このファイルは src/e2e/decision_minidemo.py に置かれている前提。
+#   実行時に sys.path に "<repo_root>/src" を追加し、"from plan_data ..." 形式で import します。
+#   これにより、src/__init__.py の有無に依存せずに動作します。
+# -----------------------------------------------------------------------------
+SRC_DIR = Path(__file__).resolve().parents[1]  # .../<repo>/src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-try:
-    from src.plan_data.observability import (
-        ensure_tables,
-        log_plan_run,
-        log_infer_call,
-        log_exec_event,
-    )
-except ModuleNotFoundError:
-    from plan_data.observability import (  # type: ignore[no-redef]
-        ensure_tables,
-        log_plan_run,
-        log_infer_call,
-        log_exec_event,
-    )
+from plan_data.trace import new_trace_id
+from plan_data.observability import (
+    ensure_tables,
+    log_plan_run,
+    log_infer_call,
+    log_exec_event,
+)
+from decision.decision_engine import DecisionEngine, DecisionRequest
 
-try:
-    from src.decision.decision_engine import DecisionEngine, DecisionRequest
-except ModuleNotFoundError:
-    from decision.decision_engine import DecisionEngine, DecisionRequest  # type: ignore[no-redef]
-
-# --- DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック ---
+# DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック
 HAVE_DO = True
 try:
-    try:
-        from src.plan_data.contracts import OrderRequest
-    except ModuleNotFoundError:
-        from plan_data.contracts import OrderRequest  # type: ignore[no-redef]
-
-    try:
-        from src.execution.risk_policy import load_policy
-        from src.execution.order_execution import place_order
-    except ModuleNotFoundError:
-        from execution.risk_policy import load_policy  # type: ignore[no-redef]
-        from execution.order_execution import place_order  # type: ignore[no-redef]
+    from plan_data.contracts import OrderRequest
+    from execution.risk_policy import load_policy
+    from execution.order_execution import place_order
 except Exception:
-    HAVE_DO = False  # import 時点で何かコケたら、素直にダミー実行に切替
+    HAVE_DO = False  # import 失敗時は DO 経路を使わない
 
 SYMBOL = "USDJPY"
 
@@ -128,12 +115,11 @@ def main() -> None:
     # 5) Decision
     engine = DecisionEngine()
     req = DecisionRequest(trace_id=trace_id, symbol=SYMBOL, features=features)
-    result = engine.decide(req)  # NOCTRIA_OBS_PG_DSN が設定されていれば obs_decisions にも記録される
+    result = engine.decide(req)  # NOCTRIA_OBS_PG_DSN が設定されていれば obs_decisions に記録
 
-    # 6) Exec
+    # 6) Exec: DO層があれば gate→idempotency→outbox→EXEC（ALERTも出ることがある）
     if HAVE_DO:
         try:
-            # DO層（Noctus Gate → Idempotency/Outbox → 送信ログ）
             # qty は大きめにして gate の clamp / ALERT 発火を狙う
             ord_req = OrderRequest(
                 symbol=req.symbol,
