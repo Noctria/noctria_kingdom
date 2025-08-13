@@ -9,6 +9,14 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional, Tuple
 
+# =============================================================================
+# Observability I/O (PostgreSQL)
+# - 旧API互換: plan/infer の簡易ロギングを維持
+# - 新API拡張: decisions / exec_events / alerts を追加
+# - CREATE IF NOT EXISTS + ALTER IF NOT EXISTS で既存スキーマを穏当に前方互換に拡張
+# - DSNは NOCTRIA_OBS_PG_DSN から取得（明示指定も可）
+# =============================================================================
+
 # -----------------------------------------------------------------------------
 # logger
 # -----------------------------------------------------------------------------
@@ -26,19 +34,26 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 def _json(obj: Any) -> str:
-    # pandas.Timestamp / datetime などを安全にシリアライズ
+    """
+    PythonオブジェクトをJSON文字列へ。
+    pandas.Timestamp / datetime 等は isoformat にフォールバック。
+    """
     try:
         import pandas as pd  # type: ignore
     except Exception:
         pd = None
     if pd is not None and isinstance(obj, getattr(pd, "Timestamp", ())):
         return json.dumps(obj.isoformat(), ensure_ascii=False)
-    return json.dumps(obj, default=lambda o: o.isoformat() if hasattr(o, "isoformat") else str(o), ensure_ascii=False)
+    return json.dumps(
+        obj,
+        default=lambda o: o.isoformat() if hasattr(o, "isoformat") else str(o),
+        ensure_ascii=False,
+    )
 
 def _get_dsn(conn_str: Optional[str]) -> str:
     """
     接続文字列が未指定なら、環境変数 NOCTRIA_OBS_PG_DSN を使う。
-    例: postgresql://noctria:******@localhost:5432/noctria_db
+    例: postgresql://noctria:******@localhost:5433/noctria_db
     """
     dsn = conn_str or os.getenv("NOCTRIA_OBS_PG_DSN")
     if not dsn:
@@ -57,7 +72,7 @@ _DB_KIND = None     # "psycopg2" or "psycopg"
 def _import_driver() -> Tuple[object, str]:
     """
     psycopg2 (v2) → psycopg (v3) の順で動的 import。結果をキャッシュ。
-    pytest の収集時（import 時）にドライバ未導入でも落ちないよう遅延解決する。
+    pytest/import 時にドライバ未導入でも直ちに落ちないようにする。
     """
     global _DRIVER, _DB_KIND
     if _DRIVER is not None and _DB_KIND is not None:
@@ -79,9 +94,9 @@ def _import_driver() -> Tuple[object, str]:
     except ModuleNotFoundError as e:
         raise RuntimeError(
             "Neither 'psycopg2' nor 'psycopg' is installed in this interpreter.\n"
-            "Install one of them within the SAME venv that runs pytest, e.g.:\n"
+            "Install in the SAME venv:\n"
             "  pip install 'psycopg2-binary>=2.9.9,<3.0'\n"
-            "or\n"
+            "  # or\n"
             "  pip install 'psycopg[binary]>=3.1,<3.2'"
         ) from e
 
@@ -104,13 +119,11 @@ def _get_conn(dsn: str):
             conn.close()
 
 def _exec(dsn: str, sql: str, params: Optional[Iterable[Any]] = None) -> None:
-    drv, _ = _import_driver()
     with _get_conn(dsn) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params or ())
 
 def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
-    drv, _ = _import_driver()
     with _get_conn(dsn) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params or ())
@@ -118,7 +131,7 @@ def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
 
 # -----------------------------------------------------------------------------
 # schema bootstrap (for dev/PoC)
-# - 既存の軽量スキーマを拡張し、Decision/Exec も記録可能に
+# - 既存の軽量スキーマを拡張し、Decision/Exec/Alert も記録可能に
 # - 旧スキーマが既にある場合は不足カラムを追加（ADD COLUMN IF NOT EXISTS）
 # -----------------------------------------------------------------------------
 _CREATE_PLAN_RUNS = """
@@ -143,29 +156,28 @@ CREATE INDEX IF NOT EXISTS idx_plan_runs_trace ON obs_plan_runs(trace_id);
 """
 
 _ALTER_PLAN_RUNS = """
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS started_at  TIMESTAMPTZ;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS status      TEXT;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS meta        JSONB;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS phase       TEXT;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS dur_sec     INTEGER;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS rows        INTEGER;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS started_at    TIMESTAMPTZ;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS finished_at   TIMESTAMPTZ;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS status        TEXT;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS meta          JSONB;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS phase         TEXT;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS dur_sec       INTEGER;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS rows          INTEGER;
 ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS missing_ratio REAL;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS error_rate  REAL;
-ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS ts          TIMESTAMPTZ DEFAULT now();
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS error_rate    REAL;
+ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS ts            TIMESTAMPTZ DEFAULT now();
 """
 
 _CREATE_INFER_CALLS = """
 CREATE TABLE IF NOT EXISTS obs_infer_calls (
   id                     BIGSERIAL PRIMARY KEY,
   ts                     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  model                  TEXT,              -- 旧API: model
-  ver                    TEXT,              -- 旧API: ver
-  dur_ms                 INTEGER,           -- 旧API: dur_ms
-  success                BOOLEAN,           -- 旧API: success
-  feature_staleness_min  INTEGER,           -- 旧API: feature_staleness_min
+  model                  TEXT,
+  ver                    TEXT,
+  dur_ms                 INTEGER,
+  success                BOOLEAN,
+  feature_staleness_min  INTEGER,
   trace_id               TEXT,
-
   -- 新API
   model_name             TEXT,
   call_at                TIMESTAMPTZ,
@@ -204,6 +216,7 @@ CREATE TABLE IF NOT EXISTS obs_decisions (
   decision        JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_decisions_trace ON obs_decisions(trace_id);
+CREATE INDEX IF NOT EXISTS idx_decisions_made  ON obs_decisions(made_at);
 """
 
 _CREATE_EXEC_EVENTS = """
@@ -220,13 +233,28 @@ CREATE TABLE IF NOT EXISTS obs_exec_events (
   response  JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_exec_events_trace ON obs_exec_events(trace_id);
+CREATE INDEX IF NOT EXISTS idx_exec_events_sent  ON obs_exec_events(sent_at);
+"""
+
+_CREATE_ALERTS = """
+CREATE TABLE IF NOT EXISTS obs_alerts (
+  id          BIGSERIAL PRIMARY KEY,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  policy_name TEXT NOT NULL,     -- e.g. risk.max_order_qty
+  reason      TEXT NOT NULL,     -- human-readable reason
+  severity    TEXT NOT NULL,     -- LOW/MEDIUM/HIGH/CRITICAL
+  details     JSONB,
+  trace_id    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_trace ON obs_alerts(trace_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_time  ON obs_alerts(created_at);
 """
 
 def ensure_tables(conn_str: Optional[str] = None) -> None:
     """
-    観測テーブル（obs_plan_runs / obs_infer_calls / obs_decisions / obs_exec_events）を存在しなければ作成。
-    旧スキーマが存在する場合は、不足カラムを追加（IF NOT EXISTS）。
-    本番では Alembic などのマイグレーション推奨。開発・PoC 向けの保険。
+    観測テーブル（obs_plan_runs / obs_infer_calls / obs_decisions / obs_exec_events / obs_alerts）を
+    存在しなければ作成。旧スキーマが存在する場合は、不足カラムを追加（IF NOT EXISTS）。
+    本番では Alembic 等のマイグレーションを推奨。開発・PoC向けの保険。
     """
     dsn = _get_dsn(conn_str)
     # CREATE
@@ -234,6 +262,7 @@ def ensure_tables(conn_str: Optional[str] = None) -> None:
     _exec(dsn, _CREATE_INFER_CALLS)
     _exec(dsn, _CREATE_DECISIONS)
     _exec(dsn, _CREATE_EXEC_EVENTS)
+    _exec(dsn, _CREATE_ALERTS)
     # ALTER for forward-compat
     _exec(dsn, _ALTER_PLAN_RUNS)
     _exec(dsn, _ALTER_INFER_CALLS)
@@ -246,14 +275,12 @@ def log_plan_run(*args, **kwargs) -> Optional[int]:
     """
     互換ディスパッチャ：
       旧API: log_plan_run(conn_str, phase, rows, dur_sec, missing_ratio, error_rate, trace_id=None)
-      新API: log_plan_run(trace_id=..., status="START"|"END"|..., started_at=..., finished_at=..., meta={...}, conn_str=None)
+      新API: log_plan_run(trace_id=..., status='START'|'END'|'ERROR'|..., started_at=..., finished_at=..., meta={...}, conn_str=None)
 
     返り値: 追加行の id（失敗時 None）
     """
-    # 新API 判定
     if "status" in kwargs or ("trace_id" in kwargs and len(args) == 0):
         return _log_plan_status(**kwargs)  # type: ignore[arg-type]
-    # 旧API フォーム
     return _log_plan_phase(*args, **kwargs)  # type: ignore[misc]
 
 def _log_plan_phase(conn_str: Optional[str],
@@ -273,7 +300,8 @@ def _log_plan_phase(conn_str: Optional[str],
     )
     params = (_utcnow(), phase, int(dur_sec), int(rows), float(missing_ratio), float(error_rate), trace_id)
     try:
-        return _fetchone(dsn, sql, params)[0]  # type: ignore[index]
+        row = _fetchone(dsn, sql, params)
+        return row[0] if row else None  # type: ignore[index]
     except Exception as e:
         logger.warning("log_plan_run(phase) failed: %s (phase=%s, trace_id=%s)", e, phase, trace_id)
         return None
@@ -301,7 +329,8 @@ def _log_plan_status(*, trace_id: str,
         _json(meta or {}),
     )
     try:
-        return _fetchone(dsn, sql, params)[0]  # type: ignore[index]
+        row = _fetchone(dsn, sql, params)
+        return row[0] if row else None  # type: ignore[index]
     except Exception as e:
         logger.warning("log_plan_run(status) failed: %s (status=%s, trace_id=%s)", e, status, trace_id)
         return None
@@ -310,14 +339,14 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     """
     互換API：
       旧: log_infer_call(conn_str, model, ver, dur_ms, success, feature_staleness_min, trace_id=None)
-           -> 呼び方: log_infer_call(dsn, model="AURUS", ver="v1", dur_ms=12, success=True, feature_staleness_min=3, trace_id=tid)
+          -> 例: log_infer_call(dsn, model="AURUS", ver="v1", dur_ms=12, success=True, feature_staleness_min=3, trace_id=tid)
 
       新: log_infer_call(trace_id=..., model_name="Dummy", call_at=..., duration_ms=..., success=True, inputs={...}, outputs={...})
-           -> conn_str は kwargs に含めてもよい
+          -> conn_str は kwargs に含めてもよい
     """
     # 新フォームのキーが含まれる場合
-    if "model_name" in kwargs or "inputs" in kwargs or "outputs" in kwargs or "duration_ms" in kwargs or "call_at" in kwargs:
-        trace_id: str = kwargs.get("trace_id")  # type: ignore[assignment]
+    if any(k in kwargs for k in ("model_name", "inputs", "outputs", "duration_ms", "call_at")):
+        trace_id: Optional[str] = kwargs.get("trace_id")
         model_name: Optional[str] = kwargs.get("model_name")
         call_at: Optional[datetime] = kwargs.get("call_at")
         duration_ms: Optional[int] = kwargs.get("duration_ms")
@@ -331,14 +360,15 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         )
         params = (trace_id, model_name, call_at or _utcnow(), duration_ms, success, _json(inputs or {}), _json(outputs or {}))
         try:
-            return _fetchone(dsn, sql, params)[0]  # type: ignore[index]
+            row = _fetchone(dsn, sql, params)
+            return row[0] if row else None  # type: ignore[index]
         except Exception as e:
             logger.warning("log_infer_call(new) failed: %s (model_name=%s, trace_id=%s)", e, model_name, trace_id)
             return None
 
     # 旧フォーム
     model: str = kwargs["model"]
-    ver: str = kwargs.get("ver", None)
+    ver: Optional[str] = kwargs.get("ver")
     dur_ms: int = kwargs["dur_ms"]
     success: bool = kwargs["success"]
     feature_staleness_min: int = kwargs.get("feature_staleness_min", 0)
@@ -350,7 +380,8 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     )
     params = (_utcnow(), model, ver, dur_ms, success, feature_staleness_min, trace_id)
     try:
-        return _fetchone(dsn, sql, params)[0]  # type: ignore[index]
+        row = _fetchone(dsn, sql, params)
+        return row[0] if row else None  # type: ignore[index]
     except Exception as e:
         logger.warning("log_infer_call(old) failed: %s (model=%s, trace_id=%s)", e, model, trace_id)
         return None
@@ -383,7 +414,8 @@ def log_decision(*, trace_id: str,
         _json(decision or {}),
     )
     try:
-        return _fetchone(dsn, sql, params)[0]  # type: ignore[index]
+        row = _fetchone(dsn, sql, params)
+        return row[0] if row else None  # type: ignore[index]
     except Exception as e:
         logger.warning("log_decision failed: %s (strategy=%s, trace_id=%s)", e, strategy_name, trace_id)
         return None
@@ -418,9 +450,41 @@ def log_exec_event(*, trace_id: str,
         _json(response or {}),
     )
     try:
-        return _fetchone(dsn, sql, params)[0]  # type: ignore[index]
+        row = _fetchone(dsn, sql, params)
+        return row[0] if row else None  # type: ignore[index]
     except Exception as e:
         logger.warning("log_exec_event failed: %s (symbol=%s, status=%s, trace_id=%s)", e, symbol, status, trace_id)
+        return None
+
+def log_alert(*,
+              policy_name: str,
+              reason: str,
+              severity: str = "MEDIUM",  # LOW / MEDIUM / HIGH / CRITICAL
+              details: Optional[Dict[str, Any]] = None,
+              trace_id: Optional[str] = None,
+              created_at: Optional[datetime] = None,
+              conn_str: Optional[str] = None) -> Optional[int]:
+    """
+    リスクゲート/再送/整合性チェックなどからのアラートを記録（obs_alerts）。
+    """
+    dsn = _get_dsn(conn_str)
+    sql = (
+        "INSERT INTO obs_alerts (created_at, policy_name, reason, severity, details, trace_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+    )
+    params = (
+        created_at or _utcnow(),
+        policy_name,
+        reason,
+        severity,
+        _json(details or {}),
+        trace_id,
+    )
+    try:
+        row = _fetchone(dsn, sql, params)
+        return row[0] if row else None  # type: ignore[index]
+    except Exception as e:
+        logger.warning("log_alert failed: %s (policy=%s, trace_id=%s)", e, policy_name, trace_id)
         return None
 
 # -----------------------------------------------------------------------------
