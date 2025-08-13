@@ -4,13 +4,10 @@
 """
 E2E ミニデモ:
 Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(実行: DO層 or ダミー)
-同一 trace_id が obs_* テーブル（plan/infer/decision/exec/alert）に連携され、
-View(obs_trace_timeline, obs_trace_latency) から一望できることを確認。
+同一 trace_id が obs_* テーブルに連携されることを確認。
 
 実行例:
     python -m src.e2e.decision_minidemo
-必要な環境変数:
-    NOCTRIA_OBS_PG_DSN="postgresql://user:pass@localhost:5433/noctria_db"
 """
 
 from __future__ import annotations
@@ -19,61 +16,86 @@ import sys
 from pathlib import Path
 import time
 import random
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime, timezone
 
 # -----------------------------------------------------------------------------
 # import 安定化:
 #   このファイルは src/e2e/decision_minidemo.py に置かれている前提。
-#   まず <repo>/src を sys.path に直接追加（単体実行対応）し、
-#   あれば core.path_config.ensure_import_path() を呼んで集中管理に委譲。
+#   まず <repo>/src を sys.path に直接追加（単体実行対応）。
+#   さらに、plan_data.* / src.plan_data.* の両方をフォールバックで試す。
 # -----------------------------------------------------------------------------
 SRC_DIR = Path(__file__).resolve().parents[1]  # .../<repo>/src
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+# --- trace id ---------------------------------------------------------------
 try:
-    # 任意: 集中管理（PROJECT_ROOT / SRC を sys.path に整備）
-    from core.path_config import ensure_import_path  # type: ignore
-    ensure_import_path()
-except Exception:
-    pass  # 無ければそのまま（上の手動追加で十分動く）
+    from plan_data.trace import new_trace_id  # when <repo>/src is on sys.path
+except ModuleNotFoundError:
+    try:
+        # when running as a package: python -m src.e2e.decision_minidemo
+        from src.plan_data.trace import new_trace_id  # type: ignore
+    except ModuleNotFoundError as e:
+        raise SystemExit(
+            "Unable to import trace utilities. "
+            "Checked: 'plan_data.trace' and 'src.plan_data.trace'. "
+            f"sys.path includes: {SRC_DIR}"
+        ) from e
 
-from plan_data.trace import new_trace_id
-
-# observability の新旧互換:
-# - ensure_views / log_alert が無い古いバージョンでも動くようフォールバック
+# --- observability I/O ------------------------------------------------------
 try:
     from plan_data.observability import (
         ensure_tables,
-        ensure_views,      # 追加: ビュー作成
-        log_plan_run,
-        log_infer_call,
-        log_exec_event,
-        log_alert,         # 追加: アラート記録
-    )
-except Exception:  # pragma: no cover - 古い環境向けフォールバック
-    from plan_data.observability import (  # type: ignore
-        ensure_tables,
+        ensure_views,
+        refresh_materialized,
         log_plan_run,
         log_infer_call,
         log_exec_event,
     )
+except ModuleNotFoundError:
+    try:
+        from src.plan_data.observability import (  # type: ignore
+            ensure_tables,
+            ensure_views,
+            refresh_materialized,
+            log_plan_run,
+            log_infer_call,
+            log_exec_event,
+        )
+    except ModuleNotFoundError as e:
+        raise SystemExit(
+            "Unable to import observability module. "
+            "Checked: 'plan_data.observability' and 'src.plan_data.observability'."
+        ) from e
 
-    def ensure_views(*_args, **_kwargs):  # type: ignore
-        return None
+# --- decision engine --------------------------------------------------------
+try:
+    from decision.decision_engine import DecisionEngine, DecisionRequest
+except ModuleNotFoundError:
+    try:
+        from src.decision.decision_engine import DecisionEngine, DecisionRequest  # type: ignore
+    except ModuleNotFoundError as e:
+        raise SystemExit(
+            "Unable to import DecisionEngine. "
+            "Checked: 'decision.decision_engine' and 'src.decision.decision_engine'."
+        ) from e
 
-    def log_alert(*_args, **_kwargs) -> Optional[int]:  # type: ignore
-        return None
-
-from decision.decision_engine import DecisionEngine, DecisionRequest
-
-# DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック
+# --- DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック ---
 HAVE_DO = True
 try:
-    from plan_data.contracts import OrderRequest
-    from execution.risk_policy import load_policy
-    from execution.order_execution import place_order
+    try:
+        from plan_data.contracts import OrderRequest
+    except ModuleNotFoundError:
+        from src.plan_data.contracts import OrderRequest  # type: ignore
+    try:
+        from execution.risk_policy import load_policy
+    except ModuleNotFoundError:
+        from src.execution.risk_policy import load_policy  # type: ignore
+    try:
+        from execution.order_execution import place_order
+    except ModuleNotFoundError:
+        from src.execution.order_execution import place_order  # type: ignore
 except Exception:
     HAVE_DO = False  # import 失敗時は DO 経路を使わない
 
@@ -127,9 +149,9 @@ def fake_exec(trace_id: str, decision: Dict[str, Any]) -> None:
 
 
 def main() -> None:
-    # 0) 観測テーブル/ビューの存在保証（dev/PoC 向け）
+    # 0) 観測テーブル・ビューの存在保証（dev/PoC 向け）
     ensure_tables()
-    ensure_views()   # View: obs_trace_timeline / obs_trace_latency / MV: obs_latency_daily
+    ensure_views()  # タイムライン/レイテンシビューを先に作っておく
 
     # 1) トレースID
     trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
@@ -173,17 +195,14 @@ def main() -> None:
         # DO層無し → ダミー実行
         fake_exec(trace_id, result.decision)
 
-    # 7) （デモ用）テスト ALERT を1件記録して、タイムラインに ALER Tが混ざることを確認
-    log_alert(
-        policy_name="risk.max_order_qty",
-        reason="demo alert: qty exceeded soft cap",
-        severity="LOW",
-        details={"max_qty": 5000, "requested": 10000},
-        trace_id=trace_id,
-    )
-
-    # 8) PLAN スパン終了ログ
+    # 7) PLAN スパン終了ログ
     log_plan_run(trace_id=trace_id, status="END", finished_at=_now_utc())
+
+    # 8) ついでに日次レイテンシをリフレッシュ（存在する場合のみ）
+    try:
+        refresh_materialized()
+    except Exception:
+        pass
 
     print(f"✅ E2E complete. trace_id={trace_id}")
 
