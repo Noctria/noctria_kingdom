@@ -1,298 +1,187 @@
+<!-- noctria_gui/templates/pdca_summary.html -->
 {% extends "base_hud.html" %}
-
 {% block title %}📊 PDCA サマリー - Noctria Kingdom{% endblock %}
-{% block header_icon %}<i class="fas fa-sync-alt"></i>{% endblock %}
+{% block header_icon %}<i class="fas fa-chart-line"></i>{% endblock %}
 {% block header_title %}PDCA SUMMARY{% endblock %}
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-<style>
-.flatpickr-calendar {
-  background: var(--bg-color);
-  border: 1px solid var(--glow-primary);
-  box-shadow: 0 0 10px var(--glow-primary);
-  color: var(--text-color);
-  font-family: monospace;
-}
-.flatpickr-day.selected,
-.flatpickr-day:hover {
-  background: var(--glow-primary);
-  color: var(--bg-color);
-  border-radius: 4px;
-}
-
-/* HUD風のセレクトボックス */
-.hud-select {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--panel-border);
-  color: var(--text-color-base);
-  font-family: var(--font-family);
-  font-size: 1rem;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%2210%22%20viewBox%3D%220%200%2014%2010%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M7%2010L0%200h14L7%2010z%22%20fill%3D%22%237DF9FF%22/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 14px 10px;
-}
-.hud-select:hover, .hud-select:focus {
-  border-color: var(--glow-primary);
-  box-shadow: 0 0 8px var(--glow-primary);
-  outline: none;
-  color: var(--text-color-title);
-}
-
-/* 小物 */
-.metric-item { min-width: 180px; text-align: center; }
-.metric-item h3 { margin: 0 0 .25rem 0; font-size: .95rem; color: var(--text-color-dim); }
-.metric-value { font-size: 1.6rem; margin: 0; }
-.table-wrapper { overflow: auto; }
-.filter-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; align-items: end; }
-.filter-form label { font-size: .85rem; opacity: .9; display: block; margin-bottom: .25rem; }
-#from-date, #to-date { width: 100%; }
-.hud-btn { white-space: nowrap; }
-</style>
+  <!-- Flatpickr (styles are further customized by hud_style.css) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 {% endblock %}
 
 {% block content %}
-<!-- フラッシュ表示（再評価結果） -->
-{% if recheck_success is not none or recheck_fail is not none %}
-  <div class="hud-panel" style="border: 1px solid #00cc66; background: rgba(0, 204, 102, 0.1); color: #e6f1ff; margin-bottom: 1rem; text-align: center;">
-    <i class="fas fa-check-circle"></i> 一括再評価 実行結果：
-    {% if recheck_success %} <strong><span class="text-green">成功 {{ recheck_success }}件</span></strong> {% endif %}
-    {% if recheck_fail %} <strong><span class="text-magenta">失敗 {{ recheck_fail }}件</span></strong> {% endif %}
-  </div>
-{% endif %}
+<div class="hud-container-simple">
 
-<!-- 期間・モード・件数フォーム -->
-<section class="hud-panel filter-panel">
-  <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
-  <!-- NOTE: ルートは from_date / to_date を受け取るので name を合わせる -->
-  <form method="get" action="/pdca/summary" class="filter-form">
-    <div>
-      <label for="from-date"><i class="fas fa-calendar-alt"></i> 開始日</label>
-      <input id="from-date" type="text" name="from_date" value="{{ filter.from | default('') }}" autocomplete="off" class="hud-input">
-    </div>
-    <div>
-      <label for="to-date"><i class="fas fa-calendar-alt"></i> 終了日</label>
-      <input id="to-date" type="text" name="to_date" value="{{ filter.to | default('') }}" autocomplete="off" class="hud-input">
-    </div>
-    <div>
-      <label for="mode-select"><i class="fas fa-eye"></i> 表示モード</label>
-      <select id="mode-select" name="mode" class="hud-select">
-        <option value="strategy" {% if mode == "strategy" %}selected{% endif %}>🧠 戦略別</option>
-        <option value="tag" {% if mode == "tag" %}selected{% endif %}>🔖 タグ別</option>
-      </select>
-    </div>
-    <div>
-      <label for="limit-select"><i class="fas fa-list-ol"></i> 表示件数</label>
-      <select id="limit-select" name="limit" class="hud-select">
-        <option value="10" {% if limit == 10 %}selected{% endif %}>10件</option>
-        <option value="20" {% if limit == 20 %}selected{% endif %}>20件</option>
-        <option value="50" {% if limit == 50 %}selected{% endif %}>50件</option>
-      </select>
-    </div>
-    <div>
-      <button type="submit" class="hud-btn"><i class="fas fa-search"></i> 絞り込む</button>
-    </div>
-  </form>
-</section>
+  <!-- Header strip (provided by base_hud) -->
 
-<!-- サマリー統計 -->
-<section class="hud-panel metrics">
-  <h2 class="panel-title"><i class="fas fa-calculator"></i> OVERALL IMPROVEMENT</h2>
-  <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;">
-    <div class="metric-item">
-      <h3><i class="fas fa-chart-line"></i> 勝率平均改善</h3>
-      <p class="metric-value text-green">{{ (summary.avg_win_rate_diff | default(0)) | round(2) }}%</p>
+  <!-- Filter panel -->
+  <section class="hud-panel">
+    <div class="panel-title">🔎 FILTER</div>
+    <div class="metrics" style="align-items:flex-end;">
+      <div class="metric-item" style="text-align:left; flex:1 1 220px;">
+        <label for="from_date" class="text-light">From (YYYY-MM-DD)</label>
+        <input id="from_date" type="text" class="flatpickr-input" value="{{ default_from }}" autocomplete="off" />
+      </div>
+      <div class="metric-item" style="text-align:left; flex:1 1 220px;">
+        <label for="to_date" class="text-light">To (YYYY-MM-DD)</label>
+        <input id="to_date" type="text" class="flatpickr-input" value="{{ default_to }}" autocomplete="off" />
+      </div>
+      <div class="metric-item" style="flex:0 0 200px;">
+        <button id="applyBtn" class="hud-link" type="button">🔍 適用</button>
+      </div>
+      <div class="metric-item" style="flex:0 0 200px;">
+        <a class="hud-link" href="/pdca/control">🔁 Recheck パネルへ</a>
+      </div>
     </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-shield-alt"></i> DD平均改善</h3>
-      <p class="metric-value text-green">{{ (summary.avg_dd_diff | default(0)) | round(2) }}</p>
-    </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-arrow-up"></i> 勝率改善数</h3>
-      <p class="metric-value text-cyan">{{ summary.win_rate_improved | default(0) }}</p>
-    </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-arrow-down"></i> DD改善数</h3>
-      <p class="metric-value text-cyan">{{ summary.dd_improved | default(0) }}</p>
-    </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-check-double"></i> 採用戦略数</h3>
-      <p class="metric-value text-yellow">{{ summary.adopted | default(0) }}</p>
-    </div>
-  </div>
-</section>
-
-<!-- グラフエリア -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem;">
-  <section class="hud-panel chart-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 勝率改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
-    <div style="height: 300px;"><canvas id="winRateChart"></canvas></div>
+    <p class="text-light" style="margin-top:.5rem;">Schema: <span class="text-normal">{{ schema_version }}</span></p>
   </section>
-  <section class="hud-panel chart-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-area"></i> 最大DD改善（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
-    <div style="height: 300px;"><canvas id="ddChart"></canvas></div>
+
+  <!-- KPI cards -->
+  <section class="hud-panel">
+    <div class="panel-title">📌 KPI SUMMARY</div>
+    <div class="metrics">
+      <div class="metric-item">
+        <div class="text-dark">再評価件数</div>
+        <div class="metric-value" id="kpi-rechecks">-</div>
+      </div>
+      <div class="metric-item">
+        <div class="text-dark">評価件数</div>
+        <div class="metric-value" id="kpi-evals">-</div>
+      </div>
+      <div class="metric-item">
+        <div class="text-dark">採用件数</div>
+        <div class="metric-value" id="kpi-adopted">-</div>
+      </div>
+      <div class="metric-item">
+        <div class="text-dark">採用率</div>
+        <div class="metric-value" id="kpi-adoption-rate">-</div>
+      </div>
+      <div class="metric-item">
+        <div class="text-dark">平均勝率</div>
+        <div class="metric-value" id="kpi-win-rate">-</div>
+      </div>
+      <div class="metric-item">
+        <div class="text-dark">取引数</div>
+        <div class="metric-value" id="kpi-trades">-</div>
+      </div>
+    </div>
   </section>
-</div>
 
-<!-- 評価詳細テーブル -->
-<section class="hud-panel log-panel">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-    <h2 class="panel-title" style="margin: 0;"><i class="fas fa-table"></i> 評価詳細（{{ "戦略別" if mode == "strategy" else "タグ別" }}）</h2>
-    <button class="hud-btn download-btn" id="downloadCsvBtn"><i class="fas fa-download"></i> CSVダウンロード</button>
+  <!-- Charts -->
+  <div class="metrics" style="gap:1.5rem;">
+    <section class="hud-panel" style="flex:1 1 380px;">
+      <div class="panel-title">📈 勝率の推移（Daily）</div>
+      <div style="height:300px"><canvas id="chartWinRate"></canvas></div>
+    </section>
+    <section class="hud-panel" style="flex:1 1 380px;">
+      <div class="panel-title">📦 評価/採用 件数（Daily）</div>
+      <div style="height:300px"><canvas id="chartCounts"></canvas></div>
+    </section>
+    <section class="hud-panel" style="flex:1 1 380px;">
+      <div class="panel-title">🔁 取引数の推移（Daily）</div>
+      <div style="height:300px"><canvas id="chartTrades"></canvas></div>
+    </section>
   </div>
-  <div class="table-wrapper">
-    <table id="summary-table" class="hud-table">
-      <thead>
-        <tr>
-          <th>{{ "戦略名" if mode == "strategy" else "タグ" }}</th>
-          <th>勝率 (Before)</th>
-          <th>勝率 (After)</th>
-          <th>差分 (%)</th>
-          <th>最大DD (Before)</th>
-          <th>最大DD (After)</th>
-          <th>採用</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if (summary.detail | default([])) | length == 0 %}
-          <tr><td colspan="7" style="text-align:center; color:#888;">データがありません</td></tr>
-        {% else %}
-          {% for row in summary.detail %}
-          <tr>
-            <td>{{ row.strategy or row.tag or row.name or row.key }}</td>
-            <td>{{ row.win_rate_before }}</td>
-            <td>{{ row.win_rate_after }}</td>
-            <td>{{ row.diff }}</td>
-            <td>{{ row.max_dd_before }}</td>
-            <td>{{ row.max_dd_after }}</td>
-            <td>{{ row.status }}</td>
-          </tr>
-          {% endfor %}
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
-</section>
 
-<!-- ✅ グラフ描画用のデータ保持 -->
-<div id="chart-data-holder" 
-     data-labels='{{ chart.labels | default([]) | tojson | safe }}'
-     data-win-rate-data='{{ chart.data | default([]) | tojson | safe }}'
-     data-dd-data='{{ chart.dd_data | default([]) | tojson | safe }}'
-     style="display: none;">
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  // Flatpickr初期化
-  flatpickr("#from-date", { dateFormat: "Y-m-d", allowInput: true });
-  flatpickr("#to-date",   { dateFormat: "Y-m-d", allowInput: true });
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script>
+    (function initPickers(){
+      if (!window.flatpickr) return;
+      var opts = { dateFormat: "Y-m-d", allowInput: true, defaultHour: 0, defaultMinute: 0 };
+      try { window.flatpickr("#from_date", opts); } catch(e){}
+      try { window.flatpickr("#to_date", opts); } catch(e){}
+    })();
 
-  const dataHolder = document.getElementById('chart-data-holder');
+    let chartWin, chartCnt, chartTr;
 
-  const chartOptions = (titleText, yAxisSuffix) => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      title: { display: true, text: titleText, color: '#e6f1ff', font: { size: 16 } }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: { color: '#a8b2d1', callback: yAxisSuffix ? (v => `${v}${yAxisSuffix}`) : undefined },
-        grid: { color: 'rgba(0, 229, 255, 0.2)' }
-      },
-      x: {
-        ticks: { color: '#a8b2d1' },
-        grid: { color: 'rgba(0, 229, 255, 0.1)' }
-      }
+    function fmtPct(x) {
+      if (x == null || isNaN(x)) return "-";
+      return (x * 100).toFixed(1) + "%";
     }
-  });
-
-  // --- チャート描画 ---
-  if (dataHolder) {
-    try {
-      const labels = JSON.parse(dataHolder.dataset.labels || '[]');
-      const winRateData = JSON.parse(dataHolder.dataset.winRateData || '[]');
-      const ddData = JSON.parse(dataHolder.dataset.ddData || '[]');
-
-      const winRateChartEl = document.getElementById('winRateChart');
-      if (winRateChartEl && winRateData.length > 0) {
-        new Chart(winRateChartEl.getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [{
-              label: '勝率改善率 (%)',
-              backgroundColor: 'rgba(46, 204, 113, 0.6)',
-              borderColor: '#2ecc71',
-              borderWidth: 1,
-              data: winRateData
-            }]
-          },
-          options: chartOptions('勝率改善（After - Before）', '%')
-        });
-      }
-
-      const ddChartEl = document.getElementById('ddChart');
-      if (ddChartEl && ddData.length > 0) {
-        new Chart(ddChartEl.getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [{
-              label: '最大DD改善 (Before - After)',
-              backgroundColor: 'rgba(231, 76, 60, 0.6)',
-              borderColor: '#e74c3c',
-              borderWidth: 1,
-              data: ddData
-            }]
-          },
-          options: chartOptions('最大DD改善（Before - After）', '')
-        });
-      }
-    } catch (e) {
-      console.error("チャートデータの描画に失敗しました:", e);
-      const chartPanels = document.querySelectorAll('.chart-panel');
-      chartPanels.forEach(p => p.innerHTML = "<p style='color:#ff4d4d; text-align:center;'>⚠️ グラフデータの表示に失敗しました。</p>");
+    function fmtNum(x) {
+      if (x == null || isNaN(x)) return "-";
+      return String(x);
     }
-  }
 
-  // --- CSVダウンロード ---
-  const downloadBtn = document.getElementById('downloadCsvBtn');
-  if (downloadBtn) {
-    downloadBtn.addEventListener('click', () => {
-      let csv = "{{ '戦略名' if mode == 'strategy' else 'タグ' }},勝率(Before),勝率(After),差分(%),最大DD(Before),最大DD(After),採用\n";
-      const rows = document.querySelectorAll("#summary-table tbody tr");
-      rows.forEach(row => {
-        const cols = row.querySelectorAll("td");
-        const rowData = Array.from(cols).map(td => `"${td.innerText.replace(/"/g, '""')}"`).join(",");
-        csv += rowData + "\n";
+    function updateKPIs(totals) {
+      document.getElementById('kpi-rechecks').textContent = fmtNum(totals?.rechecks);
+      document.getElementById('kpi-evals').textContent    = fmtNum(totals?.evals);
+      document.getElementById('kpi-adopted').textContent  = fmtNum(totals?.adopted);
+      document.getElementById('kpi-adoption-rate').textContent = totals?.adoption_rate == null ? "-" : fmtPct(totals.adoption_rate);
+      document.getElementById('kpi-win-rate').textContent = totals?.win_rate == null ? "-" : fmtPct(totals.win_rate);
+      document.getElementById('kpi-trades').textContent   = fmtNum(totals?.trades);
+    }
+
+    function renderCharts(byDay) {
+      const labels = byDay.map(d => d.date);
+      const win    = byDay.map(d => d.win_rate == null ? null : (d.win_rate * 100.0));
+      const evals  = byDay.map(d => d.evals || 0);
+      const adopt  = byDay.map(d => d.adopted || 0);
+      const trades = byDay.map(d => d.trades || 0);
+
+      // 勝率ライン
+      const ctx1 = document.getElementById('chartWinRate').getContext('2d');
+      if (chartWin) chartWin.destroy();
+      chartWin = new Chart(ctx1, {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Win Rate (%)', data: win, spanGaps: true }] },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: true } },
+          scales: { y: { suggestedMin: 0, suggestedMax: 100 } }
+        }
       });
 
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "pdca_summary.csv";
-      link.click();
-      URL.revokeObjectURL(link.href);
-    });
-  }
-});
-</script>
+      // 件数バー
+      const ctx2 = document.getElementById('chartCounts').getContext('2d');
+      if (chartCnt) chartCnt.destroy();
+      chartCnt = new Chart(ctx2, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Evals', data: evals }, { label: 'Adopted', data: adopt }] },
+        options: { responsive: true, plugins: { legend: { display: true } } }
+      });
+
+      // 取引数ライン
+      const ctx3 = document.getElementById('chartTrades').getContext('2d');
+      if (chartTr) chartTr.destroy();
+      chartTr = new Chart(ctx3, {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Trades', data: trades }] },
+        options: { responsive: true, plugins: { legend: { display: true } } }
+      });
+    }
+
+    async function fetchSummary() {
+      const from = document.getElementById('from_date').value;
+      const to   = document.getElementById('to_date').value;
+      const url  = `/pdca/summary/data?from_date=${encodeURIComponent(from)}&to_date=${encodeURIComponent(to)}`;
+      const res  = await fetch(url);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.detail || "Fetch failed");
+      return json;
+    }
+
+    async function refresh() {
+      try {
+        const data = await fetchSummary();
+        updateKPIs(data.totals || {});
+        renderCharts(data.by_day || []);
+      } catch (e) {
+        console.error(e);
+        updateKPIs({});
+        renderCharts([]);
+        alert("サマリ取得に失敗しました。DB接続や期間指定を確認してください。");
+      }
+    }
+
+    document.getElementById('applyBtn').addEventListener('click', refresh);
+    window.addEventListener('load', refresh);
+  </script>
 {% endblock %}
