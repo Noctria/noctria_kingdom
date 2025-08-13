@@ -5,34 +5,173 @@
   <meta charset="utf-8" />
   <title>Noctria PDCA Latency (Daily)</title>
   <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", Helvetica, Arial; padding: 16px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { text-align: left; border-bottom: 1px solid #e7e7e7; padding: 8px 10px; font-size: 14px; }
+    :root{--text:#111;--muted:#666;--line:#e7e7e7;--chip:#f6f8fa;}
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", Helvetica, Arial; padding: 16px; color: var(--text); background: #fff; }
+    h1 { margin: 0 0 6px 0; }
+    .sub { color: var(--muted); margin-bottom: 12px; }
+    .toolbar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin: 8px 0 16px; }
+    .toolbar label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); }
+    .toolbar input[type="text"], .toolbar input[type="number"] {
+      padding:6px 8px; border:1px solid var(--line); border-radius:6px; min-width: 12rem;
+    }
+    .toolbar button {
+      padding:8px 14px; border:1px solid var(--line); background:#fff; border-radius:8px; cursor:pointer;
+    }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:16px; margin-bottom: 16px;}
+    .card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; }
+    .card h2 { font-size:16px; margin:0 0 8px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 8px 10px; font-size: 14px; vertical-align: top; }
+    .btn-row { display:flex; gap:8px; align-items:center; margin: 4px 0 10px; }
+    .btn { padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; }
+    .muted { color: var(--muted); }
   </style>
 </head>
 <body>
   <h1>⏱️ PDCA Latency (Daily)</h1>
-  <div style="margin-bottom:12px;">obs_latency_daily のサマリ（直近30日）</div>
-  <table>
-    <thead>
-      <tr>
-        <th>day</th><th>p50_ms</th><th>p90_ms</th><th>p95_ms</th><th>max_ms</th><th>traces</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in items %}
-        <tr>
-          <td class="mono">{{ r.day }}</td>
-          <td class="mono">{{ "%.0f"|format(r.p50_ms) }}</td>
-          <td class="mono">{{ "%.0f"|format(r.p90_ms) }}</td>
-          <td class="mono">{{ "%.0f"|format(r.p95_ms) }}</td>
-          <td class="mono">{{ "%.0f"|format(r.max_ms) }}</td>
-          <td class="mono">{{ r.traces }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div style="margin-top:12px;"><a href="/pdca/timeline">← タイムラインへ</a></div>
+  <div class="sub">
+    期間:
+    <span class="mono">{{ (filter.from if filter is defined else '-') or '-' }}</span>
+    〜
+    <span class="mono">{{ (filter.to if filter is defined else '-') or '-' }}</span>
+  </div>
+
+  <!-- フィルタ（from/to が未入力なら days の遡りで表示） -->
+  <form class="toolbar" method="get" action="/pdca/latency/daily">
+    <label>開始 (YYYY-MM-DD)
+      <input type="text" name="from_date" value="{{ (filter.from if filter is defined else '') or '' }}" placeholder="YYYY-MM-DD" />
+    </label>
+    <label>終了 (YYYY-MM-DD)
+      <input type="text" name="to_date" value="{{ (filter.to if filter is defined else '') or '' }}" placeholder="YYYY-MM-DD" />
+    </label>
+    <label>days（期間未指定時に遡る日数）
+      <input type="number" name="days" min="1" max="365" value="30" />
+    </label>
+    <button type="submit">再描画</button>
+  </form>
+
+  <div class="grid">
+    <section class="card">
+      <h2>p50 / p90 / p95 / max（ミリ秒）</h2>
+      <div style="height:320px;"><canvas id="latencyChart"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>traces / day</h2>
+      <div style="height:320px;"><canvas id="countChart"></canvas></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="btn-row">
+      <h2 style="margin:0;">日次テーブル</h2>
+      <button class="btn" type="button" id="downloadCsvBtn">CSV ダウンロード</button>
+      <span class="muted">（Chart と同じデータソース）</span>
+    </div>
+    <div class="table-wrapper">
+      <table id="latency-table">
+        <thead>
+          <tr>
+            <th>day</th><th>p50_ms</th><th>p90_ms</th><th>p95_ms</th><th>max_ms</th><th>traces</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if items|length == 0 %}
+            <tr><td colspan="6" class="muted" style="text-align:center;">データがありません</td></tr>
+          {% else %}
+            {% for r in items %}
+              <tr>
+                <td class="mono">{{ r.day }}</td>
+                <td class="mono">{{ (r.p50_ms if r.p50_ms is not none else '-') }}</td>
+                <td class="mono">{{ (r.p90_ms if r.p90_ms is not none else '-') }}</td>
+                <td class="mono">{{ (r.p95_ms if r.p95_ms is not none else '-') }}</td>
+                <td class="mono">{{ (r.max_ms if r.max_ms is not none else '-') }}</td>
+                <td class="mono">{{ r.traces }}</td>
+              </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:8px;"><a href="/pdca/timeline">← タイムラインへ</a></div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // ルーターから渡ってきた配列
+    const labels = {{ (labels|default([]))|tojson|safe }};
+    const p50 = {{ (p50|default([]))|tojson|safe }};
+    const p90 = {{ (p90|default([]))|tojson|safe }};
+    const p95 = {{ (p95|default([]))|tojson|safe }};
+    const mx  = {{ (mx |default([]))|tojson|safe }};
+    const traces = {{ (traces|default([]))|tojson|safe }};
+
+    // Chart.js 共通オプション
+    const baseOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#333' } },
+        title: { color: '#111' }
+      },
+      scales: {
+        x: { ticks: { color: '#333' } },
+        y: { ticks: { color: '#333' } }
+      }
+    };
+
+    // 折れ線（p50/p90/p95/max）
+    (function () {
+      const el = document.getElementById('latencyChart');
+      if (!el || !labels.length) return;
+      const ctx = el.getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'p50', data: p50 },
+            { label: 'p90', data: p90 },
+            { label: 'p95', data: p95 },
+            { label: 'max', data: mx  },
+          ]
+        },
+        options: { ...baseOptions, plugins: { ...baseOptions.plugins, title: { display:true, text: '日次レイテンシ（ms）', color:'#111' } } }
+      });
+    })();
+
+    // 棒（traces/day）
+    (function () {
+      const el = document.getElementById('countChart');
+      if (!el || !labels.length) return;
+      const ctx = el.getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'traces', data: traces }] },
+        options: { ...baseOptions, plugins: { ...baseOptions.plugins, title: { display:true, text: '日次トレース件数', color:'#111' } } }
+      });
+    })();
+
+    // CSV ダウンロード（テーブルから生成）
+    document.getElementById('downloadCsvBtn')?.addEventListener('click', () => {
+      const rows = Array.from(document.querySelectorAll('#latency-table tr'));
+      const csv = rows.map(tr => {
+        const cols = Array.from(tr.querySelectorAll('th,td')).map(td => {
+          const text = (td.innerText || '').replace(/"/g, '""');
+          return `"${text}"`;
+        });
+        return cols.join(',');
+      }).join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'obs_latency_daily.csv';
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    });
+  </script>
 </body>
 </html>
