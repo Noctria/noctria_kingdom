@@ -11,10 +11,11 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 
 # =============================================================================
 # Observability I/O (PostgreSQL)
-# - 旧API互換: plan/infer の簡易ロギングを維持
+# - 旧API互換: plan / infer の簡易ロギングを維持
 # - 新API拡張: decisions / exec_events / alerts を追加
-# - CREATE IF NOT EXISTS + ALTER IF NOT EXISTS で既存スキーマを穏当に前方互換に拡張
+# - CREATE IF NOT EXISTS + ALTER IF NOT EXISTS で既存スキーマを前方互換に拡張
 # - DSNは NOCTRIA_OBS_PG_DSN から取得（明示指定も可）
+# - 追加: ensure_views() / refresh_materialized() で View / MV を自動作成
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -131,8 +132,8 @@ def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
 
 # -----------------------------------------------------------------------------
 # schema bootstrap (for dev/PoC)
-# - 既存の軽量スキーマを拡張し、Decision/Exec/Alert も記録可能に
-# - 旧スキーマが既にある場合は不足カラムを追加（ADD COLUMN IF NOT EXISTS）
+# 既存の軽量スキーマを拡張し、Decision/Exec/Alert も記録可能に
+# 旧スキーマが既にある場合は不足カラムを追加（ADD COLUMN IF NOT EXISTS）
 # -----------------------------------------------------------------------------
 _CREATE_PLAN_RUNS = """
 CREATE TABLE IF NOT EXISTS obs_plan_runs (
@@ -250,6 +251,118 @@ CREATE INDEX IF NOT EXISTS idx_alerts_trace ON obs_alerts(trace_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_time  ON obs_alerts(created_at);
 """
 
+# -----------------------------------------------------------------------------
+# Views / Materialized Views
+# -----------------------------------------------------------------------------
+_CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW = """
+CREATE OR REPLACE VIEW obs_trace_timeline AS
+-- Decisions
+SELECT trace_id,
+       made_at  AS ts,
+       'DECISION' AS kind,
+       decision->>'action' AS action,
+       decision AS payload
+FROM obs_decisions
+UNION ALL
+-- Exec events
+SELECT trace_id,
+       sent_at AS ts,
+       'EXEC'  AS kind,
+       side    AS action,
+       jsonb_build_object(
+         'size', size,
+         'provider', provider,
+         'status', status,
+         'order_id', order_id,
+         'response', response
+       ) AS payload
+FROM obs_exec_events
+UNION ALL
+-- Inference calls
+SELECT trace_id,
+       COALESCE(call_at, ts) AS ts,
+       'INFER' AS kind,
+       COALESCE(model_name, model) AS action,
+       jsonb_build_object(
+         'duration_ms', COALESCE(duration_ms, dur_ms),
+         'success', success,
+         'inputs', inputs,
+         'outputs', outputs
+       ) AS payload
+FROM obs_infer_calls
+UNION ALL
+-- Plan spans / phases
+SELECT trace_id,
+       COALESCE(started_at, ts) AS ts,
+       'PLAN:'||COALESCE(status,'phase') AS kind,
+       COALESCE(phase,'') AS action,
+       jsonb_build_object(
+         'rows', rows,
+         'missing_ratio', missing_ratio,
+         'error_rate', error_rate,
+         'meta', meta
+       ) AS payload
+FROM obs_plan_runs
+UNION ALL
+-- Alerts
+SELECT trace_id,
+       created_at AS ts,
+       'ALERT'    AS kind,
+       COALESCE(policy_name,'') AS action,
+       jsonb_build_object(
+         'reason', reason,
+         'severity', severity,
+         'details', details
+       ) AS payload
+FROM obs_alerts;
+"""
+
+_CREATE_OR_REPLACE_TRACE_LATENCY_VIEW = """
+CREATE OR REPLACE VIEW obs_trace_latency AS
+WITH t AS (
+  SELECT trace_id, ts, kind FROM obs_trace_timeline
+),
+agg AS (
+  SELECT
+    trace_id,
+    MIN(CASE WHEN kind='PLAN:START' THEN ts END) AS plan_start,
+    MIN(CASE WHEN kind='INFER'      THEN ts END) AS infer_ts,
+    MIN(CASE WHEN kind='DECISION'   THEN ts END) AS decision_ts,
+    MIN(CASE WHEN kind='EXEC'       THEN ts END) AS exec_ts
+  FROM t
+  GROUP BY trace_id
+)
+SELECT
+  trace_id,
+  plan_start, infer_ts, decision_ts, exec_ts,
+  EXTRACT(EPOCH FROM (infer_ts    - plan_start))*1000 AS ms_plan_to_infer,
+  EXTRACT(EPOCH FROM (decision_ts - infer_ts))*1000   AS ms_infer_to_decision,
+  EXTRACT(EPOCH FROM (exec_ts     - decision_ts))*1000 AS ms_decision_to_exec,
+  EXTRACT(EPOCH FROM (exec_ts     - plan_start))*1000  AS ms_total
+FROM agg;
+"""
+
+_CREATE_LATENCY_DAILY_MV = """
+CREATE MATERIALIZED VIEW IF NOT EXISTS obs_latency_daily AS
+SELECT
+  date_trunc('day', plan_start)::date AS day,
+  percentile_cont(0.5)  WITHIN GROUP (ORDER BY ms_total) AS p50_ms,
+  percentile_cont(0.9)  WITHIN GROUP (ORDER BY ms_total) AS p90_ms,
+  percentile_cont(0.95) WITHIN GROUP (ORDER BY ms_total) AS p95_ms,
+  MAX(ms_total) AS max_ms,
+  COUNT(*)      AS traces
+FROM obs_trace_latency
+GROUP BY 1;
+"""
+
+_CREATE_LATENCY_DAILY_INDEX = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_obs_latency_daily_day
+  ON obs_latency_daily(day);
+"""
+
+# -----------------------------------------------------------------------------
+# ensure (tables & views)
+# -----------------------------------------------------------------------------
 def ensure_tables(conn_str: Optional[str] = None) -> None:
     """
     観測テーブル（obs_plan_runs / obs_infer_calls / obs_decisions / obs_exec_events / obs_alerts）を
@@ -267,6 +380,28 @@ def ensure_tables(conn_str: Optional[str] = None) -> None:
     _exec(dsn, _ALTER_PLAN_RUNS)
     _exec(dsn, _ALTER_INFER_CALLS)
     logger.info("observability tables ensured/altered.")
+
+def ensure_views(conn_str: Optional[str] = None) -> None:
+    """
+    ビュー/マテビュー（timeline / latency / daily）を作成・更新。
+    """
+    dsn = _get_dsn(conn_str)
+    _exec(dsn, _CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW)
+    _exec(dsn, _CREATE_OR_REPLACE_TRACE_LATENCY_VIEW)
+    _exec(dsn, _CREATE_LATENCY_DAILY_MV)
+    _exec(dsn, _CREATE_LATENCY_DAILY_INDEX)
+    logger.info("observability views ensured/refreshed (definitions).")
+
+def refresh_materialized(conn_str: Optional[str] = None) -> None:
+    """
+    マテビューだけをリフレッシュ（ロックを避けるなら CONCURRENTLY）。
+    """
+    dsn = _get_dsn(conn_str)
+    try:
+        _exec(dsn, "REFRESH MATERIALIZED VIEW CONCURRENTLY obs_latency_daily;")
+    except Exception:
+        _exec(dsn, "REFRESH MATERIALIZED VIEW obs_latency_daily;")
+    logger.info("obs_latency_daily refreshed.")
 
 # -----------------------------------------------------------------------------
 # public API（旧API互換 + 新API）
@@ -339,12 +474,9 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     """
     互換API：
       旧: log_infer_call(conn_str, model, ver, dur_ms, success, feature_staleness_min, trace_id=None)
-          -> 例: log_infer_call(dsn, model="AURUS", ver="v1", dur_ms=12, success=True, feature_staleness_min=3, trace_id=tid)
-
-      新: log_infer_call(trace_id=..., model_name="Dummy", call_at=..., duration_ms=..., success=True, inputs={...}, outputs={...})
-          -> conn_str は kwargs に含めてもよい
+      新: log_infer_call(trace_id=..., model_name=..., call_at=..., duration_ms=..., success=True, inputs={}, outputs={})
     """
-    # 新フォームのキーが含まれる場合
+    # 新フォーム
     if any(k in kwargs for k in ("model_name", "inputs", "outputs", "duration_ms", "call_at")):
         trace_id: Optional[str] = kwargs.get("trace_id")
         model_name: Optional[str] = kwargs.get("model_name")
