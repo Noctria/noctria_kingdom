@@ -1,25 +1,26 @@
 # 🧭 Runbooks — Noctria Kingdom Operations
 
-**Version:** 1.0  
-**Status:** Draft → Adopted (when merged)  
-**Last Updated:** 2025-08-12 (JST)
+**Version:** 1.1  
+**Status:** Adopted (pending PR merge)  
+**Last Updated:** 2025-08-14 (JST)
 
-> 目的：本番/検証環境での**日次運用・障害対応・変更適用**を、誰が読んでも同じ品質で実行できるようにする。  
-> 関連：`../governance/Vision-Governance.md`, `../architecture/Architecture-Overview.md`, `../observability/Observability.md`, `../operations/Airflow-DAGs.md`, `../operations/Config-Registry.md`, `../security/Security-And-Access.md`
+> 目的：本番/検証環境での **日次運用・障害対応・変更適用** を、誰が読んでも同じ品質で実行できるようにする。  
+> 関連：`../governance/Vision-Governance.md` / `../architecture/Architecture-Overview.md` / `../observability/Observability.md` / `./Airflow-DAGs.md` / `./Config-Registry.md` / `../security/Security-And-Access.md`
 
 ---
 
 ## 1. 対象範囲と前提
-- 対象：Airflow、GUI(FastAPI)、戦略実行(Do層)、学習/評価(Plan/Check/Act) の日次運用と障害対応
-- 対応環境：`prod` / `stg` / `dev`
-- 前提：
-  - アクセス権限は `Security-And-Access.md` の最小権限を満たすこと
-  - 設定値は `../operations/Config-Registry.md` を正として変更すること
-  - 重要判断は `../governance/Vision-Governance.md` の RACI / ガードレールに従うこと
+- **対象**：Airflow（DAG 実行）、GUI（FastAPI）、戦略実行（Do 層）、学習/評価（Plan/Check/Act）の日次運用と障害対応  
+- **環境**：`prod` / `stg` / `dev`（本書のコマンドは代表例）  
+- **前提**
+  - アクセス権限は `Security-And-Access.md` に準拠（最小権限＋監査ログ）
+  - 設定変更は `Config-Registry.md` と **ENV** を正とする（Git へ秘密を置かない）
+  - 重要判断は `Vision-Governance.md` の **RACI / ガードレール**に従う
 
 ---
 
 ## 2. サマリ（運用フロー）
+
 ```mermaid
 flowchart LR
   A[Start of Day] --> H[Health Checks]
@@ -35,30 +36,71 @@ flowchart LR
 ## 3. 日次運用チェックリスト（SoD / EoD）
 
 ### 3.1 Start of Day（SoD, 市場前）
-- [ ] Airflow `scheduler` / `webserver` / `worker` が起動（`/health` 200）  
-- [ ] GUI `/healthz` が 200  
-- [ ] 機密情報の期限（トークン/証明書）に警告なし  
-- [ ] 前日の `exec_result` / `risk_event` の取り込み済み  
-- [ ] **取引抑制フラグ** (`global_trading_pause`) = `false` を確認（本番のみ）
+- [ ] **Airflow** `scheduler/webserver/worker` が健全（WebUI `/health` 200）
+- [ ] **GUI** `/healthz` が 200（既定ポート **8001**）
+- [ ] **PostgreSQL** 到達性と残容量（`df -h`, `pg_isready`）
+- [ ] 機密（API キー/トークン/証明書）期限の警告なし
+- [ ] 前営業日の `exec_result` / `risk_event` 取り込み済み（ETL 成功）
+- [ ] **取引抑制フラグ**（`risk_policy.global_trading_pause`）=`false` を確認（本番）
 
 ### 3.2 End of Day（EoD, 市場後）
-- [ ] `pdca_check_flow` 実行完了（KPI生成）  
-- [ ] `pdca_summary` 生成 → GUIに反映  
-- [ ] 失敗DAGの再実行は **3回まで**。超えたらインシデント扱い  
-- [ ] バックアップ/スナップショット完了確認  
-- [ ] 次営業日のイベント/祝日設定を確認（Config-Registry）
+- [ ] `pdca_check_flow` 完走（KPI 生成）→ GUI 反映
+- [ ] `pdca_summary` 生成済み
+- [ ] 失敗 DAG の手動再実行は **3 回まで**（超過でインシデント起票）
+- [ ] バックアップ/スナップショット完了
+- [ ] 翌営業日のイベント/祝日設定を確認（`Config-Registry`）
 
 ---
 
 ## 4. スタック起動/停止（標準手順）
-> 実コマンドは環境に合わせて `compose`/`systemd` を選択。以下は例。
+
+### 4.1 GUI（FastAPI, Gunicorn, systemd 管理）
+**ユニット**：`/etc/systemd/system/noctria_gui.service`  
+**環境ファイル**：`/etc/default/noctria-gui`（LF, 644, root:root）
 
 ```bash
-# 起動
-docker compose -f deploy/prod/docker-compose.yml up -d airflow-scheduler airflow-webserver airflow-worker gui
+# 起動/停止/再起動/状態
+sudo systemctl start  noctria_gui
+sudo systemctl stop   noctria_gui
+sudo systemctl restart noctria_gui
+sudo systemctl status  noctria_gui --no-pager
 
-# 停止（計画停止時）
-docker compose -f deploy/prod/docker-compose.yml stop gui
+# 直近ログ
+sudo journalctl -u noctria_gui -n 200 --no-pager
+
+# 環境が正しく入っているか（ENV/ExecStart/EnvironmentFiles）
+sudo systemctl show -p Environment -p ExecStart -p EnvironmentFiles noctria_gui
+
+# ポート 8001 で待受しているか
+ss -ltnp | grep ':8001' || sudo journalctl -u noctria_gui -n 80 --no-pager
+
+# 健全性
+curl -sS http://127.0.0.1:8001/healthz
+```
+
+> **ENV 例（/etc/default/noctria-gui）**
+> ```
+> NOCTRIA_OBS_PG_DSN=postgresql://noctria:noctria@127.0.0.1:55432/noctria_db
+> NOCTRIA_GUI_PORT=8001
+> ```
+
+**重要ノート**
+- 環境変数展開のため、`ExecStart` は **`/bin/sh -lc 'exec ... --bind 0.0.0.0:${NOCTRIA_GUI_PORT:-8001} ...'`** で起動する（sh 経由で展開）。  
+- **CRLF 混入**で環境が読まれないことがある。疑わしい場合：
+  ```bash
+  sudo sed -n 'l' /etc/default/noctria-gui   # 行末に ^M があれば CRLF
+  sudo apt-get update && sudo apt-get install -y dos2unix
+  sudo dos2unix /etc/default/noctria-gui
+  sudo chown root:root /etc/default/noctria-gui && sudo chmod 644 /etc/default/noctria-gui
+  sudo systemctl daemon-reload && sudo systemctl restart noctria_gui
+  ```
+
+### 4.2 Airflow（Docker Compose 管理の例）
+```bash
+# 起動
+docker compose -f deploy/prod/docker-compose.yml up -d airflow-scheduler airflow-webserver airflow-worker
+
+# 計画停止
 docker compose -f deploy/prod/docker-compose.yml stop airflow-worker airflow-webserver airflow-scheduler
 
 # ログ
@@ -67,136 +109,165 @@ docker compose -f deploy/prod/docker-compose.yml logs -f airflow-scheduler
 
 ---
 
-## 5. Airflow 運用（DAG操作の定石）
-- DAG 一覧/依存は `../operations/Airflow-DAGs.md` を参照
-- 原則：
-  - **再実行は idempotent** に設計（副作用がある場合は Runbook に明記）
-  - 失敗時の**自動リトライ回数**と**手動再実行手順**を統一
+## 5. Airflow 運用（DAG 操作の定石）
+- 原則 **idempotent**（副作用ありは Runbook に明記）
+- 失敗時の自動リトライ回数と手動再実行手順を統一
 
 ```bash
-# DAGの有効化/無効化
+# DAG 有効/無効
 airflow dags pause  train_prometheus_obs8
 airflow dags unpause pdca_check_flow
 
-# バックフィル（UTC基準）
+# バックフィル（UTC 基準）
 airflow dags backfill -s 2025-08-01 -e 2025-08-12 pdca_check_flow
 
 # 失敗タスクのクリア（依存含む）
 airflow tasks clear -t <task_id> -s 2025-08-12 -e 2025-08-12 -y pdca_check_flow
+
+# 健全性（WebUI 側）
+curl -s http://localhost:8080/health
 ```
 
 ---
 
-## 6. 取引の一時停止/再開（グローバル抑制）
-**目的**：異常検知・市場急変時に**全戦略の発注を即時停止**する。
+## 6. 可観測性（Observability）運用手順
+- **GUI ルート**
+  - `GET /pdca/timeline`：トレース時系列（Plan/Infer/Decision/Exec/Alert）
+  - `GET /pdca/latency/daily`：日次レイテンシ（p50/p90/p95/max, traces）
+  - `POST /pdca/observability/refresh`：ビュー/マテビューの確保・更新
+- **DB ビュー/MVIEW**
+  - `obs_trace_timeline` / `obs_trace_latency` / `obs_latency_daily`（詳細は `../observability/Observability.md`）
+- **手動リフレッシュ**
+  ```bash
+  # GUI 経由
+  curl -X POST -sS http://127.0.0.1:8001/pdca/observability/refresh
+
+  # 直接 SQL
+  psql "$NOCTRIA_OBS_PG_DSN" -c 'REFRESH MATERIALIZED VIEW obs_latency_daily;'
+  ```
+- **保持方針**
+  - 原始イベントは 30 日保持 → 日次ロールアップ参照（運用で適宜 VACUUM/パーティション）
+
+---
+
+## 7. 取引の一時停止/再開（グローバル抑制）
+**目的**：異常検知・市場急変時に **全戦略発注を即時停止**。
 
 ```bash
 # 抑制フラグ ON
 ./ops/tools/toggle_trading_pause.sh --env prod --on
 
-# 抑制フラグ OFF（再開）
+# 再開
 ./ops/tools/toggle_trading_pause.sh --env prod --off
 ```
 
 - 反映先：`Config-Registry.md` の `risk_policy.global_trading_pause`  
-- GUI でも `/ops/pause` から切替可（権限必要）
+- GUI（権限制御下）から `/ops/pause` でも切り替え可
 
 ---
 
-## 7. 新規戦略の本番導入（Deploy/Adopt）
-**前提**：`Strategy-Lifecycle.md` の承認済み、`Noctus` リスク審査OK、`Hermes` 説明文あり。
+## 8. 新規戦略の本番導入（Deploy/Adopt）
+**前提**：`Strategy-Lifecycle.md` 承認、`Noctus` リスク審査 OK、`Hermes` 説明文あり。
 
-1. ステージングで 3 営業日 A/B 検証（`pdca_recheck.py` → KPI比較）  
-2. King 承認後、本番に **低ロット** で段階導入（7→30→100%）  
-3. `pdca_push.py` でバージョン採用 → `Release-Notes.md` 更新  
-4. 監視（Lookback 24h）は「強化モード」（閾値半分）  
-5. 重大異常があれば **§6 の抑制** で即停止 → インシデントへ
+1. **stg** で 3 営業日 A/B 検証（`pdca_recheck.py` → KPI 比較）  
+2. King 承認後、本番に **低ロット** で段階導入（7% → 30% → 100%）  
+3. `pdca_push.py` で採用反映 → `Release-Notes.md` 更新  
+4. 導入後 24h は **強化監視**（閾値 0.5x）  
+5. 重大異常は §7 の抑制で即停止 → インシデントへ
 
 ---
 
-## 8. ロールバック（段階的復帰）
-- 即時停止：§6 の抑制フラグ ON  
+## 9. ロールバック（段階的復帰）
+- 即時停止：§7 の抑制フラグ ON  
 - 段階ロールバック：
-  1) 最新戦略を無効化 → 直前安定版に切替  
+  1) 最新戦略を無効化 → 直前安定版へ切替  
   2) 影響データを除外フラグでマーキング  
-  3) KPI を再集計し回復を確認  
-- 完了後、`Incident-Postmortems.md` に発生から復帰までを記録
+  3) KPI 再集計（`pdca_check_flow`）で回復確認  
+- 完了後 `Incident-Postmortems.md` に復旧記録
 
 ---
 
-## 9. 障害対応プレイブック（種類別）
+## 10. 障害対応プレイブック
 
-### 9.1 Airflow スケジューラ停止
-症状：DAGが走らない、Web UIに `scheduler down`  
-対処：
-1) `systemctl status airflow-scheduler` / コンテナログ確認  
-2) DB 接続/メッセージブローカーの死活確認  
-3) `airflow db check` → 失敗なら `airflow db migrate` / 再起動  
-4) 再開後に、失敗期間をバックフィル（§5）
+### 10.1 GUI が起動しない / ポート未待受
+**症状**：`curl /healthz` が失敗、`ss -ltnp | grep :8001` で LISTEN なし  
+**確認/対処**
+1. `sudo systemctl status noctria_gui` / `journalctl -u noctria_gui -n 200`  
+2. ログに **`'$NOCTRIA_GUI_PORT' is not a valid port number`** → `ExecStart` が **sh 経由**か確認  
+   - `systemctl show -p ExecStart noctria_gui` に **`/bin/sh -lc`** が含まれること  
+3. `EnvironmentFiles=/etc/default/noctria-gui` が読まれているか  
+   - `systemctl show -p Environment -p EnvironmentFiles noctria_gui`  
+   - ENV に `NOCTRIA_GUI_PORT=8001` と `NOCTRIA_OBS_PG_DSN=...` が出ること  
+4. CRLF 疑い → §4.1 の `dos2unix` を実施  
+5. 競合プロセス → `ss -ltnp | grep ':8001'` で既存プロセスを特定し解放  
+6. 再起動 → `systemctl daemon-reload && systemctl restart noctria_gui`
 
-### 9.2 発注遅延/約定異常（Do層）
-症状：`exec_result.json` が遅延/異常値  
-対処：
-1) ブローカー疎通 `broker_adapter` ログ確認  
-2) スリッページ閾値 > 実績？ オーバーなら自動停止トリガ  
-3) 連敗閾値超過→ `risk_event.json` → 抑制フラグON（§6）
+### 10.2 `/pdca/*` が 500（DB 認証/接続失敗）
+**症状**：GUI ログに `psycopg2.OperationalError: FATAL:  password authentication failed for user "noctria"`  
+**確認/対処**
+1. ENV の DSN を確認：`cat /etc/default/noctria-gui`  
+   - 例：`postgresql://noctria:noctria@127.0.0.1:55432/noctria_db`（**Docker の 5432→WSL では 55432 に NAT** されている例）  
+2. DB 到達性：`pg_isready -h 127.0.0.1 -p 55432 -d noctria_db -U noctria`  
+3. パスワード再設定（必要時）：`psql -h 127.0.0.1 -p 55432 -U postgres -c "ALTER USER noctria WITH PASSWORD 'noctria';"`  
+4. 反映：`systemctl restart noctria_gui`
 
-### 9.3 KPI 未生成（Check層）
-症状：ダッシュボードが更新されない  
-対処：
-1) `pdca_check_flow` 失敗タスクをクリア→再実行  
-2) 原因がデータ欠損なら `Plan-Layer` のリカバリ手順へ  
-3) 復旧後、`pdca_summary` を手動実行
+### 10.3 可観測ビューが空/欠損
+**症状**：タイムライン/レイテンシが空  
+**対処**
+1. GUI から `POST /pdca/observability/refresh` を叩く  
+2. 直接 SQL：`REFRESH MATERIALIZED VIEW obs_latency_daily;`  
+3. ETL ログを確認（Airflow ETL DAG の失敗/遅延）
+
+### 10.4 Airflow スケジューラ停止
+**症状**：DAG が走らない、WebUI に `scheduler down`  
+**対処**
+1. コンテナログ：`docker compose ... logs -f airflow-scheduler`  
+2. DB/ブローカー死活：`pg_isready` / メッセージブローカー確認  
+3. `airflow db check` → 失敗時は `airflow db migrate` 後に再起動  
+4. 復旧後、該当期間をバックフィル（§5）
+
+### 10.5 発注遅延/約定異常（Do 層）
+**症状**：`exec_result` 遅延/異常値  
+**対処**
+1. `broker_adapter` ログ疎通  
+2. スリッページ閾値超過は自動停止トリガ → §7 で即停止  
+3. 連敗閾値超過 → `risk_event` → 抑制 ON + インシデント
 
 ---
 
-## 10. バックアップ & リストア
-- バックアップ対象：
-  - `pdca_logs/**/*.json`（監査・評価・KPI）
-  - 戦略リリースメタ（`strategy_release.json`）
-  - 学習済みモデル（`/models/**`）
-  - 設定（`Config-Registry`）
-- 頻度：日次（EoD），重要DAG実行後のスナップショット
-- リストア手順（概略）：
+## 11. バックアップ & リストア
+- **対象**：`pdca_logs/**/*.json`、戦略リリースメタ、学習済みモデル（`/models/**`）、設定（`Config-Registry`）
+- **頻度**：日次（EoD）、重要 DAG 実行後はスナップショット  
+- **リストア概略**
   1) 対象日のスナップショットをマウント  
-  2) 監査ログ→`exec_result`再構成（必要時）  
+  2) 必要時 `exec_result` を監査ログから再構成  
   3) `pdca_check_flow` をバックフィル実行
 
 ---
 
-## 11. 機密/アクセス（運用観点）
-- 秘密は **環境変数 or Vault**。平文ファイル禁止  
-- アクセス権は **最小権限**＋**監査ログ**を有効化  
-- 運用者の権限変更は `Security-And-Access.md` の申請フロー必須
+## 12. 機密/アクセス（運用観点）
+- **Secrets** は ENV/Vault のみ（平文ファイル禁止）  
+- アクセスは **最小権限**＋**監査ログ有効化**  
+- 運用者権限変更は申請フロー必須（`Security-And-Access.md`）
 
 ---
 
-## 12. メンテナンスウィンドウ
-- 定例：毎週 火曜 02:00–03:00 JST（本番）  
-- 内容：OSパッチ/ライブラリアップデート/DBメンテ  
-- 影響：取引停止→GUIバナー表示→完了後の健全性チェック必須
+## 13. メンテナンスウィンドウ
+- **火曜 02:00–03:00 JST（prod）**：OS/ライブラリ/DB メンテ  
+- 影響：取引停止→GUI バナー→完了後に健全性チェック（SoD の簡易版）
 
 ---
 
-## 13. 変更管理（運用手順への反映）
-- 重要変更は **必ず同一PRで Runbooks を更新**  
-- 承認フロー：`Vision-Governance.md` の RACI に従う  
-- 採用後：`Release-Notes.md` と `CHANGELOG` を更新
-
----
-
-## 14. 監視・アラート閾値（要点）
-- 主要メトリクスと閾値は `../observability/Observability.md` を正とする  
-- 代表：
-  - **DAG 失敗率**：> 5%（5分間） → Pager  
-  - **スリッページ**：閾値超過 3 回/10 分 → 取引抑制  
-  - **連敗数**：ポリシー超過 → 取引抑制＋インシデント起票
+## 14. 変更管理（Runbook 反映）
+- 重要変更は **同一 PR で Runbooks を更新**  
+- 承認フローは `Vision-Governance.md` の **RACI** に従う  
+- Merge 後に `Release-Notes.md` / `CHANGELOG` を更新
 
 ---
 
 ## 15. テンプレ & ショートカット
 
-### 15.1 手順テンプレ（新規Runbook条項）
+### 15.1 手順テンプレ
 ```md
 ## {手順名}
 - 目的:
@@ -207,7 +278,7 @@ airflow tasks clear -t <task_id> -s 2025-08-12 -e 2025-08-12 -y pdca_check_flow
 - 監査ログ/保存先:
 ```
 
-### 15.2 よく使うコマンド集
+### 15.2 よく使うコマンド
 ```bash
 # Airflow 健全性
 curl -s http://localhost:8080/health
@@ -216,11 +287,11 @@ curl -s http://localhost:8080/health
 airflow tasks list pdca_check_flow --tree
 airflow tasks failed --since 1d
 
-# GUI 健全性
-curl -s http://localhost:8000/healthz
+# GUI 健全性（port は ENV を反映）
+curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
 ```
 
-### 15.3 連絡・エスカレーション（運用表）
+### 15.3 連絡・エスカレーション
 | 種別 | 連絡先 | 役割 |
 |---|---|---|
 | On-call Ops | #ops-oncall | 一次対応 |
@@ -231,11 +302,15 @@ curl -s http://localhost:8000/healthz
 ---
 
 ## 16. 既知の課題（Known Issues）
-- Airflow バックフィルで高頻度 I/O が発生 → ストレージ IOPS 制限に注意
-- 一部ブローカーのテスト環境でレート制限が厳格 → 夜間にまとめて検証
+- Airflow バックフィルの高 I/O → ストレージ IOPS 制限に注意  
+- 一部ブローカーのテスト環境でレート制限が厳格 → 夜間にまとめて検証  
+- GUI の **ENV 読み込み**は改行/引用符/空白に敏感（`/etc/default/noctria-gui` を常に LF・2 行・無駄な引用/空白なしに保つ）
 
 ---
 
 ## 17. 変更履歴（Changelog）
-- **2025-08-12**: 初版作成（SoD/EoD, 抑制/導入/ロールバック, 障害, 監視, テンプレ）
-
+- **2025-08-14**: v1.1
+  - GUI 運用を **systemd 標準**へ更新（`/etc/default/noctria-gui` / ポート 8001 / `sh -lc` 展開）
+  - Observability の **/pdca/timeline** / **/pdca/latency/daily** / **refresh** 手順を追加
+  - インシデントに **DB 認証失敗** / **ENV 展開不備** / **CRLF** を追加
+- **2025-08-12**: v1.0 初版
