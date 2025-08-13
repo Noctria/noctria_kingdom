@@ -3,7 +3,7 @@
 # ============================================
 """
 E2E ミニデモ:
-Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(ダミー)
+Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(実行: DO層 or ダミー)
 同一 trace_id が obs_* テーブルに連携されることを確認。
 
 実行例:
@@ -17,14 +17,48 @@ import random
 from typing import Dict, Any
 from datetime import datetime, timezone
 
-from src.plan_data.trace import new_trace_id
-from src.plan_data.observability import (
-    ensure_tables,
-    log_plan_run,
-    log_infer_call,
-    log_exec_event,
-)
-from src.decision.decision_engine import DecisionEngine, DecisionRequest
+# --- robust imports (src.* が無い環境でも動くようにフォールバック) -----------------
+try:
+    from src.plan_data.trace import new_trace_id
+except ModuleNotFoundError:
+    from plan_data.trace import new_trace_id  # type: ignore[no-redef]
+
+try:
+    from src.plan_data.observability import (
+        ensure_tables,
+        log_plan_run,
+        log_infer_call,
+        log_exec_event,
+    )
+except ModuleNotFoundError:
+    from plan_data.observability import (  # type: ignore[no-redef]
+        ensure_tables,
+        log_plan_run,
+        log_infer_call,
+        log_exec_event,
+    )
+
+try:
+    from src.decision.decision_engine import DecisionEngine, DecisionRequest
+except ModuleNotFoundError:
+    from decision.decision_engine import DecisionEngine, DecisionRequest  # type: ignore[no-redef]
+
+# --- DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック ---
+HAVE_DO = True
+try:
+    try:
+        from src.plan_data.contracts import OrderRequest
+    except ModuleNotFoundError:
+        from plan_data.contracts import OrderRequest  # type: ignore[no-redef]
+
+    try:
+        from src.execution.risk_policy import load_policy
+        from src.execution.order_execution import place_order
+    except ModuleNotFoundError:
+        from execution.risk_policy import load_policy  # type: ignore[no-redef]
+        from execution.order_execution import place_order  # type: ignore[no-redef]
+except Exception:
+    HAVE_DO = False  # import 時点で何かコケたら、素直にダミー実行に切替
 
 SYMBOL = "USDJPY"
 
@@ -96,8 +130,31 @@ def main() -> None:
     req = DecisionRequest(trace_id=trace_id, symbol=SYMBOL, features=features)
     result = engine.decide(req)  # NOCTRIA_OBS_PG_DSN が設定されていれば obs_decisions にも記録される
 
-    # 6) Exec（ダミー送信ログ）
-    fake_exec(trace_id, result.decision)
+    # 6) Exec
+    if HAVE_DO:
+        try:
+            # DO層（Noctus Gate → Idempotency/Outbox → 送信ログ）
+            # qty は大きめにして gate の clamp / ALERT 発火を狙う
+            ord_req = OrderRequest(
+                symbol=req.symbol,
+                intent="LONG" if result.decision.get("action") in ("enter_trend", "range_trade") else "SHORT",
+                qty=10000.0,
+                order_type="MARKET",
+                limit_price=None,
+                sources=[],
+                trace_id=trace_id,
+            )
+            policy = load_policy("configs/risk_policy.yml")
+            do_result = place_order(order=ord_req, risk_policy=policy, conn_str=None)
+            if do_result.get("gate_alerts"):
+                print("ALERTS:", do_result["gate_alerts"])
+        except Exception as e:
+            # DOパスで失敗した場合はフォールバックでダミー実行
+            print(f"[WARN] DO path failed ({e}); fallback to fake_exec.")
+            fake_exec(trace_id, result.decision)
+    else:
+        # DO層無し → ダミー実行
+        fake_exec(trace_id, result.decision)
 
     # 7) PLAN スパン終了ログ
     log_plan_run(trace_id=trace_id, status="END", finished_at=_now_utc())
