@@ -207,5 +207,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("GUI_PORT", "8000"))
-    uvicorn.run("noctria_gui.main:app", host="0.0.0.0", port=port, reload=_parse_bool := os.getenv("UVICORN_RELOAD", "0") in ("1", "true", "on"))
+    port = int(os.getenv("GUI_PORT", "8001"))
+    reload_flag = os.getenv("UVICORN_RELOAD", "0").lower() in ("1", "true", "on")
+    uvicorn.run("noctria_gui.main:app", host="0.0.0.0", port=port, reload=reload_flag)
