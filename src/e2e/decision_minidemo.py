@@ -11,11 +11,13 @@ Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(ダミー)
 """
 
 from __future__ import annotations
+
 import time
 import random
 from typing import Dict, Any
+from datetime import datetime, timezone
 
-from src.core.trace import generate_trace_id, now_utc
+from src.plan_data.trace import new_trace_id
 from src.plan_data.observability import (
     ensure_tables,
     log_plan_run,
@@ -26,15 +28,21 @@ from src.decision.decision_engine import DecisionEngine, DecisionRequest
 
 SYMBOL = "USDJPY"
 
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def fake_plan_features() -> Dict[str, float]:
-    # 既存Plan層の代替ダミー（統合が済むまで）
+    """既存 Plan 層の代替ダミー（collector→features→analyzer の代わり）"""
     return {
         "volatility": round(random.uniform(0.05, 0.35), 3),
         "trend_score": round(random.uniform(0.0, 1.0), 3),
     }
 
+
 def fake_infer(trace_id: str, features: Dict[str, float]) -> Dict[str, Any]:
-    # 予測器ダミー（例: Prometheusの簡易呼び出し代替）
+    """予測器ダミー（例: Prometheus の簡易呼び出し代替）"""
     t0 = time.time()
     pred = {
         "next_return_pred": round(random.uniform(-0.003, 0.003), 6),
@@ -51,12 +59,14 @@ def fake_infer(trace_id: str, features: Dict[str, float]) -> Dict[str, Any]:
     )
     return pred
 
-def fake_exec(trace_id: str, decision: Dict[str, Any]):
-    # 約定APIダミー
+
+def fake_exec(trace_id: str, decision: Dict[str, Any]) -> None:
+    """約定APIダミー（実送信の代わりに obs_exec_events に記録）"""
+    side = "BUY" if decision.get("action") in ("enter_trend", "range_trade") else "FLAT"
     log_exec_event(
         trace_id=trace_id,
         symbol=decision.get("symbol", SYMBOL),
-        side="BUY" if decision.get("action") in ("enter_trend", "range_trade") else "FLAT",
+        side=side,
         size=10000,
         provider="DummyBroker",
         status="SENT",
@@ -64,30 +74,36 @@ def fake_exec(trace_id: str, decision: Dict[str, Any]):
         response={"ok": True},
     )
 
-def main():
+
+def main() -> None:
+    # 0) 観測テーブルの存在保証（dev/PoC 向け）
     ensure_tables()
-    trace_id = generate_trace_id("noctria")
 
-    # --- Plan Run 開始/終了ログ
-    log_plan_run(trace_id=trace_id, status="START", started_at=now_utc())
+    # 1) トレースID
+    trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
+
+    # 2) PLAN スパン開始ログ（新API）
+    log_plan_run(trace_id=trace_id, status="START", started_at=_now_utc(), meta={"demo": "decision_minidemo"})
+
+    # 3) 特徴量（ダミー生成）※本来は collector→features→analyzer
     features = fake_plan_features()
-    # ここで本来のPlan層（collector→features→analyzer）に接続
 
-    # --- （任意）Infer 呼び出し
+    # 4) （任意）Infer 呼び出し（ダミー）
     _ = fake_infer(trace_id, features)
 
-    # --- Decision
+    # 5) Decision
     engine = DecisionEngine()
     req = DecisionRequest(trace_id=trace_id, symbol=SYMBOL, features=features)
-    result = engine.decide(req)
+    result = engine.decide(req)  # NOCTRIA_OBS_PG_DSN が設定されていれば obs_decisions にも記録される
 
-    # --- Exec（ダミー）
+    # 6) Exec（ダミー送信ログ）
     fake_exec(trace_id, result.decision)
 
-    # --- Plan Run 完了
-    log_plan_run(trace_id=trace_id, status="END", finished_at=now_utc())
+    # 7) PLAN スパン終了ログ
+    log_plan_run(trace_id=trace_id, status="END", finished_at=_now_utc())
 
     print(f"✅ E2E complete. trace_id={trace_id}")
+
 
 if __name__ == "__main__":
     main()
