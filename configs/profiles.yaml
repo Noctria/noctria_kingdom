@@ -1,14 +1,27 @@
-# 提案⑥: weights/rollout の外部定義（SemVerは運用で）
+# configs/profiles.yaml
+# 提案⑥: weights / rollout の外部定義（DecisionEngine 用）
+# 注意:
+# - weights のキーは StrategyProposal.strategy（実装側の名称）と **完全一致（大文字小文字含む）** させてください。
+#   ここでは Aurus / Levia / Prometheus / Veritas を想定しています。実装が異なる場合は合わせて修正してください。
+# - alpha_risk のスコア式は次の通り:
+#     score = (1 - alpha_risk) * (weight * confidence) + alpha_risk * (1 - risk_score)
+
 version: 1
+
 default:
-  rollout_percent: 100   # 7 / 30 / 100 の段階導入に対応
-  min_confidence: 0.35
-  combine: "best_one"    # or "weighted_sum"
-  alpha_risk: 0.3        # score = w*confidence + (1-w)*(1 - risk_score) ; w = 1 - alpha_risk
+  rollout_percent: 100        # 7 / 30 / 100 の段階導入に対応（実行量スケール）
+  min_confidence: 0.35        # これ未満の提案は棄却（FLAT扱い）
+  combine: "best_one"         # "best_one" | "weighted_sum"
+  alpha_risk: 0.30            # 0..1（大きいほどリスクスコア重視の減点）
+
+# 戦略別の重み（0 は無効化）
+# ※実装の StrategyProposal.strategy 名に合わせてください
 weights:
-  AURUS:   0.35
-  LEVIA:   0.25
-  PROM:    0.20
-  VERITAS: 0.20
+  Aurus:       0.35
+  Levia:       0.25
+  Prometheus:  0.20
+  Veritas:     0.20
+
+# （任意）戦略呼び出し等のタイムアウト
 timeouts_ms:
   propose: 800
