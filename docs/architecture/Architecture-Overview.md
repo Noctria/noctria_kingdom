@@ -1,6 +1,6 @@
 # 🏰 Noctria Kingdom アーキテクチャ概要
 
-**Document Version:** 1.2.4 (Draft)  
+**Document Version:** 1.2.5 (Draft)  
 **Status:** Draft (for review)  
 **Last Updated:** 2025-08-13 (JST)
 
@@ -187,11 +187,18 @@ GENJSON -. idempotency_key .-> OUTBOX
 
 ---
 
-## 6. 層別詳細図 (コンパクト解説)
+## 6. 層別詳細図 (別ファイルへのリンク)
 
-> 各レイヤの構成と主責務を、図＋テキストで自足的に把握できるように記述。
+> アーキテクチャ詳細は以下の **Mermaid** 図ファイルに分割。`Architecture-Overview.md` と同じディレクトリにある `diagrams/` から相対参照します。
 
-### 6.1 PLAN 層 (データ→特徴量→提案入力)
+- [PLAN 層 詳細図](diagrams/plan_layer.mmd)  
+- [DO 層 詳細図](diagrams/do_layer.mmd)  
+- [CHECK 層 詳細図](diagrams/check_layer.mmd)  
+- [ACT 層 詳細図](diagrams/act_layer.mmd)
+
+> 参考までに、本ファイル内にも「簡易版のコンパクト解説（Mermaid）」を残しています。
+
+### 6.1 PLAN 層 (コンパクト解説)
 
 - **主責務**: データ収集、特徴量生成、KPI 下地、AI への入力整形、遅延/欠損の記録  
 - **可観測性**: `obs_plan_runs` (phase/span)、`obs_infer_calls` (AI 前処理/推論呼び出し)  
@@ -206,7 +213,7 @@ F --> A["analyzer.py"]
 A -->|FeatureBundle| AI["AI underlings"]
 ```
 
-### 6.2 DO 層 (実行・最終ガード)
+### 6.2 DO 層 (コンパクト解説)
 
 - **主責務**: **Noctus Gate** による境界ガード (数量/時間帯/禁止銘柄/連敗縮小 等)、注文実行、監査  
 - **可観測性**: `obs_exec_events`、逸脱時は `obs_alerts`  
@@ -221,7 +228,7 @@ G -- alerts --> AL["obs_alerts"]
 E -- exec log --> EX["obs_exec_events"]
 ```
 
-### 6.3 CHECK 層 (評価・監査・メトリクス)
+### 6.3 CHECK 層 (コンパクト解説)
 
 - **主責務**: 実績評価、KPI 算出、監査照合、異常検知  
 - **可観測性**: 指標を `obs_*` や専用テーブルへ集約、**timeline/latency** へ反映
@@ -234,7 +241,7 @@ V --> KPIs["KPI artifacts"]
 KPIs --> GUI["GUI dashboards"]
 ```
 
-### 6.4 ACT 層 (昇格・ロールバック)
+### 6.4 ACT 層 (コンパクト解説)
 
 - **主責務**: 再評価/再学習、段階導入、ロールバック、レジストリ反映  
 - **基準**: 3 章の昇格/ロールバック条件に準拠
@@ -338,6 +345,10 @@ noctria_gui/{main.py,routes/**,templates/**,static/**}
 
 ## 11. 変更履歴 (Changelog)
 
+- **2025-08-13**: v1.2.5  
+  - Section 6 に **別ファイルへの詳細図リンク**（`diagrams/*.mmd`）を復活  
+  - 併せてコンパクト解説（mermaid）を維持  
+  - そのほかの本文は v1.2.4 と同等
 - **2025-08-13**: v1.2.4 草案  
   - 単一コードブロックで GitHub へ即貼り付け可能な体裁に調整  
   - Noctus Gate (**risk_gate.py**) を **Implemented (min)** として反映  
