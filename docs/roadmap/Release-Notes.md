@@ -1,8 +1,8 @@
 # 🗓 Release Notes — Noctria Kingdom
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Status:** Adopted  
-**Last Updated:** 2025-08-12 (JST)
+**Last Updated:** 2025-08-14 (JST)
 
 > 目的：Noctria Kingdom の**リリース単位**での変更点・移行手順・既知の問題を明確化し、PDCA/運用への影響を最小化する。  
 > 参照：`../governance/Vision-Governance.md` / `../operations/Runbooks.md` / `../operations/Airflow-DAGs.md` / `../operations/Config-Registry.md` / `../observability/Observability.md` / `../apis/API.md` / `../apis/Do-Layer-Contract.md` / `../security/Security-And-Access.md` / `../qa/Testing-And-QA.md` / `../models/ModelCard-Prometheus-PPO.md` / `../models/Strategy-Lifecycle.md` / `../architecture/Architecture-Overview.md`
@@ -23,7 +23,90 @@
 - [ ] Airflow 本番キュー分離（`critical_do` / `models`）  
 - [ ] `Do-Layer-Contract` の小改定（`meta.shadow` の必須化検討）  
 - [ ] KPI スキーマのバージョンタグ導入（`kpi_summary.schema.json` に `schema_version`）  
-- [ ] Observability ダッシュボードの “段階導入注釈” 自動投入
+- [ ] Observability ダッシュボードの “段階導入注釈” 自動投入  
+- [ ] **Outbox**（Do 層の冪等化キュー）実装とスイッチ導入（`do.idempotency.outbox_enabled`）  
+- [ ] GUI RBAC（`auth.provider: oidc`）準備
+
+---
+
+## 2025.08-p1 “Ops Hardening” — GUI systemd/ENV & Observability
+**リリース日:** 2025-08-14 (JST)  
+**対象:** 運用安定化（systemd 経由 GUI 起動の標準化、ENV 注入、可観測性の配線整備）。機能破壊なし。
+
+### 🧭 Highlights
+- **GUI 起動方式を systemd 標準化**：ENV 展開の不具合を解消し、再起動/監査を一貫化。  
+- **既定ポートを 8001 に更新**（ENV: `NOCTRIA_GUI_PORT` で上書き可）。  
+- **ENV ファイル** `/etc/default/noctria-gui` を **SoT** として採用（DSN/PORT）。  
+- **Observability 追補**：`obs_decisions` / `obs_exec_events` をドキュメントに反映、GUI ルート `/pdca/timeline`, `/pdca/latency/daily` を明記。  
+- ドキュメント群を最新版に更新（Mermaid の互換レンダリング修正含む）。
+
+### ✨ New (追加)
+- **systemd ユニット推奨形**（ENV 展開のため **/bin/sh -lc** 経由）：
+  ```ini
+  [Service]
+  EnvironmentFile=/etc/default/noctria-gui
+  Environment=PYTHONUNBUFFERED=1
+  WorkingDirectory=/mnt/d/noctria_kingdom
+  ExecStart=/bin/sh -lc 'exec /mnt/d/noctria_kingdom/venv_gui/bin/gunicorn \
+    --workers 4 --worker-class uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:${NOCTRIA_GUI_PORT:-8001} \
+    --access-logfile - --error-logfile - \
+    noctria_gui.main:app'
+  Restart=always
+  ```
+- **ENV ファイル（標準）**：
+  ```dotenv
+  NOCTRIA_OBS_PG_DSN=postgresql://noctria:noctria@127.0.0.1:55432/noctria_db
+  NOCTRIA_GUI_PORT=8001
+  ```
+
+### 🔧 Improvements (改善)
+- **Config Registry v1.1**：GUI 既定ポートを 8001 に更新、systemd/ENV 運用を正式化。  
+- **Architecture Overview v1.2.5**：図版リンクを `diagrams/*.mmd` に分離、Mermaid 構文を GitHub 互換へ修正。  
+- **Observability（最新版）**：テーブル/ビュー（`obs_decisions`, `obs_exec_events`, `obs_trace_timeline` 等）と GUI ルートを反映。  
+- Runbooks に **systemd 起動/確認コマンド**を追補（`systemctl show -p Environment*`, `ss -ltnp | grep :8001`）。
+
+### 🛡 Security / Governance
+- Secrets は引き続き **ENV/Vault** のみ（Git への混入禁止）。  
+- 運用変更（ポート/ユニット）は **Two-Person + King** で承認。
+
+### 🔌 API / Contract
+- 変更なし（**互換**）。GUI バインドポートの既定値のみ変更（プロキシ/ALB の転送先を要確認）。
+
+### ⚠️ Breaking Changes（互換注意）
+- **GUI 既定ポート**：`8000 → 8001`。  
+  - 影響：FW/ALB/プロキシ/コンテナの **ポート定義更新** が必要な場合あり。  
+  - API/ルート構造の変更は **なし**。
+
+### 🔁 Migration Checklist（移行チェック）
+- [ ] `/etc/default/noctria-gui` を作成（**LF/644/root:root**、CRLF 注意）  
+- [ ] `sudo systemctl daemon-reload && sudo systemctl restart noctria_gui`  
+- [ ] 反映確認：  
+  ```bash
+  sudo systemctl show -p EnvironmentFiles -p Environment -p ExecStart noctria_gui
+  ss -ltnp | grep ':8001'
+  curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
+  ```
+- [ ] 逆プロキシ/ファイアウォール/ALB のポート更新（必要時）  
+- [ ] `docs/operations/Runbooks.md` / `Config-Registry.md` の参照リンクが新仕様になっていることを確認
+
+### 🧪 QA / 運用ベリファイ
+- **再起動耐性**：`Restart=always` 動作確認（連続 3 回再起動で安定）。  
+- **ENV 展開**：`NOCTRIA_GUI_PORT` が `ExecStart` に反映されることを `journalctl -u noctria_gui` で確認。  
+- **観測**：`/pdca/timeline`, `/pdca/latency/daily` が GUI で表示されること。
+
+### 🐞 Known Issues（既知の課題）
+- 大規模バックフィル時の I/O 飽和（Storage IOPS に留意、Runbooks §12 を遵守）。  
+- 一部ブローカーのレート制限が厳格（指数バックオフを推奨）。  
+- ダッシュボードの “段階導入注釈” は現状手動（Unreleased で自動化予定）。
+
+### 📌 Post-Release Actions（リリース後タスク）
+- [ ] 7 日間の KPI 監視（`win_rate`, `max_dd_pct`, `do_order_latency_seconds`）。  
+- [ ] 逆プロキシ設定の棚卸し（8001 対応漏れをゼロに）。  
+- [ ] 監査：`systemd` ユニット変更の記録（適用者・時刻・差分）を残す。
+
+### 🙌 Acknowledgments
+現場の Ops チームと GUI/Infra を繋いでくれた皆さんに感謝。ENV 展開の不具合潰しとドキュメント整理、最高でした。
 
 ---
 
@@ -32,11 +115,11 @@
 **対象:** 文書/契約/運用標準の**初版整備**（コードの挙動を変える破壊的変更はなし）
 
 ### 🧭 Highlights
-- 統治/運用/契約/可観測性/モデル/QA 一式の**初版ドキュメント（v1.0）**を整備。
-- **ガードレール**（Non-Negotiables）と **RACI** を明文化し、運用リスクを低減。
-- **Config Registry**（defaults/env/flags/secrets）の SoT（Single source of Truth）確立。
-- **Do-Layer Contract** と **API v1** を提示し、Plan→Do→Check の I/F を固定。
-- **Observability** のメトリクス/ルール/ダッシュボード設計を標準化。
+- 統治/運用/契約/可観測性/モデル/QA 一式の**初版ドキュメント（v1.0）**を整備。  
+- **ガードレール**（Non-Negotiables）と **RACI** を明文化し、運用リスクを低減。  
+- **Config Registry**（defaults/env/flags/secrets）の SoT（Single source of Truth）確立。  
+- **Do-Layer Contract** と **API v1** を提示し、Plan→Do→Check の I/F を固定。  
+- **Observability** のメトリクス/ルール/ダッシュボード設計を標準化。  
 - **Testing & QA** パイプラインの基準とゲート条件を定義。
 
 ### ✨ New (追加)
@@ -122,6 +205,5 @@ Docs-as-Code の整備に協力した Council & Ops & Risk チーム、ありが
 ---
 
 ## 履歴（Changelog of Release Notes）
+- **2025-08-14:** `2025.08-p1 "Ops Hardening"` を追加。Document Version を 1.1 に更新。  
 - **2025-08-12:** 章立て/テンプレ確立、`2025.08 "Foundation"` を登録
-
-
