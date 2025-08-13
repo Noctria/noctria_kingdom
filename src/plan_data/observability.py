@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# logger
+// logger
 # -----------------------------------------------------------------------------
 logger = logging.getLogger("noctria.observability")
 if not logger.handlers:
@@ -68,8 +68,8 @@ def _get_dsn(conn_str: Optional[str]) -> str:
 # -----------------------------------------------------------------------------
 # driver loader (lazy import)
 # -----------------------------------------------------------------------------
-_DRIVER = None      # type: ignore[var-annotated]
-_DB_KIND = None     # "psycopg2" or "psycopg"
+_DRIVER: Optional[object] = None
+_DB_KIND: Optional[str] = None  # "psycopg2" or "psycopg"
 
 def _import_driver() -> Tuple[object, str]:
     """
@@ -472,7 +472,7 @@ def _log_plan_status(*, trace_id: str,
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_plan_runs (trace_id, started_at, finished_at, status, meta) "
-        "VALUES (%s, %s, %s, %s, %s) RETURNING id"
+        "VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id"
     )
     params = (
         trace_id,
@@ -506,7 +506,7 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         dsn = _get_dsn(conn_str)
         sql = (
             "INSERT INTO obs_infer_calls (trace_id, model_name, call_at, duration_ms, success, inputs, outputs) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
+            "VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id"
         )
         params = (trace_id, model_name, call_at or _utcnow(), duration_ms, success, _json(inputs or {}), _json(outputs or {}))
         try:
@@ -551,7 +551,7 @@ def log_decision(*, trace_id: str,
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_decisions (trace_id, made_at, engine_version, strategy_name, score, reason, features, decision) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
+        "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id"
     )
     params = (
         trace_id,
@@ -586,7 +586,7 @@ def log_exec_event(*, trace_id: str,
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_exec_events (trace_id, sent_at, symbol, side, size, provider, status, order_id, response) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING id"
     )
     params = (
         trace_id,
@@ -620,7 +620,7 @@ def log_alert(*,
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_alerts (created_at, policy_name, reason, severity, details, trace_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+        "VALUES (%s, %s, %s, %s, %s::jsonb, %s) RETURNING id"
     )
     params = (
         created_at or _utcnow(),
