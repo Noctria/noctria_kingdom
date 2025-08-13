@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
 """
-📌 Noctria Kingdom Path Config (v4.6)
+📌 Noctria Kingdom Path Config (v5.0)
 - 王国全体のパス構造を一元管理します。
-- Docker/WSL/ローカル環境差異を吸収し、自動切替＋環境変数で上書き可能に。
-- 将来の実行層リネーム（execution -> do）に互換レイヤで対応します。
+- Docker/WSL/ローカル差異を吸収し、ENVで上書き可能。
+- 実行層リネーム（execution -> do）に互換レイヤで対応。
+- ✅ NEW: ensure_import_path() を追加。エントリポイント側で呼べば import 経路を安定化。
+- ✅ NEW: NOCTRIA_AUTOPATH=1 で import 時に自動で sys.path を整備（任意）。
 """
 
 from __future__ import annotations
 from pathlib import Path
 import os
+import sys
+from contextlib import contextmanager
 
 # =========================================================
 # 🏰 基本ディレクトリ判定（Docker or ローカル）＋ENV上書き
@@ -52,11 +55,9 @@ STRATEGIES_VERITAS_GENERATED_DIR = STRATEGIES_DIR / "veritas_generated"
 DO_DIR_CANDIDATE = SRC_DIR / "do"
 EXECUTION_DIR_CANDIDATE = SRC_DIR / "execution"
 DO_DIR = DO_DIR_CANDIDATE if DO_DIR_CANDIDATE.exists() else EXECUTION_DIR_CANDIDATE
-# 後方互換（旧名）：既存コードが EXECUTION_DIR を参照しても動くように
-EXECUTION_DIR = DO_DIR
+EXECUTION_DIR = DO_DIR  # 旧名互換
 
 # --- 専門領域・アダプタ等 ---
-# 実ツリーでは experts/ はプロジェクト直下に存在。無ければ src/experts をフォールバック。
 EXPERTS_DIR = (PROJECT_ROOT / "experts") if (PROJECT_ROOT / "experts").exists() else (SRC_DIR / "experts")
 NOCTRIA_AI_DIR = SRC_DIR / "noctria_ai"
 TOOLS_DIR = SRC_DIR / "tools"
@@ -70,18 +71,15 @@ HERMES_MODELS_DIR = HERMES_DIR / "models"
 # 📦 データ・モデル・ログ領域
 # =========================================================
 DATA_DIR = PROJECT_ROOT / "data"
-STATS_DIR = DATA_DIR / "stats"  # 統計・可視化用
-
+STATS_DIR = DATA_DIR / "stats"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
-# 参照URL/パス（必要に応じて実値に差替え）
 DATA_SOURCE_URL = os.getenv("DATA_SOURCE_URL", "https://example.com/data/source.csv")
 LOCAL_DATA_PATH = DATA_DIR / "local_data"
 FEATURES_PATH = PROCESSED_DATA_DIR / "features"
 MODEL_PATH = DATA_DIR / "models" / "latest_model.pkl"
 
-# 制度・機関など（実ツリーでは airflow_docker/institutions を優先）
 INSTITUTIONS_DIR = (
     AIRFLOW_DOCKER_DIR / "institutions"
     if (AIRFLOW_DOCKER_DIR / "institutions").exists()
@@ -131,8 +129,6 @@ else:
 VERITAS_GENERATE_SCRIPT = VERITAS_DIR / "veritas_generate_strategy.py"
 VERITAS_EVALUATE_SCRIPT = VERITAS_DIR / "evaluate_veritas.py"
 
-# 実ツリーでは airflow_docker/scripts/github_push.py が存在するため優先。
-# 無ければ src/scripts/github_push_adopted_strategies.py を代替として使う。
 _github_push_primary = AIRFLOW_SCRIPTS_DIR / "github_push.py"
 _github_push_fallback = SCRIPTS_DIR / "github_push.py"
 _github_push_alt = SCRIPTS_DIR / "github_push_adopted_strategies.py"
@@ -144,8 +140,7 @@ elif _github_push_fallback.exists():
 elif _github_push_alt.exists():
     GITHUB_PUSH_SCRIPT = _github_push_alt
 else:
-    # 最後の手段：存在しないが、参照時に気づけるように未作成パスを提示
-    GITHUB_PUSH_SCRIPT = _github_push_primary
+    GITHUB_PUSH_SCRIPT = _github_push_primary  # 未作成でも参照時に気づけるように
 
 # 公開リポジトリURL（ENV上書き可能）
 GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "https://github.com/Noctria/noctria_kingdom")
@@ -164,10 +159,60 @@ CATEGORY_MAP = {
 }
 
 # =========================================================
-# ✅ パス整合性チェック用ユーティリティ
+# ✅ パス整合性・import パス整備ユーティリティ
 # =========================================================
 def _lint_path_config():
+    """各 Path が存在するかの簡易チェック（GUI/CLI デバッグ用）"""
     return {k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")}
+
+def _str(p: Path) -> str:
+    return str(p.resolve())
+
+def ensure_import_path(
+    *,
+    include_project_root: bool = True,
+    include_src: bool = True,
+    extra: tuple[Path, ...] | list[Path] = (),
+) -> None:
+    """
+    sys.path を整備する共通関数。
+    - エントリポイント（CLI/テスト/DAG/スクリプト）の冒頭で1回呼ぶだけで OK。
+    - 例:
+        from src.core.path_config import ensure_import_path
+        ensure_import_path()   # 以降は 'from plan_data...','from decision...' が安定
+
+    Args:
+      include_project_root: repo ルートを import 経路に含める（'src.' 付き import 用）
+      include_src:          'src' を import 経路に含める（トップレベル import 用）
+      extra:                追加したい Path（任意）
+    """
+    targets: list[str] = []
+    if include_project_root:
+        targets.append(_str(PROJECT_ROOT))
+    if include_src:
+        targets.append(_str(SRC_DIR))
+    targets.extend(_str(p) for p in extra if isinstance(p, Path))
+
+    # 先頭優先で追加（重複は追加しない）
+    for t in reversed(targets):  # 末尾から insert(0) することで targets の先頭が最前列へ
+        if t not in sys.path:
+            sys.path.insert(0, t)
+
+@contextmanager
+def with_import_path(**kwargs):
+    """
+    ensure_import_path を一時的に適用するコンテキストマネージャ。
+    """
+    before = list(sys.path)
+    ensure_import_path(**kwargs)
+    try:
+        yield
+    finally:
+        sys.path[:] = before
+
+# ENV で自動適用したい場合（明示 opt-in）
+if os.getenv("NOCTRIA_AUTOPATH", "").lower() in {"1", "true", "yes"}:
+    ensure_import_path()
 
 # =========================================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
@@ -202,4 +247,6 @@ __all__ = [
     "CATEGORY_MAP",
     # ユーティリティ
     "_lint_path_config",
+    "ensure_import_path",
+    "with_import_path",
 ]
