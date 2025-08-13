@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import traceback
 from importlib import import_module
@@ -60,7 +61,7 @@ logger = logging.getLogger("noctria_gui.main")
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.1.0",
+    version="2.2.0",
 )
 
 # -----------------------------------------------------------------------------
@@ -134,10 +135,11 @@ _safe_include("noctria_gui.routes.act_history_detail")
 _safe_include("noctria_gui.routes.logs_routes")
 _safe_include("noctria_gui.routes.upload_history")
 
-_safe_include("noctria_gui.routes.pdca")
-_safe_include("noctria_gui.routes.pdca_recheck")
+# --- PDCA関連（今回追加の /pdca/control を含む） ---
+_safe_include("noctria_gui.routes.pdca")           # 既存：PDCAトップ/補助
+_safe_include("noctria_gui.routes.pdca_recheck")   # 新規HTMLに対応: /pdca/control, /pdca/recheck
 _safe_include("noctria_gui.routes.pdca_routes")
-_safe_include("noctria_gui.routes.pdca_summary")
+_safe_include("noctria_gui.routes.pdca_summary")   # /pdca/summary & /pdca/summary/data
 
 _safe_include("noctria_gui.routes.push")
 _safe_include("noctria_gui.routes.push_history")
@@ -199,3 +201,11 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"},
     )
+
+# -----------------------------------------------------------------------------
+# Local dev (optional)
+# -----------------------------------------------------------------------------
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("GUI_PORT", "8000"))
+    uvicorn.run("noctria_gui.main:app", host="0.0.0.0", port=port, reload=_parse_bool := os.getenv("UVICORN_RELOAD", "0") in ("1", "true", "on"))
