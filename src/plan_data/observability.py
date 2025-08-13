@@ -15,7 +15,8 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 # - 新API拡張: decisions / exec_events / alerts を追加
 # - CREATE IF NOT EXISTS + ALTER IF NOT EXISTS で既存スキーマを前方互換に拡張
 # - DSNは NOCTRIA_OBS_PG_DSN から取得（明示指定も可）
-# - 追加: ensure_views() / refresh_materialized() で View / MV を自動作成
+# - 追加: ensure_views()/ensure_views_and_mvs()/refresh_latency_daily() で
+#         View / MV を自動作成・更新
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -335,8 +336,8 @@ agg AS (
 SELECT
   trace_id,
   plan_start, infer_ts, decision_ts, exec_ts,
-  EXTRACT(EPOCH FROM (infer_ts    - plan_start))*1000 AS ms_plan_to_infer,
-  EXTRACT(EPOCH FROM (decision_ts - infer_ts))*1000   AS ms_infer_to_decision,
+  EXTRACT(EPOCH FROM (infer_ts    - plan_start))*1000  AS ms_plan_to_infer,
+  EXTRACT(EPOCH FROM (decision_ts - infer_ts))*1000    AS ms_infer_to_decision,
   EXTRACT(EPOCH FROM (exec_ts     - decision_ts))*1000 AS ms_decision_to_exec,
   EXTRACT(EPOCH FROM (exec_ts     - plan_start))*1000  AS ms_total
 FROM agg;
@@ -392,16 +393,33 @@ def ensure_views(conn_str: Optional[str] = None) -> None:
     _exec(dsn, _CREATE_LATENCY_DAILY_INDEX)
     logger.info("observability views ensured/refreshed (definitions).")
 
-def refresh_materialized(conn_str: Optional[str] = None) -> None:
+def ensure_views_and_mvs(conn_str: Optional[str] = None) -> None:
     """
-    マテビューだけをリフレッシュ（ロックを避けるなら CONCURRENTLY）。
+    テーブル→ビュー→マテビューの順に保証（ワンストップ）。
+    """
+    ensure_tables(conn_str)
+    ensure_views(conn_str)
+    # MVは定義作成のみ。内容は必要に応じて refresh。
+    logger.info("tables + views/mviews ensured.")
+
+def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = None) -> None:
+    """
+    obs_latency_daily をリフレッシュ。CONCURRENTLY はユニークインデックス必須（構築済）。
     """
     dsn = _get_dsn(conn_str)
-    try:
-        _exec(dsn, "REFRESH MATERIALIZED VIEW CONCURRENTLY obs_latency_daily;")
-    except Exception:
-        _exec(dsn, "REFRESH MATERIALIZED VIEW obs_latency_daily;")
+    if concurrently:
+        try:
+            _exec(dsn, "REFRESH MATERIALIZED VIEW CONCURRENTLY obs_latency_daily;")
+            logger.info("obs_latency_daily refreshed CONCURRENTLY.")
+            return
+        except Exception as e:
+            logger.warning("CONCURRENTLY refresh failed: %s; falling back to non-concurrent refresh.", e)
+    _exec(dsn, "REFRESH MATERIALIZED VIEW obs_latency_daily;")
     logger.info("obs_latency_daily refreshed.")
+
+# 後方互換：旧名
+def refresh_materialized(conn_str: Optional[str] = None) -> None:
+    refresh_latency_daily(concurrently=True, conn_str=conn_str)
 
 # -----------------------------------------------------------------------------
 # public API（旧API互換 + 新API）
@@ -631,3 +649,14 @@ def ping(conn_str: Optional[str] = None) -> bool:
     except Exception as e:
         logger.warning("observability ping failed: %s", e)
         return False
+
+__all__ = [
+    # ensure
+    "ensure_tables", "ensure_views", "ensure_views_and_mvs",
+    "refresh_latency_daily", "refresh_materialized",
+    # loggers
+    "log_plan_run", "log_infer_call", "log_decision",
+    "log_exec_event", "log_alert",
+    # misc
+    "ping",
+]
