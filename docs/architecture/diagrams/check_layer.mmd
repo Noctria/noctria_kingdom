@@ -3,41 +3,46 @@ flowchart TD
 
   %% 入力（Do層からの結果/イベント）
   subgraph INPUTS["上流入力 (from DO)"]
-    EXECRES["exec_result.json<br/>(約定/損益/コスト)"]
-    RISEVT["risk_event.json<br/>(損失/連敗/異常)"]
-    AUDIT["audit_order.json<br/>(完全監査ログ)"]
+    EXECRES["exec_result.json<br/>（約定/損益/コスト）"]
+    RISEVT["risk_event.json<br/>（損失/連敗/異常）"]
+    AUDIT["audit_order.json<br/>（完全監査ログ）"]
   end
 
   %% CHECK層
-  subgraph CHECK["🔍 Check層 (src/check)"]
+  subgraph CHECK["Check層 (src/check)"]
     MON["challenge_monitor.py<br/>・DD監視/連敗監視<br/>・ルール逸脱検知<br/>・アラート生成"]
     EVAL["evaluation.py<br/>・日次/戦略別KPI<br/>・勝率/最大DD/取引数/平均R"]
-    AGG["aggregator.py<br/>・期間集計/AI別/シンボル別<br/>・ランキング/タグ別比較"]
-    STORE["/data/pdca_logs/**/*.json<br/>・評価・監視・指標の永続化"]
+    AGG["metrics_aggregator（planned）<br/>・期間集計/AI別/シンボル別<br/>・ランキング/タグ別比較"]
+    STORE["/data/pdca_logs/**/*.json<br/>・評価/監視/指標の永続化"]
   end
 
   %% 出力（Act/GUI）
   subgraph OUTPUTS["下流出力 (to ACT/GUI)"]
-    KPI["kpi_summary.json<br/>(戦略別KPIのスナップショット)"]
-    ALERT["alert_payload.json<br/>(通知/抑制フラグ付き)"]
+    KPI["kpi_summary.json<br/>（戦略別KPIのスナップショット）"]
+    ALERT["alert_payload.json<br/>（通知/抑制フラグ付き）"]
   end
 
   %% 統治/運用
   subgraph ORCH["統治/運用"]
-    GUICHECK["GUI: /pdca/check<br/>(モニタ & 評価一覧)"]
-    DAGCHECK["Airflow DAG: pdca_check_flow.py<br/>(定期評価/閾値判定)"]
-    NOTIFY["notifier.py<br/>(Slack/メール/Webhook)"]
+    GUITL["GUI: /pdca/timeline"]
+    GUIDLY["GUI: /pdca/latency/daily"]
+    DAGCHECK["Airflow DAG: check_flow<br/>（定期評価/閾値判定）"]
+    NOTIFY["notifier.py（Slack/メール/Webhook）"]
   end
 
   %% フロー
   EXECRES --> EVAL
   RISEVT --> MON
-  AUDIT --> AGG
-  EVAL --> AGG --> STORE
+  AUDIT --> EVAL
+  EVAL --> AGG
+  EVAL --> STORE
+  AGG --> STORE
   MON --> ALERT --> NOTIFY
   AGG --> KPI
+  KPI --> GUITL
+  KPI --> GUIDLY
 
-  %% 管理
-  GUICHECK --> DAGCHECK
+  %% 管理リンク
+  GUITL --> DAGCHECK
   DAGCHECK --> EVAL
   DAGCHECK --> MON
