@@ -1,278 +1,174 @@
-# 🧭 Coding Standards — Noctria Kingdom
+# 🗂 ADRs — Architecture Decision Records (Index) / Noctria Kingdom
 
-**Version:** 1.0  
-**Status:** Draft → Adopted (when merged)  
-**Last Updated:** 2025-08-12 (JST)
+**Document Version:** 1.0  
+**Status:** Adopted  
+**Last Updated:** 2025-08-14 (JST)
 
-> 目的：Noctria のコード（Plan/Do/Check/Act、API/GUI、DAG/ツール）が**安全・再現可能・読みやすい**状態で進化し続けるための標準を定める。  
-> 参照：`../architecture/Architecture-Overview.md` / `../architecture/Plan-Layer.md` / `../operations/Config-Registry.md` / `../operations/Airflow-DAGs.md` / `../observability/Observability.md` / `../security/Security-And-Access.md` / `../qa/Testing-And-QA.md` / `../apis/API.md` / `../apis/Do-Layer-Contract.md`
-
----
-
-## 1. スコープ & 原則
-- スコープ：**Python**（中核）、DAG（Airflow）、API/GUI（FastAPI）、スクリプト、テスト、設定（YAML/JSON Schema）。  
-- 原則：
-  1) **Guardrails First** — リスク境界・監査・Secrets を常に優先。  
-  2) **Clarity over Cleverness** — 可読性と明確な責務分離。  
-  3) **Reproducibility** — 同じ入力→同じ出力（シード固定、仕様の明文化）。  
-  4) **Docs-as-Code** — 変更は**同一PR**で関連ドキュメントを更新。
+> このファイルは **ADRs（Architecture Decision Records）** の「索引」と「運用ルール」「テンプレート」を提供します。  
+> **注意:** 本ファイルは *Coding Standards* ではありません。コーディング規約は `../governance/Coding-Standards.md` を正とします。
 
 ---
 
-## 2. 言語・ランタイム・依存
-- Python **3.11+** を標準。型ヒント**必須**（後述）。  
-- 依存は `requirements.txt / requirements-dev.txt` を**単一情報源**とし、CI で `pip-audit`。  
-- OS 時刻は UTC、表示は JST（`Observability.md` に準拠）。
+## 1) 目的と適用範囲
+- **目的:** 重要な技術/運用の意思決定を小さく、追跡可能に、将来の読み手にも再現できる形で記録する。  
+- **対象:** アーキテクチャ、契約/API、可観測性、セキュリティ、データ管理、運用方式（Airflow/DAG）、ガードレール（Noctus）など。  
+- **非対象:** 単純なバグ修正や明白なリファクタリング（ただし影響が広ければ ADR 化を検討）。
 
 ---
 
-## 3. プロジェクト構成（抜粋）
-```
-src/
-  core/...
-  plan_data/{collector.py,features.py,statistics.py,analyzer.py}
-  strategies/{aurus_singularis.py,levia_tempest.py,noctus_sentinella.py,prometheus_oracle.py,veritas_machina.py,hermes_cognitor.py}
-  execution/{order_execution.py,optimized_order_execution.py,broker_adapter.py,generate_order_json.py}
-  check/{evaluation.py,...}
-  act/{pdca_recheck.py,pdca_push.py,pdca_summary.py}
-  api/{main.py,routers/*.py,schemas/*.py}
-airflow_docker/dags/*.py
-config/{defaults.yml,dev.yml,stg.yml,prod.yml,flags.yml}
-docs/**  # ←本書を含む
-tests/{unit,integration,e2e,data_quality,observability,repro,perf,resilience}
-```
+## 2) 形式とディレクトリ
+- **場所:** `docs/adrs/`  
+- **命名規則:** `ADR-YYYYMMDD-xxxx-snake-case-title.md`  
+  - `YYYYMMDD` は決定日、`xxxx` は 4 桁の連番（同日内で昇順）。  
+  - 例: `ADR-20250814-0001-json-schema-as-contract.md`
+- **リンク:** ADR 同士は相互に相対パスでリンク（`Supersedes:` / `Superseded-by:` を明記）。  
+- **言語:** 日本語を基本。必要に応じて短い英語併記可。
 
 ---
 
-## 4. コーディングスタイル
-- **フォーマッタ**：`black`（line length 100）  
-- **リンタ**：`ruff`（import 順序整列含む）  
-- **型検査**：`mypy`（strict: `warn-unused-ignores`, `disallow-any-generics`）  
-- **Docstring**：**Google スタイル**を標準、公開関数/クラス/モジュールに必須。  
-- **命名**：`snake_case`（関数/変数）、`PascalCase`（クラス）、`UPPER_SNAKE`（定数）
-
-**pyproject.toml（抜粋）**
-```toml
-[tool.black]
-line-length = 100
-target-version = ["py311"]
-
-[tool.ruff]
-line-length = 100
-select = ["E","F","W","I","B","UP","SIM","PTH","N","C90"]
-ignore = ["E203"]
-target-version = "py311"
-
-[tool.mypy]
-python_version = "3.11"
-strict = true
-warn_unused_ignores = true
-disallow_any_generics = true
-```
+## 3) ステータス遷移（Lifecycle）
+- `Proposed` → レビュー中（PR 上で議論）  
+- `Accepted` → 合意し採用。実装/運用ルールに反映。  
+- `Rejected` → 採用しない。理由を記録。  
+- `Deprecated` → 将来の廃止予定。移行ガイド必須。  
+- `Superseded` → 後続 ADR に置換。リンク必須。
 
 ---
 
-## 5. 型ヒント & Docstring（例）
-```python
-from __future__ import annotations
-from dataclasses import dataclass
-from typing import TypedDict, Iterable
+## 4) いつ ADR を書くか（トリガ）
+- **契約/API/スキーマ**の変更（特に Breaking / `/v2` 導入）  
+- **可観測性**の基本方針（メトリクス SoT、保持、アラート基準）  
+- **セキュリティ/アクセス**（Two-Person Gate、Secrets 運用）  
+- **運用方式**（Airflow キュー分離、リトライ/冪等）、**データ保持**  
+- **実装原則**（Idempotency-Key 必須、Correlation-ID 貫通、Outbox パターン等）
 
-class ExecResult(TypedDict, total=False):
-    symbol: str
-    side: str
-    avg_price: float
-    filled_qty: float
-    status: str
-    ts: str
+> 迷ったら **書く**。短くても記録することに価値があります。
 
-@dataclass(frozen=True)
-class RiskBounds:
-    max_drawdown_pct: float
-    max_position_qty: float
+---
 
-def calculate_lot(signal: float, bounds: RiskBounds) -> float:
-    """Map a normalized signal [-1,1] to lot size w/ risk bounds.
+## 5) テンプレート（コピーして使用）
+```md
+# ADR-YYYYMMDD-xxxx — {短い決定タイトル}
 
-    Args:
-      signal: Normalized action in [-1.0, 1.0].
-      bounds: Risk boundaries from Noctus.
+**Status:** Proposed | Accepted | Rejected | Deprecated | Superseded  
+**Date:** YYYY-MM-DD  
+**Owners:** {role or people}  
+**Supersedes:** ./ADR-YYYYMMDD-xxxx-*.md (あれば)  
+**Superseded-by:** ./ADR-YYYYMMDD-xxxx-*.md (あれば)
 
-    Returns:
-      Non-negative lot quantity that never exceeds policy.
-    """
-    s = max(-1.0, min(1.0, signal))
-    qty = abs(s) * bounds.max_position_qty
-    return min(qty, bounds.max_position_qty)
+## Context
+- 背景・問題・制約・代替案を簡潔に。関連 Issue/PR/ドキュメント（相対リンク）:
+  - ../architecture/Architecture-Overview.md
+  - ../observability/Observability.md
+  - ../operations/Config-Registry.md
+  - ../apis/Do-Layer-Contract.md など
+
+## Decision
+- 何を採用/却下するか、**短い要点**で確定文。
+- 影響範囲（コード/運用/セキュリティ/スキーマ）も列挙。
+
+## Consequences
+- プラス/マイナス/トレードオフ。
+- 運用変更（Runbooks 追記点）、監視・SLO への影響。
+
+## Rollout / Migration
+- 段階導入（7%→30%→100%）、移行ガイド、ロールバック手順。
+- 互換性（SemVer / `/v1` 併存期限）、テスト/契約検証。
+
+## References
+- 参考リンク、前提となる ADR、外部標準/仕様など。
 ```
 
 ---
 
-## 6. 例外処理 & エラー設計
-- 例外は**意図的に**投げる（`ValueError`, `RuntimeError`, `TimeoutError` など）。  
-- API 層では **統一エラー**（`code/message/correlation_id/ts`）に変換（`API.md §2`）。  
-- **再試行**：ネットワーク系のみ指数バックオフ、**ビジネス NG** はリトライ禁止。  
-- **Idempotency-Key** 必須（書き込み系）。
+## 6) 運用ルール（Docs-as-Code）
+- **PR 同梱:** ADR は **関連コード/設定/Runbooks の変更と同一 PR** で提出。  
+- **Two-Person Gate:** `risk_policy / flags / API / Do-Contract / Schemas` の重大変更は **二人承認 + King**。  
+- **SemVer:** 契約/スキーマは後方互換を基本。Breaking は `/v2` を併存、移行ガイド必須（`Release-Notes.md` に明記）。  
+- **参照の一貫性:** ADR で決めた内容は、`Architecture-Overview.md` / `Observability.md` / `Config-Registry.md` 等へ即反映。  
+- **可観測性:** 決定ごとに必要なメトリクス/アラート更新を伴う場合は `deploy/alerts/*` の差分を含める。
 
 ---
 
-## 7. ロギング（構造化 JSON）
-- ログは**構造化 JSON**で `stdout` へ。PII/Secrets は**禁止**（`Security-And-Access.md`）  
-- **必須フィールド**：`ts, level, msg, component, correlation_id, env, git`  
-- **監査**：Do 層は **`audit_order.json`** を**全件**保存（`Do-Layer-Contract.md §7`）。
+## 7) レビュー観点チェックリスト
+- [ ] **問題設定が明確**（誰が何に困っているか / 制約は何か）  
+- [ ] **選択肢の比較**（少なくとも 2–3 案の検討跡）  
+- [ ] **決定/非決定の境界が明確**（スコープ外は明記）  
+- [ ] **運用/監視/セキュリティへの影響**が整理されている  
+- [ ] **ロールアウト/ロールバック手順**が現実的  
+- [ ] **関連文書/契約の更新**が同 PR に含まれる  
+- [ ] **Two-Person Gate** 対象なら承認者が揃っている
 
-```python
-log.info(
-    "order filled",
-    extra={"component":"do.order_execution","order_id":oid,"symbol":sym,"slippage_pct":slip}
-)
+---
+
+## 8) 直近の重要トピック（ADR 候補 / 既決の明文化）
+> まだ個別 ADR がないものは **候補**として列挙。順次 ADR 化します。
+
+- **ADR-20250814-0001 — JSON Schema を公式契約とし SemVer 運用**（/api/v1、Breaking は /v2 併存）【候補】  
+- **ADR-20250814-0002 — Idempotency-Key の書き込み系必須化（24h 冪等）**【候補】  
+- **ADR-20250814-0003 — Correlation-ID（trace_id）の P→D→Exec 貫通**（`X-Trace-Id` / DB obs_*）【候補】  
+- **ADR-20250814-0004 — Noctus Gate を Do 層の強制境界として適用**（バイパス禁止）【候補】  
+- **ADR-20250814-0005 — Observability SoT（obs_* テーブル + ロールアップ方針）**【候補】  
+- **ADR-20250814-0006 — 段階導入曲線 7%→30%→100% を標準化**（Safemode 併用）【候補】  
+- **ADR-20250814-0007 — DO 層の Outbox + Idempotency-Key で少なくとも「once」保証**【候補】  
+- **ADR-20250814-0008 — 内部時刻は UTC 固定 / 表示は GUI で TZ 補正**【候補】  
+- **ADR-20250814-0009 — Airflow キュー分離（critical_do / models）と SLO**【候補】
+
+> 上記は `Architecture-Overview.md` / `Observability.md` / `Runbooks.md` 等に既に記述があり、**ADR としての単体記録**を追加予定です。
+
+---
+
+## 9) 既存ドキュメントとの関係（Cross-Refs）
+- アーキテクチャ: `../architecture/Architecture-Overview.md`, `../architecture/Plan-Layer.md`  
+- 運用: `../operations/Runbooks.md`, `../operations/Airflow-DAGs.md`, `../operations/Config-Registry.md`  
+- 契約/API: `../apis/API.md`, `../apis/Do-Layer-Contract.md`  
+- 可観測性: `../observability/Observability.md`  
+- セキュリティ: `../security/Security-And-Access.md`  
+- QA: `../qa/Testing-And-QA.md`  
+- 計画: `../roadmap/Roadmap-OKRs.md`, `../roadmap/Release-Notes.md`
+
+---
+
+## 10) よくある質問（FAQ）
+- **Q:** Issue/PR の議論と何が違う？  
+  **A:** ADR は**決定の最終形**と**理由**を将来に残す永久記録。議論ログは散逸しがち。  
+- **Q:** 小さな変更でも必要？  
+  **A:** 影響が広い/戻しにくい/契約や運用方針に触れるなら ADR を推奨。  
+- **Q:** 既存の暗黙の方針は？  
+  **A:** 今後の変更時に**確定情報として ADR 化**。後追い ADR も価値があります。
+
+---
+
+## 11) 作成ショートカット（任意）
+```bash
+# 新規 ADR 作成の雛形出力例
+d=docs/adrs && today=$(date +%Y%m%d) && seq=0001 && \
+cat > $d/ADR-${today}-${seq}-short-title.md <<'EOF'
+# ADR-YYYYMMDD-xxxx — {短い決定タイトル}
+
+**Status:** Proposed  
+**Date:** YYYY-MM-DD  
+**Owners:** {role or people}
+
+## Context
+...
+
+## Decision
+...
+
+## Consequences
+...
+
+## Rollout / Migration
+...
+
+## References
+...
+EOF
 ```
 
 ---
 
-## 8. コンフィグ & フラグ
-- **SoT**：`config/defaults.yml` → `{env}.yml` → `flags.yml` → Secrets（Vault/ENV）  
-- 直接ハードコード禁止。読み込みは**専用モジュール**経由で、**スキーマ検証**を実施。  
-- 本番では `risk_safemode: true` を既定（`Config-Registry.md`）。
-
----
-
-## 9. データ & スキーマ
-- すべての JSON I/O は **JSON Schema** で検証（`docs/schemas/`）。  
-- `features_dict.json` / `kpi_summary.json` / `exec_result.json` などは**改訂は後方互換**（Breaking は v2 へ）。  
-- 時刻は **UTC ISO-8601** 固定。
-
----
-
-## 10. API / HTTP 標準
-- ヘッダ：`Authorization`, `Idempotency-Key`, `X-Correlation-ID` は**必須**（書き込み）。  
-- ステータス：2xx/4xx/5xx の基本準拠。  
-- **SSE/Webhook** は署名検証 & リトライ設計を実装（`API.md §10`）。  
-- **入力検証**：pydantic でスキーマ適合 → ビジネス検証（Noctus ガード）→ 実行。
-
----
-
-## 11. テスト & カバレッジ
-- **ピラミッド**：Unit → Contract → Integration → E2E（`Testing-And-QA.md`）。  
-- **基準**：コア 80% / 総合 75% 以上、契約スキーマ 100%。  
-- **ゴールデン**：再現性テストでハッシュ一致。  
-- 失敗時の**最小再現**（ログ/入力）を残す。
-
----
-
-## 12. パフォーマンス & 並行性
-- I/O は非同期 or バッチ化、CPU 集約は**ベクトル化/Numba**。  
-- Do 層：**分割発注** + **間引き** + **レート制限**（Adapter 吸収）。  
-- Airflow：`max_active_runs`/`pools` で**影響範囲を限定**（`Airflow-DAGs.md`）。
-
----
-
-## 13. セキュリティ（コード観点）
-- **Secrets** をコードに置かない。ENV/Vault から注入。  
-- **入力バリデーション**徹底（pydantic/JSON Schema）。  
-- ログに**機密/PII を出力禁止**。  
-- **Two-Person Rule** 対象の変更はレビュー＋King 承認（`Security-And-Access.md`）。
-
----
-
-## 14. Git / PR / コミット規約
-- **Conventional Commits** 準拠：`feat: ...` / `fix: ...` / `docs: ...` / `refactor: ...` / `chore: ...` など。  
-- **PR テンプレ**に**影響範囲・テスト・Runbooks/Config更新**を必ず記載。  
-- **同一PR**で関連ドキュメント更新（Docs-as-Code）。
-
-**PR チェックリスト（要約）**
-- [ ] 仕様変更のドキュメント更新（該当章）  
-- [ ] JSON Schema/契約テストがパス  
-- [ ] ログと監査の項目が適切  
-- [ ] Secrets/PII が混入していない  
-- [ ] しきい値変更は `Config-Registry.md` を更新
-
----
-
-## 15. pre-commit / CI（必須）
-**`.pre-commit-config.yaml`（抜粋）**
-```yaml
-repos:
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks: [{id: black}]
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.5.0
-    hooks: [{id: ruff, args: ["--fix"]}]
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
-    hooks: [{id: mypy}]
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.2
-    hooks: [{id: gitleaks}]
-```
-
-**CI（要件）**
-- Lint/Format/Type/Contract の**4点セット**が PR で必須。  
-- Prometheus Rules/Loki クエリは静的検証（`promtool check rules`）。
-
----
-
-## 16. 具体例（パターン集）
-
-### 16.1 CLI エントリ
-```python
-import argparse, json
-from src.plan_data.features import run as run_features
-
-def main() -> None:
-    p = argparse.ArgumentParser()
-    p.add_argument("--in", dest="inp", required=True)
-    p.add_argument("--out_df", required=True)
-    p.add_argument("--out_dict", required=True)
-    args = p.parse_args()
-    run_features(args.inp, args.out_df, args.out_dict)
-
-if __name__ == "__main__":
-    main()
-```
-
-### 16.2 FastAPI ルータ（Idempotency + Correlation）
-```python
-from fastapi import APIRouter, Header, HTTPException, Request
-router = APIRouter(prefix="/api/v1/do", tags=["do"])
-
-@router.post("/orders")
-async def create_order(req: Request,
-                       idempotency_key: str = Header(..., alias="Idempotency-Key"),
-                       corr: str | None = Header(None, alias="X-Correlation-ID")):
-    body = await req.json()
-    # validate -> risk guard -> execute
-    # return unified response
-    return {"status":"ACCEPTED"}
-```
-
-### 16.3 Airflow DAG（共通デフォルト適用）
-```python
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import timedelta
-from _defaults import DEFAULTS
-
-with DAG(dag_id="pdca_plan_workflow",
-         schedule_interval="0 5 * * 1-5",
-         default_args=DEFAULTS,
-         catchup=False, tags=["pdca","plan"]) as dag:
-    PythonOperator(task_id="collect_market_data", python_callable=collect)
-```
-
----
-
-## 17. レビュー観点チェックリスト（詳細）
-- **安全**：Noctus 境界を越えない／抑制時の分岐あり／監査が残る  
-- **構成**：ハードコードなし／SoT 準拠／スキーマ適合  
-- **品質**：テスト範囲十分／再現性（シード/ゴールデン）  
-- **観測**：構造化ログ／メトリクス／トレース／Correlation ID  
-- **パフォーマンス**：無駄なループなし／I/O バッチ／並列/バックオフ  
-- **セキュリティ**：Secrets/PII 排除／署名検証／RBAC  
-- **ドキュメント**：関連章の更新／Release-Notes 追記
-
----
-
-## 18. 変更履歴（Changelog）
-- **2025-08-12**: 初版作成（スタイル/型/例外/ログ/Config/Schema/API/テスト/CI/レビュー）
+## 12) 変更履歴
+- **2025-08-14:** v1.0 初版（索引/運用ルール/テンプレ/候補一覧）。  
+  旧内容に *Coding Standards* が含まれていたため、該当内容は `../governance/Coding-Standards.md` を正とする方針を明記。
