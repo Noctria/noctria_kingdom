@@ -1,338 +1,335 @@
-# Observability.md
-_Noctria Kingdom — 観測・可視化ガイド（最新版 / 2025-08-12）_
+# 👁️ Observability.md  
+_Noctria Kingdom — 観測・可視化ガイド（最新版 / 2025-08-14）_
 
-本ドキュメントは `/hud/observability` および関連ETL/計測の**決定事項**を一問一答の結果に基づき集約したものです。未決事項は「要検討」と明記します。
+本ドキュメントは **PDCA 可観測性（Observability）** の決定事項・実装仕様（DBスキーマ/ビュー、GUI ルート、運用手順）を **単体で完結** するようにまとめています。  
+最新 GUI 実装は **`/pdca/timeline`**（時系列ビュー）と **`/pdca/latency/daily`**（日次レイテンシ）です。
 
 ---
 
 ## 0. TL;DR（確定事項）
-- **対象範囲**: A) FastAPI（GUI）, C) 学習/推論, D) 戦略実行, E) Plan層（collector/features/statistics）
-- **収集/保存**: a) アプリ内計測→DB, c) Airflowタスク集約, d) ログETL集約
-- **計測仕込み（要点）**  
-  - A: ASGIミドルウェア＋例外ハンドラ＋テンプレ描画計測  
-  - C: 学習ループ, モデル保存直後, 推論の入口/出口, 特徴量変換完了  
-  - D: 注文発行前後, 約定イベント, リスクチェック前後, 日次/戦略単位集計  
-  - E: collector, features, statistics の開始/終了＋異常検知
-- **保存先テーブル**: `obs_api_requests`, `obs_train_jobs`, `obs_infer_calls`, `obs_orders`, `obs_trades`, `obs_plan_runs`, `obs_alerts`（全採用）
-- **保持期間**: 生データ30日→日次ロールアップ、重要KPI180日、アラート90日（Criticalは180日）
-- **アラート閾値**: 下記 §6 に定義（採用）
-- **通知チャネル**: GUI内バナーのみ（外部通知なし）
-- **ETL頻度/方式**: 5分ごと / AirflowのETL DAGで集約
-- **権限**: 全員閲覧可（ログイン不要）
-- **HUDレイアウト**: **要検討（保留）**
+- **対象範囲**: GUI (FastAPI)／Plan／Infer（AI）／Decision／Exec／Alert を **trace_id で貫通**して記録・集約。
+- **保存先（最小コア）**:  
+  - **イベント集約 VIEW**: `obs_trace_timeline`（GUI の時系列）  
+  - **レイテンシ VIEW**: `obs_trace_latency`（Plan→Infer→Decision→Exec の相対時差）  
+  - **日次レイテンシ MVIEW**: `obs_latency_daily`（p50/p90/p95/max/traces）
+- **GUI ルート**:  
+  - `GET /pdca/timeline`（trace 列挙 or 1 トレース時系列）  
+  - `GET /pdca/latency/daily`（直近 30 日の p50/p90/p95/max）  
+  - `POST /pdca/observability/refresh`（ビュー確保・MV 更新）
+- **運用**: systemd + Gunicorn（UvicornWorker）。**ENV** で DSN/PORT を注入。  
+  - `/etc/default/noctria-gui` … `NOCTRIA_OBS_PG_DSN` / `NOCTRIA_GUI_PORT`
+- **保持**: 原始イベントは 30 日→日次ロールアップ（MV 参照で OK）。
 
 ---
 
 ## 1. 目的と非目的
 ### 1.1 目的
-- 運用判断に必要な**レイテンシ/エラー/学習精度/執行KPI/データ品質**の一元可視化
-- 事後解析のための**最低限の生ログ**と**集約KPI**の確保
-- PDCAにおける **Plan→Do→Check** の循環を支える観測基盤
+- **運用判断に必要な最小指標**（フェーズ間レイテンシ、イベント時系列、アラート）を **E2E trace** で可視化。
+- **DB 中心**の SoT（Source of Truth）化：SQL ビューで GUI と疎結合に。
 
 ### 1.2 非目的
-- フル機能のAPMや外部ダッシュボード（Grafana等）の代替は目指さない
-- 高頻度の外部通知（Slack/Email）— 今回は採用しない
+- APM/Grafana の代替ではない（外部通知やメトリクス収集は最小限）。
+- 全機能 KPI ダッシュボードではない（必要最小の **PDCA 監視** に限定）。
 
 ---
 
-## 2. 対象コンポーネント（Scope）
-- **A. FastAPI（GUI）**
-- **C. 学習/推論（例: Prometheus Oracle）**
-- **D. 戦略実行（オーダー執行・リスク監視）**
-- **E. Plan層（collector / features / statistics）**
+## 2. イベントモデル（最小コア）
+**イベントは “同一 trace_id” で Plan→Infer→Decision→Exec→Alert を貫通**。  
+GUI 時系列は **`kind`**（PLAN/INFER/DECISION/EXEC/ALERT）＋`action/payload` を整形表示。
+
+### 2.1 共通カラム（推奨）
+- `ts TIMESTAMPTZ`（UTC 固定）
+- `trace_id TEXT`
+- `kind TEXT` （`PLAN:START` / `PLAN:END` / `INFER` / `DECISION` / `EXEC` / `ALERT` など）
+- `action TEXT NULL`（モデル名/戦略名/ポリシー名等）
+- `payload JSONB NULL`（任意の付帯データ）
+
+> 実テーブルはチーム/層ごとに分かれていて OK（例: `obs_plan_runs`, `obs_infer_calls`, `obs_decisions`, `obs_exec_events`, `obs_alerts`）。  
+> 本ドキュメントでは **ビュー**で GUI に提供する形を標準とする。
 
 ---
 
-## 3. メトリクス・KPI（推奨セット）
-### 3.1 A: FastAPI（GUI）
-- `http_requests_total`（メソッド/パス）
-- `http_request_duration_ms`（p50/p90/p99）
-- `http_error_rate`（4xx/5xx）
-- `template_render_time_ms`（Jinja描画）
-- `process_cpu_percent`, `process_rss_mb`（任意）
-
-### 3.2 C: 学習/推論
-- 学習: `train_jobs_count`, `train_success_rate`, `train_duration_min`, `eval_rmse/mae/mape`, `model_version`, `model_updated_at`
-- 推論: `inference_latency_ms`（p50/p90/p99）, `inference_qps`, `feature_staleness_min`
-
-### 3.3 D: 戦略実行
-- KPI: `win_rate`, `max_drawdown`, `trade_count`, `avg_holding_time_min`, `pnl_realized`, `pnl_unrealized`
-- 品質: `slippage_bps`, `order_fill_rate`, `order_reject_rate`, `latency_placement_ms`
-- リスク: `risk_limit_breaches`, `circuit_breaker_triggers`
-
-### 3.4 E: Plan層
-- 取得: `collector_run_duration_sec`, `records_fetched`, `api_error_rate`, `data_lag_min`
-- 特徴量: `feature_pipeline_duration_sec`, `missing_ratio`, `feature_drift_score`（要検討）
-- 統計: `outlier_rate`, `schema_changes_detected`
-
----
-
-## 4. 収集方式とデータフロー
-- **a) アプリ内計測 → DB挿入**（FastAPIミドルウェア、学習/推論のフック、戦略実行ハンドラ等）
-- **c) Airflow タスクからの集計**（DAG状態/ログ→集約テーブル）
-- **d) ログETL**（戦略実行CSV/JSON・Airflowログを5分ごとに取り込み）
-
-
-flowchart LR
-  A[FastAPI ミドルウェア/例外] -->|a: INSERT| DB[(PostgreSQL)]
-  C1[Train/Infer フック] -->|a: INSERT| DB
-  D1[注文/約定/リスク処理] -->|a: INSERT| DB
-  E1[collector/features/statistics] -->|a: INSERT| DB
-  L[CSV/JSON/AFログ] -->|d: ETL 5分| ETL[Airflow ETL DAG] -->|c/d: UPSERT| DB
-  DB --> HUD[/hud/observability]
-
----
-
-## 5. 計測の仕込みポイント（確定）
-### 5.1 A: FastAPI
-- **ASGIミドルウェア（必須）**: リクエスト開始/終了・除外ルート（/static, /health）
-- **例外ハンドラ（必須）**: 未捕捉例外/5xxの分類と計上
-- **テンプレ描画計測（推奨）**: Jinja描画時間の追加記録
-
-### 5.2 C: 学習/推論
-- **学習ループ（必須）**: 各試行/エポック終了時 `loss/rmse/mae/経過秒/ステータス`
-- **モデル保存直後（必須）**: `model_version/updated_at/評価指標`
-- **推論入口/出口（必須）**: `latency_ms/success/feature_staleness_min`
-- **特徴量変換完了（推奨）**: `pipeline_duration/rows/missing_ratio`
-
-### 5.3 D: 戦略実行
-- **注文発行前後（必須）**: 発行→約定までのレイテンシ、スリッページ
-- **約定イベント（必須）**: 約定価格/数量/PNL/勝敗、リジェクト理由
-- **リスクチェック前後（推奨）**: DDや上限超過、ブレーカー発動
-- **日次・戦略単位集計（推奨）**: KPI集約をテーブル/ビューとして更新
-
-### 5.4 E: Plan層
-- **collector開始/終了（必須）**: 件数/時間/遅延/エラー率
-- **features完了（必須）**: 所要時間/生成行数/欠損率
-- **statistics完了（推奨）**: 集計時間/外れ値率/スキーマ変更
-- **異常検知（推奨）**: 閾値越え時 `obs_alerts` に記録
-
----
-
-## 6. アラート設計（採用）
-- **A: FastAPI**  
-  - p99レスポンス > **1500ms**（5分連続）  
-  - 5xx率 > **2%**（10分平均）
-- **C: 学習/推論**  
-  - RMSE 前回比 > **+10%**  
-  - 推論 p99 > **800ms**（5分連続）  
-  - 特徴量鮮度 > **60分**
-- **D: 戦略実行**  
-  - MaxDD（30日ローリング） > **10%**  
-  - Reject率 > **1%**（当日）  
-  - 連敗数 ≥ **8**
-- **E: Plan層**  
-  - collector遅延 > **30分**  
-  - 欠損率 > **5%**（重要列）
-
-> **通知チャネル**: GUI内バナーのみ（Slack/Email等は**使わない**）
-
----
-
-## 7. スキーマ（採用テーブル / 推奨DDL）
-> **注意**: 実デプロイではプロジェクトの`core.path_config`に合わせたスキーマ名/インデックス名へ修正してください。
+## 3. DDL（テーブル最小 & ビュー/MV 定義）
+> そのまま psql に貼り付け可能な最小構成。既存テーブルがある場合は CREATE IF NOT EXISTS で追記してください。
 
 ```sql
--- A: FastAPI
-CREATE TABLE IF NOT EXISTS obs_api_requests (
-  id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  path TEXT NOT NULL,
-  method TEXT NOT NULL,
-  status INT NOT NULL,
-  dur_ms INT NOT NULL,
-  user_agent TEXT,
-  err_flag BOOLEAN NOT NULL DEFAULT FALSE,
-  template_render_ms INT
-);
-CREATE INDEX IF NOT EXISTS idx_obs_api_requests_ts ON obs_api_requests (ts);
-CREATE INDEX IF NOT EXISTS idx_obs_api_requests_path ON obs_api_requests (path);
+-- =========================================
+-- 3.1 最小イベントテーブル（サンプル構成）
+-- =========================================
 
--- C: 学習ジョブ
-CREATE TABLE IF NOT EXISTS obs_train_jobs (
+-- Plan フェーズ（開始/終了や処理統計）
+CREATE TABLE IF NOT EXISTS obs_plan_runs (
   id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  job_id TEXT,
-  model TEXT,
-  ver TEXT,
-  status TEXT,       -- success/fail/interrupt
-  dur_sec INT,
-  rmse DOUBLE PRECISION,
-  mae DOUBLE PRECISION,
-  mape DOUBLE PRECISION
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trace_id TEXT NOT NULL,
+  phase TEXT NOT NULL,                   -- "PLAN:START" | "PLAN:END" など
+  action TEXT,
+  payload JSONB
 );
-CREATE INDEX IF NOT EXISTS idx_obs_train_jobs_ts ON obs_train_jobs (ts);
-CREATE INDEX IF NOT EXISTS idx_obs_train_jobs_model_ver ON obs_train_jobs (model, ver);
+CREATE INDEX IF NOT EXISTS idx_obs_plan_runs_ts ON obs_plan_runs(ts);
+CREATE INDEX IF NOT EXISTS idx_obs_plan_runs_trace ON obs_plan_runs(trace_id);
 
--- C: 推論
+-- 推論（モデル名・バージョン・所要時間など）
 CREATE TABLE IF NOT EXISTS obs_infer_calls (
   id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trace_id TEXT NOT NULL,
   model TEXT,
   ver TEXT,
   dur_ms INT,
   success BOOLEAN,
-  feature_staleness_min INT
+  payload JSONB
 );
-CREATE INDEX IF NOT EXISTS idx_obs_infer_calls_ts ON obs_infer_calls (ts);
+CREATE INDEX IF NOT EXISTS idx_obs_infer_calls_ts ON obs_infer_calls(ts);
+CREATE INDEX IF NOT EXISTS idx_obs_infer_calls_trace ON obs_infer_calls(trace_id);
 
--- D: 注文発行
-CREATE TABLE IF NOT EXISTS obs_orders (
+-- 決定（王の決定 / ルール選択 / 重み等）
+CREATE TABLE IF NOT EXISTS obs_decisions (
   id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  strategy TEXT,
-  type TEXT,         -- market/limit/...
-  qty DOUBLE PRECISION,
-  price DOUBLE PRECISION,
-  lat_ms INT,
-  filled BOOLEAN,
-  rejected BOOLEAN,
-  reason TEXT
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trace_id TEXT NOT NULL,
+  action TEXT,                           -- 例: "BUY" / "FLAT" / "scalp" 等
+  confidence DOUBLE PRECISION,
+  payload JSONB
 );
-CREATE INDEX IF NOT EXISTS idx_obs_orders_ts ON obs_orders (ts);
-CREATE INDEX IF NOT EXISTS idx_obs_orders_strategy ON obs_orders (strategy);
+CREATE INDEX IF NOT EXISTS idx_obs_decisions_ts ON obs_decisions(ts);
+CREATE INDEX IF NOT EXISTS idx_obs_decisions_trace ON obs_decisions(trace_id);
 
--- D: 約定
-CREATE TABLE IF NOT EXISTS obs_trades (
+-- 実行（注文/実行の要約イベント）
+CREATE TABLE IF NOT EXISTS obs_exec_events (
   id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  strategy TEXT,
-  side TEXT,         -- buy/sell
-  qty DOUBLE PRECISION,
-  price DOUBLE PRECISION,
-  pnl DOUBLE PRECISION,
-  win_flag BOOLEAN,
-  slippage_bps DOUBLE PRECISION
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trace_id TEXT NOT NULL,
+  action TEXT,                           -- 例: "MARKET", "LIMIT", "CANCELLED"
+  status TEXT,                           -- 例: "SENT", "ACCEPTED", "FILLED", "REJECTED"
+  payload JSONB
 );
-CREATE INDEX IF NOT EXISTS idx_obs_trades_ts ON obs_trades (ts);
-CREATE INDEX IF NOT EXISTS idx_obs_trades_strategy ON obs_trades (strategy);
+CREATE INDEX IF NOT EXISTS idx_obs_exec_events_ts ON obs_exec_events(ts);
+CREATE INDEX IF NOT EXISTS idx_obs_exec_events_trace ON obs_exec_events(trace_id);
 
--- E: Plan層（collector/features/statistics）
-CREATE TABLE IF NOT EXISTS obs_plan_runs (
-  id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  phase TEXT,              -- collector|features|statistics
-  dur_sec INT,
-  rows BIGINT,
-  missing_ratio DOUBLE PRECISION,
-  error_rate DOUBLE PRECISION
-);
-CREATE INDEX IF NOT EXISTS idx_obs_plan_runs_ts ON obs_plan_runs (ts);
-CREATE INDEX IF NOT EXISTS idx_obs_plan_runs_phase ON obs_plan_runs (phase);
-
--- 共通: アラート
+-- アラート（リスク/品質/逸脱）
 CREATE TABLE IF NOT EXISTS obs_alerts (
   id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  severity TEXT,           -- Info/Warning/Critical
-  source TEXT,             -- A|C|D|E
-  key TEXT,                -- 例: p99_latency_ms
-  value DOUBLE PRECISION,
-  threshold DOUBLE PRECISION,
-  message TEXT
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trace_id TEXT,
+  severity TEXT,                         -- Info/Warning/Critical
+  action TEXT,                           -- アラートキー（例: "risk.max_order_qty"）
+  payload JSONB
 );
-CREATE INDEX IF NOT EXISTS idx_obs_alerts_ts ON obs_alerts (ts);
-CREATE INDEX IF NOT EXISTS idx_obs_alerts_source ON obs_alerts (source);
+CREATE INDEX IF NOT EXISTS idx_obs_alerts_ts ON obs_alerts(ts);
+CREATE INDEX IF NOT EXISTS idx_obs_alerts_trace ON obs_alerts(trace_id);
+
+-- =========================================
+-- 3.2 タイムライン VIEW（GUI /pdca/timeline が参照）
+-- =========================================
+
+CREATE OR REPLACE VIEW obs_trace_timeline AS
+WITH plan AS (
+  SELECT ts, trace_id, phase      AS kind, action, payload FROM obs_plan_runs
+),
+infer AS (
+  SELECT ts, trace_id, 'INFER'    AS kind, model AS action,
+         jsonb_build_object('ver', ver, 'dur_ms', dur_ms, 'success', success) || coalesce(payload,'{}'::jsonb) AS payload
+  FROM obs_infer_calls
+),
+decision AS (
+  SELECT ts, trace_id, 'DECISION' AS kind, action,
+         jsonb_build_object('confidence', confidence) || coalesce(payload,'{}'::jsonb) AS payload
+  FROM obs_decisions
+),
+exec AS (
+  SELECT ts, trace_id, 'EXEC'     AS kind, coalesce(status, action) AS action, payload
+  FROM obs_exec_events
+),
+alert AS (
+  SELECT ts, coalesce(trace_id,'') AS trace_id, 'ALERT' AS kind, action,
+         jsonb_build_object('severity', severity) || coalesce(payload,'{}'::jsonb) AS payload
+  FROM obs_alerts
+)
+SELECT * FROM plan
+UNION ALL SELECT * FROM infer
+UNION ALL SELECT * FROM decision
+UNION ALL SELECT * FROM exec
+UNION ALL SELECT * FROM alert;
+
+-- 索引は基テーブル側でカバー。VIEW 用にマテ化が必要なら別途 MVIEW を作る。
+
+-- =========================================
+-- 3.3 トレース別レイテンシ VIEW
+--     （Plan→Infer→Decision→Exec の代表時刻と差分）
+-- =========================================
+
+CREATE OR REPLACE VIEW obs_trace_latency AS
+WITH agg AS (
+  SELECT
+    trace_id,
+    MIN(CASE WHEN kind LIKE 'PLAN:%' THEN ts END)     AS plan_start,
+    MIN(CASE WHEN kind = 'INFER'     THEN ts END)     AS infer_ts,
+    MIN(CASE WHEN kind = 'DECISION'  THEN ts END)     AS decision_ts,
+    MIN(CASE WHEN kind = 'EXEC'      THEN ts END)     AS exec_ts
+  FROM obs_trace_timeline
+  GROUP BY trace_id
+)
+SELECT
+  trace_id,
+  plan_start,
+  infer_ts,
+  decision_ts,
+  exec_ts,
+  ROUND(EXTRACT(EPOCH FROM (infer_ts    - plan_start))*1000.0, 3) AS ms_plan_to_infer,
+  ROUND(EXTRACT(EPOCH FROM (decision_ts - infer_ts  ))*1000.0, 3) AS ms_infer_to_decision,
+  ROUND(EXTRACT(EPOCH FROM (exec_ts     - decision_ts))*1000.0, 3) AS ms_decision_to_exec,
+  ROUND(EXTRACT(EPOCH FROM (exec_ts     - plan_start))*1000.0, 3) AS ms_total
+FROM agg
+WHERE plan_start IS NOT NULL
+ORDER BY exec_ts DESC NULLS LAST;
+
+-- =========================================
+-- 3.4 日次レイテンシ MATERIALIZED VIEW（GUI /pdca/latency/daily）
+-- =========================================
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS obs_latency_daily AS
+SELECT
+  DATE_TRUNC('day', plan_start)::date AS day,
+  PERCENTILE_DISC(0.50) WITHIN GROUP (ORDER BY ms_total) AS p50_ms,
+  PERCENTILE_DISC(0.90) WITHIN GROUP (ORDER BY ms_total) AS p90_ms,
+  PERCENTILE_DISC(0.95) WITHIN GROUP (ORDER BY ms_total) AS p95_ms,
+  MAX(ms_total) AS max_ms,
+  COUNT(*) AS traces
+FROM obs_trace_latency
+WHERE plan_start IS NOT NULL
+GROUP BY 1
+ORDER BY 1 DESC;
+
+-- REFRESH 並列実行のためのインデックス（任意）
+CREATE INDEX IF NOT EXISTS idx_obs_latency_daily_day ON obs_latency_daily(day);
+```
+
+> 備考: `obs_trace_latency` は **代表 1 イベント/フェーズ** を最小時刻で採る素朴定義です。複数回/再試行がある場合はルール（例: 最新/最小/最大）を要件に合わせて調整してください。
+
+---
+
+## 4. GUI 仕様（FastAPI + Jinja2）
+- ルータ: `noctria_gui/routes/observability.py`  
+  - DSN は `NOCTRIA_OBS_PG_DSN`（例: `postgresql://noctria:noctria@127.0.0.1:55432/noctria_db`）
+  - **psycopg2 → psycopg v3** のフォールバック接続に対応
+  - **テンプレート**:
+    - `templates/pdca_timeline.html` … trace 一覧 or 1 トレース時系列（色分け pill）
+    - `templates/pdca_latency_daily.html` … 直近 30 日の p50/p90/p95/max/traces
+- ルート:
+  - `GET /pdca/timeline?trace=<trace_id>&days=3&limit=200`  
+    - `trace` 無指定で **最近の trace 一覧**（`obs_trace_timeline` を日付範囲で集計）
+    - `trace` 指定で **当該トレースの時系列**（`ts, kind, action, payload`）
+  - `GET /pdca/latency/daily`  
+    - `obs_latency_daily` を降順表示（直近 30 日）
+  - `POST /pdca/observability/refresh`  
+    - `ensure_views()` → `refresh_materialized()` を呼び出し  
+    - 権限は **RBAC 導入予定**（現状は簡易メンテ想定）
+
+---
+
+## 5. 運用（systemd + Gunicorn）
+**環境ファイル** `/etc/default/noctria-gui`（LF・644・root:root）
+```
+NOCTRIA_OBS_PG_DSN=postgresql://noctria:noctria@127.0.0.1:55432/noctria_db
+NOCTRIA_GUI_PORT=8001
+```
+
+**ユニット** `/etc/systemd/system/noctria_gui.service`（抜粋・実機と整合済）
+```
+[Service]
+User=noctria
+Group=noctria
+WorkingDirectory=/mnt/d/noctria_kingdom
+EnvironmentFile=/etc/default/noctria-gui
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/mnt/d/noctria_kingdom
+ExecStart=/bin/sh -lc 'exec /mnt/d/noctria_kingdom/venv_gui/bin/gunicorn \
+  --workers 4 --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:${NOCTRIA_GUI_PORT:-8001} \
+  --access-logfile - --error-logfile - \
+  noctria_gui.main:app'
+Restart=always
+RestartSec=3
+```
+
+**確認コマンド**
+```
+sudo systemctl daemon-reload && sudo systemctl restart noctria_gui
+sudo systemctl show -p EnvironmentFiles -p Environment -p ExecStart noctria_gui
+ss -ltnp | grep ':8001'
+curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
 ```
 
 ---
 
-## 8. データ保持とロールアップ（採用）
-- **生データ**（`obs_api_requests`, `obs_orders`, `obs_trades`, `obs_infer_calls`, `obs_plan_runs`）  
-  - **30日保持** → 以降は**日次集約**（平均/最大/分位など）にロールアップ
-- **重要KPI**（`win_rate`, `max_drawdown`, `rmse`, `mae`, `mape`）  
-  - **180日保持**
-- **アラート**（`obs_alerts`）  
-  - **90日保持**（Criticalは**180日**）
-
-> 実装案: `*_daily` 集約テーブル（例: `obs_api_requests_daily`）＋Airflowの日次ロールアップDAG
+## 6. データ保持とロールアップ
+- **原始イベント**（各 `obs_*` テーブル）: 30 日保持を目安（パーティション/TTL/ロールアップは運用ポリシーに準拠）  
+- **`obs_latency_daily`**: 過去分を保持（SELECT 対象は直近 30 日で十分）  
+- 将来: `obs_trace_timeline` を **MVIEW 化**する場合は `CONCURRENTLY` リフレッシュ戦略を検討。
 
 ---
 
-## 9. HUD ルート `/hud/observability`
-- **公開範囲**: **全員閲覧可（ログイン不要）**
-- **レイアウト**: **要検討（保留）**  
-  - 既存GUIにレイアウト/HTMLが生成済みのため、本ドキュメントでは拘束しない
-- **バナー通知**: アラートはGUI内バナーで提示（外部通知なし）
+## 7. しきい値（参考・最小セット）
+- **レイテンシ（ms_total, p95）**: 10,000ms 超で **Warning**、15,000ms 超で **Critical**  
+- **Exec 失敗率（当日）**: 1% 超で Warning、3% 超で Critical  
+- アラートは `obs_alerts` に書き、GUI で軽量表示（外部通知は当面なし）。
 
 ---
 
-## 10. 取り込み頻度と方式（採用）
-- **頻度**: **5分ごと**
-- **方式**: **Airflow のETL DAG**で集約実行  
-  - 戦略実行ログ / Airflowログ → 5分ごとにETLし、UPSERTでDB更新  
-  - FastAPI/学習・推論はアプリ側で**即時INSERT**（イベント駆動）
+## 8. 動作確認（サンプルデータ投入）
+```sql
+-- 1 トレースの最低限イベント
+WITH t AS (SELECT 'smoke-1'::text AS trace_id)
+INSERT INTO obs_plan_runs(ts, trace_id, phase, action, payload)
+SELECT now() - interval '20 s', trace_id, 'PLAN:START', NULL, '{}'::jsonb FROM t
+UNION ALL SELECT now() - interval '10 s', trace_id, 'PLAN:END', NULL, '{}'::jsonb FROM t;
 
----
+INSERT INTO obs_infer_calls(ts, trace_id, model, ver, dur_ms, success, payload)
+VALUES (now() - interval '9 s', 'smoke-1', 'DummyModel', 'v0', 1200, true, '{}');
 
-## 11. ランブック（運用手順・抜粋）
-1. **初期化**
-   - 本ドキュメントのDDLをPostgreSQLに適用
-   - Airflowに「obs_etl_5min」「obs_rollup_daily」DAGを登録（要プロジェクト標準化）
-2. **アプリ組み込み**
-   - FastAPIミドルウェア/例外ハンドラ/テンプレ計測をON
-   - 学習/推論/戦略実行/Plan層にフックを配置
-3. **監視**
-   - `/hud/observability` を常用
-   - GUIバナーに重要アラートを露出
-4. **保守**
-   - 30日ごとにロールアップ結果のサイズ/性能確認
-   - 閾値は四半期ごとに見直し（要検討）
+INSERT INTO obs_decisions(ts, trace_id, action, confidence, payload)
+VALUES (now() - interval '8 s', 'smoke-1', 'BUY', 0.62, '{}');
 
----
+INSERT INTO obs_exec_events(ts, trace_id, action, status, payload)
+VALUES (now() - interval '7 s', 'smoke-1', 'MARKET', 'FILLED', '{"qty":1000,"price":1.2345}');
 
-## 12. 未決事項（要検討リスト）
-- HUDの詳細レイアウト/画面分割、チャート構成、テーブルUI
-- `feature_drift_score` の具体指標（PSI/KL/他）と閾値
-- モデル/戦略ごとのタグ設計（モデル名・通貨ペア・期間など）
-- 既存スキーマとの統合方針（スキーマ名、外部キーの付与）
-
----
-
-## 13. 参考（実装スニペット / 任意）
-> 実コードはプロジェクトに合わせて調整すること。
-
-**FastAPI ミドルウェア概略**
-```python
-start = time.perf_counter()
-try:
-    resp = await call_next(request)
-    err = resp.status_code >= 500
-finally:
-    dur_ms = int((time.perf_counter() - start) * 1000)
-    if not request.url.path.startswith(("/static", "/health")):
-        insert_obs_api_request(ts=now(), path=norm(request.url.path),
-                               method=request.method, status=resp.status_code,
-                               dur_ms=dur_ms, ua=request.headers.get("user-agent"),
-                               err_flag=err, template_render_ms=getattr(request.state, "tpl_ms", None))
-```
-
-**学習ループ内ログ概略**
-```python
-log_train(job_id, model, ver, status="success", dur_sec=elapsed, rmse=rmse, mae=mae, mape=mape)
-```
-
-**推論入口/出口概略**
-```python
-t0 = now_ms()
-y = model.predict(x)
-lat_ms = now_ms() - t0
-log_infer(model, ver, dur_ms=lat_ms, success=True, feature_staleness_min=stale_min)
-```
-
-**戦略実行（注文→約定）概略**
-```python
-log_order(strategy, type, qty, price, lat_ms, filled, rejected, reason)
-log_trade(strategy, side, qty, price, pnl, win_flag, slippage_bps)
-```
-
-**Plan層フェーズ**
-```python
-log_plan_run(phase="collector", dur_sec=sec, rows=n, missing_ratio=mr, error_rate=er)
+-- 確認
+SELECT * FROM obs_trace_timeline WHERE trace_id='smoke-1' ORDER BY ts;
+SELECT * FROM obs_trace_latency  WHERE trace_id='smoke-1';
+REFRESH MATERIALIZED VIEW obs_latency_daily;
+SELECT * FROM obs_latency_daily ORDER BY day DESC LIMIT 5;
 ```
 
 ---
 
-## 14. 変更履歴
-- **2025-08-12**: 一問一答の決定を反映して全面更新。HUDレイアウトは保留。
+## 9. Mermaid（構成図・概要）
 
+```mermaid
+flowchart LR
+  P[Plan: obs_plan_runs] --> T[obs_trace_timeline]
+  I[Infer: obs_infer_calls] --> T
+  D[Decision: obs_decisions] --> T
+  E[Exec: obs_exec_events] --> T
+  A[Alert: obs_alerts] --> T
+
+  T --> L[obs_trace_latency]
+  L --> M[(obs_latency_daily)]
+
+  subgraph GUI (FastAPI)
+    TL[/GET /pdca/timeline/] -->|SELECT| T
+    LD[/GET /pdca/latency/daily/] -->|SELECT| M
+    RF[\POST /pdca/observability/refresh/] -->|ensure_views + REFRESH| M
+  end
+```
+
+---
+
+## 10. 変更履歴
+- **2025-08-14**:  
+  - GUI 実装に合わせ **`/pdca/timeline` / `/pdca/latency/daily` / `POST /pdca/observability/refresh`** を正式化。  
+  - **`obs_trace_timeline` / `obs_trace_latency` / `obs_latency_daily`** の DDL を一本化して提示。  
+  - systemd+Gunicorn の **ENV 展開と ExecStart**（`/bin/sh -lc`）に起因する落とし穴を反映。  
+- **2025-08-12**: 初版（HUD 方針は撤回、PDCA 直下へ集約）。
+
+---
