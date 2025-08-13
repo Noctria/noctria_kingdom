@@ -4,10 +4,13 @@
 """
 E2E ミニデモ:
 Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(実行: DO層 or ダミー)
-同一 trace_id が obs_* テーブルに連携されることを確認。
+同一 trace_id が obs_* テーブル（plan/infer/decision/exec/alert）に連携され、
+View(obs_trace_timeline, obs_trace_latency) から一望できることを確認。
 
 実行例:
     python -m src.e2e.decision_minidemo
+必要な環境変数:
+    NOCTRIA_OBS_PG_DSN="postgresql://user:pass@localhost:5433/noctria_db"
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import sys
 from pathlib import Path
 import time
 import random
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
 # -----------------------------------------------------------------------------
@@ -30,20 +33,39 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 try:
-    # 集中管理（任意）：PROJECT_ROOT / SRC の両方を sys.path に整備
+    # 任意: 集中管理（PROJECT_ROOT / SRC を sys.path に整備）
     from core.path_config import ensure_import_path  # type: ignore
     ensure_import_path()
 except Exception:
-    # 無ければそのまま（上の手動追加で十分動く）
-    pass
+    pass  # 無ければそのまま（上の手動追加で十分動く）
 
 from plan_data.trace import new_trace_id
-from plan_data.observability import (
-    ensure_tables,
-    log_plan_run,
-    log_infer_call,
-    log_exec_event,
-)
+
+# observability の新旧互換:
+# - ensure_views / log_alert が無い古いバージョンでも動くようフォールバック
+try:
+    from plan_data.observability import (
+        ensure_tables,
+        ensure_views,      # 追加: ビュー作成
+        log_plan_run,
+        log_infer_call,
+        log_exec_event,
+        log_alert,         # 追加: アラート記録
+    )
+except Exception:  # pragma: no cover - 古い環境向けフォールバック
+    from plan_data.observability import (  # type: ignore
+        ensure_tables,
+        log_plan_run,
+        log_infer_call,
+        log_exec_event,
+    )
+
+    def ensure_views(*_args, **_kwargs):  # type: ignore
+        return None
+
+    def log_alert(*_args, **_kwargs) -> Optional[int]:  # type: ignore
+        return None
+
 from decision.decision_engine import DecisionEngine, DecisionRequest
 
 # DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック
@@ -105,8 +127,9 @@ def fake_exec(trace_id: str, decision: Dict[str, Any]) -> None:
 
 
 def main() -> None:
-    # 0) 観測テーブルの存在保証（dev/PoC 向け）
+    # 0) 観測テーブル/ビューの存在保証（dev/PoC 向け）
     ensure_tables()
+    ensure_views()   # View: obs_trace_timeline / obs_trace_latency / MV: obs_latency_daily
 
     # 1) トレースID
     trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
@@ -150,7 +173,16 @@ def main() -> None:
         # DO層無し → ダミー実行
         fake_exec(trace_id, result.decision)
 
-    # 7) PLAN スパン終了ログ
+    # 7) （デモ用）テスト ALERT を1件記録して、タイムラインに ALER Tが混ざることを確認
+    log_alert(
+        policy_name="risk.max_order_qty",
+        reason="demo alert: qty exceeded soft cap",
+        severity="LOW",
+        details={"max_qty": 5000, "requested": 10000},
+        trace_id=trace_id,
+    )
+
+    # 8) PLAN スパン終了ログ
     log_plan_run(trace_id=trace_id, status="END", finished_at=_now_utc())
 
     print(f"✅ E2E complete. trace_id={trace_id}")
