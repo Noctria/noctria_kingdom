@@ -25,7 +25,7 @@
   .empty-note { color:#9fbad6; text-align:center; padding:.75rem 0; }
 </style>
 
-<!-- ★ ローカル配信を優先（/static/vendor に配置済み想定）。CDNは後続スクリプトで不足時のみ読込 -->
+<!-- ★ まずはローカル配信（/static/vendor に配置済み想定）。CDNは不足時のみ後で読み込み -->
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
@@ -107,21 +107,18 @@
 
 {% block scripts %}
 <script>
-/* ---------- ライブラリのCDNフォールバック（不足時のみ読み込み） ---------- */
+/* ---------- 不足時だけCDNを読み込むフォールバック ---------- */
 (function ensureLibs() {
   function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.onload=onload||function(){}; document.head.appendChild(s); }
   function need(name){ return (typeof window[name] === 'undefined'); }
   var p = [];
-
-  if (need('Chart'))    p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js', res)));
+  if (need('Chart'))     p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js', res)));
   if (need('flatpickr')) p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/flatpickr', res)));
-
   Promise.all(p).then(function(){
-    if (need('Chart'))    addScript('https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js');
+    if (need('Chart'))     addScript('https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js');
     if (need('flatpickr')) addScript('https://unpkg.com/flatpickr@4.6.13/dist/flatpickr.min.js');
-    // 最終フォールバック：ローカル（数百ミリ後にもう一度試す）
-    setTimeout(function(){
-      if (need('Chart'))    addScript('/static/vendor/chart.umd.js');
+    setTimeout(function(){ // 最終フォールバックでもう一度ローカルを試す
+      if (need('Chart'))     addScript('/static/vendor/chart.umd.js');
       if (need('flatpickr')) addScript('/static/vendor/flatpickr.min.js');
     }, 500);
   });
@@ -130,11 +127,11 @@
 
 <script>
 /* =========================
-   メインスクリプト（ロード待ち・デフォルト日付補完付き）
+   メインスクリプト（ロード待ち & グローバル公開）
    ========================= */
-let charts = { evals:null, winrate:null, trades:null };
-let GLOBAL_DEFAULT_FROM = null;
-let GLOBAL_DEFAULT_TO   = null;
+window.charts = { evals:null, winrate:null, trades:null };     // ★ コンソールから参照できるようにwindowへ
+window.GLOBAL_DEFAULT_FROM = null;
+window.GLOBAL_DEFAULT_TO   = null;
 
 function fmtPercent(x) { return (x == null) ? '—' : (x * 100).toFixed(2) + '%'; }
 function fmtDD(x)      { return (x == null) ? '—' : (x * 100).toFixed(2) + '%'; }
@@ -163,10 +160,11 @@ function isoDateDaysAgo(days){
   return d.toISOString().slice(0,10);
 }
 
-async function refresh() {
-  // ★ inputが空ならグローバルデフォルトで補完（422回避）
-  const from = (document.getElementById('from-date').value || GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14));
-  const to   = (document.getElementById('to-date').value   || GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0));
+/* ★ refresh をグローバルに公開（Consoleから呼べるように） */
+window.refresh = async function refresh() {
+  // inputが空ならグローバルデフォルトで補完（422回避）
+  const from = (document.getElementById('from-date').value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14));
+  const to   = (document.getElementById('to-date').value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0));
   const limit= document.getElementById('limit-select').value || '20';
 
   const url = `/pdca/summary/data?from_date=${encodeURIComponent(from)}&to_date=${encodeURIComponent(to)}&limit=${encodeURIComponent(limit)}`;
@@ -200,48 +198,50 @@ async function refresh() {
   const trades = byDay.map(r => r.trades ?? 0);
   const wr     = byDay.map(r => (r.win_rate == null ? null : +(r.win_rate * 100).toFixed(2)));
 
-  // ----- 空データメッセージ -----
+  // 空データメッセージ
   show(document.getElementById('noteEvals'),  labels.length === 0);
   show(document.getElementById('noteTrades'), labels.length === 0);
   show(document.getElementById('noteWR'),     labels.length === 0);
 
-  // ----- 既存チャート破棄 -----
-  for (const k of Object.keys(charts)) {
-    if (charts[k]) { charts[k].destroy(); charts[k] = null; }
+  // 既存チャート破棄
+  for (const k of Object.keys(window.charts)) {
+    if (window.charts[k]) { window.charts[k].destroy(); window.charts[k] = null; }
   }
 
-  // ----- 描画 -----
-  charts.evals   = createChart(document.getElementById('chartEvals').getContext('2d'),  'bar',  labels, 'Evaluations',  evals,  '');
-  charts.trades  = createChart(document.getElementById('chartTrades').getContext('2d'), 'bar',  labels, 'Trades',       trades, '');
-  charts.winrate = createChart(document.getElementById('chartWinRate').getContext('2d'),'line', labels, 'Win Rate (%)', wr,     '%');
-}
+  // 描画
+  window.charts.evals   = createChart(document.getElementById('chartEvals').getContext('2d'),  'bar',  labels, 'Evaluations',  evals,  '');
+  window.charts.trades  = createChart(document.getElementById('chartTrades').getContext('2d'), 'bar',  labels, 'Trades',       trades, '');
+  window.charts.winrate = createChart(document.getElementById('chartWinRate').getContext('2d'),'line', labels, 'Win Rate (%)', wr,     '%');
+};
 
-/* ========= ここからロード待ちを最優先に実施 ========= */
-(function main() {
-  // 1) まず日付インプットに文字列でデフォルトをセット（flatpickr未読込でも値が入る）
-  GLOBAL_DEFAULT_FROM = isoDateDaysAgo(14);
-  GLOBAL_DEFAULT_TO   = isoDateDaysAgo(0);
-  const fromI = document.getElementById('from-date');
-  const toI   = document.getElementById('to-date');
-  if (fromI && !fromI.value) fromI.value = GLOBAL_DEFAULT_FROM;
-  if (toI   && !toI.value)   toI.value   = GLOBAL_DEFAULT_TO;
+/* ========= DOM とライブラリのロードを待ってから初期化 ========= */
+document.addEventListener('DOMContentLoaded', function () {
+  // 1) まず input にデフォルト日付（flatpickr未読込でも値が入る）
+  window.GLOBAL_DEFAULT_FROM = isoDateDaysAgo(14);
+  window.GLOBAL_DEFAULT_TO   = isoDateDaysAgo(0);
+  var fromI = document.getElementById('from-date');
+  var toI   = document.getElementById('to-date');
+  if (fromI && !fromI.value) fromI.value = window.GLOBAL_DEFAULT_FROM;
+  if (toI   && !toI.value)   toI.value   = window.GLOBAL_DEFAULT_TO;
 
-  // 2) Flatpickrが来たら上書き初期化（なくても動く）
+  // 2) Flatpickrが来たら上書き初期化（なくてもOK）
   (function initPickers(){
     if (typeof flatpickr === 'undefined') return void setTimeout(initPickers, 120);
-    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: GLOBAL_DEFAULT_FROM });
-    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: GLOBAL_DEFAULT_TO   });
+    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_FROM });
+    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_TO   });
   })();
 
-  // 3) ボタンイベントを登録（即時可）
+  // 3) ボタンイベント登録
   var btn = document.getElementById('applyBtn');
-  if (btn) btn.addEventListener('click', refresh);
+  if (btn) btn.addEventListener('click', window.refresh);
 
-  // 4) Chart.js のロードを待ってから初回描画
+  // 4) Chart.js を待って初回描画
   (function waitChart(){
     if (typeof Chart === 'undefined') return void setTimeout(waitChart, 120);
-    refresh();
+    window.refresh();
   })();
-})();
+
+  console.log('[PDCA Summary] Ready');
+});
 </script>
 {% endblock %}
