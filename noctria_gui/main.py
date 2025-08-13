@@ -1,40 +1,72 @@
 #!/usr/bin/env python3
 # coding: utf-8
+"""
+Noctria Kingdom GUI - main entrypoint
+- ルーター統合
+- 静的/テンプレートの安全マウント
+- 例外ハンドラ
+"""
 
-import sys
+from __future__ import annotations
+
 import os
+import sys
 import json
 import logging
 import traceback
+from pathlib import Path
 from typing import Any
-from fastapi import FastAPI, Request, HTTPException, Depends
+
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import Response, RedirectResponse, JSONResponse, HTMLResponse
+from fastapi.responses import Response, RedirectResponse, JSONResponse
 from starlette.responses import FileResponse
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_DIR = os.path.join(PROJECT_ROOT, "src")
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
+# -----------------------------------------------------------------------------
+# import path: <repo_root>/src を最優先に追加
+# -----------------------------------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+# path_config（集中管理）
+from src.core.path_config import NOCTRIA_GUI_STATIC_DIR, NOCTRIA_GUI_TEMPLATES_DIR  # type: ignore
 
+# -----------------------------------------------------------------------------
+# logging
+# -----------------------------------------------------------------------------
 logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("noctria_gui.main")
 
+# -----------------------------------------------------------------------------
+# FastAPI app
+# -----------------------------------------------------------------------------
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.0.0",
+    version="2.0.1",
 )
 
-app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
-templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+# -----------------------------------------------------------------------------
+# 静的/テンプレートの安全マウント（存在しない場合も落ちないように）
+# -----------------------------------------------------------------------------
+# /static
+if NOCTRIA_GUI_STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(NOTRIA_GUI_STATIC_DIR)), name="static")
+    logger.info(f"Static mounted: {NOCTRIA_GUI_STATIC_DIR}")
+else:
+    logger.warning(f"Static dir not found: {NOCTRIA_GUI_STATIC_DIR} (skip mounting)")
+
+# templates（存在しない場合はフォールバックを試みる）
+_tpl_dir = NOCTRIA_GUI_TEMPLATES_DIR if NOCTRIA_GUI_TEMPLATES_DIR.exists() else (PROJECT_ROOT / "noctria_gui" / "templates")
+templates = Jinja2Templates(directory=str(_tpl_dir))
+logger.info(f"Templates dir: {_tpl_dir}")
 
 def from_json(value: Any) -> Any:
     if isinstance(value, str):
@@ -46,74 +78,84 @@ def from_json(value: Any) -> Any:
 
 templates.env.filters["from_json"] = from_json
 
-# --- 各種ルーターのインポート ---
-from noctria_gui.routes import (
-    dashboard, home_routes, king_routes, logs_routes,
-    path_checker, trigger, upload, upload_history,
-    act_history, act_history_detail,
-    pdca, pdca_recheck, pdca_routes, pdca_summary,
-    prometheus_routes, push, push_history,
-    statistics, statistics_detail, statistics_ranking,
-    statistics_scoreboard, statistics_tag_ranking, statistics_compare,
-    strategy_detail, strategy_heatmap, strategy_routes,
-    tag_heatmap, tag_summary, tag_summary_detail,
-    hermes, ai_routes,
-    chat_history_api,  # チャット履歴API
-    chat_api,          # OpenAIチャットAPI
-    devcycle_history   # ←★進捗ダッシュボードルート（追加！）
-)
+# -----------------------------------------------------------------------------
+# ルーターの取り込み
+# 必要に応じて存在しないモジュールはスキップ（開発中の崩壊を防ぐ）
+# -----------------------------------------------------------------------------
+def _safe_include(module_path: str, attr: str = "router", *, prefix: str | None = None, tags: list[str] | None = None):
+    try:
+        mod = __import__(module_path, fromlist=[attr])
+        router = getattr(mod, attr)
+        if prefix or tags:
+            app.include_router(router, prefix=prefix or "", tags=tags or [])
+        else:
+            app.include_router(router)
+        logger.info(f"Included router: {module_path}")
+    except Exception as e:
+        logger.warning(f"Skip router '{module_path}': {e}")
 
-logger.info("Integrating all routers into the main application...")
+logger.info("Integrating routers...")
 
-app.include_router(home_routes.router)
-app.include_router(dashboard.router)
-app.include_router(king_routes.router)
-app.include_router(trigger.router)
-app.include_router(hermes.router)
+# 主要ルーター郡（存在しなくてもスキップ可）
+_safe_include("noctria_gui.routes.home_routes")
+_safe_include("noctria_gui.routes.dashboard")
+_safe_include("noctria_gui.routes.king_routes")
+_safe_include("noctria_gui.routes.trigger")
+_safe_include("noctria_gui.routes.hermes")
 
-app.include_router(act_history.router)
-app.include_router(act_history_detail.router)
-app.include_router(logs_routes.router)
-app.include_router(upload_history.router)
+_safe_include("noctria_gui.routes.act_history")
+_safe_include("noctria_gui.routes.act_history_detail")
+_safe_include("noctria_gui.routes.logs_routes")
+_safe_include("noctria_gui.routes.upload_history")
 
-app.include_router(pdca.router)
-app.include_router(pdca_recheck.router)
-app.include_router(pdca_routes.router)
-app.include_router(pdca_summary.router)
-app.include_router(push.router)
-app.include_router(push_history.router)
+_safe_include("noctria_gui.routes.pdca")
+_safe_include("noctria_gui.routes.pdca_recheck")
+_safe_include("noctria_gui.routes.pdca_routes")
+_safe_include("noctria_gui.routes.pdca_summary")
 
-app.include_router(strategy_routes.router, prefix="/strategies", tags=["strategies"])
-app.include_router(strategy_detail.router)
-app.include_router(strategy_heatmap.router)
+_safe_include("noctria_gui.routes.push")
+_safe_include("noctria_gui.routes.push_history")
 
-app.include_router(statistics.router, prefix="/statistics", tags=["statistics"])
-app.include_router(statistics_detail.router)
-app.include_router(statistics_ranking.router)
-app.include_router(statistics_scoreboard.router)
-app.include_router(statistics_tag_ranking.router)
-app.include_router(statistics_compare.router)
+_safe_include("noctria_gui.routes.strategy_routes", prefix="/strategies", tags=["strategies"])
+_safe_include("noctria_gui.routes.strategy_detail")
+_safe_include("noctria_gui.routes.strategy_heatmap")
 
-app.include_router(tag_summary.router)
-app.include_router(tag_summary_detail.router)
-app.include_router(tag_heatmap.router)
+_safe_include("noctria_gui.routes.statistics", prefix="/statistics", tags=["statistics"])
+_safe_include("noctria_gui.routes.statistics_detail")
+_safe_include("noctria_gui.routes.statistics_ranking")
+_safe_include("noctria_gui.routes.statistics_scoreboard")
+_safe_include("noctria_gui.routes.statistics_tag_ranking")
+_safe_include("noctria_gui.routes.statistics_compare")
 
-app.include_router(ai_routes.router)
-app.include_router(devcycle_history.router)  # ←★追加
+_safe_include("noctria_gui.routes.tag_summary")
+_safe_include("noctria_gui.routes.tag_summary_detail")
+_safe_include("noctria_gui.routes.tag_heatmap")
 
-app.include_router(path_checker.router)
-app.include_router(prometheus_routes.router)
-app.include_router(upload.router)
+_safe_include("noctria_gui.routes.ai_routes")
+_safe_include("noctria_gui.routes.devcycle_history")
 
-# チャット関連ルーター
-app.include_router(chat_history_api.router)
-#app.include_router(chat_api.router)
+_safe_include("noctria_gui.routes.path_checker")
+_safe_include("noctria_gui.routes.prometheus_routes")
+_safe_include("noctria_gui.routes.upload")
 
-logger.info("✅ All routers have been integrated successfully.")
+_safe_include("noctria_gui.routes.chat_history_api")
+# _safe_include("noctria_gui.routes.chat_api")  # APIキー未設定環境での誤爆防止
 
+# ★ 新規: PDCA 可観測性ビュー（/pdca/timeline, /pdca/latency/daily 等）
+_safe_include("noctria_gui.routes.observability")
+
+logger.info("✅ All available routers integrated.")
+
+# -----------------------------------------------------------------------------
+# Routes (root / favicon / health / exception handler)
+# -----------------------------------------------------------------------------
 @app.get("/", include_in_schema=False)
 async def root_redirect():
-    return RedirectResponse(url="/dashboard")
+    # ダッシュボードが無い環境では PDCA タイムラインへ
+    try:
+        return RedirectResponse(url="/dashboard")
+    except Exception:
+        return RedirectResponse(url="/pdca/timeline")
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
@@ -122,11 +164,15 @@ async def favicon():
         return FileResponse(icon_path, media_type="image/x-icon")
     return Response(status_code=204)
 
+@app.get("/healthz", include_in_schema=False)
+async def healthz():
+    return JSONResponse({"ok": True})
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    tb = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    logger.error(f"Unhandled exception: {exc}\nTraceback:\n{tb}")
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    logger.error("Unhandled exception: %s\nTraceback:\n%s", exc, tb)
     return JSONResponse(
         status_code=500,
-        content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"}
+        content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"},
     )
