@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-// logger
+# logger
 # -----------------------------------------------------------------------------
 logger = logging.getLogger("noctria.observability")
 if not logger.handlers:
