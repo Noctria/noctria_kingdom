@@ -22,12 +22,20 @@ from datetime import datetime, timezone
 # -----------------------------------------------------------------------------
 # import 安定化:
 #   このファイルは src/e2e/decision_minidemo.py に置かれている前提。
-#   実行時に sys.path に "<repo_root>/src" を追加し、"from plan_data ..." 形式で import します。
-#   これにより、src/__init__.py の有無に依存せずに動作します。
+#   まず <repo>/src を sys.path に直接追加（単体実行対応）し、
+#   あれば core.path_config.ensure_import_path() を呼んで集中管理に委譲。
 # -----------------------------------------------------------------------------
 SRC_DIR = Path(__file__).resolve().parents[1]  # .../<repo>/src
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+
+try:
+    # 集中管理（任意）：PROJECT_ROOT / SRC の両方を sys.path に整備
+    from core.path_config import ensure_import_path  # type: ignore
+    ensure_import_path()
+except Exception:
+    # 無ければそのまま（上の手動追加で十分動く）
+    pass
 
 from plan_data.trace import new_trace_id
 from plan_data.observability import (
