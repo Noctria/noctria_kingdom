@@ -10,19 +10,19 @@ from datetime import datetime, timezone
 from typing import Optional, Dict
 
 # =============================================================================
-# Trace utilities for PLAN layer (and cross-layer use)
-# - ContextVar によりスレッド/タスク安全に trace_id を保持
-# - 人が追いやすい形式の ID を生成: YYYYMMDD-HHMMSS-SYMBOL-TF-<shortuuid>
-# - 既存 API 互換: new_trace_id / get_trace_id / with_trace_id
-# - 追加: ensure_trace_id / set_trace_id / clear_trace_id / trace_headers / is_valid_trace_id
+# Trace utilities for PLAN layer (cross-layer OK)
+# - ContextVar でスレッド/タスク安全に trace_id を保持
+# - 人が読める ID: YYYYMMDD-HHMMSS-SYMBOL-TF-<shortuuid>
+# - 互換API: new_trace_id / get_trace_id / with_trace_id
+# - 追加API: ensure_trace_id / set_trace_id / clear_trace_id /
+#           trace_headers / is_valid_trace_id / now_utc / generate_trace_id
 # =============================================================================
 
-# 現在の trace_id（スレッド/タスクローカル）
+# 現在の trace_id を保持（スレッド/タスクローカル）
 _current_trace_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "current_trace_id", default=None
 )
 
-# 受け渡し用の軽量データクラス（必要なら拡張）
 @dataclass(frozen=True)
 class Trace:
     id: str
@@ -30,21 +30,27 @@ class Trace:
 # -------------------------
 # 内部ユーティリティ
 # -------------------------
-_ID_PART_ALLOWED = re.compile(r"[A-Za-z0-9_\-]+")
+# 許容文字：英数・アンダーバー・ハイフン
+_ID_PART_CLEAN = re.compile(r"[^A-Za-z0-9_\-]+")
 
-def _now_utc() -> datetime:
+def now_utc() -> datetime:
+    """UTC の現在時刻（datetime, tz-aware）。"""
     return datetime.now(timezone.utc)
 
-def _ts() -> str:
-    # UTCで桁揃え YYYYMMDD-HHMMSS
-    return _now_utc().strftime("%Y%m%d-%H%M%S")
+def _ts_dash() -> str:
+    """YYYYMMDD-HHMMSS 形式（ダッシュ区切り）。"""
+    return now_utc().strftime("%Y%m%d-%H%M%S")
+
+def _ts_t() -> str:
+    """YYYYMMDDTHHMMSSZ 形式（互換用）。"""
+    return now_utc().strftime("%Y%m%dT%H%M%SZ")
 
 def _sanitize_part(s: str, *, upper: bool = False) -> str:
-    # 許可文字以外を除去、必要なら大文字化。空になったら "NA" を返す。
-    s = "".join(ch for ch in str(s) if _ID_PART_ALLOWED.match(ch))
-    if not s:
-        s = "NA"
-    return s.upper() if upper else s
+    """許可外文字を除去し、必要に応じて大文字化。空になったら 'NA'。"""
+    txt = _ID_PART_CLEAN.sub("", str(s))
+    if not txt:
+        txt = "NA"
+    return txt.upper() if upper else txt
 
 def _short_uuid(n: int = 8) -> str:
     return uuid.uuid4().hex[:max(4, min(n, 32))]
@@ -54,52 +60,53 @@ def _short_uuid(n: int = 8) -> str:
 # -------------------------
 def new_trace_id(*, symbol: str = "MULTI", timeframe: str = "1d") -> str:
     """
-    追跡IDを生成。例: 20250813-123045-MULTI-1d-a1b2c3d4
-    - 先頭は人間が読める UTC 日時（YYYYMMDD-HHMMSS）
-    - 対象（symbol）と timeframe を含める
-    - 衝突回避のため短縮UUIDを末尾に付与
+    人が追跡しやすい ID を生成。
+    例: 20250813-123045-MULTI-1d-a1b2c3d4
     """
     safe_symbol = _sanitize_part(symbol, upper=True)
     safe_tf = _sanitize_part(timeframe, upper=False)
-    return f"{_ts()}-{safe_symbol}-{safe_tf}-{_short_uuid(8)}"
+    return f"{_ts_dash()}-{safe_symbol}-{safe_tf}-{_short_uuid(8)}"
+
+def generate_trace_id(prefix: Optional[str] = "noctria",
+                      *,
+                      symbol: Optional[str] = None,
+                      timeframe: Optional[str] = None) -> str:
+    """
+    互換API（他モジュールが期待する名称）。
+    デフォルトは prefix-YYYYMMDDTHHMMSSZ-<short> 形式。
+    symbol/timeframe を与えた場合は new_trace_id 形式を優先。
+    """
+    if symbol or timeframe:
+        return new_trace_id(symbol=symbol or "MULTI", timeframe=timeframe or "1d")
+    ts = _ts_t()
+    short = uuid.uuid4().hex[:12]
+    return f"{prefix}-{ts}-{short}" if prefix else f"{ts}-{short}"
 
 def get_trace_id(default: Optional[str] = None) -> Optional[str]:
-    """
-    現在のコンテキストに紐づく trace_id を返す。未設定なら default を返す。
-    """
+    """現在のコンテキストに紐づく trace_id を返す。未設定なら default。"""
     return _current_trace_id.get() or default
 
 def ensure_trace_id(trace_id: Optional[str] = None) -> str:
-    """
-    与えられた trace_id を優先しつつ、無ければ現在のコンテキスト or 新規生成を返す。
-    （読み取り専用・副作用なし）
-    """
+    """与えられた ID を優先。無ければ現在のコンテキスト→新規生成の順。"""
     return trace_id or get_trace_id() or new_trace_id()
 
 def set_trace_id(trace_id: str) -> contextvars.Token:
-    """
-    現在のコンテキストに trace_id をセットして Token を返す。
-    with 文を使わない一時設定に。
-    """
+    """現在のコンテキストに trace_id をセットして Token を返す。"""
     return _current_trace_id.set(trace_id)
 
 def clear_trace_id() -> None:
-    """
-    現在のコンテキストの trace_id を None に上書きする（リセットトークンなし版）。
-    """
+    """現在のコンテキストの trace_id を None に上書き。"""
     _current_trace_id.set(None)
 
 def trace_headers(trace_id: Optional[str] = None) -> Dict[str, str]:
-    """
-    HTTP/メッセージ伝搬用ヘッダを返す。
-    """
+    """HTTP/メッセージ伝搬用ヘッダ。"""
     return {"X-Trace-Id": ensure_trace_id(trace_id)}
 
 def is_valid_trace_id(value: str) -> bool:
     """
-    形式ゆるめの妥当性チェック：
+    ゆるめの妥当性チェック：
     - 英数/アンダーバー/ハイフン/コロンのみを許容
-    - 長さ 12〜200 程度
+    - 長さ 12〜200
     """
     if not isinstance(value, str):
         return False
@@ -113,7 +120,7 @@ def is_valid_trace_id(value: str) -> bool:
 @contextlib.contextmanager
 def with_trace_id(trace_id: Optional[str] = None):
     """
-    コンテキスト内で現在の trace_id をセット/復元する。
+    コンテキスト内で trace_id をセット/復元。
     例:
       with with_trace_id(new_trace_id(symbol="USDJPY", timeframe="1h")) as tid:
           run_pipeline(tid)
@@ -132,7 +139,9 @@ def with_trace_id(trace_id: Optional[str] = None):
 # -------------------------
 __all__ = [
     "Trace",
+    "now_utc",
     "new_trace_id",
+    "generate_trace_id",
     "get_trace_id",
     "ensure_trace_id",
     "set_trace_id",
