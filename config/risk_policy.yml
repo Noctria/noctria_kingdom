@@ -1,0 +1,12 @@
+# configs/risk_policy.yml
+default:
+  trading_hours_utc: ["00:00-23:59"]  # デモでは常時許可
+  max_order_qty: 5000                 # 5,000を超えると clamp して ALERT
+  max_consecutive_losses: 2
+  shrink_after_losses_pct: 50
+  forbidden_symbols: []
+  max_position_notional: 10000
+
+overrides:
+  USDJPY:
+    max_order_qty: 1000               # USDJPYは 1,000 を超えると clamp → ALERT
