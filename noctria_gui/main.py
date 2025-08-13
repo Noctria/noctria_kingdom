@@ -5,6 +5,19 @@ Noctria Kingdom GUI - main entrypoint
 - ルーター統合
 - 静的/テンプレートの安全マウント
 - 例外ハンドラ
+
+【今回の変更点（簡易サマリ）】
+1) /static マウント時の変数タイポ修正:
+   - 誤: NOTRIA_GUI_STATIC_DIR → 正: NOCTRIA_GUI_STATIC_DIR
+   - これにより static 配下（CSS/JS/画像）が正しく配信されます。
+2) ルーター統合は既存を尊重しつつ「observability ルーター」を追加登録（_safe_include 経由）。
+3) テンプレートディレクトリは path_config で見つからない場合もフォールバック（noctria_gui/templates）。
+4) 例外ハンドラ/healthz/ルートリダイレクトは現行仕様を維持（/dashboard 不在時は /pdca/timeline へ）。
+
+【動作確認メモ】
+- 環境変数 NOCTRIA_OBS_PG_DSN を設定（PDCAビューがDB参照するため）
+- uvicorn noctria_gui.main:app --reload
+- /pdca/timeline, /pdca/latency/daily が表示できること
 """
 
 from __future__ import annotations
@@ -56,9 +69,9 @@ app = FastAPI(
 # -----------------------------------------------------------------------------
 # 静的/テンプレートの安全マウント（存在しない場合も落ちないように）
 # -----------------------------------------------------------------------------
-# /static
+# /static  ※タイポ修正: NOTRIA_ → NOCTRIA_
 if NOCTRIA_GUI_STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(NOTRIA_GUI_STATIC_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
     logger.info(f"Static mounted: {NOCTRIA_GUI_STATIC_DIR}")
 else:
     logger.warning(f"Static dir not found: {NOCTRIA_GUI_STATIC_DIR} (skip mounting)")
@@ -141,7 +154,7 @@ _safe_include("noctria_gui.routes.upload")
 _safe_include("noctria_gui.routes.chat_history_api")
 # _safe_include("noctria_gui.routes.chat_api")  # APIキー未設定環境での誤爆防止
 
-# ★ 新規: PDCA 可観測性ビュー（/pdca/timeline, /pdca/latency/daily 等）
+# ★ 追加：PDCA 可観測性ビュー（/pdca/timeline, /pdca/latency/daily 等）
 _safe_include("noctria_gui.routes.observability")
 
 logger.info("✅ All available routers integrated.")
