@@ -1,4 +1,4 @@
-graph TD
+flowchart TD
 
 %% ====== styles (GitHub-safe) ======
 classDef inputs fill:#243447,stroke:#4f86c6,color:#e6f0ff;
@@ -11,50 +11,50 @@ classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
 
 %% ====== INPUTS ======
 subgraph INPUTS ["Upstream inputs"]
-  KPI["kpi_summary.json - from CHECK"]
-  ECONF["eval_config.json - targets / window / metrics - TODO: hypothesis id and test settings not implemented"]
-  GUIACT["GUI /pdca/act - human accept or threshold adjust"]
+  KPI["kpi_summary.json<br/>from CHECK"]
+  ECONF["eval_config.json<br/>targets / window / metrics<br/><i>TODO:</i> hypothesis id & test settings"]
+  GUIACT["GUI: /pdca/recheck & /pdca/summary<br/>human accept or threshold adjust"]
 end
 
 %% ====== ACT layer ======
-subgraph ACT_LAYER ["ACT layer (src/noctria_gui/routes and src/pdca)"]
-  RECHECK["pdca_recheck.py - re-evaluate / param search / A-B compare - TODO: full experiment tracking not implemented"]
-  PUSH["pdca_push.py - adopt and release - Git push and tag - TODO: release bundle signature and SBOM not implemented"]
-  SUMMARY["pdca_summary.py - period and tag summaries - TODO: statistical report and benchmarks not implemented"]
-  FEEDBACK["feedback_adapter.py - proposals back to PLAN - TODO: proposal vs applied contract not implemented"]
+subgraph ACT_LAYER ["ACT layer (src/act & noctria_gui/routes)"]
+  RECHECK["pdca_recheck.py<br/>re-evaluate / param search / A-B compare<br/><i>TODO:</i> full experiment tracking"]
+  PUSH["pdca_push.py<br/>adopt & release (Git push / tag)<br/><i>TODO:</i> release bundle signature & SBOM"]
+  SUMMARY["pdca_summary.py<br/>period & tag summaries<br/><i>TODO:</i> statistical report & benchmarks"]
+  FEEDBACK["feedback_adapter.py<br/>proposals back to PLAN<br/><i>TODO:</i> proposal vs applied contract"]
 end
 
 %% ====== Training and retraining ======
 subgraph TRAINING ["Training and retraining (Airflow)"]
-  TRAIN_DAG["train_* DAG - train and validate - TODO: auto trigger from drift or SLO not implemented"]
-  REGISTRY["models/registry - source of truth: version and signature and data fingerprint - TODO: enforcement not implemented"]
+  TRAIN_DAG["train_* DAG<br/>train & validate<br/><i>TODO:</i> auto-trigger from drift/SLO"]
+  REGISTRY["models/registry<br/>version / signature / data fingerprint<br/><i>TODO:</i> enforcement"]
 end
 
 %% ====== OUTPUTS ======
 subgraph OUTPUTS ["Downstream outputs"]
-  PLANUPD["plan_update.json - feature or threshold proposals - TODO: schema semver not implemented"]
-  STRATREL["strategy_release.json - selected version and config - TODO: schema semver not implemented"]
-  DASH["dashboard_feed.json - visualization feed"]
+  PLANUPD["plan_update.json<br/>feature/threshold proposals<br/><i>TODO:</i> schema semver"]
+  STRATREL["strategy_release.json<br/>selected version & config<br/><i>TODO:</i> schema semver"]
+  DASH["dashboard_feed.json<br/>visualization feed"]
 end
 
 %% ====== Governance and operations ======
 subgraph GOVERNANCE ["Governance and operations"]
-  DAG_ACT["Airflow DAG pdca_act_flow.py - orchestrate - TODO: idempotent per trace_id and branch lock not implemented"]
-  GUI_ROUTE["GUI /pdca/summary and /pdca/recheck - approve and review - TODO: two person plus king workflow events not implemented"]
-  APPROVAL["approval_record.json - approvers and timestamps - TODO: persistence not implemented"]
+  DAG_ACT["Airflow DAG: pdca_act_flow.py<br/>orchestrate<br/><i>TODO:</i> idempotent per trace_id & branch lock"]
+  GUI_ROUTE["GUI: /pdca/summary & /pdca/recheck<br/>approve & review<br/><i>TODO:</i> two-person + king workflow events"]
+  APPROVAL["approval_record.json<br/>approvers & timestamps<br/><i>TODO:</i> persistence"]
 end
 
 %% ====== Observability taps ======
 subgraph OBS ["Observability taps (tables)"]
-  OBS_ACT["obs_act_runs - start and end and status and duration and approvers - TODO: add trace_id and decision_id"]
-  OBS_RECHECK["obs_recheck_jobs - trials and best and p values and CI - TODO: add trace_id and decision_id"]
-  OBS_ALT["obs_alerts - promotion failed or rollback or policy deviation - TODO: add decision_id"]
+  OBS_ACT["obs_act_runs<br/>start/end/status/duration/approvers<br/><i>TODO:</i> add trace_id & decision_id"]
+  OBS_RECHECK["obs_recheck_jobs<br/>trials/best/p values/CI<br/><i>TODO:</i> add trace_id & decision_id"]
+  OBS_ALT["obs_alerts<br/>promotion failed / rollback / policy deviation<br/><i>note:</i> table exists (generic)"]
 end
 
 %% ====== Policies and identity ======
-CRITERIA["promotion_criteria.yaml - thresholds and period and tests - TODO: formalize not implemented"]
-ROLLBACK["rollback_policy.yaml - rules and kill switch - TODO: formalize not implemented"]
-IDS["ids and versions - trace_id and decision_id and schema_version - TODO: enforce across outputs not implemented"]
+CRITERIA["promotion_criteria.yaml<br/>thresholds/period/tests<br/><i>TODO:</i> formalize"]
+ROLLBACK["rollback_policy.yaml<br/>rules & kill switch<br/><i>TODO:</i> formalize"]
+IDS["ids & versions<br/>trace_id / decision_id / schema_version<br/><i>TODO:</i> enforce across outputs"]
 
 %% ====== FLOWS ======
 KPI --> RECHECK
@@ -62,7 +62,7 @@ ECONF --> RECHECK
 GUIACT --> RECHECK
 RECHECK --> SUMMARY
 RECHECK --> PUSH
-RECHECK -. train data .-> TRAIN_DAG
+RECHECK -. "train data" .-> TRAIN_DAG
 TRAIN_DAG --> REGISTRY
 PUSH --> STRATREL
 SUMMARY --> DASH
@@ -78,9 +78,6 @@ DAG_ACT --> PUSH
 %% ====== Policies links ======
 CRITERIA --> RECHECK
 ROLLBACK --> PUSH
-
-%% ====== Feedback loop to PLAN ======
-OUTPUTS --> FEEDBACK
 
 %% ====== Observability links ======
 RECHECK -->|log| OBS_RECHECK
