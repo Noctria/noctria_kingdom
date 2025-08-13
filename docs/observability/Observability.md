@@ -152,8 +152,6 @@ UNION ALL SELECT * FROM decision
 UNION ALL SELECT * FROM exec
 UNION ALL SELECT * FROM alert;
 
--- 索引は基テーブル側でカバー。VIEW 用にマテ化が必要なら別途 MVIEW を作る。
-
 -- =========================================
 -- 3.3 トレース別レイテンシ VIEW
 --     （Plan→Infer→Decision→Exec の代表時刻と差分）
@@ -201,30 +199,23 @@ WHERE plan_start IS NOT NULL
 GROUP BY 1
 ORDER BY 1 DESC;
 
--- REFRESH 並列実行のためのインデックス（任意）
 CREATE INDEX IF NOT EXISTS idx_obs_latency_daily_day ON obs_latency_daily(day);
 ```
 
-> 備考: `obs_trace_latency` は **代表 1 イベント/フェーズ** を最小時刻で採る素朴定義です。複数回/再試行がある場合はルール（例: 最新/最小/最大）を要件に合わせて調整してください。
+> 備考: `obs_trace_latency` は **代表 1 イベント/フェーズ** を最小時刻で採る素朴定義です。複数回/再試行がある場合は要件（最新/最小/最大など）で調整。
 
 ---
 
 ## 4. GUI 仕様（FastAPI + Jinja2）
 - ルータ: `noctria_gui/routes/observability.py`  
   - DSN は `NOCTRIA_OBS_PG_DSN`（例: `postgresql://noctria:noctria@127.0.0.1:55432/noctria_db`）
-  - **psycopg2 → psycopg v3** のフォールバック接続に対応
   - **テンプレート**:
     - `templates/pdca_timeline.html` … trace 一覧 or 1 トレース時系列（色分け pill）
     - `templates/pdca_latency_daily.html` … 直近 30 日の p50/p90/p95/max/traces
 - ルート:
   - `GET /pdca/timeline?trace=<trace_id>&days=3&limit=200`  
-    - `trace` 無指定で **最近の trace 一覧**（`obs_trace_timeline` を日付範囲で集計）
-    - `trace` 指定で **当該トレースの時系列**（`ts, kind, action, payload`）
   - `GET /pdca/latency/daily`  
-    - `obs_latency_daily` を降順表示（直近 30 日）
-  - `POST /pdca/observability/refresh`  
-    - `ensure_views()` → `refresh_materialized()` を呼び出し  
-    - 権限は **RBAC 導入予定**（現状は簡易メンテ想定）
+  - `POST /pdca/observability/refresh`
 
 ---
 
@@ -235,7 +226,7 @@ NOCTRIA_OBS_PG_DSN=postgresql://noctria:noctria@127.0.0.1:55432/noctria_db
 NOCTRIA_GUI_PORT=8001
 ```
 
-**ユニット** `/etc/systemd/system/noctria_gui.service`（抜粋・実機と整合済）
+**ユニット** `/etc/systemd/system/noctria_gui.service`（抜粋）
 ```
 [Service]
 User=noctria
@@ -264,7 +255,7 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
 ---
 
 ## 6. データ保持とロールアップ
-- **原始イベント**（各 `obs_*` テーブル）: 30 日保持を目安（パーティション/TTL/ロールアップは運用ポリシーに準拠）  
+- **原始イベント**（各 `obs_*` テーブル）: 30 日保持（パーティション/TTL/ロールアップは運用ポリシーに準拠）  
 - **`obs_latency_daily`**: 過去分を保持（SELECT 対象は直近 30 日で十分）  
 - 将来: `obs_trace_timeline` を **MVIEW 化**する場合は `CONCURRENTLY` リフレッシュ戦略を検討。
 
@@ -303,23 +294,23 @@ SELECT * FROM obs_latency_daily ORDER BY day DESC LIMIT 5;
 
 ---
 
-## 9. Mermaid（構成図・概要）
+## 9. Mermaid（構成図・概要）※GitHub でレンダリング可
 
 ```mermaid
 flowchart LR
-  P[Plan: obs_plan_runs] --> T[obs_trace_timeline]
-  I[Infer: obs_infer_calls] --> T
-  D[Decision: obs_decisions] --> T
-  E[Exec: obs_exec_events] --> T
-  A[Alert: obs_alerts] --> T
+  P["Plan: obs_plan_runs"] --> T["obs_trace_timeline"]
+  I["Infer: obs_infer_calls"] --> T
+  D["Decision: obs_decisions"] --> T
+  E["Exec: obs_exec_events"] --> T
+  A["Alert: obs_alerts"] --> T
 
-  T --> L[obs_trace_latency]
-  L --> M[(obs_latency_daily)]
+  T --> L["obs_trace_latency"]
+  L --> M["obs_latency_daily"]
 
-  subgraph GUI (FastAPI)
-    TL[/GET /pdca/timeline/] -->|SELECT| T
-    LD[/GET /pdca/latency/daily/] -->|SELECT| M
-    RF[\POST /pdca/observability/refresh/] -->|ensure_views + REFRESH| M
+  subgraph GUI_FastAPI["GUI (FastAPI)"]
+    TL["GET /pdca/timeline/"] -->|SELECT| T
+    LD["GET /pdca/latency/daily"] -->|SELECT| M
+    RF["POST /pdca/observability/refresh"] -->|ensure_views + REFRESH| M
   end
 ```
 
@@ -328,8 +319,6 @@ flowchart LR
 ## 10. 変更履歴
 - **2025-08-14**:  
   - GUI 実装に合わせ **`/pdca/timeline` / `/pdca/latency/daily` / `POST /pdca/observability/refresh`** を正式化。  
-  - **`obs_trace_timeline` / `obs_trace_latency` / `obs_latency_daily`** の DDL を一本化して提示。  
-  - systemd+Gunicorn の **ENV 展開と ExecStart**（`/bin/sh -lc`）に起因する落とし穴を反映。  
+  - **`obs_trace_timeline` / `obs_trace_latency` / `obs_latency_daily`** の DDL を一本化。  
+  - Mermaid 図を **GitHub 互換の形** に修正（特殊シェイプ/エスケープの排除、`subgraph` 表記の正規化）。  
 - **2025-08-12**: 初版（HUD 方針は撤回、PDCA 直下へ集約）。
-
----
