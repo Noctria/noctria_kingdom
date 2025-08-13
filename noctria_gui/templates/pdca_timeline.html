@@ -1,0 +1,80 @@
+<!-- noctria_gui/templates/pdca_timeline.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Noctria PDCA Timeline</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", Helvetica, Arial; padding: 16px; }
+    h1 { margin: 0 0 8px 0; }
+    .sub { color: #555; margin-bottom: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; border-bottom: 1px solid #e7e7e7; padding: 8px 10px; font-size: 14px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 2px 4px; border-radius: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+    .k-plan { background: #eef7ee; color: #1f3a22; }
+    .k-infer { background: #e9f7ff; color: #0d3a4a; }
+    .k-decision { background: #fff4e6; color: #5a3a0a; }
+    .k-exec { background: #ffecec; color: #5a1f1f; }
+    .k-alert { background: #f6ecff; color: #2e1f3a; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { border: 1px solid #e7e7e7; border-radius: 10px; padding: 12px; background: #fff; }
+    .muted { color: #777; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+</head>
+<body>
+  <h1>🛡️ Noctria PDCA Timeline</h1>
+  <div class="sub">
+    {% if active_trace %}
+      Trace: <code>{{ active_trace }}</code>
+      &nbsp;|&nbsp; <a href="/pdca/timeline">最近のトレース一覧へ</a>
+    {% else %}
+      最近のトレース一覧（3日以内 / 上位200）
+    {% endif %}
+  </div>
+
+  {% if traces and not active_trace %}
+    <table>
+      <thead>
+        <tr><th>trace_id</th><th>last_ts (UTC)</th><th class="muted">events</th></tr>
+      </thead>
+      <tbody>
+        {% for t in traces %}
+          <tr>
+            <td><a class="mono" href="/pdca/timeline?trace={{ t.trace_id }}">{{ t.trace_id }}</a></td>
+            <td>{{ t.last_ts }}</td>
+            <td class="muted">{{ t.events }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {% if events and active_trace %}
+    <table>
+      <thead>
+        <tr><th style="width: 220px;">ts (UTC)</th><th style="width:140px;">kind</th><th style="width:160px;">action</th><th>payload</th></tr>
+      </thead>
+      <tbody>
+        {% for ev in events %}
+          {% set k=ev.kind %}
+          {% set pillclass = "k-plan" %}
+          {% if k.startswith("PLAN") %}{% set pillclass = "k-plan" %}
+          {% elif k == "INFER" %}{% set pillclass = "k-infer" %}
+          {% elif k == "DECISION" %}{% set pillclass = "k-decision" %}
+          {% elif k == "EXEC" %}{% set pillclass = "k-exec" %}
+          {% elif k == "ALERT" %}{% set pillclass = "k-alert" %}
+          {% endif %}
+          <tr>
+            <td class="mono">{{ ev.ts }}</td>
+            <td><span class="pill {{ pillclass }}">{{ ev.kind }}</span></td>
+            <td class="mono">{{ ev.action or "" }}</td>
+            <td><pre class="mono" style="margin:0; white-space: pre-wrap;">{{ ev.payload | tojson(indent=2) }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</body>
+</html>
