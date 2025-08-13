@@ -55,13 +55,22 @@
 > 定量境界（例：**最大 DD、連敗許容、1 日あたりの最大リスク予算**）の具体値は `../operations/Config-Registry.md` を正とする。
 
 ### 3.3 意思決定フロー（Decision Flow）
+> GitHub の Mermaid 互換性を高めるため、**ノード定義とエッジを行ごとに分離**しています。
+
 ```mermaid
 flowchart LR
-  P[Proposal] --> R[Risk Review (Noctus)]
-  R -->|OK| E[Explainability (Hermes)]
-  R -->|NG| C[Revise / Reject]
-  E --> K[Final Decision (King)]
-  K -->|Approve| DEP[Deploy / Adopt]
+  P["Proposal"]
+  R["Risk Review – Noctus"]
+  E["Explainability – Hermes"]
+  K["Final Decision – King"]
+  DEP["Deploy / Adopt"]
+  C["Revise / Reject"]
+
+  P --> R
+  R -->|OK| E
+  R -->|NG| C
+  E --> K
+  K -->|Approve| DEP
   K -->|Return| C
 ```
 
