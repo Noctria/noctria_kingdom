@@ -154,3 +154,58 @@ async def pdca_dashboard_health():
             "message": "pdca-dashboard router is ready",
         }
     )
+
+# ---- ここから追記 ---------------------------------------------------------
+
+@router.get("/api/recent", response_model=Dict[str, Any])
+def api_recent(limit: int = Query(20, ge=1, le=100)):
+    """
+    直近の評価を N 件だけ返す（表表示用の軽量API）
+    """
+    df = _read_logs_dataframe()
+    if df.empty:
+        return {"rows": []}
+
+    cols = [
+        "evaluated_at", "strategy", "tag",
+        "winrate_old", "winrate_new", "winrate_diff",
+        "maxdd_old", "maxdd_new", "maxdd_diff",
+        "trades_old", "trades_new", "notes",
+    ]
+    for c in cols:
+        if c not in df.columns:
+            df[c] = None
+
+    dff = df.sort_values("evaluated_at", ascending=False).head(limit)
+    # 文字列化して安全に返す
+    dff["evaluated_at"] = dff["evaluated_at"].astype(str)
+    return {"rows": dff[cols].to_dict(orient="records")}
+
+
+@router.get("/api/strategy_detail", response_model=Dict[str, Any])
+def api_strategy_detail(strategy: str = Query(..., min_length=1), limit: int = Query(50, ge=1, le=500)):
+    """
+    指定戦略の履歴詳細（最新 limit 件）
+    """
+    df = _read_logs_dataframe()
+    if df.empty:
+        return {"strategy": strategy, "rows": []}
+
+    dff = df[df["strategy"].astype(str) == strategy].copy()
+    if dff.empty:
+        return {"strategy": strategy, "rows": []}
+
+    cols = [
+        "evaluated_at", "strategy", "tag",
+        "winrate_old", "winrate_new", "winrate_diff",
+        "maxdd_old", "maxdd_new", "maxdd_diff",
+        "trades_old", "trades_new", "notes", "__source_file",
+    ]
+    for c in cols:
+        if c not in dff.columns:
+            dff[c] = None
+
+    dff = dff.sort_values("evaluated_at", ascending=False).head(limit)
+    dff["evaluated_at"] = dff["evaluated_at"].astype(str)
+    return {"strategy": strategy, "rows": dff[cols].to_dict(orient="records")}
+# ---- 追記ここまで ---------------------------------------------------------
