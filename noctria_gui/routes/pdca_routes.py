@@ -5,8 +5,12 @@
 """
 📊 /pdca-dashboard - PDCAダッシュボードの画面表示ルート
 - クエリパラメータからフィルタを受け取り、テンプレートに渡す
-- 現時点ではダミーデータだが、今後の拡張でDBやログから取得可能
-- テンプレートディレクトリは core.path_config の定数が無い場合でも安全にフォールバック
+- いまはダミーデータ、将来は DB / ログを集計して表示
+- テンプレートディレクトリは path_config 不在でも安全にフォールバック
+
+補足:
+- このファイルは /pdca-dashboard の最小ビューを提供します。
+  既存の /pdca/summary（統計/CSV/API/再評価トリガ等）が別ルーターにある場合は共存可能です。
 """
 
 from __future__ import annotations
@@ -20,38 +24,54 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 # ========================================
-# 📁 テンプレートディレクトリ解決（安全なフォールバック）
+# 📁 テンプレートディレクトリ解決（安全フォールバック）
 # ========================================
-_templates_dir: Optional[Path] = None
-try:
-    # プロジェクトで統一管理されている場合はこちらを優先
-    from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # type: ignore
-    _templates_dir = Path(str(NOCTRIA_GUI_TEMPLATES_DIR))
-except Exception:
-    # 直下の noctria_gui/templates をフォールバックとして使用
-    _here = Path(__file__).resolve()
-    _templates_dir = _here.parents[1] / "templates"
+def _resolve_templates_dir() -> Path:
+    """
+    テンプレートディレクトリの解決を行う。
+    - 優先: src.core.path_config.NOCTRIA_GUI_TEMPLATES_DIR
+    - 次点: core.path_config.NOCTRIA_GUI_TEMPLATES_DIR（古いimport形）
+    - 最後: このファイルの 2 つ上(noctria_gui/) 配下の templates/
+    """
+    # 1) src.core.path_config（推奨）
+    try:
+        from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR as _TPL  # type: ignore
+        p = Path(str(_TPL))
+        if p.exists():
+            return p
+    except Exception:
+        pass
 
-if not _templates_dir.exists():
-    # 最後の保険：存在しない場合でも FastAPI 起動を止めない（後で 500 を返す）
-    # ここでは例外にしない（開発初期のため）
-    pass
+    # 2) core.path_config（互換）
+    try:
+        from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR as _TPL  # type: ignore
+        p = Path(str(_TPL))
+        if p.exists():
+            return p
+    except Exception:
+        pass
 
-templates = Jinja2Templates(directory=str(_templates_dir))
+    # 3) フォールバック: <repo_root>/noctria_gui/templates
+    here = Path(__file__).resolve()
+    fallback = here.parents[1] / "templates"
+    return fallback
+
+_TEMPLATES_DIR = _resolve_templates_dir()
+templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 # ========================================
 # ⚙️ ルーター設定
 # ========================================
 router = APIRouter(
-    prefix="/pdca-dashboard",     # すべてのルートはこの接頭辞を持つ
-    tags=["PDCA"]                 # FastAPI Swagger用タグ
+    prefix="/pdca-dashboard",
+    tags=["PDCA"]
 )
 
 # ========================================
 # 🔎 フィルタ抽出ユーティリティ
 # ========================================
 def _parse_date(value: Optional[str]) -> Optional[str]:
-    """YYYY-MM-DD の簡易検証。形式不正は None で返す（テンプレにそのまま渡さない）。"""
+    """YYYY-MM-DD の簡易検証。形式不正は None を返す。"""
     if not value:
         return None
     try:
@@ -63,12 +83,12 @@ def _parse_date(value: Optional[str]) -> Optional[str]:
 def _extract_filters(request: Request) -> Dict[str, Any]:
     qp = request.query_params
     filters: Dict[str, Any] = {
-        "strategy": qp.get("strategy", "").strip(),
-        # 拡張用（必要になったらuncomment）
-        "symbol": qp.get("symbol", "").strip() if qp.get("symbol") else "",
+        "strategy": (qp.get("strategy") or "").strip(),
+        # 拡張用
+        "symbol": (qp.get("symbol") or "").strip(),
         "date_from": _parse_date(qp.get("date_from")),
         "date_to": _parse_date(qp.get("date_to")),
-        # 勝率/最大DDなど数値系（将来のバリデーション前提で文字列保持）
+        # 数値系（UI入力の生文字列を保持しつつテンプレへ渡す）
         "winrate_diff_min": qp.get("winrate_diff_min"),
         "maxdd_diff_max": qp.get("maxdd_diff_max"),
         "search": qp.get("search"),
@@ -84,12 +104,13 @@ async def show_pdca_dashboard(request: Request):
     PDCAダッシュボードのメインビュー。
     クエリパラメータからフィルターを取得し、テンプレートに渡す。
     """
-    if not _templates_dir or not (_templates_dir / "pdca_dashboard.html").exists():
+    tpl = _TEMPLATES_DIR / "pdca_dashboard.html"
+    if not tpl.exists():
         # テンプレート未配置時の分かりやすいエラー
         return HTMLResponse(
             content=(
                 "<h3>pdca_dashboard.html が見つかりません。</h3>"
-                f"<p>探索ディレクトリ: {_templates_dir}</p>"
+                f"<p>探索ディレクトリ: {_TEMPLATES_DIR}</p>"
                 "<p>noctria_gui/templates/pdca_dashboard.html を配置してください。</p>"
             ),
             status_code=500,
@@ -97,8 +118,8 @@ async def show_pdca_dashboard(request: Request):
 
     filters = _extract_filters(request)
 
-    # 📦 PDCAデータ取得（現時点ではダミーデータ）
-    # 将来: DB / data/pdca_logs/ 配下のCSV/JSONを集計してここに渡す
+    # 📦 PDCAデータ取得（現時点ではダミー）
+    # 将来: data/pdca_logs/ 配下CSV/JSON or DBからの集計結果をここへ
     pdca_data = [
         # 例:
         # {
@@ -121,15 +142,15 @@ async def show_pdca_dashboard(request: Request):
     )
 
 # ========================================
-# 🧪 ヘルスチェック/軽量データAPI（任意）
+# 🩺 ヘルスチェック/軽量データAPI
 # ========================================
 @router.get("/health", response_class=JSONResponse)
 async def pdca_dashboard_health():
     return JSONResponse(
         {
             "ok": True,
-            "templates_dir": str(_templates_dir) if _templates_dir else None,
-            "template_exists": bool(_templates_dir and (_templates_dir / "pdca_dashboard.html").exists()),
+            "templates_dir": str(_TEMPLATES_DIR),
+            "template_exists": (_TEMPLATES_DIR / "pdca_dashboard.html").exists(),
             "message": "pdca-dashboard router is ready",
         }
     )
