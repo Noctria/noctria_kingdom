@@ -209,3 +209,46 @@ def api_strategy_detail(strategy: str = Query(..., min_length=1), limit: int = Q
     dff["evaluated_at"] = dff["evaluated_at"].astype(str)
     return {"strategy": strategy, "rows": dff[cols].to_dict(orient="records")}
 # ---- 追記ここまで ---------------------------------------------------------
+
+# --- Act(採用) API 追記 ------------------------------------------------------
+from fastapi import Body
+from pydantic import BaseModel
+
+class ActBody(BaseModel):
+    strategy: str
+    reason: str | None = None
+    decision_id: str | None = None
+    dry_run: bool = False
+
+@router.post("/act", response_model=Dict[str, Any])
+def pdca_act(body: ActBody = Body(...)):
+    """
+    戦略を正式採用（veritas_generated -> strategies/adopted）
+    - Git 利用可能なら commit + tag
+    - ログ: data/pdca_logs/veritas_orders/adoptions.csv
+    """
+    try:
+        from src.core.act_service import adopt_strategy  # lazy import
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"act_service unavailable: {e}")
+
+    res = adopt_strategy(
+        body.strategy,
+        reason=body.reason or "",
+        decision_id=body.decision_id,
+        dry_run=body.dry_run,
+    )
+    status = 200 if res.ok else 400
+    return JSONResponse(
+        status_code=status,
+        content={
+            "ok": res.ok,
+            "message": res.message,
+            "strategy": res.strategy,
+            "committed": res.committed,
+            "git_tag": res.tag,
+            "output_path": str(res.output_path) if res.output_path else None,
+            "details": res.details,
+        },
+    )
+# --- 追記ここまで ------------------------------------------------------------
