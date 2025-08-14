@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📌 Noctria Kingdom Path Config (v5.0)
-- 王国全体のパス構造を一元管理します。
-- Docker/WSL/ローカル差異を吸収し、ENVで上書き可能。
-- 実行層リネーム（execution -> do）に互換レイヤで対応。
-- ✅ NEW: ensure_import_path() を追加。エントリポイント側で呼べば import 経路を安定化。
-- ✅ NEW: NOCTRIA_AUTOPATH=1 で import 時に自動で sys.path を整備（任意）。
+📌 Noctria Kingdom Path Config (v5.1)
+
+- 王国全体のパス構造を一元管理
+- Docker/WSL/ローカル差異を吸収し、ENVで上書き可能
+- 実行層リネーム（execution -> do）に互換レイヤで対応
+- ✅ ensure_import_path(): エントリポイント側で呼べば import 経路を安定化
+- ✅ NOCTRIA_AUTOPATH=1 で import 時に自動で sys.path を整備（任意）
+- ✅ NEW: ensure_strategy_packages(): strategies 配下に __init__.py を自動整備
+- ✅ NOCTRIA_AUTOINIT=1 で __init__.py を自動生成（任意）
 """
 
 from __future__ import annotations
+
 from pathlib import Path
 import os
 import sys
@@ -40,7 +44,7 @@ AIRFLOW_SCRIPTS_DIR = AIRFLOW_DOCKER_DIR / "scripts"
 # =========================================================
 # 🌐 Airflow APIベースURL（ENV上書き対応）
 # =========================================================
-AIRFLOW_API_BASE = os.getenv("AIRFLOW_API_BASE", "http://localhost:8080")
+AIRFLOW_API_BASE = os.getenv("AIRFLOW_API_BASE", "http://localhost:8080").rstrip("/")
 
 # =========================================================
 # 🧠 知性領域（AI・戦略・評価・実行）
@@ -80,11 +84,7 @@ LOCAL_DATA_PATH = DATA_DIR / "local_data"
 FEATURES_PATH = PROCESSED_DATA_DIR / "features"
 MODEL_PATH = DATA_DIR / "models" / "latest_model.pkl"
 
-INSTITUTIONS_DIR = (
-    AIRFLOW_DOCKER_DIR / "institutions"
-    if (AIRFLOW_DOCKER_DIR / "institutions").exists()
-    else PROJECT_ROOT / "institutions"
-)
+INSTITUTIONS_DIR = (AIRFLOW_DOCKER_DIR / "institutions") if (AIRFLOW_DOCKER_DIR / "institutions").exists() else PROJECT_ROOT / "institutions"
 
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
@@ -165,8 +165,10 @@ def _lint_path_config():
     """各 Path が存在するかの簡易チェック（GUI/CLI デバッグ用）"""
     return {k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")}
 
+
 def _str(p: Path) -> str:
     return str(p.resolve())
+
 
 def ensure_import_path(
     *,
@@ -177,10 +179,9 @@ def ensure_import_path(
     """
     sys.path を整備する共通関数。
     - エントリポイント（CLI/テスト/DAG/スクリプト）の冒頭で1回呼ぶだけで OK。
-    - 例:
+      例:
         from src.core.path_config import ensure_import_path
         ensure_import_path()   # 以降は 'from plan_data...','from decision...' が安定
-
     Args:
       include_project_root: repo ルートを import 経路に含める（'src.' 付き import 用）
       include_src:          'src' を import 経路に含める（トップレベル import 用）
@@ -198,11 +199,10 @@ def ensure_import_path(
         if t not in sys.path:
             sys.path.insert(0, t)
 
+
 @contextmanager
 def with_import_path(**kwargs):
-    """
-    ensure_import_path を一時的に適用するコンテキストマネージャ。
-    """
+    """ensure_import_path を一時的に適用するコンテキストマネージャ。"""
     before = list(sys.path)
     ensure_import_path(**kwargs)
     try:
@@ -210,9 +210,30 @@ def with_import_path(**kwargs):
     finally:
         sys.path[:] = before
 
+
+# --- NEW: strategies パッケージの __init__.py を自動整備（任意） ---
+def ensure_strategy_packages() -> None:
+    """
+    strategies 配下を import できるように __init__.py を自動整備する。
+    - 生成・上書きはしない（存在しなければ最小内容で作成）
+    """
+    for d in (STRATEGIES_DIR, STRATEGIES_VERITAS_GENERATED_DIR):
+        d.mkdir(parents=True, exist_ok=True)
+        init_file = d / "__init__.py"
+        if not init_file.exists():
+            try:
+                init_file.write_text("# package init (auto-created by path_config)\n", encoding="utf-8")
+            except Exception:
+                # 失敗しても致命ではない
+                pass
+
+
 # ENV で自動適用したい場合（明示 opt-in）
 if os.getenv("NOCTRIA_AUTOPATH", "").lower() in {"1", "true", "yes"}:
     ensure_import_path()
+
+if os.getenv("NOCTRIA_AUTOINIT", "").lower() in {"1", "true", "yes"}:
+    ensure_strategy_packages()
 
 # =========================================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
@@ -249,4 +270,5 @@ __all__ = [
     "_lint_path_config",
     "ensure_import_path",
     "with_import_path",
+    "ensure_strategy_packages",
 ]
