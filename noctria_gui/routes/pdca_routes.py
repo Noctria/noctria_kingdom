@@ -61,6 +61,7 @@ def _resolve_templates_dir() -> Path:
     # 3) フォールバック: <repo_root>/noctria_gui/templates
     return _THIS_FILE.parents[1] / "templates"
 
+
 _TEMPLATES_DIR = _resolve_templates_dir()
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
@@ -83,7 +84,16 @@ def _resolve_pdca_dir() -> Path:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
+
 _PDCA_DIR = _resolve_pdca_dir()
+
+# （任意）ポリシースナップショットを取れれば添付したい
+def _get_policy_snapshot() -> Dict[str, Any]:
+    try:
+        from src.core.policy_engine import get_snapshot  # type: ignore
+        return dict(get_snapshot())
+    except Exception:
+        return {}
 
 # ========================================
 # ⚙️ ルーター設定
@@ -105,6 +115,7 @@ def _parse_date(value: Optional[str]) -> Optional[str]:
         return value
     except ValueError:
         return None
+
 
 def _extract_filters(request: Request) -> Dict[str, Any]:
     qp = request.query_params
@@ -223,6 +234,7 @@ def _read_logs_dataframe():
     out = pd.concat(frames, ignore_index=True)
     return out
 
+
 @router.get("/api/recent", response_model=Dict[str, Any])
 def api_recent(limit: int = Query(20, ge=1, le=100)):
     """
@@ -259,6 +271,7 @@ def api_recent(limit: int = Query(20, ge=1, le=100)):
         rows = []
 
     return {"rows": rows}
+
 
 @router.get("/api/strategy_detail", response_model=Dict[str, Any])
 def api_strategy_detail(
@@ -299,6 +312,10 @@ def api_strategy_detail(
                 pass
 
     try:
+        dff = dff.sort_values("evaluated_at", descending=False)  # 保険: 古→新に揃えたい時は ascending=True
+    except Exception:
+        pass
+    try:
         dff = dff.sort_values("evaluated_at", ascending=False).head(limit)
         dff["evaluated_at"] = dff["evaluated_at"].astype(str)
         rows = dff[cols].to_dict(orient="records")
@@ -308,7 +325,7 @@ def api_strategy_detail(
     return {"strategy": strategy, "rows": rows}
 
 # =============================================================================
-# ✅ Act(採用) API
+# ✅ Act(採用) API — 決裁台帳連携（decision_id 自動発行 / イベント記録）
 # =============================================================================
 class ActBody(BaseModel):
     strategy: str
@@ -316,34 +333,83 @@ class ActBody(BaseModel):
     decision_id: str | None = None
     dry_run: bool = False
 
+
 @router.post("/act", response_model=Dict[str, Any])
 def pdca_act(body: ActBody = Body(...)):
     """
     戦略を正式採用（veritas_generated -> strategies/adopted）
+    - decision_id 未指定時: 決裁発行(kind=act, issued_by=ui) -> accepted -> started -> completed/failed
     - Git 利用可能なら commit + tag
     - ログ: data/pdca_logs/veritas_orders/adoptions.csv
     """
+    # 1) act_service 準備
     try:
         from src.core.act_service import adopt_strategy  # lazy import
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"act_service unavailable: {e}")
 
-    res = adopt_strategy(
-        body.strategy,
-        reason=body.reason or "",
-        decision_id=body.decision_id,
-        dry_run=body.dry_run,
-    )
-    status = 200 if res.ok else 400
-    return JSONResponse(
-        status_code=status,
-        content={
-            "ok": res.ok,
-            "message": res.message,
-            "strategy": res.strategy,
-            "committed": res.committed,
-            "git_tag": res.tag,
-            "output_path": str(res.output_path) if res.output_path else None,
-            "details": res.details,
-        },
-    )
+    # 2) Decision ledger 連携
+    decision_id = body.decision_id
+    try:
+        from src.core.decision_registry import create_decision, append_event  # type: ignore
+        if not decision_id:
+            d = create_decision(
+                kind="act",
+                issued_by="ui",
+                intent={"strategy": body.strategy, "reason": body.reason},
+                policy_snapshot=_get_policy_snapshot(),
+            )
+            decision_id = d.decision_id
+        append_event(decision_id, "accepted", {"endpoint": "/pdca-dashboard/act"})
+        append_event(decision_id, "started", {"strategy": body.strategy, "dry_run": body.dry_run})
+        _use_ledger = True
+    except Exception:
+        # 台帳モジュールが無くても採用処理は継続
+        _use_ledger = False
+
+    # 3) 採用処理
+    try:
+        res = adopt_strategy(
+            body.strategy,
+            reason=body.reason or "",
+            decision_id=decision_id,
+            dry_run=body.dry_run,
+        )
+        status = 200 if res.ok else 400
+
+        # 完了イベント
+        if _use_ledger:
+            try:
+                from src.core.decision_registry import append_event  # re-import safe
+                phase = "completed" if res.ok else "failed"
+                append_event(decision_id or "-", phase, {
+                    "committed": res.committed,
+                    "git_tag": res.tag,
+                    "output_path": str(res.output_path) if res.output_path else None,
+                    "message": res.message,
+                })
+            except Exception:
+                pass
+
+        return JSONResponse(
+            status_code=status,
+            content={
+                "ok": res.ok,
+                "message": res.message,
+                "strategy": res.strategy,
+                "committed": res.committed,
+                "git_tag": res.tag,
+                "output_path": str(res.output_path) if res.output_path else None,
+                "details": res.details,
+                "decision_id": decision_id,  # 応答に含める
+            },
+        )
+    except Exception as e:
+        # 異常時も台帳へ failed を記録
+        if _use_ledger:
+            try:
+                from src.core.decision_registry import append_event
+                append_event(decision_id or "-", "failed", {"error": str(e)})
+            except Exception:
+                pass
+        raise
