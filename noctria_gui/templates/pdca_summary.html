@@ -18,14 +18,15 @@
   }
   .hud-input:focus, .hud-select:focus { outline:none; box-shadow:0 0 8px var(--glow-primary); border-color: var(--glow-primary); }
   .metrics { display:flex; gap:1rem; flex-wrap:wrap; }
-  .metric-item { background: var(--bg-color); border-radius:8px; padding:1rem 1.25rem; box-shadow:0 0 10px var(--glow-primary); flex:1 1 160px; }
+  .metric-item { background: var(--bg-color); border-radius:8px; padding:1rem 1.25rem; box-shadow:0 0 10px var(--glow-primary); flex:1 1 180px; }
   .metric-item h3 { margin:.1rem 0 .25rem; font-size:.9rem; color:var(--text-color-light); }
   .metric-value { font-size:1.6rem; font-weight:700; margin:0; }
   .grid-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1.2rem; }
   .empty-note { color:#9fbad6; text-align:center; padding:.75rem 0; }
+  .btn-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
 </style>
 
-<!-- ★ まずはローカル配信（/static/vendor に配置済み想定）。CDNは不足時のみ後で読み込み -->
+<!-- まずはローカル配信（/static/vendor）。無ければ後段でCDNをフォールバック -->
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
@@ -36,212 +37,275 @@
   <form class="filter-form" onsubmit="return false;">
     <div>
       <label for="from-date"><i class="fas fa-calendar-alt"></i> 開始日</label>
-      <input id="from-date" type="text" class="hud-input" autocomplete="off">
+      <input id="from-date" type="text" class="hud-input" autocomplete="off" placeholder="YYYY-MM-DD">
     </div>
     <div>
       <label for="to-date"><i class="fas fa-calendar-alt"></i> 終了日</label>
-      <input id="to-date" type="text" class="hud-input" autocomplete="off">
+      <input id="to-date" type="text" class="hud-input" autocomplete="off" placeholder="YYYY-MM-DD">
     </div>
     <div>
-      <label for="limit-select"><i class="fas fa-list-ol"></i> 表示件数</label>
+      <label for="limit-select"><i class="fas fa-list-ol"></i> 表示件数（表用）</label>
       <select id="limit-select" class="hud-select">
         <option value="20" selected>20件</option>
         <option value="50">50件</option>
         <option value="100">100件</option>
       </select>
     </div>
-    <div>
-      <button id="applyBtn" class="hud-link" type="button">🔍 適用</button>
+    <div class="btn-row">
+      <button id="applyBtn" class="hud-link" type="button">🔎 適用</button>
+      <a id="csvBtn" class="hud-link" href="#" download>⬇️ CSV</a>
+      <button id="recheckAllBtn" class="hud-link" type="button">🔁 一括再評価</button>
     </div>
   </form>
 </section>
 
 <section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-calculator"></i> OVERALL KPI</h2>
+  <h2 class="panel-title"><i class="fas fa-calculator"></i> OVERALL KPI（フィルター適用後）</h2>
   <div class="metrics">
     <div class="metric-item">
-      <h3><i class="fas fa-robot"></i> Evaluations</h3>
-      <p id="kpi-evals" class="metric-value">-</p>
+      <h3><i class="fas fa-hashtag"></i> 対象件数</h3>
+      <p id="kpi-count" class="metric-value">-</p>
     </div>
     <div class="metric-item">
-      <h3><i class="fas fa-redo"></i> Rechecks</h3>
-      <p id="kpi-rechecks" class="metric-value">-</p>
+      <h3><i class="fas fa-arrow-up"></i> 勝率 改善件数</h3>
+      <p id="kpi-impr-win" class="metric-value">-</p>
     </div>
     <div class="metric-item">
-      <h3><i class="fas fa-percentage"></i> Win Rate</h3>
-      <p id="kpi-winrate" class="metric-value">-</p>
+      <h3><i class="fas fa-arrow-down"></i> 最大DD 改善件数</h3>
+      <p id="kpi-impr-dd" class="metric-value">-</p>
     </div>
     <div class="metric-item">
-      <h3><i class="fas fa-chart-area"></i> Max DD</h3>
-      <p id="kpi-dd" class="metric-value">-</p>
+      <h3><i class="fas fa-percentage"></i> 勝率 差分平均</h3>
+      <p id="kpi-avg-win-diff" class="metric-value">-</p>
     </div>
     <div class="metric-item">
-      <h3><i class="fas fa-exchange-alt"></i> Trades</h3>
-      <p id="kpi-trades" class="metric-value">-</p>
-    </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-check-double"></i> Adopted</h3>
-      <p id="kpi-adopted" class="metric-value">-</p>
+      <h3><i class="fas fa-chart-area"></i> DD 差分平均</h3>
+      <p id="kpi-avg-dd-diff" class="metric-value">-</p>
     </div>
   </div>
 </section>
 
 <div class="grid-charts">
   <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 日次 Evaluations</h2>
-    <div style="height:300px"><canvas id="chartEvals"></canvas></div>
-    <div id="noteEvals" class="empty-note" style="display:none">データがありません</div>
+    <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 日次 件数（総数 / 勝率改善）</h2>
+    <div style="height:300px"><canvas id="chartCounts"></canvas></div>
+    <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
   </section>
   <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-line"></i> 日次 Win Rate (%)</h2>
-    <div style="height:300px"><canvas id="chartWinRate"></canvas></div>
-    <div id="noteWR" class="empty-note" style="display:none">データがありません</div>
-  </section>
-  <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 日次 Trades</h2>
-    <div style="height:300px"><canvas id="chartTrades"></canvas></div>
-    <div id="noteTrades" class="empty-note" style="display:none">データがありません</div>
+    <h2 class="panel-title"><i class="fas fa-chart-line"></i> 日次 勝率差分 平均(%)</h2>
+    <div style="height:300px"><canvas id="chartWinDiff"></canvas></div>
+    <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
   </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-/* ---------- 不足時だけCDNを読み込むフォールバック ---------- */
+/* ---------- ライブラリのフォールバック読込 ---------- */
 (function ensureLibs() {
   function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.onload=onload||function(){}; document.head.appendChild(s); }
   function need(name){ return (typeof window[name] === 'undefined'); }
-  var p = [];
-  if (need('Chart'))     p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js', res)));
-  if (need('flatpickr')) p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/flatpickr', res)));
+  const p = [];
+  if (need('Chart'))     p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', res)));
+  if (need('flatpickr')) p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js', res)));
   Promise.all(p).then(function(){
-    if (need('Chart'))     addScript('https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js');
-    if (need('flatpickr')) addScript('https://unpkg.com/flatpickr@4.6.13/dist/flatpickr.min.js');
-    setTimeout(function(){ // 最終フォールバックでもう一度ローカルを試す
+    // それでも無ければ最後にローカルをもう一度
+    setTimeout(function(){
       if (need('Chart'))     addScript('/static/vendor/chart.umd.js');
       if (need('flatpickr')) addScript('/static/vendor/flatpickr.min.js');
-    }, 500);
+    }, 400);
   });
 })();
 </script>
 
 <script>
 /* =========================
-   メインスクリプト（ロード待ち & グローバル公開）
+   メインスクリプト
+   - 既存の FastAPI ルーターに合わせたエンドポイントで実装
+   - /pdca/api/summary            -> KPI
+   - /pdca/api/summary_timeseries -> グラフ
+   - /pdca/summary.csv            -> CSV
    ========================= */
-window.charts = { evals:null, winrate:null, trades:null };     // ★ コンソールから参照できるようにwindowへ
+window.NoctriaPDCA = { charts: { counts:null, winDiff:null } };
 window.GLOBAL_DEFAULT_FROM = null;
 window.GLOBAL_DEFAULT_TO   = null;
 
-function fmtPercent(x) { return (x == null) ? '—' : (x * 100).toFixed(2) + '%'; }
-function fmtDD(x)      { return (x == null) ? '—' : (x * 100).toFixed(2) + '%'; }
 function setText(id, t){ const el=document.getElementById(id); if(el) el.textContent = t; }
 function show(el, b)   { el.style.display = b ? '' : 'none'; }
+function percentFmt(v){ return (v == null || isNaN(v)) ? '—' : `${(+v).toFixed(2)}%`; }
 
-function createChart(ctx, type, labels, datasetLabel, data, ySuffix) {
+function isoDateDaysAgo(days){
+  const now = new Date();
+  // ローカルタイム基準で日単位のズレを避ける
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function buildQuery() {
+  const from = document.getElementById('from-date').value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
+  const to   = document.getElementById('to-date').value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  const sp = new URLSearchParams();
+  sp.set('date_from', from);
+  sp.set('date_to', to);
+  return sp.toString();
+}
+
+function wireCsvButton(){
+  const a = document.getElementById('csvBtn');
+  if (!a) return;
+  const qs = buildQuery();
+  a.href = '/pdca/summary.csv' + (qs ? `?${qs}` : '');
+}
+
+function createLine(ctx, labels, label, data, ySuffix){
   const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
   return new Chart(ctx, {
-    type,
-    data: { labels, datasets: [{ label: datasetLabel, data }] },
+    type: 'line',
+    data: { labels, datasets:[{ label, data, tension:0.25 }] },
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
+      plugins:{ legend:{ display:true } },
       scales:{
         y:{ beginAtZero:true, grid:{ color:gridC }, ticks:{ color:axisC, callback:v => ySuffix ? `${v}${ySuffix}` : v } },
-        x:{ grid:{ color:gridC }, ticks:{ color:axisC } }
+        x:{ grid:{ color:gridC }, ticks:{ color:axisC, maxRotation:0 } }
       }
     }
   });
 }
 
-function isoDateDaysAgo(days){
-  const t = new Date();
-  const d = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate() - days));
-  return d.toISOString().slice(0,10);
+function createBar2Axis(ctx, labels, ds1, ds2){
+  const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: ds1.label, data: ds1.data, yAxisID:'y1' },
+        { label: ds2.label, data: ds2.data, yAxisID:'y1' },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      scales:{
+        y1:{ type:'linear', position:'left', beginAtZero:true, grid:{ color:gridC }, ticks:{ color:axisC } },
+        x :{ grid:{ color:gridC }, ticks:{ color:axisC, maxRotation:0 } }
+      },
+      plugins:{ legend:{ display:true } }
+    }
+  });
 }
 
-/* ★ refresh をグローバルに公開（Consoleから呼べるように） */
-window.refresh = async function refresh() {
-  // inputが空ならグローバルデフォルトで補完（422回避）
-  const from = (document.getElementById('from-date').value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14));
-  const to   = (document.getElementById('to-date').value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0));
-  const limit= document.getElementById('limit-select').value || '20';
+/* ======== 一括再評価トリガ ======== */
+async function triggerRecheckAll(){
+  const reason = prompt("一括再評価の理由（任意）", "") || "";
+  const qs = new URLSearchParams(buildQuery());
+  // API 仕様に合わせて prefix を調整
+  const url = new URL('/pdca/recheck_all', window.location.origin);
+  url.searchParams.set('reason', reason);
+  url.searchParams.set('filter_date_from', qs.get('date_from'));
+  url.searchParams.set('filter_date_to', qs.get('date_to'));
+  // diff系や検索はフォーム増設時に追加
+  try{
+    const res = await fetch(url.toString(), { method:'POST' });
+    const js = await res.json();
+    alert(js.message || JSON.stringify(js));
+  }catch(e){
+    alert('再評価の起動に失敗しました: ' + (e?.message || e));
+  }
+}
 
-  const url = `/pdca/summary/data?from_date=${encodeURIComponent(from)}&to_date=${encodeURIComponent(to)}&limit=${encodeURIComponent(limit)}`;
-  let json;
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) {
-      const txt = await res.text().catch(()=> '');
-      throw new Error(`HTTP ${res.status} ${res.statusText} ${txt}`);
-    }
-    json = await res.json();
-  } catch (e) {
-    console.error('API失敗', e);
-    alert('データ取得に失敗しました: ' + e.message);
-    return;
+/* ======== メイン更新処理（グローバル公開） ======== */
+window.pdcaRefresh = async function pdcaRefresh(){
+  const qs = buildQuery();
+
+  // 1) KPI
+  try{
+    const res = await fetch('/pdca/api/summary?' + qs, { cache:'no-store' });
+    if(!res.ok) throw new Error('summary HTTP ' + res.status);
+    const s = await res.json();
+    setText('kpi-count',     (s.count ?? 0).toString());
+    setText('kpi-impr-win',  (s.improved_winrate ?? 0).toString());
+    setText('kpi-impr-dd',   (s.improved_maxdd ?? 0).toString());
+    setText('kpi-avg-win-diff', percentFmt(s.avg_winrate_diff));  // 単位は % を想定
+    setText('kpi-avg-dd-diff',  percentFmt(s.avg_maxdd_diff));    // 単位は % を想定
+  }catch(e){
+    console.error(e);
   }
 
-  // ----- KPI 更新 -----
-  const t = json.totals || {};
-  setText('kpi-evals',    (t.evals ?? 0).toString());
-  setText('kpi-rechecks', (t.rechecks ?? 0).toString());
-  setText('kpi-trades',   (t.trades ?? 0).toString());
-  setText('kpi-adopted',  (t.adopted ?? 0).toString());
-  setText('kpi-winrate',  fmtPercent(t.win_rate));
-  setText('kpi-dd',       fmtDD(t.max_drawdown));
+  // 2) 時系列
+  try{
+    const res = await fetch('/pdca/api/summary_timeseries?' + qs, { cache:'no-store' });
+    if(!res.ok) throw new Error('timeseries HTTP ' + res.status);
+    const ts = await res.json();
 
-  // ----- グラフ用データ -----
-  const byDay = Array.isArray(json.by_day) ? json.by_day : [];
-  const labels = byDay.map(r => r.date);
-  const evals  = byDay.map(r => r.evals ?? 0);
-  const trades = byDay.map(r => r.trades ?? 0);
-  const wr     = byDay.map(r => (r.win_rate == null ? null : +(r.win_rate * 100).toFixed(2)));
+    const labels = ts.labels || [];
+    const total  = ts.total_count || [];
+    const impr   = ts.improved_winrate_count || [];
+    const avgWr  = (ts.avg_winrate_diff || []).map(v => (v==null? null : +(+v).toFixed(2)));
 
-  // 空データメッセージ
-  show(document.getElementById('noteEvals'),  labels.length === 0);
-  show(document.getElementById('noteTrades'), labels.length === 0);
-  show(document.getElementById('noteWR'),     labels.length === 0);
+    // 空メッセージ表示
+    show(document.getElementById('noteCounts'),  labels.length === 0);
+    show(document.getElementById('noteWinDiff'), labels.length === 0);
 
-  // 既存チャート破棄
-  for (const k of Object.keys(window.charts)) {
-    if (window.charts[k]) { window.charts[k].destroy(); window.charts[k] = null; }
+    // 既存チャート破棄
+    if (window.NoctriaPDCA.charts.counts)  { window.NoctriaPDCA.charts.counts.destroy();  window.NoctriaPDCA.charts.counts = null; }
+    if (window.NoctriaPDCA.charts.winDiff) { window.NoctriaPDCA.charts.winDiff.destroy(); window.NoctriaPDCA.charts.winDiff = null; }
+
+    // 再描画
+    window.NoctriaPDCA.charts.counts  = createBar2Axis(
+      document.getElementById('chartCounts').getContext('2d'),
+      labels,
+      { label:'総件数', data: total },
+      { label:'勝率改善件数', data: impr }
+    );
+
+    window.NoctriaPDCA.charts.winDiff = createLine(
+      document.getElementById('chartWinDiff').getContext('2d'),
+      labels,
+      '勝率差分 平均(%)',
+      avgWr,
+      '%'
+    );
+  }catch(e){
+    console.error(e);
   }
 
-  // 描画
-  window.charts.evals   = createChart(document.getElementById('chartEvals').getContext('2d'),  'bar',  labels, 'Evaluations',  evals,  '');
-  window.charts.trades  = createChart(document.getElementById('chartTrades').getContext('2d'), 'bar',  labels, 'Trades',       trades, '');
-  window.charts.winrate = createChart(document.getElementById('chartWinRate').getContext('2d'),'line', labels, 'Win Rate (%)', wr,     '%');
+  // 3) CSV ボタンのリンク更新
+  wireCsvButton();
 };
 
-/* ========= DOM とライブラリのロードを待ってから初期化 ========= */
-document.addEventListener('DOMContentLoaded', function () {
-  // 1) まず input にデフォルト日付（flatpickr未読込でも値が入る）
+/* ========= DOM 準備 ========= */
+document.addEventListener('DOMContentLoaded', function(){
+  // デフォルト日付（ローカルタイム基準で前後ずれを避ける）
   window.GLOBAL_DEFAULT_FROM = isoDateDaysAgo(14);
   window.GLOBAL_DEFAULT_TO   = isoDateDaysAgo(0);
-  var fromI = document.getElementById('from-date');
-  var toI   = document.getElementById('to-date');
+  const fromI = document.getElementById('from-date');
+  const toI   = document.getElementById('to-date');
   if (fromI && !fromI.value) fromI.value = window.GLOBAL_DEFAULT_FROM;
   if (toI   && !toI.value)   toI.value   = window.GLOBAL_DEFAULT_TO;
 
-  // 2) Flatpickrが来たら上書き初期化（なくてもOK）
+  // Flatpickr が読み込まれたら初期化（無くてもOK）
   (function initPickers(){
     if (typeof flatpickr === 'undefined') return void setTimeout(initPickers, 120);
     flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_FROM });
     flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_TO   });
   })();
 
-  // 3) ボタンイベント登録
-  var btn = document.getElementById('applyBtn');
-  if (btn) btn.addEventListener('click', window.refresh);
+  // ボタン
+  const btn = document.getElementById('applyBtn');
+  if (btn) btn.addEventListener('click', window.pdcaRefresh);
 
-  // 4) Chart.js を待って初回描画
+  const rbtn = document.getElementById('recheckAllBtn');
+  if (rbtn) rbtn.addEventListener('click', triggerRecheckAll);
+
+  // Chart.js を待って初回描画
   (function waitChart(){
     if (typeof Chart === 'undefined') return void setTimeout(waitChart, 120);
-    window.refresh();
+    window.pdcaRefresh();
   })();
-
-  console.log('[PDCA Summary] Ready');
 });
 </script>
 {% endblock %}
