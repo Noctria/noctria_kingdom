@@ -2,7 +2,7 @@
 {% extends "base_hud.html" %}
 
 {% block title %}📊 PDCA サマリー - Noctria Kingdom{% endblock %}
-{% block header_icon %}<i class="fas fa-sync-alt"></i>{% endblock %}
+{% block header_icon %}<i class="fas fa-sync-alt" aria-hidden="true"></i>{% endblock %}
 {% block header_title %}PDCA SUMMARY{% endblock %}
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
@@ -24,6 +24,7 @@
   .grid-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1.2rem; }
   .empty-note { color:#9fbad6; text-align:center; padding:.75rem 0; }
   .btn-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
 </style>
 
 <!-- まずはローカル配信。無ければ後段でCDNフォールバック -->
@@ -32,68 +33,71 @@
 {% endblock %}
 
 {% block content %}
-<section class="hud-panel filter-panel">
-  <h2 class="panel-title"><i class="fas fa-filter"></i> FILTER & SEARCH</h2>
-  <form class="filter-form" onsubmit="return false;">
+<section class="hud-panel filter-panel" aria-labelledby="filter-title">
+  <h2 id="filter-title" class="panel-title"><i class="fas fa-filter" aria-hidden="true"></i> FILTER & SEARCH</h2>
+  <form class="filter-form" onsubmit="return false;" aria-describedby="filter-help">
+    <p id="filter-help" class="sr-only">開始日と終了日で範囲を指定し、適用ボタンで更新します。</p>
     <div>
-      <label for="from-date"><i class="fas fa-calendar-alt"></i> 開始日</label>
-      <input id="from-date" type="text" class="hud-input" autocomplete="off" placeholder="YYYY-MM-DD">
+      <label for="from-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 開始日</label>
+      <input id="from-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-describedby="from-date-help">
+      <span id="from-date-help" class="sr-only">開始日をYYYY-MM-DDで入力</span>
     </div>
     <div>
-      <label for="to-date"><i class="fas fa-calendar-alt"></i> 終了日</label>
-      <input id="to-date" type="text" class="hud-input" autocomplete="off" placeholder="YYYY-MM-DD">
+      <label for="to-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 終了日</label>
+      <input id="to-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-describedby="to-date-help">
+      <span id="to-date-help" class="sr-only">終了日をYYYY-MM-DDで入力</span>
     </div>
     <div>
-      <label for="limit-select"><i class="fas fa-list-ol"></i> 表示件数（表用）</label>
-      <select id="limit-select" class="hud-select">
+      <label for="limit-select"><i class="fas fa-list-ol" aria-hidden="true"></i> 表示件数（表用）</label>
+      <select id="limit-select" class="hud-select" aria-label="表示件数">
         <option value="20" selected>20件</option>
         <option value="50">50件</option>
         <option value="100">100件</option>
       </select>
     </div>
     <div class="btn-row">
-      <button id="applyBtn" class="hud-link" type="button">🔎 適用</button>
-      <a id="csvBtn" class="hud-link" href="#" download>⬇️ CSV</a>
-      <button id="recheckAllBtn" class="hud-link" type="button">🔁 一括再評価</button>
+      <button id="applyBtn" class="hud-link" type="button" aria-label="フィルターを適用">🔎 適用</button>
+      <a id="csvBtn" class="hud-link" href="#" download aria-label="CSVをダウンロード">⬇️ CSV</a>
+      <button id="recheckAllBtn" class="hud-link" type="button" aria-label="一括再評価を実行">🔁 一括再評価</button>
     </div>
   </form>
 </section>
 
-<section class="hud-panel">
-  <h2 class="panel-title"><i class="fas fa-calculator"></i> OVERALL KPI（フィルター適用後）</h2>
-  <div class="metrics">
-    <div class="metric-item">
-      <h3><i class="fas fa-hashtag"></i> 対象件数</h3>
-      <p id="kpi-count" class="metric-value">-</p>
+<section class="hud-panel" aria-labelledby="kpi-title">
+  <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator" aria-hidden="true"></i> OVERALL KPI（フィルター適用後）</h2>
+  <div class="metrics" role="list">
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-hashtag" aria-hidden="true"></i> 対象件数</h3>
+      <p id="kpi-count" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-arrow-up"></i> 勝率 改善件数</h3>
-      <p id="kpi-impr-win" class="metric-value">-</p>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-arrow-up" aria-hidden="true"></i> 勝率 改善件数</h3>
+      <p id="kpi-impr-win" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-arrow-down"></i> 最大DD 改善件数</h3>
-      <p id="kpi-impr-dd" class="metric-value">-</p>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-arrow-down" aria-hidden="true"></i> 最大DD 改善件数</h3>
+      <p id="kpi-impr-dd" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-percentage"></i> 勝率 差分平均</h3>
-      <p id="kpi-avg-win-diff" class="metric-value">-</p>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-percentage" aria-hidden="true"></i> 勝率 差分平均</h3>
+      <p id="kpi-avg-win-diff" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="metric-item">
-      <h3><i class="fas fa-chart-area"></i> DD 差分平均</h3>
-      <p id="kpi-avg-dd-diff" class="metric-value">-</p>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-chart-area" aria-hidden="true"></i> DD 差分平均</h3>
+      <p id="kpi-avg-dd-diff" class="metric-value" aria-live="polite">-</p>
     </div>
   </div>
 </section>
 
 <div class="grid-charts">
-  <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 日次 件数（総数 / 勝率改善）</h2>
-    <div style="height:300px"><canvas id="chartCounts"></canvas></div>
+  <section class="hud-panel" aria-labelledby="chart-counts-title">
+    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> 日次 件数（総数 / 勝率改善）</h2>
+    <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の総件数と勝率改善件数のグラフ"></canvas></div>
     <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
   </section>
-  <section class="hud-panel">
-    <h2 class="panel-title"><i class="fas fa-chart-line"></i> 日次 勝率差分 平均(%)</h2>
-    <div style="height:300px"><canvas id="chartWinDiff"></canvas></div>
+  <section class="hud-panel" aria-labelledby="chart-windiff-title">
+    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line" aria-hidden="true"></i> 日次 勝率差分 平均(%)</h2>
+    <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率差分平均の折れ線グラフ"></canvas></div>
     <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
   </section>
 </div>
@@ -103,7 +107,7 @@
 <script>
 /* ---------- ライブラリのフォールバック読込 ---------- */
 (function ensureLibs() {
-  function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.onload=onload||function(){}; document.head.appendChild(s); }
+  function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.defer=true; s.onload=onload||function(){}; document.head.appendChild(s); }
   function need(name){ return (typeof window[name] === 'undefined'); }
   const p = [];
   if (need('Chart'))     p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', res)));
@@ -159,6 +163,7 @@ function wireCsvButton(){
   a.href = '/pdca/summary.csv' + (qs ? `?${qs}` : '');
 }
 
+/* Chart helpers */
 function createLine(ctx, labels, label, data, ySuffix){
   const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
   return new Chart(ctx, {
@@ -179,13 +184,10 @@ function createBar2Axis(ctx, labels, ds1, ds2){
   const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
   return new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: ds1.label, data: ds1.data, yAxisID:'y1' },
-        { label: ds2.label, data: ds2.data, yAxisID:'y1' },
-      ]
-    },
+    data: { labels, datasets: [
+      { label: ds1.label, data: ds1.data, yAxisID:'y1' },
+      { label: ds2.label, data: ds2.data, yAxisID:'y1' },
+    ]},
     options: {
       responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
       scales:{
@@ -207,7 +209,7 @@ async function triggerRecheckAll(){
   url.searchParams.set('filter_date_to', qs.get('date_to'));
   try{
     const res = await fetch(url.toString(), { method:'POST' });
-    const js = await res.json();
+    const js = await res.json().catch(()=>({message:'未知の応答'}));
     alert(js.message || JSON.stringify(js));
   }catch(e){
     alert('再評価の起動に失敗しました: ' + (e?.message || e));
@@ -226,10 +228,10 @@ window.pdcaRefresh = async function pdcaRefresh(){
     setText('kpi-count',     (s.count ?? 0).toString());
     setText('kpi-impr-win',  (s.improved_winrate ?? 0).toString());
     setText('kpi-impr-dd',   (s.improved_maxdd ?? 0).toString());
-    setText('kpi-avg-win-diff', percentFmt(s.avg_winrate_diff));  // 単位は % を想定
-    setText('kpi-avg-dd-diff',  percentFmt(s.avg_maxdd_diff));    // 単位は % を想定
+    setText('kpi-avg-win-diff', percentFmt(s.avg_winrate_diff));  // % を想定
+    setText('kpi-avg-dd-diff',  percentFmt(s.avg_maxdd_diff));    // % を想定
   }catch(e){
-    console.error(e);
+    console.error('[KPI] fetch error:', e);
   }
 
   // 2) 時系列
@@ -238,10 +240,10 @@ window.pdcaRefresh = async function pdcaRefresh(){
     if(!res.ok) throw new Error('timeseries HTTP ' + res.status);
     const ts = await res.json();
 
-    const labels = ts.labels || [];
-    const total  = ts.total_count || [];
-    const impr   = ts.improved_winrate_count || [];
-    const avgWr  = (ts.avg_winrate_diff || []).map(v => (v==null? null : +(+v).toFixed(2)));
+    const labels = Array.isArray(ts.labels) ? ts.labels : [];
+    const total  = Array.isArray(ts.total_count) ? ts.total_count : [];
+    const impr   = Array.isArray(ts.improved_winrate_count) ? ts.improved_winrate_count : [];
+    const avgWr  = (Array.isArray(ts.avg_winrate_diff) ? ts.avg_winrate_diff : []).map(v => (v==null? null : +(+v).toFixed(2)));
 
     // 空メッセージ表示
     show(document.getElementById('noteCounts'),  labels.length === 0);
@@ -251,20 +253,28 @@ window.pdcaRefresh = async function pdcaRefresh(){
     if (window.NoctriaPDCA.charts.counts)  { window.NoctriaPDCA.charts.counts.destroy();  window.NoctriaPDCA.charts.counts = null; }
     if (window.NoctriaPDCA.charts.winDiff) { window.NoctriaPDCA.charts.winDiff.destroy(); window.NoctriaPDCA.charts.winDiff = null; }
 
-    // 再描画
+    // 再描画（要素存在チェック）
     const ctxCounts  = document.getElementById('chartCounts');
     const ctxWinDiff = document.getElementById('chartWinDiff');
     if (ctxCounts && ctxCounts.getContext) {
-      window.NoctriaPDCA.charts.counts  = createBar2Axis(ctxCounts.getContext('2d'), labels,
+      window.NoctriaPDCA.charts.counts  = createBar2Axis(
+        ctxCounts.getContext('2d'),
+        labels,
         { label:'総件数', data: total },
         { label:'勝率改善件数', data: impr }
       );
     }
     if (ctxWinDiff && ctxWinDiff.getContext) {
-      window.NoctriaPDCA.charts.winDiff = createLine(ctxWinDiff.getContext('2d'), labels, '勝率差分 平均(%)', avgWr, '%');
+      window.NoctriaPDCA.charts.winDiff = createLine(
+        ctxWinDiff.getContext('2d'),
+        labels,
+        '勝率差分 平均(%)',
+        avgWr,
+        '%'
+      );
     }
   }catch(e){
-    console.error(e);
+    console.error('[Timeseries] fetch error:', e);
   }
 
   // 3) CSV ボタンのリンク更新
