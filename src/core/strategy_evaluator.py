@@ -3,7 +3,7 @@
 # coding: utf-8
 
 """
-📊 Strategy Evaluator (Noctria) — unified v2.1
+📊 Strategy Evaluator (Noctria) — unified v2.2
 
 目的
 - GUI → 一括DAG(veritas_recheck_all_dag) → 個別DAG(veritas_recheck_dag) から呼ばれる
@@ -18,13 +18,9 @@
 - 呼び出し元（DAG）から追加された `decision_id`, `caller`, `parent_dag`,
   `trigger_reason` 等はそのまま追記される。
 
-出力スキーマ（最低限）
-- strategy, evaluated_at,
-- winrate_old, winrate_new,
-- maxdd_old, maxdd_new,
-- trades_old, trades_new,
-- tag, notes,
-- （必要に応じて）winrate_diff, maxdd_diff, decision_id, caller, parent_dag, trigger_reason, passed
+拡張（v2.2）
+- `src/core/policy_engine.py` が存在する場合は方針スナップショットを付与し、
+  採用判定もそのポリシーに委譲（無ければ従来の閾値を使用）。
 """
 
 from __future__ import annotations
@@ -35,7 +31,7 @@ import logging
 import random
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 # --------------------------------------------------------------------------------------
 # ルート・パス設定（path_config が無くても動くようにフォールバック）
@@ -48,7 +44,7 @@ try:
     from src.core.path_config import (  # type: ignore
         STRATEGIES_DIR,                         # 例: <repo>/src/strategies
         STRATEGIES_VERITAS_GENERATED_DIR,       # 例: <repo>/src/strategies/veritas_generated
-        ACT_LOG_DIR,                            # 例: <repo>/data/pdca_logs/veritas_orders とは別管理でもOK
+        ACT_LOG_DIR,                            # 例: <repo>/data/act_logs
         PDCA_LOG_DIR as _PDCA_LOG_DIR_SETTING,  # あれば使う
     )
 except Exception:
@@ -59,9 +55,23 @@ except Exception:
     _PDCA_LOG_DIR_SETTING = None  # 後でデフォルトに差し替え
 
 # PDCA サマリが読む既定のログ置き場
-PDCA_LOG_DIR = Path(_PDCA_LOG_DIR_SETTING) if _PDCA_LOG_DIR_SETTING else (PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders")
+PDCA_LOG_DIR = Path(_PDCA_LOG_DIR_SETTING) if _PDCA_LOG_DIR_SETTING else (
+    PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders"
+)
 PDCA_LOG_DIR.mkdir(parents=True, exist_ok=True)
 ACT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# --------------------------------------------------------------------------------------
+# ポリシー（任意モジュール接続）
+# --------------------------------------------------------------------------------------
+_POLICY_AVAILABLE = False
+try:
+    # 任意：存在すればポリシーを使用
+    from src.core.policy_engine import get_snapshot as _policy_snapshot, meets_criteria as _policy_meets
+    _POLICY_AVAILABLE = True
+except Exception:
+    _policy_snapshot = None
+    _policy_meets = None
 
 # --------------------------------------------------------------------------------------
 # ロガー
@@ -70,7 +80,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - 
 logger = logging.getLogger("StrategyEvaluator")
 
 # --------------------------------------------------------------------------------------
-# 王国の採用基準（必要に応じて .env / path_config へ移す）
+# 王国の採用基準（policy_engine が無い場合のフォールバック）
 # --------------------------------------------------------------------------------------
 WIN_RATE_THRESHOLD = 60.0       # 最低勝率（%）
 MAX_DRAWDOWN_THRESHOLD = 20.0   # 最大許容ドローダウン（%）
@@ -78,7 +88,7 @@ MAX_DRAWDOWN_THRESHOLD = 20.0   # 最大許容ドローダウン（%）
 # --------------------------------------------------------------------------------------
 # ユーティリティ
 # --------------------------------------------------------------------------------------
-_STD_KEYS = [
+_STD_KEYS: List[str] = [
     "strategy", "evaluated_at",
     "winrate_old", "winrate_new",
     "maxdd_old", "maxdd_new",
@@ -93,11 +103,13 @@ def _coerce_float(v: Any) -> Optional[float]:
     try:
         if v is None:
             return None
+        if isinstance(v, str) and v.endswith("%"):
+            v = v[:-1]
         return float(v)
     except Exception:
         return None
 
-def _strategy_file_candidates(strategy_name: str) -> list[Path]:
+def _strategy_file_candidates(strategy_name: str) -> List[Path]:
     """
     戦略ファイルの可能性がある場所を列挙（存在チェックは呼び出し側で）。
     - veritas_generated/{name}.py を優先
@@ -134,6 +146,7 @@ def _ensure_standard_result(strategy_name: str, raw: Dict[str, Any]) -> Dict[str
         "tag": raw.get("tag") or "recheck",
         "notes": raw.get("notes") or "",
     }
+
     # diff の計算
     if res["winrate_old"] is not None and res["winrate_new"] is not None:
         res["winrate_diff"] = round(res["winrate_new"] - res["winrate_old"], 6)
@@ -148,8 +161,8 @@ def _ensure_standard_result(strategy_name: str, raw: Dict[str, Any]) -> Dict[str
 
 def is_strategy_adopted(evaluation_result: Dict[str, Any]) -> bool:
     """
-    採用基準: 勝率 >= WIN_RATE_THRESHOLD かつ DD <= MAX_DRAWDOWN_THRESHOLD
-    - v2.0 の win_rate/max_drawdown だけがある場合でも _ensure_standard_result 前提で呼ぶため OK。
+    採用基準: policy_engine があればそちらを優先。
+    無ければ 勝率 >= WIN_RATE_THRESHOLD かつ DD <= MAX_DRAWDOWN_THRESHOLD
     """
     wr = evaluation_result.get("winrate_new")
     dd = evaluation_result.get("maxdd_new")
@@ -159,8 +172,15 @@ def is_strategy_adopted(evaluation_result: Dict[str, Any]) -> bool:
     except Exception:
         wr_f, dd_f = -1e9, 1e9
 
+    if _POLICY_AVAILABLE and callable(_policy_meets):
+        ok = bool(_policy_meets(wr_f, dd_f))
+        logger.info("採用判定(policy): strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)",
+                    evaluation_result.get("strategy"), "PASS" if ok else "FAIL", wr_f, dd_f)
+        return ok
+
     ok = (wr_f >= WIN_RATE_THRESHOLD) and (dd_f <= MAX_DRAWDOWN_THRESHOLD)
-    logger.info("採用判定: strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)", evaluation_result.get("strategy"), "PASS" if ok else "FAIL", wr_f, dd_f)
+    logger.info("採用判定(threshold): strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)",
+                evaluation_result.get("strategy"), "PASS" if ok else "FAIL", wr_f, dd_f)
     return ok
 
 # --------------------------------------------------------------------------------------
@@ -182,9 +202,9 @@ def evaluate_strategy(strategy_name: str) -> Dict[str, Any]:
     # ダミー評価（準再現性）
     seed_value = sum(ord(c) for c in strategy_name)
     random.seed(seed_value)
-    win_rate = round(random.uniform(50.0, 75.0), 2)     # 50〜75%
-    max_dd = round(random.uniform(5.0, 30.0), 2)        # 5〜30%
-    trades = int(random.uniform(20, 200))               # 20〜200
+    win_rate = round(random.uniform(50.0, 75.0), 2)      # 50〜75%
+    max_dd   = round(random.uniform(5.0, 30.0),  2)      # 5〜30%
+    trades   = int(random.uniform(20, 200))              # 20〜200
 
     raw = {
         "strategy": strategy_name,
@@ -197,7 +217,16 @@ def evaluate_strategy(strategy_name: str) -> Dict[str, Any]:
         "trades_new": trades,
         "tag": "recheck",
         "notes": "dummy evaluation (replace with real backtest)",
+        "source": "evaluate_strategy",
     }
+
+    # 方針スナップショット（あれば付与）
+    if _POLICY_AVAILABLE and callable(_policy_snapshot):
+        try:
+            raw["policy_snapshot"] = _policy_snapshot()
+        except Exception:
+            # policy取得に失敗しても評価は継続
+            pass
 
     result = _ensure_standard_result(strategy_name, raw)
     result["passed"] = is_strategy_adopted(result)
@@ -206,7 +235,7 @@ def evaluate_strategy(strategy_name: str) -> Dict[str, Any]:
 # --------------------------------------------------------------------------------------
 # ロギング
 # --------------------------------------------------------------------------------------
-def _pdca_csv_headers(extra_keys: list[str]) -> list[str]:
+def _pdca_csv_headers(extra_keys: List[str]) -> List[str]:
     base = [
         "strategy", "evaluated_at",
         "winrate_old", "winrate_new",
@@ -216,12 +245,25 @@ def _pdca_csv_headers(extra_keys: list[str]) -> list[str]:
         "winrate_diff", "maxdd_diff",
         "trigger_reason", "decision_id", "caller", "parent_dag",
         "passed",
+        "source",
+        "policy_snapshot",  # JSON文字列として入る可能性あり（下で整形）
     ]
     # 衝突しない追加キーを末尾に
     for k in extra_keys:
         if k not in base:
             base.append(k)
     return base
+
+def _jsonify_for_csv(v: Any) -> Any:
+    """
+    CSVセルに辞書/配列などが来た場合は JSON 文字列化して格納。
+    """
+    if isinstance(v, (dict, list)):
+        try:
+            return json.dumps(v, ensure_ascii=False)
+        except Exception:
+            return str(v)
+    return v
 
 def log_evaluation_result(evaluation_result: Dict[str, Any]) -> None:
     """
@@ -243,7 +285,7 @@ def log_evaluation_result(evaluation_result: Dict[str, Any]) -> None:
         w = csv.DictWriter(f, fieldnames=headers)
         if write_header:
             w.writeheader()
-        row = {h: evaluation_result.get(h) for h in headers}
+        row = {h: _jsonify_for_csv(evaluation_result.get(h)) for h in headers}
         w.writerow(row)
     logger.info("PDCA CSV appended: %s", csv_path)
 
