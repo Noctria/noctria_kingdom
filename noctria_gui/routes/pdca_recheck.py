@@ -1,7 +1,7 @@
 # noctria_gui/routes/pdca_recheck.py
 # -*- coding: utf-8 -*-
 """
-🔁 PDCA Recheck Routes (single & bulk) — v2.0
+🔁 PDCA Recheck Routes (single & bulk) — v2.1
 
 提供エンドポイント:
 - POST /pdca/recheck        : 単一戦略の再評価トリガ（Airflow REST via airflow_client）
@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import subprocess
@@ -98,6 +99,7 @@ def _obs_safe_log(trace_id: str, ai_name: str, params: Dict[str, Any], metrics: 
                 note=note,
             )
         except Exception:
+            # 観測ログ失敗は本処理に影響させない
             pass
 
 
@@ -165,44 +167,43 @@ def _read_candidate_strategies(
 ) -> List[str]:
     """
     data/pdca_logs/veritas_orders/rechecks_*.csv を新しい順に走査、期間内に評価された strategy を収集。
-    pandas 不要・重複除去・最大件数制限あり。
+    - csv.DictReader で安全に読み込み（カンマ/クォート含むセルもOK）
+    - pandas 不要・重複除去・最大件数制限あり
     """
     df = _parse_ymd(date_from)
     dt = _parse_ymd(date_to)
 
-    files = sorted(PDCA_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)[:max_files]
-    seen = set()
+    try:
+        files = sorted(PDCA_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)[:max_files]
+    except Exception:
+        files = []
+
+    seen: set[str] = set()
     out: List[str] = []
 
     for fp in files:
         try:
-            with fp.open("r", encoding="utf-8") as f:
-                header = None
-                for line in f:
-                    line = line.rstrip("\n")
-                    if not line:
-                        continue
-                    cols = line.split(",")
-                    if header is None:
-                        header = [c.strip() for c in cols]
-                        continue
-                    row = {header[i]: (cols[i] if i < len(header) else "") for i in range(len(header))}
-                    strategy = row.get("strategy", "").strip()
+            with fp.open("r", encoding="utf-8", newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    strategy = (row.get("strategy") or "").strip()
                     if not strategy or strategy in seen:
                         continue
 
+                    # 期間フィルタ（evaluated_at があれば利用）
                     ok = True
                     if df or dt:
-                        ts = row.get("evaluated_at", "")
-                        try:
-                            d = datetime.fromisoformat(ts.replace("Z", "+00:00")).date() if ts else None
-                            if d:
+                        ts = (row.get("evaluated_at") or row.get("timestamp") or "").strip()
+                        if ts:
+                            try:
+                                d = datetime.fromisoformat(ts.replace("Z", "+00:00")).date()
                                 if df and d < df.date():
                                     ok = False
                                 if dt and d > dt.date():
                                     ok = False
-                        except Exception:
-                            pass
+                            except Exception:
+                                # 解析不能時は許容（フィルタなしで通す）
+                                pass
                     if not ok:
                         continue
 
@@ -211,7 +212,9 @@ def _read_candidate_strategies(
                     if len(out) >= max_targets:
                         break
         except Exception:
+            # 壊れたCSVはスキップ
             continue
+
         if len(out) >= max_targets:
             break
 
@@ -398,7 +401,7 @@ async def recheck_all(
 # 参考: 履歴ページ（テンプレが無い環境でも起動を止めない）
 @router.get("/history", include_in_schema=False)
 async def pdca_history(request: Request):
-    tpl = NOCTRIA_GUI_TEMPLATES_DIR / "pdca" / "history.html"
+    tpl = Path(NOCTRIA_GUI_TEMPLATES_DIR) / "pdca" / "history.html"
     if not tpl.exists():
         return JSONResponse({"ok": True, "message": "history.html not found (placeholder)."})
     return templates.TemplateResponse("pdca/history.html", {"request": request})
