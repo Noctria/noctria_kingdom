@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Airflow REST API クライアント（2.x / /api/v1）
+
 - 目的: DAG Run のトリガ／ヘルスチェック等の最小ユースケースを安全に提供
 - 特徴:
   * Bearer Token または Basic 認証の両対応
   * requests.Session による接続の再利用
   * verify_ssl の環境変数制御（既定: False）
   * conf に datetime 等が入っても ISO8601 で安全に JSON 化
+  * /health, /version は base_url が /api/v1 でも自動でルートに切替
 
 環境変数:
 - AIRFLOW_API_BASE_URL   (例: http://localhost:8080/api/v1)
@@ -18,6 +20,7 @@ Airflow REST API クライアント（2.x / /api/v1）
 
 主要メソッド:
 - health() -> dict
+- version() -> dict
 - trigger_dag_run(dag_id, conf=None, logical_date=None, note=None, dag_run_id=None) -> dict
 - get_dag_run(dag_id, dag_run_id) -> dict
 - list_dag_runs(dag_id, state=None, limit=100, order_by="-start_date") -> dict
@@ -50,7 +53,7 @@ def _json_default(o: Any) -> Any:
         if o.tzinfo is None:
             o = o.replace(tzinfo=timezone.utc)
         return o.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    # pydantic の BaseModel など
+    # pydantic BaseModel など
     if hasattr(o, "dict"):
         try:
             return o.dict()
@@ -82,6 +85,11 @@ class AirflowRESTClient:
     ) -> None:
         env_base = os.getenv("AIRFLOW_API_BASE_URL", "http://localhost:8080/api/v1").rstrip("/")
         self.base_url = (base_url or env_base).rstrip("/")
+
+        # ルート側URL（/api/v1 を含むなら削って root を保持）
+        self._root_base = self.base_url
+        if self._root_base.endswith("/api/v1"):
+            self._root_base = self._root_base[: -len("/api/v1")]
 
         self.token = token or os.getenv("AIRFLOW_API_TOKEN")
         self.username = username or os.getenv("AIRFLOW_API_USERNAME")
@@ -118,8 +126,9 @@ class AirflowRESTClient:
             return (self.username, self.password)
         return None
 
-    def _request(self, method: str, path: str, **kwargs) -> requests.Response:
-        url = f"{self.base_url}{path}"
+    def _request(self, method: str, path: str, *, use_root: bool = False, **kwargs) -> requests.Response:
+        base = self._root_base if use_root else self.base_url
+        url = f"{base}{path}"
         # 既定の headers / auth / verify / timeout を補完
         kwargs.setdefault("headers", self._headers())
         kwargs.setdefault("auth", self._auth())
@@ -136,17 +145,17 @@ class AirflowRESTClient:
     def health(self) -> Dict[str, Any]:
         """
         Airflow Webserver のヘルス確認。
-        GET /health
+        多くの環境で /health は Web ルート直下にあるため、/api/v1 付きでも root に打ち直す。
         """
-        r = self._request("GET", "/health")
+        r = self._request("GET", "/health", use_root=True)
         return r.json()
 
     def version(self) -> Dict[str, Any]:
         """
         Airflow Webserver のバージョン情報。
-        GET /version
+        こちらもルート直下を使う。
         """
-        r = self._request("GET", "/version")
+        r = self._request("GET", "/version", use_root=True)
         return r.json()
 
     def trigger_dag_run(
@@ -165,7 +174,7 @@ class AirflowRESTClient:
             dag_id: 対象DAGのID
             conf:   DAGに渡す conf（JSON シリアライズ可能）
             logical_date: ISO8601文字列（省略時は now UTC）
-            note:   Airflow 2.7+ の任意メモ（フィールド未対応の環境では無視される）
+            note:   Airflow 2.7+ の任意メモ（フィールド未対応の環境では無視される可能性に注意）
             dag_run_id: 明示 run_id（省略時はAirflow側で自動生成）
 
         Returns:
@@ -178,6 +187,7 @@ class AirflowRESTClient:
         if dag_run_id:
             payload["dag_run_id"] = dag_run_id
         if note:
+            # 一部バージョンでは note 未対応。未対応の場合は Airflow 側が無視 or 400 を返すため呼び出し側で捕捉を。
             payload["note"] = note
 
         data = json.dumps(payload, default=_json_default)
