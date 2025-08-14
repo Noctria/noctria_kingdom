@@ -2,17 +2,23 @@
 # -*- coding: utf-8 -*-
 """
 PDCAサマリー用のデータ取得＆KPI集計ユーティリティ
-- 依存DB: Postgres（psycopg3 → psycopg2 の順でフォールバック）
-- 想定テーブル: obs_infer_calls
-    必須カラム: started_at, ended_at, ai_name, status, params_json, metrics_json
-- 役割:
-    1) 期間指定で obs_infer_calls を取得（接続不可や未作成時は安全に空配列）
-    2) KPI（評価件数/再評価件数/採用件数/採用率/平均勝率/最大DD/取引数）を集計
-    3) 日次集計（勝率・件数・取引数）を生成
+
+優先ソース: Postgres テーブル `obs_infer_calls`
+  必須カラム: started_at, ended_at, ai_name, status, params_json, metrics_json
+
+役割:
+  1) 期間指定で obs_infer_calls を取得（接続不可や未作成時は安全に空配列）
+  2) KPI（評価件数/再評価件数/採用件数/採用率/平均勝率/最大DD/取引数）を集計
+  3) 日次集計（勝率・件数・取引数）を生成
 
 環境変数:
-- NOCTRIA_OBS_PG_DSN （推奨）
-  または POSTGRES_HOST/PORT/DB/USER/PASSWORD からDSNを組み立て
+  - NOCTRIA_OBS_PG_DSN （推奨）
+    例: postgresql://user:pass@host:5432/dbname
+  - もしくは POSTGRES_HOST/PORT/DB/USER/PASSWORD からDSNを組み立て
+
+返却値の単位:
+  - win_rate: 0〜1 の比率（UI側で%表記に変換してください）
+  - max_drawdown: 0〜1 の比率（負の値を返せる実装でも可。ここではそのまま）
 """
 
 from __future__ import annotations
@@ -26,14 +32,11 @@ from typing import Any, Dict, List, Optional
 # ---- DB 接続（psycopg v3 → v2 フォールバック） ----
 try:
     import psycopg  # type: ignore
-    _DB_BACKEND = "psycopg3"
 except Exception:
     psycopg = None  # type: ignore
-    _DB_BACKEND = "none"
 
 try:
     import psycopg2  # type: ignore
-    _DB_BACKEND_V2 = "psycopg2"
 except Exception:
     psycopg2 = None  # type: ignore
 
@@ -60,6 +63,7 @@ def _get_dsn() -> Optional[str]:
 def _connect():
     """
     接続オブジェクトを返す。失敗時は None。
+    psycopg(3)→psycopg2(2) の順で試行。
     """
     dsn = _get_dsn()
     if not dsn:
@@ -122,7 +126,7 @@ def _load_json(val: Any) -> Dict[str, Any]:
 def fetch_infer_calls(from_date: datetime, to_date: datetime) -> List[InferRow]:
     """
     obs_infer_calls から from_date〜to_date(含む) の行を取得。
-    取得失敗/未接続でも空配列を返し、上位はGracefulに処理できる。
+    取得失敗/未接続でも空配列を返す（UI/上位はGracefulに継続可能）。
     """
     conn = _connect()
     if conn is None:
@@ -235,10 +239,10 @@ def _get_int(d: Dict[str, Any], *keys: str) -> Optional[int]:
 def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
     """
     柔軟なメトリクス抽出：
-    - 勝率: metrics_json.win_rate / success_ratio / accuracy を優先。
-            無ければ wins / trades から推定。
-    - 最大DD: metrics_json.max_drawdown / max_dd / mdd
-    - 取引数: metrics_json.trades / num_trades / n_trades / total_trades
+      - 勝率: metrics_json.win_rate / success_ratio / accuracy を優先。
+              無ければ wins / trades から推定。
+      - 最大DD: metrics_json.max_drawdown / max_dd / mdd
+      - 取引数: metrics_json.trades / num_trades / n_trades / total_trades
     """
     total_evals = sum(1 for r in rows if _is_eval(r))
     total_rechecks = sum(1 for r in rows if _is_recheck(r))
@@ -267,7 +271,7 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
                 wins_sum += wins
                 trades_sum_for_win += total
 
-        # --- 最大DD（負値を想定、より小さいほど悪い）---
+        # --- 最大DD（より小さいほど悪い想定。ここではそのまま最小値を代表値に）---
         dd = _get_num(m, "max_drawdown", "max_dd", "mdd")
         if dd is not None:
             dd_values.append(dd)
@@ -287,15 +291,17 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
     # 最大DD: 最悪値（最小値）を採用
     agg_max_dd: Optional[float] = min(dd_values) if dd_values else None
 
-    adoption_rate = (total_adopted / total_evals) if total_evals > 0 else None
+    adopt_rate = (total_adopted / total_evals) if total_evals > 0 else None
 
+    # 後方互換: adopt_rate を正式キーに、adoption_rate も併記
     return {
         "evals": total_evals,
         "rechecks": total_rechecks,
         "adopted": total_adopted,
-        "adoption_rate": adoption_rate,  # 0-1 or None
+        "adopt_rate": adopt_rate,        # 正式
+        "adoption_rate": adopt_rate,     # 互換（フロント実装差異に配慮）
         "win_rate": agg_win_rate,        # 0-1 or None
-        "max_drawdown": agg_max_dd,      # 例: -0.12（-12%）
+        "max_drawdown": agg_max_dd,      # 例: -0.12（-12%）/ 0.12（12%）
         "trades": trades_sum,
     }
 
@@ -303,10 +309,22 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
 def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
     """
     日次でまとめてグラフ用の配列を返す。
-    - date: YYYY-MM-DD（UTC日付）
-    - evals, adopted, trades, win_rate(平均または wins/total 推定)
+      - date: YYYY-MM-DD（UTC日付）
+      - evals, adopted, trades, win_rate(平均または wins/total 推定)
     """
-    buckets: Dict[str, Dict[str, Any]] = {}
+    from collections import defaultdict
+
+    buckets: Dict[str, Dict[str, Any]] = defaultdict(
+        lambda: {
+            "date": "",
+            "evals": 0,
+            "adopted": 0,
+            "trades": 0,
+            "_win_rates": [],
+            "_wins": 0,
+            "_total": 0,
+        }
+    )
 
     def _key(dt_: datetime) -> str:
         d = dt_.astimezone(timezone.utc).date()
@@ -314,18 +332,8 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
 
     for r in rows:
         key = _key(r.started_at)
-        b = buckets.setdefault(
-            key,
-            {
-                "date": key,
-                "evals": 0,
-                "adopted": 0,
-                "trades": 0,
-                "_win_rates": [],
-                "_wins": 0,
-                "_total": 0,
-            },
-        )
+        b = buckets[key]
+        b["date"] = key
 
         if _is_eval(r):
             b["evals"] += 1
@@ -361,7 +369,7 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
                 "evals": b["evals"],
                 "adopted": b["adopted"],
                 "trades": b["trades"],
-                "win_rate": wr,
+                "win_rate": wr,  # 0-1 or None
             }
         )
 
