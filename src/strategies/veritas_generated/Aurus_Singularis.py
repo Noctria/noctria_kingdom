@@ -2,25 +2,26 @@
 # -*- coding: utf-8 -*-
 """
 Aurus_Singularis — Dummy but KPI-computable minimal strategy
+
 - 外部依存なし（標準ライブラリのみ）
 - propose(): 最低限の“シグナル”を返す
 - backtest(): シグナル→ダミー売買→KPI算出まで一気通貫
 - kpis(): 外部から trades を渡してKPIだけ算出も可
-
-想定用途
-- パイプラインが「戦略モジュールをimportできること」を要件にしている環境で、
-  実ロジック未実装でも PDCA / KPI 可視化フローを通すための最小実装
+- ✅ GUI 連携用の公開APIを追加:
+    * compute_kpis()         → dict を返す
+    * run_backtest()         → (kpis, trades) を返す
+    * class Strategy.compute_kpis() → 上記をラップ
 
 使い方（単体実行テスト）:
     python -m strategies.veritas_generated.Aurus_Singularis
 """
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Iterable
+from typing import Any, Dict, List, Optional, Iterable, Tuple
 from dataclasses import dataclass
 
 NAME = "Aurus_Singularis"
-VERSION = "0.1.0-dummy"
+VERSION = "0.2.0-dummy"
 
 
 @dataclass
@@ -79,10 +80,10 @@ class AurusSingularis:
         if n == 0:
             return {
                 "trades": 0,
-                "win_rate": 0.0,
-                "avg_return_pct": 0.0,
-                "pnl_sum_pct": 0.0,
-                "max_drawdown_pct": 0.0,
+                "win_rate": 0.0,            # %（0..100）
+                "avg_return_pct": 0.0,      # %
+                "pnl_sum_pct": 0.0,         # %
+                "max_drawdown_pct": 0.0,    # %
             }
         wins = sum(1 for t in trades if t.ret_pct > 0)
         pnl_sum = sum(t.ret_pct for t in trades)
@@ -95,11 +96,11 @@ class AurusSingularis:
             curve.append(acc)
         mdd = _max_drawdown_from_curve(curve)
         return {
-            "trades": n,
-            "win_rate": round(100.0 * wins / n, 2),
-            "avg_return_pct": round(avg_ret, 4),
-            "pnl_sum_pct": round(pnl_sum, 4),
-            "max_drawdown_pct": round(mdd, 4),
+            "trades": n,                                # 取引数
+            "win_rate": round(100.0 * wins / n, 2),     # 勝率（%）
+            "avg_return_pct": round(avg_ret, 4),        # 平均リターン（%）
+            "pnl_sum_pct": round(pnl_sum, 4),           # 合計PnL（%）
+            "max_drawdown_pct": round(mdd, 4),          # 最大DD（%）
         }
 
     # ---- 内部：価格列からダミー売買を合成 ----
@@ -148,9 +149,49 @@ def _max_drawdown_from_curve(curve_pct: List[float]) -> float:
     return mdd
 
 
+# ============================================================
+# ✅ GUI / ルーターから拾われる公開API（どれか1つあればOK）
+# ============================================================
+def compute_kpis() -> Dict[str, Any]:
+    """
+    GUI（/strategies/detail/<name> のフォールバック）が参照する最小API。
+    戻り値は dict。 win_rate は 0..1 でも 0..100（%）でもOK。
+    ここでは % で返す（上位は自動で扱える）。
+    """
+    strat = AurusSingularis()
+    bt = strat.backtest()
+    return dict(bt["kpis"])
+
+
+def run_backtest() -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    互換API: (kpis, trades) のタプルを返す。
+    """
+    strat = AurusSingularis()
+    bt = strat.backtest()
+    kpis = dict(bt["kpis"])
+    trades = list(bt["trades"])
+    return kpis, trades
+
+
+class Strategy:
+    """
+    互換用クラスAPI（存在すれば GUI 側が拾える）
+    """
+    def compute_kpis(self) -> Dict[str, Any]:
+        return compute_kpis()
+
+
 # ---- 単体テスト実行（python -m で動作確認可能） ----
 if __name__ == "__main__":
     strat = AurusSingularis()
     bt = strat.backtest()  # ダミー価格列で実行
-    print("[Aurus_Singularis] KPIs:", bt["kpis"])
-    print("[Aurus_Singularis] Trades sample:", bt["trades"][:3])
+    print(f"[{NAME}] KPIs:", bt["kpis"])
+    print(f"[{NAME}] Trades sample:", bt["trades"][:3])
+
+
+__all__ = [
+    "NAME", "VERSION",
+    "Trade", "AurusSingularis",
+    "compute_kpis", "run_backtest", "Strategy",
+]
