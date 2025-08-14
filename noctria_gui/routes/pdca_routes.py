@@ -17,11 +17,18 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query, Body, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+# ========================================
+# 📁 プロジェクトパス解決（フォールバック込み）
+# ========================================
+_THIS_FILE = Path(__file__).resolve()
+PROJECT_ROOT = _THIS_FILE.parents[2]  # <repo_root>
 
 # ========================================
 # 📁 テンプレートディレクトリ解決（安全フォールバック）
@@ -52,12 +59,31 @@ def _resolve_templates_dir() -> Path:
         pass
 
     # 3) フォールバック: <repo_root>/noctria_gui/templates
-    here = Path(__file__).resolve()
-    fallback = here.parents[1] / "templates"
-    return fallback
+    return _THIS_FILE.parents[1] / "templates"
 
 _TEMPLATES_DIR = _resolve_templates_dir()
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+
+# ========================================
+# 📁 PDCAログディレクトリ解決（安全フォールバック）
+# ========================================
+def _resolve_pdca_dir() -> Path:
+    """
+    PDCAサマリーが読むログの標準出力先を解決。
+    - 優先: src.core.path_config.PDCA_LOG_DIR
+    - 最後: <repo_root>/data/pdca_logs/veritas_orders
+    """
+    try:
+        from src.core.path_config import PDCA_LOG_DIR as _P  # type: ignore
+        p = Path(str(_P))
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    except Exception:
+        p = PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+_PDCA_DIR = _resolve_pdca_dir()
 
 # ========================================
 # ⚙️ ルーター設定
@@ -120,17 +146,7 @@ async def show_pdca_dashboard(request: Request):
 
     # 📦 PDCAデータ取得（現時点ではダミー）
     # 将来: data/pdca_logs/ 配下CSV/JSON or DBからの集計結果をここへ
-    pdca_data = [
-        # 例:
-        # {
-        #     "strategy": "mean_revert_001",
-        #     "win_rate": 72.5,
-        #     "max_dd": 12.4,
-        #     "timestamp": "2025-07-13T12:34:56",
-        #     "tag": "recheck",
-        #     "notes": ""
-        # },
-    ]
+    pdca_data: List[Dict[str, Any]] = []
 
     return templates.TemplateResponse(
         "pdca_dashboard.html",
@@ -151,11 +167,61 @@ async def pdca_dashboard_health():
             "ok": True,
             "templates_dir": str(_TEMPLATES_DIR),
             "template_exists": (_TEMPLATES_DIR / "pdca_dashboard.html").exists(),
+            "pdca_dir": str(_PDCA_DIR),
             "message": "pdca-dashboard router is ready",
         }
     )
 
-# ---- ここから追記 ---------------------------------------------------------
+# =============================================================================
+# 📈 直近ログの軽量API（このルーターの中で使えるように安全実装）
+# =============================================================================
+def _read_logs_dataframe():
+    """
+    data/pdca_logs/veritas_orders/rechecks_*.csv を読み込んで連結。
+    - pandas が無ければ空DFを返す。
+    - ファイルが多い場合に備え、更新日時の新しい順に最大 60 ファイルまで。
+    """
+    try:
+        import pandas as pd  # type: ignore
+    except Exception:
+        class _Dummy:
+            @property
+            def empty(self): return True
+            def __getattr__(self, _): return self
+            def copy(self): return self
+            def sort_values(self, *_, **__): return self
+            def head(self, *_): return self
+            def to_dict(self, *_, **__): return {}
+            def __getitem__(self, _): return self
+            def astype(self, *_ , **__): return self
+        return _Dummy()
+
+    files = sorted(_PDCA_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = files[:60]  # 上限
+    if not files:
+        return pd.DataFrame()
+
+    frames = []
+    for fp in files:
+        try:
+            df = pd.read_csv(fp)
+            df["__source_file"] = str(fp.name)
+            # evaluated_at があれば日付として扱えるように（失敗してもOK）
+            if "evaluated_at" in df.columns:
+                try:
+                    df["evaluated_at"] = pd.to_datetime(df["evaluated_at"], errors="coerce")
+                except Exception:
+                    pass
+            frames.append(df)
+        except Exception:
+            # 壊れたCSVはスキップ
+            continue
+
+    if not frames:
+        return pd.DataFrame()
+
+    out = pd.concat(frames, ignore_index=True)
+    return out
 
 @router.get("/api/recent", response_model=Dict[str, Any])
 def api_recent(limit: int = Query(20, ge=1, le=100)):
@@ -163,7 +229,12 @@ def api_recent(limit: int = Query(20, ge=1, le=100)):
     直近の評価を N 件だけ返す（表表示用の軽量API）
     """
     df = _read_logs_dataframe()
-    if df.empty:
+    try:
+        empty = df.empty  # pandas が無い場合のダミーにも対応
+    except Exception:
+        empty = True
+
+    if empty:
         return {"rows": []}
 
     cols = [
@@ -172,27 +243,46 @@ def api_recent(limit: int = Query(20, ge=1, le=100)):
         "maxdd_old", "maxdd_new", "maxdd_diff",
         "trades_old", "trades_new", "notes",
     ]
+    # 欠損列を埋める
     for c in cols:
-        if c not in df.columns:
-            df[c] = None
+        if c not in getattr(df, "columns", []):
+            try:
+                df[c] = None
+            except Exception:
+                pass
 
-    dff = df.sort_values("evaluated_at", ascending=False).head(limit)
-    # 文字列化して安全に返す
-    dff["evaluated_at"] = dff["evaluated_at"].astype(str)
-    return {"rows": dff[cols].to_dict(orient="records")}
+    try:
+        dff = df.sort_values("evaluated_at", ascending=False).head(limit).copy()
+        dff["evaluated_at"] = dff["evaluated_at"].astype(str)
+        rows = dff[cols].to_dict(orient="records")
+    except Exception:
+        rows = []
 
+    return {"rows": rows}
 
 @router.get("/api/strategy_detail", response_model=Dict[str, Any])
-def api_strategy_detail(strategy: str = Query(..., min_length=1), limit: int = Query(50, ge=1, le=500)):
+def api_strategy_detail(
+    strategy: str = Query(..., min_length=1),
+    limit: int = Query(50, ge=1, le=500)
+):
     """
     指定戦略の履歴詳細（最新 limit 件）
     """
     df = _read_logs_dataframe()
-    if df.empty:
+    try:
+        empty = df.empty
+    except Exception:
+        empty = True
+
+    if empty:
         return {"strategy": strategy, "rows": []}
 
-    dff = df[df["strategy"].astype(str) == strategy].copy()
-    if dff.empty:
+    try:
+        dff = df[df["strategy"].astype(str) == strategy].copy()
+    except Exception:
+        dff = None
+
+    if dff is None or getattr(dff, "empty", True):
         return {"strategy": strategy, "rows": []}
 
     cols = [
@@ -202,18 +292,24 @@ def api_strategy_detail(strategy: str = Query(..., min_length=1), limit: int = Q
         "trades_old", "trades_new", "notes", "__source_file",
     ]
     for c in cols:
-        if c not in dff.columns:
-            dff[c] = None
+        if c not in getattr(dff, "columns", []):
+            try:
+                dff[c] = None
+            except Exception:
+                pass
 
-    dff = dff.sort_values("evaluated_at", ascending=False).head(limit)
-    dff["evaluated_at"] = dff["evaluated_at"].astype(str)
-    return {"strategy": strategy, "rows": dff[cols].to_dict(orient="records")}
-# ---- 追記ここまで ---------------------------------------------------------
+    try:
+        dff = dff.sort_values("evaluated_at", ascending=False).head(limit)
+        dff["evaluated_at"] = dff["evaluated_at"].astype(str)
+        rows = dff[cols].to_dict(orient="records")
+    except Exception:
+        rows = []
 
-# --- Act(採用) API 追記 ------------------------------------------------------
-from fastapi import Body
-from pydantic import BaseModel
+    return {"strategy": strategy, "rows": rows}
 
+# =============================================================================
+# ✅ Act(採用) API
+# =============================================================================
 class ActBody(BaseModel):
     strategy: str
     reason: str | None = None
@@ -251,4 +347,3 @@ def pdca_act(body: ActBody = Body(...)):
             "details": res.details,
         },
     )
-# --- 追記ここまで ------------------------------------------------------------
