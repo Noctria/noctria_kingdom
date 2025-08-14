@@ -3,6 +3,7 @@
 # coding: utf-8
 """
 Noctria Kingdom GUI - main entrypoint
+
 - ルーター統合（存在しないものは安全にスキップ）
 - 静的/テンプレートの安全マウント
 - 例外ハンドラ / healthz / ルートリダイレクト
@@ -11,6 +12,7 @@ Noctria Kingdom GUI - main entrypoint
 - path_config 不在時でもフォールバックして起動継続
 - Jinja2 に from_json フィルタを登録
 - HAS_DASHBOARD を柔軟に判定（module名に ".dashboard" を含む場合を許容）
+- 統治ルール可視化ルーター（governance_rules）を配線
 """
 
 from __future__ import annotations
@@ -74,7 +76,7 @@ logger = logging.getLogger("noctria_gui.main")
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.2.1",
+    version="2.3.0",
 )
 
 # -----------------------------------------------------------------------------
@@ -139,25 +141,28 @@ logger.info("Integrating routers...")
 
 # 主要ルーター群（存在しなくてもスキップ可）
 _safe_include("noctria_gui.routes.home_routes")
-_safe_include("noctria_gui.routes.dashboard")  # HAS_DASHBOARD をセット（存在すれば）
+_safe_include("noctria_gui.routes.dashboard")            # ダッシュボード（あれば HAS_DASHBOARD=True）
+
+# 王の統治系
 _safe_include("noctria_gui.routes.king_routes")
 _safe_include("noctria_gui.routes.trigger")
 _safe_include("noctria_gui.routes.hermes")
 
+# Act/ログ系
 _safe_include("noctria_gui.routes.act_history")
 _safe_include("noctria_gui.routes.act_history_detail")
 _safe_include("noctria_gui.routes.logs_routes")
 _safe_include("noctria_gui.routes.upload_history")
 
 # --- PDCA関連 ---
-_safe_include("noctria_gui.routes.pdca")           # 既存：PDCAトップ/補助
-_safe_include("noctria_gui.routes.pdca_recheck")   # /pdca/control, /pdca/recheck（環境により未配置可）
-_safe_include("noctria_gui.routes.pdca_routes")    # /pdca-dashboard（HUDダッシュボード）
-_safe_include("noctria_gui.routes.pdca_summary")   # /pdca/summary & /pdca/api/summary
+_safe_include("noctria_gui.routes.pdca")                 # 既存：PDCAトップ/補助
+_safe_include("noctria_gui.routes.pdca_recheck")         # /pdca/control, /pdca/recheck（環境により未配置可）
+_safe_include("noctria_gui.routes.pdca_routes")          # /pdca-dashboard（HUDダッシュボード）
+_safe_include("noctria_gui.routes.pdca_summary")         # /pdca/summary & /pdca/api/summary
 
+# 戦略・統計・タグ
 _safe_include("noctria_gui.routes.push")
 _safe_include("noctria_gui.routes.push_history")
-
 _safe_include("noctria_gui.routes.strategy_routes", prefix="/strategies", tags=["strategies"])
 _safe_include("noctria_gui.routes.strategy_detail")
 _safe_include("noctria_gui.routes.strategy_heatmap")
@@ -173,18 +178,24 @@ _safe_include("noctria_gui.routes.tag_summary")
 _safe_include("noctria_gui.routes.tag_summary_detail")
 _safe_include("noctria_gui.routes.tag_heatmap")
 
+# AI/DevCycle系
 _safe_include("noctria_gui.routes.ai_routes")
 _safe_include("noctria_gui.routes.devcycle_history")
 
+# ユーティリティ
 _safe_include("noctria_gui.routes.path_checker")
 _safe_include("noctria_gui.routes.prometheus_routes")
 _safe_include("noctria_gui.routes.upload")
 
+# チャット履歴API（循環importの可能性があるため安全取り込み）
 _safe_include("noctria_gui.routes.chat_history_api")
 # _safe_include("noctria_gui.routes.chat_api")  # APIキー未設定環境での誤爆防止
 
-# 可観測性ビュー（存在しなければスキップ）
+# 可観測性ビュー
 _safe_include("noctria_gui.routes.observability")
+
+# 🔰 新規: 統治ルール可視化（metrics/timeline + HTML）
+_safe_include("noctria_gui.routes.governance_rules")
 
 logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBOARD)
 
@@ -228,6 +239,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("GUI_PORT", "8001"))
     reload_flag = os.getenv("UVICORN_RELOAD", "0").lower() in ("1", "true", "on")
     uvicorn.run("noctria_gui.main:app", host="0.0.0.0", port=port, reload=reload_flag)
