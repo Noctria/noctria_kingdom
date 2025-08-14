@@ -11,12 +11,11 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 
 # =============================================================================
 # Observability I/O (PostgreSQL)
-# - 旧API互換: plan / infer の簡易ロギングを維持
-# - 新API拡張: decisions / exec_events / alerts を追加
+# - 旧API互換: infer の簡易ロギング (ai_name / started_at / ended_at / params_json / metrics_json / status / note)
+# - 新API拡張: model_name / inputs / outputs / duration_ms など
 # - CREATE IF NOT EXISTS + ALTER IF NOT EXISTS で既存スキーマを前方互換に拡張
-# - DSNは NOCTRIA_OBS_PG_DSN から取得（明示指定も可）
-# - 追加: ensure_views()/ensure_views_and_mvs()/refresh_latency_daily() で
-#         View / MV を自動作成・更新
+# - DSN は NOCTRIA_OBS_PG_DSN から取得（例: postgresql://user:pass@host:5432/dbname）
+# - ensure_views() / refresh_latency_daily() あり
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -36,10 +35,7 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 def _json(obj: Any) -> str:
-    """
-    PythonオブジェクトをJSON文字列へ。
-    pandas.Timestamp / datetime 等は isoformat にフォールバック。
-    """
+    """PythonオブジェクトをJSON文字列へ。pandas.Timestamp/datetime等はisoformatにフォールバック。"""
     try:
         import pandas as pd  # type: ignore
     except Exception:
@@ -53,10 +49,7 @@ def _json(obj: Any) -> str:
     )
 
 def _get_dsn(conn_str: Optional[str]) -> str:
-    """
-    接続文字列が未指定なら、環境変数 NOCTRIA_OBS_PG_DSN を使う。
-    例: postgresql://noctria:******@localhost:5433/noctria_db
-    """
+    """接続文字列が未指定なら、環境変数 NOCTRIA_OBS_PG_DSN を使う。"""
     dsn = conn_str or os.getenv("NOCTRIA_OBS_PG_DSN")
     if not dsn:
         raise ValueError(
@@ -72,10 +65,7 @@ _DRIVER: Optional[object] = None
 _DB_KIND: Optional[str] = None  # "psycopg2" or "psycopg"
 
 def _import_driver() -> Tuple[object, str]:
-    """
-    psycopg2 (v2) → psycopg (v3) の順で動的 import。結果をキャッシュ。
-    pytest/import 時にドライバ未導入でも直ちに落ちないようにする。
-    """
+    """psycopg2(v2) → psycopg(v3) の順で import。結果はキャッシュ。"""
     global _DRIVER, _DB_KIND
     if _DRIVER is not None and _DB_KIND is not None:
         return _DRIVER, _DB_KIND
@@ -133,8 +123,6 @@ def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
 
 # -----------------------------------------------------------------------------
 # schema bootstrap (for dev/PoC)
-# 既存の軽量スキーマを拡張し、Decision/Exec/Alert も記録可能に
-# 旧スキーマが既にある場合は不足カラムを追加（ADD COLUMN IF NOT EXISTS）
 # -----------------------------------------------------------------------------
 _CREATE_PLAN_RUNS = """
 CREATE TABLE IF NOT EXISTS obs_plan_runs (
@@ -170,17 +158,30 @@ ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS error_rate    REAL;
 ALTER TABLE obs_plan_runs ADD COLUMN IF NOT EXISTS ts            TIMESTAMPTZ DEFAULT now();
 """
 
+# 互換: 旧GUIが期待するカラムも包含
 _CREATE_INFER_CALLS = """
 CREATE TABLE IF NOT EXISTS obs_infer_calls (
   id                     BIGSERIAL PRIMARY KEY,
   ts                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- 旧々API（model/ver/dur_ms/...）
   model                  TEXT,
   ver                    TEXT,
   dur_ms                 INTEGER,
   success                BOOLEAN,
   feature_staleness_min  INTEGER,
-  trace_id               TEXT,
+
+  -- 旧GUI互換（pdca_recheck が吐く）
+  ai_name                TEXT,
+  started_at             TIMESTAMPTZ,
+  ended_at               TIMESTAMPTZ,
+  status                 TEXT,
+  note                   TEXT,
+  params_json            JSONB,
+  metrics_json           JSONB,
+
   -- 新API
+  trace_id               TEXT,
   model_name             TEXT,
   call_at                TIMESTAMPTZ,
   duration_ms            INTEGER,
@@ -192,17 +193,27 @@ CREATE INDEX IF NOT EXISTS idx_infer_calls_trace ON obs_infer_calls(trace_id);
 """
 
 _ALTER_INFER_CALLS = """
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS model_name TEXT;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS call_at    TIMESTAMPTZ;
+-- 新API側
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS model_name  TEXT;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS call_at     TIMESTAMPTZ;
 ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS duration_ms INTEGER;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS inputs     JSONB;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS outputs    JSONB;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS model      TEXT;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS ver        TEXT;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS dur_ms     INTEGER;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS success    BOOLEAN;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS inputs      JSONB;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS outputs     JSONB;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS model       TEXT;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS ver         TEXT;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS dur_ms      INTEGER;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS success     BOOLEAN;
 ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS feature_staleness_min INTEGER;
-ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS ts         TIMESTAMPTZ DEFAULT now();
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS ts          TIMESTAMPTZ DEFAULT now();
+
+-- 旧GUI互換カラム
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS ai_name     TEXT;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS started_at  TIMESTAMPTZ;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS ended_at    TIMESTAMPTZ;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS status      TEXT;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS note        TEXT;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS params_json JSONB;
+ALTER TABLE obs_infer_calls ADD COLUMN IF NOT EXISTS metrics_json JSONB;
 """
 
 _CREATE_DECISIONS = """
@@ -242,8 +253,8 @@ _CREATE_ALERTS = """
 CREATE TABLE IF NOT EXISTS obs_alerts (
   id          BIGSERIAL PRIMARY KEY,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  policy_name TEXT NOT NULL,     -- e.g. risk.max_order_qty
-  reason      TEXT NOT NULL,     -- human-readable reason
+  policy_name TEXT NOT NULL,
+  reason      TEXT NOT NULL,
   severity    TEXT NOT NULL,     -- LOW/MEDIUM/HIGH/CRITICAL
   details     JSONB,
   trace_id    TEXT
@@ -253,7 +264,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_time  ON obs_alerts(created_at);
 """
 
 # -----------------------------------------------------------------------------
-# Views / Materialized Views
+# Views / Materialized Views（互換: 旧/新の両カラムを COALESCE）
 # -----------------------------------------------------------------------------
 _CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW = """
 CREATE OR REPLACE VIEW obs_trace_timeline AS
@@ -279,16 +290,18 @@ SELECT trace_id,
        ) AS payload
 FROM obs_exec_events
 UNION ALL
--- Inference calls
-SELECT trace_id,
-       COALESCE(call_at, ts) AS ts,
+-- Inference calls（旧GUI互換/新API/旧々APIを包括）
+SELECT COALESCE(trace_id, '') AS trace_id,
+       COALESCE(call_at, started_at, ts) AS ts,
        'INFER' AS kind,
-       COALESCE(model_name, model) AS action,
+       COALESCE(model_name, model, ai_name) AS action,
        jsonb_build_object(
          'duration_ms', COALESCE(duration_ms, dur_ms),
          'success', success,
-         'inputs', inputs,
-         'outputs', outputs
+         'inputs', COALESCE(inputs, params_json),
+         'outputs', COALESCE(outputs, metrics_json),
+         'status', status,
+         'note', note
        ) AS payload
 FROM obs_infer_calls
 UNION ALL
@@ -365,27 +378,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_obs_latency_daily_day
 # ensure (tables & views)
 # -----------------------------------------------------------------------------
 def ensure_tables(conn_str: Optional[str] = None) -> None:
-    """
-    観測テーブル（obs_plan_runs / obs_infer_calls / obs_decisions / obs_exec_events / obs_alerts）を
-    存在しなければ作成。旧スキーマが存在する場合は、不足カラムを追加（IF NOT EXISTS）。
-    本番では Alembic 等のマイグレーションを推奨。開発・PoC向けの保険。
-    """
+    """観測テーブル群を存在保証（不足カラムは追加）。"""
     dsn = _get_dsn(conn_str)
-    # CREATE
     _exec(dsn, _CREATE_PLAN_RUNS)
     _exec(dsn, _CREATE_INFER_CALLS)
     _exec(dsn, _CREATE_DECISIONS)
     _exec(dsn, _CREATE_EXEC_EVENTS)
     _exec(dsn, _CREATE_ALERTS)
-    # ALTER for forward-compat
     _exec(dsn, _ALTER_PLAN_RUNS)
     _exec(dsn, _ALTER_INFER_CALLS)
     logger.info("observability tables ensured/altered.")
 
 def ensure_views(conn_str: Optional[str] = None) -> None:
-    """
-    ビュー/マテビュー（timeline / latency / daily）を作成・更新。
-    """
+    """ビュー/マテビュー（timeline/latency/daily）を作成・更新（定義）。"""
     dsn = _get_dsn(conn_str)
     _exec(dsn, _CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW)
     _exec(dsn, _CREATE_OR_REPLACE_TRACE_LATENCY_VIEW)
@@ -394,18 +399,13 @@ def ensure_views(conn_str: Optional[str] = None) -> None:
     logger.info("observability views ensured/refreshed (definitions).")
 
 def ensure_views_and_mvs(conn_str: Optional[str] = None) -> None:
-    """
-    テーブル→ビュー→マテビューの順に保証（ワンストップ）。
-    """
+    """テーブル→ビュー→マテビューの順に保証（ワンストップ）。"""
     ensure_tables(conn_str)
     ensure_views(conn_str)
-    # MVは定義作成のみ。内容は必要に応じて refresh。
     logger.info("tables + views/mviews ensured.")
 
 def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = None) -> None:
-    """
-    obs_latency_daily をリフレッシュ。CONCURRENTLY はユニークインデックス必須（構築済）。
-    """
+    """obs_latency_daily をリフレッシュ。CONCURRENTLY はユニークインデックス必須。"""
     dsn = _get_dsn(conn_str)
     if concurrently:
         try:
@@ -429,7 +429,6 @@ def log_plan_run(*args, **kwargs) -> Optional[int]:
     互換ディスパッチャ：
       旧API: log_plan_run(conn_str, phase, rows, dur_sec, missing_ratio, error_rate, trace_id=None)
       新API: log_plan_run(trace_id=..., status='START'|'END'|'ERROR'|..., started_at=..., finished_at=..., meta={...}, conn_str=None)
-
     返り値: 追加行の id（失敗時 None）
     """
     if "status" in kwargs or ("trace_id" in kwargs and len(args) == 0):
@@ -443,9 +442,7 @@ def _log_plan_phase(conn_str: Optional[str],
                     missing_ratio: float,
                     error_rate: float,
                     trace_id: Optional[str] = None) -> Optional[int]:
-    """
-    旧API：P層の各フェーズ（collector/features/statistics 等）の計測を1件記録。
-    """
+    """旧API：P層の各フェーズ計測を1件記録。"""
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_plan_runs (ts, phase, dur_sec, rows, missing_ratio, error_rate, trace_id) "
@@ -465,10 +462,7 @@ def _log_plan_status(*, trace_id: str,
                      finished_at: Optional[datetime] = None,
                      meta: Optional[Dict[str, Any]] = None,
                      conn_str: Optional[str] = None) -> Optional[int]:
-    """
-    新API：Plan 実行スパンの開始/終了や状態を記録。
-    status 例: START / END / ERROR / CHECKPOINT-xxx など
-    """
+    """新API：Plan 実行スパンの開始/終了や状態を記録。"""
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_plan_runs (trace_id, started_at, finished_at, status, meta) "
@@ -491,10 +485,56 @@ def _log_plan_status(*, trace_id: str,
 def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     """
     互換API：
-      旧: log_infer_call(conn_str, model, ver, dur_ms, success, feature_staleness_min, trace_id=None)
       新: log_infer_call(trace_id=..., model_name=..., call_at=..., duration_ms=..., success=True, inputs={}, outputs={})
+      旧々: log_infer_call(conn_str, model, ver, dur_ms, success, feature_staleness_min, trace_id=None)
+      旧GUI互換(pdca_recheck): log_infer_call(trace_id=..., ai_name=..., started_at=ISO, ended_at=ISO, params_json={}, metrics_json={}, status='success'|'failed', note='')
     """
-    # 新フォーム
+    dsn = _get_dsn(conn_str)
+
+    # --- 旧GUI互換フォーム（pdca_recheck が使う） ---
+    if "ai_name" in kwargs or "params_json" in kwargs or "metrics_json" in kwargs:
+        trace_id: Optional[str] = kwargs.get("trace_id")
+        ai_name: Optional[str] = kwargs.get("ai_name")
+        started_at_raw = kwargs.get("started_at")
+        ended_at_raw = kwargs.get("ended_at")
+        status: Optional[str] = kwargs.get("status")
+        note: Optional[str] = kwargs.get("note", "")
+        params_json = kwargs.get("params_json") or {}
+        metrics_json = kwargs.get("metrics_json") or {}
+
+        # ISO8601 文字列をTIMESTAMPTZに渡す（psycopg がよしなに変換）
+        started_at = started_at_raw
+        ended_at = ended_at_raw
+
+        # duration_ms を（可能なら）算出
+        duration_ms: Optional[int] = None
+        try:
+            if started_at_raw and ended_at_raw:
+                s = datetime.fromisoformat(str(started_at_raw).replace("Z", "+00:00"))
+                e = datetime.fromisoformat(str(ended_at_raw).replace("Z", "+00:00"))
+                duration_ms = int((e - s).total_seconds() * 1000)
+        except Exception:
+            duration_ms = None
+
+        sql = (
+            "INSERT INTO obs_infer_calls "
+            "(trace_id, ai_name, started_at, ended_at, status, note, params_json, metrics_json, duration_ms, call_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s) "
+            "RETURNING id"
+        )
+        params = (
+            trace_id, ai_name, started_at, ended_at, status, note,
+            _json(params_json), _json(metrics_json),
+            duration_ms, started_at or _utcnow()
+        )
+        try:
+            row = _fetchone(dsn, sql, params)
+            return row[0] if row else None  # type: ignore[index]
+        except Exception as e:
+            logger.warning("log_infer_call(gui-compat) failed: %s (ai_name=%s, trace_id=%s)", e, ai_name, trace_id)
+            return None
+
+    # --- 新フォーム ---
     if any(k in kwargs for k in ("model_name", "inputs", "outputs", "duration_ms", "call_at")):
         trace_id: Optional[str] = kwargs.get("trace_id")
         model_name: Optional[str] = kwargs.get("model_name")
@@ -503,7 +543,7 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         success: Optional[bool] = kwargs.get("success", True)
         inputs = kwargs.get("inputs")
         outputs = kwargs.get("outputs")
-        dsn = _get_dsn(conn_str)
+
         sql = (
             "INSERT INTO obs_infer_calls (trace_id, model_name, call_at, duration_ms, success, inputs, outputs) "
             "VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id"
@@ -516,14 +556,13 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             logger.warning("log_infer_call(new) failed: %s (model_name=%s, trace_id=%s)", e, model_name, trace_id)
             return None
 
-    # 旧フォーム
+    # --- 旧々フォーム ---
     model: str = kwargs["model"]
     ver: Optional[str] = kwargs.get("ver")
     dur_ms: int = kwargs["dur_ms"]
     success: bool = kwargs["success"]
     feature_staleness_min: int = kwargs.get("feature_staleness_min", 0)
     trace_id: Optional[str] = kwargs.get("trace_id")
-    dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_infer_calls (ts, model, ver, dur_ms, success, feature_staleness_min, trace_id) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
@@ -545,9 +584,7 @@ def log_decision(*, trace_id: str,
                  decision: Dict[str, Any],
                  made_at: Optional[datetime] = None,
                  conn_str: Optional[str] = None) -> Optional[int]:
-    """
-    DecisionEngine の最終判断を記録（obs_decisions）。
-    """
+    """DecisionEngine の最終判断を記録（obs_decisions）。"""
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_decisions (trace_id, made_at, engine_version, strategy_name, score, reason, features, decision) "
@@ -580,9 +617,7 @@ def log_exec_event(*, trace_id: str,
                    response: Optional[Dict[str, Any]] = None,
                    sent_at: Optional[datetime] = None,
                    conn_str: Optional[str] = None) -> Optional[int]:
-    """
-    実執行（送信結果など）を記録（obs_exec_events）。
-    """
+    """実執行（送信結果など）を記録（obs_exec_events）。"""
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_exec_events (trace_id, sent_at, symbol, side, size, provider, status, order_id, response) "
@@ -614,9 +649,7 @@ def log_alert(*,
               trace_id: Optional[str] = None,
               created_at: Optional[datetime] = None,
               conn_str: Optional[str] = None) -> Optional[int]:
-    """
-    リスクゲート/再送/整合性チェックなどからのアラートを記録（obs_alerts）。
-    """
+    """リスクゲート/再送/整合性チェックなどからのアラートを記録（obs_alerts）。"""
     dsn = _get_dsn(conn_str)
     sql = (
         "INSERT INTO obs_alerts (created_at, policy_name, reason, severity, details, trace_id) "
