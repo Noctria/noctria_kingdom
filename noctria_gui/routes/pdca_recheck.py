@@ -1,10 +1,10 @@
 # noctria_gui/routes/pdca_recheck.py
 # -*- coding: utf-8 -*-
 """
-🔁 PDCA Recheck Routes (single & bulk) — v2.3
+🔁 PDCA Recheck Routes (single & bulk) — v2.4
 
 提供エンドポイント:
-- POST /pdca/recheck        : 単一戦略の再評価トリガ（Airflow REST推奨, 成功時は統計詳細へ303）
+- POST /pdca/recheck        : 単一戦略の再評価トリガ（Airflow REST推奨, 成功時は /strategies/detail/{name} へ 303）
 - POST /pdca/recheck_all    : 期間/フィルタで抽出した複数戦略を一括トリガ（ルール通過のみ）
 
 強化点:
@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 
-from fastapi import APIRouter, Body, Form, Query, Request, HTTPException
+from fastapi import APIRouter, Body, Form, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -295,7 +295,7 @@ async def recheck_strategy(
     """
     単一戦略の再評価を Airflow（REST）でトリガ。
     - 前段で drawdown guard を評価（NGなら409）
-    - 成功時は /statistics/detail?mode=strategy&key={strategy_name} へ 303 Redirect
+    - 成功時は /strategies/detail/{strategy_name} へ 303 Redirect
     """
     if not _strategy_exists(strategy_name):
         return JSONResponse(status_code=404, content={"detail": f"戦略が存在しません: {strategy_name}", "strategy_name": strategy_name})
@@ -387,14 +387,10 @@ async def recheck_strategy(
         _ledger_event(decision_id, "failed", {"error": str(e)})
         return JSONResponse(status_code=500, content={"detail": f"Airflow DAGトリガー失敗: {str(e)}", "strategy_name": strategy_name})
 
-    # Redirect to statistics detail
-    query = urllib.parse.urlencode({
-        "mode": "strategy",
-        "key": strategy_name,
-        "trace_id": trace_id,
-        "decision_id": decision_id or "",
-    })
-    return RedirectResponse(url=f"/statistics/detail?{query}", status_code=303)
+    # ✅ Redirect: /strategies/detail/{name}?trace_id=...&decision_id=...
+    safe_name = urllib.parse.quote(strategy_name, safe="")
+    query = urllib.parse.urlencode({"trace_id": trace_id, "decision_id": decision_id or ""})
+    return RedirectResponse(url=f"/strategies/detail/{safe_name}?{query}", status_code=303)
 
 
 @router.post("/recheck_all")
