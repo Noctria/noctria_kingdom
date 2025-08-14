@@ -1,39 +1,32 @@
 #!/usr/bin/env python3
-# coding: utf-8
+# -*- coding: utf-8 -*-
 """
 update_docs_from_index.py
-────────────────────────────────────────────────────────────
-00-INDEX.md と、その中でリンクされている Markdown（想定21本）を走査し、
-各ドキュメントの「最終更新以降」のGitログを集計して変更サマリを作成。
-サマリは以下の2系統で出力します。
 
-  1) 任意のログ（docs/_build/logs/... に集約ログと各ファイル個別ログ）
-  2) 各ドキュメントへの自動追記（「## Update Log (auto)」節として追記）
+📚 目的
+- docs/00_index/00-INDEX.md を起点に、リンクされた Markdown 文書を走査
+- 各ドキュメントに対し、「そのドキュメントの最終更新以降」の Git 変更（=最新の開発内容）を収集
+- 収集結果を任意ログ（デフォルト: docs/_generated/update_docs.log）に出力
+- 各ドキュメントに自動で CHANGELOG セクションを挿入/更新（マーカーで管理）
+- 変更があれば git add/commit/push（--dry-run なら実ファイルは変更せず、push もしない）
 
-最後に、--apply 指定時はファイルを上書き保存、
---push 指定時は git add/commit/push まで自動実行します。
+📝 前提
+- リポジトリ直下で実行すること（カレントが /mnt/d/noctria_kingdom）
+- Git が使えること（コミット履歴があること）
+- remote ‘origin’ が正しく設定済みで、push できること
 
-“関連するコード範囲”の推定は次の順で行います:
-  a) ドキュメント本文中の `src/...` や `noctria_gui/...` にマッチする相対パスを抽出し、そこを対象に git log
-  b) 抽出できない場合は、一般的に文書の範囲になることが多い top-level を対象:
-     ["src", "noctria_gui", "airflow_docker", "docs"]
+🔧 使い方
+  # ドライラン（差分抽出とログ出力のみ。ファイル変更・pushしない）
+  python3 scripts/update_docs_from_index.py \
+    --index docs/00_index/00-INDEX.md \
+    --dry-run
 
-要件:
-  - リポジトリ直下で実行（または --repo-root 指定）
-  - Git が使える環境（リモート origin 設定済み）
-  - Python 3.9+
-
-例:
-  python tools/update_docs_from_index.py \
-    --index docs/00-INDEX.md \
-    --since auto \
-    --apply --push
-
-まずは dry-run:
-  python tools/update_docs_from_index.py --index docs/00-INDEX.md --dry-run
+  # 実更新 ＋ 自動コミット＆push
+  python3 scripts/update_docs_from_index.py \
+    --index docs/00_index/00-INDEX.md
 """
-
 from __future__ import annotations
+
 import argparse
 import os
 import re
@@ -42,259 +35,331 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Optional, Tuple
 
-# ---------------------------
-# Utils
-# ---------------------------
+# -----------------------------
+# Config
+# -----------------------------
+AUTOGEN_BEGIN = "<!-- AUTOGEN:CHANGELOG START -->"
+AUTOGEN_END = "<!-- AUTOGEN:CHANGELOG END -->"
+DEFAULT_LOG = "docs/_generated/update_docs.log"
+DEFAULT_BRANCH = None  # None=現在のブランチ
+DOC_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+\.md)\)")  # [Title](path/to/file.md)
 
-RE_MD_LINK = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
-RE_CODE_PATH = re.compile(r'(?P<p>(?:src|noctria_gui|airflow_docker|docs)/[A-Za-z0-9_\-./]+)')
+# 変更抽出の対象（ソース側パスの大枠）
+DIFF_SCOPE_DIRS = [
+    "src",
+    "noctria_gui",
+    "airflow_docker",
+    "experts",
+    "tools",
+    "scripts",
+    # "docs" は除外（ドキュメント相互の更新ノイズを避ける）
+]
 
-TOP_LEVEL_DEFAULTS = ["src", "noctria_gui", "airflow_docker", "docs"]
 
 @dataclass
-class DocTarget:
-    path: Path
-    related_paths: List[str]  # for git log scoping
-    since_iso: str            # ISO string used for git --since
-    last_mtime: datetime      # filesystem last modified time
-
-@dataclass
-class CommitEntry:
-    hash: str
-    date: str   # iso
+class CommitInfo:
+    short_hash: str
     author: str
+    date_iso: str
     subject: str
+    files: List[str]
 
-def sh(cmd: List[str], cwd: Optional[Path]=None, check: bool=True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=str(cwd) if cwd else None, text=True, capture_output=True, check=check)
 
-def git_root(explicit: Optional[Path]) -> Path:
-    if explicit:
-        return explicit.resolve()
+# -----------------------------
+# Utils
+# -----------------------------
+def sh(cmd: List[str], cwd: Optional[Path] = None, check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=check)
+
+
+def git_available() -> bool:
     try:
-        out = sh(["git", "rev-parse", "--show-toplevel"], check=True)
-        return Path(out.stdout.strip()).resolve()
-    except subprocess.CalledProcessError:
-        print("ERROR: Not a git repository (or git not found). Use --repo-root.", file=sys.stderr)
-        sys.exit(2)
+        sh(["git", "--version"], check=True)
+        return True
+    except Exception:
+        return False
 
-def parse_index(index_md: Path) -> List[Path]:
-    text = index_md.read_text(encoding="utf-8", errors="ignore")
-    links = []
-    for m in RE_MD_LINK.finditer(text):
-        href = m.group(1).strip()
-        # 画像や外部URLは除外
-        if href.startswith("http://") or href.startswith("https://") or href.startswith("mailto:"):
-            continue
-        if any(href.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".gif", ".svg"]):
-            continue
-        p = (index_md.parent / href).resolve()
-        if p.suffix.lower() == ".md" and p.exists():
-            links.append(p)
-    # index 自体も先頭に含める
-    if index_md.suffix.lower() == ".md":
-        links = [index_md.resolve()] + [p for p in links if p.resolve() != index_md.resolve()]
-    # 重複排除
-    uniq = []
-    seen = set()
-    for p in links:
-        rp = str(p)
-        if rp not in seen:
-            uniq.append(p)
-            seen.add(rp)
-    return uniq
 
-def find_related_paths(md_path: Path) -> List[str]:
-    text = md_path.read_text(encoding="utf-8", errors="ignore")
-    found = set()
-    for m in RE_CODE_PATH.finditer(text):
-        rel = m.group("p")
-        # 末尾の句読点や括弧を落とす
-        rel = rel.strip().rstrip(").,;]}")
-        if Path(rel).exists():
-            found.add(rel)
-    if found:
-        return sorted(found)
-    return TOP_LEVEL_DEFAULTS[:]  # fallback
+def git_root() -> Path:
+    out = sh(["git", "rev-parse", "--show-toplevel"]).stdout.strip()
+    return Path(out)
 
-def file_mtime(p: Path) -> datetime:
-    return datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
 
-def iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+def current_branch() -> str:
+    out = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+    return out
 
-def choose_since(since_arg: str, mtime: datetime) -> str:
+
+def ensure_parent(p: Path) -> None:
+    p.parent.mkdir(parents=True, exist_ok=True)
+
+
+def parse_index(index_path: Path) -> List[Path]:
+    text = index_path.read_text(encoding="utf-8")
+    paths = []
+    for m in DOC_LINK_RE.finditer(text):
+        rel = m.group(1).strip()
+        # アンカー除去 e.g. file.md#section
+        rel = rel.split("#", 1)[0]
+        paths.append((index_path.parent / rel).resolve())
+    # 重複除去・存在チェックは後段で
+    return paths
+
+
+def doc_last_update_ts(repo: Path, path: Path) -> Optional[int]:
     """
-    --since の解釈:
-      - "auto"  : ドキュメントの最終更新時刻 (ファイル mtime) を使用
-      - それ以外: git の --since へそのまま渡す（"2025-08-01", "2 weeks ago" 等）
+    ドキュメント自身を最後に更新したコミットのUnix epoch（秒）。
+    ない場合は None（未コミット or 追跡外）。
     """
-    if since_arg == "auto":
-        return iso(mtime)
-    return since_arg
-
-def git_log(repo: Path, since_iso: str, paths: List[str]) -> List[CommitEntry]:
-    # pretty: <hash>|<date>|<author>|<subject>
-    fmt = "%h|%ad|%an|%s"
-    cmd = ["git", "log", f"--since={since_iso}", f"--pretty=format:{fmt}", "--date=iso"]
-    cmd += ["--"] + paths
     try:
-        cp = sh(cmd, cwd=repo, check=True)
-        lines = [ln for ln in cp.stdout.splitlines() if ln.strip()]
-        out: List[CommitEntry] = []
-        for ln in lines:
-            parts = ln.split("|", 3)
-            if len(parts) == 4:
-                out.append(CommitEntry(hash=parts[0], date=parts[1], author=parts[2], subject=parts[3]))
-        return out
-    except subprocess.CalledProcessError as e:
-        # パスが1つも該当しない場合などは空扱い
-        return []
+        out = sh(["git", "log", "-1", "--format=%ct", "--", str(path)], cwd=repo).stdout.strip()
+        return int(out) if out else None
+    except Exception:
+        return None
 
-def ensure_dir(p: Path) -> None:
-    p.mkdir(parents=True, exist_ok=True)
 
-def now_stamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-
-def append_update_section(md_path: Path, commits: List[CommitEntry], dry_run: bool) -> Tuple[bool, str]:
+def collect_commits_since(repo: Path, since_epoch: Optional[int]) -> List[CommitInfo]:
     """
-    ドキュメント末尾に以下の形式で追記する:
-      ## Update Log (auto)
-      - 2025-08-15 12:34  (abc123) subject  — author
-      ...
-    すでに同日同内容が入っている場合は重複追記しない簡易チェック付き。
+    since_epoch 以降のコミットを対象に、ソース側のディレクトリ（DIFF_SCOPE_DIRS）の変更のみを拾う。
+    docs/ 以下は除外。
     """
-    if not commits:
-        return False, "no commits"
-
-    head = "## Update Log (auto)"
-    lines = md_path.read_text(encoding="utf-8", errors="ignore").splitlines()
-
-    # 今日追加分として生成
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    block = [head, f"", f"**Synced at (UTC)**: {today}", ""]
-    for c in commits:
-        # ISO → "YYYY-MM-DD HH:MM"
-        when = c.date.replace("T", " ")[:16]
-        block.append(f"- {when}  ({c.hash}) {c.subject}  — {c.author}")
-    block_text = "\n".join(block) + "\n"
-
-    existing_text = "\n".join(lines)
-    # 簡易重複チェック：同じhash行が既に含まれていれば追記しない
-    if any(c.hash in existing_text for c in commits):
-        return False, "already contains some of these commits"
-
-    new_text = existing_text
-    if head in existing_text:
-        # 既存の Update Log の前に1空行挿入して追記
-        new_text = existing_text + "\n\n" + block_text
+    if since_epoch is None:
+        # ドキュメントが未コミットの場合は直近30日の変更を対象にする（安全側）
+        since_opt = "--since=30.days"
     else:
-        new_text = existing_text.rstrip() + "\n\n" + block_text
+        dt = datetime.fromtimestamp(since_epoch, tz=timezone.utc).isoformat()
+        since_opt = f"--since={dt}"
 
-    if not dry_run:
-        md_path.write_text(new_text, encoding="utf-8")
+    # --name-only で変更ファイル一覧を取る
+    cmd = [
+        "git", "log",
+        "--pretty=%h|%an|%aI|%s",
+        "--name-only",
+        since_opt,
+        "--",
+    ] + DIFF_SCOPE_DIRS
 
-    return True, f"appended {len(commits)} entries"
+    cp = sh(cmd, cwd=repo, check=False)  # 空でもOK
+    lines = cp.stdout.splitlines()
 
-def git_add_commit_push(repo: Path, message: str, push: bool) -> None:
-    # add
-    sh(["git", "add", "docs"], cwd=repo, check=True)
-    # commit（変更がなければスキップ）
-    try:
-        sh(["git", "commit", "-m", message], cwd=repo, check=True)
-        if push:
-            # リモートは origin、現在ブランチへプッシュ
-            sh(["git", "push"], cwd=repo, check=True)
-    except subprocess.CalledProcessError as e:
-        # 何も変更がないケース
-        print("No changes to commit.", file=sys.stderr)
+    commits: List[CommitInfo] = []
+    cur: Optional[CommitInfo] = None
+    for line in lines:
+        if not line.strip():
+            continue
+        if "|" in line and re.match(r"^[0-9a-f]{7,}", line):
+            # 新しいコミット行
+            hh, author, date_iso, subject = line.split("|", 3)
+            if cur:
+                commits.append(cur)
+            cur = CommitInfo(short_hash=hh, author=author, date_iso=date_iso, subject=subject, files=[])
+        else:
+            # ファイル行
+            if cur is not None:
+                f = line.strip()
+                # docs/ を除外（ドキュメント同士の更新は差分扱いしない）
+                if f and not f.startswith("docs/"):
+                    cur.files.append(f)
+    if cur:
+        commits.append(cur)
 
-# ---------------------------
+    # 変更ファイルが0のコミットはノイズなので除外
+    commits = [c for c in commits if c.files]
+    return commits
+
+
+def build_changelog_section(doc_path: Path, commits: List[CommitInfo], last_ts: Optional[int]) -> str:
+    title_date = datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if last_ts else "N/A"
+    lines = []
+    lines.append(AUTOGEN_BEGIN)
+    lines.append("")
+    lines.append(f"### 🛠 Updates since: `{title_date}`")
+    if not commits:
+        lines.append("")
+        lines.append("> （この期間に反映すべき開発差分は検出されませんでした）")
+    else:
+        lines.append("")
+        for c in commits:
+            # コミット概要
+            lines.append(f"- `{c.short_hash}` {c.date_iso} — **{c.subject}** _(by {c.author})_")
+            # 影響ファイル（長すぎないよう先頭10のみ表示）
+            if c.files:
+                show = c.files[:10]
+                more = len(c.files) - len(show)
+                for f in show:
+                    lines.append(f"  - `{f}`")
+                if more > 0:
+                    lines.append(f"  - …and {more} more files")
+    lines.append("")
+    lines.append(AUTOGEN_END)
+    lines.append("")
+    return "\n".join(lines)
+
+
+def splice_autogen_section(orig_text: str, new_section: str) -> str:
+    """
+    既存の AUTOGEN セクションを置換。無ければ末尾に追加。
+    """
+    begin = re.escape(AUTOGEN_BEGIN)
+    end = re.escape(AUTOGEN_END)
+    pat = re.compile(begin + r".*?" + end, re.DOTALL)
+
+    if pat.search(orig_text):
+        return pat.sub(new_section.strip(), orig_text)
+    else:
+        # 末尾に追記（前後に空行）
+        if not orig_text.endswith("\n"):
+            orig_text += "\n"
+        return orig_text + "\n" + new_section
+
+
+def git_add_commit_push(repo: Path, paths: List[Path], dry_run: bool, commit_msg: str, branch: Optional[str]) -> None:
+    if dry_run:
+        print("[DRY-RUN] skip git add/commit/push")
+        return
+    rels = [str(p.relative_to(repo)) for p in paths]
+    if not rels:
+        print("No changed files to commit.")
+        return
+    sh(["git", "add"] + rels, cwd=repo)
+    # 変更が無ければ commit しない
+    diff = sh(["git", "diff", "--cached", "--name-only"], cwd=repo).stdout.strip()
+    if not diff:
+        print("No staged changes; skip commit.")
+        return
+    sh(["git", "commit", "-m", commit_msg], cwd=repo)
+    # push
+    if branch is None:
+        branch = current_branch()
+    print(f"Pushing to origin/{branch} ...")
+    sh(["git", "push", "origin", branch], cwd=repo)
+
+
+# -----------------------------
 # Main
-# ---------------------------
-
+# -----------------------------
 def main():
-    ap = argparse.ArgumentParser(description="Update docs listed in 00-INDEX.md based on recent git changes.")
-    ap.add_argument("--index", default="docs/00-INDEX.md", help="Path to 00-INDEX.md")
-    ap.add_argument("--repo-root", default=None, help="Repository root (if not running inside git repo)")
-    ap.add_argument("--since", default="auto", help='Since boundary for git log. "auto" = per-file mtime; or pass "2025-08-01", "2 weeks ago".')
-    ap.add_argument("--apply", action="store_true", help="Actually modify markdown files (append Update Log).")
-    ap.add_argument("--push", action="store_true", help="After apply, git add/commit/push.")
-    ap.add_argument("--dry-run", action="store_true", help="Do not write files or push. Just log.")
-    ap.add_argument("--log-dir", default="docs/_build/logs", help="Directory to write logs into.")
+    ap = argparse.ArgumentParser(description="Update docs pointed by 00-INDEX.md based on latest dev diffs (git).")
+    ap.add_argument("--index", required=True, help="Path to 00-INDEX.md (e.g., docs/00_index/00-INDEX.md)")
+    ap.add_argument("--log-out", default=DEFAULT_LOG, help=f"Path to output log file (default: {DEFAULT_LOG})")
+    ap.add_argument("--branch", default=DEFAULT_BRANCH, help="Target branch to push (default: current branch)")
+    ap.add_argument("--dry-run", action="store_true", help="Do not modify files or push; only print & write log")
     args = ap.parse_args()
 
-    repo = git_root(Path(args.repo_root) if args.repo_root else None)
-    index_md = (repo / args.index).resolve()
-    if not index_md.exists():
-        print(f"ERROR: index not found: {index_md}", file=sys.stderr)
+    if not git_available():
+        print("ERROR: git is not available in PATH.", file=sys.stderr)
         sys.exit(2)
 
-    # 1) 対象ファイルを列挙
-    docs = parse_index(index_md)
-    if not docs:
-        print("No markdown files found via index.", file=sys.stderr)
-        sys.exit(1)
+    repo = git_root()
+    index_path = (repo / args.index).resolve()
+    if not index_path.exists():
+        print(f"ERROR: index markdown not found: {index_path}", file=sys.stderr)
+        sys.exit(2)
 
-    # 2) ログ出力先
-    log_dir = (repo / args.log_dir).resolve()
-    ensure_dir(log_dir)
-    batch_stamp = now_stamp()
-    batch_log = log_dir / f"changes_{batch_stamp}.log"
+    print(f"Repo: {repo}")
+    print(f"Index: {index_path}")
 
-    batch_lines = []
-    batch_lines.append(f"# Doc Update Scan @ {datetime.now(timezone.utc).isoformat()}Z")
-    batch_lines.append(f"Repo: {repo}")
-    batch_lines.append(f"Index: {index_md}")
-    batch_lines.append("")
-
-    # 3) 各ドキュメントごとに git log を収集
-    changed_any = False
-    for md in docs:
-        mtime = file_mtime(md)
-        since_iso = choose_since(args.since, mtime)
-        related = find_related_paths(md)
-        commits = git_log(repo, since_iso, related)
-        batch_lines.append(f"## {md.relative_to(repo)}")
-        batch_lines.append(f"- since: {since_iso}")
-        batch_lines.append(f"- related_paths: {', '.join(related)}")
-        batch_lines.append(f"- commits: {len(commits)}")
-        for c in commits:
-            batch_lines.append(f"  - {c.date} {c.hash} {c.author}: {c.subject}")
-        batch_lines.append("")
-
-        # 個別ログ
-        per_log = log_dir / f"{md.stem}_changes_{batch_stamp}.log"
-        per_text = "\n".join(batch_lines[-(len(commits)+4):])  # そのセクションだけ
-        per_log.write_text(per_text, encoding="utf-8")
-
-        # ドキュメントへ追記（apply時のみ）
-        if args.apply and commits:
-            ok, msg = append_update_section(md, commits, dry_run=args.dry_run)
-            batch_lines.append(f"- apply: {ok} ({msg})")
-            if ok:
-                changed_any = True
+    # 対象ドキュメント一覧の抽出
+    doc_paths = parse_index(index_path)
+    # 重複・存在フィルタ
+    uniq_docs = []
+    seen = set()
+    for p in doc_paths:
+        if p in seen:
+            continue
+        seen.add(p)
+        # 未存在でも、将来のために作るか？ → ここでは存在するもののみ対象に（安全）
+        if p.exists():
+            uniq_docs.append(p)
         else:
-            batch_lines.append("- apply: skipped")
-        batch_lines.append("")
+            print(f"WARNING: linked doc not found (skip): {p}")
 
-    # 4) バッチログを書き出し
-    batch_log.write_text("\n".join(batch_lines) + "\n", encoding="utf-8")
-    print(f"[LOG] Wrote batch log: {batch_log}")
+    if not uniq_docs:
+        print("No linked docs found from index. Nothing to do.")
+        return
 
-    # 5) git push
-    if args.apply and not args.dry_run:
-        if changed_any:
-            msg = f"docs: auto-append Update Log from git since ({args.since}) @ {batch_stamp}"
-            git_add_commit_push(repo, msg, push=args.push)
-            print("[GIT] commit/push completed.")
-        else:
-            print("[GIT] no changes to commit/push.")
+    # ログの用意
+    log_path = (repo / args.log_out).resolve()
+    ensure_parent(log_path)
+
+    changed_docs: List[Path] = []
+    with log_path.open("w", encoding="utf-8") as lf:
+        lf.write(f"# Auto Doc Update Log\n\n")
+        lf.write(f"- index: `{index_path.relative_to(repo)}`\n")
+        lf.write(f"- generated_at: {datetime.now(timezone.utc).isoformat()}\n")
+        lf.write(f"- dry_run: {args.dry_run}\n\n")
+
+        for doc in uniq_docs:
+            rel = doc.relative_to(repo)
+            print(f"\n==> {rel}")
+            lf.write(f"\n## {rel}\n")
+
+            last_ts = doc_last_update_ts(repo, doc)
+            if last_ts:
+                lf.write(f"- last_doc_update: {datetime.fromtimestamp(last_ts, tz=timezone.utc).isoformat()}\n")
+            else:
+                lf.write(f"- last_doc_update: N/A (untracked or no commits)\n")
+
+            commits = collect_commits_since(repo, last_ts)
+            lf.write(f"- commits_found: {len(commits)}\n\n")
+
+            # ログ詳細
+            if not commits:
+                lf.write("> No relevant commits since last doc update.\n")
+            else:
+                for c in commits:
+                    lf.write(f"- {c.short_hash} {c.date_iso} — {c.subject} (by {c.author})\n")
+                    for f in c.files[:10]:
+                        lf.write(f"  - {f}\n")
+                    if len(c.files) > 10:
+                        lf.write(f"  - …and {len(c.files)-10} more files\n")
+
+            # ドキュメント更新
+            try:
+                orig = doc.read_text(encoding="utf-8")
+            except Exception:
+                print(f"ERROR: cannot read doc: {doc}")
+                lf.write(f"\n! ERROR: cannot read doc.\n")
+                continue
+
+            new_sec = build_changelog_section(doc, commits, last_ts)
+            updated = splice_autogen_section(orig, new_sec)
+
+            if updated != orig:
+                lf.write("\n- action: would_update AUTOGEN section\n")
+                if not args.dry_run:
+                    doc.write_text(updated, encoding="utf-8")
+                    changed_docs.append(doc)
+                    print("   updated.")
+                else:
+                    print("   (dry-run) changes detected (not written).")
+            else:
+                lf.write("\n- action: no changes\n")
+                print("   no changes.")
+
+    print(f"\nLog written: {log_path.relative_to(repo)}")
+
+    # Git 反映
+    if changed_docs:
+        print(f"\nChanged docs: {len(changed_docs)}")
+        git_add_commit_push(
+            repo=repo,
+            paths=[log_path] + changed_docs,
+            dry_run=args.dry_run,
+            commit_msg="docs: auto-update from 00-INDEX (AUTOGEN changelog)",
+            branch=args.branch,
+        )
     else:
-        print("[GIT] skipped (apply/dry-run flags).")
+        # ログだけコミットしても良いが、ノイズになるのでスキップ
+        print("No doc content changes; skip git commit/push (log not committed).")
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+            print(f"\nCommand failed: {' '.join(e.cmd)}", file=sys.stderr)
+            print(e.stderr or e.stdout, file=sys.stderr)
+            sys.exit(e.returncode)
