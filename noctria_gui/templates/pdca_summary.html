@@ -26,7 +26,7 @@
   .btn-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
 </style>
 
-<!-- まずはローカル配信（/static/vendor）。無ければ後段でCDNをフォールバック -->
+<!-- まずはローカル配信。無ければ後段でCDNフォールバック -->
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
@@ -121,7 +121,6 @@
 <script>
 /* =========================
    メインスクリプト
-   - 既存の FastAPI ルーターに合わせたエンドポイントで実装
    - /pdca/api/summary            -> KPI
    - /pdca/api/summary_timeseries -> グラフ
    - /pdca/summary.csv            -> CSV
@@ -131,7 +130,7 @@ window.GLOBAL_DEFAULT_FROM = null;
 window.GLOBAL_DEFAULT_TO   = null;
 
 function setText(id, t){ const el=document.getElementById(id); if(el) el.textContent = t; }
-function show(el, b)   { el.style.display = b ? '' : 'none'; }
+function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
 function percentFmt(v){ return (v == null || isNaN(v)) ? '—' : `${(+v).toFixed(2)}%`; }
 
 function isoDateDaysAgo(days){
@@ -145,8 +144,8 @@ function isoDateDaysAgo(days){
 }
 
 function buildQuery() {
-  const from = document.getElementById('from-date').value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
-  const to   = document.getElementById('to-date').value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
+  const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
   const sp = new URLSearchParams();
   sp.set('date_from', from);
   sp.set('date_to', to);
@@ -202,12 +201,10 @@ function createBar2Axis(ctx, labels, ds1, ds2){
 async function triggerRecheckAll(){
   const reason = prompt("一括再評価の理由（任意）", "") || "";
   const qs = new URLSearchParams(buildQuery());
-  // API 仕様に合わせて prefix を調整
   const url = new URL('/pdca/recheck_all', window.location.origin);
   url.searchParams.set('reason', reason);
   url.searchParams.set('filter_date_from', qs.get('date_from'));
   url.searchParams.set('filter_date_to', qs.get('date_to'));
-  // diff系や検索はフォーム増設時に追加
   try{
     const res = await fetch(url.toString(), { method:'POST' });
     const js = await res.json();
@@ -255,20 +252,17 @@ window.pdcaRefresh = async function pdcaRefresh(){
     if (window.NoctriaPDCA.charts.winDiff) { window.NoctriaPDCA.charts.winDiff.destroy(); window.NoctriaPDCA.charts.winDiff = null; }
 
     // 再描画
-    window.NoctriaPDCA.charts.counts  = createBar2Axis(
-      document.getElementById('chartCounts').getContext('2d'),
-      labels,
-      { label:'総件数', data: total },
-      { label:'勝率改善件数', data: impr }
-    );
-
-    window.NoctriaPDCA.charts.winDiff = createLine(
-      document.getElementById('chartWinDiff').getContext('2d'),
-      labels,
-      '勝率差分 平均(%)',
-      avgWr,
-      '%'
-    );
+    const ctxCounts  = document.getElementById('chartCounts');
+    const ctxWinDiff = document.getElementById('chartWinDiff');
+    if (ctxCounts && ctxCounts.getContext) {
+      window.NoctriaPDCA.charts.counts  = createBar2Axis(ctxCounts.getContext('2d'), labels,
+        { label:'総件数', data: total },
+        { label:'勝率改善件数', data: impr }
+      );
+    }
+    if (ctxWinDiff && ctxWinDiff.getContext) {
+      window.NoctriaPDCA.charts.winDiff = createLine(ctxWinDiff.getContext('2d'), labels, '勝率差分 平均(%)', avgWr, '%');
+    }
   }catch(e){
     console.error(e);
   }
@@ -295,13 +289,12 @@ document.addEventListener('DOMContentLoaded', function(){
   })();
 
   // ボタン
-  const btn = document.getElementById('applyBtn');
-  if (btn) btn.addEventListener('click', window.pdcaRefresh);
-
+  const btn  = document.getElementById('applyBtn');
   const rbtn = document.getElementById('recheckAllBtn');
+  if (btn)  btn.addEventListener('click', window.pdcaRefresh);
   if (rbtn) rbtn.addEventListener('click', triggerRecheckAll);
 
-  // Chart.js を待って初回描画
+  // 初回描画（Chart.js を待ってから）
   (function waitChart(){
     if (typeof Chart === 'undefined') return void setTimeout(waitChart, 120);
     window.pdcaRefresh();
