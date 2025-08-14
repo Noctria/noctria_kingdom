@@ -2,11 +2,14 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📊 PDCA Summary Route (v3.2)
+📊 PDCA Summary Route (v3.3)
 
-- HTML表示 (/pdca/summary) / JSON提供 (/pdca/summary/data) / CSVエクスポート (/pdca/summary.csv)
-- 日付は YYYY-MM-DD を推奨（未指定時は直近30日を自動設定）
-- テンプレートは HUD 準拠の pdca_summary.html を使用
+- HTML表示 (/pdca/summary)
+- JSON提供 (/pdca/summary/data)
+- CSVエクスポート (/pdca/summary.csv)
+- 互換API（旧フロント用）:
+    - /pdca/api/summary  → /pdca/summary/data に 307 Redirect
+    - /pdca/api/summary_timeseries → 当面は /pdca/summary/data に 307 Redirect
 
 堅牢化ポイント:
 - path_config や plan_data サービスが無い環境でも「空の結果」で動作継続
@@ -24,7 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 # -----------------------------------------------------------------------------
@@ -68,7 +71,6 @@ def _resolve_templates_dir() -> Path:
     # 3) フォールバック: <repo_root>/noctria_gui/templates
     return PROJECT_ROOT / "noctria_gui" / "templates"
 
-
 _TEMPLATES_DIR = _resolve_templates_dir()
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
@@ -111,7 +113,6 @@ def _load_pdca_services():
 
         return _fetch_infer_calls, _aggregate_kpis, _aggregate_by_day
 
-
 fetch_infer_calls, aggregate_kpis, aggregate_by_day = _load_pdca_services()
 
 # -----------------------------------------------------------------------------
@@ -135,7 +136,6 @@ def _parse_date_ymd(s: Optional[str]) -> Optional[datetime]:
         logger.warning("Invalid date format (expected YYYY-MM-DD): %s", s)
         return None
 
-
 def _default_range_days(days: int = 30) -> Tuple[datetime, datetime]:
     """
     直近days日（今日を含む）を返す（naive datetime）。
@@ -146,7 +146,6 @@ def _default_range_days(days: int = 30) -> Tuple[datetime, datetime]:
         datetime(start.year, start.month, start.day),
         datetime(today_local.year, today_local.month, today_local.day),
     )
-
 
 def _normalize_range(
     frm: Optional[datetime], to: Optional[datetime]
@@ -162,7 +161,6 @@ def _normalize_range(
         frm, to = to, frm
 
     return frm, to, frm.date().isoformat(), to.date().isoformat()
-
 
 # -----------------------------------------------------------------------------
 # Routes
@@ -203,7 +201,6 @@ async def pdca_summary_page(
         "schema_version": SCHEMA_VERSION,
     }
     return templates.TemplateResponse("pdca_summary.html", context)
-
 
 @router.get(
     "/summary/data",
@@ -266,7 +263,6 @@ async def pdca_summary_data(
     }
     return JSONResponse(payload)
 
-
 @router.get(
     "/summary.csv",
     response_class=Response,
@@ -323,3 +319,66 @@ async def pdca_summary_csv(
         "Cache-Control": "no-store",
     }
     return Response(content=csv_data, headers=headers)
+
+# -----------------------------------------------------------------------------
+# 互換エンドポイント（旧フロントの呼び出しを吸収）
+# -----------------------------------------------------------------------------
+@router.get("/api/summary")
+async def api_summary_legacy(
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str]   = Query(None, description="YYYY-MM-DD"),
+):
+    """
+    旧API: /pdca/api/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+    新API: /pdca/summary/data?from_date=...&to_date=...
+    → 当面は 307 Redirect で橋渡し（フロントはそのままでOK）
+    """
+    def _ok(s: Optional[str]) -> bool:
+        try:
+            if not s:
+                return False
+            datetime.strptime(s, "%Y-%m-%d")
+            return True
+        except Exception:
+            return False
+
+    params = []
+    if _ok(date_from): params.append(("from_date", date_from))  # 変換！
+    if _ok(date_to):   params.append(("to_date", date_to))      # 変換！
+
+    url = "/pdca/summary/data"
+    if params:
+        q = "&".join(f"{k}={v}" for k, v in params)
+        url = f"{url}?{q}"
+
+    return RedirectResponse(url=url, status_code=307)
+
+@router.get("/api/summary_timeseries")
+async def api_summary_timeseries_legacy(
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str]   = Query(None, description="YYYY-MM-DD"),
+):
+    """
+    旧API: /pdca/api/summary_timeseries
+    本来は時系列専用スキーマだが、まず 404 を解消することを優先。
+    当面は /pdca/summary/data をそのまま返す（将来必要なら専用形状に変更）。
+    """
+    def _ok(s: Optional[str]) -> bool:
+        try:
+            if not s:
+                return False
+            datetime.strptime(s, "%Y-%m-%d")
+            return True
+        except Exception:
+            return False
+
+    params = []
+    if _ok(date_from): params.append(("from_date", date_from))
+    if _ok(date_to):   params.append(("to_date", date_to))
+
+    url = "/pdca/summary/data"
+    if params:
+        q = "&".join(f"{k}={v}" for k, v in params)
+        url = f"{url}?{q}"
+
+    return RedirectResponse(url=url, status_code=307)
