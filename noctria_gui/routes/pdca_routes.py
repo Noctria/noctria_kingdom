@@ -11,18 +11,21 @@
 補足:
 - このファイルは /pdca-dashboard の最小ビューを提供します。
   既存の /pdca/summary（統計/CSV/API/再評価トリガ等）が別ルーターにある場合は共存可能です。
+- 本ファイルには「採用API」「再評価トリガAPI（単発/一括）」も含めています。
 """
 
 from __future__ import annotations
 
+import os
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from fastapi import APIRouter, Request, Query, Body, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # ========================================
 # 📁 プロジェクトパス解決（フォールバック込み）
@@ -312,10 +315,6 @@ def api_strategy_detail(
                 pass
 
     try:
-        dff = dff.sort_values("evaluated_at", descending=False)  # 保険: 古→新に揃えたい時は ascending=True
-    except Exception:
-        pass
-    try:
         dff = dff.sort_values("evaluated_at", ascending=False).head(limit)
         dff["evaluated_at"] = dff["evaluated_at"].astype(str)
         rows = dff[cols].to_dict(orient="records")
@@ -413,3 +412,245 @@ def pdca_act(body: ActBody = Body(...)):
             except Exception:
                 pass
         raise
+
+# =============================================================================
+# 🧰 Airflow呼び出しユーティリティ
+# =============================================================================
+def _airflow_headers() -> Dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = os.getenv("AIRFLOW_API_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _airflow_auth_tuple() -> Optional[Tuple[str, str]]:
+    user = os.getenv("AIRFLOW_USERNAME")
+    pwd = os.getenv("AIRFLOW_PASSWORD")
+    if user and pwd:
+        return (user, pwd)
+    return None
+
+
+def _trigger_airflow_dag(dag_id: str, conf: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Airflow v2 REST: POST /api/v1/dags/{dag_id}/dagRuns
+    必須: AIRFLOW_BASE_URL（例 http://airflow-webserver:8080）
+    認証: AIRFLOW_API_TOKEN または AIRFLOW_USERNAME/PASSWORD
+    """
+    base = os.getenv("AIRFLOW_BASE_URL")
+    if not base:
+        return {"ok": False, "error": "AIRFLOW_BASE_URL is not set"}
+
+    url = f"{base.rstrip('/')}/api/v1/dags/{dag_id}/dagRuns"
+    payload = {"conf": conf}
+
+    try:
+        import requests  # type: ignore
+    except Exception:
+        return {"ok": False, "error": "requests module not available"}
+
+    try:
+        r = requests.post(
+            url,
+            headers=_airflow_headers(),
+            auth=_airflow_auth_tuple(),
+            data=json.dumps(payload),
+            timeout=15,
+        )
+        if r.status_code // 100 == 2:
+            try:
+                js = r.json()
+            except Exception:
+                js = {}
+            return {"ok": True, "status_code": r.status_code, "response": js, "dag_run_id": js.get("dag_run_id")}
+        return {"ok": False, "status_code": r.status_code, "error": r.text}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+# =============================================================================
+# 🔁 再評価トリガ API（単発）
+# =============================================================================
+class RecheckBody(BaseModel):
+    strategy: str = Field(..., min_length=1)
+    reason: str | None = None
+    decision_id: str | None = None
+    caller: str | None = "ui"
+
+
+@router.post("/recheck", response_model=Dict[str, Any])
+def pdca_recheck(body: RecheckBody = Body(...)):
+    # Decision
+    decision_id = body.decision_id
+    try:
+        from src.core.decision_registry import create_decision, append_event  # type: ignore
+        if not decision_id:
+            d = create_decision(
+                kind="recheck",
+                issued_by=body.caller or "ui",
+                intent={"strategy": body.strategy, "reason": body.reason},
+                policy_snapshot=_get_policy_snapshot(),
+            )
+            decision_id = d.decision_id
+        append_event(decision_id, "accepted", {"endpoint": "/pdca-dashboard/recheck"})
+        _use_ledger = True
+    except Exception:
+        _use_ledger = False
+
+    # Trigger Airflow
+    conf = {
+        "strategy_name": body.strategy,
+        "decision_id": decision_id,
+        "caller": body.caller or "ui",
+        "reason": body.reason or "",
+        "parent_dag": "gui",
+    }
+    trig = _trigger_airflow_dag(dag_id="veritas_recheck_dag", conf=conf)
+
+    if _use_ledger:
+        try:
+            from src.core.decision_registry import append_event
+            append_event(decision_id or "-", "started" if trig.get("ok") else "failed", {"airflow": trig})
+        except Exception:
+            pass
+
+    status = 200 if trig.get("ok") else 500
+    return JSONResponse(
+        status_code=status,
+        content={
+            "ok": bool(trig.get("ok")),
+            "decision_id": decision_id,
+            "dag": "veritas_recheck_dag",
+            "dag_run_id": trig.get("dag_run_id"),
+            "airflow": {k: v for k, v in trig.items() if k != "ok"},
+        },
+    )
+
+# =============================================================================
+# 🔁 一括再評価トリガ API
+#   - 日付範囲で pdca CSV を走査し、戦略のユニーク集合に対して個別DAGを多重起動
+# =============================================================================
+class RecheckAllBody(BaseModel):
+    filter_date_from: str | None = None  # "YYYY-MM-DD"
+    filter_date_to: str | None = None    # "YYYY-MM-DD"
+    reason: str | None = None
+    caller: str | None = "ui"
+    limit: int = Field(50, ge=1, le=200)  # 安全制限
+
+
+def _date_in_range_str(d: str, start: Optional[str], end: Optional[str]) -> bool:
+    if not d:
+        return False
+    try:
+        dd = datetime.fromisoformat(d[:10])
+        if start and dd < datetime.fromisoformat(start):
+            return False
+        if end and dd > datetime.fromisoformat(end):
+            return False
+        return True
+    except Exception:
+        return False
+
+
+@router.post("/recheck_all", response_class=JSONResponse)
+def pdca_recheck_all(body: RecheckAllBody = Body(...)):
+    # 候補抽出
+    df = _read_logs_dataframe()
+    strategies: List[str] = []
+
+    try:
+        if getattr(df, "empty", True):
+            strategies = []
+        else:
+            # evaluated_at を文字列化して日付フィルタ
+            dff = df.copy()
+            try:
+                dff["__date_str"] = dff["evaluated_at"].astype(str)
+            except Exception:
+                dff["__date_str"] = ""
+            if body.filter_date_from or body.filter_date_to:
+                mask = dff["__date_str"].apply(
+                    lambda x: _date_in_range_str(x, body.filter_date_from, body.filter_date_to)
+                )
+                dff = dff[mask]
+            # ユニーク戦略（順序維持）
+            strategies = list(
+                dict.fromkeys([str(x) for x in dff.get("strategy", []) if str(x).strip()])
+            )
+    except Exception:
+        strategies = []
+
+    # 上限カット
+    if len(strategies) > body.limit:
+        strategies = strategies[:body.limit]
+
+    # Decision（親決裁）
+    parent_decision_id: Optional[str] = None
+    try:
+        from src.core.decision_registry import create_decision, append_event  # type: ignore
+        d = create_decision(
+            kind="recheck_all",
+            issued_by=body.caller or "ui",
+            intent={"range": [body.filter_date_from, body.filter_date_to], "reason": body.reason},
+            policy_snapshot=_get_policy_snapshot(),
+        )
+        parent_decision_id = d.decision_id
+        append_event(parent_decision_id, "accepted", {"endpoint": "/pdca-dashboard/recheck_all"})
+        _use_ledger = True
+    except Exception:
+        _use_ledger = False
+
+    results = []
+    for strat in strategies:
+        conf = {
+            "strategy_name": strat,
+            "decision_id": f"{parent_decision_id}:{strat}" if parent_decision_id else None,
+            "caller": body.caller or "ui",
+            "reason": body.reason or "",
+            "parent_dag": "gui.recheck_all",
+        }
+        trig = _trigger_airflow_dag("veritas_recheck_dag", conf)
+        results.append(
+            {
+                "strategy": strat,
+                "ok": bool(trig.get("ok")),
+                "dag_run_id": trig.get("dag_run_id"),
+                "airflow": {k: v for k, v in trig.items() if k != "ok"},
+            }
+        )
+
+        if _use_ledger:
+            try:
+                from src.core.decision_registry import append_event
+                append_event(
+                    parent_decision_id or "-",
+                    "started" if trig.get("ok") else "failed",
+                    {"strategy": strat, "airflow": trig},
+                )
+            except Exception:
+                pass
+
+    summary = {
+        "requested": len(strategies),
+        "triggered": sum(1 for r in results if r["ok"]),
+        "failed": sum(1 for r in results if not r["ok"]),
+    }
+
+    if _use_ledger:
+        try:
+            from src.core.decision_registry import append_event
+            append_event(parent_decision_id or "-", "completed", {"summary": summary})
+        except Exception:
+            pass
+
+    status = 200 if summary["failed"] == 0 else (207 if summary["triggered"] > 0 else 500)
+    return JSONResponse(
+        status_code=status,
+        content={
+            "ok": summary["failed"] == 0,
+            "decision_id": parent_decision_id,
+            "range": [body.filter_date_from, body.filter_date_to],
+            "summary": summary,
+            "results": results,
+        },
+    )
