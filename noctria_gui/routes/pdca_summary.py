@@ -2,10 +2,9 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📊 PDCA Summary Route (v3.1)
+📊 PDCA Summary Route (v3.2)
 
-- DBや観測ログを集計してサマリーを提供
-- HTML表示 (/pdca/summary) と JSON提供 (/pdca/summary/data)
+- HTML表示 (/pdca/summary) / JSON提供 (/pdca/summary/data) / CSVエクスポート (/pdca/summary.csv)
 - 日付は YYYY-MM-DD を推奨（未指定時は直近30日を自動設定）
 - テンプレートは HUD 準拠の pdca_summary.html を使用
 
@@ -16,14 +15,16 @@
 
 from __future__ import annotations
 
+import csv
 import logging
 import sys
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 # -----------------------------------------------------------------------------
@@ -264,3 +265,61 @@ async def pdca_summary_data(
         "count_rows": len(rows),
     }
     return JSONResponse(payload)
+
+
+@router.get(
+    "/summary.csv",
+    response_class=Response,
+    summary="PDCAサマリー（日次時系列CSV）",
+)
+async def pdca_summary_csv(
+    from_date: str = Query(..., description="YYYY-MM-DD"),
+    to_date: str = Query(..., description="YYYY-MM-DD"),
+) -> Response:
+    """
+    日次サマリーの CSV を返す。
+    カラム: date, evals, adopted, trades, win_rate
+    （win_rate は 0〜1 の比率。表記はフロントで%化してください）
+    """
+    frm = _parse_date_ymd(from_date)
+    to = _parse_date_ymd(to_date)
+    if not frm or not to:
+        raise HTTPException(
+            status_code=400, detail="from_date/to_date は YYYY-MM-DD 形式で指定してください。"
+        )
+
+    frm, to, from_str, to_str = _normalize_range(frm, to)
+
+    try:
+        rows = fetch_infer_calls(frm, to)
+    except Exception as e:
+        logger.error("fetch_infer_calls failed: %s", e, exc_info=True)
+        rows = []
+
+    try:
+        series = aggregate_by_day(rows)
+    except Exception as e:
+        logger.error("aggregate_by_day failed: %s", e, exc_info=True)
+        series = []
+
+    # CSV 生成
+    buf = StringIO()
+    w = csv.writer(buf)
+    w.writerow(["date", "evals", "adopted", "trades", "win_rate"])  # win_rate: 0-1
+    for r in series:
+        w.writerow([
+            r.get("date", ""),
+            r.get("evals", 0),
+            r.get("adopted", 0),
+            r.get("trades", 0),
+            "" if r.get("win_rate") is None else r.get("win_rate"),
+        ])
+
+    csv_data = buf.getvalue()
+    filename = f"pdca_summary_{from_str}_to_{to_str}.csv"
+    headers = {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=csv_data, headers=headers)
