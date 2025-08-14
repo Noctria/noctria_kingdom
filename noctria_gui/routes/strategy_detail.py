@@ -2,19 +2,22 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📘 Strategy Detail Route (v3.2 safe)
-- 指定戦略の PDCA 推移・指標トレンド/分布・履歴を可視化
-- 依存（templates / services）が未配備でも 500 にせずフォールバック
-  - ?raw=1  : JSON生出力
-  - ?safe=1 : テンプレ失敗時は簡易HTMLで返す（既定ON）
+📘 Strategy Detail Route (v3.3 safe + module fallback)
+- 指定戦略の PDCA 推移・トレンド/分布・履歴を可視化
+- 依存が未配備でも 500 にせずフォールバック
+  * 統計ログが無い場合でも、戦略ファイル/モジュールがあれば表示
+  * ?raw=1 : JSON 生返却
+  * ?safe=1: テンプレ失敗時は簡易HTML（既定ON）
 """
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 from collections import defaultdict
 from dataclasses import asdict, is_dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -22,51 +25,43 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-# ------------------------------------------------------------
-# ロギング
-# ------------------------------------------------------------
 logger = logging.getLogger("noctria_gui.strategy_detail")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 # ------------------------------------------------------------
-# パス設定（path_config がなくても動作）
+# パス設定（path_config がなくても動く）
 # ------------------------------------------------------------
 _THIS = Path(__file__).resolve()
 PROJECT_ROOT = _THIS.parents[2]  # <repo_root>
-
 try:
-    from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, DATA_DIR  # type: ignore
+    from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, DATA_DIR, STRATEGIES_DIR  # type: ignore
 except Exception:  # pragma: no cover
     NOCTRIA_GUI_TEMPLATES_DIR = PROJECT_ROOT / "noctria_gui" / "templates"
     DATA_DIR = PROJECT_ROOT / "data"
+    STRATEGIES_DIR = PROJECT_ROOT / "src" / "strategies"
 
 STATS_DIR = DATA_DIR / "stats"
-
 router = APIRouter(prefix="/strategies", tags=["strategy-detail"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # ------------------------------------------------------------
-# 依存サービス（未配備でもフォールバック）
+# 依存サービス（無ければフォールバック）
 # ------------------------------------------------------------
 def _load_all_statistics_fallback() -> List[Dict[str, Any]]:
-    """data/stats/ 配下の *.json（配列 or 1行1JSON）を素直に読み込むフォールバック。"""
     out: List[Dict[str, Any]] = []
     if not STATS_DIR.exists():
         return out
-
     for fp in sorted(STATS_DIR.glob("*.json")):
         try:
             text = fp.read_text(encoding="utf-8").strip()
             if not text:
                 continue
             if text.lstrip().startswith("["):
-                # 配列 JSON
                 arr = json.loads(text)
                 if isinstance(arr, list):
                     out.extend(x for x in arr if isinstance(x, dict))
             else:
-                # 行区切り JSON を想定
                 for line in text.splitlines():
                     line = line.strip()
                     if not line:
@@ -76,29 +71,22 @@ def _load_all_statistics_fallback() -> List[Dict[str, Any]]:
                         if isinstance(obj, dict):
                             out.append(obj)
                     except Exception:
-                        # 行単位のパース失敗はスキップ
                         continue
         except Exception:
-            # 壊れたファイルはスキップ
             continue
     return out
 
-
 try:
-    # 任意依存。存在しない場合はフォールバックローダに切替
     from noctria_gui.services import statistics_service  # type: ignore
-
     def load_all_statistics() -> List[Dict[str, Any]]:
         try:
             logs = statistics_service.load_all_statistics()
-            # dataclass 対応
             if logs and is_dataclass(logs[0]):
                 return [asdict(x) for x in logs]
             return logs
         except Exception:
             logger.warning("statistics_service.load_all_statistics() 失敗。フォールバックに切替。", exc_info=True)
             return _load_all_statistics_fallback()
-
 except Exception:  # pragma: no cover
     def load_all_statistics() -> List[Dict[str, Any]]:
         return _load_all_statistics_fallback()
@@ -114,10 +102,9 @@ DASHBOARD_METRICS: List[Dict[str, Any]] = [
 ]
 
 # ------------------------------------------------------------
-# ユーティリティ
+# ユーティリティ（%変換・集計）
 # ------------------------------------------------------------
 def _to_pct_if_ratio(k: str, v: Any) -> Any:
-    # win_rate / max_drawdown が 0..1 っぽければ % に変換
     try:
         fv = float(v)
     except Exception:
@@ -126,7 +113,6 @@ def _to_pct_if_ratio(k: str, v: Any) -> Any:
         return fv * 100.0
     return fv
 
-
 def _agg(vals: List[Optional[float]], dec: int) -> Tuple[Optional[float], Optional[float], Optional[float]]:
     xs = [v for v in vals if isinstance(v, (int, float))]
     if not xs:
@@ -134,16 +120,16 @@ def _agg(vals: List[Optional[float]], dec: int) -> Tuple[Optional[float], Option
     avg = round(sum(xs) / len(xs), dec)
     return avg, round(max(xs), dec), round(min(xs), dec)
 
-
+# ------------------------------------------------------------
+# ログ→履歴/トレンド/分布 生成
+# ------------------------------------------------------------
 def _build_history_trend_dist(strategy_name: str, logs: List[Dict[str, Any]]):
-    """履歴（hist）、日次トレンド（trend_dict）、分布（dist）を生成。"""
     hist = [log for log in logs if log.get("strategy") == strategy_name]
     if not hist:
         return None, None, None
 
-    # 日次集計
-    trend = defaultdict(lambda: defaultdict(list))  # date -> metric -> [values]
-    dist = defaultdict(list)                        # metric -> [values]
+    trend = defaultdict(lambda: defaultdict(list))
+    dist = defaultdict(list)
 
     for log in hist:
         date = (log.get("evaluated_at") or "")[:10]
@@ -164,45 +150,78 @@ def _build_history_trend_dist(strategy_name: str, logs: List[Dict[str, Any]]):
         vals: List[Optional[float]] = []
         for d in dates:
             arr = trend[d][k]
-            if arr:
-                vals.append(round(sum(arr) / len(arr), m["dec"]))
-            else:
-                vals.append(None)
+            vals.append(round(sum(arr) / len(arr), m["dec"]) if arr else None)
         avg, vmax, vmin = _agg(vals, m["dec"])
         diff = None
-        if len([v for v in vals if v is not None]) >= 2:
-            # 末尾の連続2点の差分（Noneは無視）
-            tail = [v for v in vals if v is not None][-2:]
-            diff = round(tail[-1] - tail[-2], m["dec"])
-        trend_dict[k] = {
-            "labels": dates,
-            "values": vals,
-            "avg": avg,
-            "max": vmax,
-            "min": vmin,
-            "diff": diff,
-        }
+        seq = [v for v in vals if v is not None]
+        if len(seq) >= 2:
+            diff = round(seq[-1] - seq[-2], m["dec"])
+        trend_dict[k] = {"labels": dates, "values": vals, "avg": avg, "max": vmax, "min": vmin, "diff": diff}
     return hist, trend_dict, dist
 
+# ------------------------------------------------------------
+# モジュール / ファイル フォールバック
+# ------------------------------------------------------------
+def _strategy_candidates(name: str) -> List[Path]:
+    vg = STRATEGIES_DIR / "veritas_generated"
+    return [
+        vg / f"{name}.py", vg / f"{name}.json",
+        STRATEGIES_DIR / f"{name}.py", STRATEGIES_DIR / f"{name}.json",
+    ]
 
-def _find_related_by_tags(all_logs: List[Dict[str, Any]],
-                          strategy_name: str,
-                          current_tags: List[str]) -> List[Dict[str, Any]]:
-    if not current_tags:
-        return []
-    rel = []
-    seen = set()
-    for s in all_logs:
-        name = s.get("strategy")
-        if not name or name == strategy_name or name in seen:
+def _strategy_exists(name: str) -> bool:
+    return any(p.exists() for p in _strategy_candidates(name))
+
+def _import_strategy_module(name: str):
+    for mn in (f"strategies.veritas_generated.{name}", f"strategies.{name}"):
+        try:
+            return importlib.import_module(mn)
+        except Exception:
             continue
-        tags = s.get("tags") or []
-        if any(t in (tags or []) for t in current_tags):
-            rel.append(s)
-            seen.add(name)
-        if len(rel) >= 4:
-            break
-    return rel
+    return None
+
+def _compute_kpis_from_module(mod) -> Dict[str, Any]:
+    # Strategy クラス優先
+    for attr in ("Strategy", "strategy",):
+        S = getattr(mod, attr, None)
+        if S:
+            try:
+                obj = S() if callable(S) else S
+                if hasattr(obj, "compute_kpis"):
+                    k = obj.compute_kpis()
+                    if is_dataclass(k): k = asdict(k)
+                    if not isinstance(k, dict): k = dict(k)
+                    return k
+            except Exception:
+                pass
+    # top-level 関数
+    for fn_name in ("compute_kpis", "get_kpis", "calc_kpis"):
+        fn = getattr(mod, fn_name, None)
+        if callable(fn):
+            try:
+                k = fn()
+                if is_dataclass(k): k = asdict(k)
+                if not isinstance(k, dict): k = dict(k)
+                return k
+            except Exception:
+                pass
+    # run_backtest -> (kpis, trades)
+    rb = getattr(mod, "run_backtest", None)
+    if callable(rb):
+        try:
+            ret = rb()
+            if isinstance(ret, tuple) and len(ret) >= 1:
+                k = ret[0]
+                if is_dataclass(k): k = asdict(k)
+                if not isinstance(k, dict): k = dict(k)
+                return k
+        except Exception:
+            pass
+    # 何もなければ placeholder
+    return {"trades": 0, "win_rate": None, "avg_return_pct": None, "pnl_sum_pct": None, "max_drawdown_pct": None, "_note": "module: KPIs unavailable"}
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 # ------------------------------------------------------------
 # Route
@@ -218,28 +237,70 @@ async def show_strategy_detail(
 ):
     logger.info("戦略詳細リクエスト: %s", strategy_name)
 
-    # データ読込（services が無ければフォールバック）
+    # 1) まず統計ログで探す
+    logs: List[Dict[str, Any]] = []
     try:
         logs = load_all_statistics()
     except Exception as e:
-        logger.error("統計ログの読み込みに失敗: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="統計ログの読み込みに失敗しました。")
+        logger.warning("統計ログ読み込み失敗（フォールバック継続）: %s", e, exc_info=True)
+        logs = []
 
-    # 戦略存在確認
     matched_strategy = next((log for log in logs if log.get("strategy") == strategy_name), None)
+
+    # 2) ログになければ、モジュール/ファイルでフォールバック表示
+    fallback_used = False
     if not matched_strategy:
-        raise HTTPException(status_code=404, detail=f"戦略『{strategy_name}』は見つかりません。")
+        if not _strategy_exists(strategy_name):
+            # 本当に何も無ければ 404
+            raise HTTPException(status_code=404, detail=f"戦略『{strategy_name}』は見つかりません。")
+        # KPI だけでも出す
+        mod = _import_strategy_module(strategy_name)
+        kpis = {}
+        if mod:
+            try:
+                kpis = _compute_kpis_from_module(mod)
+            except Exception:
+                kpis = {}
+        matched_strategy = {
+            "strategy": strategy_name,
+            "tags": [],
+            "win_rate": kpis.get("win_rate"),
+            "max_drawdown": kpis.get("max_drawdown") or kpis.get("max_drawdown_pct"),
+            "trade_count": kpis.get("trades") or kpis.get("trade_count"),
+            "profit_factor": kpis.get("profit_factor"),
+            "kpis": kpis,
+            "_source": "module_only",
+            "_observed_at": _now_iso(),
+        }
+        logs = []  # 履歴なし
+        fallback_used = True
 
-    # 関連戦略（タグ）
+    # 3) 関連戦略（タグ一致）
+    def _find_related_by_tags(all_logs: List[Dict[str, Any]], current_tags: List[str]) -> List[Dict[str, Any]]:
+        if not all_logs or not current_tags:
+            return []
+        rel, seen = [], set()
+        for s in all_logs:
+            name = s.get("strategy")
+            if not name or name == strategy_name or name in seen:
+                continue
+            tags = s.get("tags") or []
+            if any(t in (tags or []) for t in current_tags):
+                rel.append(s); seen.add(name)
+            if len(rel) >= 4:
+                break
+        return rel
+
     current_tags = matched_strategy.get("tags") or []
-    related_strategies = _find_related_by_tags(logs, strategy_name, current_tags)
+    related_strategies = _find_related_by_tags(logs, current_tags)
 
-    # 履歴/トレンド/分布
+    # 4) 履歴/トレンド/分布
     hist, trend_dict, dist = _build_history_trend_dist(strategy_name, logs)
     if hist is None:
-        raise HTTPException(status_code=404, detail="履歴情報が存在しません。")
+        # 履歴が無い場合は空で返す（フォールバック時も 200 にする）
+        hist, trend_dict, dist = [], {}, {}
 
-    # raw=1 なら JSON 生返却
+    # 5) raw=1 なら JSON 返却
     base_payload = {
         "strategy": matched_strategy,
         "related_strategies": related_strategies,
@@ -249,22 +310,16 @@ async def show_strategy_detail(
         "eval_list": sorted(hist, key=lambda x: (x.get("evaluated_at") or ""), reverse=True),
         "trace_id": trace_id,
         "decision_id": decision_id,
+        "_fallback_used": fallback_used,
     }
     if raw == 1:
         return JSONResponse(base_payload)
 
-    # テンプレート選択（存在しなければ safe モードで簡易HTML）
-    # 優先: templates/strategies/detail.html -> 従来: strategy_detail.html
+    # 6) テンプレ描画（無ければ簡易HTML）
     tpl_primary = NOCTRIA_GUI_TEMPLATES_DIR / "strategies" / "detail.html"
     tpl_legacy = NOCTRIA_GUI_TEMPLATES_DIR / "strategy_detail.html"
     context = {"request": request, **base_payload}
-
-    if tpl_primary.exists():
-        tpl_name = "strategies/detail.html"
-    elif tpl_legacy.exists():
-        tpl_name = "strategy_detail.html"
-    else:
-        tpl_name = None
+    tpl_name = "strategies/detail.html" if tpl_primary.exists() else ("strategy_detail.html" if tpl_legacy.exists() else None)
 
     if tpl_name:
         if safe == 1:
@@ -274,7 +329,6 @@ async def show_strategy_detail(
                 logger.warning("テンプレ描画失敗。簡易HTMLにフォールバック: %s", e, exc_info=True)
                 # fallthrough to simple HTML
         else:
-            # safe=0 の場合はテンプレの例外をそのまま上げる
             return templates.TemplateResponse(tpl_name, context)
 
     # 簡易HTMLフォールバック
@@ -288,7 +342,7 @@ async def show_strategy_detail(
       <h2>Overview</h2>
       <pre>{json.dumps(matched_strategy, ensure_ascii=False, indent=2)}</pre>
 
-      <h2>KPIs / Trends (aggregated daily)</h2>
+      <h2>Trends</h2>
       <pre>{json.dumps(trend_dict, ensure_ascii=False, indent=2)}</pre>
 
       <h2>Distributions</h2>
