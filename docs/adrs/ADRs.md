@@ -300,6 +300,27 @@ EOF
 <!-- AUTODOC:BEGIN mode=git_log path_globs=docs/adrs/*.md title=ADRファイルの更新履歴（最近50） limit=50 since=2025-07-01 -->
 ### ADRファイルの更新履歴（最近50）
 
+- **e79166f** 2025-08-16T00:51:44+09:00 — docs: full-wrap AUTODOC + sync from partials (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/00_index/00-INDEX.md.bak`
+  - `"docs/Next Actions \342\200\224 Noctria PDCA Hardening Plan.md"`
+  - `"docs/Next Actions \342\200\224 Noctria PDCA Hardening Plan.md.bak"`
+  - `docs/Noctria_Kingdom_System_Design_v2025-08.md`
+  - `docs/Noctria_Kingdom_System_Design_v2025-08.md.bak`
+  - `docs/README.md`
+  - `docs/README.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md`
+  - `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/04_order_request.md`
+  - `docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md`
+  - `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md`
+  - `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak`
 - **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
   - `docs/00_index/00-INDEX.md`
   - `docs/00_index/00-INDEX.md.bak`

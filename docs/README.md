@@ -33,6 +33,50 @@ Noctria: 統合判断AI（王）
 <!-- AUTODOC:BEGIN mode=git_log path_globs="README.md;docs/**/*.md" title=ドキュメント更新履歴（最近30） limit=30 since=2025-08-01 -->
 ### ドキュメント更新履歴（最近30）
 
+- **558bfd7** 2025-08-16T01:44:43+09:00 — docs: cleanup AUTODOC duplicates and strip stray diff hunks (by Veritas Machina)
+  - `.gitignore`
+  - `20250603.md.bak`
+  - `AirFlow_start.md.bak`
+  - `airflow_docker/.env.bak`
+  - `airflow_docker/docker/Dockerfile.bak`
+  - `airflow_docker/pvc/airflow-dags-pv.yaml.bak`
+  - `airflow_docker/pvc/airflow-dags-pvc.yaml.bak`
+  - `airflow_docker/scripts/download_veritas_model.py.bak`
+  - `airflow_docker/scripts/push_generated_strategy.py.bak`
+  - `autogen_scripts/openai_noctria_dev.py.bak`
+  - `callmemo_20250602.md.bak`
+  - `docs/00_index/00-INDEX.md.bak`
+  - `"docs/Next Actions \342\200\224 Noctria PDCA Hardening Plan.md.bak"`
+  - `docs/Noctria_Kingdom_System_Design_v2025-08.md.bak`
+  - `docs/README.md.bak`
+  - `docs/_generated/diff_report.md`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak`
+- **c00a20a** 2025-08-16T01:07:45+09:00 — diff check (by Veritas Machina)
+  - `docs/_generated/diff_report.md`
+- **e79166f** 2025-08-16T00:51:44+09:00 — docs: full-wrap AUTODOC + sync from partials (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/00_index/00-INDEX.md.bak`
+  - `"docs/Next Actions \342\200\224 Noctria PDCA Hardening Plan.md"`
+  - `"docs/Next Actions \342\200\224 Noctria PDCA Hardening Plan.md.bak"`
+  - `docs/Noctria_Kingdom_System_Design_v2025-08.md`
+  - `docs/Noctria_Kingdom_System_Design_v2025-08.md.bak`
+  - `docs/README.md`
+  - `docs/README.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md`
+  - `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/04_order_request.md`
+  - `docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md`
+  - `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md`
+  - `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak`
 - **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
   - `docs/00_index/00-INDEX.md`
   - `docs/00_index/00-INDEX.md.bak`
@@ -163,10 +207,4 @@ Noctria: 統合判断AI（王）
   - `docs/observability/Observability.md`
 - **80783ed** 2025-08-13T00:22:34+09:00 — Update Observability.md (by Noctoria)
   - `docs/observability/Observability.md`
-- **602e45d** 2025-08-12T23:57:03+09:00 — Update Observability.md (by Noctoria)
-  - `docs/observability/Observability.md`
-- **7116954** 2025-08-12T23:44:44+09:00 — Update Observability.md (by Noctoria)
-  - `docs/observability/Observability.md`
-- **9a3c459** 2025-08-12T23:02:47+09:00 — Update Do-Layer-Contract.md (by Noctoria)
-  - `docs/apis/Do-Layer-Contract.md`
 <!-- AUTODOC:END -->
