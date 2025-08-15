@@ -1,236 +1,41 @@
-# docs/autodoc_rules.yaml
-# Noctria AutoDoc rules (starter, opinionated)
-# - 役割: 既存 md に AUTODOC ブロックを一括挿入するための定義
-# - 基本方針:
-#   * Mermaid 図は mode=file_content + fence=mermaid
-#   * コードや仕様の更新は mode=git_log（limit/sinceでノイズ低減）
-#   * 位置は H1直後（after_h1）か末尾（end）が基本
-#   * path_globs は repo-root 相対（scripts/update_docs_from_index.py の仕様）
-
-# ✅ 共通プリセット（YAMLアンカー）
-x-presets:
-  git_recent_30: &git_recent_30
-    mode: "git_log"
-    limit: 30
-    since: "2025-08-01"
-
-  git_recent_50: &git_recent_50
-    mode: "git_log"
-    limit: 50
-    since: "2025-07-01"
-
-  mermaid_set: &mermaid_set
-    mode: "file_content"
-    fence: "mermaid"
-
-rules:
-  # ========== トップ/インデックス ==========
-  - match: "README.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "README.md;docs/**/*.md"
-        title: "ドキュメント更新履歴（最近30）"
-
-  - match: "00_index/00-INDEX.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_50
-        path_globs: "docs/**/*.md"
-        title: "Docs全体の更新履歴（最近50）"
-
-  # ========== アーキテクチャ ==========
-  - match: "architecture/Architecture-Overview.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/architecture/diagrams/*.mmd"
-        title: "アーキテクチャ図（最新セット）"
-      - <<: *git_recent_30
-        path_globs: "src/**/*.py"
-        title: "コードベース更新履歴（最近30）"
-
-  - match: "architecture/Plan-Layer.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/architecture/diagrams/plan_layer.mmd;docs/architecture/diagrams/plan_layer_*.mmd"
-        title: "PLAN層 図（最新）"
-      - <<: *git_recent_30
-        path_globs: "src/plan_data/*.py;src/plan_data/**/*.py"
-        title: "PLAN層 変更履歴（最近30）"
-
-  # ========== 観測性/可観測性 ==========
-  - match: "observability/Observability.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/architecture/diagrams/act_layer.mmd"
-        title: "Act Layer Mermaid図（最新）"
-      - <<: *git_recent_30
-        path_globs: "src/plan_data/observability.py;src/plan_data/trace.py;src/plan_data/decision_engine.py"
-        title: "Observability/Trace/DecisionEngine 更新履歴（最近30）"
-
-  # ========== モデル/戦略 ==========
-  - match: "models/ModelCard-Prometheus-PPO.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/models/diagrams/prometheus_ppo.mmd"
-        title: "Prometheus PPO モデル図（最新）"
-      - <<: *git_recent_30
-        path_globs: "src/prometheus_oracle/**/*.py;src/strategies/prometheus_oracle.py"
-        title: "Prometheus Oracle 実装更新履歴（最近30）"
-
-  - match: "models/Strategy-Lifecycle.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/architecture/diagrams/strategy_lifecycle.mmd"
-        title: "戦略ライフサイクル図（最新）"
-      - <<: *git_recent_30
-        path_globs: "src/strategies/**/*.py;src/veritas/**/*.py"
-        title: "戦略/Veritas 更新履歴（最近30）"
-
-  # ========== API ==========
-  - match: "apis/API.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "noctria_gui/routes/**/*.py;noctria_gui/**/main.py;src/apis/**/*.py"
-        title: "API/GUI Routes 更新履歴（最近30）"
-
-  - match: "apis/Do-Layer-Contract.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/architecture/diagrams/do_layer_contract.mmd"
-        title: "Do-Layer Contract（最新）"
-      - <<: *git_recent_30
-        path_globs: "src/core/risk_control.py;src/execution/**/*.py"
-        title: "Do層 契約/実装更新履歴（最近30）"
-
-  # ========== 運用 ==========
-  - match: "operations/Airflow-DAGs.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *mermaid_set
-        path_globs: "docs/architecture/diagrams/airflow_dags.mmd"
-        title: "Airflow DAGs 図（最新）"
-      - <<: *git_recent_50
-        path_globs: "airflow_docker/dags/**/*.py;airflow_docker/*.yaml;airflow_docker/**/*.yaml"
-        title: "Airflow/DAG/Compose 更新履歴（最近50）"
-
-  - match: "operations/Runbooks.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/operations/*.md;docs/misc/*.md"
-        title: "運用ドキュメント更新履歴（最近30）"
-
-  - match: "operations/Config-Registry.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "src/core/settings.py;src/core/config/**/*.py;docs/operations/*.md"
-        title: "設定/レジストリ更新履歴（最近30）"
-
-  # ========== ガバナンス/標準 ==========
-  - match: "governance/Coding-Standards.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/governance/*.md;docs/qa/*.md"
-        title: "標準/品質関連ドキュメント更新履歴（最近30）"
-
-  - match: "governance/Vision-Governance.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/governance/*.md"
-        title: "ビジョン/統治 文書更新履歴（最近30）"
-
-  # ========== セキュリティ ==========
-  - match: "security/Security-And-Access.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/security/*.md;src/security/**/*.py"
-        title: "セキュリティ関連更新履歴（最近30）"
-
-  # ========== QA/テスト ==========
-  - match: "qa/Testing-And-QA.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "tests/**/*.py;docs/qa/*.md"
-        title: "テスト/QA 更新履歴（最近30）"
-
-  # ========== インシデント ==========
-  - match: "incidents/Incident-Postmortems.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/incidents/*.md;logs/incidents/**/*.md"
-        title: "インシデント文書更新履歴（最近30）"
-
-  # ========== リスク ==========
-  - match: "risks/Risk-Register.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/risks/*.md"
-        title: "リスクレジスタ更新履歴（最近30）"
-
-  # ========== ロードマップ ==========
-  - match: "roadmap/Roadmap-OKRs.md"
-    position: "after_h1"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/roadmap/*.md"
-        title: "OKR/ロードマップ更新履歴（最近30）"
-
-  - match: "roadmap/Release-Notes.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_50
-        path_globs: "docs/roadmap/*.md"
-        title: "Release Notes 更新履歴（最近50）"
-
-  # ========== ADR ==========
-  - match: "adrs/ADRs.md"
-    position: "end"
-    only_if_missing: false
-    blocks:
-      - <<: *git_recent_50
-        path_globs: "docs/adrs/*.md"
-        title: "ADRファイルの更新履歴（最近50）"
-
-  # ========== 雑多（misc） ==========
-  - match: "misc/*.md"
-    position: "end"
-    only_if_missing: true
-    blocks:
-      - <<: *git_recent_30
-        path_globs: "docs/misc/*.md"
-        title: "Misc 文書更新履歴（最近30）"
+wrap_rules:
+  - file: "apis/Do-Layer-Contract.md"
+    partials_root: "docs/_partials/apis/Do-Layer-Contract"
+    keep_heading: true
+    sections:
+      - heading_regex: "^##\\s*1\\)\\s*スコープ\\s*&\\s*原則"
+        slug: "01_scope_principles"
+        title: "スコープ & 原則（最新）"
+      - heading_regex: "^##\\s*2\\)\\s*フロー（概観）"
+        slug: "02_flow_overview"
+        title: "フロー（概観）"
+      - heading_regex: "^##\\s*3\\)\\s*エンティティ（Schemas）"
+        slug: "03_entities_schemas"
+        title: "エンティティ（Schemas）"
+      - heading_regex: "^##\\s*4\\)\\s*`order_request`（Plan\\s*→\\s*Do）"
+        slug: "04_order_request"
+        title: "`order_request`（Plan → Do）"
+      - heading_regex: "^##\\s*5\\)\\s*`exec_result`（Do\\s*→\\s*Check）"
+        slug: "05_exec_result"
+        title: "`exec_result`（Do → Check）"
+      - heading_regex: "^##\\s*6\\)\\s*`audit_order`（WORM\\s*監査）"
+        slug: "06_audit_order"
+        title: "`audit_order`（WORM 監査）"
+      - heading_regex: "^##\\s*7\\)\\s*数値精度・丸め（Financial\\s*Correctness）"
+        slug: "07_financial_correctness"
+        title: "数値精度・丸め（Financial Correctness）"
+      - heading_regex: "^##\\s*8\\)\\s*Idempotency\\s*/\\s*Concurrency"
+        slug: "08_idempotency_concurrency"
+        title: "Idempotency / Concurrency"
+      - heading_regex: "^##\\s*9\\)\\s*エラーコード（対照表）"
+        slug: "09_error_codes"
+        title: "エラーコード（対照表）"
+      - heading_regex: "^##\\s*10\\)\\s*サンプル（テスト用最小セット）"
+        slug: "10_samples_min"
+        title: "サンプル（テスト用最小セット）"
+      - heading_regex: "^##\\s*11\\)\\s*契約テスト（CI\\s*要件）"
+        slug: "11_contract_tests"
+        title: "契約テスト（CI 要件）"
+      - heading_regex: "^##\\s*12\\)\\s*変更履歴"
+        slug: "12_changelog"
+        title: "変更履歴"
