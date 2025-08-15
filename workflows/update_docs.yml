@@ -2,14 +2,12 @@ name: update_docs
 
 on:
   push:
-    # どのブランチでも、docs配下かスクリプトが変わったら走る
     branches:
-      - '**'
+      - '**'         # どのブランチでも
     paths:
-      - 'docs/**'
-      - 'scripts/update_docs_from_index.py'
-  # 手動実行も可（Actions > Run workflow）
-  workflow_dispatch:
+      - 'docs/**'    # docs配下の変更
+      - 'scripts/update_docs_from_index.py'  # スクリプト更新
+  workflow_dispatch:  # 手動実行も可
 
 permissions:
   contents: write   # 変更をコミット＆プッシュするため
@@ -18,12 +16,13 @@ jobs:
   run-update-docs:
     runs-on: ubuntu-latest
     env:
-      TZ: Asia/Tokyo   # JST表記の更新日時などに合わせたい場合
+      TZ: Asia/Tokyo   # JST表記が必要なら
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # コミット差分やタグ参照が必要になる場合に備えて
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,9 +36,14 @@ jobs:
             pip install -r requirements.txt
           fi
 
+      - name: Install ripgrep (for sanity checks)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ripgrep
+
       - name: Run update_docs_from_index.py
         run: |
-          set -e
+          set -euo pipefail
           if [ -f scripts/update_docs_from_index.py ]; then
             python scripts/update_docs_from_index.py
           else
@@ -47,15 +51,29 @@ jobs:
             exit 1
           fi
 
+      - name: Docs sanity check
+        run: |
+          set -euo pipefail
+          # 1) 連続 AUTODOC マーカーがないか
+          if rg -nUP '(<!-- AUTODOC:(?:BEGIN|END)[^>]*-->[ \t]*\R){2,}' docs -g '!docs/_generated/**' ; then
+            echo "ERROR: consecutive AUTODOC markers found"
+            exit 1
+          fi
+          # 2) diff 断片が混入していないか
+          if rg -n "(@@ -[0-9]+,[0-9]+ \+[0-9]+,[0-9]+ @@|^diff --git|^index [0-9a-f]{7,}\.\.)" docs -g '!docs/_generated/**' ; then
+            echo "ERROR: stray diff hunks found"
+            exit 1
+          fi
+
       - name: Commit & push if changed
         run: |
-          set -e
+          set -euo pipefail
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
+            # [skip ci] を入れて他ワークフローを抑止（後述のbuild_and_deployのif条件と二重ガード）
             git commit -m "📄 AutoDoc: update docs from index [skip ci]"
-            # 元のブランチにプッシュ
             git push
           else
             echo "ドキュメントの変更はありません。"
