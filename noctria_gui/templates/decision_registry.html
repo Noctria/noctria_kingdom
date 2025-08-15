@@ -1,0 +1,108 @@
+<!-- noctria_gui/templates/decision_registry.html -->
+{% extends "base_hud.html" %}
+{% block title %}{{ page_title }} | Noctria HUD{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <h1 class="panel-title">{{ page_title }}</h1>
+
+  {% if mode == "index" %}
+    <form method="get" action="/decisions" class="form-grid" style="margin-bottom:1rem">
+      <div class="form-row">
+        <label>検索 (decision_id / kind / phase / issued_by)</label>
+        <input type="text" name="q" placeholder="検索語" value="{{ query or '' }}">
+      </div>
+      <div class="form-row">
+        <label>件数</label>
+        <input type="number" name="n" min="1" value="{{ n }}">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">🔎 検索</button>
+        <a class="btn" href="/decisions">↻ クリア</a>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-compact">
+        <thead>
+          <tr>
+            <th>時刻(UTC)</th>
+            <th>phase</th>
+            <th>decision_id</th>
+            <th>kind</th>
+            <th>issued_by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows|reverse %}
+            <tr>
+              <td><code>{{ r.ts_utc }}</code></td>
+              <td>{{ r.phase }}</td>
+              <td><a href="/decisions/{{ r.decision_id }}">{{ r.decision_id }}</a></td>
+              <td>{{ r.kind }}</td>
+              <td>{{ r.issued_by }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="muted">イベントがありません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if mode == "detail" %}
+    <div class="grid-2">
+      <div>
+        <h3>最新イベントの概要</h3>
+        <ul class="kv">
+          <li><span>decision_id</span><code>{{ decision_id }}</code></li>
+          <li><span>最終phase</span>{{ latest.phase }}</li>
+          <li><span>kind</span>{{ latest.kind }}</li>
+          <li><span>issued_by</span>{{ latest.issued_by }}</li>
+          <li><span>最終時刻(UTC)</span><code>{{ latest.ts_utc }}</code></li>
+        </ul>
+
+        <details open>
+          <summary>intent_json</summary>
+          <pre>{{ latest.intent_json | from_json | tojson(indent=2) }}</pre>
+        </details>
+        <details>
+          <summary>policy_snapshot_json</summary>
+          <pre>{{ latest.policy_snapshot_json | from_json | tojson(indent=2) }}</pre>
+        </details>
+        <details>
+          <summary>extra_json</summary>
+          <pre>{{ latest.extra_json | from_json | tojson(indent=2) }}</pre>
+        </details>
+
+        <div class="actions" style="margin-top: 0.5rem">
+          <a class="btn" href="/decisions">← 一覧へ</a>
+        </div>
+      </div>
+
+      <div>
+        <h3>イベント時系列</h3>
+        <div class="timeline">
+          {% for ev in events %}
+            <div class="timeline-item">
+              <div class="timeline-time"><code>{{ ev.ts_utc }}</code></div>
+              <div class="timeline-badge">{{ ev.phase }}</div>
+              <div class="timeline-content">
+                <div class="muted">kind: {{ ev.kind }} / issued_by: {{ ev.issued_by }}</div>
+                {% set extra = ev.extra_json | from_json %}
+                {% if extra and extra != {} %}
+                  <pre>{{ extra | tojson(indent=2) }}</pre>
+                {% endif %}
+              </div>
+            </div>
+          {% else %}
+            <p class="muted">イベントが見つかりません。</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% include "partials/toast.html" ignore missing %}
+{% endblock %}
