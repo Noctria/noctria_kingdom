@@ -132,11 +132,6 @@
 ### `docs/00_index/00-INDEX.md`
 
 ```diff
-diff --git a/docs/00_index/00-INDEX.md b/docs/00_index/00-INDEX.md
-index d52937c..4e8d321 100644
---- a/docs/00_index/00-INDEX.md
-+++ b/docs/00_index/00-INDEX.md
-@@ -407,4 +407,25 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
  ### Docs全体の更新履歴（最近50）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -162,7 +157,6 @@ index d52937c..4e8d321 100644
 +  - `docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak`
  - **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
    - `docs/00_index/00-INDEX.md`
-@@ -562,5 +583,3 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
  - **39879e1** 2025-08-12T11:11:02+09:00 — Plan-Layer.md を更新 (by Noctoria)
    - `docs/architecture/Plan-Layer.md`
 -- **d52df0f** 2025-08-12T11:04:27+09:00 — Strategy-Lifecycle.md を更新 (by Noctoria)
@@ -174,11 +168,6 @@ index d52937c..4e8d321 100644
 ### `docs/00_index/00-INDEX.md.bak`
 
 ```diff
-diff --git a/docs/00_index/00-INDEX.md.bak b/docs/00_index/00-INDEX.md.bak
-index 20249ff..d52937c 100644
---- a/docs/00_index/00-INDEX.md.bak
-+++ b/docs/00_index/00-INDEX.md.bak
-@@ -407,4 +407,25 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
  ### Docs全体の更新履歴（最近50）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -204,7 +193,6 @@ index 20249ff..d52937c 100644
 +  - `docs/apis/Do-Layer-Contract.md.bak`
  - **30ae379** 2025-08-15T18:55:06+09:00 — 📄 AutoDoc: update docs from index (by Veritas Machina)
    - `action`
-@@ -543,5 +564,3 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
  - **d52df0f** 2025-08-12T11:04:27+09:00 — Strategy-Lifecycle.md を更新 (by Noctoria)
    - `docs/models/Strategy-Lifecycle.md`
 -- **bf26e27** 2025-08-12T11:00:03+09:00 — ModelCard-Prometheus-PPO.md を更新 (by Noctoria)
@@ -224,15 +212,9 @@ _(binary or no textual diff)_
 ### `docs/Noctria_Kingdom_System_Design_v2025-08.md`
 
 ```diff
-diff --git a/docs/Noctria_Kingdom_System_Design_v2025-08.md b/docs/Noctria_Kingdom_System_Design_v2025-08.md
-index 5cb8a50..2aa0172 100644
---- a/docs/Noctria_Kingdom_System_Design_v2025-08.md
-+++ b/docs/Noctria_Kingdom_System_Design_v2025-08.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md -->
  # Noctria Kingdom System Design（v2025-08 統合版 + db_logging統合）
  
-@@ -85,2 +86,3 @@ flowchart TD
    ORDER --> GENORDER
    ORDER -.-> OPTORDER
 +<!-- AUTODOC:END -->
@@ -242,12 +224,7 @@ index 5cb8a50..2aa0172 100644
 ### `docs/Noctria_Kingdom_System_Design_v2025-08.md.bak`
 
 ```diff
-diff --git a/docs/Noctria_Kingdom_System_Design_v2025-08.md.bak b/docs/Noctria_Kingdom_System_Design_v2025-08.md.bak
 new file mode 100644
-index 0000000..9220bc5
---- /dev/null
-+++ b/docs/Noctria_Kingdom_System_Design_v2025-08.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -257,11 +234,6 @@ index 0000000..9220bc5
 ### `docs/README.md`
 
 ```diff
-diff --git a/docs/README.md b/docs/README.md
-index c3c3ebb..2266d29 100755
---- a/docs/README.md
-+++ b/docs/README.md
-@@ -34,4 +34,25 @@ Noctria: 統合判断AI（王）
  ### ドキュメント更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -287,7 +259,6 @@ index c3c3ebb..2266d29 100755
 +  - `docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak`
  - **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
    - `docs/00_index/00-INDEX.md`
-@@ -149,5 +170,3 @@ Noctria: 統合判断AI（王）
  - **9a3c459** 2025-08-12T23:02:47+09:00 — Update Do-Layer-Contract.md (by Noctoria)
    - `docs/apis/Do-Layer-Contract.md`
 -- **ce87e75** 2025-08-12T22:54:25+09:00 — Update Testing-And-QA.md (by Noctoria)
@@ -299,11 +270,6 @@ index c3c3ebb..2266d29 100755
 ### `docs/README.md.bak`
 
 ```diff
-diff --git a/docs/README.md.bak b/docs/README.md.bak
-index da68e0c..c3c3ebb 100644
---- a/docs/README.md.bak
-+++ b/docs/README.md.bak
-@@ -34,4 +34,25 @@ Noctria: 統合判断AI（王）
  ### ドキュメント更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -329,7 +295,6 @@ index da68e0c..c3c3ebb 100644
 +  - `docs/apis/Do-Layer-Contract.md.bak`
  - **30ae379** 2025-08-15T18:55:06+09:00 — 📄 AutoDoc: update docs from index (by Veritas Machina)
    - `action`
-@@ -130,5 +151,3 @@ Noctria: 統合判断AI（王）
  - **ce87e75** 2025-08-12T22:54:25+09:00 — Update Testing-And-QA.md (by Noctoria)
    - `docs/qa/Testing-And-QA.md`
 -- **108b97b** 2025-08-12T22:49:15+09:00 — Update Architecture-Overview.md (by Noctoria)
@@ -341,11 +306,6 @@ index da68e0c..c3c3ebb 100644
 ### `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md b/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md
-index 70877e5..894c785 100644
---- a/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md
-@@ -5,4 +5,7 @@
  ### スコープ & 原則（最新）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
@@ -353,8 +313,6 @@ index 70877e5..894c785 100644
 +
  - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
  - **原則**：  
-@@ -15,2 +18,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -364,11 +322,6 @@ index 70877e5..894c785 100644
 ### `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak b/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak
-index 1767f0e..70877e5 100644
---- a/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md.bak
-@@ -2,4 +2,7 @@
  ### スコープ & 原則（最新）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
@@ -376,7 +329,6 @@ index 1767f0e..70877e5 100644
 +
  - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
  - **原則**：  
-@@ -11,2 +14,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -386,11 +338,6 @@ index 1767f0e..70877e5 100644
 ### `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md b/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md
-index 4a1b483..20ce24f 100644
---- a/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md
-@@ -5,4 +5,7 @@
  ### フロー（概観）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
@@ -398,8 +345,6 @@ index 4a1b483..20ce24f 100644
 +
  ```mermaid
  sequenceDiagram
-@@ -24,2 +27,4 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -409,11 +354,6 @@ index 4a1b483..20ce24f 100644
 ### `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak b/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak
-index 294bcc7..4a1b483 100644
---- a/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md.bak
-@@ -2,4 +2,7 @@
  ### フロー（概観）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
@@ -421,7 +361,6 @@ index 294bcc7..4a1b483 100644
 +
  ```mermaid
  sequenceDiagram
-@@ -20,2 +23,3 @@ sequenceDiagram
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -431,11 +370,6 @@ index 294bcc7..4a1b483 100644
 ### `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md b/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md
-index 17b1431..b6b5f09 100644
---- a/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md
-@@ -5,4 +5,7 @@
  ### エンティティ（Schemas）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
@@ -443,8 +377,6 @@ index 17b1431..b6b5f09 100644
 +
  - `docs/schemas/order_request.schema.json`  
  - `docs/schemas/exec_result.schema.json`  
-@@ -15,2 +18,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -454,11 +386,6 @@ index 17b1431..b6b5f09 100644
 ### `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak b/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak
-index 5fa8c66..17b1431 100644
---- a/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md.bak
-@@ -2,4 +2,7 @@
  ### エンティティ（Schemas）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
@@ -466,7 +393,6 @@ index 5fa8c66..17b1431 100644
 +
  - `docs/schemas/order_request.schema.json`  
  - `docs/schemas/exec_result.schema.json`  
-@@ -11,2 +14,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -476,11 +402,6 @@ index 5fa8c66..17b1431 100644
 ### `docs/_partials/apis/Do-Layer-Contract/04_order_request.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/04_order_request.md b/docs/_partials/apis/Do-Layer-Contract/04_order_request.md
-index 1085f33..5660a8d 100644
---- a/docs/_partials/apis/Do-Layer-Contract/04_order_request.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/04_order_request.md
-@@ -5,4 +5,7 @@
  ### `order_request`（Plan → Do）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
@@ -488,8 +409,6 @@ index 1085f33..5660a8d 100644
 +
  **必須**：`symbol`, `side`, `proposed_qty`, `time`, `meta.strategy`  
  **オプション**：`max_slippage_pct`, `time_in_force`, `constraints.qty_step/price_tick`, `meta.shadow`
-@@ -29,2 +32,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -499,11 +418,6 @@ index 1085f33..5660a8d 100644
 ### `docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak b/docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak
-index 1530d77..1085f33 100644
---- a/docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/04_order_request.md.bak
-@@ -2,4 +2,7 @@
  ### `order_request`（Plan → Do）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
@@ -511,7 +425,6 @@ index 1530d77..1085f33 100644
 +
  **必須**：`symbol`, `side`, `proposed_qty`, `time`, `meta.strategy`  
  **オプション**：`max_slippage_pct`, `time_in_force`, `constraints.qty_step/price_tick`, `meta.shadow`
-@@ -25,2 +28,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -521,11 +434,6 @@ index 1530d77..1085f33 100644
 ### `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md b/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md
-index 68404ec..9d10f53 100644
---- a/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md
-@@ -5,4 +5,7 @@
  ### `exec_result`（Do → Check）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
@@ -533,8 +441,6 @@ index 68404ec..9d10f53 100644
 +
  **必須**：`order_id`, `status`, `filled_qty`, `ts`  
  **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
-@@ -30,2 +33,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -544,11 +450,6 @@ index 68404ec..9d10f53 100644
 ### `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak b/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak
-index fb2c3ee..68404ec 100644
---- a/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/05_exec_result.md.bak
-@@ -2,4 +2,7 @@
  ### `exec_result`（Do → Check）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
@@ -556,7 +457,6 @@ index fb2c3ee..68404ec 100644
 +
  **必須**：`order_id`, `status`, `filled_qty`, `ts`  
  **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
-@@ -26,2 +29,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -566,11 +466,6 @@ index fb2c3ee..68404ec 100644
 ### `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md b/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md
-index 5815491..e6b9006 100644
---- a/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md
-@@ -5,4 +5,7 @@
  ### `audit_order`（WORM 監査）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
@@ -578,8 +473,6 @@ index 5815491..e6b9006 100644
 +
  **完全記録**：入力/正規化/丸め/リスク判定/ブローカー応答/遅延/署名
  
-@@ -38,2 +41,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -589,11 +482,6 @@ index 5815491..e6b9006 100644
 ### `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak b/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak
-index 3fee5ad..5815491 100644
---- a/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/06_audit_order.md.bak
-@@ -2,4 +2,7 @@
  ### `audit_order`（WORM 監査）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
@@ -601,7 +489,6 @@ index 3fee5ad..5815491 100644
 +
  **完全記録**：入力/正規化/丸め/リスク判定/ブローカー応答/遅延/署名
  
-@@ -34,2 +37,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -611,11 +498,6 @@ index 3fee5ad..5815491 100644
 ### `docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md b/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md
-index a8526b9..f30dac6 100644
---- a/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md
-@@ -5,4 +5,7 @@
  ### 数値精度・丸め（Financial Correctness）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
@@ -623,8 +505,6 @@ index a8526b9..f30dac6 100644
 +
  - **数量**：`qty_step` に **floor**（例：0.5004 → 0.500）  
  - **価格**：`price_tick` に **side 別**丸め  
-@@ -17,2 +20,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -634,11 +514,6 @@ index a8526b9..f30dac6 100644
 ### `docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md.bak b/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md.bak
-index cb6b273..a8526b9 100644
---- a/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md.bak
-@@ -2,4 +2,7 @@
  ### 数値精度・丸め（Financial Correctness）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
@@ -646,7 +521,6 @@ index cb6b273..a8526b9 100644
 +
  - **数量**：`qty_step` に **floor**（例：0.5004 → 0.500）  
  - **価格**：`price_tick` に **side 別**丸め  
-@@ -13,2 +16,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -656,11 +530,6 @@ index cb6b273..a8526b9 100644
 ### `docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md b/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md
-index 1fa449b..38a6a8a 100644
---- a/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md
-@@ -5,4 +5,7 @@
  ### Idempotency / Concurrency
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
@@ -668,8 +537,6 @@ index 1fa449b..38a6a8a 100644
 +
  - ヘッダ `Idempotency-Key` を**必須**（24h 保持）。  
  - **完全一致**でない同一キーは `409 IDEMPOTENCY_KEY_CONFLICT`。  
-@@ -12,2 +15,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -679,11 +546,6 @@ index 1fa449b..38a6a8a 100644
 ### `docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak b/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak
-index 798f731..1fa449b 100644
---- a/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md.bak
-@@ -2,4 +2,7 @@
  ### Idempotency / Concurrency
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
@@ -691,7 +553,6 @@ index 798f731..1fa449b 100644
 +
  - ヘッダ `Idempotency-Key` を**必須**（24h 保持）。  
  - **完全一致**でない同一キーは `409 IDEMPOTENCY_KEY_CONFLICT`。  
-@@ -8,2 +11,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -701,11 +562,6 @@ index 798f731..1fa449b 100644
 ### `docs/_partials/apis/Do-Layer-Contract/09_error_codes.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md b/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md
-index db70d43..b223d02 100644
---- a/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md
-@@ -5,4 +5,7 @@
  ### エラーコード（対照表）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
@@ -713,8 +569,6 @@ index db70d43..b223d02 100644
 +
  | code | HTTP | 説明 | 再試行 |
  |---|---:|---|---|
-@@ -17,2 +20,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -724,11 +578,6 @@ index db70d43..b223d02 100644
 ### `docs/_partials/apis/Do-Layer-Contract/09_error_codes.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md.bak b/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md.bak
-index d84fa1d..db70d43 100644
---- a/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/09_error_codes.md.bak
-@@ -2,4 +2,7 @@
  ### エラーコード（対照表）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
@@ -736,7 +585,6 @@ index d84fa1d..db70d43 100644
 +
  | code | HTTP | 説明 | 再試行 |
  |---|---:|---|---|
-@@ -13,2 +16,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -746,11 +594,6 @@ index d84fa1d..db70d43 100644
 ### `docs/_partials/apis/Do-Layer-Contract/10_samples_min.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md b/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md
-index fa1f1c9..ddb2dff 100644
---- a/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md
-@@ -5,4 +5,7 @@
  ### サンプル（テスト用最小セット）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
@@ -758,8 +601,6 @@ index fa1f1c9..ddb2dff 100644
 +
  ```json
  // FILLED
-@@ -19,2 +22,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -769,11 +610,6 @@ index fa1f1c9..ddb2dff 100644
 ### `docs/_partials/apis/Do-Layer-Contract/10_samples_min.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md.bak b/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md.bak
-index fc4cc86..fa1f1c9 100644
---- a/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/10_samples_min.md.bak
-@@ -2,4 +2,7 @@
  ### サンプル（テスト用最小セット）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
@@ -781,7 +617,6 @@ index fc4cc86..fa1f1c9 100644
 +
  ```json
  // FILLED
-@@ -15,2 +18,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -791,11 +626,6 @@ index fc4cc86..fa1f1c9 100644
 ### `docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md b/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md
-index 2758c60..7362e26 100644
---- a/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md
-@@ -5,4 +5,7 @@
  ### 契約テスト（CI 要件）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
@@ -803,8 +633,6 @@ index 2758c60..7362e26 100644
 +
  - `docs/schemas/*.schema.json` に **100% 適合**。  
  - `FILLED / PARTIAL / REJECTED` の**3パターン**を**必須**（`Testing-And-QA.md §9`）。  
-@@ -12,2 +15,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -814,11 +642,6 @@ index 2758c60..7362e26 100644
 ### `docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md.bak b/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md.bak
-index bd84a03..2758c60 100644
---- a/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md.bak
-@@ -2,4 +2,7 @@
  ### 契約テスト（CI 要件）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
@@ -826,7 +649,6 @@ index bd84a03..2758c60 100644
 +
  - `docs/schemas/*.schema.json` に **100% 適合**。  
  - `FILLED / PARTIAL / REJECTED` の**3パターン**を**必須**（`Testing-And-QA.md §9`）。  
-@@ -8,2 +11,3 @@
  ---
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -836,11 +658,6 @@ index bd84a03..2758c60 100644
 ### `docs/_partials/apis/Do-Layer-Contract/12_changelog.md`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/12_changelog.md b/docs/_partials/apis/Do-Layer-Contract/12_changelog.md
-index ea9de0b..d2cc3c3 100644
---- a/docs/_partials/apis/Do-Layer-Contract/12_changelog.md
-+++ b/docs/_partials/apis/Do-Layer-Contract/12_changelog.md
-@@ -5,4 +5,7 @@
  ### 変更履歴
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
@@ -848,8 +665,6 @@ index ea9de0b..d2cc3c3 100644
 +
  - **2025-08-12**: v1.0 決定版（丸め/境界/Idempotent/WORM/エラー表/サンプル）
  
-@@ -511,2 +514,4 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -859,11 +674,6 @@ index ea9de0b..d2cc3c3 100644
 ### `docs/_partials/apis/Do-Layer-Contract/12_changelog.md.bak`
 
 ```diff
-diff --git a/docs/_partials/apis/Do-Layer-Contract/12_changelog.md.bak b/docs/_partials/apis/Do-Layer-Contract/12_changelog.md.bak
-index dd19755..ea9de0b 100644
---- a/docs/_partials/apis/Do-Layer-Contract/12_changelog.md.bak
-+++ b/docs/_partials/apis/Do-Layer-Contract/12_changelog.md.bak
-@@ -2,4 +2,7 @@
  ### 変更履歴
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
@@ -871,7 +681,6 @@ index dd19755..ea9de0b 100644
 +
  - **2025-08-12**: v1.0 決定版（丸め/境界/Idempotent/WORM/エラー表/サンプル）
  
-@@ -507,2 +510,3 @@
  <!-- AUTOGEN:CHANGELOG END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -885,12 +694,7 @@ _(binary or no textual diff)_
 ### `docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md b/docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md
 new file mode 100644
-index 0000000..5cb8a50
---- /dev/null
-+++ b/docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md
-@@ -0,0 +1,86 @@
 +# Noctria Kingdom System Design（v2025-08 統合版 + db_logging統合）
 +
 +## 1. 目的と範囲
@@ -983,12 +787,7 @@ index 0000000..5cb8a50
 ### `docs/_partials_full/docs/api_reference.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/api_reference.md b/docs/_partials_full/docs/api_reference.md
 new file mode 100644
-index 0000000..9db5b52
---- /dev/null
-+++ b/docs/_partials_full/docs/api_reference.md
-@@ -0,0 +1,169 @@
 +📌 **次の Markdown ファイルを表示するよ！**  
 +5️⃣ **`docs/api_reference.md`**（API仕様書）  
 +
@@ -1164,12 +963,7 @@ index 0000000..9db5b52
 ### `docs/_partials_full/docs/apis/observability/Observability.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/apis/observability/Observability.md b/docs/_partials_full/docs/apis/observability/Observability.md
 new file mode 100644
-index 0000000..d8a4095
---- /dev/null
-+++ b/docs/_partials_full/docs/apis/observability/Observability.md
-@@ -0,0 +1,262 @@
 +
 +
 +<!-- AUTOGEN:CHANGELOG START -->
@@ -1438,12 +1232,7 @@ index 0000000..d8a4095
 ### `docs/_partials_full/docs/architecture_bak.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/architecture_bak.md b/docs/_partials_full/docs/architecture_bak.md
 new file mode 100644
-index 0000000..8fe43e3
---- /dev/null
-+++ b/docs/_partials_full/docs/architecture_bak.md
-@@ -0,0 +1,86 @@
 +📌 **`docs/` フォルダの各ファイルを Markdown 形式で出力するよ！** 🚀  
 +
 +📂 **`docs/` フォルダの構成:**  
@@ -1536,12 +1325,7 @@ index 0000000..8fe43e3
 ### `docs/_partials_full/docs/data_handling.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/data_handling.md b/docs/_partials_full/docs/data_handling.md
 new file mode 100644
-index 0000000..75c8fb0
---- /dev/null
-+++ b/docs/_partials_full/docs/data_handling.md
-@@ -0,0 +1,20 @@
 +# 📈 データ処理・学習パイプライン
 +
 +## 📊 データソース
@@ -1568,12 +1352,7 @@ index 0000000..75c8fb0
 ### `docs/_partials_full/docs/howto/howto-*.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/howto/howto-*.md b/docs/_partials_full/docs/howto/howto-*.md
 new file mode 100644
-index 0000000..79b9bc6
---- /dev/null
-+++ b/docs/_partials_full/docs/howto/howto-*.md
-@@ -0,0 +1,432 @@
 +<!-- ================================================================== -->
 +<!-- FILE: docs/howto/README.md -->
 +<!-- ================================================================== -->
@@ -2012,12 +1791,7 @@ index 0000000..79b9bc6
 ### `docs/_partials_full/docs/knowledge.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/knowledge.md b/docs/_partials_full/docs/knowledge.md
 new file mode 100644
-index 0000000..c33f8dd
---- /dev/null
-+++ b/docs/_partials_full/docs/knowledge.md
-@@ -0,0 +1,141 @@
 +# Noctria Kingdom 開発ナレッジベース
 +
 +## 開発環境・実行基盤
@@ -2165,12 +1939,7 @@ index 0000000..c33f8dd
 ### `docs/_partials_full/docs/optimization_notes.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/optimization_notes.md b/docs/_partials_full/docs/optimization_notes.md
 new file mode 100644
-index 0000000..08d2155
---- /dev/null
-+++ b/docs/_partials_full/docs/optimization_notes.md
-@@ -0,0 +1,22 @@
 +# 🎯 強化学習・パラメータ最適化ログ
 +
 +## 🤖 強化学習（PPO）
@@ -2199,12 +1968,7 @@ index 0000000..08d2155
 ### `docs/_partials_full/docs/plan_feature_spec.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/plan_feature_spec.md b/docs/_partials_full/docs/plan_feature_spec.md
 new file mode 100644
-index 0000000..a46de44
---- /dev/null
-+++ b/docs/_partials_full/docs/plan_feature_spec.md
-@@ -0,0 +1,82 @@
 +# Noctria Kingdom - Plan層 標準特徴量セット仕様
 +
 +## 概要
@@ -2293,12 +2057,7 @@ index 0000000..a46de44
 ### `docs/_partials_full/docs/strategy_manual.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/strategy_manual.md b/docs/_partials_full/docs/strategy_manual.md
 new file mode 100644
-index 0000000..458df4c
---- /dev/null
-+++ b/docs/_partials_full/docs/strategy_manual.md
-@@ -0,0 +1,27 @@
 +# 🤖 Noctria Kingdom 戦略AI説明
 +
 +## AurusSingularis
@@ -2332,12 +2091,7 @@ index 0000000..458df4c
 ### `docs/_partials_full/docs/structure_principles.md`
 
 ```diff
-diff --git a/docs/_partials_full/docs/structure_principles.md b/docs/_partials_full/docs/structure_principles.md
 new file mode 100644
-index 0000000..bea79a5
---- /dev/null
-+++ b/docs/_partials_full/docs/structure_principles.md
-@@ -0,0 +1,59 @@
 +# 📘 Noctria Kingdom ディレクトリ構成設計原則（v2.0）
 +
 +---
@@ -2403,11 +2157,6 @@ index 0000000..bea79a5
 ### `docs/adrs/ADRs.md`
 
 ```diff
-diff --git a/docs/adrs/ADRs.md b/docs/adrs/ADRs.md
-index f8ef580..7645f91 100644
---- a/docs/adrs/ADRs.md
-+++ b/docs/adrs/ADRs.md
-@@ -301,4 +301,25 @@ EOF
  ### ADRファイルの更新履歴（最近50）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -2439,11 +2188,6 @@ index f8ef580..7645f91 100644
 ### `docs/adrs/ADRs.md.bak`
 
 ```diff
-diff --git a/docs/adrs/ADRs.md.bak b/docs/adrs/ADRs.md.bak
-index 6d5ecb6..f8ef580 100644
---- a/docs/adrs/ADRs.md.bak
-+++ b/docs/adrs/ADRs.md.bak
-@@ -301,4 +301,25 @@ EOF
  ### ADRファイルの更新履歴（最近50）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -2475,15 +2219,9 @@ index 6d5ecb6..f8ef580 100644
 ### `docs/api_reference.md`
 
 ```diff
-diff --git a/docs/api_reference.md b/docs/api_reference.md
-index 9db5b52..bb28bbf 100755
---- a/docs/api_reference.md
-+++ b/docs/api_reference.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/api_reference.md -->
  📌 **次の Markdown ファイルを表示するよ！**  
  5️⃣ **`docs/api_reference.md`**（API仕様書）  
-@@ -168,2 +169,3 @@ Noctria Kingdom では、外部アプリケーションやサービスとの連
  💡 **追加で調整や機能拡張が必要なら、すぐに対応するよ！**  
  このまま実装進めても問題ない？✨
 +<!-- AUTODOC:END -->
@@ -2493,12 +2231,7 @@ index 9db5b52..bb28bbf 100755
 ### `docs/api_reference.md.bak`
 
 ```diff
-diff --git a/docs/api_reference.md.bak b/docs/api_reference.md.bak
 new file mode 100644
-index 0000000..e68eccf
---- /dev/null
-+++ b/docs/api_reference.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/api_reference.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -2508,11 +2241,6 @@ index 0000000..e68eccf
 ### `docs/apis/Do-Layer-Contract.md`
 
 ```diff
-diff --git a/docs/apis/Do-Layer-Contract.md b/docs/apis/Do-Layer-Contract.md
-index 75723ae..85253e9 100644
---- a/docs/apis/Do-Layer-Contract.md
-+++ b/docs/apis/Do-Layer-Contract.md
-@@ -50,4 +50,7 @@
  ### スコープ & 原則（最新）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
@@ -2520,8 +2248,6 @@ index 75723ae..85253e9 100644
 +
  - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
  - **原則**：  
-@@ -61,4 +64,8 @@
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2529,7 +2255,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 2) フロー（概観）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
-@@ -71,4 +78,7 @@
  ### フロー（概観）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
@@ -2537,8 +2262,6 @@ index 75723ae..85253e9 100644
 +
  ```mermaid
  sequenceDiagram
-@@ -91,4 +101,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2546,7 +2269,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 3) エンティティ（Schemas）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
-@@ -101,4 +115,7 @@ sequenceDiagram
  ### エンティティ（Schemas）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
@@ -2554,8 +2276,6 @@ index 75723ae..85253e9 100644
 +
  - `docs/schemas/order_request.schema.json`  
  - `docs/schemas/exec_result.schema.json`  
-@@ -112,4 +129,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2563,7 +2283,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 4) `order_request`（Plan → Do）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
-@@ -122,4 +143,7 @@ sequenceDiagram
  ### `order_request`（Plan → Do）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
@@ -2571,8 +2290,6 @@ index 75723ae..85253e9 100644
 +
  **必須**：`symbol`, `side`, `proposed_qty`, `time`, `meta.strategy`  
  **オプション**：`max_slippage_pct`, `time_in_force`, `constraints.qty_step/price_tick`, `meta.shadow`
-@@ -147,4 +171,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2580,7 +2297,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 5) `exec_result`（Do → Check）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
-@@ -157,4 +185,7 @@ sequenceDiagram
  ### `exec_result`（Do → Check）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
@@ -2588,8 +2304,6 @@ index 75723ae..85253e9 100644
 +
  **必須**：`order_id`, `status`, `filled_qty`, `ts`  
  **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
-@@ -183,4 +214,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2597,7 +2311,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 6) `audit_order`（WORM 監査）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
-@@ -193,4 +228,7 @@ sequenceDiagram
  ### `audit_order`（WORM 監査）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
@@ -2605,8 +2318,6 @@ index 75723ae..85253e9 100644
 +
  **完全記録**：入力/正規化/丸め/リスク判定/ブローカー応答/遅延/署名
  
-@@ -227,4 +265,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2614,7 +2325,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 7) 数値精度・丸め（Financial Correctness）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
-@@ -237,4 +279,7 @@ sequenceDiagram
  ### 数値精度・丸め（Financial Correctness）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
@@ -2622,8 +2332,6 @@ index 75723ae..85253e9 100644
 +
  - **数量**：`qty_step` に **floor**（例：0.5004 → 0.500）  
  - **価格**：`price_tick` に **side 別**丸め  
-@@ -250,4 +295,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2631,7 +2339,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 8) Idempotency / Concurrency
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
-@@ -260,4 +309,7 @@ sequenceDiagram
  ### Idempotency / Concurrency
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
@@ -2639,8 +2346,6 @@ index 75723ae..85253e9 100644
 +
  - ヘッダ `Idempotency-Key` を**必須**（24h 保持）。  
  - **完全一致**でない同一キーは `409 IDEMPOTENCY_KEY_CONFLICT`。  
-@@ -268,4 +320,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2648,7 +2353,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 9) エラーコード（対照表）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
-@@ -278,4 +334,7 @@ sequenceDiagram
  ### エラーコード（対照表）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
@@ -2656,8 +2360,6 @@ index 75723ae..85253e9 100644
 +
  | code | HTTP | 説明 | 再試行 |
  |---|---:|---|---|
-@@ -291,4 +350,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2665,7 +2367,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 10) サンプル（テスト用最小セット）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
-@@ -301,4 +364,7 @@ sequenceDiagram
  ### サンプル（テスト用最小セット）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
@@ -2673,8 +2374,6 @@ index 75723ae..85253e9 100644
 +
  ```json
  // FILLED
-@@ -316,4 +382,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2682,7 +2381,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 11) 契約テスト（CI 要件）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
-@@ -326,4 +396,7 @@ sequenceDiagram
  ### 契約テスト（CI 要件）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
@@ -2690,8 +2388,6 @@ index 75723ae..85253e9 100644
 +
  - `docs/schemas/*.schema.json` に **100% 適合**。  
  - `FILLED / PARTIAL / REJECTED` の**3パターン**を**必須**（`Testing-And-QA.md §9`）。  
-@@ -334,4 +407,8 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2699,7 +2395,6 @@ index 75723ae..85253e9 100644
 +<!-- AUTODOC:END -->
  ## 12) 変更履歴
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
-@@ -344,4 +421,7 @@ sequenceDiagram
  ### 変更履歴
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
@@ -2707,8 +2402,6 @@ index 75723ae..85253e9 100644
 +
  - **2025-08-12**: v1.0 決定版（丸め/境界/Idempotent/WORM/エラー表/サンプル）
  
-@@ -851,2 +931,6 @@ sequenceDiagram
- <!-- AUTODOC:END -->
  <!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
@@ -2720,11 +2413,6 @@ index 75723ae..85253e9 100644
 ### `docs/apis/Do-Layer-Contract.md.bak`
 
 ```diff
-diff --git a/docs/apis/Do-Layer-Contract.md.bak b/docs/apis/Do-Layer-Contract.md.bak
-index d278454..75723ae 100644
---- a/docs/apis/Do-Layer-Contract.md.bak
-+++ b/docs/apis/Do-Layer-Contract.md.bak
-@@ -42,48 +42,811 @@
  ## 1) スコープ & 原則
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
 -(自動置換)
@@ -2746,8 +2434,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 2) フロー（概観）
+## 2) フロー（概観）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
 -(自動置換)
 +### フロー（概観）
@@ -2777,8 +2464,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 3) エンティティ（Schemas）
+## 3) エンティティ（Schemas）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
 -(自動置換)
 +### エンティティ（Schemas）
@@ -2799,8 +2485,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 4) `order_request`（Plan → Do）
+## 4) `order_request`（Plan → Do）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
 -(自動置換)
 +### `order_request`（Plan → Do）
@@ -2835,8 +2520,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 5) `exec_result`（Do → Check）
+## 5) `exec_result`（Do → Check）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
 -(自動置換)
 +### `exec_result`（Do → Check）
@@ -2872,8 +2556,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 6) `audit_order`（WORM 監査）
+## 6) `audit_order`（WORM 監査）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
 -(自動置換)
 +### `audit_order`（WORM 監査）
@@ -2917,8 +2600,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 7) 数値精度・丸め（Financial Correctness）
+## 7) 数値精度・丸め（Financial Correctness）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
 -(自動置換)
 +### 数値精度・丸め（Financial Correctness）
@@ -2941,8 +2623,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 8) Idempotency / Concurrency
+## 8) Idempotency / Concurrency
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
 -(自動置換)
 +### Idempotency / Concurrency
@@ -2960,8 +2641,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 9) エラーコード（対照表）
+## 9) エラーコード（対照表）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
 -(自動置換)
 +### エラーコード（対照表）
@@ -2984,8 +2664,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 10) サンプル（テスト用最小セット）
+## 10) サンプル（テスト用最小セット）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
 -(自動置換)
 +### サンプル（テスト用最小セット）
@@ -3010,8 +2689,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 11) 契約テスト（CI 要件）
+## 11) 契約テスト（CI 要件）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
 -(自動置換)
 +### 契約テスト（CI 要件）
@@ -3029,8 +2707,7 @@ index d278454..75723ae 100644
 +---
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
- ## 12) 変更履歴
+## 12) 変更履歴
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
 -(自動置換)
 +### 変更履歴
@@ -3547,22 +3224,14 @@ index d278454..75723ae 100644
 +<!-- AUTOGEN:CHANGELOG END -->
 +<!-- AUTODOC:END -->
 +<!-- AUTODOC:END -->
- <!-- AUTODOC:END -->
-
 ```
 
 ### `docs/apis/observability/Observability.md`
 
 ```diff
-diff --git a/docs/apis/observability/Observability.md b/docs/apis/observability/Observability.md
-index d8a4095..f17a113 100644
---- a/docs/apis/observability/Observability.md
-+++ b/docs/apis/observability/Observability.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/apis/observability/Observability.md -->
  
  
-@@ -261,2 +262,3 @@
  
  <!-- AUTOGEN:CHANGELOG END -->
 +<!-- AUTODOC:END -->
@@ -3572,12 +3241,7 @@ index d8a4095..f17a113 100644
 ### `docs/apis/observability/Observability.md.bak`
 
 ```diff
-diff --git a/docs/apis/observability/Observability.md.bak b/docs/apis/observability/Observability.md.bak
 new file mode 100644
-index 0000000..c0bc276
---- /dev/null
-+++ b/docs/apis/observability/Observability.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/apis/observability/Observability.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -3587,15 +3251,9 @@ index 0000000..c0bc276
 ### `docs/architecture_bak.md`
 
 ```diff
-diff --git a/docs/architecture_bak.md b/docs/architecture_bak.md
-index 8fe43e3..e3b1f02 100755
---- a/docs/architecture_bak.md
-+++ b/docs/architecture_bak.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/architecture_bak.md -->
  📌 **`docs/` フォルダの各ファイルを Markdown 形式で出力するよ！** 🚀  
  
-@@ -85,2 +86,3 @@ Noctria_Kingdom/
  📌 **次の Markdown ファイルを表示する際は「次」と指示してください！** 🚀✨  
  準備が整ったら、**順番に出していくよ！** 💡
 +<!-- AUTODOC:END -->
@@ -3605,12 +3263,7 @@ index 8fe43e3..e3b1f02 100755
 ### `docs/architecture_bak.md.bak`
 
 ```diff
-diff --git a/docs/architecture_bak.md.bak b/docs/architecture_bak.md.bak
 new file mode 100644
-index 0000000..928f9bc
---- /dev/null
-+++ b/docs/architecture_bak.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/architecture_bak.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -3620,15 +3273,9 @@ index 0000000..928f9bc
 ### `docs/data_handling.md`
 
 ```diff
-diff --git a/docs/data_handling.md b/docs/data_handling.md
-index 75c8fb0..28a98a3 100755
---- a/docs/data_handling.md
-+++ b/docs/data_handling.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/data_handling.md -->
  # 📈 データ処理・学習パイプライン
  
-@@ -19,2 +20,3 @@
    - `optimize_params.py`
    - `optimize_params_with_optuna.py`
 +<!-- AUTODOC:END -->
@@ -3638,12 +3285,7 @@ index 75c8fb0..28a98a3 100755
 ### `docs/data_handling.md.bak`
 
 ```diff
-diff --git a/docs/data_handling.md.bak b/docs/data_handling.md.bak
 new file mode 100644
-index 0000000..e9510e6
---- /dev/null
-+++ b/docs/data_handling.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/data_handling.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -3653,11 +3295,6 @@ index 0000000..e9510e6
 ### `docs/governance/Coding-Standards.md`
 
 ```diff
-diff --git a/docs/governance/Coding-Standards.md b/docs/governance/Coding-Standards.md
-index e6b621d..731410d 100644
---- a/docs/governance/Coding-Standards.md
-+++ b/docs/governance/Coding-Standards.md
-@@ -3,4 +3,25 @@
  ### 標準/品質関連ドキュメント更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3689,11 +3326,6 @@ index e6b621d..731410d 100644
 ### `docs/governance/Coding-Standards.md.bak`
 
 ```diff
-diff --git a/docs/governance/Coding-Standards.md.bak b/docs/governance/Coding-Standards.md.bak
-index d110057..e6b621d 100644
---- a/docs/governance/Coding-Standards.md.bak
-+++ b/docs/governance/Coding-Standards.md.bak
-@@ -3,4 +3,25 @@
  ### 標準/品質関連ドキュメント更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3725,11 +3357,6 @@ index d110057..e6b621d 100644
 ### `docs/governance/Vision-Governance.md`
 
 ```diff
-diff --git a/docs/governance/Vision-Governance.md b/docs/governance/Vision-Governance.md
-index 2b44817..3196c6b 100644
---- a/docs/governance/Vision-Governance.md
-+++ b/docs/governance/Vision-Governance.md
-@@ -330,4 +330,25 @@ flowchart LR
  ### ビジョン/統治 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3761,11 +3388,6 @@ index 2b44817..3196c6b 100644
 ### `docs/governance/Vision-Governance.md.bak`
 
 ```diff
-diff --git a/docs/governance/Vision-Governance.md.bak b/docs/governance/Vision-Governance.md.bak
-index acdfc5d..2b44817 100644
---- a/docs/governance/Vision-Governance.md.bak
-+++ b/docs/governance/Vision-Governance.md.bak
-@@ -330,4 +330,25 @@ flowchart LR
  ### ビジョン/統治 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3797,15 +3419,9 @@ index acdfc5d..2b44817 100644
 ### `docs/howto/howto-*.md`
 
 ```diff
-diff --git a/docs/howto/howto-*.md b/docs/howto/howto-*.md
-index 79b9bc6..46135ea 100644
---- a/docs/howto/howto-*.md
-+++ b/docs/howto/howto-*.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/howto/howto-*.md -->
  <!-- ================================================================== -->
  <!-- FILE: docs/howto/README.md -->
-@@ -431,2 +432,3 @@ curl -X POST http://localhost:8001/pdca/observability/refresh
    - シャドー手順を `flags.dry_run + meta.shadow` に統一（Config と整合）。  
  - **2025-08-12**: v1.0 初版テンプレ群（Backfill/Airflow Debug/Shadow/Canary/Rollback/Pause/Config/Risk/Local Tests/Evidence/Alert/Secrets）
 +<!-- AUTODOC:END -->
@@ -3815,12 +3431,7 @@ index 79b9bc6..46135ea 100644
 ### `docs/howto/howto-*.md.bak`
 
 ```diff
-diff --git a/docs/howto/howto-*.md.bak b/docs/howto/howto-*.md.bak
 new file mode 100644
-index 0000000..b971d50
---- /dev/null
-+++ b/docs/howto/howto-*.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/howto/howto-*.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -3830,11 +3441,6 @@ index 0000000..b971d50
 ### `docs/incidents/Incident-Postmortems.md`
 
 ```diff
-diff --git a/docs/incidents/Incident-Postmortems.md b/docs/incidents/Incident-Postmortems.md
-index 1520270..f17c58e 100644
---- a/docs/incidents/Incident-Postmortems.md
-+++ b/docs/incidents/Incident-Postmortems.md
-@@ -468,4 +468,25 @@ Window: 06:50Z–08:10Z. Root cause under investigation. PM due in 24h.
  ### インシデント文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3866,11 +3472,6 @@ index 1520270..f17c58e 100644
 ### `docs/incidents/Incident-Postmortems.md.bak`
 
 ```diff
-diff --git a/docs/incidents/Incident-Postmortems.md.bak b/docs/incidents/Incident-Postmortems.md.bak
-index c5f963c..1520270 100644
---- a/docs/incidents/Incident-Postmortems.md.bak
-+++ b/docs/incidents/Incident-Postmortems.md.bak
-@@ -468,4 +468,25 @@ Window: 06:50Z–08:10Z. Root cause under investigation. PM due in 24h.
  ### インシデント文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3902,15 +3503,9 @@ index c5f963c..1520270 100644
 ### `docs/knowledge.md`
 
 ```diff
-diff --git a/docs/knowledge.md b/docs/knowledge.md
-index c33f8dd..3450d52 100644
---- a/docs/knowledge.md
-+++ b/docs/knowledge.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/knowledge.md -->
  # Noctria Kingdom 開発ナレッジベース
  
-@@ -140,2 +141,3 @@
  
  **この追記も含め、ナレッジベース全体の内容はNoctria Kingdomの全AI・開発者が最優先で遵守すること。**
 +<!-- AUTODOC:END -->
@@ -3920,12 +3515,7 @@ index c33f8dd..3450d52 100644
 ### `docs/knowledge.md.bak`
 
 ```diff
-diff --git a/docs/knowledge.md.bak b/docs/knowledge.md.bak
 new file mode 100644
-index 0000000..1f23621
---- /dev/null
-+++ b/docs/knowledge.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/knowledge.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -3935,11 +3525,6 @@ index 0000000..1f23621
 ### `docs/misc/0529progress.md`
 
 ```diff
-diff --git a/docs/misc/0529progress.md b/docs/misc/0529progress.md
-index a5e9038..20a5f06 100644
---- a/docs/misc/0529progress.md
-+++ b/docs/misc/0529progress.md
-@@ -162,4 +162,25 @@ Noctria/
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -3971,11 +3556,6 @@ index a5e9038..20a5f06 100644
 ### `docs/misc/0529progress.md.bak`
 
 ```diff
-diff --git a/docs/misc/0529progress.md.bak b/docs/misc/0529progress.md.bak
-index 0851077..a5e9038 100644
---- a/docs/misc/0529progress.md.bak
-+++ b/docs/misc/0529progress.md.bak
-@@ -162,4 +162,25 @@ Noctria/
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4007,11 +3587,6 @@ index 0851077..a5e9038 100644
 ### `docs/misc/20250530.md`
 
 ```diff
-diff --git a/docs/misc/20250530.md b/docs/misc/20250530.md
-index 1be6b68..9e38eb0 100644
---- a/docs/misc/20250530.md
-+++ b/docs/misc/20250530.md
-@@ -149,4 +149,25 @@ noctria-kingdom/
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4043,11 +3618,6 @@ index 1be6b68..9e38eb0 100644
 ### `docs/misc/20250530.md.bak`
 
 ```diff
-diff --git a/docs/misc/20250530.md.bak b/docs/misc/20250530.md.bak
-index 008d4e9..1be6b68 100644
---- a/docs/misc/20250530.md.bak
-+++ b/docs/misc/20250530.md.bak
-@@ -149,4 +149,25 @@ noctria-kingdom/
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4079,11 +3649,6 @@ index 008d4e9..1be6b68 100644
 ### `docs/misc/20250603.md`
 
 ```diff
-diff --git a/docs/misc/20250603.md b/docs/misc/20250603.md
-index 98ccf4e..4a75835 100644
---- a/docs/misc/20250603.md
-+++ b/docs/misc/20250603.md
-@@ -19,4 +19,25 @@
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4115,11 +3680,6 @@ index 98ccf4e..4a75835 100644
 ### `docs/misc/20250603.md.bak`
 
 ```diff
-diff --git a/docs/misc/20250603.md.bak b/docs/misc/20250603.md.bak
-index 4c80f02..98ccf4e 100644
---- a/docs/misc/20250603.md.bak
-+++ b/docs/misc/20250603.md.bak
-@@ -19,4 +19,25 @@
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4151,11 +3711,6 @@ index 4c80f02..98ccf4e 100644
 ### `docs/misc/API_Keys.md`
 
 ```diff
-diff --git a/docs/misc/API_Keys.md b/docs/misc/API_Keys.md
-index 16b44ff..069c6e4 100644
---- a/docs/misc/API_Keys.md
-+++ b/docs/misc/API_Keys.md
-@@ -4,4 +4,25 @@ Your API key is: b2f6d1acae00425eb33f242a33314045
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4187,11 +3742,6 @@ index 16b44ff..069c6e4 100644
 ### `docs/misc/API_Keys.md.bak`
 
 ```diff
-diff --git a/docs/misc/API_Keys.md.bak b/docs/misc/API_Keys.md.bak
-index b5133c5..16b44ff 100644
---- a/docs/misc/API_Keys.md.bak
-+++ b/docs/misc/API_Keys.md.bak
-@@ -4,4 +4,25 @@ Your API key is: b2f6d1acae00425eb33f242a33314045
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4223,11 +3773,6 @@ index b5133c5..16b44ff 100644
 ### `docs/misc/AirFlow-pip-list.md`
 
 ```diff
-diff --git a/docs/misc/AirFlow-pip-list.md b/docs/misc/AirFlow-pip-list.md
-index 69f87f6..a38f1f1 100644
---- a/docs/misc/AirFlow-pip-list.md
-+++ b/docs/misc/AirFlow-pip-list.md
-@@ -391,4 +391,25 @@ zope.interface                           6.1
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4259,11 +3804,6 @@ index 69f87f6..a38f1f1 100644
 ### `docs/misc/AirFlow-pip-list.md.bak`
 
 ```diff
-diff --git a/docs/misc/AirFlow-pip-list.md.bak b/docs/misc/AirFlow-pip-list.md.bak
-index 3e16de6..69f87f6 100644
---- a/docs/misc/AirFlow-pip-list.md.bak
-+++ b/docs/misc/AirFlow-pip-list.md.bak
-@@ -391,4 +391,25 @@ zope.interface                           6.1
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4295,11 +3835,6 @@ index 3e16de6..69f87f6 100644
 ### `docs/misc/AirFlow_start.md`
 
 ```diff
-diff --git a/docs/misc/AirFlow_start.md b/docs/misc/AirFlow_start.md
-index ec11a6f..9fe80cf 100644
---- a/docs/misc/AirFlow_start.md
-+++ b/docs/misc/AirFlow_start.md
-@@ -67,4 +67,25 @@ docker compose ps
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4331,11 +3866,6 @@ index ec11a6f..9fe80cf 100644
 ### `docs/misc/AirFlow_start.md.bak`
 
 ```diff
-diff --git a/docs/misc/AirFlow_start.md.bak b/docs/misc/AirFlow_start.md.bak
-index b5165a9..ec11a6f 100644
---- a/docs/misc/AirFlow_start.md.bak
-+++ b/docs/misc/AirFlow_start.md.bak
-@@ -67,4 +67,25 @@ docker compose ps
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4375,11 +3905,6 @@ _(binary or no textual diff)_
 ### `docs/misc/README.md`
 
 ```diff
-diff --git a/docs/misc/README.md b/docs/misc/README.md
-index 365f003..77b4397 100644
---- a/docs/misc/README.md
-+++ b/docs/misc/README.md
-@@ -256,4 +256,25 @@ Happy coding and trading in the Kingdom!
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4411,11 +3936,6 @@ index 365f003..77b4397 100644
 ### `docs/misc/README.md.bak`
 
 ```diff
-diff --git a/docs/misc/README.md.bak b/docs/misc/README.md.bak
-index 6bf3503..365f003 100644
---- a/docs/misc/README.md.bak
-+++ b/docs/misc/README.md.bak
-@@ -256,4 +256,25 @@ Happy coding and trading in the Kingdom!
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4447,11 +3967,6 @@ index 6bf3503..365f003 100644
 ### `docs/misc/README_latest.md`
 
 ```diff
-diff --git a/docs/misc/README_latest.md b/docs/misc/README_latest.md
-index 19f92b7..c06af35 100644
---- a/docs/misc/README_latest.md
-+++ b/docs/misc/README_latest.md
-@@ -14,4 +14,25 @@
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4483,11 +3998,6 @@ index 19f92b7..c06af35 100644
 ### `docs/misc/README_latest.md.bak`
 
 ```diff
-diff --git a/docs/misc/README_latest.md.bak b/docs/misc/README_latest.md.bak
-index 573e7b6..19f92b7 100644
---- a/docs/misc/README_latest.md.bak
-+++ b/docs/misc/README_latest.md.bak
-@@ -14,4 +14,25 @@
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4535,11 +4045,6 @@ _(binary or no textual diff)_
 ### `docs/misc/callmemo_20250602.md`
 
 ```diff
-diff --git a/docs/misc/callmemo_20250602.md b/docs/misc/callmemo_20250602.md
-index f3e7184..6652106 100644
---- a/docs/misc/callmemo_20250602.md
-+++ b/docs/misc/callmemo_20250602.md
-@@ -104,4 +104,25 @@ Windows: venv_mt5 はMT5接続専用（テスト用）
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4571,11 +4076,6 @@ index f3e7184..6652106 100644
 ### `docs/misc/callmemo_20250602.md.bak`
 
 ```diff
-diff --git a/docs/misc/callmemo_20250602.md.bak b/docs/misc/callmemo_20250602.md.bak
-index d6c58e6..f3e7184 100644
---- a/docs/misc/callmemo_20250602.md.bak
-+++ b/docs/misc/callmemo_20250602.md.bak
-@@ -104,4 +104,25 @@ Windows: venv_mt5 はMT5接続専用（テスト用）
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4607,11 +4107,6 @@ index d6c58e6..f3e7184 100644
 ### `docs/misc/docker use.md`
 
 ```diff
-diff --git a/docs/misc/docker use.md b/docs/misc/docker use.md
-index b261a2c..ea3bd58 100644
---- a/docs/misc/docker use.md	
-+++ b/docs/misc/docker use.md	
-@@ -71,4 +71,25 @@ yaml
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4643,11 +4138,6 @@ index b261a2c..ea3bd58 100644
 ### `docs/misc/docker use.md.bak`
 
 ```diff
-diff --git a/docs/misc/docker use.md.bak b/docs/misc/docker use.md.bak
-index dff179e..b261a2c 100644
---- a/docs/misc/docker use.md.bak	
-+++ b/docs/misc/docker use.md.bak	
-@@ -71,4 +71,25 @@ yaml
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4679,11 +4169,6 @@ index dff179e..b261a2c 100644
 ### `docs/misc/docker_tensorflow_gpu_setup.md`
 
 ```diff
-diff --git a/docs/misc/docker_tensorflow_gpu_setup.md b/docs/misc/docker_tensorflow_gpu_setup.md
-index f96050d..2c4f5e7 100644
---- a/docs/misc/docker_tensorflow_gpu_setup.md
-+++ b/docs/misc/docker_tensorflow_gpu_setup.md
-@@ -60,4 +60,25 @@ python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU')
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4715,11 +4200,6 @@ index f96050d..2c4f5e7 100644
 ### `docs/misc/docker_tensorflow_gpu_setup.md.bak`
 
 ```diff
-diff --git a/docs/misc/docker_tensorflow_gpu_setup.md.bak b/docs/misc/docker_tensorflow_gpu_setup.md.bak
-index b75d454..f96050d 100644
---- a/docs/misc/docker_tensorflow_gpu_setup.md.bak
-+++ b/docs/misc/docker_tensorflow_gpu_setup.md.bak
-@@ -60,4 +60,25 @@ python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU')
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4751,11 +4231,6 @@ index b75d454..f96050d 100644
 ### `docs/misc/how-to-use-git.md`
 
 ```diff
-diff --git a/docs/misc/how-to-use-git.md b/docs/misc/how-to-use-git.md
-index 58804e0..580de23 100644
---- a/docs/misc/how-to-use-git.md
-+++ b/docs/misc/how-to-use-git.md
-@@ -245,4 +245,25 @@ yaml
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4787,11 +4262,6 @@ index 58804e0..580de23 100644
 ### `docs/misc/how-to-use-git.md.bak`
 
 ```diff
-diff --git a/docs/misc/how-to-use-git.md.bak b/docs/misc/how-to-use-git.md.bak
-index 8db799e..58804e0 100644
---- a/docs/misc/how-to-use-git.md.bak
-+++ b/docs/misc/how-to-use-git.md.bak
-@@ -245,4 +245,25 @@ yaml
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4823,11 +4293,6 @@ index 8db799e..58804e0 100644
 ### `docs/misc/latest_tree_and_functions.md`
 
 ```diff
-diff --git a/docs/misc/latest_tree_and_functions.md b/docs/misc/latest_tree_and_functions.md
-index 7b14144..1fb0334 100644
---- a/docs/misc/latest_tree_and_functions.md
-+++ b/docs/misc/latest_tree_and_functions.md
-@@ -190,4 +190,25 @@
  ### Misc 文書更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4859,11 +4324,6 @@ index 7b14144..1fb0334 100644
 ### `docs/misc/latest_tree_and_functions.md.bak`
 
 ```diff
-diff --git a/docs/misc/latest_tree_and_functions.md.bak b/docs/misc/latest_tree_and_functions.md.bak
-index ede3027..7b14144 100644
---- a/docs/misc/latest_tree_and_functions.md.bak
-+++ b/docs/misc/latest_tree_and_functions.md.bak
-@@ -190,4 +190,25 @@
  ### Misc 文書更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4903,11 +4363,6 @@ _(binary or no textual diff)_
 ### `docs/operations/Config-Registry.md`
 
 ```diff
-diff --git a/docs/operations/Config-Registry.md b/docs/operations/Config-Registry.md
-index 15be658..da0ebe2 100644
---- a/docs/operations/Config-Registry.md
-+++ b/docs/operations/Config-Registry.md
-@@ -474,4 +474,25 @@ OIDC_CLIENT_SECRET=
  ### 設定/レジストリ更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4939,11 +4394,6 @@ index 15be658..da0ebe2 100644
 ### `docs/operations/Config-Registry.md.bak`
 
 ```diff
-diff --git a/docs/operations/Config-Registry.md.bak b/docs/operations/Config-Registry.md.bak
-index 6ed6f66..15be658 100644
---- a/docs/operations/Config-Registry.md.bak
-+++ b/docs/operations/Config-Registry.md.bak
-@@ -474,4 +474,25 @@ OIDC_CLIENT_SECRET=
  ### 設定/レジストリ更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -4975,11 +4425,6 @@ index 6ed6f66..15be658 100644
 ### `docs/operations/Runbooks.md`
 
 ```diff
-diff --git a/docs/operations/Runbooks.md b/docs/operations/Runbooks.md
-index d4d4da1..6892bd9 100644
---- a/docs/operations/Runbooks.md
-+++ b/docs/operations/Runbooks.md
-@@ -443,4 +443,25 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
  ### 運用ドキュメント更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5011,11 +4456,6 @@ index d4d4da1..6892bd9 100644
 ### `docs/operations/Runbooks.md.bak`
 
 ```diff
-diff --git a/docs/operations/Runbooks.md.bak b/docs/operations/Runbooks.md.bak
-index 41d7f47..d4d4da1 100644
---- a/docs/operations/Runbooks.md.bak
-+++ b/docs/operations/Runbooks.md.bak
-@@ -443,4 +443,25 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
  ### 運用ドキュメント更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5047,15 +4487,9 @@ index 41d7f47..d4d4da1 100644
 ### `docs/optimization_notes.md`
 
 ```diff
-diff --git a/docs/optimization_notes.md b/docs/optimization_notes.md
-index 08d2155..ec974c9 100755
---- a/docs/optimization_notes.md
-+++ b/docs/optimization_notes.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/optimization_notes.md -->
  # 🎯 強化学習・パラメータ最適化ログ
  
-@@ -21,2 +22,3 @@
    - `apply_best_params.py`
    - `apply_best_params_to_metaai.py`
 +<!-- AUTODOC:END -->
@@ -5065,12 +4499,7 @@ index 08d2155..ec974c9 100755
 ### `docs/optimization_notes.md.bak`
 
 ```diff
-diff --git a/docs/optimization_notes.md.bak b/docs/optimization_notes.md.bak
 new file mode 100644
-index 0000000..1054963
---- /dev/null
-+++ b/docs/optimization_notes.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/optimization_notes.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -5080,15 +4509,9 @@ index 0000000..1054963
 ### `docs/plan_feature_spec.md`
 
 ```diff
-diff --git a/docs/plan_feature_spec.md b/docs/plan_feature_spec.md
-index a46de44..6f1916c 100644
---- a/docs/plan_feature_spec.md
-+++ b/docs/plan_feature_spec.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/plan_feature_spec.md -->
  # Noctria Kingdom - Plan層 標準特徴量セット仕様
  
-@@ -81,2 +82,3 @@ sample = {
  df = pd.DataFrame(sample)
  print(df)
 +<!-- AUTODOC:END -->
@@ -5098,12 +4521,7 @@ index a46de44..6f1916c 100644
 ### `docs/plan_feature_spec.md.bak`
 
 ```diff
-diff --git a/docs/plan_feature_spec.md.bak b/docs/plan_feature_spec.md.bak
 new file mode 100644
-index 0000000..0901c04
---- /dev/null
-+++ b/docs/plan_feature_spec.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/plan_feature_spec.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -5113,11 +4531,6 @@ index 0000000..0901c04
 ### `docs/qa/Testing-And-QA.md`
 
 ```diff
-diff --git a/docs/qa/Testing-And-QA.md b/docs/qa/Testing-And-QA.md
-index be22173..44c7a8f 100644
---- a/docs/qa/Testing-And-QA.md
-+++ b/docs/qa/Testing-And-QA.md
-@@ -504,4 +504,25 @@ repos:
  ### テスト/QA 更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5149,11 +4562,6 @@ index be22173..44c7a8f 100644
 ### `docs/qa/Testing-And-QA.md.bak`
 
 ```diff
-diff --git a/docs/qa/Testing-And-QA.md.bak b/docs/qa/Testing-And-QA.md.bak
-index 2a5344e..be22173 100644
---- a/docs/qa/Testing-And-QA.md.bak
-+++ b/docs/qa/Testing-And-QA.md.bak
-@@ -504,4 +504,25 @@ repos:
  ### テスト/QA 更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5185,11 +4593,6 @@ index 2a5344e..be22173 100644
 ### `docs/risks/Risk-Register.md`
 
 ```diff
-diff --git a/docs/risks/Risk-Register.md b/docs/risks/Risk-Register.md
-index 4757e37..76fa9f9 100644
---- a/docs/risks/Risk-Register.md
-+++ b/docs/risks/Risk-Register.md
-@@ -3,4 +3,25 @@
  ### リスクレジスタ更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5221,11 +4624,6 @@ index 4757e37..76fa9f9 100644
 ### `docs/risks/Risk-Register.md.bak`
 
 ```diff
-diff --git a/docs/risks/Risk-Register.md.bak b/docs/risks/Risk-Register.md.bak
-index 81be41b..4757e37 100644
---- a/docs/risks/Risk-Register.md.bak
-+++ b/docs/risks/Risk-Register.md.bak
-@@ -3,4 +3,25 @@
  ### リスクレジスタ更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5257,11 +4655,6 @@ index 81be41b..4757e37 100644
 ### `docs/roadmap/Release-Notes.md`
 
 ```diff
-diff --git a/docs/roadmap/Release-Notes.md b/docs/roadmap/Release-Notes.md
-index 50fa9ac..2a3014c 100644
---- a/docs/roadmap/Release-Notes.md
-+++ b/docs/roadmap/Release-Notes.md
-@@ -336,4 +336,25 @@ Docs-as-Code の整備に協力した Council & Ops & Risk チーム、ありが
  ### Release Notes 更新履歴（最近50）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5293,11 +4686,6 @@ index 50fa9ac..2a3014c 100644
 ### `docs/roadmap/Release-Notes.md.bak`
 
 ```diff
-diff --git a/docs/roadmap/Release-Notes.md.bak b/docs/roadmap/Release-Notes.md.bak
-index b1871fd..50fa9ac 100644
---- a/docs/roadmap/Release-Notes.md.bak
-+++ b/docs/roadmap/Release-Notes.md.bak
-@@ -336,4 +336,25 @@ Docs-as-Code の整備に協力した Council & Ops & Risk チーム、ありが
  ### Release Notes 更新履歴（最近50）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5329,11 +4717,6 @@ index b1871fd..50fa9ac 100644
 ### `docs/roadmap/Roadmap-OKRs.md`
 
 ```diff
-diff --git a/docs/roadmap/Roadmap-OKRs.md b/docs/roadmap/Roadmap-OKRs.md
-index ce9b5a8..764095e 100644
---- a/docs/roadmap/Roadmap-OKRs.md
-+++ b/docs/roadmap/Roadmap-OKRs.md
-@@ -3,4 +3,25 @@
  ### OKR/ロードマップ更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5365,11 +4748,6 @@ index ce9b5a8..764095e 100644
 ### `docs/roadmap/Roadmap-OKRs.md.bak`
 
 ```diff
-diff --git a/docs/roadmap/Roadmap-OKRs.md.bak b/docs/roadmap/Roadmap-OKRs.md.bak
-index ffa1d4c..ce9b5a8 100644
---- a/docs/roadmap/Roadmap-OKRs.md.bak
-+++ b/docs/roadmap/Roadmap-OKRs.md.bak
-@@ -3,4 +3,25 @@
  ### OKR/ロードマップ更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5401,11 +4779,6 @@ index ffa1d4c..ce9b5a8 100644
 ### `docs/security/Security-And-Access.md`
 
 ```diff
-diff --git a/docs/security/Security-And-Access.md b/docs/security/Security-And-Access.md
-index 683d6c7..ac8da95 100644
---- a/docs/security/Security-And-Access.md
-+++ b/docs/security/Security-And-Access.md
-@@ -462,4 +462,25 @@ flags:
  ### セキュリティ関連更新履歴（最近30）
  
 +- **51ddf2a** 2025-08-15T19:53:46+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5437,11 +4810,6 @@ index 683d6c7..ac8da95 100644
 ### `docs/security/Security-And-Access.md.bak`
 
 ```diff
-diff --git a/docs/security/Security-And-Access.md.bak b/docs/security/Security-And-Access.md.bak
-index 5344aaf..683d6c7 100644
---- a/docs/security/Security-And-Access.md.bak
-+++ b/docs/security/Security-And-Access.md.bak
-@@ -462,4 +462,25 @@ flags:
  ### セキュリティ関連更新履歴（最近30）
  
 +- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
@@ -5473,15 +4841,9 @@ index 5344aaf..683d6c7 100644
 ### `docs/strategy_manual.md`
 
 ```diff
-diff --git a/docs/strategy_manual.md b/docs/strategy_manual.md
-index 458df4c..2fbf240 100755
---- a/docs/strategy_manual.md
-+++ b/docs/strategy_manual.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/strategy_manual.md -->
  # 🤖 Noctria Kingdom 戦略AI説明
  
-@@ -26,2 +27,3 @@
  - シグナル重み付き合算またはルールベースで統合判断
  - ログ: `/opt/airflow/logs/system.log`
 +<!-- AUTODOC:END -->
@@ -5491,12 +4853,7 @@ index 458df4c..2fbf240 100755
 ### `docs/strategy_manual.md.bak`
 
 ```diff
-diff --git a/docs/strategy_manual.md.bak b/docs/strategy_manual.md.bak
 new file mode 100644
-index 0000000..88b7318
---- /dev/null
-+++ b/docs/strategy_manual.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/strategy_manual.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->
@@ -5506,15 +4863,9 @@ index 0000000..88b7318
 ### `docs/structure_principles.md`
 
 ```diff
-diff --git a/docs/structure_principles.md b/docs/structure_principles.md
-index bea79a5..27759dc 100755
---- a/docs/structure_principles.md
-+++ b/docs/structure_principles.md
-@@ -1,2 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/structure_principles.md -->
  # 📘 Noctria Kingdom ディレクトリ構成設計原則（v2.0）
  
-@@ -57,3 +58,3 @@ Noctria Kingdom は「自律戦略AI国家」であるという思想に基づ
  
  ## 🚫 `.gitignore` 推奨対象
 -
@@ -5525,12 +4876,7 @@ index bea79a5..27759dc 100755
 ### `docs/structure_principles.md.bak`
 
 ```diff
-diff --git a/docs/structure_principles.md.bak b/docs/structure_principles.md.bak
 new file mode 100644
-index 0000000..4894c72
---- /dev/null
-+++ b/docs/structure_principles.md.bak
-@@ -0,0 +1,3 @@
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/structure_principles.md -->
 +(自動置換)
 +<!-- AUTODOC:END -->

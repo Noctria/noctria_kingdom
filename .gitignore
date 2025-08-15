@@ -86,3 +86,5 @@ generated_code/*.tmp
 generated_code/path_config.py
 generated_code/generated_code/
 
+*.bak
+*.bak

@@ -512,6 +512,3 @@
 
 <!-- AUTOGEN:CHANGELOG END -->
 <!-- AUTODOC:END -->
-<!-- AUTODOC:END -->
-<!-- AUTODOC:END -->
-<!-- AUTODOC:END -->

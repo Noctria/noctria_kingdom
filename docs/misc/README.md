@@ -248,7 +248,6 @@ Noctria Kingdom の世界では、システム全体が一国の体制に見立�
 何か修正・追記があれば、この README を更新する形で運用を続けてください。  
 Happy coding and trading in the Kingdom!  
   
----  
 
 以上が **Noctria Kingdom の Extended README** です。  
 この内容を保存すれば、いつでもシステム全体の構成や開発経緯、物語的背景を再現・再生成できます。

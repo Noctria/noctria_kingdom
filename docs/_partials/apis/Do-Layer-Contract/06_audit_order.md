@@ -39,6 +39,3 @@
 
 ---
 <!-- AUTODOC:END -->
-<!-- AUTODOC:END -->
-<!-- AUTODOC:END -->
-<!-- AUTODOC:END -->
