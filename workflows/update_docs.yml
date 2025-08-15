@@ -1,0 +1,95 @@
+name: Update docs from index
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'scripts/update_docs_from_index.py'
+      - '.github/workflows/update_docs.yml'
+  workflow_dispatch: {}
+
+# 並行実行の衝突を防止
+concurrency:
+  group: update-docs-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-docs:
+    # ループ防止：Bot の自動コミットでは実行しない
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 変更検知・差分コミット向け
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies (best-effort)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          elif [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          else
+            # 最低限、Markdown 生成やYAML等を扱う想定
+            pip install -q markdown pyyaml jinja2
+          fi
+
+      - name: Run updater
+        shell: bash
+        env:
+          # 必要ならスクリプトに渡す環境変数をここで定義
+          AUTODOC_ROOT: docs
+          AUTODOC_PARTIALS_FULL: docs/_partials_full
+          AUTODOC_PARTIALS_APIS: docs/_partials/apis
+        run: |
+          set -euxo pipefail
+          # 例: スクリプトは idempotent（実行して差分がなければ何も変えない）であること
+          python scripts/update_docs_from_index.py
+
+      - name: Detect changes
+        id: git_status
+        shell: bash
+        run: |
+          set -e
+          if git diff --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit & push changes
+        if: ${{ steps.git_status.outputs.changed == 'true' && github.event_name == 'push' }}
+        env:
+          GIT_AUTHOR_NAME: noctria-bot
+          GIT_AUTHOR_EMAIL: noctria-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: noctria-bot
+          GIT_COMMITTER_EMAIL: noctria-bot@users.noreply.github.com
+        run: |
+          set -euxo pipefail
+          git status
+          git add -A
+          git commit -m "📄 AutoDoc: update docs from index [skip ci]"
+          # [skip ci] でこのコミットによる再トリガーを抑制
+          git push
+
+      # PRの場合は「差分が出たら失敗」にして気付けるように（任意）
+      - name: Fail if PR needs regenerated docs
+        if: ${{ steps.git_status.outputs.changed == 'true' && github.event_name == 'pull_request' }}
+        run: |
+          echo "::error ::Docs are outdated. Run the updater and commit the results."
+          exit 1
