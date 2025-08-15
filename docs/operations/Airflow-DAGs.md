@@ -8,6 +8,8 @@
 <!-- AUTODOC:BEGIN mode=git_log path_globs="airflow_docker/dags/**/*.py;airflow_docker/*.yaml;airflow_docker/**/*.yaml" title="Airflow/DAG/Compose 更新履歴（最近50）" limit=50 since=2025-07-01 -->
 ### Airflow/DAG/Compose 更新履歴（最近50）
 
+- **cfd609e** 2025-08-16T04:08:24+09:00 — Create noctria_act_pipeline.py (by Noctoria)
+  - `airflow_docker/dags/noctria_act_pipeline.py`
 - **feef06f** 2025-08-15T02:33:44+09:00 — Update docker-compose.yaml (by Noctoria)
   - `airflow_docker/docker-compose.yaml`
 - **f63e897** 2025-08-14T20:12:50+09:00 — Update veritas_recheck_dag.py (by Noctoria)
@@ -106,8 +108,6 @@
   - `airflow_docker/dags/metaai_apply_dag.py`
 - **72dca69** 2025-07-27T14:23:32+09:00 — Update veritas_eval_dag.py (by Noctoria)
   - `airflow_docker/dags/veritas_eval_dag.py`
-- **c3acad7** 2025-07-27T14:21:33+09:00 — Update veritas_recheck_dag.py (by Noctoria)
-  - `airflow_docker/dags/veritas_recheck_dag.py`
 <!-- AUTODOC:END -->
 
 ## 1) インフラ / デプロイ

@@ -10,6 +10,9 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
 ### 変更履歴
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
+### 変更履歴
+
 - **2025-08-12**: v1.0 決定版（丸め/境界/Idempotent/WORM/エラー表/サンプル）
 
 ---
@@ -514,5 +517,4 @@
   - `src/plan_data/contracts.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
-<!-- AUTODOC:END -->
 <!-- AUTODOC:END -->

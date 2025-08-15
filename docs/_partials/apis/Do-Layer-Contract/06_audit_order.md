@@ -10,6 +10,9 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
 ### `audit_order`（WORM 監査）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
+### `audit_order`（WORM 監査）
+
 **完全記録**：入力/正規化/丸め/リスク判定/ブローカー応答/遅延/署名
 
 ```json
@@ -41,5 +44,4 @@
 ```
 
 ---
-<!-- AUTODOC:END -->
 <!-- AUTODOC:END -->

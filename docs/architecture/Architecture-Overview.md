@@ -809,6 +809,10 @@ class DECISION_MINI,TEST_E2E demo;
 <!-- AUTODOC:BEGIN mode=git_log path_globs=src/**/*.py title=コードベース更新履歴（最近30） limit=30 since=2025-08-01 -->
 ### コードベース更新履歴（最近30）
 
+- **e25e60a** 2025-08-16T04:11:29+09:00 — Update decision_registry.py (by Noctoria)
+  - `src/core/decision_registry.py`
+- **b2a650a** 2025-08-16T04:08:59+09:00 — Create git_utils.py (by Noctoria)
+  - `src/core/git_utils.py`
 - **a39c7db** 2025-08-15T04:14:15+09:00 — Update observability.py (by Noctoria)
   - `src/plan_data/observability.py`
 - **09a3e13** 2025-08-15T03:51:14+09:00 — Update Aurus_Singularis.py (by Noctoria)
@@ -864,9 +868,5 @@ class DECISION_MINI,TEST_E2E demo;
 - **99a3122** 2025-08-13T14:53:14+09:00 — Update decision_minidemo.py (by Noctoria)
   - `src/e2e/decision_minidemo.py`
 - **9786e16** 2025-08-13T14:49:18+09:00 — Update decision_minidemo.py (by Noctoria)
-  - `src/e2e/decision_minidemo.py`
-- **3696066** 2025-08-13T14:45:26+09:00 — Create show_timeline.py (by Noctoria)
-  - `src/tools/show_timeline.py`
-- **dee8185** 2025-08-13T14:38:49+09:00 — Update decision_minidemo.py (by Noctoria)
   - `src/e2e/decision_minidemo.py`
 <!-- AUTODOC:END -->
