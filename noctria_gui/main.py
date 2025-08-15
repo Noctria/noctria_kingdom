@@ -191,6 +191,7 @@ _safe_include("noctria_gui.routes.tag_heatmap")
 # AI/DevCycle系
 _safe_include("noctria_gui.routes.ai_routes")
 _safe_include("noctria_gui.routes.devcycle_history")
+_safe_include("noctria_gui.routes.decision_registry")
 
 # ユーティリティ
 _safe_include("noctria_gui.routes.path_checker")
