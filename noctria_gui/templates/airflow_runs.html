@@ -1,0 +1,108 @@
+<!-- noctria_gui/templates/airflow_runs.html -->
+{% extends "base_hud.html" %}
+{% block title %}{{ page_title }} | Noctria HUD{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <h1 class="panel-title">{{ page_title }}</h1>
+
+  {% if mode == "index" %}
+    <form method="get" action="/airflow/runs" class="form-grid" style="margin-bottom:1rem">
+      <div class="form-row">
+        <label>DAG ID</label>
+        <input type="text" name="dag_id" value="{{ dag_id }}">
+      </div>
+      <div class="form-row">
+        <label>Limit</label>
+        <input type="number" name="limit" min="1" max="200" value="{{ limit }}">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">🔄 更新</button>
+        <a class="btn" href="/airflow/runs?dag_id={{ dag_id }}">↻ 既定</a>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-compact">
+        <thead>
+          <tr>
+            <th>dag_run_id</th>
+            <th>state</th>
+            <th>start_date</th>
+            <th>end_date</th>
+            <th>conf</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in runs %}
+            <tr>
+              <td><a href="/airflow/runs/{{ r.dag_run_id }}?dag_id={{ dag_id }}"><code>{{ r.dag_run_id }}</code></a></td>
+              <td>{{ r.state }}</td>
+              <td><code>{{ r.start_date }}</code></td>
+              <td><code>{{ r.end_date }}</code></td>
+              <td><pre style="white-space:pre-wrap;max-width:40vw;overflow:auto">{{ r.conf | tojson(indent=0) }}</pre></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="muted">実行履歴がありません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if mode == "detail" %}
+    <ul class="kv">
+      <li><span>DAG ID</span><code>{{ dag_id }}</code></li>
+      <li><span>dag_run_id</span><code>{{ run.dag_run_id }}</code></li>
+      <li><span>state</span>{{ run.state }}</li>
+      <li><span>start_date</span><code>{{ run.start_date }}</code></li>
+      <li><span>end_date</span><code>{{ run.end_date }}</code></li>
+    </ul>
+
+    <details open>
+      <summary>conf</summary>
+      <pre>{{ run.conf | tojson(indent=2) }}</pre>
+    </details>
+
+    {% if task_instances %}
+      <h3 style="margin-top: 1rem">Task Instances</h3>
+      <div class="table-responsive">
+        <table class="table table-compact">
+          <thead>
+            <tr>
+              <th>task_id</th>
+              <th>state</th>
+              <th>try_number</th>
+              <th>start_date</th>
+              <th>end_date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ti in task_instances %}
+              <tr>
+                <td>{{ ti.task_id }}</td>
+                <td>{{ ti.state }}</td>
+                <td>{{ ti.try_number }}</td>
+                <td><code>{{ ti.start_date }}</code></td>
+                <td><code>{{ ti.end_date }}</code></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    {% if failure_hint %}
+      <div class="alert alert-warn" style="margin-top:1rem">
+        ⚠️ ヒント: {{ failure_hint }}
+      </div>
+    {% endif %}
+
+    <div class="actions" style="margin-top: 0.5rem">
+      <a class="btn" href="/airflow/runs?dag_id={{ dag_id }}">← 一覧へ</a>
+    </div>
+  {% endif %}
+</div>
+
+{% include "partials/toast.html" ignore missing %}
+{% endblock %}
