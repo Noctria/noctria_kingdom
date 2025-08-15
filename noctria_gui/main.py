@@ -11,9 +11,10 @@ Noctria Kingdom GUI - main entrypoint
 
 今回のポイント
 - path_config 不在時でもフォールバックして起動継続
-- Jinja2 に from_json フィルタを登録し、env を app.state.jinja_env に公開
+- Jinja2 に from_json / tojson フィルタを登録し、env を app.state.jinja_env に公開
 - HAS_DASHBOARD を緩やかに判定（module名に ".dashboard" を含む場合を許容）
-- Act手動トリガ用ルーター（act_adopt）を配線
+- Act手動トリガ／Decision/Tags/Airflow 履歴ビューを配線
+- トースト閉じる用の /__clear_toast を追加
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
+from markupsafe import Markup
 
 # -----------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
@@ -78,7 +80,7 @@ logger = logging.getLogger("noctria_gui.main")
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.4.0",
+    version="2.5.0",
 )
 
 # セッション（HUDトーストやフォーム結果の一時通知に使用）
@@ -109,9 +111,24 @@ def from_json(value: Any) -> Any:
             return {}
     return value
 
+def tojson_filter(value: Any, indent: int = 2) -> Markup:
+    try:
+        return Markup(json.dumps(value, ensure_ascii=False, indent=indent))
+    except Exception:
+        return Markup("null")
+
 templates.env.filters["from_json"] = from_json
+templates.env.filters["tojson"] = tojson_filter
+
 # 互換用: ルーター側で request.app.state.jinja_env を参照できるように公開
 app.state.jinja_env = templates.env
+
+# 便利: ルーターから使えるレンダラ（request をテンプレに渡す版）
+def render_template(request: Request, template_name: str, **ctx: Any) -> str:
+    tmpl = templates.env.get_template(template_name)
+    return tmpl.render(request=request, **ctx)
+
+app.state.render_template = render_template  # ルーターから利用可
 
 # -----------------------------------------------------------------------------
 # ルーターの取り込み（存在しないモジュールはスキップ）
@@ -169,7 +186,7 @@ _safe_include("noctria_gui.routes.pdca")                 # 既存：PDCAトッ�
 _safe_include("noctria_gui.routes.pdca_recheck")         # /pdca/control, /pdca/recheck
 _safe_include("noctria_gui.routes.pdca_routes")          # /pdca-dashboard（HUDダッシュボード）
 _safe_include("noctria_gui.routes.pdca_summary")         # /pdca/summary & /pdca/api/summary
-_safe_include("noctria_gui.routes.pdca_recent")
+_safe_include("noctria_gui.routes.pdca_recent")          # 直近採用タグカード
 
 # 戦略・統計・タグ
 _safe_include("noctria_gui.routes.push")
@@ -197,7 +214,7 @@ _safe_include("noctria_gui.routes.decision_registry")
 # Airflow関連
 _safe_include("noctria_gui.routes.airflow_runs")
 
-#git関連
+# Git関連
 _safe_include("noctria_gui.routes.git_tags")
 
 # ユーティリティ
@@ -218,7 +235,7 @@ _safe_include("noctria_gui.routes.governance_rules")
 logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBOARD)
 
 # -----------------------------------------------------------------------------
-# Routes (root / favicon / health / exception handler)
+# Routes (root / favicon / toast-clear / health / exception handler)
 # -----------------------------------------------------------------------------
 @app.get("/", include_in_schema=False)
 async def root_redirect():
@@ -232,6 +249,15 @@ async def favicon():
         return FileResponse(icon_path, media_type="image/x-icon")
     return Response(status_code=204)
 
+@app.get("/__clear_toast", include_in_schema=False)
+async def __clear_toast(request: Request):
+    try:
+        if request.session.get("toast"):
+            request.session.pop("toast", None)
+    except Exception:
+        pass
+    return Response(status_code=204)
+
 @app.get("/healthz", include_in_schema=False)
 async def healthz():
     return JSONResponse(
@@ -241,6 +267,7 @@ async def healthz():
             "templates_dir": str(_tpl_dir),
             "has_dashboard": HAS_DASHBOARD,
             "session_enabled": True,
+            "version": app.version if hasattr(app, "version") else "unknown",
         }
     )
 
