@@ -1,0 +1,79 @@
+name: update_docs
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'docs/**'
+      - 'scripts/update_docs_from_index.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-update-docs:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Tokyo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (if any)
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Install ripgrep (for sanity checks)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ripgrep
+
+      - name: Run update_docs_from_index.py
+        run: |
+          set -euo pipefail
+          if [ -f scripts/update_docs_from_index.py ]; then
+            python scripts/update_docs_from_index.py
+          else
+            echo "scripts/update_docs_from_index.py が見つかりません。パスを確認してください。" >&2
+            exit 1
+          fi
+
+      - name: Docs sanity check
+        run: |
+          set -euo pipefail
+          # 1) 連続 AUTODOC マーカーがないか
+          if rg -nUP '(<!-- AUTODOC:(?:BEGIN|END)[^>]*-->[ \t]*\R){2,}' docs -g '!docs/_generated/**' ; then
+            echo "ERROR: consecutive AUTODOC markers found"
+            exit 1
+          fi
+          # 2) diff 断片が混入していないか
+          if rg -n "(@@ -[0-9]+,[0-9]+ \+[0-9]+,[0-9]+ @@|^diff --git|^index [0-9a-f]{7,}\.\.)" docs -g '!docs/_generated/**' ; then
+            echo "ERROR: stray diff hunks found"
+            exit 1
+          fi
+
+      - name: Commit & push if changed
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "📄 AutoDoc: update docs from index [skip ci]"
+            git push
+          else
+            echo "ドキュメントの変更はありません。"
+          fi
