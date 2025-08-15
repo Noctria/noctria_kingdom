@@ -196,6 +196,9 @@ _safe_include("noctria_gui.routes.decision_registry")
 # Airflow関連
 _safe_include("noctria_gui.routes.airflow_runs")
 
+#git関連
+_safe_include("noctria_gui.routes.git_tags")
+
 # ユーティリティ
 _safe_include("noctria_gui.routes.path_checker")
 _safe_include("noctria_gui.routes.prometheus_routes")
