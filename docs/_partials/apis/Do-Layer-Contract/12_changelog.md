@@ -1,206 +1,250 @@
-# 🔐 Security & Access — Noctria Kingdom
-
-**Version:** 1.0  
-**Status:** Draft → Adopted (when merged)  
-**Last Updated:** 2025-08-12 (JST)
-
-> 目的：Noctria の PDCA/運用全体に対して **最小権限・監査可能・回復可能** なセキュリティ基盤を定義する。  
-> 参照：`../governance/Vision-Governance.md` / `../operations/Runbooks.md` / `../operations/Config-Registry.md` / `../operations/Airflow-DAGs.md` / `../observability/Observability.md` / `../apis/API.md` / `../apis/Do-Layer-Contract.md`
+- **2025-08-12**: v1.0 決定版（丸め/境界/Idempotent/WORM/エラー表/サンプル）
 
 ---
 
-## 1. スコープ & 原則
-- スコープ：**API/GUI、Airflow、Plan/Do/Check/Act、データ/モデル、Secrets、ネットワーク、監査**  
-- 原則：
-  1) **最小権限（Least Privilege）** — 役割ベースで必要最低限のみ付与  
-  2) **ゼロトラスト** — ネットワーク境界を信用しない（AuthN/Z & TLS）  
-  3) **Secrets をコード/レポに残さない** — Vault/ENV 専用  
-  4) **監査可能性** — 変更・実行・アクセスの**証跡**を保存  
-  5) **二人承認** — 重大変更は **Two-Person Rule**（レビュー＋King 承認）  
+<!-- ================================================================== -->
+<!-- FILE: docs/schemas/order_request.schema.json -->
+<!-- ================================================================== -->
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctria.example/schemas/order_request.schema.json",
+  "title": "order_request",
+  "type": "object",
+  "required": ["symbol", "side", "proposed_qty", "time", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "symbol": { "type": "string", "minLength": 1 },
+    "side": { "type": "string", "enum": ["BUY", "SELL"] },
+    "proposed_qty": { "type": "number", "minimum": 0 },
+    "max_slippage_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "time": { "type": "string", "format": "date-time" },
+    "time_in_force": { "type": "string", "enum": ["GTC", "IOC", "FOK"] },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "qty_step": { "type": "number", "exclusiveMinimum": 0 },
+        "price_tick": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["strategy"],
+      "additionalProperties": true,
+      "properties": {
+        "strategy": { "type": "string", "minLength": 1 },
+        "shadow": { "type": "boolean" }
+      }
+    }
+  }
+}
 
----
+<!-- ================================================================== -->
+<!-- FILE: docs/schemas/exec_result.schema.json -->
+<!-- ================================================================== -->
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctria.example/schemas/exec_result.schema.json",
+  "title": "exec_result",
+  "type": "object",
+  "required": ["order_id", "status", "filled_qty", "ts"],
+  "additionalProperties": true,
+  "properties": {
+    "order_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["FILLED", "PARTIAL", "REJECTED", "CANCELLED"] },
+    "filled_qty": { "type": "number", "minimum": 0 },
+    "avg_price": { "type": "number", "minimum": 0 },
+    "fees": { "type": "number", "minimum": 0 },
+    "slippage_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "reason": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "symbol": { "type": "string" },
+        "strategy": { "type": "string" }
+      }
+    },
+    "latency_ms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "do_submit": { "type": "number", "minimum": 0 },
+        "broker": { "type": "number", "minimum": 0 }
+      }
+    },
+    "ts": { "type": "string", "format": "date-time" }
+  }
+}
 
-## 2. データ分類 & 取り扱い
-| クラス | 例 | 保存 | 転送 | ログ出力 |
-|---|---|---|---|---|
-| S3（機密） | APIキー、ブローカー認証、個人識別情報 | Vault/ENV（暗号化・厳格ACL） | TLS1.2+ | **禁止**（hash/伏字のみ） |
-| S2（内部） | 戦略メタ、評価レポート、監査ログ | 暗号化ストレージ（KMS） | TLS1.2+ | **最小限**（body_hash） |
-| S1（公開可） | リリースノート、設計資料 | Git | HTTPS | 可 |
+<!-- ================================================================== -->
+<!-- FILE: docs/schemas/audit_order.schema.json -->
+<!-- ================================================================== -->
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctria.example/schemas/audit_order.schema.json",
+  "title": "audit_order",
+  "type": "object",
+  "required": ["audit_id","correlation_id","received_ts","idempotency_key","request","normalized","risk_eval","exec_result"],
+  "additionalProperties": false,
+  "properties": {
+    "audit_id": { "type": "string" },
+    "correlation_id": { "type": "string" },
+    "received_ts": { "type": "string", "format": "date-time" },
+    "idempotency_key": { "type": "string" },
+    "request": { "$ref": "order_request.schema.json" },
+    "normalized": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "symbol": { "type": "string" },
+        "side": { "type": "string", "enum": ["BUY","SELL"] },
+        "qty_rounded": { "type": "number", "minimum": 0 },
+        "rounding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "qty_mode": { "type": "string", "enum": ["floor","ceil","nearest"] },
+            "qty_step": { "type": "number", "exclusiveMinimum": 0 },
+            "price_tick": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      }
+    },
+    "risk_eval": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "policy_version": { "type": "string" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "name": { "type": "string" },
+              "ok": { "type": "boolean" },
+              "limit": { "type": "number" },
+              "value": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "broker": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "provider": { "type": "string" },
+        "sent_ts": { "type": "string", "format": "date-time" },
+        "response": { "type": ["object","null"] }
+      }
+    },
+    "latency_ms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "do_submit": { "type": "number", "minimum": 0 },
+        "broker": { "type": "number", "minimum": 0 }
+      }
+    },
+    "exec_result": { "$ref": "exec_result.schema.json" },
+    "signature": {
+      "type": "object",
+      "required": ["alg","value"],
+      "additionalProperties": true,
+      "properties": {
+        "alg": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    }
+  }
+}
 
-> ログには **PII/Secrets を禁止**。必要時は **hash/伏字**（`Observability.md §12`）。
+<!-- ================================================================== -->
+<!-- FILE: docs/schemas/risk_event.schema.json -->
+<!-- ================================================================== -->
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctria.example/schemas/risk_event.schema.json",
+  "title": "risk_event",
+  "type": "object",
+  "required": ["kind","severity","observed","threshold","ts"],
+  "additionalProperties": true,
+  "properties": {
+    "kind": { "type": "string", "minLength": 1 },
+    "severity": { "type": "string", "enum": ["LOW","MEDIUM","HIGH","CRITICAL"] },
+    "observed": { "type": "number" },
+    "threshold": { "type": "number" },
+    "symbol": { "type": "string" },
+    "strategy": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" }
+  }
+}
 
----
+<!-- ================================================================== -->
+<!-- FILE: docs/schemas/kpi_summary.schema.json -->
+<!-- ================================================================== -->
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctria.example/schemas/kpi_summary.schema.json",
+  "title": "kpi_summary",
+  "type": "object",
+  "required": ["schema_version","window","metrics","generated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "window": { "type": "string" },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sharpe_adj": { "type": "number" },
+        "sortino": { "type": "number" },
+        "max_drawdown_pct": { "type": "number" },
+        "win_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "turnover": { "type": "number", "minimum": 0 }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" }
+  }
+}
 
-## 3. 役割と権限（RBAC）
-| ロール | 主な権限 | 禁止事項 |
-|---|---|---|
-| **King** | 最終承認、Flags/Config の最終適用、緊急停止 | 直接Secrets閲覧（原則） |
-| **Ops** | デプロイ、Airflow運用、抑制/再開、バックフィル | リスク境界の単独変更 |
-| **Risk (Noctus)** | リスク境界設定、Safemode、アラート裁定 | デプロイ/Secrets編集 |
-| **Models** | 学習/推論DAG、モデル登録 | 本番抑制制御 |
-| **Arch** | スキーマ/契約変更、DAG設計レビュー | 本番Flagsの単独変更 |
-| **ReadOnly** | ダッシュボード/ログ閲覧 | 書き込み全般 |
-
-**アクセス申請フロー（概念）**
-```mermaid
-flowchart LR
-  U[申請者] --> R[所属Leadレビュー]
-  R --> S[Secレビュー(最小権限/期間設定)]
-  S --> K[King承認]
-  K --> I[適用(Vault/ACL/RBAC)]
-  I --> A[監査記録]
-```
-
----
-
-## 4. 認証・認可（API/GUI）
-- **Auth**：OIDC/JWT（GUI/外部）、内部トークン（サービス間）  
-- **Scopes（例）**：`read:pdca`, `write:orders`, `read:config`, `write:config`, `admin:ops`  
-- **2FA**：GUI 操作は 2FA 必須（`Config-Registry.md gui.auth.require_2fa`）  
-- **CORS**：最小オリジン許可、Cookie利用時は `SameSite=strict`  
-- **Rate Limit**：既定 60 rpm、`/do/orders` 系は 10 rps（`API.md §14`）
-
-**API セキュアヘッダ（必須）**
-- `Authorization: Bearer <JWT>` / `Noctria-Token <key>`  
-- `Idempotency-Key`（変更系）  
-- `X-Correlation-ID`（全リクエスト）
-
----
-
-## 5. Secrets 管理
-- 保存：**Vault/Secrets Backend/ENV**（Git/Variables へ保存禁止）  
-- 参照：サービス起動時に**注入**（環境変数 or マウントファイル）  
-- ローテーション：**90日**（`Runbooks.md §10`）／漏えい疑義時は即時  
-- 監査：**誰が/いつ/何に**アクセスしたかを SIEM へ転送  
-- 検査：PR時に **Secret Scan**（キーワード・entropy）を強制
-
-**.env.sample（例）**
-```dotenv
-BROKER_API_KEY=
-BROKER_API_SECRET=
-DB_PRIMARY_URL=
-OIDC_CLIENT_ID=
-OIDC_CLIENT_SECRET=
-```
-
----
-
-## 6. Airflow のセキュリティ
-- Web 認証：OIDC or Basic（**匿名閲覧禁止**）  
-- RBAC：Viewer/Op/Model/Risk/King の**ロールに準拠**  
-- Variables：**Secretsを置かない**（Connections/Secrets Backend を使用）  
-- 接続情報：パスワードは**常にマスク**（Export禁止）  
-- 実行権限：`max_active_runs`, `pools` で Do 層を**隔離**（影響限定）  
-- 監査：Web UI 操作ログを保存（インポートエラー含む）
-
----
-
-## 7. ネットワーク & 暗号化
-- **TLS1.2+** を必須化（内部通信含む）  
-- **最小開口**：外部に出すポートは API/GUI のみ。Airflow Web は管理ネットに限定  
-- **Egress 制御**：ブローカー/API 宛のみ許可（Do 層）  
-- **IP 制限**：本番 GUI/API は許可リスト制（必要に応じ VPN）  
-- **At-Rest**：ストレージ暗号化（KMS）／バックアップも暗号化  
-- **DNS/時刻**：NTP固定、Clock Skew 監視（`Risk-Register.md R-05`）
-
----
-
-## 8. 変更管理 & Two-Person Rule
-- **対象**：`risk_policy`/`flags`/`Do-Layer`/`API`/`Schemas`/`Observability Rules`  
-- **運用**：**同一PR**で関連ドキュメントを更新（`Runbooks`/`Config-Registry`/`API`/`Do-Layer-Contract`）  
-- **承認**：ロールごとに**二人承認 + King**（重大変更）  
-- **ADR**：本質的変更は `../adrs/` に Decision/Context/Consequences を記録
-
----
-
-## 9. 監査 & ログ（不可侵性）
-- **統一フォーマット**：構造化 JSON（`Observability.md §3.1`）  
-- **重要イベント**：`who/what/when/where` を必須（`correlation_id` 付与）  
-- **tamper-evident**：監査ログは**改変検知**ストレージ（WORM 相当）へも保存推奨  
-- **保持**：S2=90日以上、S3=最小限（法令・契約に従う）
-
----
-
-## 10. インシデント対応（要点）
-1) **検知**：アラート/通報/監査ログ  
-2) **封じ込め**：`global_trading_pause`、アクセストークン無効化、回線遮断  
-3) **根本原因**：トレース・監査・変更履歴の照合  
-4) **回復**：段階再開（Safemode/低ロット）  
-5) **報告**：24h 内に `../incidents/Incident-Postmortems.md` 草案  
-6) **再発防止**：`Risk-Register.md` と `ADRs/` 更新
-
----
-
-## 11. テンプレ & 手順
-
-### 11.1 権限付与（期限付き）
-```md
-# Access Grant — {User} ({Role})
-- 目的: {運用/調査/対応}
-- 期間: {開始〜終了 JST}
-- 最小権限: {role, scopes}
-- 審査: Sec, 所属Lead
-- 承認: King
-- 設定: Vault/ACL/RBAC 反映済（証跡ID: ...）
-- 失効手順: 自動失効 or 手動revoke（日時）
-```
-
-### 11.2 オンボーディング/オフボーディング チェックリスト
-```md
-## Onboarding
-- [ ] NDA/ポリシー同意
-- [ ] アカウント発行（OIDC）
-- [ ] ロール割当（最小権限）
-- [ ] 2FA 設定
-- [ ] 監査に基づく初回ログイン確認
-
-## Offboarding
-- [ ] アカウント無効化
-- [ ] Secrets/権限の revoke
-- [ ] 端末・鍵の回収
-- [ ] 監査/退職ログの保存
-```
-
-### 11.3 設定の安全サンプル（抜粋）
-```yaml
-gui:
-  auth:
-    provider: "oidc"
-    require_2fa: true
-observability:
-  alerts:
-    dag_fail_rate_pct: 5
-flags:
-  global_trading_pause: false
-  risk_safemode: true
-```
-
----
-
-## 12. よくある質問（FAQ）
-- **Q:** 変更加えるだけで King 承認いる？  
-  **A:** `risk_policy`/`flags`/`Do-Layer`/`API`/`Schemas` は **Yes**。他はRACI表に従う。  
-- **Q:** Airflow Variables にキーを入れてもいい？  
-  **A:** **No**。Connections/Secrets Backend を使う。  
-- **Q:** 誰が抑制を解除できる？  
-  **A:** `Ops` が提案、`Risk` が評価、**King が最終承認**（`Runbooks §6` 併記）。
-
----
-
-## 13. 既知の制約 / TODO
-- VPN/Zero-Trust Network Access（ZTNA）導入の検討  
-- Secrets ローテの自動化（回転と影響波及の可視化）  
-- 監査ログの WORM ストレージ化（法規要件に合わせる）
-
----
-
-## 14. 変更履歴（Changelog）
-- **2025-08-12**: 初版作成（RBAC/Secrets/ネットワーク/監査/Incident/Two-Person）
-
+<!-- ================================================================== -->
+<!-- FILE: docs/schemas/risk_policy.schema.json -->
+<!-- ================================================================== -->
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctria.example/schemas/risk_policy.schema.json",
+  "title": "risk_policy",
+  "type": "object",
+  "required": ["version","limits"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_drawdown_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "max_position_qty": { "type": "number", "minimum": 0 },
+        "max_slippage_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "losing_streak_threshold": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
 
 <!-- AUTOGEN:CHANGELOG START -->
 
-### 🛠 Updates since: `2025-08-12 03:44 UTC`
+### 🛠 Updates since: `2025-08-12 14:02 UTC`
 
 - `4715c7b` 2025-08-15T05:12:32+09:00 — **Update update_docs_from_index.py** _(by Noctoria)_
   - `scripts/update_docs_from_index.py`
@@ -458,32 +502,3 @@ flags:
   - `src/plan_data/contracts.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
-<!-- AUTODOC:BEGIN mode=git_log path_globs="docs/security/*.md;src/security/**/*.py" title=セキュリティ関連更新履歴（最近30） limit=30 since=2025-08-01 -->
-### セキュリティ関連更新履歴（最近30）
-
-- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
-  - `docs/00_index/00-INDEX.md`
-  - `docs/_generated/update_docs.log`
-  - `docs/adrs/ADRs.md`
-  - `docs/apis/API.md`
-  - `docs/apis/Do-Layer-Contract.md`
-  - `docs/apis/observability/Observability.md`
-  - `docs/architecture/Architecture-Overview.md`
-  - `docs/architecture/Plan-Layer.md`
-  - `docs/governance/Coding-Standards.md`
-  - `docs/governance/Vision-Governance.md`
-  - `docs/incidents/Incident-Postmortems.md`
-  - `docs/models/ModelCard-Prometheus-PPO.md`
-  - `docs/models/Strategy-Lifecycle.md`
-  - `docs/observability/Observability.md`
-  - `docs/operations/Airflow-DAGs.md`
-  - `docs/operations/Config-Registry.md`
-  - `docs/operations/Runbooks.md`
-  - `docs/qa/Testing-And-QA.md`
-  - `docs/risks/Risk-Register.md`
-  - `docs/roadmap/Release-Notes.md`
-- **c24444d** 2025-08-12T12:44:53+09:00 — Security-And-Access.md を更新 (by Noctoria)
-  - `docs/security/Security-And-Access.md`
-- **65c77f4** 2025-08-12T03:03:28+09:00 — Create Security-And-Access.md (by Noctoria)
-  - `docs/security/Security-And-Access.md`
-<!-- AUTODOC:END -->

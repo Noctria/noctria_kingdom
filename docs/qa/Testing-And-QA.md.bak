@@ -501,5 +501,45 @@ repos:
 
 <!-- AUTOGEN:CHANGELOG END -->
 <!-- AUTODOC:BEGIN mode=git_log path_globs="tests/**/*.py;docs/qa/*.md" title="テスト/QA 更新履歴（最近30）" limit=30 since=2025-08-01 -->
-(自動置換)
+### テスト/QA 更新履歴（最近30）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **f167207** 2025-08-14T03:16:58+09:00 — Update Testing-And-QA.md (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
+- **e1a488f** 2025-08-13T11:05:24+09:00 — Create test_trace_decision_e2e.py (by Noctoria)
+  - `tests/test_trace_decision_e2e.py`
+- **69fbc97** 2025-08-13T03:46:50+09:00 — Update conftest.py (by Noctoria)
+  - `tests/conftest.py`
+- **e1e0061** 2025-08-13T03:10:15+09:00 — Create test_trace_and_integration.py (by Noctoria)
+  - `tests/test_trace_and_integration.py`
+- **d348f79** 2025-08-13T03:09:49+09:00 — Create test_minidemo_smoke.py (by Noctoria)
+  - `tests/test_minidemo_smoke.py`
+- **2019666** 2025-08-13T03:09:21+09:00 — Create conftest.py (by Noctoria)
+  - `tests/conftest.py`
+- **ce87e75** 2025-08-12T22:54:25+09:00 — Update Testing-And-QA.md (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
+- **887b679** 2025-08-12T13:01:56+09:00 — Testing-And-QA.md を更新 (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
+- **962c3ca** 2025-08-12T03:03:53+09:00 — Create Testing-And-QA.md (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
 <!-- AUTODOC:END -->

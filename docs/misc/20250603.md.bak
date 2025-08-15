@@ -16,5 +16,7 @@
   lrwxrwxrwx 1 noctria noctria   27 Jun  1 23:38 noctria-kingdom-main -> /opt/airflow-main
   drwxr-xr-x 6 noctria noctria 4096 Jun  3 02:54 venv_noctria
 <!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
-(自動置換)
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
 <!-- AUTODOC:END -->
