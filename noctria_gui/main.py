@@ -169,6 +169,7 @@ _safe_include("noctria_gui.routes.pdca")                 # 既存：PDCAトッ�
 _safe_include("noctria_gui.routes.pdca_recheck")         # /pdca/control, /pdca/recheck
 _safe_include("noctria_gui.routes.pdca_routes")          # /pdca-dashboard（HUDダッシュボード）
 _safe_include("noctria_gui.routes.pdca_summary")         # /pdca/summary & /pdca/api/summary
+_safe_include("noctria_gui.routes.pdca_recent")
 
 # 戦略・統計・タグ
 _safe_include("noctria_gui.routes.push")
