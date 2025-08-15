@@ -67,3 +67,8 @@ yaml
 [こちらをクリックしてダウンロードしてください](sandbox:/mnt/data/docker_tensorflow_gpu_next_steps.md)
 
 必要に応じてファイル名を変更してお使いください！
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

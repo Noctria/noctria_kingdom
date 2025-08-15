@@ -1,0 +1,47 @@
+{
+  "project": "prometheus",
+  "algo": "PPO",
+  "saved_at_utc": "2025-08-11T14:18:19.831564",
+  "save_dir": "/opt/airflow/data/models/prometheus/PPO/obs8/manual__2025-08-11T14:18:10+00:00",
+  "files": {
+    "model_zip": "model.zip",
+    "metadata": "metadata.json"
+  },
+  "environment": {
+    "env_class": "src.envs.noctria_fx_trading_env:NoctriaFXTradingEnv",
+    "observation_space": {
+      "space": "Box",
+      "shape": [
+        8
+      ],
+      "dtype": "float32",
+      "low": [
+        "-Infinity",
+        "-Infinity",
+        "-Infinity",
+        "-Infinity",
+        "-Infinity",
+        "-Infinity",
+        "-Infinity",
+        "-Infinity"
+      ],
+      "high": [
+        "Infinity",
+        "Infinity",
+        "Infinity",
+        "Infinity",
+        "Infinity",
+        "Infinity",
+        "Infinity",
+        "Infinity"
+      ]
+    },
+    "action_space": {
+      "space": "Discrete",
+      "n": 3
+    }
+  },
+  "obs_dim": 8,
+  "total_timesteps": 1000,
+  "airflow_dag_run_id": "manual__2025-08-11T14:18:10+00:00"
+}

@@ -10,3 +10,8 @@
 | 🏦 **制度的AIユニット**       | `institutions/central_bank_ai.py`     | 中央銀行を模したファンダ判断AIユニット（利上げ／インフレ環境の影響を評価）        |
 | 📁 **データ格納先**          | `data/`                               | トレーニング・実行用の事前処理済みデータCSV格納先                    |
 | 🌐 **GUI/API連携**       | `scripts/run_veritas_generate_dag.py` | FastAPI経由でDAGを起動し、外部アプリと統合（フロント表示用のログJSON化含む） |
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

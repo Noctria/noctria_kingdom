@@ -1,0 +1,130 @@
+[
+  {
+    "file": "veritas/generate_strategy_file.py",
+    "imports": []
+  },
+  {
+    "file": "veritas/veritas_airflow_executor.py",
+    "imports": []
+  },
+  {
+    "file": "veritas/veritas_generate_strategy.py",
+    "imports": []
+  },
+  {
+    "file": "execution/challenge_monitor.py",
+    "imports": []
+  },
+  {
+    "file": "execution/execution_manager.py",
+    "imports": []
+  },
+  {
+    "file": "execution/optimized_order_execution.py",
+    "imports": []
+  },
+  {
+    "file": "execution/order_execution.py",
+    "imports": []
+  },
+  {
+    "file": "execution/save_model_metadata.py",
+    "imports": []
+  },
+  {
+    "file": "execution/switch_to_best_model.py",
+    "imports": []
+  },
+  {
+    "file": "execution/tensorflow_task.py",
+    "imports": []
+  },
+  {
+    "file": "execution/trade_analysis.py",
+    "imports": []
+  },
+  {
+    "file": "execution/trade_monitor.py",
+    "imports": []
+  },
+  {
+    "file": "execution/trade_simulator.py",
+    "imports": []
+  },
+  {
+    "file": "tests/backtesting.py",
+    "imports": []
+  },
+  {
+    "file": "tests/execute_order_test.py",
+    "imports": []
+  },
+  {
+    "file": "tests/forward_test_meta_ai.py",
+    "imports": []
+  },
+  {
+    "file": "tests/integration_test_noctria.py",
+    "imports": []
+  },
+  {
+    "file": "tests/run_ai_trading_loop.py",
+    "imports": []
+  },
+  {
+    "file": "tests/stress_tests.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_dqn_agent.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_dummy.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_floor_mod.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_floor_mod_gpu.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_meta_ai_env_rl.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_meta_ai_rl.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_meta_ai_rl_longrun.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_meta_ai_rl_real_data.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_mt5_connection.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_noctria.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_noctria_master_ai.py",
+    "imports": []
+  },
+  {
+    "file": "tests/test_path_config.py",
+    "imports": []
+  },
+  {
+    "file": "tests/unit_tests.py",
+    "imports": []
+  }
+]

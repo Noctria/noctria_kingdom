@@ -252,3 +252,8 @@ Happy coding and trading in the Kingdom!
 
 以上が **Noctria Kingdom の Extended README** です。  
 この内容を保存すれば、いつでもシステム全体の構成や開発経緯、物語的背景を再現・再生成できます。
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

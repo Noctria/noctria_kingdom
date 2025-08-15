@@ -241,3 +241,8 @@ yaml
 
 必要なら、この内容をさらに **プロジェクト用にカスタマイズ** して渡すこともできます！  
 他に付け加えたいTipsなどがあれば教えてね🚀✨
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

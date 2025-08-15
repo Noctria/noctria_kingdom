@@ -77,3 +77,8 @@ docker compose up --build -d
 🎯 効果
 ✅ これで Airflow 環境内に gym, optuna, shimmy, tensorboard が自動的にインストールされます！
 ✅ 以後、手動で pip install する必要はありません。
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

@@ -326,3 +326,40 @@ flowchart LR
   - `src/core/airflow_client.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/governance/*.md title="ビジョン/統治 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### ビジョン/統治 文書更新履歴（最近30）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **d141a4c** 2025-08-14T03:30:22+09:00 — Update Vision-Governance.md (by Noctoria)
+  - `docs/governance/Vision-Governance.md`
+- **dc7a660** 2025-08-14T03:26:59+09:00 — Update Vision-Governance.md (by Noctoria)
+  - `docs/governance/Vision-Governance.md`
+- **f04bab9** 2025-08-12T16:12:50+09:00 — Coding-Standards.md を更新 (by Noctoria)
+  - `docs/governance/Coding-Standards.md`
+- **fb5463e** 2025-08-12T04:32:41+09:00 — Update Vision-Governance.md (by Noctoria)
+  - `docs/governance/Vision-Governance.md`
+- **5d39f52** 2025-08-12T03:05:01+09:00 — Create Coding-Standards.md (by Noctoria)
+  - `docs/governance/Coding-Standards.md`
+- **e5f163e** 2025-08-12T02:59:35+09:00 — Create Vision-Governance.md (by Noctoria)
+  - `docs/governance/Vision-Governance.md`
+<!-- AUTODOC:END -->

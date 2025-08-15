@@ -387,3 +387,8 @@ yarl                                     1.9.4
 zipp                                     3.17.0
 zope.event                               5.0
 zope.interface                           6.1
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

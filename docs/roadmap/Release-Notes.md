@@ -332,3 +332,40 @@ Docs-as-Code の整備に協力した Council & Ops & Risk チーム、ありが
   - `src/core/airflow_client.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/roadmap/*.md title="Release Notes 更新履歴（最近50）" limit=50 since=2025-07-01 -->
+### Release Notes 更新履歴（最近50）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **8021926** 2025-08-14T03:12:38+09:00 — Update Roadmap-OKRs.md (by Noctoria)
+  - `docs/roadmap/Roadmap-OKRs.md`
+- **1bd84f1** 2025-08-14T03:04:19+09:00 — Update Release-Notes.md (by Noctoria)
+  - `docs/roadmap/Release-Notes.md`
+- **c193ed7** 2025-08-12T16:09:23+09:00 — Roadmap-OKRs.md を更新 (by Noctoria)
+  - `docs/roadmap/Roadmap-OKRs.md`
+- **513e712** 2025-08-12T16:03:18+09:00 — Release-Notes.md を更新 (by Noctoria)
+  - `docs/roadmap/Release-Notes.md`
+- **1fc087b** 2025-08-12T03:04:38+09:00 — Create Roadmap-OKRs.md (by Noctoria)
+  - `docs/roadmap/Roadmap-OKRs.md`
+- **0757b67** 2025-08-12T03:04:22+09:00 — Create Release-Notes.md (by Noctoria)
+  - `docs/roadmap/Release-Notes.md`
+<!-- AUTODOC:END -->

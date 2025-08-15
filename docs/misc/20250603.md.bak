@@ -1,0 +1,20 @@
+# 📜 2025年6月3日 議事録
+
+## 🎯 本日のテーマ
+- Noctria Kingdomの開発・運用環境の整備
+- Linux（WSL2）・Windowsでの仮想環境（venv）再構築
+- `NoctriaMasterAI` 統合テスト準備
+- Pythonライブラリの環境再構築（`requirements.txt`の作成＆インストール）
+
+---
+
+## ✅ 実施内容
+
+### 1️⃣ WSL2環境の確認
+- ホームディレクトリのシンボリックリンク構造を確認：
+  ```bash
+  lrwxrwxrwx 1 noctria noctria   27 Jun  1 23:38 noctria-kingdom-main -> /opt/airflow-main
+  drwxr-xr-x 6 noctria noctria 4096 Jun  3 02:54 venv_noctria
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+(自動置換)
+<!-- AUTODOC:END -->

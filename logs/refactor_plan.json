@@ -1,0 +1,27 @@
+{
+  "delete": [
+    "/mnt/d/noctria_kingdom/core/__pycache__"
+  ],
+  "duplicate": [
+    "/mnt/d/noctria_kingdom/core"
+  ],
+  "git_internal": [],
+  "other": [
+    "/mnt/d/noctria_kingdom/docs",
+    "/mnt/d/noctria_kingdom/EA_Strategies",
+    "/mnt/d/noctria_kingdom/noctria_kingdom",
+    "/mnt/d/noctria_kingdom/optimization",
+    "/mnt/d/noctria_kingdom/airflow_docker/docker",
+    "/mnt/d/noctria_kingdom/airflow_docker/institutions",
+    "/mnt/d/noctria_kingdom/airflow_docker/plugins",
+    "/mnt/d/noctria_kingdom/airflow_docker/pod_templates",
+    "/mnt/d/noctria_kingdom/airflow_docker/pvc",
+    "/mnt/d/noctria_kingdom/airflow_docker/values",
+    "/mnt/d/noctria_kingdom/noctria_gui/backend",
+    "/mnt/d/noctria_kingdom/noctria_gui/frontend",
+    "/mnt/d/noctria_kingdom/tests/backtesting",
+    "/mnt/d/noctria_kingdom/veritas/generate",
+    "/mnt/d/noctria_kingdom/noctria_gui/backend/app",
+    "/mnt/d/noctria_kingdom/veritas/generate/templates"
+  ]
+}

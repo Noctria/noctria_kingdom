@@ -439,3 +439,44 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
   - `src/core/airflow_client.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs="docs/operations/*.md;docs/misc/*.md" title=運用ドキュメント更新履歴（最近30） limit=30 since=2025-08-01 -->
+### 運用ドキュメント更新履歴（最近30）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **02b8516** 2025-08-14T02:56:00+09:00 — Update Config-Registry.md (by Noctoria)
+  - `docs/operations/Config-Registry.md`
+- **1a4b22e** 2025-08-14T02:50:27+09:00 — Update Runbooks.md (by Noctoria)
+  - `docs/operations/Runbooks.md`
+- **3373062** 2025-08-12T10:56:04+09:00 — Airflow-DAGs.md を更新 (by Noctoria)
+  - `docs/operations/Airflow-DAGs.md`
+- **3998941** 2025-08-12T04:39:48+09:00 — Update Config-Registry.md (by Noctoria)
+  - `docs/operations/Config-Registry.md`
+- **05d3f5d** 2025-08-12T04:36:19+09:00 — Update Runbooks.md (by Noctoria)
+  - `docs/operations/Runbooks.md`
+- **a410532** 2025-08-12T03:01:21+09:00 — Create Airflow-DAGs.md (by Noctoria)
+  - `docs/operations/Airflow-DAGs.md`
+- **9371b3c** 2025-08-12T03:01:04+09:00 — Create Config-Registry.md (by Noctoria)
+  - `docs/operations/Config-Registry.md`
+- **ee7cb52** 2025-08-12T03:00:26+09:00 — Create Runbooks.md (by Noctoria)
+  - `docs/operations/Runbooks.md`
+<!-- AUTODOC:END -->

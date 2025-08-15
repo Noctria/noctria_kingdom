@@ -1,4 +1,156 @@
 # 👁️ Observability.md  
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/act_layer.mmd title="Act Layer Mermaid図（最新）" fence=mermaid -->
+### Act Layer Mermaid図（最新）
+
+```mermaid
+flowchart TD
+
+%% ====== styles (GitHub-safe) ======
+classDef inputs fill:#243447,stroke:#4f86c6,color:#e6f0ff;
+classDef act fill:#3a2e4d,stroke:#a78bfa,color:#f3e8ff;
+classDef train fill:#2d3a2f,stroke:#76c893,color:#e0ffe8;
+classDef outputs fill:#1f3b2d,stroke:#6bbf59,color:#d7fbe8;
+classDef gov fill:#2e2e2e,stroke:#b7b7b7,color:#ffffff;
+classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
+classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
+
+%% ====== INPUTS ======
+subgraph INPUTS ["Upstream inputs"]
+  KPI["kpi_summary.json<br/>from CHECK"]
+  ECONF["eval_config.json<br/>targets / window / metrics<br/><i>TODO:</i> hypothesis id & test settings"]
+  GUIACT["GUI: /pdca/recheck & /pdca/summary<br/>human accept or threshold adjust"]
+end
+
+%% ====== ACT layer ======
+subgraph ACT_LAYER ["ACT layer (src/act & noctria_gui/routes)"]
+  RECHECK["pdca_recheck.py<br/>re-evaluate / param search / A-B compare<br/><i>TODO:</i> full experiment tracking"]
+  PUSH["pdca_push.py<br/>adopt & release (Git push / tag)<br/><i>TODO:</i> release bundle signature & SBOM"]
+  SUMMARY["pdca_summary.py<br/>period & tag summaries<br/><i>TODO:</i> statistical report & benchmarks"]
+  FEEDBACK["feedback_adapter.py<br/>proposals back to PLAN<br/><i>TODO:</i> proposal vs applied contract"]
+end
+
+%% ====== Training and retraining ======
+subgraph TRAINING ["Training and retraining (Airflow)"]
+  TRAIN_DAG["train_* DAG<br/>train & validate<br/><i>TODO:</i> auto-trigger from drift/SLO"]
+  REGISTRY["models/registry<br/>version / signature / data fingerprint<br/><i>TODO:</i> enforcement"]
+end
+
+%% ====== OUTPUTS ======
+subgraph OUTPUTS ["Downstream outputs"]
+  PLANUPD["plan_update.json<br/>feature/threshold proposals<br/><i>TODO:</i> schema semver"]
+  STRATREL["strategy_release.json<br/>selected version & config<br/><i>TODO:</i> schema semver"]
+  DASH["dashboard_feed.json<br/>visualization feed"]
+end
+
+%% ====== Governance and operations ======
+subgraph GOVERNANCE ["Governance and operations"]
+  DAG_ACT["Airflow DAG: pdca_act_flow.py<br/>orchestrate<br/><i>TODO:</i> idempotent per trace_id & branch lock"]
+  GUI_ROUTE["GUI: /pdca/summary & /pdca/recheck<br/>approve & review<br/><i>TODO:</i> two-person + king workflow events"]
+  APPROVAL["approval_record.json<br/>approvers & timestamps<br/><i>TODO:</i> persistence"]
+end
+
+%% ====== Observability taps ======
+subgraph OBS ["Observability taps (tables)"]
+  OBS_ACT["obs_act_runs<br/>start/end/status/duration/approvers<br/><i>TODO:</i> add trace_id & decision_id"]
+  OBS_RECHECK["obs_recheck_jobs<br/>trials/best/p values/CI<br/><i>TODO:</i> add trace_id & decision_id"]
+  OBS_ALT["obs_alerts<br/>promotion failed / rollback / policy deviation<br/><i>note:</i> table exists (generic)"]
+end
+
+%% ====== Policies and identity ======
+CRITERIA["promotion_criteria.yaml<br/>thresholds/period/tests<br/><i>TODO:</i> formalize"]
+ROLLBACK["rollback_policy.yaml<br/>rules & kill switch<br/><i>TODO:</i> formalize"]
+IDS["ids & versions<br/>trace_id / decision_id / schema_version<br/><i>TODO:</i> enforce across outputs"]
+
+%% ====== FLOWS ======
+KPI --> RECHECK
+ECONF --> RECHECK
+GUIACT --> RECHECK
+RECHECK --> SUMMARY
+RECHECK --> PUSH
+RECHECK -. "train data" .-> TRAIN_DAG
+TRAIN_DAG --> REGISTRY
+PUSH --> STRATREL
+SUMMARY --> DASH
+FEEDBACK --> PLANUPD
+
+%% ====== Governance links ======
+GUI_ROUTE --> RECHECK
+GUI_ROUTE --> PUSH
+GUI_ROUTE --> APPROVAL
+DAG_ACT --> RECHECK
+DAG_ACT --> PUSH
+
+%% ====== Policies links ======
+CRITERIA --> RECHECK
+ROLLBACK --> PUSH
+
+%% ====== Observability links ======
+RECHECK -->|log| OBS_RECHECK
+PUSH -->|log| OBS_ACT
+SUMMARY -->|log| OBS_ACT
+APPROVAL -->|log| OBS_ACT
+ROLLBACK -->|alert| OBS_ALT
+
+%% ====== Identity propagation (not implemented) ======
+KPI -. trace_id .-> RECHECK
+RECHECK -. decision_id .-> PUSH
+PUSH -. decision_id .-> STRATREL
+SUMMARY -. decision_id .-> DASH
+PLANUPD -. trace_id .-> FEEDBACK
+
+%% ====== class bindings ======
+class KPI,ECONF,GUIACT inputs;
+class RECHECK,PUSH,SUMMARY,FEEDBACK act;
+class TRAIN_DAG,REGISTRY train;
+class PLANUPD,STRATREL,DASH outputs;
+class DAG_ACT,GUI_ROUTE,APPROVAL gov;
+class OBS_ACT,OBS_RECHECK,OBS_ALT obs;
+class CRITERIA,ROLLBACK,IDS todo;
+```
+<!-- AUTODOC:END -->
+
+<!-- AUTODOC:BEGIN mode=git_log path_globs="src/plan_data/observability.py;src/plan_data/trace.py;src/plan_data/decision_engine.py" title="Observability/Trace/DecisionEngine 更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Observability/Trace/DecisionEngine 更新履歴（最近30）
+
+- **a39c7db** 2025-08-15T04:14:15+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **206dac2** 2025-08-14T00:21:25+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **435b19e** 2025-08-13T21:57:54+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **a33f63e** 2025-08-13T14:17:31+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **3fe7a25** 2025-08-13T13:42:41+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **5c617c4** 2025-08-13T12:43:52+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **8b7bc76** 2025-08-13T11:24:48+09:00 — Rename decision_engine.py to decision_engine.py (by Noctoria)
+  - `src/decision/decision_engine.py`
+- **e70244e** 2025-08-13T11:23:29+09:00 — Rename trace.py to trace.py (by Noctoria)
+  - `src/core/trace.py`
+- **7dfab9c** 2025-08-13T11:17:32+09:00 — Update trace.py (by Noctoria)
+  - `src/plan_data/trace.py`
+- **e4a9e83** 2025-08-13T10:58:32+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **9c1c5d0** 2025-08-13T10:50:29+09:00 — Update decision_engine.py (by Noctoria)
+  - `src/plan_data/decision_engine.py`
+- **31a28ae** 2025-08-13T10:47:02+09:00 — Update trace.py (by Noctoria)
+  - `src/plan_data/trace.py`
+- **9738c0b** 2025-08-13T04:18:54+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **668d424** 2025-08-13T04:07:33+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **43c5d7a** 2025-08-13T02:53:07+09:00 — Update trace.py (by Noctoria)
+  - `src/plan_data/trace.py`
+- **b80bcf2** 2025-08-13T02:24:16+09:00 — Update observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **881c42c** 2025-08-13T01:52:58+09:00 — Create observability.py (by Noctoria)
+  - `src/plan_data/observability.py`
+- **04080ca** 2025-08-13T01:52:28+09:00 — Create trace.py (by Noctoria)
+  - `src/plan_data/trace.py`
+- **2f52073** 2025-08-13T01:52:00+09:00 — Create decision_engine.py (by Noctoria)
+  - `src/plan_data/decision_engine.py`
+<!-- AUTODOC:END -->
 _Noctria Kingdom — 観測・可視化ガイド（最新版 / 2025-08-14）_
 
 本ドキュメントは **PDCA 可観測性（Observability）** の決定事項・実装仕様（DBスキーマ/ビュー、GUI ルート、運用手順）を **単体で完結** するようにまとめています。  

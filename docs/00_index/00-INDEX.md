@@ -403,3 +403,126 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
   - `src/core/airflow_client.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/**/*.md title=Docs全体の更新履歴（最近50） limit=50 since=2025-07-01 -->
+### Docs全体の更新履歴（最近50）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **c29388a** 2025-08-14T03:33:49+09:00 — Update ADRs.md (by Noctoria)
+  - `docs/adrs/ADRs.md`
+- **d141a4c** 2025-08-14T03:30:22+09:00 — Update Vision-Governance.md (by Noctoria)
+  - `docs/governance/Vision-Governance.md`
+- **dc7a660** 2025-08-14T03:26:59+09:00 — Update Vision-Governance.md (by Noctoria)
+  - `docs/governance/Vision-Governance.md`
+- **6112943** 2025-08-14T03:23:05+09:00 — Update howto-*.md (by Noctoria)
+  - `docs/howto/howto-*.md`
+- **f167207** 2025-08-14T03:16:58+09:00 — Update Testing-And-QA.md (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
+- **8021926** 2025-08-14T03:12:38+09:00 — Update Roadmap-OKRs.md (by Noctoria)
+  - `docs/roadmap/Roadmap-OKRs.md`
+- **05194d5** 2025-08-14T03:09:18+09:00 — Update ModelCard-Prometheus-PPO.md (by Noctoria)
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+- **1bd84f1** 2025-08-14T03:04:19+09:00 — Update Release-Notes.md (by Noctoria)
+  - `docs/roadmap/Release-Notes.md`
+- **02b8516** 2025-08-14T02:56:00+09:00 — Update Config-Registry.md (by Noctoria)
+  - `docs/operations/Config-Registry.md`
+- **1a4b22e** 2025-08-14T02:50:27+09:00 — Update Runbooks.md (by Noctoria)
+  - `docs/operations/Runbooks.md`
+- **33dd76d** 2025-08-14T02:46:28+09:00 — Update Observability.md (by Noctoria)
+  - `docs/observability/Observability.md`
+- **f1f2743** 2025-08-14T02:42:05+09:00 — Update Observability.md (by Noctoria)
+  - `docs/observability/Observability.md`
+- **32ae51d** 2025-08-14T02:35:42+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **01fec3a** 2025-08-14T02:31:01+09:00 — Update 00-INDEX.md (by Noctoria)
+  - `docs/00_index/00-INDEX.md`
+- **3f7b49d** 2025-08-14T02:19:26+09:00 — Update 00-INDEX.md (by Noctoria)
+  - `docs/00_index/00-INDEX.md`
+- **7e68901** 2025-08-13T21:26:36+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **ff8d8c2** 2025-08-13T16:54:25+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **93b1ef1** 2025-08-13T12:09:58+09:00 — Rename Next Actions — Noctria PDCA Hardening Plan to Next Actions — Noctria PDCA Hardening Plan.md (by Noctoria)
+  - `"docs/Next Actions \342\200\224 Noctria PDCA Hardening Plan.md"`
+- **2e20d48** 2025-08-13T11:55:12+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **cb308f7** 2025-08-13T01:39:56+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **23940b4** 2025-08-13T00:43:38+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **8faf489** 2025-08-13T00:24:16+09:00 — Update Observability.md (by Noctoria)
+  - `docs/observability/Observability.md`
+- **80783ed** 2025-08-13T00:22:34+09:00 — Update Observability.md (by Noctoria)
+  - `docs/observability/Observability.md`
+- **602e45d** 2025-08-12T23:57:03+09:00 — Update Observability.md (by Noctoria)
+  - `docs/observability/Observability.md`
+- **7116954** 2025-08-12T23:44:44+09:00 — Update Observability.md (by Noctoria)
+  - `docs/observability/Observability.md`
+- **9a3c459** 2025-08-12T23:02:47+09:00 — Update Do-Layer-Contract.md (by Noctoria)
+  - `docs/apis/Do-Layer-Contract.md`
+- **ce87e75** 2025-08-12T22:54:25+09:00 — Update Testing-And-QA.md (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
+- **108b97b** 2025-08-12T22:49:15+09:00 — Update Architecture-Overview.md (by Noctoria)
+  - `docs/architecture/Architecture-Overview.md`
+- **7da33ee** 2025-08-12T18:22:22+09:00 — Update API.md (by Noctoria)
+  - `docs/apis/API.md`
+- **c683774** 2025-08-12T18:08:26+09:00 — Update ModelCard-Prometheus-PPO.md (by Noctoria)
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+- **c428e54** 2025-08-12T18:05:58+09:00 — Update ModelCard-Prometheus-PPO.md (by Noctoria)
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+- **92cd64e** 2025-08-12T18:01:38+09:00 — Update howto-*.md (by Noctoria)
+  - `docs/howto/howto-*.md`
+- **14dd164** 2025-08-12T17:57:02+09:00 — Update Incident-Postmortems.md (by Noctoria)
+  - `docs/incidents/Incident-Postmortems.md`
+- **d62ef46** 2025-08-12T17:18:36+09:00 — Update 00-INDEX.md (by Noctoria)
+  - `docs/00_index/00-INDEX.md`
+- **9191144** 2025-08-12T17:16:41+09:00 — Update 00-INDEX.md (by Noctoria)
+  - `docs/00_index/00-INDEX.md`
+- **8bdcdaf** 2025-08-12T17:15:26+09:00 — Rename ADRs to ADRs.md (by Noctoria)
+  - `docs/adrs/ADRs.md`
+- **f04bab9** 2025-08-12T16:12:50+09:00 — Coding-Standards.md を更新 (by Noctoria)
+  - `docs/governance/Coding-Standards.md`
+- **c193ed7** 2025-08-12T16:09:23+09:00 — Roadmap-OKRs.md を更新 (by Noctoria)
+  - `docs/roadmap/Roadmap-OKRs.md`
+- **513e712** 2025-08-12T16:03:18+09:00 — Release-Notes.md を更新 (by Noctoria)
+  - `docs/roadmap/Release-Notes.md`
+- **887b679** 2025-08-12T13:01:56+09:00 — Testing-And-QA.md を更新 (by Noctoria)
+  - `docs/qa/Testing-And-QA.md`
+- **c24444d** 2025-08-12T12:44:53+09:00 — Security-And-Access.md を更新 (by Noctoria)
+  - `docs/security/Security-And-Access.md`
+- **54f2a56** 2025-08-12T12:36:43+09:00 — Risk-Register.md を更新 (by Noctoria)
+  - `docs/risks/Risk-Register.md`
+- **f5abdc3** 2025-08-12T12:21:46+09:00 — Observability.md を作成 (by Noctoria)
+  - `docs/observability/Observability.md`
+- **3983ba0** 2025-08-12T12:07:40+09:00 — Do-Layer-Contract.md を更新 (by Noctoria)
+  - `docs/apis/Do-Layer-Contract.md`
+- **3677890** 2025-08-12T11:49:32+09:00 — API.md を更新 (by Noctoria)
+  - `docs/apis/API.md`
+- **39879e1** 2025-08-12T11:11:02+09:00 — Plan-Layer.md を更新 (by Noctoria)
+  - `docs/architecture/Plan-Layer.md`
+- **d52df0f** 2025-08-12T11:04:27+09:00 — Strategy-Lifecycle.md を更新 (by Noctoria)
+  - `docs/models/Strategy-Lifecycle.md`
+- **bf26e27** 2025-08-12T11:00:03+09:00 — ModelCard-Prometheus-PPO.md を更新 (by Noctoria)
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+- **3373062** 2025-08-12T10:56:04+09:00 — Airflow-DAGs.md を更新 (by Noctoria)
+  - `docs/operations/Airflow-DAGs.md`
+<!-- AUTODOC:END -->

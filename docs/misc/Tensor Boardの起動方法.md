@@ -27,3 +27,8 @@ http://localhost:6006
 --port 6006: デフォルトのTensorBoardポートです。競合がある場合は別ポートを指定できます。
 
 Airflowコンテナに tensorboard がインストールされていない場合は、Dockerfileで事前にインストールしておく必要があります（RUN pip install tensorboard）。
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/misc/*.md title="Misc 文書更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Misc 文書更新履歴（最近30）
+
+_変更は見つかりませんでした。_
+<!-- AUTODOC:END -->

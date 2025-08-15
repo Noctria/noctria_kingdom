@@ -1,4 +1,33 @@
 # 🧨 Risk Register — Noctria Kingdom
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/risks/*.md title=リスクレジスタ更新履歴（最近30） limit=30 since=2025-08-01 -->
+### リスクレジスタ更新履歴（最近30）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **54f2a56** 2025-08-12T12:36:43+09:00 — Risk-Register.md を更新 (by Noctoria)
+  - `docs/risks/Risk-Register.md`
+- **6511b0f** 2025-08-12T03:06:43+09:00 — Create Risk-Register.md (by Noctoria)
+  - `docs/risks/Risk-Register.md`
+<!-- AUTODOC:END -->
 
 **Version:** 1.0  
 **Status:** Draft → Adopted (when merged)  

@@ -297,3 +297,32 @@ EOF
   - `src/core/airflow_client.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs=docs/adrs/*.md title=ADRファイルの更新履歴（最近50） limit=50 since=2025-07-01 -->
+### ADRファイルの更新履歴（最近50）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **c29388a** 2025-08-14T03:33:49+09:00 — Update ADRs.md (by Noctoria)
+  - `docs/adrs/ADRs.md`
+- **8bdcdaf** 2025-08-12T17:15:26+09:00 — Rename ADRs to ADRs.md (by Noctoria)
+  - `docs/adrs/ADRs.md`
+<!-- AUTODOC:END -->

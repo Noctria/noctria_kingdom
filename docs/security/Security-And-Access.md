@@ -458,3 +458,32 @@ flags:
   - `src/plan_data/contracts.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs="docs/security/*.md;src/security/**/*.py" title=セキュリティ関連更新履歴（最近30） limit=30 since=2025-08-01 -->
+### セキュリティ関連更新履歴（最近30）
+
+- **d09c7ae** 2025-08-15T05:31:20+09:00 — docs: update from 00-INDEX.md sync (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/_generated/update_docs.log`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/API.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/observability/Observability.md`
+  - `docs/architecture/Architecture-Overview.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
+  - `docs/incidents/Incident-Postmortems.md`
+  - `docs/models/ModelCard-Prometheus-PPO.md`
+  - `docs/models/Strategy-Lifecycle.md`
+  - `docs/observability/Observability.md`
+  - `docs/operations/Airflow-DAGs.md`
+  - `docs/operations/Config-Registry.md`
+  - `docs/operations/Runbooks.md`
+  - `docs/qa/Testing-And-QA.md`
+  - `docs/risks/Risk-Register.md`
+  - `docs/roadmap/Release-Notes.md`
+- **c24444d** 2025-08-12T12:44:53+09:00 — Security-And-Access.md を更新 (by Noctoria)
+  - `docs/security/Security-And-Access.md`
+- **65c77f4** 2025-08-12T03:03:28+09:00 — Create Security-And-Access.md (by Noctoria)
+  - `docs/security/Security-And-Access.md`
+<!-- AUTODOC:END -->

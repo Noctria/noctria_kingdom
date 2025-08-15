@@ -1,4 +1,114 @@
 # Airflow 環境プロファイル（Noctria固有・記入テンプレ）
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/airflow_dags.mmd title="Airflow DAGs 図（最新）" fence=mermaid -->
+### Airflow DAGs 図（最新）
+
+<!-- Missing: docs/architecture/diagrams/airflow_dags.mmd -->
+<!-- AUTODOC:END -->
+
+<!-- AUTODOC:BEGIN mode=git_log path_globs="airflow_docker/dags/**/*.py;airflow_docker/*.yaml;airflow_docker/**/*.yaml" title="Airflow/DAG/Compose 更新履歴（最近50）" limit=50 since=2025-07-01 -->
+### Airflow/DAG/Compose 更新履歴（最近50）
+
+- **feef06f** 2025-08-15T02:33:44+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **f63e897** 2025-08-14T20:12:50+09:00 — Update veritas_recheck_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_recheck_dag.py`
+- **7c3785e** 2025-08-14T20:08:26+09:00 — Create veritas_recheck_all_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_recheck_all_dag.py`
+- **80087e1** 2025-08-12T00:42:11+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **6d5b453** 2025-08-12T00:36:01+09:00 — Update train_prometheus_obs8_dag.py (by Noctoria)
+  - `airflow_docker/dags/train_prometheus_obs8_dag.py`
+- **30a31fa** 2025-08-11T23:32:38+09:00 — Update train_prometheus_obs8_dag.py (by Noctoria)
+  - `airflow_docker/dags/train_prometheus_obs8_dag.py`
+- **8fe1b17** 2025-08-11T23:30:02+09:00 — Update train_prometheus_obs8_dag.py (by Noctoria)
+  - `airflow_docker/dags/train_prometheus_obs8_dag.py`
+- **477f57a** 2025-08-11T23:01:58+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **6da41c0** 2025-08-11T22:43:05+09:00 — Create train_prometheus_obs8_dag.py (by Noctoria)
+  - `airflow_docker/dags/train_prometheus_obs8_dag.py`
+- **9ffb94c** 2025-08-11T15:52:22+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **b3c28ed** 2025-08-11T15:24:19+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **88d0310** 2025-08-11T04:48:18+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **9746e95** 2025-08-11T03:21:09+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **a659048** 2025-08-11T02:44:49+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **12a6650** 2025-08-11T02:19:06+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **e640510** 2025-08-11T02:15:39+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **7dc8bc3** 2025-08-11T02:07:16+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **3384205** 2025-08-11T01:20:09+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **057f065** 2025-08-10T21:14:53+09:00 — Update docker-compose.yaml (by Noctoria)
+  - `airflow_docker/docker-compose.yaml`
+- **11b1ba6** 2025-08-10T21:12:46+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **22c44b8** 2025-08-10T20:56:12+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **dc82273** 2025-08-10T20:41:51+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **2057f52** 2025-08-10T20:29:12+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **1526c05** 2025-08-10T20:27:25+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **a5719d7** 2025-08-10T20:14:57+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **c9b7293** 2025-08-10T20:13:55+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **95b6eb2** 2025-08-10T20:04:21+09:00 — Update hermes_strategy_dag.py (by Noctoria)
+  - `airflow_docker/dags/hermes_strategy_dag.py`
+- **28a663d** 2025-08-10T18:35:36+09:00 — Update aurus_strategy_dag.py (by Noctoria)
+  - `airflow_docker/dags/aurus_strategy_dag.py`
+- **ec50407** 2025-08-10T18:22:45+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **7bf2d7b** 2025-08-10T18:09:18+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **61ae2db** 2025-08-10T15:46:19+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **f927817** 2025-08-10T04:15:39+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **2b8ff54** 2025-08-10T03:48:39+09:00 — Update noctria_kingdom_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_pdca_dag.py`
+- **3a86ad4** 2025-08-10T03:46:12+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **4ac7249** 2025-08-05T03:50:33+09:00 — Update noctria_kingdom_dag.py (by Noctoria)
+  - `airflow_docker/dags/noctria_kingdom_dag.py`
+- **7329094** 2025-07-31T10:38:34+09:00 — veritas_replay_dag.py を更新 (by Noctoria)
+  - `airflow_docker/dags/veritas_replay_dag.py`
+- **c9846b1** 2025-07-31T10:36:06+09:00 — veritas_push_dag.py を更新 (by Noctoria)
+  - `airflow_docker/dags/veritas_push_dag.py`
+- **97c0c12** 2025-07-31T10:33:52+09:00 — veritas_act_record_dag.py を更新 (by Noctoria)
+  - `airflow_docker/dags/veritas_act_record_dag.py`
+- **371e5f0** 2025-07-31T10:29:36+09:00 — veritas_recheck_dag.py を更新 (by Noctoria)
+  - `airflow_docker/dags/veritas_recheck_dag.py`
+- **532042e** 2025-07-31T03:00:39+09:00 — veritas_eval_dag.py を更新 (by Noctoria)
+  - `airflow_docker/dags/veritas_eval_dag.py`
+- **9bcbc4a** 2025-07-31T02:57:23+09:00 — veritas_generate_dag.py を更新 (by Noctoria)
+  - `airflow_docker/dags/veritas_generate_dag.py`
+- **8d340cf** 2025-07-27T22:41:36+09:00 — Update veritas_generate_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_generate_dag.py`
+- **9442c81** 2025-07-27T17:14:58+09:00 — Update veritas_refactor_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_refactor_dag.py`
+- **ec4914a** 2025-07-27T17:08:03+09:00 — Update veritas_generate_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_generate_dag.py`
+- **da730c9** 2025-07-27T16:11:29+09:00 — Update veritas_generate_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_generate_dag.py`
+- **f26bfc9** 2025-07-27T16:08:42+09:00 — Update veritas_generate_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_generate_dag.py`
+- **4bf73bb** 2025-07-27T16:04:28+09:00 — Update veritas_pdca_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_pdca_dag.py`
+- **4e07d1c** 2025-07-27T14:24:07+09:00 — Update metaai_apply_dag.py (by Noctoria)
+  - `airflow_docker/dags/metaai_apply_dag.py`
+- **72dca69** 2025-07-27T14:23:32+09:00 — Update veritas_eval_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_eval_dag.py`
+- **c3acad7** 2025-07-27T14:21:33+09:00 — Update veritas_recheck_dag.py (by Noctoria)
+  - `airflow_docker/dags/veritas_recheck_dag.py`
+<!-- AUTODOC:END -->
 
 ## 1) インフラ / デプロイ
 - デプロイ形態: （例）Docker Compose / K8s / MWAA / Astronomer

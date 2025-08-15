@@ -376,3 +376,37 @@ abs( model_action_mean - scalar(avg_over_time(model_action_mean[7d])) ) > 0.2
   - `src/core/airflow_client.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/models/diagrams/prometheus_ppo.mmd title="Prometheus PPO モデル図（最新）" fence=mermaid -->
+### Prometheus PPO モデル図（最新）
+
+<!-- Missing: docs/models/diagrams/prometheus_ppo.mmd -->
+<!-- AUTODOC:END -->
+
+<!-- AUTODOC:BEGIN mode=git_log path_globs="src/prometheus_oracle/**/*.py;src/strategies/prometheus_oracle.py" title="Prometheus Oracle 実装更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Prometheus Oracle 実装更新履歴（最近30）
+
+- **2666206** 2025-08-12T02:19:52+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **9902b22** 2025-08-12T01:50:28+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **d325590** 2025-08-11T04:54:46+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **c1b9297** 2025-08-11T04:19:05+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **1f9a272** 2025-08-10T02:48:56+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **8e8d9ec** 2025-08-10T00:25:42+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **b120823** 2025-08-09T03:08:58+09:00 — fix: restore prometheus_oracle.py from commit a485c88 (by Veritas Machina)
+  - `src/strategies/prometheus_oracle.py`
+- **bac13e5** 2025-08-09T02:00:47+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **a485c88** 2025-08-09T02:00:05+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **d7d0d42** 2025-08-06T22:17:55+09:00 — prometheus_oracle.py を更新 (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **a58141d** 2025-08-02T06:06:25+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+- **c1bfbcb** 2025-08-02T01:54:30+09:00 — Update prometheus_oracle.py (by Noctoria)
+  - `src/strategies/prometheus_oracle.py`
+<!-- AUTODOC:END -->

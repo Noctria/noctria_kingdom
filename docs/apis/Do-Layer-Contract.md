@@ -2,6 +2,32 @@
 <!-- FILE: docs/apis/Do-Layer-Contract.md -->
 <!-- ================================================================== -->
 # ⚔️ Do-Layer Contract — Order/Execution/Audit（決定版）
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/do_layer_contract.mmd title="Do-Layer Contract（最新）" fence=mermaid -->
+### Do-Layer Contract（最新）
+
+<!-- Missing: docs/architecture/diagrams/do_layer_contract.mmd -->
+<!-- AUTODOC:END -->
+
+<!-- AUTODOC:BEGIN mode=git_log path_globs="src/core/risk_control.py;src/execution/**/*.py" title="Do層 契約/実装更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### Do層 契約/実装更新履歴（最近30）
+
+- **b1453a0** 2025-08-13T16:03:47+09:00 — Update order_execution.py (by Noctoria)
+  - `src/execution/order_execution.py`
+- **9ed85b3** 2025-08-13T15:53:16+09:00 — Update risk_policy.py (by Noctoria)
+  - `src/execution/risk_policy.py`
+- **fba6dda** 2025-08-13T15:24:26+09:00 — Update risk_gate.py (by Noctoria)
+  - `src/execution/risk_gate.py`
+- **112e173** 2025-08-13T15:18:00+09:00 — Create risk_policy.py (by Noctoria)
+  - `src/execution/risk_policy.py`
+- **e29e4bb** 2025-08-13T12:50:28+09:00 — Create risk_gate.py (by Noctoria)
+  - `src/execution/risk_gate.py`
+- **06e96bd** 2025-08-08T00:44:01+09:00 — Update order_execution.py (by Noctoria)
+  - `src/execution/order_execution.py`
+- **555064f** 2025-08-08T00:36:14+09:00 — Update optimized_order_execution.py (by Noctoria)
+  - `src/execution/optimized_order_execution.py`
+- **a42d51e** 2025-08-08T00:23:43+09:00 — Update order_execution.py (by Noctoria)
+  - `src/execution/order_execution.py`
+<!-- AUTODOC:END -->
 
 **Version:** 1.0  
 **Status:** Adopted  

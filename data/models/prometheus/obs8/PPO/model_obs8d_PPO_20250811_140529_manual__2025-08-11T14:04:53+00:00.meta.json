@@ -1,0 +1,14 @@
+{
+  "created_at": "2025-08-11T14:05:29.458881",
+  "project": "prometheus",
+  "algo": "PPO",
+  "obs_dim": 8,
+  "env_class": "NoctriaFXTradingEnv",
+  "env_kwargs": {
+    "window": 128,
+    "fee": 0.0002,
+    "reward_mode": "pnl",
+    "max_episode_steps": 200,
+    "render_mode": null,
+    "obs_dim": 8,
+    "observation_space": 

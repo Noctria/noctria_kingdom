@@ -529,3 +529,67 @@ curl -X POST https://example/api/v1/act/adopt \
   - `src/plan_data/contracts.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:BEGIN mode=git_log path_globs="noctria_gui/routes/**/*.py;noctria_gui/**/main.py;src/apis/**/*.py" title="API/GUI Routes 更新履歴（最近30）" limit=30 since=2025-08-01 -->
+### API/GUI Routes 更新履歴（最近30）
+
+- **969f987** 2025-08-15T04:36:32+09:00 — Update pdca_summary.py (by Noctoria)
+  - `noctria_gui/routes/pdca_summary.py`
+- **aea152c** 2025-08-15T03:34:12+09:00 — Update strategy_detail.py (by Noctoria)
+  - `noctria_gui/routes/strategy_detail.py`
+- **3bc997c** 2025-08-15T03:23:40+09:00 — Update strategy_detail.py (by Noctoria)
+  - `noctria_gui/routes/strategy_detail.py`
+- **482da8a** 2025-08-15T03:02:26+09:00 — Update pdca_recheck.py (by Noctoria)
+  - `noctria_gui/routes/pdca_recheck.py`
+- **e4c82d5** 2025-08-15T01:16:27+09:00 — Update pdca_recheck.py (by Noctoria)
+  - `noctria_gui/routes/pdca_recheck.py`
+- **47a5847** 2025-08-15T01:06:11+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **1b4c2ec** 2025-08-15T00:41:34+09:00 — Create statistics_routes.py (by Noctoria)
+  - `noctria_gui/routes/statistics_routes.py`
+- **49795a6** 2025-08-15T00:34:44+09:00 — Update pdca_recheck.py (by Noctoria)
+  - `noctria_gui/routes/pdca_recheck.py`
+- **e66ac97** 2025-08-14T22:08:25+09:00 — Update pdca_recheck.py (by Noctoria)
+  - `noctria_gui/routes/pdca_recheck.py`
+- **6c49b8e** 2025-08-14T21:58:17+09:00 — Update pdca_summary.py (by Noctoria)
+  - `noctria_gui/routes/pdca_summary.py`
+- **368203e** 2025-08-14T21:44:48+09:00 — Update pdca_summary.py (by Noctoria)
+  - `noctria_gui/routes/pdca_summary.py`
+- **cc9da23** 2025-08-14T21:32:42+09:00 — Update pdca_routes.py (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **434d2e2** 2025-08-14T21:23:55+09:00 — Update pdca_routes.py (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **1eaed26** 2025-08-14T21:08:01+09:00 — Update pdca_routes.py (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **28bb890** 2025-08-14T20:51:37+09:00 — Update pdca_routes.py (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **4b7ca22** 2025-08-14T20:35:18+09:00 — Update pdca_routes.py (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **074b6cf** 2025-08-14T20:24:03+09:00 — Update pdca_routes.py (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **49fe520** 2025-08-14T15:41:00+09:00 — main.py を更新 (by Noctoria)
+  - `noctria_gui/main.py`
+- **3648612** 2025-08-14T15:35:27+09:00 — pdca_routes.py を更新 (by Noctoria)
+  - `noctria_gui/routes/pdca_routes.py`
+- **35e4c50** 2025-08-14T04:49:16+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **1a0b00e** 2025-08-14T04:29:17+09:00 — Update pdca_summary.py (by Noctoria)
+  - `noctria_gui/routes/pdca_summary.py`
+- **6ff093a** 2025-08-14T04:24:34+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **cf248ee** 2025-08-14T04:15:18+09:00 — Update pdca_recheck.py (by Noctoria)
+  - `noctria_gui/routes/pdca_recheck.py`
+- **303f8d2** 2025-08-14T01:02:09+09:00 — Update observability.py (by Noctoria)
+  - `noctria_gui/routes/observability.py`
+- **00df80a** 2025-08-13T23:18:49+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **d1e0cd2** 2025-08-13T22:01:43+09:00 — Update pdca_summary.py (by Noctoria)
+  - `noctria_gui/routes/pdca_summary.py`
+- **82cc0ad** 2025-08-13T16:33:01+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **c42088c** 2025-08-13T16:29:45+09:00 — Update observability.py (by Noctoria)
+  - `noctria_gui/routes/observability.py`
+- **5cfbeff** 2025-08-13T16:15:55+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **3bc104a** 2025-08-13T16:07:38+09:00 — Create observability.py (by Noctoria)
+  - `noctria_gui/routes/observability.py`
+<!-- AUTODOC:END -->
