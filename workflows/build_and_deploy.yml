@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'docs/**'
-      - '.github/workflows/update_docs.yml'
 
 permissions:
   contents: read
@@ -17,7 +14,7 @@ concurrency:
 
 jobs:
   build_and_deploy:
-    # [skip ci] がコミットメッセージにあればこのジョブは実行しない
+    # [skip ci] がコミットメッセージにあれば実行しない
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     runs-on: ubuntu-latest
 
@@ -34,6 +31,8 @@ jobs:
         run: |
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
+          else
+            echo "No requirements.txt. Skipping pip install."
           fi
 
       - name: Run tests
@@ -41,7 +40,7 @@ jobs:
           if [ -d tests ]; then
             pytest -q
           else
-            echo "No tests directory. Skipping."
+            echo "No tests directory. Skipping tests."
           fi
 
       - name: Log in to DockerHub
