@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/Noctria_Kingdom_System_Design_v2025-08.md -->
 # Noctria Kingdom System Design（v2025-08 統合版 + db_logging統合）
 
 ## 1. 目的と範囲
@@ -84,3 +85,4 @@ flowchart TD
 
   ORDER --> GENORDER
   ORDER -.-> OPTORDER
+<!-- AUTODOC:END -->

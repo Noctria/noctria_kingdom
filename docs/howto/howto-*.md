@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/howto/howto-*.md -->
 <!-- ================================================================== -->
 <!-- FILE: docs/howto/README.md -->
 <!-- ================================================================== -->
@@ -430,3 +431,4 @@ curl -X POST http://localhost:8001/pdca/observability/refresh
   - Airflow CLI の例を最新化（`--downstream`/`--pool`/`--state`）。  
   - シャドー手順を `flags.dry_run + meta.shadow` に統一（Config と整合）。  
 - **2025-08-12**: v1.0 初版テンプレ群（Backfill/Airflow Debug/Shadow/Canary/Rollback/Pause/Config/Risk/Local Tests/Evidence/Alert/Secrets）
+<!-- AUTODOC:END -->

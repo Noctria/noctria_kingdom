@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs="/mnt/d/noctria_kingdom/docs/_partials_full/docs/Next Actions — Noctria PDCA Hardening Plan.md" -->
 # ✅ Next Actions — Noctria PDCA Hardening Plan
 
 ## M1. DO層の堅牢化（今日から）
@@ -116,3 +117,4 @@ weights:
 - [ ] CHECK層の **P95 KPI** ダッシュボード（Grafana/Metabase）
 - [ ] ACT層の自動昇格/ロールバック（Two-Person + King 承認フロー付き）
 - [ ] モデルレジストリの署名/指紋/評価リンク（SoT強化）
+<!-- AUTODOC:END -->

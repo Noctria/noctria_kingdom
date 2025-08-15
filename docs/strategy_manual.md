@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/strategy_manual.md -->
 # 🤖 Noctria Kingdom 戦略AI説明
 
 ## AurusSingularis
@@ -25,3 +26,4 @@
 - 各AIの出力をXCom経由で受け取り
 - シグナル重み付き合算またはルールベースで統合判断
 - ログ: `/opt/airflow/logs/system.log`
+<!-- AUTODOC:END -->

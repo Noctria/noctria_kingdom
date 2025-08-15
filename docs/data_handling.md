@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/data_handling.md -->
 # 📈 データ処理・学習パイプライン
 
 ## 📊 データソース
@@ -18,3 +19,4 @@
 - Optuna最適化:
   - `optimize_params.py`
   - `optimize_params_with_optuna.py`
+<!-- AUTODOC:END -->

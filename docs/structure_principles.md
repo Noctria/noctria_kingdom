@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/structure_principles.md -->
 # 📘 Noctria Kingdom ディレクトリ構成設計原則（v2.0）
 
 ---
@@ -56,4 +57,4 @@ Noctria Kingdom は「自律戦略AI国家」であるという思想に基づ�
 ---
 
 ## 🚫 `.gitignore` 推奨対象
-
+<!-- AUTODOC:END -->

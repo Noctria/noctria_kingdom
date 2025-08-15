@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/apis/observability/Observability.md -->
 
 
 <!-- AUTOGEN:CHANGELOG START -->
@@ -260,3 +261,4 @@
   - `src/plan_data/contracts.py`
 
 <!-- AUTOGEN:CHANGELOG END -->
+<!-- AUTODOC:END -->

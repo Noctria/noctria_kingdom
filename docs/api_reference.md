@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/api_reference.md -->
 📌 **次の Markdown ファイルを表示するよ！**  
 5️⃣ **`docs/api_reference.md`**（API仕様書）  
 
@@ -167,3 +168,4 @@ Noctria Kingdom では、外部アプリケーションやサービスとの連�
 
 💡 **追加で調整や機能拡張が必要なら、すぐに対応するよ！**  
 このまま実装進めても問題ない？✨
+<!-- AUTODOC:END -->

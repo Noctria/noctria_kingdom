@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/architecture_bak.md -->
 📌 **`docs/` フォルダの各ファイルを Markdown 形式で出力するよ！** 🚀  
 
 📂 **`docs/` フォルダの構成:**  
@@ -84,3 +85,4 @@ Noctria_Kingdom/
 
 📌 **次の Markdown ファイルを表示する際は「次」と指示してください！** 🚀✨  
 準備が整ったら、**順番に出していくよ！** 💡
+<!-- AUTODOC:END -->

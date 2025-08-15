@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/plan_feature_spec.md -->
 # Noctria Kingdom - Plan層 標準特徴量セット仕様
 
 ## 概要
@@ -80,3 +81,4 @@ sample = {
 }
 df = pd.DataFrame(sample)
 print(df)
+<!-- AUTODOC:END -->

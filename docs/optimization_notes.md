@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/optimization_notes.md -->
 # 🎯 強化学習・パラメータ最適化ログ
 
 ## 🤖 強化学習（PPO）
@@ -20,3 +21,4 @@
 - 適用スクリプト:
   - `apply_best_params.py`
   - `apply_best_params_to_metaai.py`
+<!-- AUTODOC:END -->

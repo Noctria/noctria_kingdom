@@ -1,3 +1,4 @@
+<!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/knowledge.md -->
 # Noctria Kingdom 開発ナレッジベース
 
 ## 開発環境・実行基盤
@@ -139,3 +140,4 @@
 ---
 
 **この追記も含め、ナレッジベース全体の内容はNoctria Kingdomの全AI・開発者が最優先で遵守すること。**
+<!-- AUTODOC:END -->
