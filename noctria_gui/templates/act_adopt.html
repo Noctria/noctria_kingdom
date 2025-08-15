@@ -1,0 +1,66 @@
+<!-- noctria_gui/templates/act_adopt.html -->
+{% extends "base_hud.html" %}
+{% block title %}⚙️ Act採用ワークフロー | Noctria HUD{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <h1 class="panel-title">⚙️ Act層 自動採用（再評価 → 採用 → Push → タグ）</h1>
+  <p class="muted">再評価ログを集計し、基準を満たす戦略を採用・コミット・タグ付けまで自動実行します。</p>
+
+  <form method="post" action="/act/adopt/trigger" class="form-grid">
+    <div class="form-row">
+      <label>LOOKBACK_DAYS</label>
+      <input type="number" name="lookback_days" value="{{ defaults.LOOKBACK_DAYS }}" min="1" required>
+    </div>
+
+    <div class="form-row">
+      <label>WINRATE_MIN_DELTA_PCT</label>
+      <input type="number" name="winrate_min_delta_pct" step="0.1" value="{{ defaults.WINRATE_MIN_DELTA_PCT }}" required>
+    </div>
+
+    <div class="form-row">
+      <label>MAX_DD_MAX_DELTA_PCT</label>
+      <input type="number" name="max_dd_max_delta_pct" step="0.1" value="{{ defaults.MAX_DD_MAX_DELTA_PCT }}" required>
+    </div>
+
+    <div class="form-row">
+      <label>MIN_TRADES</label>
+      <input type="number" name="min_trades" value="{{ defaults.MIN_TRADES }}" min="1" required>
+    </div>
+
+    <div class="form-row">
+      <label>DRY_RUN</label>
+      <input type="checkbox" name="dry_run" {% if defaults.DRY_RUN %}checked{% endif %}>
+    </div>
+
+    <div class="form-row">
+      <label>TAG_PREFIX</label>
+      <input type="text" name="tag_prefix" value="{{ defaults.TAG_PREFIX }}" required>
+    </div>
+
+    <div class="form-row">
+      <label>RELEASE_NOTES</label>
+      <input type="text" name="release_notes" value="{{ defaults.RELEASE_NOTES }}">
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        🚀 トリガー ({{ defaults.TAG_PREFIX }})
+      </button>
+    </div>
+  </form>
+
+  <hr class="divider"/>
+
+  <div class="tips">
+    <h3>メモ</h3>
+    <ul>
+      <li>この操作は Airflow の <code>noctria_act_pipeline</code> をトリガします。</li>
+      <li><code>DRY_RUN</code> チェックで、実ファイル生成やGit操作をスキップした試運転ができます。</li>
+      <li>閾値はフォームで上書き可能。固定値は <code>act_adopt.py</code> の <code>DEFAULTS</code> を編集してください。</li>
+    </ul>
+  </div>
+</div>
+
+{% include "partials/toast.html" ignore missing %}
+{% endblock %}
