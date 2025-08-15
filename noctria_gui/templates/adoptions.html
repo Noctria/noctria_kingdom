@@ -1,0 +1,77 @@
+<!-- noctria_gui/templates/adoptions.html -->
+{% extends "base_hud.html" %}
+{% block title %}{{ page_title }} | Noctria HUD{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <h1 class="panel-title">{{ page_title }}</h1>
+  <p class="muted">Gitの採用タグ（既定: <code>{{ pattern }}</code>）と Decision Registry の突き合わせ結果を一覧表示します。</p>
+
+  <form method="get" action="/adoptions" class="form-grid" style="margin-bottom:1rem">
+    <div class="form-row">
+      <label>タグパターン</label>
+      <input type="text" name="pattern" value="{{ pattern }}">
+    </div>
+    <div class="form-row">
+      <label>件数</label>
+      <input type="number" name="limit" min="1" max="1000" value="{{ limit }}">
+    </div>
+    <div class="form-row">
+      <label>検索（tag / sha / decision / phase）</label>
+      <input type="text" name="q" value="{{ q }}">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">🔎 フィルタ</button>
+      <a class="btn" href="/adoptions">↻ リセット</a>
+      <a class="btn" href="/adoptions.csv?pattern={{ pattern }}&limit={{ limit }}&q={{ q | urlencode }}">⬇ CSV</a>
+      <a class="btn" href="/adoptions.json?pattern={{ pattern }}&limit={{ limit }}&q={{ q | urlencode }}">🧪 JSON</a>
+      <a class="btn" href="/pdca/recent-adoptions">🗂 カード表示</a>
+      <a class="btn" href="/tags">🏷 タグ一覧</a>
+    </div>
+  </form>
+
+  {% if not git_available %}
+    <div class="alert">GitHelper が未配備か、リポジトリにアクセスできません（<code>src/core/git_utils.py</code> を確認）。</div>
+  {% endif %}
+  {% if not registry_available %}
+    <div class="alert">Decision Registry が未配備です（<code>src/core/decision_registry.py</code> を配置）。</div>
+  {% endif %}
+
+  <div class="table-responsive">
+    <table class="table table-compact">
+      <thead>
+        <tr>
+          <th>tag</th>
+          <th>tag date</th>
+          <th>sha</th>
+          <th>annotated</th>
+          <th>decision_id</th>
+          <th>decision phase</th>
+          <th>registry ts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td><a href="/tags/{{ r.tag }}"><code>{{ r.tag }}</code></a></td>
+            <td><code>{{ r.date }}</code></td>
+            <td><code>{{ r.sha }}</code></td>
+            <td>{{ r.annotated }}</td>
+            {% if r.decision_id %}
+              <td><a href="/decisions/{{ r.decision_id }}"><code>{{ r.decision_id }}</code></a></td>
+              <td>{{ r.decision_phase }}</td>
+              <td><code>{{ r.decision_ts_utc }}</code></td>
+            {% else %}
+              <td class="muted" colspan="3">—</td>
+            {% endif %}
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="muted">データがありません</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "partials/toast.html" ignore missing %}
+{% endblock %}
