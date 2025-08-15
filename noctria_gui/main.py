@@ -7,12 +7,13 @@ Noctria Kingdom GUI - main entrypoint
 - ルーター統合（存在しないものは安全にスキップ）
 - 静的/テンプレートの安全マウント
 - 例外ハンドラ / healthz / ルートリダイレクト
+- セッション（HUDトースト等で request.session を利用）
 
 今回のポイント
 - path_config 不在時でもフォールバックして起動継続
-- Jinja2 に from_json フィルタを登録
-- HAS_DASHBOARD を柔軟に判定（module名に ".dashboard" を含む場合を許容）
-- 統治ルール可視化ルーター（governance_rules）を配線
+- Jinja2 に from_json フィルタを登録し、env を app.state.jinja_env に公開
+- HAS_DASHBOARD を緩やかに判定（module名に ".dashboard" を含む場合を許容）
+- Act手動トリガ用ルーター（act_adopt）を配線
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 
 # -----------------------------------------------------------------------------
@@ -76,8 +78,12 @@ logger = logging.getLogger("noctria_gui.main")
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.3.0",
+    version="2.4.0",
 )
+
+# セッション（HUDトーストやフォーム結果の一時通知に使用）
+SESSION_SECRET = os.getenv("NOCTRIA_SESSION_SECRET", "noctria-dev-only-change-me")
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
 # -----------------------------------------------------------------------------
 # 静的/テンプレートの安全マウント（存在しない場合も落ちないように）
@@ -104,6 +110,8 @@ def from_json(value: Any) -> Any:
     return value
 
 templates.env.filters["from_json"] = from_json
+# 互換用: ルーター側で request.app.state.jinja_env を参照できるように公開
+app.state.jinja_env = templates.env
 
 # -----------------------------------------------------------------------------
 # ルーターの取り込み（存在しないモジュールはスキップ）
@@ -153,10 +161,12 @@ _safe_include("noctria_gui.routes.act_history")
 _safe_include("noctria_gui.routes.act_history_detail")
 _safe_include("noctria_gui.routes.logs_routes")
 _safe_include("noctria_gui.routes.upload_history")
+# 新規: Act手動トリガ（前回追加）
+_safe_include("noctria_gui.routes.act_adopt")
 
 # --- PDCA関連 ---
 _safe_include("noctria_gui.routes.pdca")                 # 既存：PDCAトップ/補助
-_safe_include("noctria_gui.routes.pdca_recheck")         # /pdca/control, /pdca/recheck（環境により未配置可）
+_safe_include("noctria_gui.routes.pdca_recheck")         # /pdca/control, /pdca/recheck
 _safe_include("noctria_gui.routes.pdca_routes")          # /pdca-dashboard（HUDダッシュボード）
 _safe_include("noctria_gui.routes.pdca_summary")         # /pdca/summary & /pdca/api/summary
 
@@ -194,7 +204,7 @@ _safe_include("noctria_gui.routes.chat_history_api")
 # 可観測性ビュー
 _safe_include("noctria_gui.routes.observability")
 
-# 🔰 新規: 統治ルール可視化（metrics/timeline + HTML）
+# 統治ルール可視化（metrics/timeline + HTML）
 _safe_include("noctria_gui.routes.governance_rules")
 
 logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBOARD)
@@ -222,6 +232,7 @@ async def healthz():
             "static_dir": str(NOCTRIA_GUI_STATIC_DIR),
             "templates_dir": str(_tpl_dir),
             "has_dashboard": HAS_DASHBOARD,
+            "session_enabled": True,
         }
     )
 
