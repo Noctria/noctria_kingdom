@@ -205,6 +205,7 @@ _safe_include("noctria_gui.routes.statistics_compare")
 _safe_include("noctria_gui.routes.tag_summary")
 _safe_include("noctria_gui.routes.tag_summary_detail")
 _safe_include("noctria_gui.routes.tag_heatmap")
+_safe_include("noctria_gui.routes.adoptions")
 
 # AI/DevCycle系
 _safe_include("noctria_gui.routes.ai_routes")
