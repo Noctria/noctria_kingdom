@@ -193,6 +193,9 @@ _safe_include("noctria_gui.routes.ai_routes")
 _safe_include("noctria_gui.routes.devcycle_history")
 _safe_include("noctria_gui.routes.decision_registry")
 
+# Airflow関連
+_safe_include("noctria_gui.routes.airflow_runs")
+
 # ユーティリティ
 _safe_include("noctria_gui.routes.path_checker")
 _safe_include("noctria_gui.routes.prometheus_routes")
