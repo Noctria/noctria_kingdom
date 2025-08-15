@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-update_docs_from_index.py — AutoDoc v1.5 (file_content 対応)
+update_docs_from_index.py — AutoDoc v1.6 (file_content + hardening)
 
 Markdown 内の AUTODOC ブロックを検出し、以下の2モードで本文を書き換える:
 - mode=git_log      : Git のコミット履歴を整形して挿入（既定）
@@ -10,7 +10,7 @@ Markdown 内の AUTODOC ブロックを検出し、以下の2モードで本文�
 【マーカー例】
 
 (1) Gitログを差し込む:
-<!-- AUTODOC:BEGIN path_globs=src/plan_data/*.py;src/plan_data/**/*.py limit=30 title="Plan Data の最近の変更" since=2025-08-01 author=Noctoria -->
+<!-- AUTODOC:BEGIN path_globs=src/plan_data/*.py;src/plan_data/**/*.py limit=30 title="Plan Data の最近の変更" since=2025-08-01 author=Noctoria include_files=false -->
 (ここは自動で置き換え)
 <!-- AUTODOC:END -->
 
@@ -25,7 +25,7 @@ Markdown 内の AUTODOC ブロックを検出し、以下の2モードで本文�
 <!-- AUTODOC:END -->
 
 実行例:
-  python scripts/update_docs_from_index.py --docs-root docs --repo-root . --dry-run False
+  python3 scripts/update_docs_from_index.py --docs-root docs --repo-root . --dry-run False
 
 安全策:
 - 既定で .bak バックアップを作成
@@ -43,7 +43,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # =============================
 # 基本ユーティリティ
@@ -67,6 +67,11 @@ def is_git_repo(path: Path) -> bool:
 def now_iso_jst() -> str:
     JST = dt.timezone(dt.timedelta(hours=9))
     return dt.datetime.now(JST).isoformat()
+
+def parse_bool(val: Optional[str], default: bool = True) -> bool:
+    if val is None:
+        return default
+    return str(val).strip().lower() in ("1", "true", "yes", "y", "on")
 
 # =============================
 # マーカー解析
@@ -102,6 +107,7 @@ def find_autodoc_blocks(md_text: str) -> List[AutoDocBlock]:
             break
         m_end = END_RE.search(md_text, m_begin.end())
         if not m_end:
+            # ENDがない場合はスキップ（壊れたブロックは無視）
             pos = m_begin.end()
             continue
         attrs = parse_attrs(m_begin.group("attrs"))
@@ -136,6 +142,13 @@ def git_log_for_paths(
     since: Optional[str] = None,
     author: Optional[str] = None,
 ) -> List[CommitEntry]:
+    """
+    指定パス（複数）に関するコミット履歴を新しい順に取得。
+    paths が空のときは安全のため空リストを返す（リポジトリ全体のログを拾わない）。
+    """
+    if not paths:
+        return []
+
     pretty = "%H|%cI|%s|%an"
     cmd = ["git", "log", f"--pretty=format:{pretty}", f"-n{limit}"]
     if since:
@@ -164,16 +177,21 @@ def git_log_for_paths(
 # =============================
 
 def resolve_globs(globs_text: str, repo_root: Path) -> List[str]:
+    """
+    'a/*.py;b/**/*.py' → 実ファイル相対パスへ解決。マッチなしのパターンはそのまま残す。
+    出力順は安定化のため sort 済み。
+    """
     results: List[str] = []
     for g in [p.strip() for p in (globs_text or "").split(";") if p.strip()]:
-        matches = glob.glob(str(repo_root / g), recursive=True)
+        matches = sorted(glob.glob(str(repo_root / g), recursive=True))
         if matches:
             for m in matches:
                 rel = os.path.relpath(m, start=repo_root)
                 results.append(rel)
         else:
             results.append(g)
-    # unique
+
+    # unique（順序維持）
     seen = set()
     dedup = []
     for x in results:
@@ -186,7 +204,11 @@ def resolve_globs(globs_text: str, repo_root: Path) -> List[str]:
 # レンダリング
 # =============================
 
-def render_git_section(title: Optional[str], entries: List[CommitEntry], include_files: bool = True) -> str:
+def render_git_section(
+    title: Optional[str],
+    entries: List[CommitEntry],
+    include_files: bool = True
+) -> str:
     lines: List[str] = []
     if title:
         lines += [f"### {title}", ""]
@@ -197,7 +219,7 @@ def render_git_section(title: Optional[str], entries: List[CommitEntry], include
     for e in entries:
         lines.append(f"- **{e.sha}** {e.iso_time} — {e.subject} (by {e.author})")
         if include_files and e.files:
-            for f in e.files[:20]:
+            for f in e.files[:20]:  # ノイズ抑制
                 lines.append(f"  - `{f}`")
     return "\n".join(lines)
 
@@ -298,13 +320,12 @@ def update_markdown_file(
         mode = (attrs.get("mode") or "git_log").strip().lower()
         glob_text = attrs.get("path_globs")
         if not glob_text:
-            # 指定なしはスキップ
+            # 指定なしはスキップ（本文はそのまま）
             continue
 
         title = attrs.get("title")
         paths = resolve_globs(glob_text, repo_root)
 
-        # 置換内容を組み立て
         if mode == "file_content":
             fence = attrs.get("fence")  # e.g. mermaid, python, json, md
             section_md = render_file_contents_section(repo_root, title=title, rel_paths=paths, fence=fence)
@@ -313,8 +334,9 @@ def update_markdown_file(
             limit = int(attrs.get("limit", "50"))
             since = attrs.get("since")
             author = attrs.get("author")
+            include_files = parse_bool(attrs.get("include_files"), True)
             entries = git_log_for_paths(repo_root, paths, limit=limit, since=since, author=author)
-            section_md = render_git_section(title=title, entries=entries)
+            section_md = render_git_section(title=title, entries=entries, include_files=include_files)
 
         # 置換反映（BEGIN〜ENDの本文のみ）
         body_start = blk.body_span[0] + offset
@@ -372,7 +394,8 @@ def main():
             res = update_markdown_file(md, repo_root, dry_run=args.dry_run, create_backup=args.backup)
             icon = "✅" if res.changed else "—"
             print(f"## {md.relative_to(docs_root)}\n- {icon} {res.message}\n")
-            if res.changed: changed += 1
+            if res.changed:
+                changed += 1
         except Exception as e:
             print(f"## {md.relative_to(docs_root)}\n- ❌ Error: {e}\n")
 
