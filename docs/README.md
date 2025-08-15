@@ -33,6 +33,27 @@ Noctria: 統合判断AI（王）
 <!-- AUTODOC:BEGIN mode=git_log path_globs="README.md;docs/**/*.md" title=ドキュメント更新履歴（最近30） limit=30 since=2025-08-01 -->
 ### ドキュメント更新履歴（最近30）
 
+- **7111b30** 2025-08-15T19:38:34+09:00 — docs: AUTODOCブロック挿入および本文更新 (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/00_index/00-INDEX.md.bak`
+  - `docs/README.md`
+  - `docs/README.md.bak`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md`
+  - `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md`
+  - `docs/_partials/apis/Do-Layer-Contract/04_order_request.md`
+  - `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md`
+  - `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md`
+  - `docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md`
+  - `docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md`
+  - `docs/_partials/apis/Do-Layer-Contract/09_error_codes.md`
+  - `docs/_partials/apis/Do-Layer-Contract/10_samples_min.md`
+  - `docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md`
+  - `docs/_partials/apis/Do-Layer-Contract/12_changelog.md`
+  - `docs/adrs/ADRs.md`
+  - `docs/adrs/ADRs.md.bak`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/apis/Do-Layer-Contract.md.bak`
 - **30ae379** 2025-08-15T18:55:06+09:00 — 📄 AutoDoc: update docs from index (by Veritas Machina)
   - `action`
   - `data/decisions/ledger.csv`
@@ -129,6 +150,4 @@ Noctria: 統合判断AI（王）
   - `docs/apis/Do-Layer-Contract.md`
 - **ce87e75** 2025-08-12T22:54:25+09:00 — Update Testing-And-QA.md (by Noctoria)
   - `docs/qa/Testing-And-QA.md`
-- **108b97b** 2025-08-12T22:49:15+09:00 — Update Architecture-Overview.md (by Noctoria)
-  - `docs/architecture/Architecture-Overview.md`
 <!-- AUTODOC:END -->
