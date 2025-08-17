@@ -10,6 +10,8 @@ Noctria Kingdom GUI - main entrypoint
 - セッション（HUDトースト等で request.session を利用）
 
 今回のポイント
+- .env を確実に読み込む（PROJECT_ROOT/.env, noctria_gui/.env の順で）
+- PDCAサマリーDB: 起動時に ensure_tables()/healthcheck() を best-effort 実行
 - path_config 不在時でもフォールバックして起動継続
 - Jinja2 に from_json / tojson フィルタを登録し、env を app.state.jinja_env に公開
 - HAS_DASHBOARD を緩やかに判定（module名に ".dashboard" を含む場合を許容）
@@ -43,6 +45,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]  # <repo_root>/noctria_gui/ -
 SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+
+# -----------------------------------------------------------------------------
+# .env を確実に読み込む（python-dotenv 前提）
+# -----------------------------------------------------------------------------
+try:
+    from dotenv import load_dotenv  # type: ignore
+    # 読み込み順：プロジェクト直下 → GUI配下（重複変数は上書きしない）
+    for _env_path in (PROJECT_ROOT / ".env", PROJECT_ROOT / "noctria_gui" / ".env"):
+        if _env_path.exists():
+            load_dotenv(_env_path, override=False)
+except Exception:
+    # dotenv が未インストールでも起動は継続（環境変数だけで動作可）
+    pass
 
 # -----------------------------------------------------------------------------
 # 集中管理パス設定（path_config が無くても動くようにフォールバック）
@@ -80,7 +95,7 @@ logger = logging.getLogger("noctria_gui.main")
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.5.0",
+    version="2.6.0",
 )
 
 # セッション（HUDトーストやフォーム結果の一時通知に使用）
@@ -129,6 +144,35 @@ def render_template(request: Request, template_name: str, **ctx: Any) -> str:
     return tmpl.render(request=request, **ctx)
 
 app.state.render_template = render_template  # ルーターから利用可
+
+# -----------------------------------------------------------------------------
+# PDCAサマリーDB: 起動時に ensure/health を best-effort で実行
+# -----------------------------------------------------------------------------
+_SUMMARY_AVAILABLE = False
+_SUMMARY_DSN = None
+try:
+    from src.plan_data import pdca_summary_service as _P  # type: ignore
+    _SUMMARY_AVAILABLE = True
+    # 利用予定 DSN を保持（healthz で表示用）
+    try:
+        _SUMMARY_DSN = getattr(_P, "_get_dsn", lambda: None)()
+    except Exception:
+        _SUMMARY_DSN = None
+except Exception as _e:
+    logger.warning("PDCA summary service not available: %r", _e)
+    _SUMMARY_AVAILABLE = False
+
+@app.on_event("startup")
+def _startup_pdca_summary() -> None:
+    if not _SUMMARY_AVAILABLE:
+        return
+    try:
+        _P.ensure_tables(verbose=False)
+        ok, msg = _P.healthcheck()
+        logger.info(("✅" if ok else "⚠️") + " PDCA summary DB: %s", msg)
+    except Exception as e:
+        # 起動阻害はしない（ログのみ）
+        logger.warning("PDCA summary DB init skipped: %r", e)
 
 # -----------------------------------------------------------------------------
 # ルーターの取り込み（存在しないモジュールはスキップ）
@@ -262,6 +306,15 @@ async def __clear_toast(request: Request):
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz():
+    # DB ヘルスは Optional（失敗しても API は 200 を返し、情報で示す）
+    db_ok, db_msg = (False, "pdca summary not available")
+    dsn_preview = _SUMMARY_DSN
+    if _SUMMARY_AVAILABLE:
+        try:
+            db_ok, db_msg = _P.healthcheck()
+        except Exception as e:
+            db_ok, db_msg = False, f"healthcheck failed: {type(e).__name__}: {e!r}"
+
     return JSONResponse(
         {
             "ok": True,
@@ -270,6 +323,13 @@ async def healthz():
             "has_dashboard": HAS_DASHBOARD,
             "session_enabled": True,
             "version": app.version if hasattr(app, "version") else "unknown",
+            "pdca_summary": {
+                "available": _SUMMARY_AVAILABLE,
+                "db_ok": db_ok,
+                "message": db_msg,
+                # DSN は漏えい対策でホスト/DB 名程度のみ表示（フルはログに出さない）
+                "dsn": dsn_preview,
+            },
         }
     )
 
