@@ -75,6 +75,23 @@
           <pre>{{ latest.extra_json | from_json | tojson(indent=2) }}</pre>
         </details>
 
+        {% if airflow_refs and airflow_refs|length > 0 %}
+          <h3 style="margin-top:1rem">関連する Airflow Run</h3>
+          <ul class="list">
+            {% for ref in airflow_refs %}
+              <li>
+                <a href="/airflow/runs/{{ ref.dag_run_id }}{% if ref.dag_id %}?dag_id={{ ref.dag_id }}{% endif %}">
+                  <code>{{ ref.dag_run_id }}</code>
+                </a>
+                {% if ref.dag_id %}<span class="muted"> ({{ ref.dag_id }})</span>{% endif %}
+                <span class="muted">- linked at <code>{{ ref.ts_utc }}</code></span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="muted" style="margin-top:.75rem">Airflow Run への参照は見つかりませんでした。</div>
+        {% endif %}
+
         <div class="actions" style="margin-top: 0.5rem">
           <a class="btn" href="/decisions">← 一覧へ</a>
         </div>
