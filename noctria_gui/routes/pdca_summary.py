@@ -2,7 +2,7 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📊 PDCA Summary Route (v3.3)
+📊 PDCA Summary Route (v3.4)
 
 - HTML表示 (/pdca/summary)
 - JSON提供 (/pdca/summary/data)
@@ -14,6 +14,7 @@
 堅牢化ポイント:
 - path_config や plan_data サービスが無い環境でも「空の結果」で動作継続
 - テンプレートディレクトリも安全フォールバック
+- request.app.state.jinja_env があればそれを優先（共通フィルタを利用）
 """
 
 from __future__ import annotations
@@ -156,10 +157,8 @@ def _normalize_range(
     """
     if frm is None or to is None:
         frm, to = _default_range_days(30)
-
     if to < frm:
         frm, to = to, frm
-
     return frm, to, frm.date().isoformat(), to.date().isoformat()
 
 # -----------------------------------------------------------------------------
@@ -177,7 +176,7 @@ async def pdca_summary_page(
 ) -> HTMLResponse:
     """
     サーバーサイド描画（ページの土台のみ）。実データは /pdca/summary/data から取得。
-    テンプレートに default_from / default_to / schema_version を渡す。
+    直近採用タグウィジェット（/pdca/widgets/recent-adoptions）を埋め込む前提のデフォルト値も渡す。
     """
     tpl = _TEMPLATES_DIR / "pdca_summary.html"
     if not tpl.exists():
@@ -194,13 +193,24 @@ async def pdca_summary_page(
     to = _parse_date_ymd(to_date)
     _, _, default_from, default_to = _normalize_range(frm, to)
 
-    context: Dict[str, Any] = {
-        "request": request,
-        "default_from": default_from,
-        "default_to": default_to,
-        "schema_version": SCHEMA_VERSION,
-    }
-    return templates.TemplateResponse("pdca_summary.html", context)
+    # jinja環境：app.state.jinja_env を優先（共通フィルタ tojson/from_json 等）
+    env = getattr(request.app.state, "jinja_env", templates.env)
+    html = env.get_template("pdca_summary.html").render(
+        request=request,
+        page_title="🧭 PDCA Summary",
+        default_from=default_from,
+        default_to=default_to,
+        schema_version=SCHEMA_VERSION,
+        # Recent adoption widget default params
+        recent_adoptions_params={
+            "pattern": "veritas-",
+            "limit": 9,
+            "cols": 3,
+            "title": "🧩 直近採用タグ",
+        },
+    )
+    return HTMLResponse(html)
+
 
 @router.get(
     "/summary/data",
@@ -263,6 +273,7 @@ async def pdca_summary_data(
     }
     return JSONResponse(payload)
 
+
 @router.get(
     "/summary.csv",
     response_class=Response,
@@ -320,6 +331,7 @@ async def pdca_summary_csv(
     }
     return Response(content=csv_data, headers=headers)
 
+
 # -----------------------------------------------------------------------------
 # 互換エンドポイント（旧フロントの呼び出しを吸収）
 # -----------------------------------------------------------------------------
@@ -352,6 +364,7 @@ async def api_summary_legacy(
         url = f"{url}?{q}"
 
     return RedirectResponse(url=url, status_code=307)
+
 
 @router.get("/api/summary_timeseries")
 async def api_summary_timeseries_legacy(
