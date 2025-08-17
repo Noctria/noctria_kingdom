@@ -1,38 +1,58 @@
 <!-- noctria_gui/templates/widgets/recent_adoptions_fragment.html -->
 <div class="widget-panel">
   {% if title %}<h2 class="widget-title" style="margin:0 0 .5rem 0">{{ title }}</h2>{% endif %}
-  <div class="cards-grid" style="display:grid; gap:.75rem; grid-template-columns: repeat({{ cols }}, minmax(0,1fr));">
-    {% for c in items %}
-      {% set d = c.decision %}
-      <div class="card">
-        <div class="card-header">
-          <code>{{ c.tag }}</code>
-          <span class="badge" title="annotated?">{{ c.annotated }}</span>
-        </div>
-        <div class="card-body">
-          <ul class="kv">
-            <li><span>tag date</span><code>{{ c.date }}</code></li>
-            <li><span>sha</span><code>{{ c.sha }}</code></li>
-            {% if d and d.decision_id %}
-              <li><span>decision</span><a href="/decisions/{{ d.decision_id }}"><code>{{ d.decision_id }}</code></a></li>
-              <li><span>phase</span>{{ d.phase }}</li>
-              <li><span>registry ts</span><code>{{ d.ts_utc }}</code></li>
-            {% else %}
-              <li><span>decision</span><span class="muted">—</span></li>
+
+  <div class="cards-grid"
+       style="display:grid; gap:.75rem; grid-template-columns: repeat({{ (cols or 3)|int }}, minmax(0,1fr));">
+    {% if items and items|length > 0 %}
+      {% for c in items %}
+        {% set d = c.decision or {} %}
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+            <code class="mono">{{ c.tag }}</code>
+            {% if c.annotated %}
+              <span class="badge" title="annotated tag">annotated</span>
             {% endif %}
-          </ul>
+          </div>
+
+          <div class="card-body">
+            <ul class="kv">
+              <li><span>tag date</span><code>{{ c.date or "—" }}</code></li>
+              <li><span>sha</span><code>{{ (c.sha or "")[:8] }}</code></li>
+              {% if c.subject %}
+                <li><span>subject</span><span>“{{ c.subject }}”</span></li>
+              {% endif %}
+
+              {% if d.decision_id %}
+                <li>
+                  <span>decision</span>
+                  <a href="/decisions/{{ d.decision_id }}" target="_top" aria-label="open decision {{ d.decision_id }}">
+                    <code>{{ d.decision_id }}</code>
+                  </a>
+                </li>
+                <li><span>phase</span>{{ d.phase or "—" }}</li>
+                <li><span>registry ts</span><code>{{ d.ts_utc or "—" }}</code></li>
+              {% else %}
+                <li><span>decision</span><span class="muted">—</span></li>
+              {% endif %}
+            </ul>
+          </div>
+
+          <div class="card-actions" style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <a class="btn" href="/decisions?q={{ c.tag | urlencode }}" target="_top">🔍 Decision 検索</a>
+            <a class="btn" href="/tags?selected={{ c.tag | urlencode }}" target="_top">🏷 タグ</a>
+          </div>
         </div>
-        <div class="card-actions">
-          <a class="btn" href="/tags/{{ c.tag }}">詳しく</a>
-        </div>
-      </div>
+      {% endfor %}
     {% else %}
       <div class="muted">表示するカードがありません。</div>
-    {% endfor %}
+    {% endif %}
   </div>
-  <div class="widget-actions" style="margin-top:.5rem">
-    <a class="btn" href="/adoptions?pattern={{ pattern }}&limit={{ limit }}">🗂 一覧</a>
-    <a class="btn" href="/tags">🏷 タグ</a>
-    <a class="btn" href="/pdca/recent-adoptions?pattern={{ pattern }}&limit={{ limit }}">🔎 拡大表示</a>
+
+  <div class="widget-actions" style="margin-top:.5rem; display:flex; gap:.5rem; flex-wrap:wrap">
+    <a class="btn" href="/adoptions?pattern={{ pattern | urlencode }}&limit={{ limit }}" target="_top">🗂 一覧</a>
+    <a class="btn" href="/tags" target="_top">🏷 タグ</a>
+    <!-- 拡大表示は widgets エンドポイント（フルページで見たい場合は iframe ではなく遷移） -->
+    <a class="btn" href="/pdca/widgets/recent-adoptions?pattern={{ pattern | urlencode }}&limit={{ limit }}&cols={{ (cols or 3)|int }}" target="_top">🔎 拡大表示</a>
   </div>
 </div>
