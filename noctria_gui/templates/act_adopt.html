@@ -1,13 +1,22 @@
 <!-- noctria_gui/templates/act_adopt.html -->
 {% extends "base_hud.html" %}
-{% block title %}⚙️ Act採用ワークフロー | Noctria HUD{% endblock %}
+{% block title %}{{ page_title or "⚙️ Act採用ワークフロー" }} | Noctria HUD{% endblock %}
 
 {% block content %}
 <div class="panel">
   <h1 class="panel-title">⚙️ Act層 自動採用（再評価 → 採用 → Push → タグ）</h1>
-  <p class="muted">再評価ログを集計し、基準を満たす戦略を採用・コミット・タグ付けまで自動実行します。</p>
+  <p class="muted">
+    再評価ログを集計し、基準を満たす戦略を採用・コミット・タグ付けまで自動実行します。<br/>
+    このフォームは <code>POST /act/adopt</code> に送信され、Decision を発行して Airflow を起動します。
+  </p>
 
-  <form method="post" action="/act/adopt/trigger" class="form-grid">
+  <!-- 推奨：新エンドポイント /act/adopt -->
+  <form method="post" action="/act/adopt" class="form-grid">
+    <div class="form-row">
+      <label>DAG ID</label>
+      <input type="text" name="dag_id" value="{{ default_dag_id or 'noctria_act_pipeline' }}" required>
+    </div>
+
     <div class="form-row">
       <label>LOOKBACK_DAYS</label>
       <input type="number" name="lookback_days" value="{{ defaults.LOOKBACK_DAYS }}" min="1" required>
@@ -31,6 +40,7 @@
     <div class="form-row">
       <label>DRY_RUN</label>
       <input type="checkbox" name="dry_run" {% if defaults.DRY_RUN %}checked{% endif %}>
+      <small class="muted">未チェックの場合は本番実行</small>
     </div>
 
     <div class="form-row">
@@ -43,21 +53,52 @@
       <input type="text" name="release_notes" value="{{ defaults.RELEASE_NOTES }}">
     </div>
 
+    <div class="form-row">
+      <label>Note（任意・Runメモ）</label>
+      <input type="text" name="note" placeholder="ex. nightly batch / manual run">
+    </div>
+
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">
         🚀 トリガー ({{ defaults.TAG_PREFIX }})
       </button>
+      <a class="btn" href="/airflow/runs?dag_id={{ default_dag_id or 'noctria_act_pipeline' }}">🌀 実行履歴</a>
+      <a class="btn" href="/decisions">🗂 台帳一覧</a>
     </div>
   </form>
+
+  <details style="margin-top:1rem">
+    <summary class="muted">レガシーAPIで送信する（/act/adopt/trigger）</summary>
+    <p class="muted" style="margin:.25rem 0 .5rem">
+      旧エンドポイントは Decision 連携なしで Airflow を直接トリガします（後方互換用）。
+    </p>
+    <form method="post" action="/act/adopt/trigger" class="form-grid">
+      <input type="hidden" name="lookback_days" value="{{ defaults.LOOKBACK_DAYS }}">
+      <input type="hidden" name="winrate_min_delta_pct" value="{{ defaults.WINRATE_MIN_DELTA_PCT }}">
+      <input type="hidden" name="max_dd_max_delta_pct" value="{{ defaults.MAX_DD_MAX_DELTA_PCT }}">
+      <input type="hidden" name="min_trades" value="{{ defaults.MIN_TRADES }}">
+      <input type="hidden" name="tag_prefix" value="{{ defaults.TAG_PREFIX }}">
+      <input type="hidden" name="release_notes" value="{{ defaults.RELEASE_NOTES }}">
+      <!-- レガシーは DRY_RUN を切り替えたい場合のみチェック（未チェック=送信されず False） -->
+      <div class="form-row">
+        <label>DRY_RUN (legacy)</label>
+        <input type="checkbox" name="dry_run" {% if defaults.DRY_RUN %}checked{% endif %}>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn">↩︎ 互換トリガー</button>
+      </div>
+    </form>
+  </details>
 
   <hr class="divider"/>
 
   <div class="tips">
     <h3>メモ</h3>
     <ul>
-      <li>この操作は Airflow の <code>noctria_act_pipeline</code> をトリガします。</li>
+      <li>この操作は Airflow の <code>{{ default_dag_id or 'noctria_act_pipeline' }}</code> をトリガします。</li>
       <li><code>DRY_RUN</code> チェックで、実ファイル生成やGit操作をスキップした試運転ができます。</li>
       <li>閾値はフォームで上書き可能。固定値は <code>act_adopt.py</code> の <code>DEFAULTS</code> を編集してください。</li>
+      <li>新エンドポイントは Decision を自動発行し、Airflow Run と相互リンク（台帳の <code>extra_json.airflow</code>）を記録します。</li>
     </ul>
   </div>
 </div>
