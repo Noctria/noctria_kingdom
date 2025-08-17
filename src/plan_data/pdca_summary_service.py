@@ -27,17 +27,17 @@ import os
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-# ---- DB 接続（psycopg v3 → v2 フォールバック） ----
+# ---- DB 接続（psycopg v3 → v2 フォールバック）----
 try:
     import psycopg  # type: ignore
-except Exception:
+except Exception:  # pragma: no cover
     psycopg = None  # type: ignore
 
 try:
     import psycopg2  # type: ignore
-except Exception:
+except Exception:  # pragma: no cover
     psycopg2 = None  # type: ignore
 
 
@@ -49,8 +49,8 @@ def _get_dsn() -> Optional[str]:
     if dsn:
         return dsn
 
-    # 後方互換: 個別ENVから組み立て
-    host = os.getenv("POSTGRES_HOST", "localhost")
+    # 後方互換: 個別ENVから組み立て（既定は 127.0.0.1:5432 に統一）
+    host = os.getenv("POSTGRES_HOST", "127.0.0.1")
     port = os.getenv("POSTGRES_PORT", "5432")
     db = os.getenv("POSTGRES_DB", "noctria_db")
     user = os.getenv("POSTGRES_USER", "noctria")
@@ -374,3 +374,56 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
         )
 
     return out
+
+
+# ---------------------------------------------------------------------
+# ヘルス/初期化
+# ---------------------------------------------------------------------
+def healthcheck() -> Tuple[bool, str]:
+    """
+    DB 接続の生死確認（/healthz から呼ばれる想定）
+    成功: (True, 'db=... user=... now=...')
+    失敗: (False, 'connect failed: ...')
+    """
+    conn = _connect()
+    if conn is None:
+        return False, "connect failed: no driver or DSN unavailable"
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("select current_database(), current_user, now()")
+                db, usr, now = cur.fetchone()
+        return True, f"db={db} user={usr} now={now}"
+    except Exception as e:
+        return False, f"connect failed: {type(e).__name__}: {e}"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def ensure_tables(verbose: bool = False) -> None:
+    """
+    起動時に呼ばれる想定のダミー実装。
+    テーブル作成は本職責務外のため、存在確認だけ行い副作用は与えない。
+    """
+    conn = _connect()
+    if conn is None:
+        return
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("select to_regclass('obs_infer_calls')")
+                _ = cur.fetchone()
+        if verbose:
+            print("[pdca_summary_service] ensure_tables: checked (no-op)")
+    except Exception:
+        # 失敗しても GUI を止めない
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
