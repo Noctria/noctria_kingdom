@@ -809,6 +809,10 @@ class DECISION_MINI,TEST_E2E demo;
 <!-- AUTODOC:BEGIN mode=git_log path_globs=src/**/*.py title=コードベース更新履歴（最近30） limit=30 since=2025-08-01 -->
 ### コードベース更新履歴（最近30）
 
+- **a19193a** 2025-08-16T05:25:12+09:00 — Update airflow_client.py (by Noctoria)
+  - `src/core/airflow_client.py`
+- **b96eae7** 2025-08-16T05:16:53+09:00 — Update git_utils.py (by Noctoria)
+  - `src/core/git_utils.py`
 - **e25e60a** 2025-08-16T04:11:29+09:00 — Update decision_registry.py (by Noctoria)
   - `src/core/decision_registry.py`
 - **b2a650a** 2025-08-16T04:08:59+09:00 — Create git_utils.py (by Noctoria)
@@ -865,8 +869,4 @@ class DECISION_MINI,TEST_E2E demo;
   - `src/execution/risk_gate.py`
 - **112e173** 2025-08-13T15:18:00+09:00 — Create risk_policy.py (by Noctoria)
   - `src/execution/risk_policy.py`
-- **99a3122** 2025-08-13T14:53:14+09:00 — Update decision_minidemo.py (by Noctoria)
-  - `src/e2e/decision_minidemo.py`
-- **9786e16** 2025-08-13T14:49:18+09:00 — Update decision_minidemo.py (by Noctoria)
-  - `src/e2e/decision_minidemo.py`
 <!-- AUTODOC:END -->

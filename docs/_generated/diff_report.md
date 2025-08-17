@@ -490,6 +490,9 @@ flowchart TD
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
 ### スコープ & 原則（最新）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
+### スコープ & 原則（最新）
+
 - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
 - **原則**：  
   1. **Guardrails First** — Noctus の `risk_policy` を**強制**（越境は**拒否**）。  
@@ -524,6 +527,9 @@ flowchart TD
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
 ### スコープ & 原則（最新）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
+### スコープ & 原則（最新）
+
 - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
 - **原則**：  
   1. **Guardrails First** — Noctus の `risk_policy` を**強制**（越境は**拒否**）。  
@@ -543,6 +549,9 @@ flowchart TD
  ### フロー（概観）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
+### フロー（概観）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
 ### フロー（概観）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
@@ -600,6 +609,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
 ### フロー（概観）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
+### フロー（概観）
+
 ```mermaid
 sequenceDiagram
   autonumber
@@ -628,6 +640,9 @@ sequenceDiagram
  ### エンティティ（Schemas）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
+### エンティティ（Schemas）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
 ### エンティティ（Schemas）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
@@ -676,6 +691,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
 ### エンティティ（Schemas）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
+### エンティティ（Schemas）
+
 - `docs/schemas/order_request.schema.json`  
 - `docs/schemas/exec_result.schema.json`  
 - `docs/schemas/audit_order.schema.json`  
@@ -695,6 +713,9 @@ sequenceDiagram
  ### `order_request`（Plan → Do）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
+### `order_request`（Plan → Do）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
 ### `order_request`（Plan → Do）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
@@ -757,6 +778,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
 ### `order_request`（Plan → Do）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
+### `order_request`（Plan → Do）
+
 **必須**：`symbol`, `side`, `proposed_qty`, `time`, `meta.strategy`  
 **オプション**：`max_slippage_pct`, `time_in_force`, `constraints.qty_step/price_tick`, `meta.shadow`
 
@@ -790,6 +814,9 @@ sequenceDiagram
  ### `exec_result`（Do → Check）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
+### `exec_result`（Do → Check）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
 ### `exec_result`（Do → Check）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
@@ -853,6 +880,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
 ### `exec_result`（Do → Check）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
+### `exec_result`（Do → Check）
+
 **必須**：`order_id`, `status`, `filled_qty`, `ts`  
 **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
 
@@ -887,6 +917,9 @@ sequenceDiagram
  ### `audit_order`（WORM 監査）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
+### `audit_order`（WORM 監査）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
 ### `audit_order`（WORM 監査）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
@@ -958,6 +991,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
 ### `audit_order`（WORM 監査）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
+### `audit_order`（WORM 監査）
+
 **完全記録**：入力/正規化/丸め/リスク判定/ブローカー応答/遅延/署名
 
 ```json
@@ -1014,6 +1050,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
 ### 数値精度・丸め（Financial Correctness）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
+### 数値精度・丸め（Financial Correctness）
+
 - **数量**：`qty_step` に **floor**（例：0.5004 → 0.500）  
 - **価格**：`price_tick` に **side 別**丸め  
   - `BUY` → **floor**（過大価格を避ける）  
@@ -1036,6 +1075,9 @@ sequenceDiagram
  ### 数値精度・丸め（Financial Correctness）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
+### 数値精度・丸め（Financial Correctness）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
 ### 数値精度・丸め（Financial Correctness）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
@@ -1085,6 +1127,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
 ### Idempotency / Concurrency
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
+### Idempotency / Concurrency
+
 - ヘッダ `Idempotency-Key` を**必須**（24h 保持）。  
 - **完全一致**でない同一キーは `409 IDEMPOTENCY_KEY_CONFLICT`。  
 - 同一キー再送は**最初の結果**を**そのまま返却**。`audit_order` は**追記なし**。
@@ -1116,6 +1161,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
 ### Idempotency / Concurrency
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
+### Idempotency / Concurrency
+
 - ヘッダ `Idempotency-Key` を**必須**（24h 保持）。  
 - **完全一致**でない同一キーは `409 IDEMPOTENCY_KEY_CONFLICT`。  
 - 同一キー再送は**最初の結果**を**そのまま返却**。`audit_order` は**追記なし**。
@@ -1132,6 +1180,9 @@ sequenceDiagram
  ### エラーコード（対照表）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
+### エラーコード（対照表）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
 ### エラーコード（対照表）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
@@ -1182,6 +1233,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
 ### エラーコード（対照表）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
+### エラーコード（対照表）
+
 | code | HTTP | 説明 | 再試行 |
 |---|---:|---|---|
 | `TRADING_PAUSED` | 409 | 全局抑制中 | ❌ |
@@ -1203,6 +1257,9 @@ sequenceDiagram
  ### サンプル（テスト用最小セット）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
+### サンプル（テスト用最小セット）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
 ### サンプル（テスト用最小セット）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
@@ -1255,6 +1312,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
 ### サンプル（テスト用最小セット）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
+### サンプル（テスト用最小セット）
+
 ```json
 // FILLED
 {"order_id":"SIM-1","status":"FILLED","filled_qty":0.5,"avg_price":59001.0,"fees":0.12,"ts":"2025-08-12T06:58:03Z"}
@@ -1278,6 +1338,9 @@ sequenceDiagram
  ### 契約テスト（CI 要件）
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
+### 契約テスト（CI 要件）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
 ### 契約テスト（CI 要件）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
@@ -1323,6 +1386,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
 ### 契約テスト（CI 要件）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
+### 契約テスト（CI 要件）
+
 - `docs/schemas/*.schema.json` に **100% 適合**。  
 - `FILLED / PARTIAL / REJECTED` の**3パターン**を**必須**（`Testing-And-QA.md §9`）。  
 - 丸め/桁（§7）と Idempotency 再送（§8）を含む**再現テスト**。
@@ -1339,6 +1405,9 @@ sequenceDiagram
  ### 変更履歴
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
+### 変更履歴
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
 ### 変更履歴
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
@@ -1869,6 +1938,9 @@ sequenceDiagram
  ### 変更履歴
  
 +<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
+### 変更履歴
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
 ### 変更履歴
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
@@ -4296,6 +4368,9 @@ Noctria Kingdom では、外部アプリケーションやサービスとの連�
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
 ### スコープ & 原則（最新）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
+### スコープ & 原則（最新）
+
 - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
 - **原則**：  
   1. **Guardrails First** — Noctus の `risk_policy` を**強制**（越境は**拒否**）。  
@@ -4311,6 +4386,9 @@ Noctria Kingdom では、外部アプリケーションやサービスとの連�
 +<!-- AUTODOC:END -->
  ## 2) フロー（概観）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
+### フロー（概観）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
 ### フロー（概観）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
@@ -4363,6 +4441,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
 ### エンティティ（Schemas）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
+### エンティティ（Schemas）
+
 - `docs/schemas/order_request.schema.json`  
 - `docs/schemas/exec_result.schema.json`  
 - `docs/schemas/audit_order.schema.json`  
@@ -4378,6 +4459,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
  ## 4) `order_request`（Plan → Do）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
+### `order_request`（Plan → Do）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
 ### `order_request`（Plan → Do）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
@@ -4435,6 +4519,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
 ### `exec_result`（Do → Check）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
+### `exec_result`（Do → Check）
+
 **必須**：`order_id`, `status`, `filled_qty`, `ts`  
 **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
 
@@ -4465,6 +4552,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
  ## 6) `audit_order`（WORM 監査）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
+### `audit_order`（WORM 監査）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
 ### `audit_order`（WORM 監査）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
@@ -4531,6 +4621,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
 ### 数値精度・丸め（Financial Correctness）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
+### 数値精度・丸め（Financial Correctness）
+
 - **数量**：`qty_step` に **floor**（例：0.5004 → 0.500）  
 - **価格**：`price_tick` に **side 別**丸め  
   - `BUY` → **floor**（過大価格を避ける）  
@@ -4548,6 +4641,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
  ## 8) Idempotency / Concurrency
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
+### Idempotency / Concurrency
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
 ### Idempotency / Concurrency
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
@@ -4588,6 +4684,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
 ### エラーコード（対照表）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
+### エラーコード（対照表）
+
 | code | HTTP | 説明 | 再試行 |
 |---|---:|---|---|
 | `TRADING_PAUSED` | 409 | 全局抑制中 | ❌ |
@@ -4605,6 +4704,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
  ## 10) サンプル（テスト用最小セット）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
+### サンプル（テスト用最小セット）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
 ### サンプル（テスト用最小セット）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
@@ -4652,6 +4754,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
 ### 契約テスト（CI 要件）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
+### 契約テスト（CI 要件）
+
 - `docs/schemas/*.schema.json` に **100% 適合**。  
 - `FILLED / PARTIAL / REJECTED` の**3パターン**を**必須**（`Testing-And-QA.md §9`）。  
 - 丸め/桁（§7）と Idempotency 再送（§8）を含む**再現テスト**。
@@ -4664,6 +4769,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
  ## 12) 変更履歴
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
+### 変更履歴
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
 ### 変更履歴
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
@@ -5209,6 +5317,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
 ### スコープ & 原則（最新）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md title="スコープ & 原則（最新）" -->
+### スコープ & 原則（最新）
+
 - **対象**：`order_request`（入力）/ `exec_result`（出力）/ `audit_order`（監査）/ `risk_event`（警報）の**データ契約**。  
 - **原則**：  
   1. **Guardrails First** — Noctus の `risk_policy` を**強制**（越境は**拒否**）。  
@@ -5221,6 +5332,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
 ## 2) フロー（概観）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
+### フロー（概観）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
 ### フロー（概観）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md title=フロー（概観） -->
@@ -5270,6 +5384,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
 ### エンティティ（Schemas）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md title=エンティティ（Schemas） -->
+### エンティティ（Schemas）
+
 - `docs/schemas/order_request.schema.json`  
 - `docs/schemas/exec_result.schema.json`  
 - `docs/schemas/audit_order.schema.json`  
@@ -5282,6 +5399,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
 ## 4) `order_request`（Plan → Do）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
+### `order_request`（Plan → Do）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
 ### `order_request`（Plan → Do）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
@@ -5336,6 +5456,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
 ### `exec_result`（Do → Check）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
+### `exec_result`（Do → Check）
+
 **必須**：`order_id`, `status`, `filled_qty`, `ts`  
 **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
 
@@ -5363,6 +5486,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
 ## 6) `audit_order`（WORM 監査）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
+### `audit_order`（WORM 監査）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
 ### `audit_order`（WORM 監査）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/06_audit_order.md title="`audit_order`（WORM 監査）" -->
@@ -5426,6 +5552,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
 ### 数値精度・丸め（Financial Correctness）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md title="数値精度・丸め（Financial Correctness）" -->
+### 数値精度・丸め（Financial Correctness）
+
 - **数量**：`qty_step` に **floor**（例：0.5004 → 0.500）  
 - **価格**：`price_tick` に **side 別**丸め  
   - `BUY` → **floor**（過大価格を避ける）  
@@ -5440,6 +5569,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
 ## 8) Idempotency / Concurrency
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
+### Idempotency / Concurrency
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
 ### Idempotency / Concurrency
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md title="Idempotency / Concurrency" -->
@@ -5477,6 +5609,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
 ### エラーコード（対照表）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/09_error_codes.md title=エラーコード（対照表） -->
+### エラーコード（対照表）
+
 | code | HTTP | 説明 | 再試行 |
 |---|---:|---|---|
 | `TRADING_PAUSED` | 409 | 全局抑制中 | ❌ |
@@ -5491,6 +5626,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
 ## 10) サンプル（テスト用最小セット）
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
+### サンプル（テスト用最小セット）
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
 ### サンプル（テスト用最小セット）
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/10_samples_min.md title=サンプル（テスト用最小セット） -->
@@ -5535,6 +5673,9 @@ sequenceDiagram
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
 ### 契約テスト（CI 要件）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md title="契約テスト（CI 要件）" -->
+### 契約テスト（CI 要件）
+
 - `docs/schemas/*.schema.json` に **100% 適合**。  
 - `FILLED / PARTIAL / REJECTED` の**3パターン**を**必須**（`Testing-And-QA.md §9`）。  
 - 丸め/桁（§7）と Idempotency 再送（§8）を含む**再現テスト**。
@@ -5544,6 +5685,9 @@ sequenceDiagram
 +<!-- AUTODOC:END -->
 ## 12) 変更履歴
  <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
+### 変更履歴
+
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
 ### 変更履歴
 
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/12_changelog.md title=変更履歴 -->
