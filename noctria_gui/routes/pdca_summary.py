@@ -2,14 +2,14 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📊 PDCA Summary Route (v3.4)
+📊 PDCA Summary Route (v3.5)
 
 - HTML表示 (/pdca/summary)
 - JSON提供 (/pdca/summary/data)
 - CSVエクスポート (/pdca/summary.csv)
-- 互換API（旧フロント用）:
-    - /pdca/api/summary  → /pdca/summary/data に 307 Redirect
-    - /pdca/api/summary_timeseries → 当面は /pdca/summary/data に 307 Redirect
+- 互換API（旧フロント用・リダイレクト廃止）:
+    - /pdca/api/summary           → 200 JSON を**直接**返す（totals中心のサマリー）
+    - /pdca/api/summary_timeseries→ 200 JSON を**直接**返す（日次時系列の配列）
 
 堅牢化ポイント:
 - path_config や plan_data サービスが無い環境でも「空の結果」で動作継続
@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 # -----------------------------------------------------------------------------
@@ -138,9 +138,7 @@ def _parse_date_ymd(s: Optional[str]) -> Optional[datetime]:
         return None
 
 def _default_range_days(days: int = 30) -> Tuple[datetime, datetime]:
-    """
-    直近days日（今日を含む）を返す（naive datetime）。
-    """
+    """直近days日（今日を含む）を返す（naive datetime）。"""
     today_local = datetime.now(timezone.utc).astimezone().date()
     start = today_local - timedelta(days=days - 1)
     return (
@@ -160,6 +158,31 @@ def _normalize_range(
     if to < frm:
         frm, to = to, frm
     return frm, to, frm.date().isoformat(), to.date().isoformat()
+
+def _first_nonempty(*vals: Optional[str]) -> Optional[str]:
+    for v in vals:
+        if v:
+            return v
+    return None
+
+def _resolve_from_to_strings(
+    date_from: Optional[str],
+    date_to: Optional[str],
+    from_date: Optional[str],
+    to_date: Optional[str],
+    from_alias: Optional[str],
+    to_alias: Optional[str],
+    filter_date_from: Optional[str],
+    filter_date_to: Optional[str],
+) -> Tuple[str, str]:
+    """複数エイリアスから from/to を決定し、YYYY-MM-DD 文字列を返す（足りなければデフォルト適用）。"""
+    f_str = _first_nonempty(date_from, from_date, from_alias, filter_date_from)
+    t_str = _first_nonempty(date_to,   to_date,   to_alias,   filter_date_to)
+
+    f_dt = _parse_date_ymd(f_str)
+    t_dt = _parse_date_ymd(t_str)
+    _, _, f_out, t_out = _normalize_range(f_dt, t_dt)
+    return f_out, t_out
 
 # -----------------------------------------------------------------------------
 # Routes
@@ -333,65 +356,68 @@ async def pdca_summary_csv(
 
 
 # -----------------------------------------------------------------------------
-# 互換エンドポイント（旧フロントの呼び出しを吸収）
+# 互換エンドポイント（旧フロントの呼び出しを吸収・JSON直接返却）
 # -----------------------------------------------------------------------------
 @router.get("/api/summary")
 async def api_summary_legacy(
-    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    date_to: Optional[str]   = Query(None, description="YYYY-MM-DD"),
+    # 旧式/多種エイリアスを広く受ける
+    date_from: Optional[str]       = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str]         = Query(None, description="YYYY-MM-DD"),
+    from_date: Optional[str]       = Query(None, description="YYYY-MM-DD"),
+    to_date: Optional[str]         = Query(None, description="YYYY-MM-DD"),
+    from_alias: Optional[str]      = Query(None, alias="from", description="YYYY-MM-DD"),
+    to_alias: Optional[str]        = Query(None, alias="to", description="YYYY-MM-DD"),
+    filter_date_from: Optional[str]= Query(None, description="YYYY-MM-DD"),
+    filter_date_to: Optional[str]  = Query(None, description="YYYY-MM-DD"),
 ):
     """
     旧API: /pdca/api/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-    新API: /pdca/summary/data?from_date=...&to_date=...
-    → 当面は 307 Redirect で橋渡し（フロントはそのままでOK）
+    ※ 307 リダイレクトは廃止。ここでJSONを直接返す。
+    レスポンスは /pdca/summary/data と同形。
     """
-    def _ok(s: Optional[str]) -> bool:
-        try:
-            if not s:
-                return False
-            datetime.strptime(s, "%Y-%m-%d")
-            return True
-        except Exception:
-            return False
-
-    params = []
-    if _ok(date_from): params.append(("from_date", date_from))  # 変換！
-    if _ok(date_to):   params.append(("to_date", date_to))      # 変換！
-
-    url = "/pdca/summary/data"
-    if params:
-        q = "&".join(f"{k}={v}" for k, v in params)
-        url = f"{url}?{q}"
-
-    return RedirectResponse(url=url, status_code=307)
+    f_str, t_str = _resolve_from_to_strings(
+        date_from, date_to, from_date, to_date, from_alias, to_alias, filter_date_from, filter_date_to
+    )
+    # 中央実装に合わせる
+    return await pdca_summary_data(from_date=f_str, to_date=t_str)
 
 
 @router.get("/api/summary_timeseries")
 async def api_summary_timeseries_legacy(
-    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    date_to: Optional[str]   = Query(None, description="YYYY-MM-DD"),
+    # 旧式/多種エイリアスを広く受ける
+    date_from: Optional[str]       = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str]         = Query(None, description="YYYY-MM-DD"),
+    from_date: Optional[str]       = Query(None, description="YYYY-MM-DD"),
+    to_date: Optional[str]         = Query(None, description="YYYY-MM-DD"),
+    from_alias: Optional[str]      = Query(None, alias="from", description="YYYY-MM-DD"),
+    to_alias: Optional[str]        = Query(None, alias="to", description="YYYY-MM-DD"),
+    filter_date_from: Optional[str]= Query(None, description="YYYY-MM-DD"),
+    filter_date_to: Optional[str]  = Query(None, description="YYYY-MM-DD"),
 ):
     """
     旧API: /pdca/api/summary_timeseries
-    本来は時系列専用スキーマだが、まず 404 を解消することを優先。
-    当面は /pdca/summary/data をそのまま返す（将来必要なら専用形状に変更）。
+    ※ 307 リダイレクトは廃止。**日次時系列の配列**を直接返す。
+       既存フロントが配列を期待しているケースに合わせる。
     """
-    def _ok(s: Optional[str]) -> bool:
-        try:
-            if not s:
-                return False
-            datetime.strptime(s, "%Y-%m-%d")
-            return True
-        except Exception:
-            return False
+    f_str, t_str = _resolve_from_to_strings(
+        date_from, date_to, from_date, to_date, from_alias, to_alias, filter_date_from, filter_date_to
+    )
 
-    params = []
-    if _ok(date_from): params.append(("from_date", date_from))
-    if _ok(date_to):   params.append(("to_date", date_to))
+    frm = _parse_date_ymd(f_str)
+    to  = _parse_date_ymd(t_str)
+    frm, to, _, _ = _normalize_range(frm, to)
 
-    url = "/pdca/summary/data"
-    if params:
-        q = "&".join(f"{k}={v}" for k, v in params)
-        url = f"{url}?{q}"
+    try:
+        rows = fetch_infer_calls(frm, to)
+    except Exception as e:
+        logger.error("fetch_infer_calls failed: %s", e, exc_info=True)
+        rows = []
 
-    return RedirectResponse(url=url, status_code=307)
+    try:
+        series = aggregate_by_day(rows)
+    except Exception as e:
+        logger.error("aggregate_by_day failed: %s", e, exc_info=True)
+        series = []
+
+    # 配列（各要素: {"date": "YYYY-MM-DD", ...}）だけを返す
+    return JSONResponse(series)
