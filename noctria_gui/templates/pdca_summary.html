@@ -85,33 +85,33 @@
       <p id="kpi-count" class="metric-value" aria-live="polite">-</p>
     </div>
     <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-arrow-up" aria-hidden="true"></i> 勝率 改善件数</h3>
-      <p id="kpi-impr-win" class="metric-value" aria-live="polite">-</p>
+      <h3><i class="fas fa-check-circle" aria-hidden="true"></i> 採用件数</h3>
+      <p id="kpi-adopted" class="metric-value" aria-live="polite">-</p>
     </div>
     <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-arrow-down" aria-hidden="true"></i> 最大DD 改善件数</h3>
-      <p id="kpi-impr-dd" class="metric-value" aria-live="polite">-</p>
+      <h3><i class="fas fa-redo-alt" aria-hidden="true"></i> 再評価件数</h3>
+      <p id="kpi-rechecks" class="metric-value" aria-live="polite">-</p>
     </div>
     <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-percentage" aria-hidden="true"></i> 勝率 差分平均</h3>
-      <p id="kpi-avg-win-diff" class="metric-value" aria-live="polite">-</p>
+      <h3><i class="fas fa-percentage" aria-hidden="true"></i> 勝率（平均）</h3>
+      <p id="kpi-winrate" class="metric-value" aria-live="polite">-</p>
     </div>
     <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-chart-area" aria-hidden="true"></i> DD 差分平均</h3>
-      <p id="kpi-avg-dd-diff" class="metric-value" aria-live="polite">-</p>
+      <h3><i class="fas fa-chart-area" aria-hidden="true"></i> 最大DD（最悪）</h3>
+      <p id="kpi-maxdd" class="metric-value" aria-live="polite">-</p>
     </div>
   </div>
 </section>
 
 <div class="grid-charts">
   <section class="hud-panel" aria-labelledby="chart-counts-title">
-    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> 日次 件数（総数 / 勝率改善）</h2>
-    <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の総件数と勝率改善件数のグラフ"></canvas></div>
+    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> 日次 件数（評価 / 採用）</h2>
+    <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の評価件数と採用件数のグラフ"></canvas></div>
     <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
   </section>
   <section class="hud-panel" aria-labelledby="chart-windiff-title">
-    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line" aria-hidden="true"></i> 日次 勝率差分 平均(%)</h2>
-    <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率差分平均の折れ線グラフ"></canvas></div>
+    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line" aria-hidden="true"></i> 日次 勝率（平均 %）</h2>
+    <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率の折れ線グラフ"></canvas></div>
     <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
   </section>
 </div>
@@ -143,7 +143,6 @@
   if (need('Chart'))     p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', res)));
   if (need('flatpickr')) p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js', res)));
   Promise.all(p).then(function(){
-    // それでも無ければ最後にローカルをもう一度
     setTimeout(function(){
       if (need('Chart'))     addScript('/static/vendor/chart.umd.js');
       if (need('flatpickr')) addScript('/static/vendor/flatpickr.min.js');
@@ -155,9 +154,8 @@
 <script>
 /* =========================
    メインスクリプト
-   - /pdca/api/summary            -> KPI
-   - /pdca/api/summary_timeseries -> グラフ（互換リダイレクトで /pdca/summary/data に吸収）
-   - /pdca/summary.csv            -> CSV（新APIパラメータ名に注意）
+   - /pdca/api/summary       -> KPI + by_day（ここからグラフ描画）
+   - /pdca/summary.csv       -> CSV（from_date/to_date）
    ========================= */
 window.NoctriaPDCA = { charts: { counts:null, winDiff:null } };
 window.GLOBAL_DEFAULT_FROM = null;
@@ -165,7 +163,8 @@ window.GLOBAL_DEFAULT_TO   = null;
 
 function setText(id, t){ const el=document.getElementById(id); if(el) el.textContent = t; }
 function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
-function percentFmt(v){ return (v == null || isNaN(v)) ? '—' : `${(+v).toFixed(2)}%`; }
+function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
+function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
 
 function isoDateDaysAgo(days){
   const now = new Date();
@@ -177,7 +176,7 @@ function isoDateDaysAgo(days){
 }
 
 function buildQueryLegacy() {
-  // 旧API互換用（date_from/date_to）
+  // 旧API互換（バックエンドで307リダイレクト対応している想定）
   const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
   const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
   const sp = new URLSearchParams();
@@ -187,19 +186,21 @@ function buildQueryLegacy() {
 }
 
 function buildQueryNew() {
-  // 新API用（from_date/to_date）— CSV はこちらを使用
+  // CSVは新パラメータ名を優先しつつ、互換のため旧名も同時に付与
   const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
   const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
   const sp = new URLSearchParams();
   sp.set('from_date', from);
   sp.set('to_date', to);
+  sp.set('date_from', from);
+  sp.set('date_to', to);
   return sp.toString();
 }
 
 function wireCsvButton(){
   const a = document.getElementById('csvBtn');
   if (!a) return;
-  const qs = buildQueryNew(); // ← CSV は新API名
+  const qs = buildQueryNew();
   a.href = '/pdca/summary.csv' + (qs ? `?${qs}` : '');
 }
 
@@ -257,74 +258,65 @@ async function triggerRecheckAll(){
   }
 }
 
-/* ======== メイン更新処理（グローバル公開） ======== */
+/* ======== メイン更新処理 ======== */
 window.pdcaRefresh = async function pdcaRefresh(){
   const qsLegacy = buildQueryLegacy();
 
-  // 1) KPI（旧APIを叩く → サーバ側で307リダイレクト処理）
   try{
+    // まとめて summary だけ叩いて、KPI と timeseries を同時に処理
     const res = await fetch('/pdca/api/summary?' + qsLegacy, { cache:'no-store' });
     if(!res.ok) throw new Error('summary HTTP ' + res.status);
     const s = await res.json();
-    setText('kpi-count',     (s.count ?? 0).toString());
-    setText('kpi-impr-win',  (s.improved_winrate ?? 0).toString());
-    setText('kpi-impr-dd',   (s.improved_maxdd ?? 0).toString());
-    setText('kpi-avg-win-diff', percentFmt(s.avg_winrate_diff));  // % を想定
-    setText('kpi-avg-dd-diff',  percentFmt(s.avg_maxdd_diff));    // % を想定
-  }catch(e){
-    console.error('[KPI] fetch error:', e);
-  }
 
-  // 2) 時系列
-  try{
-    const res = await fetch('/pdca/api/summary_timeseries?' + qsLegacy, { cache:'no-store' });
-    if(!res.ok) throw new Error('timeseries HTTP ' + res.status);
-    const ts = await res.json();
+    // --- KPI ---
+    const t = s?.totals || {};
+    setText('kpi-count',     intFmt(s?.count_rows));
+    setText('kpi-adopted',   intFmt(t?.adopted));
+    setText('kpi-rechecks',  intFmt(t?.rechecks));
+    setText('kpi-winrate',   percentFmt(t?.win_rate));
+    setText('kpi-maxdd',     percentFmt(t?.max_drawdown));
 
-    const labels = Array.isArray(ts.labels) ? ts.labels : [];
-    const total  = Array.isArray(ts.total_count) ? ts.total_count : [];
-    const impr   = Array.isArray(ts.improved_winrate_count) ? ts.improved_winrate_count : [];
-    const avgWr  = (Array.isArray(ts.avg_winrate_diff) ? ts.avg_winrate_diff : []).map(v => (v==null? null : +(+v).toFixed(2)));
+    // --- 時系列（by_day）
+    const by = Array.isArray(s?.by_day) ? s.by_day : [];
+    const labels = by.map(r => r?.date ?? '');
+    const evals  = by.map(r => (r?.evals ?? 0));
+    const adopted= by.map(r => (r?.adopted ?? 0));
+    const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
 
-    // 空メッセージ表示
     show(document.getElementById('noteCounts'),  labels.length === 0);
     show(document.getElementById('noteWinDiff'), labels.length === 0);
 
-    // 既存チャート破棄
     if (window.NoctriaPDCA.charts.counts)  { window.NoctriaPDCA.charts.counts.destroy();  window.NoctriaPDCA.charts.counts = null; }
     if (window.NoctriaPDCA.charts.winDiff) { window.NoctriaPDCA.charts.winDiff.destroy(); window.NoctriaPDCA.charts.winDiff = null; }
 
-    // 再描画（要素存在チェック）
     const ctxCounts  = document.getElementById('chartCounts');
     const ctxWinDiff = document.getElementById('chartWinDiff');
     if (ctxCounts && ctxCounts.getContext) {
       window.NoctriaPDCA.charts.counts  = createBar2Axis(
         ctxCounts.getContext('2d'),
         labels,
-        { label:'総件数', data: total },
-        { label:'勝率改善件数', data: impr }
+        { label:'評価件数', data: evals },
+        { label:'採用件数', data: adopted }
       );
     }
     if (ctxWinDiff && ctxWinDiff.getContext) {
       window.NoctriaPDCA.charts.winDiff = createLine(
         ctxWinDiff.getContext('2d'),
         labels,
-        '勝率差分 平均(%)',
-        avgWr,
+        '勝率（平均 %）',
+        wrPct,
         '%'
       );
     }
   }catch(e){
-    console.error('[Timeseries] fetch error:', e);
+    console.error('[summary] fetch error:', e);
   }
 
-  // 3) CSV ボタンのリンク更新（新API名を採用）
   wireCsvButton();
 };
 
 /* ========= DOM 準備 ========= */
 document.addEventListener('DOMContentLoaded', function(){
-  // デフォルト日付（ローカルタイム基準で前後ずれを避ける）
   window.GLOBAL_DEFAULT_FROM = "{{ default_from or '' }}".trim() || isoDateDaysAgo(14);
   window.GLOBAL_DEFAULT_TO   = "{{ default_to or '' }}".trim()   || isoDateDaysAgo(0);
   const fromI = document.getElementById('from-date');
@@ -332,20 +324,17 @@ document.addEventListener('DOMContentLoaded', function(){
   if (fromI && !fromI.value) fromI.value = window.GLOBAL_DEFAULT_FROM;
   if (toI   && !toI.value)   toI.value   = window.GLOBAL_DEFAULT_TO;
 
-  // Flatpickr が読み込まれたら初期化（無くてもOK）
   (function initPickers(){
     if (typeof flatpickr === 'undefined') return void setTimeout(initPickers, 120);
     flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_FROM });
     flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_TO   });
   })();
 
-  // ボタン
   const btn  = document.getElementById('applyBtn');
   const rbtn = document.getElementById('recheckAllBtn');
   if (btn)  btn.addEventListener('click', window.pdcaRefresh);
   if (rbtn) rbtn.addEventListener('click', triggerRecheckAll);
 
-  // 初回描画（Chart.js を待ってから）
   (function waitChart(){
     if (typeof Chart === 'undefined') return void setTimeout(waitChart, 120);
     window.pdcaRefresh();
