@@ -43,24 +43,22 @@
   .pager { display:flex; gap:.5rem; align-items:center; justify-content:flex-end; margin-top:.5rem; }
   .pager .hud-link[disabled] { opacity:.5; pointer-events:none; }
 
-  /* ===== オートコンプリート ===== */
+  /* Auto-complete */
   .ac-wrap { position:relative; }
   .ac-list {
-    position:absolute; inset:auto 0  auto 0; top:100%; z-index:2000;
-    background: #0c1220; border:1px solid var(--panel-border); border-radius:6px;
+    position:absolute; inset:auto 0 auto 0; top:100%; z-index:2000;
+    background:#0c1220; border:1px solid var(--panel-border); border-radius:6px;
     margin-top:.25rem; box-shadow:0 8px 16px rgba(0,0,0,.35);
     max-height:240px; overflow:auto; display:none;
   }
   .ac-list.show { display:block; }
-  .ac-item {
-    padding:.45rem .6rem; cursor:pointer; display:flex; align-items:center; gap:.5rem;
-  }
+  .ac-item { padding:.45rem .6rem; cursor:pointer; display:flex; align-items:center; gap:.5rem; }
   .ac-item:hover, .ac-item.active { background: rgba(0,229,255,.12); }
   .ac-empty { padding:.5rem .6rem; color:#9fbad6; }
   .ac-kbd { margin-left:auto; opacity:.6; font-size:.85em; }
 </style>
 
-<!-- ローカル → 足りなければ後段でCDNフォールバック -->
+<!-- まずローカル、足りなければ後段でCDN -->
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
@@ -102,7 +100,6 @@
       <button id="recheckAllBtn" class="hud-link" type="button">🔁 一括再評価</button>
     </div>
 
-    <!-- クイックプリセット -->
     <div class="preset-row">
       <button type="button" class="hud-link preset-btn" data-days="0">今日</button>
       <button type="button" class="hud-link preset-btn" data-days="7">7日間</button>
@@ -113,46 +110,42 @@
   </form>
 </section>
 
-<!-- 直近採用タグウィジェット -->
 {% set w = recent_adoptions_params or {'pattern':'veritas-','limit':9,'cols':3,'title':'🧩 直近採用タグ'} %}
 <section class="hud-panel" aria-labelledby="adopt-widget-title">
   <h2 id="adopt-widget-title" class="panel-title"><i class="fas fa-tags" aria-hidden="true"></i> 直近の採用タグ</h2>
-  <iframe
-    class="widget-frame"
+  <iframe class="widget-frame"
     src="/pdca/widgets/recent-adoptions?pattern={{ w.pattern | urlencode }}&limit={{ w.limit }}&cols={{ w.cols }}&title={{ w.title | urlencode }}"
-    loading="lazy"
-  ></iframe>
+    loading="lazy"></iframe>
 </section>
 
 <section class="hud-panel" aria-labelledby="kpi-title">
   <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator" aria-hidden="true"></i> OVERALL KPI（フィルター適用後）</h2>
   <div class="metrics" role="list">
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-hashtag" aria-hidden="true"></i> 対象件数</h3><p id="kpi-count" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-check-circle" aria-hidden="true"></i> 採用件数</h3><p id="kpi-adopted" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-redo-alt" aria-hidden="true"></i> 再評価件数</h3><p id="kpi-rechecks" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-percentage" aria-hidden="true"></i> 勝率（平均）</h3><p id="kpi-winrate" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-chart-area" aria-hidden="true"></i> 最大DD（最悪）</h3><p id="kpi-maxdd" class="metric-value" aria-live="polite">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-hashtag"></i> 対象件数</h3><p id="kpi-count" class="metric-value" aria-live="polite">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-check-circle"></i> 採用件数</h3><p id="kpi-adopted" class="metric-value" aria-live="polite">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-redo-alt"></i> 再評価件数</h3><p id="kpi-rechecks" class="metric-value" aria-live="polite">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-percentage"></i> 勝率（平均）</h3><p id="kpi-winrate" class="metric-value" aria-live="polite">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-chart-area"></i> 最大DD（最悪）</h3><p id="kpi-maxdd" class="metric-value" aria-live="polite">-</p></div>
   </div>
 </section>
 
 <div class="grid-charts">
   <section class="hud-panel" aria-labelledby="chart-counts-title">
-    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> 日次 件数（評価 / 採用）</h2>
+    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar"></i> 日次 件数（評価 / 採用）</h2>
     <div class="btn-row" style="margin:.25rem 0 .5rem"><button type="button" class="hud-link" onclick="downloadChartPNG('chartCounts','counts')">📸 画像保存</button></div>
     <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の評価件数と採用件数のグラフ"></canvas></div>
     <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
   </section>
   <section class="hud-panel" aria-labelledby="chart-windiff-title">
-    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line" aria-hidden="true"></i> 日次 勝率（平均 %）</h2>
+    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line"></i> 日次 勝率（平均 %）</h2>
     <div class="btn-row" style="margin:.25rem 0 .5rem"><button type="button" class="hud-link" onclick="downloadChartPNG('chartWinDiff','winrate')">📸 画像保存</button></div>
     <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率の折れ線グラフ"></canvas></div>
     <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
   </section>
 </div>
 
-<!-- 詳細テーブル -->
 <section id="details-panel" class="hud-panel" aria-labelledby="details-title" style="display:none">
-  <h2 id="details-title" class="panel-title"><i class="fas fa-table" aria-hidden="true"></i> DETAILS</h2>
+  <h2 id="details-title" class="panel-title"><i class="fas fa-table"></i> DETAILS</h2>
   <div class="btn-row" style="margin:.25rem 0 .5rem">
     <label for="page-size">表示件数</label>
     <select id="page-size" class="hud-select" style="width:auto">
@@ -193,7 +186,7 @@
 
 {% block scripts %}
 <script>
-/* ---------- フォールバック読込 ---------- */
+/* ---------- ライブラリのフォールバック ---------- */
 (function ensureLibs() {
   function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.defer=true; s.onload=onload||function(){}; document.head.appendChild(s); }
   function need(name){ return (typeof window[name] === 'undefined'); }
@@ -210,14 +203,13 @@
 </script>
 
 <script>
-/* ====== ユーティリティ ====== */
+/* ========== Utils ========== */
 function $(id){ return document.getElementById(id); }
 function setText(id, t){ const el=$(id); if(el) el.textContent = (t ?? '—'); }
 function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
 function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
 function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
 function toast(msg, ok=true){ const t=$('toast'); if(!t) return; t.className='toast '+(ok?'ok':'err')+' show'; t.textContent=msg; setTimeout(()=>{t.className='toast';},1800); }
-
 function isoDateDaysAgo(days){ const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-days);
   const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
 function normalizeDate(s){
@@ -227,21 +219,18 @@ function normalizeDate(s){
   const d=new Date(t); if(!isNaN(d)) { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
   return t;
 }
-
-/* ====== PNG出力 ====== */
+/* PNG */
 function downloadChartPNG(canvasId, baseName){
   const el=$(canvasId); if(!el) return;
   try{ const url=el.toDataURL('image/png',1.0); const a=document.createElement('a'); const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
     a.href=url; a.download=`pdca-${baseName}-${stamp}.png`; document.body.appendChild(a); a.click(); a.remove(); toast('画像を書き出しました'); }
   catch(e){ console.error('png export failed', e); toast('画像の書き出しに失敗', false); }
 }
-
-/* ====== グローバル状態 ====== */
+/* Global */
 window.NoctriaPDCA = window.NoctriaPDCA || {};
 function getCharts(){ if(!window.NoctriaPDCA.charts) window.NoctriaPDCA.charts={counts:null,winDiff:null}; return window.NoctriaPDCA.charts; }
 window.GLOBAL_DEFAULT_FROM=null; window.GLOBAL_DEFAULT_TO=null;
-
-/* ====== URL ⇄ 入力 ====== */
+/* URL ⇄ Inputs */
 function readUrlIntoInputs(){
   const usp=new URLSearchParams(location.search);
   const rawFrom=usp.get('date_from')||usp.get('from_date')||usp.get('from');
@@ -263,20 +252,11 @@ function inputsToParamsAllKeys(){
 }
 function buildCsvParams(){ return inputsToParamsAllKeys(); }
 function wireCsvButton(){ const a=$('csvBtn'); if(a) a.href='/pdca/summary.csv?'+buildCsvParams().toString(); }
-
-/* ====== 共有リンクコピー ====== */
+/* Copy URL */
 function buildShareUrl(){ const qs=inputsToParamsAllKeys().toString(); return location.origin+location.pathname+(qs?`?${qs}`:''); }
-async function copyShareUrl(){
-  const url=buildShareUrl();
-  try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }
-  catch(e){
-    try{ const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px';
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました'); }
-    catch(e2){ prompt('このURLをコピーしてください:', url); }
-  }
-}
-
-/* ====== プリセット ====== */
+async function copyShareUrl(){ const url=buildShareUrl(); try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }
+catch(e){ try{ const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました'); } catch{ prompt('このURLをコピーしてください:', url); } } }
+/* Presets */
 function wirePresets(){
   document.querySelectorAll('.preset-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
@@ -288,8 +268,7 @@ function wirePresets(){
     });
   });
 }
-
-/* ====== テーブル ====== */
+/* Table */
 const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc' };
 function coerceRow(r){ return { date:r.date??r.day??'', tag:r.tag??r.strategy??r.name??'',
   evals:(+r.evals)||0, adopted:(+r.adopted)||0,
@@ -323,8 +302,7 @@ function attachTableEvents(){
   $('nextPage')?.addEventListener('click', ()=>{ tableState.page++; renderTablePage(); });
   $('page-size')?.addEventListener('change', (e)=>{ tableState.pageSize=+e.target.value||20; tableState.page=1; renderTablePage(); });
 }
-
-/* ====== エクスポート（CSV/JSON） ====== */
+/* Export */
 function getRangeSlug(){
   const usp = new URLSearchParams(location.search);
   const from = normalizeDate(usp.get('date_from')||usp.get('from_date')||usp.get('from')||$('from-date')?.value||'');
@@ -352,7 +330,7 @@ function exportDetailsCSV(){
     (r.max_drawdown==null?'':r.max_drawdown.toFixed(2)),
     r.rechecks, r.trades
   ]);
-  const bom = '\uFEFF'; // Excel対策
+  const bom = '\uFEFF';
   const csv = [header.join(','), ...rows.map(rr=>rr.map(toCsvValue).join(','))].join('\n');
   const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
   downloadBlob(bom + csv, 'text/csv;charset=utf-8', `pdca_details_${getRangeSlug()}_${stamp}.csv`);
@@ -374,12 +352,15 @@ function exportDetailsJSON(){
   downloadBlob(JSON.stringify(data, null, 2), 'application/json;charset=utf-8', `pdca_details_${getRangeSlug()}_${stamp}.json`);
   toast('JSONを書き出しました');
 }
-
-/* ====== 連打防止 ====== */
+/* 連打防止（★修正済みタイポ） */
 let fetching=false;
-function setApplying(b){ const btn=$('applyBtn'), spin=$('applySpin'); fetching=b; if(btn){btn.disabled=b; btn.style.opacity=b?.6:1;} if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); } }
-
-/* ====== 一括再評価 ====== */
+function setApplying(b){
+  const btn=$('applyBtn'), spin=$('applySpin');
+  fetching=b;
+  if(btn){ btn.disabled=b; btn.style.opacity = b ? 0.6 : 1; }  /* ←ここ修正 */
+  if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); }
+}
+/* 一括再評価 */
 async function triggerRecheckAll(){
   const reason = prompt("一括再評価の理由（任意）", "") || "";
   const p = inputsToParamsAllKeys();
@@ -395,40 +376,33 @@ async function triggerRecheckAll(){
     toast('再評価の起動に失敗: ' + (e?.message || e), false);
   }
 }
-
-/* ====== API ====== */
+/* API */
 async function fetchDetailsFallback(qs){
   try{ const res=await fetch('/pdca/api/details?'+qs,{cache:'no-store'}); if(!res.ok) return []; const js=await res.json(); return Array.isArray(js)?js:(Array.isArray(js?.items)?js.items:[]);}catch{return[]}
 }
 async function doRefresh(){
   const p=inputsToParamsAllKeys(); const qs=p.toString();
   history.replaceState(null,'',location.pathname+'?'+qs);
-
   const res = await fetch('/pdca/api/summary?'+qs, { cache:'no-store' });
   if(!res.ok) throw new Error('summary HTTP '+res.status);
   const s = await res.json();
-
   const t = s?.totals || {};
   setText('kpi-count', intFmt(s?.count_rows));
   setText('kpi-adopted', intFmt(t?.adopted));
   setText('kpi-rechecks', intFmt(t?.rechecks));
   setText('kpi-winrate', percentFmt(t?.win_rate));
   setText('kpi-maxdd', percentFmt(t?.max_drawdown));
-
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
   const labels = by.map(r => r?.date ?? '');
   const evals  = by.map(r => (+r?.evals)||0);
   const adopted= by.map(r => (+r?.adopted)||0);
   const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
-
   show($('noteCounts'),  labels.length===0);
   show($('noteWinDiff'), labels.length===0);
-
   const charts=getCharts();
   if (charts.counts?.destroy) { try{ charts.counts.destroy(); }catch{} }
   if (charts.winDiff?.destroy) { try{ charts.winDiff.destroy(); }catch{} }
   charts.counts=null; charts.winDiff=null;
-
   const ctxCounts=$('chartCounts'), ctxWinDiff=$('chartWinDiff');
   if (ctxCounts?.getContext) charts.counts = new Chart(ctxCounts.getContext('2d'), {
     type:'bar', data:{ labels, datasets:[{label:'評価件数',data:evals,yAxisID:'y1'},{label:'採用件数',data:adopted,yAxisID:'y1'}]},
@@ -439,36 +413,28 @@ async function doRefresh(){
     type:'line', data:{ labels, datasets:[{label:'勝率（平均 %）',data:wrPct,tension:.25}]},
     options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:0 }}, y:{ beginAtZero:true }}}
   });
-
   let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
   if(Array.isArray(details) && details.length){ tableState.raw = details.map(coerceRow); sortView(); tableState.page=1; renderTablePage(); }
   else { tableState.raw=[]; tableState.view=[]; renderTablePage(); }
-
   wireCsvButton();
 }
 window.pdcaRefresh = async function(){
   if(fetching) return;
   setApplying(true);
-  try{ localStorage.setItem('pdca_filters_v1', JSON.stringify({
-    from:$('from-date').value, to:$('to-date').value,
-    tag:$('tag-input')?.value||'', win:$('win-diff-input')?.value||'',
-    dd:$('dd-diff-input')?.value||'', mt:$('min-trades-input')?.value||''
-  })); await doRefresh(); toast('更新しました'); }
-  catch(e){ console.error('[summary] error:',e); toast('取得に失敗: '+(e?.message||e), false); }
+  try{
+    localStorage.setItem('pdca_filters_v1', JSON.stringify({
+      from:$('from-date').value, to:$('to-date').value,
+      tag:$('tag-input')?.value||'', win:$('win-diff-input')?.value||'',
+      dd:$('dd-diff-input')?.value||'', mt:$('min-trades-input')?.value||''
+    }));
+    await doRefresh(); toast('更新しました');
+  }catch(e){ console.error('[summary] error:',e); toast('取得に失敗: '+(e?.message||e), false); }
   finally{ setApplying(false); }
-};
-
-/* ====== タグ・オートコンプリート ======
-  仕様:
-  - /pdca/api/tags?q=... に問い合わせ（推奨）。失敗時は /pdca/api/tags を取得してクライアント側で絞り込み。
-  - 返却は ["veritas","levia", ...] もしくは [{name:"veritas"}, ...] の両対応。
-  - 入力中に120msデバウンス、↑↓で移動、Enterで決定、Escで閉じる、クリック選択可。
-  - 選択時に即時 pdcaRefresh() を実行（不要なら呼び出しをコメントアウト）。
-*/
+}
+/* オートコンプリート（タグ） */
 (function(){
   const inputId='tag-input', listId='tag-ac-list';
   let cacheAll=null, lastQuery='', activeIndex=-1, pending=null;
-
   function el(){ return {inp:$(inputId), list:$(listId)}; }
   function normalizeItems(js){
     if(!js) return [];
@@ -477,32 +443,17 @@ window.pdcaRefresh = async function(){
     return [];
   }
   async function queryServer(q){
-    // まず q 付き、だめなら全件
-    try{
-      const r = await fetch('/pdca/api/tags?q='+encodeURIComponent(q||''), {cache:'no-store'});
-      if(r.ok){ return normalizeItems(await r.json()); }
-    }catch{}
-    // フォールバック（全件一度だけキャッシュ）
-    if(cacheAll==null){
-      try{
-        const r2 = await fetch('/pdca/api/tags', {cache:'no-store'});
-        if(r2.ok){ cacheAll = normalizeItems(await r2.json()); }
-      }catch{ cacheAll = []; }
-    }
-    const src = cacheAll||[];
-    const t = (q||'').toLowerCase();
-    // 前方一致優先 → 部分一致
+    try{ const r = await fetch('/pdca/api/tags?q='+encodeURIComponent(q||''), {cache:'no-store'}); if(r.ok){ return normalizeItems(await r.json()); } }catch{}
+    if(cacheAll==null){ try{ const r2 = await fetch('/pdca/api/tags', {cache:'no-store'}); if(r2.ok){ cacheAll = normalizeItems(await r2.json()); } }catch{ cacheAll = []; } }
+    const src = cacheAll||[]; const t=(q||'').toLowerCase();
     const starts = src.filter(s=>s.toLowerCase().startsWith(t));
     const contains = src.filter(s=>!s.toLowerCase().startsWith(t) && s.toLowerCase().includes(t));
-    return [...new Set([...starts, ...contains])].slice(0, 50);
+    return [...new Set([...starts, ...contains])].slice(0,50);
   }
   function render(items){
     const {inp,list} = el(); if(!list) return;
     list.innerHTML = '';
-    if(!items.length){
-      list.innerHTML = '<div class="ac-empty">候補がありません</div>';
-      list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1; return;
-    }
+    if(!items.length){ list.innerHTML = '<div class="ac-empty">候補がありません</div>'; list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1; return; }
     items.forEach((s,idx)=>{
       const div=document.createElement('div');
       div.className='ac-item'; div.setAttribute('role','option'); div.id=`ac-item-${idx}`;
@@ -526,7 +477,6 @@ window.pdcaRefresh = async function(){
     const sel = list.children[idx]?.textContent?.replace(/^#\s*/,'').replace(/\s*Enterで決定\s*$/,'') || '';
     if(inp){ inp.value = sel; }
     close();
-    // 選択後に即適用（不要なら下行コメントアウト）
     window.pdcaRefresh && window.pdcaRefresh();
   }
   function schedule(q){
@@ -534,17 +484,15 @@ window.pdcaRefresh = async function(){
     pending = setTimeout(async ()=>{
       lastQuery=q;
       const items = await queryServer(q);
-      // 入力が進んでいたら最新値でなければ無視
       if(lastQuery!==q) return;
       render(items);
     }, 120);
   }
-
   function wire(){
     const {inp,list}=el(); if(!inp||!list) return;
     inp.addEventListener('input', (e)=>{ const q=(e.target.value||'').trim(); schedule(q); });
     inp.addEventListener('focus', ()=>{ schedule((inp.value||'').trim()); });
-    inp.addEventListener('blur', ()=>{ setTimeout(close, 120); }); // クリック選択に猶予
+    inp.addEventListener('blur', ()=>{ setTimeout(close, 120); });
     inp.addEventListener('keydown', (e)=>{
       if(e.key==='ArrowDown'){ e.preventDefault(); move(1); }
       else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); }
@@ -557,72 +505,7 @@ window.pdcaRefresh = async function(){
 </script>
 
 <script>
-/* ====== 連打防止・データ取得 ====== */
-let fetching=false;
-function setApplying(b){ const btn=$('applyBtn'), spin=$('applySpin'); fetching=b; if(btn){btn.disabled=b; btn.style.opacity=b?.6:1;} if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); } }
-
-async function fetchDetailsFallback(qs){
-  try{ const res=await fetch('/pdca/api/details?'+qs,{cache:'no-store'}); if(!res.ok) return []; const js=await res.json(); return Array.isArray(js)?js:(Array.isArray(js?.items)?js.items:[]);}catch{return[]}
-}
-async function doRefresh(){
-  const p=inputsToParamsAllKeys(); const qs=p.toString();
-  history.replaceState(null,'',location.pathname+'?'+qs);
-
-  const res = await fetch('/pdca/api/summary?'+qs, { cache:'no-store' });
-  if(!res.ok) throw new Error('summary HTTP '+res.status);
-  const s = await res.json();
-
-  const t = s?.totals || {};
-  setText('kpi-count', intFmt(s?.count_rows));
-  setText('kpi-adopted', intFmt(t?.adopted));
-  setText('kpi-rechecks', intFmt(t?.rechecks));
-  setText('kpi-winrate', percentFmt(t?.win_rate));
-  setText('kpi-maxdd', percentFmt(t?.max_drawdown));
-
-  const by = Array.isArray(s?.by_day) ? s.by_day : [];
-  const labels = by.map(r => r?.date ?? '');
-  const evals  = by.map(r => (+r?.evals)||0);
-  const adopted= by.map(r => (+r?.adopted)||0);
-  const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
-
-  show($('noteCounts'),  labels.length===0);
-  show($('noteWinDiff'), labels.length===0);
-
-  const charts=getCharts();
-  if (charts.counts?.destroy) { try{ charts.counts.destroy(); }catch{} }
-  if (charts.winDiff?.destroy) { try{ charts.winDiff.destroy(); }catch{} }
-  charts.counts=null; charts.winDiff=null;
-
-  const ctxCounts=$('chartCounts'), ctxWinDiff=$('chartWinDiff');
-  if (ctxCounts?.getContext) charts.counts = new Chart(ctxCounts.getContext('2d'), {
-    type:'bar', data:{ labels, datasets:[{label:'評価件数',data:evals,yAxisID:'y1'},{label:'採用件数',data:adopted,yAxisID:'y1'}]},
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      scales:{ y1:{ type:'linear', position:'left', beginAtZero:true }, x:{ ticks:{ maxRotation:0 }}}}
-  });
-  if (ctxWinDiff?.getContext) charts.winDiff = new Chart(ctxWinDiff.getContext('2d'), {
-    type:'line', data:{ labels, datasets:[{label:'勝率（平均 %）',data:wrPct,tension:.25}]},
-    options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:0 }}, y:{ beginAtZero:true }}}
-  });
-
-  let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
-  if(Array.isArray(details) && details.length){ tableState.raw = details.map(coerceRow); sortView(); tableState.page=1; renderTablePage(); }
-  else { tableState.raw=[]; tableState.view=[]; renderTablePage(); }
-
-  wireCsvButton();
-}
-window.pdcaRefresh = async function(){
-  if(fetching) return;
-  setApplying(true);
-  try{ localStorage.setItem('pdca_filters_v1', JSON.stringify({
-    from:$('from-date').value, to:$('to-date').value,
-    tag:$('tag-input')?.value||'', win:$('win-diff-input')?.value||'',
-    dd:$('dd-diff-input')?.value||'', mt:$('min-trades-input')?.value||''
-  })); await doRefresh(); toast('更新しました'); }
-  catch(e){ console.error('[summary] error:',e); toast('取得に失敗: '+(e?.message||e), false); }
-  finally{ setApplying(false); }
-};
-
-/* ====== 起動 ====== */
+/* ========== 起動 ========== */
 document.addEventListener('DOMContentLoaded', function(){
   window.GLOBAL_DEFAULT_FROM = "{{ default_from or '' }}".trim() || isoDateDaysAgo(14);
   window.GLOBAL_DEFAULT_TO   = "{{ default_to or '' }}".trim()   || isoDateDaysAgo(0);
