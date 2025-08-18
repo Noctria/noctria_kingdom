@@ -140,6 +140,10 @@ class DECISION_MINI,TEST_E2E demo;
 <!-- AUTODOC:BEGIN mode=git_log path_globs="src/plan_data/*.py;src/plan_data/**/*.py" title="PLAN層 変更履歴（最近30）" limit=30 since=2025-08-01 -->
 ### PLAN層 変更履歴（最近30）
 
+- **0a246cf** 2025-08-19T02:37:10+09:00 — Update pdca_summary_service.py (by Noctoria)
+  - `src/plan_data/pdca_summary_service.py`
+- **73b1b0d** 2025-08-18T03:37:41+09:00 — Update pdca_summary_service.py (by Noctoria)
+  - `src/plan_data/pdca_summary_service.py`
 - **a39c7db** 2025-08-15T04:14:15+09:00 — Update observability.py (by Noctoria)
   - `src/plan_data/observability.py`
 - **00fc537** 2025-08-15T01:44:12+09:00 — Create kpi_minidemo.py (by Noctoria)
@@ -196,10 +200,6 @@ class DECISION_MINI,TEST_E2E demo;
   - `src/plan_data/observation_adapter.py`
 - **189ce11** 2025-08-11T15:14:42+09:00 — Update observation_adapter.py (by Noctoria)
   - `src/plan_data/observation_adapter.py`
-- **05d909e** 2025-08-11T15:10:48+09:00 — Update feature_spec.py (by Noctoria)
-  - `src/plan_data/feature_spec.py`
-- **747c498** 2025-08-11T15:04:10+09:00 — Create __init__.py (by Noctoria)
-  - `src/plan_data/__init__.py`
 <!-- AUTODOC:END -->
 
 **Version:** 1.0  

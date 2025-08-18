@@ -506,7 +506,7 @@ class CRITERIA,ROLLBACK,IDS todo;
 #### `docs/architecture/diagrams/check_layer.mmd`
 
 ```mermaid
-%% CHECK層 詳細図（実績評価・監視・集計）
+%% CHECK層 詳細図（実績評価・監視・集計） — updated 2025-08-17
 flowchart TD
 
   %% 入力（Do層からの結果/イベント）
@@ -516,44 +516,58 @@ flowchart TD
     AUDIT["audit_order.json<br/>（完全監査ログ）"]
   end
 
-  %% CHECK層
+  %% CHECK層本体
   subgraph CHECK["Check層 (src/check)"]
     MON["challenge_monitor.py<br/>・DD監視/連敗監視<br/>・ルール逸脱検知<br/>・アラート生成"]
     EVAL["evaluation.py<br/>・日次/戦略別KPI<br/>・勝率/最大DD/取引数/平均R"]
-    AGG["metrics_aggregator（planned）<br/>・期間集計/AI別/シンボル別<br/>・ランキング/タグ別比較"]
+    AGG["metrics_aggregator.py（planned）<br/>・期間集計/AI別/シンボル別<br/>・ランキング/タグ別比較"]
     STORE["/data/pdca_logs/**/*.json<br/>・評価/監視/指標の永続化"]
+    EXP["prometheus_exporter.py（planned）<br/>・/metrics エクスポート"]
   end
 
-  %% 出力（Act/GUI）
-  subgraph OUTPUTS["下流出力 (to ACT/GUI)"]
-    KPI["kpi_summary.json<br/>（戦略別KPIのスナップショット）"]
+  %% 出力（Act/GUI/Obs）
+  subgraph OUTPUTS["下流出力 (to ACT/GUI/Obs)"]
+    KPI["kpi_summary.json<br/>（/pdca/summary の主要入力）"]
     ALERT["alert_payload.json<br/>（通知/抑制フラグ付き）"]
   end
 
-  %% 統治/運用
-  subgraph ORCH["統治/運用"]
-    GUITL["GUI: /pdca/timeline"]
-    GUIDLY["GUI: /pdca/latency/daily"]
+  %% 統治/運用/GUI
+  subgraph ORCH["統治/運用・可視化"]
+    GUISUM["GUI: /pdca/summary"]
+    GUISTAT["GUI: /statistics/*<br/>（ranking/scoreboard/compare 等）"]
+    OBS["GUI: /observability"]
     DAGCHECK["Airflow DAG: check_flow<br/>（定期評価/閾値判定）"]
     NOTIFY["notifier.py（Slack/メール/Webhook）"]
+    ACTLINK["Act/Decision 連携（別図）<br/>※アラートが採用候補になる"]
   end
 
-  %% フロー
+  %% フロー（処理経路）
   EXECRES --> EVAL
-  RISEVT --> MON
-  AUDIT --> EVAL
+  RISEVT  --> MON
+  AUDIT   --> EVAL
+
   EVAL --> AGG
   EVAL --> STORE
-  AGG --> STORE
+  AGG  --> STORE
+
   MON --> ALERT --> NOTIFY
   AGG --> KPI
-  KPI --> GUITL
-  KPI --> GUIDLY
+  KPI --> GUISUM
+  AGG --> GUISTAT
 
-  %% 管理リンク
-  GUITL --> DAGCHECK
+  %% 可観測性
+  MON --> EXP
+  EVAL --> EXP
+  AGG  --> EXP
+  EXP  --> OBS
+
+  %% オーケストレーション
+  GUISUM --> DAGCHECK
   DAGCHECK --> EVAL
   DAGCHECK --> MON
+
+  %% Act/Decision 連携の位置づけ（本図では詳細割愛）
+  ALERT --> ACTLINK
 ```
 
 #### `docs/architecture/diagrams/do_layer.mmd`
@@ -809,6 +823,12 @@ class DECISION_MINI,TEST_E2E demo;
 <!-- AUTODOC:BEGIN mode=git_log path_globs=src/**/*.py title=コードベース更新履歴（最近30） limit=30 since=2025-08-01 -->
 ### コードベース更新履歴（最近30）
 
+- **0a246cf** 2025-08-19T02:37:10+09:00 — Update pdca_summary_service.py (by Noctoria)
+  - `src/plan_data/pdca_summary_service.py`
+- **73b1b0d** 2025-08-18T03:37:41+09:00 — Update pdca_summary_service.py (by Noctoria)
+  - `src/plan_data/pdca_summary_service.py`
+- **3c389b0** 2025-08-17T21:58:56+09:00 — Create decision_hooks.py (by Noctoria)
+  - `src/core/decision_hooks.py`
 - **a19193a** 2025-08-16T05:25:12+09:00 — Update airflow_client.py (by Noctoria)
   - `src/core/airflow_client.py`
 - **b96eae7** 2025-08-16T05:16:53+09:00 — Update git_utils.py (by Noctoria)
@@ -862,11 +882,5 @@ class DECISION_MINI,TEST_E2E demo;
 - **b1453a0** 2025-08-13T16:03:47+09:00 — Update order_execution.py (by Noctoria)
   - `src/execution/order_execution.py`
 - **9ed85b3** 2025-08-13T15:53:16+09:00 — Update risk_policy.py (by Noctoria)
-  - `src/execution/risk_policy.py`
-- **b112ce9** 2025-08-13T15:30:22+09:00 — Update contracts.py (by Noctoria)
-  - `src/plan_data/contracts.py`
-- **fba6dda** 2025-08-13T15:24:26+09:00 — Update risk_gate.py (by Noctoria)
-  - `src/execution/risk_gate.py`
-- **112e173** 2025-08-13T15:18:00+09:00 — Create risk_policy.py (by Noctoria)
   - `src/execution/risk_policy.py`
 <!-- AUTODOC:END -->
