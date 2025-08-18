@@ -2,7 +2,7 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/strategy_lifecycle.mmd title=戦略ライフサイクル図（最新） fence=mermaid -->
 ### 戦略ライフサイクル図（最新）
 
-<!-- Missing: docs/architecture/diagrams/strategy_lifecycle.mmd -->
+_対象ファイルが見つかりませんでした。_
 <!-- AUTODOC:END -->
 
 <!-- AUTODOC:BEGIN mode=git_log path_globs="src/strategies/**/*.py;src/veritas/**/*.py" title="戦略/Veritas 更新履歴（最近30）" limit=30 since=2025-08-01 -->

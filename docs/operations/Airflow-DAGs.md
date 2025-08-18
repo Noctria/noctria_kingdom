@@ -2,7 +2,7 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/airflow_dags.mmd title="Airflow DAGs 図（最新）" fence=mermaid -->
 ### Airflow DAGs 図（最新）
 
-<!-- Missing: docs/architecture/diagrams/airflow_dags.mmd -->
+_対象ファイルが見つかりませんでした。_
 <!-- AUTODOC:END -->
 
 <!-- AUTODOC:BEGIN mode=git_log path_globs="airflow_docker/dags/**/*.py;airflow_docker/*.yaml;airflow_docker/**/*.yaml" title="Airflow/DAG/Compose 更新履歴（最近50）" limit=50 since=2025-07-01 -->

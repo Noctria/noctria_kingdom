@@ -379,7 +379,7 @@ abs( model_action_mean - scalar(avg_over_time(model_action_mean[7d])) ) > 0.2
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/models/diagrams/prometheus_ppo.mmd title="Prometheus PPO モデル図（最新）" fence=mermaid -->
 ### Prometheus PPO モデル図（最新）
 
-<!-- Missing: docs/models/diagrams/prometheus_ppo.mmd -->
+_対象ファイルが見つかりませんでした。_
 <!-- AUTODOC:END -->
 
 <!-- AUTODOC:BEGIN mode=git_log path_globs="src/prometheus_oracle/**/*.py;src/strategies/prometheus_oracle.py" title="Prometheus Oracle 実装更新履歴（最近30）" limit=30 since=2025-08-01 -->

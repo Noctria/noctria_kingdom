@@ -2,8 +2,6 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs="docs/architecture/diagrams/plan_layer.mmd;docs/architecture/diagrams/plan_layer_*.mmd" title="PLAN層 図（最新）" fence=mermaid -->
 ### PLAN層 図（最新）
 
-#### `docs/architecture/diagrams/plan_layer.mmd`
-
 ```mermaid
 flowchart TD
 
@@ -133,8 +131,6 @@ class TRACEID plan;
 class OBS_PLAN,OBS_INFER,OBS_DEC,OBS_EXEC,OBS_ALT obs;
 class DECISION_MINI,TEST_E2E demo;
 ```
-
-<!-- Missing: docs/architecture/diagrams/plan_layer_*.mmd -->
 <!-- AUTODOC:END -->
 
 <!-- AUTODOC:BEGIN mode=git_log path_globs="src/plan_data/*.py;src/plan_data/**/*.py" title="PLAN層 変更履歴（最近30）" limit=30 since=2025-08-01 -->

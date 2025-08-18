@@ -19,6 +19,9 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
 ### `exec_result`（Do → Check）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/05_exec_result.md title="`exec_result`（Do → Check）" -->
+### `exec_result`（Do → Check）
+
 **必須**：`order_id`, `status`, `filled_qty`, `ts`  
 **オプション**：`avg_price`, `fees`, `reason.code`, `slippage_pct`, `latency_ms`
 
