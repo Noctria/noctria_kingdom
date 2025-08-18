@@ -28,9 +28,21 @@
   .widget-frame { width:100%; border:none; min-height:480px; overflow:hidden; border-radius:8px; }
   .grid-quicklinks { display:grid; gap:1rem; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1rem; }
   .link-card { text-decoration:none; color:inherit; }
+
+  /* Toast */
+  .toast {
+    position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
+    background: rgba(0,0,0,.7); border:1px solid rgba(255,255,255,.15);
+    padding:.6rem .9rem; border-radius:.5rem; display:none;
+  }
+  .toast.show { display:block; }
+  .toast.ok { border-color:#22c55e; }
+  .toast.err { border-color:#ef4444; }
+  .spinner { display:none; margin-left:.5rem }
+  .spinner.show { display:inline-block; }
 </style>
 
-<!-- まずはローカル配信。無ければ後段でCDNフォールバック -->
+<!-- ローカル → 足りなければ後段でCDNフォールバック -->
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
@@ -39,34 +51,43 @@
 <section class="hud-panel filter-panel" aria-labelledby="filter-title">
   <h2 id="filter-title" class="panel-title"><i class="fas fa-filter" aria-hidden="true"></i> FILTER & SEARCH</h2>
   <form class="filter-form" onsubmit="return false;" aria-describedby="filter-help">
-    <p id="filter-help" class="sr-only">開始日と終了日で範囲を指定し、適用ボタンで更新します。</p>
+    <p id="filter-help" class="sr-only">期間・タグ・しきい値でフィルターし、適用で更新します。</p>
     <div>
       <label for="from-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 開始日</label>
-      <input id="from-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-describedby="from-date-help">
-      <span id="from-date-help" class="sr-only">開始日をYYYY-MM-DDで入力</span>
+      <input id="from-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD">
     </div>
     <div>
       <label for="to-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 終了日</label>
-      <input id="to-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-describedby="to-date-help">
-      <span id="to-date-help" class="sr-only">終了日をYYYY-MM-DDで入力</span>
+      <input id="to-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD">
     </div>
     <div>
-      <label for="limit-select"><i class="fas fa-list-ol" aria-hidden="true"></i> 表示件数（表用）</label>
-      <select id="limit-select" class="hud-select" aria-label="表示件数">
-        <option value="20" selected>20件</option>
-        <option value="50">50件</option>
-        <option value="100">100件</option>
-      </select>
+      <label for="tag-input"><i class="fas fa-tags" aria-hidden="true"></i> タグ/戦略</label>
+      <input id="tag-input" type="text" class="hud-input" placeholder="e.g. veritas / levia">
     </div>
+    <div>
+      <label for="win-diff-input"><i class="fas fa-arrow-trend-up" aria-hidden="true"></i> 勝率差分 ≥ %</label>
+      <input id="win-diff-input" type="number" step="0.1" class="hud-input" placeholder="例: 3">
+    </div>
+    <div>
+      <label for="dd-diff-input"><i class="fas fa-arrow-trend-down" aria-hidden="true"></i> 最大DD差分 ≤ %</label>
+      <input id="dd-diff-input" type="number" step="0.1" class="hud-input" placeholder="例: -2">
+    </div>
+    <div>
+      <label for="min-trades-input"><i class="fas fa-list-ol" aria-hidden="true"></i> 最小取引数</label>
+      <input id="min-trades-input" type="number" step="1" min="0" class="hud-input" placeholder="例: 30">
+    </div>
+
     <div class="btn-row">
-      <button id="applyBtn" class="hud-link" type="button" aria-label="フィルターを適用">🔎 適用</button>
+      <button id="applyBtn" class="hud-link" type="button" aria-label="フィルターを適用">
+        🔎 適用 <span id="applySpin" class="spinner">⏳</span>
+      </button>
       <a id="csvBtn" class="hud-link" href="#" download aria-label="CSVをダウンロード">⬇️ CSV</a>
       <button id="recheckAllBtn" class="hud-link" type="button" aria-label="一括再評価を実行">🔁 一括再評価</button>
     </div>
   </form>
 </section>
 
-<!-- 直近採用タグウィジェット（/pdca/widgets/recent-adoptions） -->
+<!-- 直近採用タグウィジェット -->
 {% set w = recent_adoptions_params or {'pattern':'veritas-','limit':9,'cols':3,'title':'🧩 直近採用タグ'} %}
 <section class="hud-panel" aria-labelledby="adopt-widget-title">
   <h2 id="adopt-widget-title" class="panel-title"><i class="fas fa-tags" aria-hidden="true"></i> 直近の採用タグ</h2>
@@ -131,6 +152,8 @@
     <div class="card-body muted">採用パイプラインの実行履歴。conf/タスク一覧/関連Decisionを確認。</div>
   </a>
 </div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -153,18 +176,25 @@
 
 <script>
 /* =========================
-   メインスクリプト（前回互換）
-   - /pdca/api/summary       -> KPI + by_day（ここからグラフ描画）
-   - /pdca/summary.csv       -> CSV（from_date/to_date）
+   メインスクリプト（URL同期 & 追加フィルター対応）
+   - /pdca/api/summary?date_from&date_to[&tag&win_diff&dd_diff&min_trades]
+   - /pdca/summary.csv は from_date/to_date も付与（互換）
    ========================= */
 window.NoctriaPDCA = { charts: { counts:null, winDiff:null } };
 window.GLOBAL_DEFAULT_FROM = null;
 window.GLOBAL_DEFAULT_TO   = null;
 
-function setText(id, t){ const el=document.getElementById(id); if(el) el.textContent = t; }
+function $(id){ return document.getElementById(id); }
+function setText(id, t){ const el=$(id); if(el) el.textContent = t; }
 function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
 function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
 function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
+function toast(msg, ok=true){
+  const t = $('toast'); if(!t) return;
+  t.className = 'toast ' + (ok?'ok':'err') + ' show';
+  t.textContent = msg;
+  setTimeout(()=>{ t.className='toast'; }, 2000);
+}
 
 function isoDateDaysAgo(days){
   const now = new Date();
@@ -175,36 +205,53 @@ function isoDateDaysAgo(days){
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function buildQueryLegacy() {
-  // 旧API互換（バックエンドで307リダイレクト対応している想定）
-  const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
-  const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
-  const sp = new URLSearchParams();
-  sp.set('date_from', from);
-  sp.set('date_to', to);
-  return sp.toString();
+function readUrlIntoInputs(){
+  const usp = new URLSearchParams(location.search);
+  const from = usp.get('date_from') || usp.get('from_date') || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
+  const to   = usp.get('date_to')   || usp.get('to_date')   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  const tag  = usp.get('tag') || '';
+  const win  = usp.get('win_diff') || '';
+  const dd   = usp.get('dd_diff') || '';
+  const mt   = usp.get('min_trades') || '';
+  if ($('from-date')) $('from-date').value = from;
+  if ($('to-date'))   $('to-date').value   = to;
+  if ($('tag-input')) $('tag-input').value = tag;
+  if ($('win-diff-input')) $('win-diff-input').value = win;
+  if ($('dd-diff-input'))  $('dd-diff-input').value  = dd;
+  if ($('min-trades-input')) $('min-trades-input').value = mt;
 }
 
-function buildQueryNew() {
-  // CSVは新パラメータ名を優先しつつ、互換のため旧名も同時に付与
-  const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
-  const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
-  const sp = new URLSearchParams();
-  sp.set('from_date', from);
-  sp.set('to_date', to);
-  sp.set('date_from', from);
-  sp.set('date_to', to);
-  return sp.toString();
+function inputsToParams(){
+  const from = $('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
+  const to   = $('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  const tag  = $('tag-input')?.value?.trim();
+  const win  = $('win-diff-input')?.value?.trim();
+  const dd   = $('dd-diff-input')?.value?.trim();
+  const mt   = $('min-trades-input')?.value?.trim();
+
+  const p = new URLSearchParams();
+  p.set('date_from', from);
+  p.set('date_to', to);
+  if (tag) p.set('tag', tag);
+  if (win) p.set('win_diff', win);
+  if (dd)  p.set('dd_diff', dd);
+  if (mt)  p.set('min_trades', mt);
+  return p;
+}
+
+function buildCsvParams(){
+  // 互換のため new/legacy 両方のキーを付ける
+  const p = inputsToParams();
+  const from = p.get('date_from'); const to = p.get('date_to');
+  p.set('from_date', from); p.set('to_date', to);
+  return p;
 }
 
 function wireCsvButton(){
-  const a = document.getElementById('csvBtn');
-  if (!a) return;
-  const qs = buildQueryNew();
-  a.href = '/pdca/summary.csv' + (qs ? `?${qs}` : '');
+  const a = $('csvBtn'); if(!a) return;
+  a.href = '/pdca/summary.csv?' + buildCsvParams().toString();
 }
 
-/* Chart helpers */
 function createLine(ctx, labels, label, data, ySuffix){
   const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
   return new Chart(ctx, {
@@ -240,31 +287,31 @@ function createBar2Axis(ctx, labels, ds1, ds2){
   });
 }
 
-/* ======== 一括再評価トリガ ======== */
 async function triggerRecheckAll(){
   const reason = prompt("一括再評価の理由（任意）", "") || "";
-  const qsLegacy = buildQueryLegacy();
-  const url = new URL('/pdca/recheck_all', window.location.origin);
-  const uspL = new URLSearchParams(qsLegacy);
+  const p = inputsToParams();
+  const url = new URL('/pdca/recheck_all', location.origin);
   url.searchParams.set('reason', reason);
-  url.searchParams.set('filter_date_from', uspL.get('date_from'));
-  url.searchParams.set('filter_date_to', uspL.get('date_to'));
+  url.searchParams.set('filter_date_from', p.get('date_from'));
+  url.searchParams.set('filter_date_to', p.get('date_to'));
   try{
     const res = await fetch(url.toString(), { method:'POST' });
     const js = await res.json().catch(()=>({message:'未知の応答'}));
-    alert(js.message || JSON.stringify(js));
+    toast(js.message || '起動しました', res.ok);
   }catch(e){
-    alert('再評価の起動に失敗しました: ' + (e?.message || e));
+    toast('再評価の起動に失敗: ' + (e?.message || e), false);
   }
 }
 
 /* ======== メイン更新処理 ======== */
 window.pdcaRefresh = async function pdcaRefresh(){
-  const qsLegacy = buildQueryLegacy();
-
+  const spin = $('applySpin'); if (spin) spin.classList.add('show');
   try{
-    // まとめて summary だけ叩いて、KPI と timeseries を同時に処理
-    const res = await fetch('/pdca/api/summary?' + qsLegacy, { cache:'no-store' });
+    // URL同期（共有/リロード用）
+    const p = inputsToParams();
+    history.replaceState(null, '', location.pathname + '?' + p.toString());
+
+    const res = await fetch('/pdca/api/summary?' + p.toString(), { cache:'no-store' });
     if(!res.ok) throw new Error('summary HTTP ' + res.status);
     const s = await res.json();
 
@@ -283,14 +330,14 @@ window.pdcaRefresh = async function pdcaRefresh(){
     const adopted= by.map(r => (r?.adopted ?? 0));
     const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
 
-    show(document.getElementById('noteCounts'),  labels.length === 0);
-    show(document.getElementById('noteWinDiff'), labels.length === 0);
+    show($('noteCounts'),  labels.length === 0);
+    show($('noteWinDiff'), labels.length === 0);
 
     if (window.NoctriaPDCA.charts.counts)  { window.NoctriaPDCA.charts.counts.destroy();  window.NoctriaPDCA.charts.counts = null; }
     if (window.NoctriaPDCA.charts.winDiff) { window.NoctriaPDCA.charts.winDiff.destroy(); window.NoctriaPDCA.charts.winDiff = null; }
 
-    const ctxCounts  = document.getElementById('chartCounts');
-    const ctxWinDiff = document.getElementById('chartWinDiff');
+    const ctxCounts  = $('chartCounts');
+    const ctxWinDiff = $('chartWinDiff');
     if (ctxCounts && ctxCounts.getContext) {
       window.NoctriaPDCA.charts.counts  = createBar2Axis(
         ctxCounts.getContext('2d'),
@@ -308,30 +355,33 @@ window.pdcaRefresh = async function pdcaRefresh(){
         '%'
       );
     }
+
+    wireCsvButton();
+    toast('更新しました');
   }catch(e){
     console.error('[summary] fetch error:', e);
+    toast('取得に失敗: ' + (e?.message || e), false);
+  }finally{
+    if (spin) spin.classList.remove('show');
   }
-
-  wireCsvButton();
 };
 
 /* ========= DOM 準備 ========= */
 document.addEventListener('DOMContentLoaded', function(){
   window.GLOBAL_DEFAULT_FROM = "{{ default_from or '' }}".trim() || isoDateDaysAgo(14);
   window.GLOBAL_DEFAULT_TO   = "{{ default_to or '' }}".trim()   || isoDateDaysAgo(0);
-  const fromI = document.getElementById('from-date');
-  const toI   = document.getElementById('to-date');
-  if (fromI && !fromI.value) fromI.value = window.GLOBAL_DEFAULT_FROM;
-  if (toI   && !toI.value)   toI.value   = window.GLOBAL_DEFAULT_TO;
+
+  // URL→入力欄へ（初回）
+  readUrlIntoInputs();
 
   (function initPickers(){
     if (typeof flatpickr === 'undefined') return void setTimeout(initPickers, 120);
-    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_FROM });
-    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_TO   });
+    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: $('from-date')?.value || window.GLOBAL_DEFAULT_FROM });
+    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: $('to-date')?.value   || window.GLOBAL_DEFAULT_TO   });
   })();
 
-  const btn  = document.getElementById('applyBtn');
-  const rbtn = document.getElementById('recheckAllBtn');
+  const btn  = $('applyBtn');
+  const rbtn = $('recheckAllBtn');
   if (btn)  btn.addEventListener('click', window.pdcaRefresh);
   if (rbtn) rbtn.addEventListener('click', triggerRecheckAll);
 
