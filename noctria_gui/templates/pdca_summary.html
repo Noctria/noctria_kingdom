@@ -58,9 +58,9 @@
     border-bottom:1px solid rgba(255,255,255,0.12);
   }
   .hud-table tbody tr:nth-child(even){ background: rgba(255,255,255,0.03); }
-  .kpi-good { color:#86efac; }    /* green-300 */
-  .kpi-warn { color:#fde68a; }    /* amber-200 */
-  .kpi-bad  { color:#fca5a5; }    /* rose-300 */
+  .kpi-good { color:#86efac; }
+  .kpi-warn { color:#fde68a; }
+  .kpi-bad  { color:#fca5a5; }
 
   /* ====== Helpers ====== */
   .muted { opacity:.8; font-size:.9rem; }
@@ -69,13 +69,9 @@
   .fade { opacity:.85; }
   .scroll-x { overflow-x:auto; }
 
-  /* Charts wrapper for responsive canvas */
   .chart-wrap { width:100%; max-width:100%; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.10); border-radius:1rem; padding:.75rem; }
   .chart-wrap canvas { width:100% !important; height:320px !important; }
-
-  @media (max-width: 480px){
-    .chart-wrap canvas { height:260px !important; }
-  }
+  @media (max-width: 480px){ .chart-wrap canvas { height:260px !important; } }
 </style>
 {% endblock %}
 
@@ -85,32 +81,32 @@
     <div class="hud-field">
       <label for="from">From</label>
       <input id="from" name="from" type="text" placeholder="YYYY-MM-DD"
-             value="{{ request.args.get('from', from_date|default('', true)) }}">
+             value="{{ request.query_params.get('from', from_date|default('', true)) }}">
     </div>
     <div class="hud-field">
       <label for="to">To</label>
       <input id="to" name="to" type="text" placeholder="YYYY-MM-DD"
-             value="{{ request.args.get('to', to_date|default('', true)) }}">
+             value="{{ request.query_params.get('to', to_date|default('', true)) }}">
     </div>
     <div class="hud-field">
       <label for="tag">Tag / Strategy</label>
       <input id="tag" name="tag" type="text" placeholder="e.g. veritas / levia"
-             value="{{ request.args.get('tag', selected_tag|default('', true)) }}">
+             value="{{ request.query_params.get('tag', selected_tag|default('', true)) }}">
     </div>
     <div class="hud-field">
       <label for="win_diff">勝率差分しきい値（%以上）</label>
       <input id="win_diff" name="win_diff" type="number" step="0.1" inputmode="decimal" placeholder="例: 3"
-             value="{{ request.args.get('win_diff', win_diff|default('', true)) }}">
+             value="{{ request.query_params.get('win_diff', win_diff|default('', true)) }}">
     </div>
     <div class="hud-field">
       <label for="dd_diff">最大DD差分しきい値（%以上）</label>
       <input id="dd_diff" name="dd_diff" type="number" step="0.1" inputmode="decimal" placeholder="例: -2"
-             value="{{ request.args.get('dd_diff', dd_diff|default('', true)) }}">
+             value="{{ request.query_params.get('dd_diff', dd_diff|default('', true)) }}">
     </div>
     <div class="hud-field">
       <label for="min_trades">最小取引数</label>
       <input id="min_trades" name="min_trades" type="number" step="1" min="0" placeholder="例: 30"
-             value="{{ request.args.get('min_trades', min_trades|default('', true)) }}">
+             value="{{ request.query_params.get('min_trades', min_trades|default('', true)) }}">
     </div>
     <div class="hud-field">
       <button class="hud-btn" type="submit" aria-label="apply filters">
@@ -128,7 +124,6 @@
   </p>
 </section>
 
-<!-- Summary KPIs -->
 <section class="hud-section" aria-label="summary-kpis">
   <h3>サマリー</h3>
   <div class="hud-cards">
@@ -169,7 +164,6 @@
   </div>
 </section>
 
-<!-- Charts -->
 <section class="hud-section" aria-label="charts">
   <h3>トレンド</h3>
   <div class="chart-wrap" aria-live="polite">
@@ -180,7 +174,6 @@
   </div>
 </section>
 
-<!-- Table -->
 <section class="hud-section" aria-label="details">
   <h3>詳細（最新50件）</h3>
   <div class="scroll-x">
@@ -250,7 +243,6 @@
 
   // ====== Chart helpers ======
   function safe(val, fallback){ return (val===null||val===undefined) ? fallback : val; }
-  function toPercent(v){ return (v===null||v===undefined) ? null : Math.round(v*1000)/10; }
 
   // サーバ側が charts オブジェクトを用意できない場合でも安全に動作
   const charts = safe({{ charts|default({})|tojson }}, {});
