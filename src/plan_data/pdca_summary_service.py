@@ -3,7 +3,7 @@
 """
 PDCAサマリー用のデータ取得＆KPI集計ユーティリティ
 
-優先ソース: Postgres テーブル `obs_infer_calls`
+優先ソース: Postgres テーブル/ビュー `obs_infer_calls`
   必須カラム: started_at, ended_at, ai_name, status, params_json, metrics_json
 
 役割:
@@ -291,7 +291,9 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
     # 最大DD: 最悪値（最小値）を採用
     agg_max_dd: Optional[float] = min(dd_values) if dd_values else None
 
-    adopt_rate = (total_adopted / total_evals) if total_evals > 0 else None
+    # --- 採用率: 分母ゼロ(評価=0)でも採用データだけある場合にフォールバック ---
+    effective_total = total_evals if total_evals > 0 else (total_evals + total_adopted)
+    adopt_rate = (total_adopted / effective_total) if effective_total > 0 else None
 
     # 後方互換: adopt_rate を正式キーに、adoption_rate も併記
     return {
@@ -310,7 +312,7 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
     """
     日次でまとめてグラフ用の配列を返す。
       - date: YYYY-MM-DD（UTC日付）
-      - evals, adopted, trades, win_rate(平均または wins/total 推定)
+      - evals, adopted, trades, win_rate(平均または wins/total 推定), adopt_rate(フォールバック含む)
     """
     from collections import defaultdict
 
@@ -363,13 +365,18 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
         elif b["_total"] > 0:
             wr = b["_wins"] / b["_total"]
 
+        # 日次採用率: 分母ゼロ(評価=0)なら evals+adopted でフォールバック
+        effective_total = b["evals"] if b["evals"] > 0 else (b["evals"] + b["adopted"])
+        adopt_rate = (b["adopted"] / effective_total) if effective_total > 0 else None
+
         out.append(
             {
                 "date": b["date"],
                 "evals": b["evals"],
                 "adopted": b["adopted"],
                 "trades": b["trades"],
-                "win_rate": wr,  # 0-1 or None
+                "win_rate": wr,       # 0-1 or None
+                "adopt_rate": adopt_rate,  # 0-1 or None
             }
         )
 
