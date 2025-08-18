@@ -1,35 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-update_docs_from_index.py — AutoDoc v1.6 (file_content + hardening)
+update_docs_from_index.py — AutoDoc v1.7 (frontmatter fix + glob magic)
 
 Markdown 内の AUTODOC ブロックを検出し、以下の2モードで本文を書き換える:
 - mode=git_log      : Git のコミット履歴を整形して挿入（既定）
 - mode=file_content : 指定ファイルの最新内容をそのまま挿入（コードフェンス対応）
 
-【マーカー例】
-
-(1) Gitログを差し込む:
-<!-- AUTODOC:BEGIN path_globs=src/plan_data/*.py;src/plan_data/**/*.py limit=30 title="Plan Data の最近の変更" since=2025-08-01 author=Noctoria include_files=false -->
-(ここは自動で置き換え)
-<!-- AUTODOC:END -->
-
-(2) Mermaidファイル内容を差し込む:
-<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/act_layer.mmd fence=mermaid title="Act Layer Mermaid図" -->
-(ここは自動で置き換え)
-<!-- AUTODOC:END -->
-
-(3) 複数ファイルをまとめて差し込む（各ファイルで小見出し＋コードブロック化）:
-<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/diagrams/*.mmd fence=mermaid title="最新Mermaid図セット" -->
-(ここは自動で置き換え)
-<!-- AUTODOC:END -->
-
-実行例:
-  python3 scripts/update_docs_from_index.py --docs-root docs --repo-root . --dry-run False
-
-安全策:
-- 既定で .bak バックアップを作成
-- YAML front-matter の last_updated をJSTで自動更新（存在時のみ）
+改良点 v1.7:
+- front-matter(last_updated) の更新だけでも書き込むよう修正
+- AUTODOC ブロックが無い .md でも front-matter 更新可能（--touch-front-matter）
+- 未解決パターンは git のマジック `:(glob)` を付与して pathspec 取りこぼしを防止
+- BOM / CRLF を許容する front-matter 正規表現
 """
 
 from __future__ import annotations
@@ -178,8 +160,10 @@ def git_log_for_paths(
 
 def resolve_globs(globs_text: str, repo_root: Path) -> List[str]:
     """
-    'a/*.py;b/**/*.py' → 実ファイル相対パスへ解決。マッチなしのパターンはそのまま残す。
-    出力順は安定化のため sort 済み。
+    'a/*.py;b/**/*.py' → 実ファイル相対パスへ解決。
+    - マッチしたものは実ファイルの相対パスで返す
+    - マッチしなかったパターンは git pathspec の `:(glob)` を付与して残す
+    出力順は安定化のため sort 済み、かつ unique。
     """
     results: List[str] = []
     for g in [p.strip() for p in (globs_text or "").split(";") if p.strip()]:
@@ -189,7 +173,11 @@ def resolve_globs(globs_text: str, repo_root: Path) -> List[str]:
                 rel = os.path.relpath(m, start=repo_root)
                 results.append(rel)
         else:
-            results.append(g)
+            # git の glob マジックでパススペックとして扱わせる
+            gg = g
+            if not g.startswith(":(glob)"):
+                gg = f":(glob){g}"
+            results.append(gg)
 
     # unique（順序維持）
     seen = set()
@@ -238,12 +226,6 @@ def render_file_contents_section(
     rel_paths: List[str],
     fence: Optional[str] = None,
 ) -> str:
-    """
-    指定ファイル群の内容をまとめて差し込む。
-    - title があればセクション見出し
-    - 複数ファイル時: 各ファイルを小見出し(####)＋コードブロックで列挙
-    - fence があれば ```{fence} でコードフェンス化
-    """
     lines: List[str] = []
     if title:
         lines += [f"### {title}", ""]
@@ -252,23 +234,39 @@ def render_file_contents_section(
         lines.append("_対象ファイルが見つかりませんでした。_")
         return "\n".join(lines)
 
+    # rel_paths には pathspec（:(glob)xxx）が混ざる可能性があるため、実ファイルのみ読む
+    materialized: List[str] = []
     for rel in rel_paths:
+        if rel.startswith(":(glob)"):
+            # glob 再展開（repo_root 基準）
+            pat = rel[len(":(glob)"):]
+            materialized += [os.path.relpath(p, start=repo_root) for p in glob.glob(str(repo_root / pat), recursive=True)]
+        else:
+            materialized.append(rel)
+
+    # 重複排除
+    mat_seen = set()
+    files = [p for p in materialized if not (p in mat_seen or mat_seen.add(p))]
+
+    if not files:
+        lines.append("_対象ファイルが見つかりませんでした。_")
+        return "\n".join(lines)
+
+    for rel in files:
         abs_path = (repo_root / rel).resolve()
         if not abs_path.exists() or not abs_path.is_file():
             lines.append(f"<!-- Missing: {rel} -->")
             continue
 
         content = read_text_safely(abs_path)
-        if len(rel_paths) > 1:
+        if len(files) > 1:
             lines += [f"#### `{rel}`", ""]
 
         if fence:
             lines += [f"```{fence}", content.rstrip("\n"), "```", ""]
         else:
-            # コードフェンスなしでそのまま挿入（Markdown衝突回避のため末尾に空行）
             lines += [content.rstrip("\n"), ""]
 
-    # 末尾の空行調整
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
@@ -277,7 +275,8 @@ def render_file_contents_section(
 # Front-matter 更新
 # =============================
 
-FRONT_MATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+# BOM と CRLF を許容
+FRONT_MATTER_RE = re.compile(r"^\ufeff?---\s*\r?\n(.*?)\r?\n---\s*\r?\n", re.DOTALL)
 
 def update_front_matter_last_updated(md_text: str, iso_now: str) -> str:
     m = FRONT_MATTER_RE.match(md_text)
@@ -305,22 +304,21 @@ def update_markdown_file(
     repo_root: Path,
     dry_run: bool,
     create_backup: bool,
+    touch_front_matter: bool,
 ) -> UpdateResult:
-    text = md_path.read_text(encoding="utf-8")
-    blocks = find_autodoc_blocks(text)
-    if not blocks:
-        return UpdateResult(md_path, False, "No AUTODOC blocks.")
+    original = md_path.read_text(encoding="utf-8")
+    blocks = find_autodoc_blocks(original)
 
-    new_text = text
+    new_text = original
     offset = 0
     total_changes = 0
 
+    # AUTODOC ブロック置換
     for blk in blocks:
         attrs = blk.attrs
         mode = (attrs.get("mode") or "git_log").strip().lower()
         glob_text = attrs.get("path_globs")
         if not glob_text:
-            # 指定なしはスキップ（本文はそのまま）
             continue
 
         title = attrs.get("title")
@@ -330,7 +328,6 @@ def update_markdown_file(
             fence = attrs.get("fence")  # e.g. mermaid, python, json, md
             section_md = render_file_contents_section(repo_root, title=title, rel_paths=paths, fence=fence)
         else:
-            # git_log (default)
             limit = int(attrs.get("limit", "50"))
             since = attrs.get("since")
             author = attrs.get("author")
@@ -338,7 +335,6 @@ def update_markdown_file(
             entries = git_log_for_paths(repo_root, paths, limit=limit, since=since, author=author)
             section_md = render_git_section(title=title, entries=entries, include_files=include_files)
 
-        # 置換反映（BEGIN〜ENDの本文のみ）
         body_start = blk.body_span[0] + offset
         body_end   = blk.body_span[1] + offset
         replacement = "\n" + section_md + "\n"
@@ -346,17 +342,19 @@ def update_markdown_file(
         offset += len(replacement) - (body_end - body_start)
         total_changes += 1
 
-    # front-matter の最終更新時刻
-    updated_text = update_front_matter_last_updated(new_text, now_iso_jst())
+    # front-matter 更新（オプション：ブロックが無くても実施）
+    fm_before = new_text
+    if touch_front_matter or total_changes > 0:
+        new_text = update_front_matter_last_updated(new_text, now_iso_jst())
 
-    if updated_text != text and total_changes > 0:
+    if new_text != original:
         if dry_run:
-            return UpdateResult(md_path, False, f"Would update ({total_changes} block(s)).")
+            return UpdateResult(md_path, False, f"Would write ({total_changes} block(s) replaced; front-matter {'touched' if fm_before != new_text else 'kept'}).")
         else:
             if create_backup:
-                md_path.with_suffix(md_path.suffix + ".bak").write_text(text, encoding="utf-8")
-            md_path.write_text(updated_text, encoding="utf-8")
-            return UpdateResult(md_path, True, f"Updated ({total_changes} block(s)).")
+                md_path.with_suffix(md_path.suffix + ".bak").write_text(original, encoding="utf-8")
+            md_path.write_text(new_text, encoding="utf-8")
+            return UpdateResult(md_path, True, f"Updated ({total_changes} block(s)); front-matter {'updated' if fm_before != new_text else 'unchanged'}.")
     else:
         return UpdateResult(md_path, False, "No changes applied.")
 
@@ -373,6 +371,8 @@ def main():
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--dry-run", type=lambda x: str(x).lower() in ("1","true","yes","y"), default=False)
     parser.add_argument("--backup",  type=lambda x: str(x).lower() in ("1","true","yes","y"), default=True)
+    parser.add_argument("--touch-front-matter", type=lambda x: str(x).lower() in ("1","true","yes","y"), default=True,
+                        help="AUTODOC ブロックが無くても front-matter の last_updated を更新します（既定: True）")
     args = parser.parse_args()
 
     docs_root = args.docs_root.resolve()
@@ -391,7 +391,7 @@ def main():
     changed = 0
     for md in sorted(md_files):
         try:
-            res = update_markdown_file(md, repo_root, dry_run=args.dry_run, create_backup=args.backup)
+            res = update_markdown_file(md, repo_root, dry_run=args.dry_run, create_backup=args.backup, touch_front_matter=args.touch_front_matter)
             icon = "✅" if res.changed else "—"
             print(f"## {md.relative_to(docs_root)}\n- {icon} {res.message}\n")
             if res.changed:
