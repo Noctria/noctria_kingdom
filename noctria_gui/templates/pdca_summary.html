@@ -24,22 +24,14 @@
   .grid-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1.2rem; }
   .empty-note { color:#9fbad6; text-align:center; padding:.75rem 0; }
   .btn-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
-  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
   .widget-frame { width:100%; border:none; min-height:480px; overflow:hidden; border-radius:8px; }
   .grid-quicklinks { display:grid; gap:1rem; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1rem; }
   .link-card { text-decoration:none; color:inherit; }
 
-  /* Toast */
-  .toast {
-    position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
-    background: rgba(0,0,0,.7); border:1px solid rgba(255,255,255,.15);
-    padding:.6rem .9rem; border-radius:.5rem; display:none;
-  }
-  .toast.show { display:block; }
-  .toast.ok { border-color:#22c55e; }
-  .toast.err { border-color:#ef4444; }
-  .spinner { display:none; margin-left:.5rem }
-  .spinner.show { display:inline-block; }
+  /* Toast / spinner */
+  .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999; background: rgba(0,0,0,.7); border:1px solid rgba(255,255,255,.15); padding:.6rem .9rem; border-radius:.5rem; display:none; }
+  .toast.show { display:block; } .toast.ok { border-color:#22c55e; } .toast.err { border-color:#ef4444; }
+  .spinner { display:none; margin-left:.5rem } .spinner.show { display:inline-block; }
 
   /* Table */
   .table-wrap { overflow:auto; }
@@ -59,39 +51,35 @@
 {% block content %}
 <section class="hud-panel filter-panel" aria-labelledby="filter-title">
   <h2 id="filter-title" class="panel-title"><i class="fas fa-filter" aria-hidden="true"></i> FILTER & SEARCH</h2>
-  <form class="filter-form" onsubmit="return false;" aria-describedby="filter-help">
-    <p id="filter-help" class="sr-only">期間・タグ・しきい値でフィルターし、適用で更新します。</p>
+  <form class="filter-form" onsubmit="return false;">
     <div>
-      <label for="from-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 開始日</label>
+      <label for="from-date"><i class="fas fa-calendar-alt"></i> 開始日</label>
       <input id="from-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD">
     </div>
     <div>
-      <label for="to-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 終了日</label>
+      <label for="to-date"><i class="fas fa-calendar-alt"></i> 終了日</label>
       <input id="to-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD">
     </div>
     <div>
-      <label for="tag-input"><i class="fas fa-tags" aria-hidden="true"></i> タグ/戦略</label>
+      <label for="tag-input"><i class="fas fa-tags"></i> タグ/戦略</label>
       <input id="tag-input" type="text" class="hud-input" placeholder="e.g. veritas / levia">
     </div>
     <div>
-      <label for="win-diff-input"><i class="fas fa-arrow-trend-up" aria-hidden="true"></i> 勝率差分 ≥ %</label>
-      <input id="win-diff-input" type="number" step="0.1" class="hud-input" placeholder="例: 3">
+      <label for="win-diff-input"><i class="fas fa-arrow-trend-up"></i> 勝率差分 ≥ %</label>
+      <input id="win-diff-input" type="number" step="0.1" class="hud-input" placeholder="例: 0.7">
     </div>
     <div>
-      <label for="dd-diff-input"><i class="fas fa-arrow-trend-down" aria-hidden="true"></i> 最大DD差分 ≤ %</label>
-      <input id="dd-diff-input" type="number" step="0.1" class="hud-input" placeholder="例: -2">
+      <label for="dd-diff-input"><i class="fas fa-arrow-trend-down"></i> 最大DD差分 ≤ %</label>
+      <input id="dd-diff-input" type="number" step="0.1" class="hud-input" placeholder="例: -0.6">
     </div>
     <div>
-      <label for="min-trades-input"><i class="fas fa-list-ol" aria-hidden="true"></i> 最小取引数</label>
+      <label for="min-trades-input"><i class="fas fa-list-ol"></i> 最小取引数</label>
       <input id="min-trades-input" type="number" step="1" min="0" class="hud-input" placeholder="例: 30">
     </div>
-
     <div class="btn-row">
-      <button id="applyBtn" class="hud-link" type="button" aria-label="フィルターを適用">
-        🔎 適用 <span id="applySpin" class="spinner">⏳</span>
-      </button>
-      <a id="csvBtn" class="hud-link" href="#" download aria-label="CSVをダウンロード">⬇️ CSV</a>
-      <button id="recheckAllBtn" class="hud-link" type="button" aria-label="一括再評価を実行">🔁 一括再評価</button>
+      <button id="applyBtn" class="hud-link" type="button">🔎 適用 <span id="applySpin" class="spinner">⏳</span></button>
+      <a id="csvBtn" class="hud-link" href="#" download>⬇️ CSV</a>
+      <button id="recheckAllBtn" class="hud-link" type="button">🔁 一括再評価</button>
     </div>
   </form>
 </section>
@@ -99,54 +87,33 @@
 <!-- 直近採用タグウィジェット -->
 {% set w = recent_adoptions_params or {'pattern':'veritas-','limit':9,'cols':3,'title':'🧩 直近採用タグ'} %}
 <section class="hud-panel" aria-labelledby="adopt-widget-title">
-  <h2 id="adopt-widget-title" class="panel-title"><i class="fas fa-tags" aria-hidden="true"></i> 直近の採用タグ</h2>
-  <iframe
-    class="widget-frame"
+  <h2 id="adopt-widget-title" class="panel-title"><i class="fas fa-tags"></i> 直近の採用タグ</h2>
+  <iframe class="widget-frame"
     src="/pdca/widgets/recent-adoptions?pattern={{ w.pattern | urlencode }}&limit={{ w.limit }}&cols={{ w.cols }}&title={{ w.title | urlencode }}"
-    loading="lazy"
-  ></iframe>
+    loading="lazy"></iframe>
 </section>
 
 <section class="hud-panel" aria-labelledby="kpi-title">
-  <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator" aria-hidden="true"></i> OVERALL KPI（フィルター適用後）</h2>
+  <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator"></i> OVERALL KPI（フィルター適用後）</h2>
   <div class="metrics" role="list">
-    <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-hashtag" aria-hidden="true"></i> 対象件数</h3>
-      <p id="kpi-count" class="metric-value" aria-live="polite">-</p>
-    </div>
-    <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-check-circle" aria-hidden="true"></i> 採用件数</h3>
-      <p id="kpi-adopted" class="metric-value" aria-live="polite">-</p>
-    </div>
-    <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-redo-alt" aria-hidden="true"></i> 再評価件数</h3>
-      <p id="kpi-rechecks" class="metric-value" aria-live="polite">-</p>
-    </div>
-    <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-percentage" aria-hidden="true"></i> 勝率（平均）</h3>
-      <p id="kpi-winrate" class="metric-value" aria-live="polite">-</p>
-    </div>
-    <div class="metric-item" role="listitem">
-      <h3><i class="fas fa-chart-area" aria-hidden="true"></i> 最大DD（最悪）</h3>
-      <p id="kpi-maxdd" class="metric-value" aria-live="polite">-</p>
-    </div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-hashtag"></i> 対象件数</h3><p id="kpi-count" class="metric-value">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-check-circle"></i> 採用件数</h3><p id="kpi-adopted" class="metric-value">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-redo-alt"></i> 再評価件数</h3><p id="kpi-rechecks" class="metric-value">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-percentage"></i> 勝率（平均）</h3><p id="kpi-winrate" class="metric-value">-</p></div>
+    <div class="metric-item" role="listitem"><h3><i class="fas fa-chart-area"></i> 最大DD（最悪）</h3><p id="kpi-maxdd" class="metric-value">-</p></div>
   </div>
 </section>
 
 <div class="grid-charts">
   <section class="hud-panel" aria-labelledby="chart-counts-title">
-    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> 日次 件数（評価 / 採用）</h2>
-    <div class="btn-row" style="margin:.25rem 0 .5rem">
-      <button type="button" class="hud-link" onclick="downloadChartPNG('chartCounts','counts')">📸 画像保存</button>
-    </div>
+    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar"></i> 日次 件数（評価 / 採用）</h2>
+    <div class="btn-row" style="margin:.25rem 0 .5rem"><button type="button" class="hud-link" onclick="downloadChartPNG('chartCounts','counts')">📸 画像保存</button></div>
     <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の評価件数と採用件数のグラフ"></canvas></div>
     <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
   </section>
   <section class="hud-panel" aria-labelledby="chart-windiff-title">
-    <h2 id="chart-windiff-title" class="panel-title"><i class="fas a fa-chart-line" aria-hidden="true"></i> 日次 勝率（平均 %）</h2>
-    <div class="btn-row" style="margin:.25rem 0 .5rem">
-      <button type="button" class="hud-link" onclick="downloadChartPNG('chartWinDiff','winrate')">📸 画像保存</button>
-    </div>
+    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line"></i> 日次 勝率（平均 %）</h2>
+    <div class="btn-row" style="margin:.25rem 0 .5rem"><button type="button" class="hud-link" onclick="downloadChartPNG('chartWinDiff','winrate')">📸 画像保存</button></div>
     <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率の折れ線グラフ"></canvas></div>
     <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
   </section>
@@ -154,21 +121,19 @@
 
 <!-- 詳細テーブル -->
 <section id="details-panel" class="hud-panel" aria-labelledby="details-title" style="display:none">
-  <h2 id="details-title" class="panel-title"><i class="fas fa-table" aria-hidden="true"></i> DETAILS</h2>
+  <h2 id="details-title" class="panel-title"><i class="fas fa-table"></i> DETAILS</h2>
   <div class="btn-row" style="margin:.25rem 0 .5rem">
     <label for="page-size">表示件数</label>
     <select id="page-size" class="hud-select" style="width:auto">
-      <option value="20" selected>20</option>
-      <option value="50">50</option>
-      <option value="100">100</option>
+      <option value="20" selected>20</option><option value="50">50</option><option value="100">100</option>
     </select>
     <span class="muted" id="details-info" style="margin-left:auto"></span>
   </div>
   <div class="table-wrap">
-    <table class="hud-table" id="details-table" aria-describedby="details-title">
+    <table class="hud-table" id="details-table">
       <thead>
         <tr>
-          <th data-key="date">日付 <span class="sort" aria-hidden="true">↕</span></th>
+          <th data-key="date">日付 <span class="sort">↕</span></th>
           <th data-key="tag">タグ <span class="sort">↕</span></th>
           <th data-key="evals">評価 <span class="sort">↕</span></th>
           <th data-key="adopted">採用 <span class="sort">↕</span></th>
@@ -188,28 +153,12 @@
   </div>
 </section>
 
-<!-- クイックリンク -->
-<div class="grid-quicklinks">
-  <a class="card link-card" href="/adoptions">
-    <div class="card-header">🗂 採用タグ × Decision 一覧</div>
-    <div class="card-body muted">GitタグとDecision台帳を突き合わせた総覧。CSV/JSONエクスポート対応。</div>
-  </a>
-  <a class="card link-card" href="/decisions">
-    <div class="card-header">🗄 Decision Registry</div>
-    <div class="card-body muted">決裁イベントの台帳。Airflow Run への相互リンクあり。</div>
-  </a>
-  <a class="card link-card" href="/airflow/runs">
-    <div class="card-header">🌀 Airflow Runs</div>
-    <div class="card-body muted">採用パイプラインの実行履歴。conf/タスク一覧/関連Decisionを確認。</div>
-  </a>
-</div>
-
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-/* ---------- ライブラリのフォールバック読込 ---------- */
+/* ---------- フォールバック読込 ---------- */
 (function ensureLibs() {
   function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.defer=true; s.onload=onload||function(){}; document.head.appendChild(s); }
   function need(name){ return (typeof window[name] === 'undefined'); }
@@ -226,84 +175,82 @@
 </script>
 
 <script>
-/* =========================
-   メインスクリプト（URL同期 & 追加フィルター & PNG保存 & テーブル）
-   - /pdca/api/summary?date_from&date_to[&tag&win_diff&dd_diff&min_trades]
-   - /pdca/api/details? ... （あれば使用）/ なければ s.details を使う
-   - /pdca/summary.csv は from_date/to_date も付与（互換）
-   ========================= */
-window.NoctriaPDCA = { charts: { counts:null, winDiff:null } };
-window.GLOBAL_DEFAULT_FROM = null;
-window.GLOBAL_DEFAULT_TO   = null;
-
+/* ====== ユーティリティ ====== */
 function $(id){ return document.getElementById(id); }
 function setText(id, t){ const el=$(id); if(el) el.textContent = (t ?? '—'); }
 function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
 function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
 function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
-function toast(msg, ok=true){
-  const t = $('toast'); if(!t) return;
-  t.className = 'toast ' + (ok?'ok':'err') + ' show';
-  t.textContent = msg;
-  setTimeout(()=>{ t.className='toast'; }, 1800);
+function toast(msg, ok=true){ const t=$('toast'); if(!t) return; t.className='toast '+(ok?'ok':'err')+' show'; t.textContent=msg; setTimeout(()=>{t.className='toast';},1800); }
+
+function isoDateDaysAgo(days){
+  const now = new Date(); const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+  const yyyy = d.getFullYear(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-/* ===== PNG ダウンロード ===== */
+/* 8桁(YYYYMMDD) → YYYY-MM-DD へ正規化。既にハイフンありはそのまま。*/
+function normalizeDate(s){
+  if(!s) return s;
+  const t = String(s).trim();
+  if(/^\d{8}$/.test(t)) return `${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}`;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  // flatpickr が解釈できるなら Date に通してみる
+  const d = new Date(t); if(!isNaN(d)) { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
+  return t;
+}
+
+/* ====== PNG ダウンロード ====== */
 function downloadChartPNG(canvasId, baseName){
-  const el = $(canvasId);
-  if(!el) return;
+  const el = $(canvasId); if(!el) return;
   try{
     const url = el.toDataURL('image/png', 1.0);
     const a = document.createElement('a');
     const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-    a.href = url;
-    a.download = `pdca-${baseName}-${stamp}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.href = url; a.download = `pdca-${baseName}-${stamp}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
     toast('画像を書き出しました');
-  }catch(e){
-    console.error('png export failed', e);
-    toast('画像の書き出しに失敗', false);
-  }
+  }catch(e){ console.error('png export failed', e); toast('画像の書き出しに失敗', false); }
 }
 
-function isoDateDaysAgo(days){
-  const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+/* ====== URL ⇄ 入力 ====== */
+window.GLOBAL_DEFAULT_FROM = null;
+window.GLOBAL_DEFAULT_TO   = null;
 
 function readUrlIntoInputs(){
   const usp = new URLSearchParams(location.search);
-  const from = usp.get('date_from') || usp.get('from_date') || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
-  const to   = usp.get('date_to')   || usp.get('to_date')   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  // すべてのキーを受け付ける
+  const rawFrom = usp.get('date_from') || usp.get('from_date') || usp.get('from');
+  const rawTo   = usp.get('date_to')   || usp.get('to_date')   || usp.get('to');
+  const from = normalizeDate(rawFrom || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14));
+  const to   = normalizeDate(rawTo   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0));
   const tag  = usp.get('tag') || '';
   const win  = usp.get('win_diff') || '';
-  const dd   = usp.get('dd_diff') || '';
+  const dd   = usp.get('dd_diff')  || '';
   const mt   = usp.get('min_trades') || '';
-  if ($('from-date')) $('from-date').value = from;
-  if ($('to-date'))   $('to-date').value   = to;
+
+  $('from-date').value = from;
+  $('to-date').value   = to;
   if ($('tag-input')) $('tag-input').value = tag;
   if ($('win-diff-input')) $('win-diff-input').value = win;
   if ($('dd-diff-input'))  $('dd-diff-input').value  = dd;
   if ($('min-trades-input')) $('min-trades-input').value = mt;
 }
 
-function inputsToParams(){
-  const from = $('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
-  const to   = $('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+function inputsToParamsAllKeys(){
+  // API互換のため、同じ値を全てのキーで付与
+  const from = normalizeDate($('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14));
+  const to   = normalizeDate($('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0));
   const tag  = $('tag-input')?.value?.trim();
   const win  = $('win-diff-input')?.value?.trim();
   const dd   = $('dd-diff-input')?.value?.trim();
   const mt   = $('min-trades-input')?.value?.trim();
 
   const p = new URLSearchParams();
-  p.set('date_from', from);
-  p.set('date_to', to);
+  // 新旧すべて入れる（バックエンドどちらでも拾える）
+  p.set('date_from', from); p.set('date_to', to);
+  p.set('from_date', from); p.set('to_date', to);
+  p.set('from', from);      p.set('to', to);
   if (tag) p.set('tag', tag);
   if (win) p.set('win_diff', win);
   if (dd)  p.set('dd_diff', dd);
@@ -311,105 +258,50 @@ function inputsToParams(){
   return p;
 }
 
-function buildCsvParams(){
-  // 互換のため new/legacy 両方のキーを付ける
-  const p = inputsToParams();
-  const from = p.get('date_from'); const to = p.get('date_to');
-  p.set('from_date', from); p.set('to_date', to);
-  return p;
-}
+function buildCsvParams(){ return inputsToParamsAllKeys(); }
+function wireCsvButton(){ const a=$('csvBtn'); if(a) a.href = '/pdca/summary.csv?' + buildCsvParams().toString(); }
 
-function wireCsvButton(){
-  const a = $('csvBtn'); if(!a) return;
-  a.href = '/pdca/summary.csv?' + buildCsvParams().toString();
-}
-
-/* ====== localStorage （自動保存/復元） ====== */
+/* ====== フィルター保存/復元 ====== */
 const LS_KEY = 'pdca_filters_v1';
-function saveFilters(){
-  try{
-    const obj = {
-      from: $('from-date')?.value || '',
-      to  : $('to-date')?.value || '',
-      tag : $('tag-input')?.value || '',
-      win : $('win-diff-input')?.value || '',
-      dd  : $('dd-diff-input')?.value || '',
-      mt  : $('min-trades-input')?.value || ''
-    };
-    localStorage.setItem(LS_KEY, JSON.stringify(obj));
-  }catch{}
-}
-function restoreFilters(){
-  try{
-    const v = localStorage.getItem(LS_KEY); if(!v) return;
-    const obj = JSON.parse(v);
-    if(obj.from && $('from-date')) $('from-date').value = obj.from;
-    if(obj.to   && $('to-date'))   $('to-date').value   = obj.to;
-    if($('tag-input')) $('tag-input').value = obj.tag ?? '';
-    if($('win-diff-input')) $('win-diff-input').value = obj.win ?? '';
-    if($('dd-diff-input'))  $('dd-diff-input').value  = obj.dd ?? '';
-    if($('min-trades-input')) $('min-trades-input').value = obj.mt ?? '';
-  }catch{}
-}
+function saveFilters(){ try{
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    from:$('from-date').value, to:$('to-date').value,
+    tag:$('tag-input')?.value||'', win:$('win-diff-input')?.value||'',
+    dd:$('dd-diff-input')?.value||'', mt:$('min-trades-input')?.value||''
+  }));
+}catch{}}
+function restoreFilters(){ try{
+  const v=localStorage.getItem(LS_KEY); if(!v) return;
+  const o=JSON.parse(v);
+  if(o.from) $('from-date').value = normalizeDate(o.from);
+  if(o.to)   $('to-date').value   = normalizeDate(o.to);
+  if($('tag-input')) $('tag-input').value = o.tag ?? '';
+  if($('win-diff-input')) $('win-diff-input').value = o.win ?? '';
+  if($('dd-diff-input'))  $('dd-diff-input').value  = o.dd ?? '';
+  if($('min-trades-input')) $('min-trades-input').value = o.mt ?? '';
+}catch{}}
 
 /* ====== Chart helpers ====== */
 function createLine(ctx, labels, label, data, ySuffix){
   const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
-  return new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets:[{ label, data, tension:0.25 }] },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:true } },
-      scales:{
-        y:{ beginAtZero:true, grid:{ color:gridC }, ticks:{ color:axisC, callback:v => ySuffix ? `${v}${ySuffix}` : v } },
-        x:{ grid:{ color:gridC }, ticks:{ color:axisC, maxRotation:0 } }
-      }
-    }
-  });
+  return new Chart(ctx, { type:'line',
+    data:{ labels, datasets:[{ label, data, tension:0.25 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:true} },
+      scales:{ y:{ beginAtZero:true, grid:{color:gridC}, ticks:{color:axisC, callback:v=>ySuffix?`${v}${ySuffix}`:v}},
+               x:{ grid:{color:gridC}, ticks:{color:axisC, maxRotation:0}}}}});
 }
-
 function createBar2Axis(ctx, labels, ds1, ds2){
   const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
-  return new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: ds1.label, data: ds1.data, yAxisID:'y1' },
-      { label: ds2.label, data: ds2.data, yAxisID:'y1' },
-    ]},
-    options: {
-      responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
-      scales:{
-        y1:{ type:'linear', position:'left', beginAtZero:true, grid:{ color:gridC }, ticks:{ color:axisC } },
-        x :{ grid:{ color:gridC }, ticks:{ color:axisC, maxRotation:0 } }
-      },
-      plugins:{ legend:{ display:true } }
-    }
-  });
+  return new Chart(ctx, { type:'bar',
+    data:{ labels, datasets:[ {label:ds1.label,data:ds1.data,yAxisID:'y1'}, {label:ds2.label,data:ds2.data,yAxisID:'y1'} ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      scales:{ y1:{ type:'linear', position:'left', beginAtZero:true, grid:{color:gridC}, ticks:{color:axisC}},
+               x:{ grid:{color:gridC}, ticks:{color:axisC, maxRotation:0}}}, plugins:{legend:{display:true}} }});
 }
 
-/* ======== フェッチ連打防止 ======== */
-let fetching = false;
-function setApplying(b){
-  const btn = $('applyBtn');
-  const spin = $('applySpin');
-  fetching = b;
-  if(btn){ btn.disabled = b; btn.style.opacity = b ? .6 : 1; }
-  if(spin){ b ? spin.classList.add('show') : spin.classList.remove('show'); }
-}
-
-/* ======== テーブル（ページング＆ソート） ======== */
-const tableState = {
-  raw: [],          // サーバからの生配列
-  view: [],         // ソート後の配列
-  page: 1,
-  pageSize: 20,
-  sortKey: 'date',
-  sortDir: 'desc'   // 'asc' | 'desc'
-};
-
+/* ====== テーブル ====== */
+const tableState = { raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc' };
 function coerceRow(r){
-  // 可能なキーに合わせてガード
   return {
     date: r.date ?? r.day ?? '',
     tag: r.tag ?? r.strategy ?? r.name ?? '',
@@ -421,210 +313,113 @@ function coerceRow(r){
     trades: Number.isFinite(+r.trades) ? +r.trades : (Number.isFinite(+r.num_trades)? +r.num_trades : 0),
   };
 }
-
 function sortView(){
-  const key = tableState.sortKey, dir = tableState.sortDir;
+  const k=tableState.sortKey, d=tableState.sortDir;
   tableState.view = [...tableState.raw].sort((a,b)=>{
-    const va = a[key]; const vb = b[key];
-    if(va==null && vb==null) return 0;
-    if(va==null) return 1;
-    if(vb==null) return -1;
-    if(typeof va === 'number' && typeof vb === 'number'){
-      return dir==='asc' ? (va - vb) : (vb - va);
-    }
-    // 文字列はロケール比較
-    return dir==='asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    const va=a[k], vb=b[k];
+    if(va==null && vb==null) return 0; if(va==null) return 1; if(vb==null) return -1;
+    if(typeof va==='number' && typeof vb==='number') return d==='asc' ? va-vb : vb-va;
+    return d==='asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
   });
 }
-
 function renderTablePage(){
-  const panel = $('details-panel');
-  if(!panel) return;
-  if(!tableState.view.length){
-    panel.style.display = 'none';
-    return;
-  }
-  panel.style.display = '';
-
-  const body = $('details-body');
-  const info = $('details-info');
-  const pageSize = tableState.pageSize;
-  const total = tableState.view.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  if(tableState.page > totalPages) tableState.page = totalPages;
-  const start = (tableState.page - 1) * pageSize;
-  const slice = tableState.view.slice(start, start + pageSize);
-
-  body.innerHTML = slice.map(r => `
-    <tr>
-      <td>${r.date || ''}</td>
-      <td>${r.tag || ''}</td>
-      <td>${r.evals}</td>
-      <td>${r.adopted}</td>
-      <td>${r.win_rate==null?'—':r.win_rate.toFixed(2)}</td>
-      <td>${r.max_drawdown==null?'—':r.max_drawdown.toFixed(2)}</td>
-      <td>${r.rechecks}</td>
-      <td>${r.trades}</td>
-    </tr>
-  `).join('');
-
-  setText('pageStatus', `${tableState.page} / ${totalPages}`);
-  setText('details-info', `全 ${total} 件`);
-  $('prevPage').toggleAttribute?.('disabled', tableState.page<=1);
-  $('nextPage').toggleAttribute?.('disabled', tableState.page>=totalPages);
+  const panel=$('details-panel'); if(!panel) return;
+  if(!tableState.view.length){ panel.style.display='none'; return; } panel.style.display='';
+  const body=$('details-body'), info=$('details-info'); const ps=tableState.pageSize; const total=tableState.view.length;
+  const totalPages=Math.max(1, Math.ceil(total/ps)); if(tableState.page>totalPages) tableState.page=totalPages;
+  const start=(tableState.page-1)*ps; const slice=tableState.view.slice(start, start+ps);
+  body.innerHTML = slice.map(r=>`
+    <tr><td>${r.date||''}</td><td>${r.tag||''}</td><td>${r.evals}</td><td>${r.adopted}</td>
+    <td>${r.win_rate==null?'—':r.win_rate.toFixed(2)}</td><td>${r.max_drawdown==null?'—':r.max_drawdown.toFixed(2)}</td>
+    <td>${r.rechecks}</td><td>${r.trades}</td></tr>`).join('');
+  setText('pageStatus', `${tableState.page} / ${totalPages}`); setText('details-info', `全 ${total} 件`);
+  $('prevPage').toggleAttribute?.('disabled', tableState.page<=1); $('nextPage').toggleAttribute?.('disabled', tableState.page>=totalPages);
 }
-
 function attachTableEvents(){
-  // ソート
-  const thead = $('details-table')?.querySelector('thead');
-  if(thead){
-    thead.addEventListener('click', (ev)=>{
-      const th = ev.target.closest('th');
-      if(!th || !th.dataset.key) return;
-      const key = th.dataset.key;
-      if(tableState.sortKey === key){
-        tableState.sortDir = (tableState.sortDir === 'asc' ? 'desc' : 'asc');
-      }else{
-        tableState.sortKey = key;
-        tableState.sortDir = (key==='date' || key==='tag') ? 'asc' : 'desc';
-      }
-      sortView(); tableState.page = 1; renderTablePage();
-    });
-  }
-  // ページング
+  $('details-table')?.querySelector('thead')?.addEventListener('click',(ev)=>{
+    const th=ev.target.closest('th'); if(!th?.dataset.key) return; const key=th.dataset.key;
+    if(tableState.sortKey===key){ tableState.sortDir = (tableState.sortDir==='asc'?'desc':'asc'); }
+    else { tableState.sortKey=key; tableState.sortDir=(key==='date'||key==='tag')?'asc':'desc'; }
+    sortView(); tableState.page=1; renderTablePage();
+  });
   $('prevPage')?.addEventListener('click', ()=>{ if(tableState.page>1){ tableState.page--; renderTablePage(); }});
   $('nextPage')?.addEventListener('click', ()=>{ tableState.page++; renderTablePage(); });
-  $('page-size')?.addEventListener('change', (e)=>{ tableState.pageSize = +e.target.value || 20; tableState.page = 1; renderTablePage(); });
+  $('page-size')?.addEventListener('change', (e)=>{ tableState.pageSize=+e.target.value||20; tableState.page=1; renderTablePage(); });
 }
 
-/* ======== メイン更新処理 ======== */
-async function fetchDetailsFallback(paramsQS){
-  // /pdca/api/details が存在すれば使う。404/エラーなら空配列に。
-  try{
-    const res = await fetch('/pdca/api/details?' + paramsQS, { cache:'no-store' });
-    if(!res.ok) return [];
-    const js = await res.json();
-    if(Array.isArray(js)) return js;
-    if(Array.isArray(js?.items)) return js.items;
-    return [];
-  }catch{ return []; }
-}
+/* ====== 連打防止 ====== */
+let fetching=false;
+function setApplying(b){ const btn=$('applyBtn'), spin=$('applySpin'); fetching=b; if(btn){btn.disabled=b; btn.style.opacity=b?.6:1;} if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); } }
 
+/* ====== API ====== */
+async function fetchDetailsFallback(qs){
+  try{ const res=await fetch('/pdca/api/details?'+qs,{cache:'no-store'}); if(!res.ok) return []; const js=await res.json(); return Array.isArray(js)?js:(Array.isArray(js?.items)?js.items:[]);}catch{return[]}
+}
 async function doRefresh(){
-  // URL同期（共有/リロード用）
-  const p = inputsToParams();
-  const qs = p.toString();
-  history.replaceState(null, '', location.pathname + '?' + qs);
+  const p = inputsToParamsAllKeys(); const qs=p.toString();
+  history.replaceState(null,'',location.pathname+'?'+qs);
 
-  const res = await fetch('/pdca/api/summary?' + qs, { cache:'no-store' });
-  if(!res.ok) throw new Error('summary HTTP ' + res.status);
+  const res = await fetch('/pdca/api/summary?'+qs, { cache:'no-store' });
+  if(!res.ok) throw new Error('summary HTTP '+res.status);
   const s = await res.json();
 
-  // --- KPI ---
   const t = s?.totals || {};
-  setText('kpi-count',     intFmt(s?.count_rows));
-  setText('kpi-adopted',   intFmt(t?.adopted));
-  setText('kpi-rechecks',  intFmt(t?.rechecks));
-  setText('kpi-winrate',   percentFmt(t?.win_rate));
-  setText('kpi-maxdd',     percentFmt(t?.max_drawdown));
+  setText('kpi-count', intFmt(s?.count_rows));
+  setText('kpi-adopted', intFmt(t?.adopted));
+  setText('kpi-rechecks', intFmt(t?.rechecks));
+  setText('kpi-winrate', percentFmt(t?.win_rate));
+  setText('kpi-maxdd', percentFmt(t?.max_drawdown));
 
-  // --- 時系列（by_day）
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
-  const labels = by.map(r => r?.date ?? '');
-  const evals  = by.map(r => Number.isFinite(+r?.evals) ? +r.evals : 0);
-  const adopted= by.map(r => Number.isFinite(+r?.adopted) ? +r.adopted : 0);
-  const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
+  const labels = by.map(r=>r?.date??'');
+  const evals  = by.map(r=>Number.isFinite(+r?.evals)?+r.evals:0);
+  const adopted= by.map(r=>Number.isFinite(+r?.adopted)?+r.adopted:0);
+  const wrPct  = by.map(r=>(r?.win_rate==null?null:+(r.win_rate*100).toFixed(2)));
 
-  show($('noteCounts'),  labels.length === 0);
-  show($('noteWinDiff'), labels.length === 0);
+  show($('noteCounts'),  labels.length===0);
+  show($('noteWinDiff'), labels.length===0);
 
-  if (window.NoctriaPDCA.charts.counts)  { try{ window.NoctriaPDCA.charts.counts.destroy(); }catch{} window.NoctriaPDCA.charts.counts = null; }
-  if (window.NoctriaPDCA.charts.winDiff) { try{ window.NoctriaPDCA.charts.winDiff.destroy(); }catch{} window.NoctriaPDCA.charts.winDiff = null; }
+  if (window.NoctriaPDCA?.charts?.counts)  { try{ window.NoctriaPDCA.charts.counts.destroy(); }catch{} window.NoctriaPDCA.charts.counts=null; }
+  if (window.NoctriaPDCA?.charts?.winDiff) { try{ window.NoctriaPDCA.charts.winDiff.destroy(); }catch{} window.NoctriaPDCA.charts.winDiff=null; }
 
-  const ctxCounts  = $('chartCounts');
-  const ctxWinDiff = $('chartWinDiff');
-  if (ctxCounts && ctxCounts.getContext) {
-    window.NoctriaPDCA.charts.counts  = createBar2Axis(
-      ctxCounts.getContext('2d'),
-      labels,
-      { label:'評価件数', data: evals },
-      { label:'採用件数', data: adopted }
-    );
-  }
-  if (ctxWinDiff && ctxWinDiff.getContext) {
-    window.NoctriaPDCA.charts.winDiff = createLine(
-      ctxWinDiff.getContext('2d'),
-      labels,
-      '勝率（平均 %）',
-      wrPct,
-      '%'
-    );
-  }
+  const ctxCounts=$('chartCounts'), ctxWinDiff=$('chartWinDiff');
+  if (ctxCounts?.getContext) window.NoctriaPDCA.charts.counts = createBar2Axis(ctxCounts.getContext('2d'), labels, {label:'評価件数',data:evals}, {label:'採用件数',data:adopted});
+  if (ctxWinDiff?.getContext) window.NoctriaPDCA.charts.winDiff = createLine(ctxWinDiff.getContext('2d'), labels, '勝率（平均 %）', wrPct, '%');
 
-  // --- 詳細テーブル（s.details か /pdca/api/details）
-  let details = Array.isArray(s?.details) ? s.details : null;
-  if(!details) {
-    details = await fetchDetailsFallback(qs);
-  }
-  if(Array.isArray(details) && details.length){
-    tableState.raw = details.map(coerceRow);
-    sortView(); tableState.page = 1; renderTablePage();
-  }else{
-    tableState.raw = []; tableState.view = []; renderTablePage();
-  }
+  let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
+  if(Array.isArray(details) && details.length){ tableState.raw = details.map(coerceRow); sortView(); tableState.page=1; renderTablePage(); }
+  else { tableState.raw=[]; tableState.view=[]; renderTablePage(); }
 
   wireCsvButton();
 }
-
-let fetching = false;
-function setApplying(b){
-  const btn = $('applyBtn');
-  const spin = $('applySpin');
-  fetching = b;
-  if(btn){ btn.disabled = b; btn.style.opacity = b ? .6 : 1; }
-  if(spin){ b ? spin.classList.add('show') : spin.classList.remove('show'); }
-}
-
-window.pdcaRefresh = async function pdcaRefresh(){
+window.pdcaRefresh = async function(){
   if(fetching) return;
   setApplying(true);
-  try{
-    saveFilters();
-    await doRefresh();
-    toast('更新しました');
-  }catch(e){
-    console.error('[summary] fetch error:', e);
-    toast('取得に失敗: ' + (e?.message || e), false);
-  }finally{
-    setApplying(false);
-  }
+  try{ saveFilters(); await doRefresh(); toast('更新しました'); }
+  catch(e){ console.error('[summary] error:',e); toast('取得に失敗: '+(e?.message||e), false); }
+  finally{ setApplying(false); }
 };
 
-/* ========= DOM 準備 ========= */
+/* ====== 起動 ====== */
 document.addEventListener('DOMContentLoaded', function(){
   window.GLOBAL_DEFAULT_FROM = "{{ default_from or '' }}".trim() || isoDateDaysAgo(14);
   window.GLOBAL_DEFAULT_TO   = "{{ default_to or '' }}".trim()   || isoDateDaysAgo(0);
 
-  // URL→入力欄へ（初回）
-  readUrlIntoInputs();
-  // 保存済みフィルターで上書き（前回操作の復元）
-  restoreFilters();
+  readUrlIntoInputs();   // URL → 入力
+  restoreFilters();      // 保存済みで上書き
 
   (function initPickers(){
     if (typeof flatpickr === 'undefined') return void setTimeout(initPickers, 120);
-    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: $('from-date')?.value || window.GLOBAL_DEFAULT_FROM });
-    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: $('to-date')?.value   || window.GLOBAL_DEFAULT_TO   });
+    // 値を正規化してから初期化（8桁でもOK）
+    $('from-date').value = normalizeDate($('from-date').value || window.GLOBAL_DEFAULT_FROM);
+    $('to-date').value   = normalizeDate($('to-date').value   || window.GLOBAL_DEFAULT_TO);
+    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate:$('from-date').value });
+    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate:$('to-date').value   });
   })();
 
-  const btn  = $('applyBtn');
-  const rbtn = $('recheckAllBtn');
-  if (btn)  btn.addEventListener('click', window.pdcaRefresh);
-  if (rbtn) rbtn.addEventListener('click', triggerRecheckAll);
-
-  // テーブルのイベント紐付け
+  $('applyBtn')?.addEventListener('click', window.pdcaRefresh);
+  $('recheckAllBtn')?.addEventListener('click', triggerRecheckAll);
   attachTableEvents();
-
-  // 初回でも正しいCSVリンクを張る
   wireCsvButton();
 
   (function waitChart(){
