@@ -11,11 +11,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style>
   .filter-form { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:.75rem; align-items:end; }
-  .hud-input, .hud-select {
-    background: rgba(0,0,0,0.3); border:1px solid var(--panel-border);
-    color: var(--text-color-base); font-family: var(--font-family); font-size:1rem;
-    border-radius:4px; padding:.5rem .75rem; transition: box-shadow .25s ease;
-  }
+  .hud-input, .hud-select { background: rgba(0,0,0,0.3); border:1px solid var(--panel-border); color: var(--text-color-base); font-family: var(--font-family); font-size:1rem; border-radius:4px; padding:.5rem .75rem; transition: box-shadow .25s ease; }
   .hud-input:focus, .hud-select:focus { outline:none; box-shadow:0 0 8px var(--glow-primary); border-color: var(--glow-primary); }
   .metrics { display:flex; gap:1rem; flex-wrap:wrap; }
   .metric-item { background: var(--bg-color); border-radius:8px; padding:1rem 1.25rem; box-shadow:0 0 10px var(--glow-primary); flex:1 1 180px; }
@@ -30,7 +26,7 @@
   .link-card { text-decoration:none; color:inherit; }
 
   /* Toast / spinner */
-  .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999; background: rgba(0,0,0,.7); border:1px solid rgba(255,255,255,.15); padding:.6rem .9rem; border-radius:.5rem; display:none; }
+  .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999; background: rgba(0,0,0,.72); border:1px solid rgba(255,255,255,.18); padding:.6rem .9rem; border-radius:.5rem; display:none; }
   .toast.show { display:block; } .toast.ok { border-color:#22c55e; } .toast.err { border-color:#ef4444; }
   .spinner { display:none; margin-left:.5rem } .spinner.show { display:inline-block; }
 
@@ -43,22 +39,27 @@
   .pager { display:flex; gap:.5rem; align-items:center; justify-content:flex-end; margin-top:.5rem; }
   .pager .hud-link[disabled] { opacity:.5; pointer-events:none; }
 
-  /* Auto-complete */
-  .ac-wrap { position:relative; }
-  .ac-list {
-    position:absolute; inset:auto 0 auto 0; top:100%; z-index:2000;
-    background:#0c1220; border:1px solid var(--panel-border); border-radius:6px;
-    margin-top:.25rem; box-shadow:0 8px 16px rgba(0,0,0,.35);
-    max-height:240px; overflow:auto; display:none;
+  /* ===== Skeletons ===== */
+  .skel { position:relative; overflow:hidden; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:8px; }
+  .skel::after {
+    content:""; position:absolute; inset:0; transform: translateX(-100%);
+    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.14), rgba(255,255,255,0));
+    animation: shimmer 1.5s infinite;
   }
-  .ac-list.show { display:block; }
-  .ac-item { padding:.45rem .6rem; cursor:pointer; display:flex; align-items:center; gap:.5rem; }
-  .ac-item:hover, .ac-item.active { background: rgba(0,229,255,.12); }
-  .ac-empty { padding:.5rem .6rem; color:#9fbad6; }
-  .ac-kbd { margin-left:auto; opacity:.6; font-size:.85em; }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+  .skel-chart { height:300px; }
+  .skel-metric { height:36px; border-radius:6px; }
+  .skel-row { height:36px; }
+  .hide-when-loading.loading { display:none !important; }
+  .show-when-loading { display:none; }
+  .show-when-loading.loading { display:block; }
+
+  /* Error panel */
+  .error-panel { display:none; margin-top:.75rem; padding:.6rem .8rem; border-radius:.5rem; border:1px solid #ef4444; background: rgba(239,68,68,.08); }
+  .error-panel.show { display:block; }
+  .error-panel code { white-space:pre-wrap; }
 </style>
 
-<!-- まずローカル、足りなければ後段でCDN -->
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
@@ -120,12 +121,13 @@
 
 <section class="hud-panel" aria-labelledby="kpi-title">
   <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator" aria-hidden="true"></i> OVERALL KPI（フィルター適用後）</h2>
-  <div class="metrics" role="list">
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-hashtag"></i> 対象件数</h3><p id="kpi-count" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-check-circle"></i> 採用件数</h3><p id="kpi-adopted" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-redo-alt"></i> 再評価件数</h3><p id="kpi-rechecks" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-percentage"></i> 勝率（平均）</h3><p id="kpi-winrate" class="metric-value" aria-live="polite">-</p></div>
-    <div class="metric-item" role="listitem"><h3><i class="fas fa-chart-area"></i> 最大DD（最悪）</h3><p id="kpi-maxdd" class="metric-value" aria-live="polite">-</p></div>
+  <div class="metrics" role="list" id="kpiMetrics" aria-busy="false">
+    <!-- Skeletons for metrics -->
+    <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m1"></div><h3><i class="fas fa-hashtag"></i> 対象件数</h3><p id="kpi-count" class="metric-value hide-when-loading">-</p></div>
+    <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m2"></div><h3><i class="fas fa-check-circle"></i> 採用件数</h3><p id="kpi-adopted" class="metric-value hide-when-loading">-</p></div>
+    <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m3"></div><h3><i class="fas fa-redo-alt"></i> 再評価件数</h3><p id="kpi-rechecks" class="metric-value hide-when-loading">-</p></div>
+    <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m4"></div><h3><i class="fas fa-percentage"></i> 勝率（平均）</h3><p id="kpi-winrate" class="metric-value hide-when-loading">-</p></div>
+    <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m5"></div><h3><i class="fas fa-chart-area"></i> 最大DD（最悪）</h3><p id="kpi-maxdd" class="metric-value hide-when-loading">-</p></div>
   </div>
 </section>
 
@@ -133,14 +135,16 @@
   <section class="hud-panel" aria-labelledby="chart-counts-title">
     <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar"></i> 日次 件数（評価 / 採用）</h2>
     <div class="btn-row" style="margin:.25rem 0 .5rem"><button type="button" class="hud-link" onclick="downloadChartPNG('chartCounts','counts')">📸 画像保存</button></div>
-    <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の評価件数と採用件数のグラフ"></canvas></div>
-    <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
+    <div class="skel skel-chart show-when-loading" id="skel-counts"></div>
+    <div style="height:300px" class="hide-when-loading" id="wrapCounts"><canvas id="chartCounts" role="img" aria-label="日次の評価件数と採用件数のグラフ"></canvas></div>
+    <div id="noteCounts" class="empty-note hide-when-loading" style="display:none">データがありません</div>
   </section>
   <section class="hud-panel" aria-labelledby="chart-windiff-title">
     <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line"></i> 日次 勝率（平均 %）</h2>
     <div class="btn-row" style="margin:.25rem 0 .5rem"><button type="button" class="hud-link" onclick="downloadChartPNG('chartWinDiff','winrate')">📸 画像保存</button></div>
-    <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率の折れ線グラフ"></canvas></div>
-    <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
+    <div class="skel skel-chart show-when-loading" id="skel-win"></div>
+    <div style="height:300px" class="hide-when-loading" id="wrapWin"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率の折れ線グラフ"></canvas></div>
+    <div id="noteWinDiff" class="empty-note hide-when-loading" style="display:none">データがありません</div>
   </section>
 </div>
 
@@ -157,7 +161,8 @@
       <span class="muted" id="details-info"></span>
     </div>
   </div>
-  <div class="table-wrap">
+  <div class="skel skel-row show-when-loading" id="skel-table" style="height:180px"></div>
+  <div class="table-wrap hide-when-loading" id="wrapTable">
     <table class="hud-table" id="details-table">
       <thead>
         <tr>
@@ -174,12 +179,21 @@
       <tbody id="details-body"></tbody>
     </table>
   </div>
-  <div class="pager">
+  <div class="pager hide-when-loading" id="wrapPager">
     <button class="hud-link" id="prevPage">◀ 前へ</button>
     <span id="pageStatus">1 / 1</span>
     <button class="hud-link" id="nextPage">次へ ▶</button>
   </div>
 </section>
+
+<!-- エラー詳細（ユーザー向け簡易表示） -->
+<div id="error-panel" class="error-panel" role="alert" aria-live="assertive"></div>
+
+<div class="grid-quicklinks">
+  <a class="card link-card" href="/adoptions"><div class="card-header">🗂 採用タグ × Decision 一覧</div><div class="card-body muted">GitタグとDecision台帳の総覧。CSV/JSON対応。</div></a>
+  <a class="card link-card" href="/decisions"><div class="card-header">🗄 Decision Registry</div><div class="card-body muted">決裁イベントの台帳。Airflow Run への相互リンク。</div></a>
+  <a class="card link-card" href="/airflow/runs"><div class="card-header">🌀 Airflow Runs</div><div class="card-body muted">採用パイプライン実行履歴。</div></a>
+</div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 {% endblock %}
@@ -207,30 +221,41 @@
 function $(id){ return document.getElementById(id); }
 function setText(id, t){ const el=$(id); if(el) el.textContent = (t ?? '—'); }
 function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
+function toast(msg, ok=true){ const t=$('toast'); if(!t) return; t.className='toast '+(ok?'ok':'err')+' show'; t.textContent=msg; setTimeout(()=>{t.className='toast';},2000); }
+function isoDateDaysAgo(days){ const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-days); const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
+function normalizeDate(s){ if(!s) return s; const t=String(s).trim(); if(/^\d{8}$/.test(t)) return `${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}`; if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; const d=new Date(t); if(!isNaN(d)){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; } return t; }
 function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
 function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
-function toast(msg, ok=true){ const t=$('toast'); if(!t) return; t.className='toast '+(ok?'ok':'err')+' show'; t.textContent=msg; setTimeout(()=>{t.className='toast';},1800); }
-function isoDateDaysAgo(days){ const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-days);
-  const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
-function normalizeDate(s){
-  if(!s) return s; const t=String(s).trim();
-  if(/^\d{8}$/.test(t)) return `${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}`;
-  if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const d=new Date(t); if(!isNaN(d)) { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
-  return t;
-}
-/* PNG */
+
+/* PNG保存 */
 function downloadChartPNG(canvasId, baseName){
   const el=$(canvasId); if(!el) return;
   try{ const url=el.toDataURL('image/png',1.0); const a=document.createElement('a'); const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
     a.href=url; a.download=`pdca-${baseName}-${stamp}.png`; document.body.appendChild(a); a.click(); a.remove(); toast('画像を書き出しました'); }
   catch(e){ console.error('png export failed', e); toast('画像の書き出しに失敗', false); }
 }
-/* Global */
-window.NoctriaPDCA = window.NoctriaPDCA || {};
-function getCharts(){ if(!window.NoctriaPDCA.charts) window.NoctriaPDCA.charts={counts:null,winDiff:null}; return window.NoctriaPDCA.charts; }
-window.GLOBAL_DEFAULT_FROM=null; window.GLOBAL_DEFAULT_TO=null;
-/* URL ⇄ Inputs */
+
+/* ===== ローディング制御（Skeleton表示） ===== */
+let fetching=false;
+function setApplying(b){
+  const btn=$('applyBtn'), spin=$('applySpin');
+  fetching=b;
+  if(btn){ btn.disabled=b; btn.style.opacity = b ? 0.6 : 1; }
+  if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); }
+  // エリアの切替
+  const loadingClass = b ? 'loading' : '';
+  ['kpiMetrics','wrapCounts','wrapWin','wrapTable','wrapPager'].forEach(id=>{
+    const el=$(id); if(!el) return;
+    if(b) el.classList.add('loading'); else el.classList.remove('loading');
+  });
+  ['skel-m1','skel-m2','skel-m3','skel-m4','skel-m5','skel-counts','skel-win','skel-table'].forEach(id=>{
+    const el=$(id); if(!el) return;
+    if(b) el.classList.add('loading'); else el.classList.remove('loading');
+  });
+  const kpi=$('kpiMetrics'); if(kpi) kpi.setAttribute('aria-busy', String(b));
+}
+
+/* ===== URL ⇄ 入力 ===== */
 function readUrlIntoInputs(){
   const usp=new URLSearchParams(location.search);
   const rawFrom=usp.get('date_from')||usp.get('from_date')||usp.get('from');
@@ -250,25 +275,20 @@ function inputsToParamsAllKeys(){
   const p=new URLSearchParams(); p.set('date_from',from); p.set('date_to',to); p.set('from_date',from); p.set('to_date',to); p.set('from',from); p.set('to',to);
   if(tag) p.set('tag',tag); if(win) p.set('win_diff',win); if(dd) p.set('dd_diff',dd); if(mt) p.set('min_trades',mt); return p;
 }
-function buildCsvParams(){ return inputsToParamsAllKeys(); }
-function wireCsvButton(){ const a=$('csvBtn'); if(a) a.href='/pdca/summary.csv?'+buildCsvParams().toString(); }
-/* Copy URL */
+function wireCsvButton(){ const a=$('csvBtn'); if(a) a.href='/pdca/summary.csv?'+inputsToParamsAllKeys().toString(); }
 function buildShareUrl(){ const qs=inputsToParamsAllKeys().toString(); return location.origin+location.pathname+(qs?`?${qs}`:''); }
-async function copyShareUrl(){ const url=buildShareUrl(); try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }
-catch(e){ try{ const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました'); } catch{ prompt('このURLをコピーしてください:', url); } } }
-/* Presets */
-function wirePresets(){
-  document.querySelectorAll('.preset-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const mode=btn.dataset.mode, days=+btn.dataset.days;
-      if(mode==='year'){ const y=new Date().getFullYear(); $('from-date').value=`${y}-01-01`; $('to-date').value=isoDateDaysAgo(0); }
-      else if(mode==='reset'){ $('from-date').value=window.GLOBAL_DEFAULT_FROM||isoDateDaysAgo(14); $('to-date').value=window.GLOBAL_DEFAULT_TO||isoDateDaysAgo(0); }
-      else{ $('from-date').value=isoDateDaysAgo(days); $('to-date').value=isoDateDaysAgo(0); }
-      window.pdcaRefresh && window.pdcaRefresh();
-    });
-  });
+
+/* ===== 共有リンクコピー ===== */
+async function copyShareUrl(){
+  const url=buildShareUrl();
+  try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }
+  catch(e){
+    try{ const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました'); }
+    catch(e2){ prompt('このURLをコピーしてください:', url); }
+  }
 }
-/* Table */
+
+/* ===== テーブル ===== */
 const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc' };
 function coerceRow(r){ return { date:r.date??r.day??'', tag:r.tag??r.strategy??r.name??'',
   evals:(+r.evals)||0, adopted:(+r.adopted)||0,
@@ -280,7 +300,8 @@ function sortView(){ const k=tableState.sortKey,d=tableState.sortDir; tableState
   if(typeof va==='number' && typeof vb==='number') return d==='asc'?va-vb:vb-va;
   return d==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));}); }
 function renderTablePage(){
-  const panel=$('details-panel'); if(!panel) return; if(!tableState.view.length){ panel.style.display='none'; return; } panel.style.display='';
+  const panel=$('details-panel'); if(!panel) return;
+  if(!tableState.view.length){ panel.style.display='none'; return; } panel.style.display='';
   const body=$('details-body'),info=$('details-info'); const ps=tableState.pageSize,total=tableState.view.length;
   const totalPages=Math.max(1,Math.ceil(total/ps)); if(tableState.page>totalPages) tableState.page=totalPages;
   const start=(tableState.page-1)*ps; const slice=tableState.view.slice(start,start+ps);
@@ -302,34 +323,15 @@ function attachTableEvents(){
   $('nextPage')?.addEventListener('click', ()=>{ tableState.page++; renderTablePage(); });
   $('page-size')?.addEventListener('change', (e)=>{ tableState.pageSize=+e.target.value||20; tableState.page=1; renderTablePage(); });
 }
-/* Export */
-function getRangeSlug(){
-  const usp = new URLSearchParams(location.search);
-  const from = normalizeDate(usp.get('date_from')||usp.get('from_date')||usp.get('from')||$('from-date')?.value||'');
-  const to   = normalizeDate(usp.get('date_to')  ||usp.get('to_date')  ||usp.get('to')  ||$('to-date')?.value  ||'');
-  return `${from||'NA'}_${to||'NA'}`;
-}
-function downloadBlob(data, mime, filename){
-  const blob = new Blob([data], {type: mime});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-}
-function toCsvValue(v){
-  const s = (v==null) ? '' : String(v);
-  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
-  return s;
-}
+
+/* ===== エクスポート ===== */
+function downloadBlob(data, mime, filename){ const blob = new Blob([data], {type: mime}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+function toCsvValue(v){ const s = (v==null) ? '' : String(v); if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"'; return s; }
+function getRangeSlug(){ const usp=new URLSearchParams(location.search); const from=normalizeDate(usp.get('date_from')||usp.get('from_date')||usp.get('from')||$('from-date')?.value||''); const to=normalizeDate(usp.get('date_to')||usp.get('to_date')||usp.get('to')||$('to-date')?.value||''); return `${from||'NA'}_${to||'NA'}`; }
 function exportDetailsCSV(){
   if(!tableState.view.length){ toast('出力対象がありません', false); return; }
   const header = ['date','tag','evals','adopted','win_rate_pct','max_drawdown_pct','rechecks','trades'];
-  const rows = tableState.view.map(r=>[
-    r.date||'', r.tag||'', r.evals, r.adopted,
-    (r.win_rate==null?'':r.win_rate.toFixed(2)),
-    (r.max_drawdown==null?'':r.max_drawdown.toFixed(2)),
-    r.rechecks, r.trades
-  ]);
+  const rows = tableState.view.map(r=>[r.date||'', r.tag||'', r.evals, r.adopted, (r.win_rate==null?'':r.win_rate.toFixed(2)), (r.max_drawdown==null?'':r.max_drawdown.toFixed(2)), r.rechecks, r.trades]);
   const bom = '\uFEFF';
   const csv = [header.join(','), ...rows.map(rr=>rr.map(toCsvValue).join(','))].join('\n');
   const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
@@ -338,71 +340,82 @@ function exportDetailsCSV(){
 }
 function exportDetailsJSON(){
   if(!tableState.view.length){ toast('出力対象がありません', false); return; }
-  const data = tableState.view.map(r=>({
-    date: r.date||'',
-    tag:  r.tag||'',
-    evals: r.evals,
-    adopted: r.adopted,
-    win_rate_pct: (r.win_rate==null?null:+r.win_rate.toFixed(2)),
-    max_drawdown_pct: (r.max_drawdown==null?null:+r.max_drawdown.toFixed(2)),
-    rechecks: r.rechecks,
-    trades: r.trades
-  }));
+  const data = tableState.view.map(r=>({ date:r.date||'', tag:r.tag||'', evals:r.evals, adopted:r.adopted, win_rate_pct:(r.win_rate==null?null:+r.win_rate.toFixed(2)), max_drawdown_pct:(r.max_drawdown==null?null:+r.max_drawdown.toFixed(2)), rechecks:r.rechecks, trades:r.trades }));
   const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
   downloadBlob(JSON.stringify(data, null, 2), 'application/json;charset=utf-8', `pdca_details_${getRangeSlug()}_${stamp}.json`);
   toast('JSONを書き出しました');
 }
-/* 連打防止（★修正済みタイポ） */
-let fetching=false;
-function setApplying(b){
-  const btn=$('applyBtn'), spin=$('applySpin');
-  fetching=b;
-  if(btn){ btn.disabled=b; btn.style.opacity = b ? 0.6 : 1; }  /* ←ここ修正 */
-  if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); }
+
+/* ===== エラーパネル ===== */
+function showErrorPanel(info){
+  const p=$('error-panel'); if(!p) return;
+  if(!info){ p.classList.remove('show'); p.innerHTML=''; return; }
+  const {where,status,statusText,message,requestId,bodySnippet} = info;
+  p.innerHTML = `<strong>取得に失敗しました</strong><br>
+    <div>場所: <code>${where||'-'}</code></div>
+    <div>HTTP: <code>${status||'-'} ${statusText||''}</code> ${requestId?`<span class="muted">(x-request-id: ${requestId})</span>`:''}</div>
+    ${message?`<div>詳細: <code>${message}</code></div>`:''}
+    ${bodySnippet?`<div>応答抜粋: <code>${bodySnippet}</code></div>`:''}`;
+  p.classList.add('show');
 }
-/* 一括再評価 */
-async function triggerRecheckAll(){
-  const reason = prompt("一括再評価の理由（任意）", "") || "";
-  const p = inputsToParamsAllKeys();
-  const url = new URL('/pdca/recheck_all', location.origin);
-  url.searchParams.set('reason', reason);
-  url.searchParams.set('filter_date_from', p.get('date_from'));
-  url.searchParams.set('filter_date_to', p.get('date_to'));
-  try{
-    const res = await fetch(url.toString(), { method:'POST' });
-    const js = await res.json().catch(()=>({message:'未知の応答'}));
-    toast(js.message || '起動しました', res.ok);
-  }catch(e){
-    toast('再評価の起動に失敗: ' + (e?.message || e), false);
+
+/* ===== fetch ラッパ（詳細ログ） ===== */
+async function fetchJsonWithDetail(url){
+  const res = await fetch(url, {cache:'no-store'});
+  const rid = res.headers.get('x-request-id') || res.headers.get('x-amzn-requestid') || null;
+  let data=null, bodySnippet='';
+  try{ data = await res.clone().json(); }
+  catch(_){ try{ bodySnippet = (await res.clone().text()).slice(0,300); }catch{} }
+  if(!res.ok){
+    const apiMsg = data && (data.detail || data.message);
+    const err = new Error(apiMsg || `HTTP ${res.status} ${res.statusText}`);
+    err.__detail = { status: res.status, statusText: res.statusText, bodySnippet, requestId: rid, message: apiMsg };
+    throw err;
   }
+  return { data, requestId: rid };
 }
-/* API */
+
+/* ===== API ===== */
 async function fetchDetailsFallback(qs){
-  try{ const res=await fetch('/pdca/api/details?'+qs,{cache:'no-store'}); if(!res.ok) return []; const js=await res.json(); return Array.isArray(js)?js:(Array.isArray(js?.items)?js.items:[]);}catch{return[]}
+  try{ const {data} = await fetchJsonWithDetail('/pdca/api/details?'+qs); if(Array.isArray(data)) return data; if(Array.isArray(data?.items)) return data.items; }
+  catch(e){ console.error('[details] fallback error', e); }
+  return [];
 }
+
+window.NoctriaPDCA = window.NoctriaPDCA || {};
+function getCharts(){ if(!window.NoctriaPDCA.charts) window.NoctriaPDCA.charts={counts:null,winDiff:null}; return window.NoctriaPDCA.charts; }
+
 async function doRefresh(){
   const p=inputsToParamsAllKeys(); const qs=p.toString();
   history.replaceState(null,'',location.pathname+'?'+qs);
-  const res = await fetch('/pdca/api/summary?'+qs, { cache:'no-store' });
-  if(!res.ok) throw new Error('summary HTTP '+res.status);
-  const s = await res.json();
+  showErrorPanel(null);
+
+  // summary
+  const {data:s, requestId:rid1} = await fetchJsonWithDetail('/pdca/api/summary?'+qs);
+
+  // KPI
   const t = s?.totals || {};
   setText('kpi-count', intFmt(s?.count_rows));
   setText('kpi-adopted', intFmt(t?.adopted));
   setText('kpi-rechecks', intFmt(t?.rechecks));
   setText('kpi-winrate', percentFmt(t?.win_rate));
   setText('kpi-maxdd', percentFmt(t?.max_drawdown));
+
+  // charts
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
   const labels = by.map(r => r?.date ?? '');
   const evals  = by.map(r => (+r?.evals)||0);
   const adopted= by.map(r => (+r?.adopted)||0);
   const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
+
   show($('noteCounts'),  labels.length===0);
   show($('noteWinDiff'), labels.length===0);
+
   const charts=getCharts();
   if (charts.counts?.destroy) { try{ charts.counts.destroy(); }catch{} }
   if (charts.winDiff?.destroy) { try{ charts.winDiff.destroy(); }catch{} }
   charts.counts=null; charts.winDiff=null;
+
   const ctxCounts=$('chartCounts'), ctxWinDiff=$('chartWinDiff');
   if (ctxCounts?.getContext) charts.counts = new Chart(ctxCounts.getContext('2d'), {
     type:'bar', data:{ labels, datasets:[{label:'評価件数',data:evals,yAxisID:'y1'},{label:'採用件数',data:adopted,yAxisID:'y1'}]},
@@ -413,11 +426,22 @@ async function doRefresh(){
     type:'line', data:{ labels, datasets:[{label:'勝率（平均 %）',data:wrPct,tension:.25}]},
     options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:0 }}, y:{ beginAtZero:true }}}
   });
+
+  // details（summaryに含まれなければ fallback）
   let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
   if(Array.isArray(details) && details.length){ tableState.raw = details.map(coerceRow); sortView(); tableState.page=1; renderTablePage(); }
   else { tableState.raw=[]; tableState.view=[]; renderTablePage(); }
+
+  // CSVリンク
   wireCsvButton();
+
+  // デバッグログ（開発者向け）
+  console.groupCollapsed('%cPDCA refresh ok','color:#22c55e');
+  console.log('requestId(summary):', rid1);
+  console.log('labels:', labels.length, 'details:', details?.length||0);
+  console.groupEnd();
 }
+
 window.pdcaRefresh = async function(){
   if(fetching) return;
   setApplying(true);
@@ -427,21 +451,42 @@ window.pdcaRefresh = async function(){
       tag:$('tag-input')?.value||'', win:$('win-diff-input')?.value||'',
       dd:$('dd-diff-input')?.value||'', mt:$('min-trades-input')?.value||''
     }));
-    await doRefresh(); toast('更新しました');
-  }catch(e){ console.error('[summary] error:',e); toast('取得に失敗: '+(e?.message||e), false); }
-  finally{ setApplying(false); }
+    await doRefresh();
+    toast('更新しました');
+  }catch(e){
+    const d = e?.__detail || {};
+    console.group('%cPDCA refresh error','color:#ef4444');
+    console.error('Error:', e);
+    console.log('detail:', d);
+    console.groupEnd();
+    showErrorPanel({ where:'/pdca/api/summary', status:d.status, statusText:d.statusText, message:d.message||e?.message, requestId:d.requestId, bodySnippet:d.bodySnippet });
+    toast(`取得に失敗 (HTTP ${d.status||'—'})`, false);
+  }finally{
+    setApplying(false);
+  }
 }
-/* オートコンプリート（タグ） */
+
+/* ===== Presets / Events / CSV ===== */
+function wirePresets(){
+  document.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const mode=btn.dataset.mode, days=+btn.dataset.days;
+      if(mode==='year'){ const y=new Date().getFullYear(); $('from-date').value=`${y}-01-01`; $('to-date').value=isoDateDaysAgo(0); }
+      else if(mode==='reset'){ $('from-date').value=window.GLOBAL_DEFAULT_FROM||isoDateDaysAgo(14); $('to-date').value=window.GLOBAL_DEFAULT_TO||isoDateDaysAgo(0); }
+      else{ $('from-date').value=isoDateDaysAgo(days); $('to-date').value=isoDateDaysAgo(0); }
+      window.pdcaRefresh && window.pdcaRefresh();
+    });
+  });
+}
+</script>
+
+<script>
+/* ====== タグ・オートコンプリート（既存維持） ====== */
 (function(){
   const inputId='tag-input', listId='tag-ac-list';
   let cacheAll=null, lastQuery='', activeIndex=-1, pending=null;
   function el(){ return {inp:$(inputId), list:$(listId)}; }
-  function normalizeItems(js){
-    if(!js) return [];
-    if(Array.isArray(js) && js.length && typeof js[0]==='string') return js;
-    if(Array.isArray(js)) return js.map(o=>o?.name||o?.tag||o).filter(Boolean);
-    return [];
-  }
+  function normalizeItems(js){ if(!js) return []; if(Array.isArray(js) && js.length && typeof js[0]==='string') return js; if(Array.isArray(js)) return js.map(o=>o?.name||o?.tag||o).filter(Boolean); return []; }
   async function queryServer(q){
     try{ const r = await fetch('/pdca/api/tags?q='+encodeURIComponent(q||''), {cache:'no-store'}); if(r.ok){ return normalizeItems(await r.json()); } }catch{}
     if(cacheAll==null){ try{ const r2 = await fetch('/pdca/api/tags', {cache:'no-store'}); if(r2.ok){ cacheAll = normalizeItems(await r2.json()); } }catch{ cacheAll = []; } }
@@ -455,8 +500,7 @@ window.pdcaRefresh = async function(){
     list.innerHTML = '';
     if(!items.length){ list.innerHTML = '<div class="ac-empty">候補がありません</div>'; list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1; return; }
     items.forEach((s,idx)=>{
-      const div=document.createElement('div');
-      div.className='ac-item'; div.setAttribute('role','option'); div.id=`ac-item-${idx}`;
+      const div=document.createElement('div'); div.className='ac-item'; div.setAttribute('role','option'); div.id=`ac-item-${idx}`;
       div.innerHTML = `<span># ${s}</span><span class="ac-kbd">Enterで決定</span>`;
       div.addEventListener('mousedown',(e)=>{ e.preventDefault(); pick(idx); });
       list.appendChild(div);
@@ -472,34 +516,9 @@ window.pdcaRefresh = async function(){
       if(r.bottom>lr.bottom) act.scrollIntoView(false); else if(r.top<lr.top) act.scrollIntoView(); }
   }
   function close(){ const {list,inp}=el(); if(!list) return; list.classList.remove('show'); inp.setAttribute('aria-expanded','false'); activeIndex=-1; }
-  function pick(idx){
-    const {inp,list}=el(); if(!list) return;
-    const sel = list.children[idx]?.textContent?.replace(/^#\s*/,'').replace(/\s*Enterで決定\s*$/,'') || '';
-    if(inp){ inp.value = sel; }
-    close();
-    window.pdcaRefresh && window.pdcaRefresh();
-  }
-  function schedule(q){
-    if(pending) clearTimeout(pending);
-    pending = setTimeout(async ()=>{
-      lastQuery=q;
-      const items = await queryServer(q);
-      if(lastQuery!==q) return;
-      render(items);
-    }, 120);
-  }
-  function wire(){
-    const {inp,list}=el(); if(!inp||!list) return;
-    inp.addEventListener('input', (e)=>{ const q=(e.target.value||'').trim(); schedule(q); });
-    inp.addEventListener('focus', ()=>{ schedule((inp.value||'').trim()); });
-    inp.addEventListener('blur', ()=>{ setTimeout(close, 120); });
-    inp.addEventListener('keydown', (e)=>{
-      if(e.key==='ArrowDown'){ e.preventDefault(); move(1); }
-      else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); }
-      else if(e.key==='Enter'){ if(activeIndex>=0){ e.preventDefault(); pick(activeIndex); } else { close(); } }
-      else if(e.key==='Escape'){ close(); }
-    });
-  }
+  function pick(idx){ const {inp,list}=el(); if(!list) return; const sel = list.children[idx]?.textContent?.replace(/^#\s*/,'').replace(/\s*Enterで決定\s*$/,'') || ''; if(inp){ inp.value = sel; } close(); window.pdcaRefresh && window.pdcaRefresh(); }
+  function schedule(q){ if(pending) clearTimeout(pending); pending = setTimeout(async ()=>{ lastQuery=q; const items = await queryServer(q); if(lastQuery!==q) return; render(items); }, 120); }
+  function wire(){ const {inp,list}=el(); if(!inp||!list) return; inp.addEventListener('input', (e)=>{ const q=(e.target.value||'').trim(); schedule(q); }); inp.addEventListener('focus', ()=>{ schedule((inp.value||'').trim()); }); inp.addEventListener('blur', ()=>{ setTimeout(close, 120); }); inp.addEventListener('keydown', (e)=>{ if(e.key==='ArrowDown'){ e.preventDefault(); move(1); } else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); } else if(e.key==='Enter'){ if(activeIndex>=0){ e.preventDefault(); pick(activeIndex); } else { close(); } } else if(e.key==='Escape'){ close(); } }); }
   document.addEventListener('DOMContentLoaded', wire);
 })();
 </script>
@@ -520,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function(){
     flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate:$('to-date').value   });
   })();
 
-  $('applyBtn')?.addEventListener('click', window.pdcaRefresh);
+  $('applyBtn')?.addEventListener('click', ()=> window.pdcaRefresh());
   $('recheckAllBtn')?.addEventListener('click', triggerRecheckAll);
   $('copyLinkBtn')?.addEventListener('click', copyShareUrl);
   $('exportCsvBtn')?.addEventListener('click', exportDetailsCSV);
