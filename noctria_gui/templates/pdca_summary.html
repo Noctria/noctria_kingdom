@@ -10,302 +10,335 @@
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style>
-  /* ====== Layout ====== */
-  .filter-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: .75rem;
-    align-items: end;
+  .filter-form { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:.75rem; align-items:end; }
+  .hud-input, .hud-select {
+    background: rgba(0,0,0,0.3); border:1px solid var(--panel-border);
+    color: var(--text-color-base); font-family: var(--font-family); font-size:1rem;
+    border-radius:4px; padding:.5rem .75rem; transition: box-shadow .25s ease;
   }
-  .hud-field { display:flex; flex-direction:column; gap:.35rem; }
-  .hud-field label { font-size:.85rem; opacity:.9; }
-  .hud-field input, .hud-field select {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.12);
-    padding:.55rem .7rem; border-radius:.6rem; color:inherit; width:100%;
-  }
-  .hud-btn {
-    display:inline-flex; align-items:center; justify-content:center;
-    gap:.5rem; padding:.6rem .9rem; border-radius:.7rem;
-    border:1px solid var(--glow-primary, #7dd3fc);
-    background: linear-gradient(180deg, rgba(125,211,252,.10), rgba(125,211,252,.02));
-    cursor:pointer; text-decoration:none;
-  }
-  .hud-btn i { font-size:.95rem; }
-  .hud-cards {
-    display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: .9rem; margin-top:1rem;
-  }
-  .hud-card {
-    padding:1rem; border-radius:1rem;
-    background: rgba(255,255,255,0.03);
-    border:1px solid rgba(255,255,255,0.10);
-    box-shadow: 0 0 0 1px rgba(125,211,252,.08), 0 8px 18px rgba(0,0,0,.25) inset;
-  }
-  .hud-card h4 { margin:0 0 .35rem; font-size:.95rem; opacity:.9; }
-  .hud-card .value { font-size:1.4rem; font-weight:700; letter-spacing:.3px; }
-  .hud-section { margin-top:1.25rem; }
-  .hud-section h3 { font-size:1rem; margin:0 0 .6rem; opacity:.95; }
-
-  /* ====== Table ====== */
-  .hud-table {
-    width:100%; border-collapse: collapse; font-size:.95rem; overflow:auto;
-    border:1px solid rgba(255,255,255,0.08); border-radius:.6rem;
-  }
-  .hud-table th, .hud-table td { padding:.6rem .65rem; text-align:left; }
-  .hud-table thead th {
-    position:sticky; top:0; background:rgba(255,255,255,0.06);
-    border-bottom:1px solid rgba(255,255,255,0.12);
-  }
-  .hud-table tbody tr:nth-child(even){ background: rgba(255,255,255,0.03); }
-  .kpi-good { color:#86efac; }
-  .kpi-warn { color:#fde68a; }
-  .kpi-bad  { color:#fca5a5; }
-
-  /* ====== Helpers ====== */
-  .muted { opacity:.8; font-size:.9rem; }
-  .nowrap { white-space:nowrap; }
-  .right { text-align:right; }
-  .fade { opacity:.85; }
-  .scroll-x { overflow-x:auto; }
-
-  .chart-wrap { width:100%; max-width:100%; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.10); border-radius:1rem; padding:.75rem; }
-  .chart-wrap canvas { width:100% !important; height:320px !important; }
-  @media (max-width: 480px){ .chart-wrap canvas { height:260px !important; } }
+  .hud-input:focus, .hud-select:focus { outline:none; box-shadow:0 0 8px var(--glow-primary); border-color: var(--glow-primary); }
+  .metrics { display:flex; gap:1rem; flex-wrap:wrap; }
+  .metric-item { background: var(--bg-color); border-radius:8px; padding:1rem 1.25rem; box-shadow:0 0 10px var(--glow-primary); flex:1 1 180px; }
+  .metric-item h3 { margin:.1rem 0 .25rem; font-size:.9rem; color:var(--text-color-light); }
+  .metric-value { font-size:1.6rem; font-weight:700; margin:0; }
+  .grid-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1.2rem; }
+  .empty-note { color:#9fbad6; text-align:center; padding:.75rem 0; }
+  .btn-row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+  .widget-frame { width:100%; border:none; min-height:480px; overflow:hidden; border-radius:8px; }
+  .grid-quicklinks { display:grid; gap:1rem; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1rem; }
+  .link-card { text-decoration:none; color:inherit; }
 </style>
+
+<!-- まずはローカル配信。無ければ後段でCDNフォールバック -->
+<script src="/static/vendor/chart.umd.js"></script>
+<script src="/static/vendor/flatpickr.min.js"></script>
 {% endblock %}
 
 {% block content %}
-<section aria-label="filters">
-  <form class="filter-form" method="get" action="/pdca/summary">
-    <div class="hud-field">
-      <label for="from">From</label>
-      <input id="from" name="from" type="text" placeholder="YYYY-MM-DD"
-             value="{{ request.query_params.get('from', from_date|default('', true)) }}">
+<section class="hud-panel filter-panel" aria-labelledby="filter-title">
+  <h2 id="filter-title" class="panel-title"><i class="fas fa-filter" aria-hidden="true"></i> FILTER & SEARCH</h2>
+  <form class="filter-form" onsubmit="return false;" aria-describedby="filter-help">
+    <p id="filter-help" class="sr-only">開始日と終了日で範囲を指定し、適用ボタンで更新します。</p>
+    <div>
+      <label for="from-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 開始日</label>
+      <input id="from-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-describedby="from-date-help">
+      <span id="from-date-help" class="sr-only">開始日をYYYY-MM-DDで入力</span>
     </div>
-    <div class="hud-field">
-      <label for="to">To</label>
-      <input id="to" name="to" type="text" placeholder="YYYY-MM-DD"
-             value="{{ request.query_params.get('to', to_date|default('', true)) }}">
+    <div>
+      <label for="to-date"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 終了日</label>
+      <input id="to-date" type="text" class="hud-input" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-describedby="to-date-help">
+      <span id="to-date-help" class="sr-only">終了日をYYYY-MM-DDで入力</span>
     </div>
-    <div class="hud-field">
-      <label for="tag">Tag / Strategy</label>
-      <input id="tag" name="tag" type="text" placeholder="e.g. veritas / levia"
-             value="{{ request.query_params.get('tag', selected_tag|default('', true)) }}">
+    <div>
+      <label for="limit-select"><i class="fas fa-list-ol" aria-hidden="true"></i> 表示件数（表用）</label>
+      <select id="limit-select" class="hud-select" aria-label="表示件数">
+        <option value="20" selected>20件</option>
+        <option value="50">50件</option>
+        <option value="100">100件</option>
+      </select>
     </div>
-    <div class="hud-field">
-      <label for="win_diff">勝率差分しきい値（%以上）</label>
-      <input id="win_diff" name="win_diff" type="number" step="0.1" inputmode="decimal" placeholder="例: 3"
-             value="{{ request.query_params.get('win_diff', win_diff|default('', true)) }}">
-    </div>
-    <div class="hud-field">
-      <label for="dd_diff">最大DD差分しきい値（%以上）</label>
-      <input id="dd_diff" name="dd_diff" type="number" step="0.1" inputmode="decimal" placeholder="例: -2"
-             value="{{ request.query_params.get('dd_diff', dd_diff|default('', true)) }}">
-    </div>
-    <div class="hud-field">
-      <label for="min_trades">最小取引数</label>
-      <input id="min_trades" name="min_trades" type="number" step="1" min="0" placeholder="例: 30"
-             value="{{ request.query_params.get('min_trades', min_trades|default('', true)) }}">
-    </div>
-    <div class="hud-field">
-      <button class="hud-btn" type="submit" aria-label="apply filters">
-        <i class="fas fa-filter"></i> 適用
-      </button>
-    </div>
-    <div class="hud-field">
-      <a class="hud-btn" href="/pdca/summary" aria-label="reset filters">
-        <i class="fas fa-rotate-left"></i> リセット
-      </a>
+    <div class="btn-row">
+      <button id="applyBtn" class="hud-link" type="button" aria-label="フィルターを適用">🔎 適用</button>
+      <a id="csvBtn" class="hud-link" href="#" download aria-label="CSVをダウンロード">⬇️ CSV</a>
+      <button id="recheckAllBtn" class="hud-link" type="button" aria-label="一括再評価を実行">🔁 一括再評価</button>
     </div>
   </form>
-  <p class="muted" style="margin-top:.35rem;">
-    期間・タグ・差分しきい値で PDCA 再評価結果を絞り込みます。空欄は無視されます。
-  </p>
 </section>
 
-<section class="hud-section" aria-label="summary-kpis">
-  <h3>サマリー</h3>
-  <div class="hud-cards">
-    {% set S = summary or {} %}
-    <div class="hud-card" role="status">
-      <h4>対象期間の試行数</h4>
-      <div class="value">{{ S.total_runs|default(0) }}</div>
-      <div class="muted">runs</div>
+<!-- 直近採用タグウィジェット（/pdca/widgets/recent-adoptions） -->
+{% set w = recent_adoptions_params or {'pattern':'veritas-','limit':9,'cols':3,'title':'🧩 直近採用タグ'} %}
+<section class="hud-panel" aria-labelledby="adopt-widget-title">
+  <h2 id="adopt-widget-title" class="panel-title"><i class="fas fa-tags" aria-hidden="true"></i> 直近の採用タグ</h2>
+  <iframe
+    class="widget-frame"
+    src="/pdca/widgets/recent-adoptions?pattern={{ w.pattern | urlencode }}&limit={{ w.limit }}&cols={{ w.cols }}&title={{ w.title | urlencode }}"
+    loading="lazy"
+  ></iframe>
+</section>
+
+<section class="hud-panel" aria-labelledby="kpi-title">
+  <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator" aria-hidden="true"></i> OVERALL KPI（フィルター適用後）</h2>
+  <div class="metrics" role="list">
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-hashtag" aria-hidden="true"></i> 対象件数</h3>
+      <p id="kpi-count" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="hud-card">
-      <h4>採用数 / 採用率</h4>
-      <div class="value">
-        {{ S.total_adopted|default(0) }} /
-        {% if S.adoption_rate is defined %}
-          {{ (S.adoption_rate*100)|round(1) }}%
-        {% else %}—{% endif %}
-      </div>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-check-circle" aria-hidden="true"></i> 採用件数</h3>
+      <p id="kpi-adopted" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="hud-card">
-      <h4>平均 勝率差分</h4>
-      {% set wd = S.avg_winrate_diff if S.avg_winrate_diff is defined else None %}
-      <div class="value {% if wd is not none %}{% if wd>=0 %}kpi-good{% else %}kpi-bad{% endif %}{% endif %}">
-        {% if wd is not none %}{{ (wd)|round(2) }}%{% else %}—{% endif %}
-      </div>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-redo-alt" aria-hidden="true"></i> 再評価件数</h3>
+      <p id="kpi-rechecks" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="hud-card">
-      <h4>平均 最大DD差分</h4>
-      {% set dd = S.avg_maxdd_diff if S.avg_maxdd_diff is defined else None %}
-      <div class="value {% if dd is not none %}{% if dd<=0 %}kpi-good{% else %}kpi-bad{% endif %}{% endif %}">
-        {% if dd is not none %}{{ (dd)|round(2) }}%{% else %}—{% endif %}
-      </div>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-percentage" aria-hidden="true"></i> 勝率（平均）</h3>
+      <p id="kpi-winrate" class="metric-value" aria-live="polite">-</p>
     </div>
-    <div class="hud-card">
-      <h4>対象戦略/タグ</h4>
-      <div class="value fade">{{ selected_tag|default("all") }}</div>
-      <div class="muted">tag</div>
+    <div class="metric-item" role="listitem">
+      <h3><i class="fas fa-chart-area" aria-hidden="true"></i> 最大DD（最悪）</h3>
+      <p id="kpi-maxdd" class="metric-value" aria-live="polite">-</p>
     </div>
   </div>
 </section>
 
-<section class="hud-section" aria-label="charts">
-  <h3>トレンド</h3>
-  <div class="chart-wrap" aria-live="polite">
-    <canvas id="chartCounts" aria-label="日次件数トレンド"></canvas>
-  </div>
-  <div class="chart-wrap" style="margin-top:.9rem">
-    <canvas id="chartDiffs" aria-label="差分分布"></canvas>
-  </div>
-</section>
+<div class="grid-charts">
+  <section class="hud-panel" aria-labelledby="chart-counts-title">
+    <h2 id="chart-counts-title" class="panel-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> 日次 件数（評価 / 採用）</h2>
+    <div style="height:300px"><canvas id="chartCounts" role="img" aria-label="日次の評価件数と採用件数のグラフ"></canvas></div>
+    <div id="noteCounts" class="empty-note" style="display:none">データがありません</div>
+  </section>
+  <section class="hud-panel" aria-labelledby="chart-windiff-title">
+    <h2 id="chart-windiff-title" class="panel-title"><i class="fas fa-chart-line" aria-hidden="true"></i> 日次 勝率（平均 %）</h2>
+    <div style="height:300px"><canvas id="chartWinDiff" role="img" aria-label="日次の勝率の折れ線グラフ"></canvas></div>
+    <div id="noteWinDiff" class="empty-note" style="display:none">データがありません</div>
+  </section>
+</div>
 
-<section class="hud-section" aria-label="details">
-  <h3>詳細（最新50件）</h3>
-  <div class="scroll-x">
-    <table class="hud-table">
-      <thead>
-        <tr>
-          <th class="nowrap">日時</th>
-          <th>戦略</th>
-          <th class="right">勝率差分</th>
-          <th class="right">最大DD差分</th>
-          <th class="right">取引数</th>
-          <th class="nowrap">採用</th>
-          <th>メモ</th>
-          <th class="nowrap">リンク</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% set rows = details or [] %}
-      {% if rows and rows|length>0 %}
-        {% for r in rows[:50] %}
-          <tr>
-            <td class="nowrap">{{ r.timestamp|default(r.date)|default("—") }}</td>
-            <td>{{ r.strategy|default(r.tag)|default("—") }}</td>
-            <td class="right {% if r.winrate_diff is defined %}{% if r.winrate_diff>=0 %}kpi-good{% else %}kpi-bad{% endif %}{% endif %}">
-              {% if r.winrate_diff is defined %}{{ (r.winrate_diff)|round(2) }}%{% else %}—{% endif %}
-            </td>
-            <td class="right {% if r.maxdd_diff is defined %}{% if r.maxdd_diff<=0 %}kpi-good{% else %}kpi-bad{% endif %}{% endif %}">
-              {% if r.maxdd_diff is defined %}{{ (r.maxdd_diff)|round(2) }}%{% else %}—{% endif %}
-            </td>
-            <td class="right">{{ r.trades|default("—") }}</td>
-            <td class="nowrap">
-              {% if r.adopted in [True, "true", 1, "1", "yes"] %}
-                <span class="kpi-good"><i class="fas fa-check"></i></span>
-              {% elif r.adopted in [False, "false", 0, "0", "no"] %}
-                <span class="kpi-bad"><i class="fas fa-times"></i></span>
-              {% else %}—{% endif %}
-            </td>
-            <td class="fade">{{ r.note|default("") }}</td>
-            <td class="nowrap">
-              {% if r.link %}
-                <a class="hud-btn" href="{{ r.link }}" target="_blank" rel="noopener">
-                  <i class="fas fa-up-right-from-square"></i> 詳細
-                </a>
-              {% else %}—{% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-      {% else %}
-        <tr><td colspan="8" class="fade">データがありません。</td></tr>
-      {% endif %}
-      </tbody>
-    </table>
-  </div>
-</section>
-
+<!-- クイックリンク -->
+<div class="grid-quicklinks">
+  <a class="card link-card" href="/adoptions">
+    <div class="card-header">🗂 採用タグ × Decision 一覧</div>
+    <div class="card-body muted">GitタグとDecision台帳を突き合わせた総覧。CSV/JSONエクスポート対応。</div>
+  </a>
+  <a class="card link-card" href="/decisions">
+    <div class="card-header">🗄 Decision Registry</div>
+    <div class="card-body muted">決裁イベントの台帳。Airflow Run への相互リンクあり。</div>
+  </a>
+  <a class="card link-card" href="/airflow/runs">
+    <div class="card-header">🌀 Airflow Runs</div>
+    <div class="card-body muted">採用パイプラインの実行履歴。conf/タスク一覧/関連Decisionを確認。</div>
+  </a>
+</div>
 {% endblock %}
 
-{% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% block scripts %}
 <script>
-  // ====== Flatpickr init ======
-  const fromEl = document.getElementById('from');
-  const toEl = document.getElementById('to');
-  if (fromEl) flatpickr(fromEl, { dateFormat: "Y-m-d", allowInput: true });
-  if (toEl) flatpickr(toEl, { dateFormat: "Y-m-d", allowInput: true });
+/* ---------- ライブラリのフォールバック読込 ---------- */
+(function ensureLibs() {
+  function addScript(src, onload){ var s=document.createElement('script'); s.src=src; s.defer=true; s.onload=onload||function(){}; document.head.appendChild(s); }
+  function need(name){ return (typeof window[name] === 'undefined'); }
+  const p = [];
+  if (need('Chart'))     p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', res)));
+  if (need('flatpickr')) p.push(new Promise(res => addScript('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js', res)));
+  Promise.all(p).then(function(){
+    setTimeout(function(){
+      if (need('Chart'))     addScript('/static/vendor/chart.umd.js');
+      if (need('flatpickr')) addScript('/static/vendor/flatpickr.min.js');
+    }, 400);
+  });
+})();
+</script>
 
-  // ====== Chart helpers ======
-  function safe(val, fallback){ return (val===null||val===undefined) ? fallback : val; }
+<script>
+/* =========================
+   メインスクリプト（前回互換）
+   - /pdca/api/summary       -> KPI + by_day（ここからグラフ描画）
+   - /pdca/summary.csv       -> CSV（from_date/to_date）
+   ========================= */
+window.NoctriaPDCA = { charts: { counts:null, winDiff:null } };
+window.GLOBAL_DEFAULT_FROM = null;
+window.GLOBAL_DEFAULT_TO   = null;
 
-  // サーバ側が charts オブジェクトを用意できない場合でも安全に動作
-  const charts = safe({{ charts|default({})|tojson }}, {});
-  const counts = safe(charts.counts, {});
-  const diffs  = safe(charts.diffs, {});
+function setText(id, t){ const el=document.getElementById(id); if(el) el.textContent = t; }
+function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
+function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
+function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
 
-  // --- Chart 1: 日次件数（total vs adopted）
-  (function(){
-    const ctx = document.getElementById('chartCounts');
-    if(!ctx) return;
+function isoDateDaysAgo(days){
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
-    const labels = safe(counts.labels, []);
-    const total  = safe(counts.total, []);
-    const adopted= safe(counts.adopted, []);
+function buildQueryLegacy() {
+  // 旧API互換（バックエンドで307リダイレクト対応している想定）
+  const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
+  const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  const sp = new URLSearchParams();
+  sp.set('date_from', from);
+  sp.set('date_to', to);
+  return sp.toString();
+}
 
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: '総件数', data: total, tension:.25, borderWidth:2, fill:false },
-          { label: '採用件数', data: adopted, tension:.25, borderWidth:2, fill:false }
-        ]
-      },
-      options: {
-        responsive:true,
-        maintainAspectRatio:false,
-        interaction:{ mode:'index', intersect:false },
-        plugins:{ legend:{ display:true } },
-        scales:{
-          x:{ ticks:{ maxTicksLimit:10 }},
-          y:{ beginAtZero:true, suggestedMax: Math.max(5, Math.max(...total,0)+2) }
-        }
+function buildQueryNew() {
+  // CSVは新パラメータ名を優先しつつ、互換のため旧名も同時に付与
+  const from = document.getElementById('from-date')?.value || window.GLOBAL_DEFAULT_FROM || isoDateDaysAgo(14);
+  const to   = document.getElementById('to-date')?.value   || window.GLOBAL_DEFAULT_TO   || isoDateDaysAgo(0);
+  const sp = new URLSearchParams();
+  sp.set('from_date', from);
+  sp.set('to_date', to);
+  sp.set('date_from', from);
+  sp.set('date_to', to);
+  return sp.toString();
+}
+
+function wireCsvButton(){
+  const a = document.getElementById('csvBtn');
+  if (!a) return;
+  const qs = buildQueryNew();
+  a.href = '/pdca/summary.csv' + (qs ? `?${qs}` : '');
+}
+
+/* Chart helpers */
+function createLine(ctx, labels, label, data, ySuffix){
+  const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets:[{ label, data, tension:0.25 }] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true } },
+      scales:{
+        y:{ beginAtZero:true, grid:{ color:gridC }, ticks:{ color:axisC, callback:v => ySuffix ? `${v}${ySuffix}` : v } },
+        x:{ grid:{ color:gridC }, ticks:{ color:axisC, maxRotation:0 } }
       }
-    });
+    }
+  });
+}
+
+function createBar2Axis(ctx, labels, ds1, ds2){
+  const gridC='rgba(0, 229, 255, 0.15)', axisC='#a8b2d1';
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: ds1.label, data: ds1.data, yAxisID:'y1' },
+      { label: ds2.label, data: ds2.data, yAxisID:'y1' },
+    ]},
+    options: {
+      responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      scales:{
+        y1:{ type:'linear', position:'left', beginAtZero:true, grid:{ color:gridC }, ticks:{ color:axisC } },
+        x :{ grid:{ color:gridC }, ticks:{ color:axisC, maxRotation:0 } }
+      },
+      plugins:{ legend:{ display:true } }
+    }
+  });
+}
+
+/* ======== 一括再評価トリガ ======== */
+async function triggerRecheckAll(){
+  const reason = prompt("一括再評価の理由（任意）", "") || "";
+  const qsLegacy = buildQueryLegacy();
+  const url = new URL('/pdca/recheck_all', window.location.origin);
+  const uspL = new URLSearchParams(qsLegacy);
+  url.searchParams.set('reason', reason);
+  url.searchParams.set('filter_date_from', uspL.get('date_from'));
+  url.searchParams.set('filter_date_to', uspL.get('date_to'));
+  try{
+    const res = await fetch(url.toString(), { method:'POST' });
+    const js = await res.json().catch(()=>({message:'未知の応答'}));
+    alert(js.message || JSON.stringify(js));
+  }catch(e){
+    alert('再評価の起動に失敗しました: ' + (e?.message || e));
+  }
+}
+
+/* ======== メイン更新処理 ======== */
+window.pdcaRefresh = async function pdcaRefresh(){
+  const qsLegacy = buildQueryLegacy();
+
+  try{
+    // まとめて summary だけ叩いて、KPI と timeseries を同時に処理
+    const res = await fetch('/pdca/api/summary?' + qsLegacy, { cache:'no-store' });
+    if(!res.ok) throw new Error('summary HTTP ' + res.status);
+    const s = await res.json();
+
+    // --- KPI ---
+    const t = s?.totals || {};
+    setText('kpi-count',     intFmt(s?.count_rows));
+    setText('kpi-adopted',   intFmt(t?.adopted));
+    setText('kpi-rechecks',  intFmt(t?.rechecks));
+    setText('kpi-winrate',   percentFmt(t?.win_rate));
+    setText('kpi-maxdd',     percentFmt(t?.max_drawdown));
+
+    // --- 時系列（by_day）
+    const by = Array.isArray(s?.by_day) ? s.by_day : [];
+    const labels = by.map(r => r?.date ?? '');
+    const evals  = by.map(r => (r?.evals ?? 0));
+    const adopted= by.map(r => (r?.adopted ?? 0));
+    const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
+
+    show(document.getElementById('noteCounts'),  labels.length === 0);
+    show(document.getElementById('noteWinDiff'), labels.length === 0);
+
+    if (window.NoctriaPDCA.charts.counts)  { window.NoctriaPDCA.charts.counts.destroy();  window.NoctriaPDCA.charts.counts = null; }
+    if (window.NoctriaPDCA.charts.winDiff) { window.NoctriaPDCA.charts.winDiff.destroy(); window.NoctriaPDCA.charts.winDiff = null; }
+
+    const ctxCounts  = document.getElementById('chartCounts');
+    const ctxWinDiff = document.getElementById('chartWinDiff');
+    if (ctxCounts && ctxCounts.getContext) {
+      window.NoctriaPDCA.charts.counts  = createBar2Axis(
+        ctxCounts.getContext('2d'),
+        labels,
+        { label:'評価件数', data: evals },
+        { label:'採用件数', data: adopted }
+      );
+    }
+    if (ctxWinDiff && ctxWinDiff.getContext) {
+      window.NoctriaPDCA.charts.winDiff = createLine(
+        ctxWinDiff.getContext('2d'),
+        labels,
+        '勝率（平均 %）',
+        wrPct,
+        '%'
+      );
+    }
+  }catch(e){
+    console.error('[summary] fetch error:', e);
+  }
+
+  wireCsvButton();
+};
+
+/* ========= DOM 準備 ========= */
+document.addEventListener('DOMContentLoaded', function(){
+  window.GLOBAL_DEFAULT_FROM = "{{ default_from or '' }}".trim() || isoDateDaysAgo(14);
+  window.GLOBAL_DEFAULT_TO   = "{{ default_to or '' }}".trim()   || isoDateDaysAgo(0);
+  const fromI = document.getElementById('from-date');
+  const toI   = document.getElementById('to-date');
+  if (fromI && !fromI.value) fromI.value = window.GLOBAL_DEFAULT_FROM;
+  if (toI   && !toI.value)   toI.value   = window.GLOBAL_DEFAULT_TO;
+
+  (function initPickers(){
+    if (typeof flatpickr === 'undefined') return void setTimeout(initPickers, 120);
+    flatpickr('#from-date', { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_FROM });
+    flatpickr('#to-date',   { dateFormat:'Y-m-d', allowInput:true, defaultDate: window.GLOBAL_DEFAULT_TO   });
   })();
 
-  // --- Chart 2: 差分分布（勝率差分 / 最大DD差分）
-  (function(){
-    const ctx = document.getElementById('chartDiffs');
-    if(!ctx) return;
+  const btn  = document.getElementById('applyBtn');
+  const rbtn = document.getElementById('recheckAllBtn');
+  if (btn)  btn.addEventListener('click', window.pdcaRefresh);
+  if (rbtn) rbtn.addEventListener('click', triggerRecheckAll);
 
-    const labels = safe(diffs.labels, ['勝率 +','勝率 -','DD +','DD -']);
-    const winPos = safe(diffs.win_pos, 0);
-    const winNeg = safe(diffs.win_neg, 0);
-    const ddPos  = safe(diffs.dd_pos, 0);
-    const ddNeg  = safe(diffs.dd_neg, 0);
-
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: '件数', data: [winPos, winNeg, ddPos, ddNeg], borderWidth:1 }
-        ]
-      },
-      options: {
-        responsive:true,
-        maintainAspectRatio:false,
-        plugins:{ legend:{ display:false } },
-        scales:{ y:{ beginAtZero:true } }
-      }
-    });
+  (function waitChart(){
+    if (typeof Chart === 'undefined') return void setTimeout(waitChart, 120);
+    window.pdcaRefresh();
   })();
+});
 </script>
 {% endblock %}
