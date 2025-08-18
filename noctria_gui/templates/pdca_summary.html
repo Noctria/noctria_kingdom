@@ -141,7 +141,11 @@
     <select id="page-size" class="hud-select" style="width:auto">
       <option value="20" selected>20</option><option value="50">50</option><option value="100">100</option>
     </select>
-    <span class="muted" id="details-info" style="margin-left:auto"></span>
+    <div style="margin-left:auto; display:flex; gap:.5rem; align-items:center;">
+      <button id="exportCsvBtn" class="hud-link" type="button">📤 CSV出力</button>
+      <button id="exportJsonBtn" class="hud-link" type="button">📤 JSON出力</button>
+      <span class="muted" id="details-info"></span>
+    </div>
   </div>
   <div class="table-wrap">
     <table class="hud-table" id="details-table">
@@ -247,16 +251,11 @@ function wireCsvButton(){ const a=$('csvBtn'); if(a) a.href='/pdca/summary.csv?'
 function buildShareUrl(){ const qs=inputsToParamsAllKeys().toString(); return location.origin+location.pathname+(qs?`?${qs}`:''); }
 async function copyShareUrl(){
   const url=buildShareUrl();
-  try{
-    await navigator.clipboard.writeText(url);
-    toast('共有リンクをコピーしました');
-  }catch(e){
-    try{
-      const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px';
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました');
-    }catch(e2){
-      prompt('このURLをコピーしてください:', url);
-    }
+  try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }
+  catch(e){
+    try{ const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました'); }
+    catch(e2){ prompt('このURLをコピーしてください:', url); }
   }
 }
 
@@ -276,7 +275,7 @@ function wirePresets(){
 /* ====== テーブル ====== */
 const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc' };
 function coerceRow(r){ return { date:r.date??r.day??'', tag:r.tag??r.strategy??r.name??'',
-  evals:+r.evals||0, adopted:+r.adopted||0,
+  evals:(+r.evals)||0, adopted:(+r.adopted)||0,
   win_rate:(r.win_rate==null?null:+(+r.win_rate*100).toFixed(2)),
   max_drawdown:(r.max_drawdown==null?null:+(+r.max_drawdown*100).toFixed(2)),
   rechecks:(+r.rechecks||+r.recheck_count||0), trades:(+r.trades||+r.num_trades||0) }; }
@@ -306,6 +305,58 @@ function attachTableEvents(){
   $('prevPage')?.addEventListener('click', ()=>{ if(tableState.page>1){ tableState.page--; renderTablePage(); }});
   $('nextPage')?.addEventListener('click', ()=>{ tableState.page++; renderTablePage(); });
   $('page-size')?.addEventListener('change', (e)=>{ tableState.pageSize=+e.target.value||20; tableState.page=1; renderTablePage(); });
+}
+
+/* ====== エクスポート（CSV/JSON） ====== */
+function getRangeSlug(){
+  const usp = new URLSearchParams(location.search);
+  const from = normalizeDate(usp.get('date_from')||usp.get('from_date')||usp.get('from')||$('from-date')?.value||'');
+  const to   = normalizeDate(usp.get('date_to')  ||usp.get('to_date')  ||usp.get('to')  ||$('to-date')?.value  ||'');
+  return `${from||'NA'}_${to||'NA'}`;
+}
+function downloadBlob(data, mime, filename){
+  const blob = new Blob([data], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function toCsvValue(v){
+  const s = (v==null) ? '' : String(v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function exportDetailsCSV(){
+  if(!tableState.view.length){ toast('出力対象がありません', false); return; }
+  const header = ['date','tag','evals','adopted','win_rate_pct','max_drawdown_pct','rechecks','trades'];
+  const rows = tableState.view.map(r=>[
+    r.date||'', r.tag||'', r.evals, r.adopted,
+    (r.win_rate==null?'':r.win_rate.toFixed(2)),
+    (r.max_drawdown==null?'':r.max_drawdown.toFixed(2)),
+    r.rechecks, r.trades
+  ]);
+  const bom = '\uFEFF'; // Excel対策
+  const csv = [header.join(','), ...rows.map(rr=>rr.map(toCsvValue).join(','))].join('\n');
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  downloadBlob(bom + csv, 'text/csv;charset=utf-8', `pdca_details_${getRangeSlug()}_${stamp}.csv`);
+  toast('CSVを書き出しました');
+}
+function exportDetailsJSON(){
+  if(!tableState.view.length){ toast('出力対象がありません', false); return; }
+  // 数値はテーブル表示と同じスケール（%は0-100）で落とす
+  const data = tableState.view.map(r=>({
+    date: r.date||'',
+    tag:  r.tag||'',
+    evals: r.evals,
+    adopted: r.adopted,
+    win_rate_pct: (r.win_rate==null?null:+r.win_rate.toFixed(2)),
+    max_drawdown_pct: (r.max_drawdown==null?null:+r.max_drawdown.toFixed(2)),
+    rechecks: r.rechecks,
+    trades: r.trades
+  }));
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  downloadBlob(JSON.stringify(data, null, 2), 'application/json;charset=utf-8', `pdca_details_${getRangeSlug()}_${stamp}.json`);
+  toast('JSONを書き出しました');
 }
 
 /* ====== 連打防止 ====== */
@@ -408,7 +459,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
   $('applyBtn')?.addEventListener('click', window.pdcaRefresh);
   $('recheckAllBtn')?.addEventListener('click', triggerRecheckAll);
-  $('copyLinkBtn')?.addEventListener('click', copyShareUrl);       /* ← 共有リンク */
+  $('copyLinkBtn')?.addEventListener('click', copyShareUrl);
+  $('exportCsvBtn')?.addEventListener('click', exportDetailsCSV);
+  $('exportJsonBtn')?.addEventListener('click', exportDetailsJSON);
   wirePresets();
   attachTableEvents();
   wireCsvButton();
