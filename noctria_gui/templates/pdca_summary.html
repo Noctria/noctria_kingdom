@@ -31,21 +31,17 @@
   .spinner { display:none; margin-left:.5rem } .spinner.show { display:inline-block; }
 
   /* Table */
-  .table-wrap { overflow:auto; }
-  table.hud-table { width:100%; border-collapse:collapse; font-size:.95rem; }
+  .table-wrap { overflow:auto; position:relative; }
+  table.hud-table { width:100%; border-collapse:collapse; font-size:.95rem; background: transparent; }
   table.hud-table th, table.hud-table td { padding:.5rem .6rem; border-bottom:1px solid var(--panel-border); white-space:nowrap; }
-  table.hud-table th { text-align:left; color:var(--text-color-light); cursor:pointer; user-select:none; }
+  table.hud-table th { text-align:left; color:var(--text-color-light); cursor:pointer; user-select:none; position: sticky; top: 0; background: var(--bg-color); z-index: 2; }
   table.hud-table th .sort { opacity:.7; font-size:.85em; margin-left:.25rem; }
   .pager { display:flex; gap:.5rem; align-items:center; justify-content:flex-end; margin-top:.5rem; }
   .pager .hud-link[disabled] { opacity:.5; pointer-events:none; }
 
   /* ===== Skeletons ===== */
   .skel { position:relative; overflow:hidden; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:8px; }
-  .skel::after {
-    content:""; position:absolute; inset:0; transform: translateX(-100%);
-    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.14), rgba(255,255,255,0));
-    animation: shimmer 1.5s infinite;
-  }
+  .skel::after { content:""; position:absolute; inset:0; transform: translateX(-100%); background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.14), rgba(255,255,255,0)); animation: shimmer 1.5s infinite; }
   @keyframes shimmer { 100% { transform: translateX(100%); } }
   .skel-chart { height:300px; }
   .skel-metric { height:36px; border-radius:6px; }
@@ -122,7 +118,6 @@
 <section class="hud-panel" aria-labelledby="kpi-title">
   <h2 id="kpi-title" class="panel-title"><i class="fas fa-calculator" aria-hidden="true"></i> OVERALL KPI（フィルター適用後）</h2>
   <div class="metrics" role="list" id="kpiMetrics" aria-busy="false">
-    <!-- Skeletons for metrics -->
     <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m1"></div><h3><i class="fas fa-hashtag"></i> 対象件数</h3><p id="kpi-count" class="metric-value hide-when-loading">-</p></div>
     <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m2"></div><h3><i class="fas fa-check-circle"></i> 採用件数</h3><p id="kpi-adopted" class="metric-value hide-when-loading">-</p></div>
     <div class="metric-item"><div class="skel skel-metric show-when-loading" id="skel-m3"></div><h3><i class="fas fa-redo-alt"></i> 再評価件数</h3><p id="kpi-rechecks" class="metric-value hide-when-loading">-</p></div>
@@ -153,7 +148,10 @@
   <div class="btn-row" style="margin:.25rem 0 .5rem">
     <label for="page-size">表示件数</label>
     <select id="page-size" class="hud-select" style="width:auto">
-      <option value="20" selected>20</option><option value="50">50</option><option value="100">100</option>
+      <option value="20" selected>20</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+      <option value="all">すべて</option>
     </select>
     <div style="margin-left:auto; display:flex; gap:.5rem; align-items:center;">
       <button id="exportCsvBtn" class="hud-link" type="button">📤 CSV出力</button>
@@ -162,7 +160,7 @@
     </div>
   </div>
   <div class="skel skel-row show-when-loading" id="skel-table" style="height:180px"></div>
-  <div class="table-wrap hide-when-loading" id="wrapTable">
+  <div class="table-wrap hide-when-loading" id="wrapTable" style="max-height:420px;">
     <table class="hud-table" id="details-table">
       <thead>
         <tr>
@@ -178,6 +176,7 @@
       </thead>
       <tbody id="details-body"></tbody>
     </table>
+    <!-- 仮想スクロール時のスペーサをJSで追加 -->
   </div>
   <div class="pager hide-when-loading" id="wrapPager">
     <button class="hud-link" id="prevPage">◀ 前へ</button>
@@ -242,15 +241,11 @@ function setApplying(b){
   fetching=b;
   if(btn){ btn.disabled=b; btn.style.opacity = b ? 0.6 : 1; }
   if(spin){ b?spin.classList.add('show'):spin.classList.remove('show'); }
-  // エリアの切替
-  const loadingClass = b ? 'loading' : '';
   ['kpiMetrics','wrapCounts','wrapWin','wrapTable','wrapPager'].forEach(id=>{
-    const el=$(id); if(!el) return;
-    if(b) el.classList.add('loading'); else el.classList.remove('loading');
+    const el=$(id); if(!el) return; if(b) el.classList.add('loading'); else el.classList.remove('loading');
   });
   ['skel-m1','skel-m2','skel-m3','skel-m4','skel-m5','skel-counts','skel-win','skel-table'].forEach(id=>{
-    const el=$(id); if(!el) return;
-    if(b) el.classList.add('loading'); else el.classList.remove('loading');
+    const el=$(id); if(!el) return; if(b) el.classList.add('loading'); else el.classList.remove('loading');
   });
   const kpi=$('kpiMetrics'); if(kpi) kpi.setAttribute('aria-busy', String(b));
 }
@@ -288,21 +283,91 @@ async function copyShareUrl(){
   }
 }
 
-/* ===== テーブル ===== */
-const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc' };
+/* ===== テーブル（ページング + 仮想スクロール） ===== */
+const VIRTUAL_THRESHOLD = 800;     // これ以上は自動で仮想化
+const ROW_H = 36;                   // 行の概算高さ(px)
+const BUFFER_ROWS = 8;              // 先読み/後読み
+
+const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc', virtual:false };
+let vSpacerEl=null; // 仮想スクロール用スペーサ
+let vScrollHandler=null;
+
 function coerceRow(r){ return { date:r.date??r.day??'', tag:r.tag??r.strategy??r.name??'',
   evals:(+r.evals)||0, adopted:(+r.adopted)||0,
   win_rate:(r.win_rate==null?null:+(+r.win_rate*100).toFixed(2)),
   max_drawdown:(r.max_drawdown==null?null:+(+r.max_drawdown*100).toFixed(2)),
   rechecks:(+r.rechecks||+r.recheck_count||0), trades:(+r.trades||+r.num_trades||0) }; }
+
 function sortView(){ const k=tableState.sortKey,d=tableState.sortDir; tableState.view=[...tableState.raw].sort((a,b)=>{
   const va=a[k],vb=b[k]; if(va==null&&vb==null)return 0; if(va==null)return 1; if(vb==null)return -1;
   if(typeof va==='number' && typeof vb==='number') return d==='asc'?va-vb:vb-va;
   return d==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));}); }
+
+function ensureSpacer(){
+  const wrap=$('wrapTable');
+  if(!vSpacerEl){ vSpacerEl=document.createElement('div'); vSpacerEl.id='vSpacer'; vSpacerEl.style.width='1px'; vSpacerEl.style.height='0'; }
+  if(wrap && !vSpacerEl.isConnected){ wrap.appendChild(vSpacerEl); }
+}
+
+function setVirtualMode(on){
+  const wrap=$('wrapTable'), table=$('details-table'), pager=$('wrapPager');
+  tableState.virtual = !!on;
+  if(on){
+    ensureSpacer();
+    wrap.style.maxHeight = '420px';
+    if(pager) pager.style.display = 'none';
+    table.style.position='absolute';
+    table.style.top='0'; table.style.left='0'; table.style.right='0';
+    if(!vScrollHandler){ vScrollHandler = ()=> renderTableVirtual(); wrap.addEventListener('scroll', vScrollHandler, { passive:true }); }
+    renderTableVirtual();
+  }else{
+    // 解除
+    if(vScrollHandler){ wrap.removeEventListener('scroll', vScrollHandler); vScrollHandler=null; }
+    if(vSpacerEl){ vSpacerEl.style.height='0px'; }
+    const tbody=$('details-body'); if(tbody){ tbody.style.transform=''; }
+    const pager=$('wrapPager'); if(pager) pager.style.display = '';
+    const table=$('details-table'); if(table){ table.style.position=''; table.style.top=''; table.style.left=''; table.style.right=''; }
+    renderTablePage();
+  }
+}
+
+function renderTableVirtual(){
+  const wrap=$('wrapTable'); const tbody=$('details-body');
+  if(!wrap||!tbody) return;
+  const total = tableState.view.length;
+  if(total===0){ tbody.innerHTML=''; if(vSpacerEl) vSpacerEl.style.height='0px'; return; }
+
+  const viewportH = wrap.clientHeight || 420;
+  const totalH = total * ROW_H;
+  if(vSpacerEl){ vSpacerEl.style.height = totalH + 'px'; }
+
+  const scrollTop = wrap.scrollTop;
+  const first = Math.max(0, Math.floor(scrollTop / ROW_H) - BUFFER_ROWS);
+  const visRows = Math.ceil(viewportH / ROW_H) + BUFFER_ROWS*2;
+  const last = Math.min(total, first + visRows);
+
+  const rows = [];
+  for(let i=first;i<last;i++){
+    const r = tableState.view[i];
+    rows.push(`<tr><td>${r.date||''}</td><td>${r.tag||''}</td><td>${r.evals}</td><td>${r.adopted}</td>
+      <td>${r.win_rate==null?'—':r.win_rate.toFixed(2)}</td>
+      <td>${r.max_drawdown==null?'—':r.max_drawdown.toFixed(2)}</td>
+      <td>${r.rechecks}</td><td>${r.trades}</td></tr>`);
+  }
+  tbody.innerHTML = rows.join('');
+  tbody.style.transform = `translateY(${first*ROW_H}px)`;
+  setText('details-info', `全 ${total} 件（仮想表示 ${last-first} 行）`);
+}
+
 function renderTablePage(){
   const panel=$('details-panel'); if(!panel) return;
   if(!tableState.view.length){ panel.style.display='none'; return; } panel.style.display='';
-  const body=$('details-body'),info=$('details-info'); const ps=tableState.pageSize,total=tableState.view.length;
+
+  // 仮想モードならそちらで描画
+  if(tableState.virtual){ renderTableVirtual(); return; }
+
+  const body=$('details-body'),info=$('details-info');
+  const ps=tableState.pageSize,total=tableState.view.length;
   const totalPages=Math.max(1,Math.ceil(total/ps)); if(tableState.page>totalPages) tableState.page=totalPages;
   const start=(tableState.page-1)*ps; const slice=tableState.view.slice(start,start+ps);
   body.innerHTML=slice.map(r=>`<tr><td>${r.date||''}</td><td>${r.tag||''}</td><td>${r.evals}</td><td>${r.adopted}</td>
@@ -312,16 +377,33 @@ function renderTablePage(){
   $('prevPage')?.toggleAttribute?.('disabled', tableState.page<=1);
   $('nextPage')?.toggleAttribute?.('disabled', tableState.page>=totalPages);
 }
+
 function attachTableEvents(){
   $('details-table')?.querySelector('thead')?.addEventListener('click',(ev)=>{
     const th=ev.target.closest('th'); if(!th?.dataset.key) return; const key=th.dataset.key;
     if(tableState.sortKey===key){ tableState.sortDir = (tableState.sortDir==='asc'?'desc':'asc'); }
     else { tableState.sortKey=key; tableState.sortDir=(key==='date'||key==='tag')?'asc':'desc'; }
-    sortView(); tableState.page=1; renderTablePage();
+    sortView();
+    // 両モードで先頭へ
+    tableState.page=1;
+    $('wrapTable').scrollTop = 0;
+    renderTablePage();
   });
   $('prevPage')?.addEventListener('click', ()=>{ if(tableState.page>1){ tableState.page--; renderTablePage(); }});
   $('nextPage')?.addEventListener('click', ()=>{ tableState.page++; renderTablePage(); });
-  $('page-size')?.addEventListener('change', (e)=>{ tableState.pageSize=+e.target.value||20; tableState.page=1; renderTablePage(); });
+  $('page-size')?.addEventListener('change', (e)=>{
+    const v = e.target.value;
+    if(v==='all'){
+      tableState.pageSize = Number.MAX_SAFE_INTEGER;
+      setVirtualMode(true);
+    }else{
+      tableState.pageSize=+v||20;
+      setVirtualMode(tableState.view.length > VIRTUAL_THRESHOLD);
+    }
+    tableState.page=1;
+    $('wrapTable').scrollTop = 0;
+    renderTablePage();
+  });
 }
 
 /* ===== エクスポート ===== */
@@ -399,7 +481,7 @@ async function doRefresh(){
   setText('kpi-adopted', intFmt(t?.adopted));
   setText('kpi-rechecks', intFmt(t?.rechecks));
   setText('kpi-winrate', percentFmt(t?.win_rate));
-  setText('kpi-maxdd', percentFmt(t?.max_drawdown));
+  setText('kpi-maxdd',   percentFmt(t?.max_drawdown));
 
   // charts
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
@@ -429,16 +511,33 @@ async function doRefresh(){
 
   // details（summaryに含まれなければ fallback）
   let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
-  if(Array.isArray(details) && details.length){ tableState.raw = details.map(coerceRow); sortView(); tableState.page=1; renderTablePage(); }
-  else { tableState.raw=[]; tableState.view=[]; renderTablePage(); }
+  if(Array.isArray(details) && details.length){
+    tableState.raw = details.map(coerceRow);
+    sortView();
+    $('wrapTable').scrollTop = 0;
+
+    // 仮想モード判定
+    const sizeSel = $('page-size')?.value || '20';
+    if(sizeSel==='all' || tableState.view.length > VIRTUAL_THRESHOLD){
+      setVirtualMode(true);
+    }else{
+      setVirtualMode(false);
+    }
+
+    tableState.page=1;
+    renderTablePage();
+  }else{
+    tableState.raw=[]; tableState.view=[];
+    setVirtualMode(false);
+    renderTablePage();
+  }
 
   // CSVリンク
   wireCsvButton();
 
-  // デバッグログ（開発者向け）
   console.groupCollapsed('%cPDCA refresh ok','color:#22c55e');
   console.log('requestId(summary):', rid1);
-  console.log('labels:', labels.length, 'details:', details?.length||0);
+  console.log('labels:', labels.length, 'details:', details?.length||0, 'virtual:', tableState.virtual);
   console.groupEnd();
 }
 
