@@ -36,6 +36,9 @@
   table.hud-table th, table.hud-table td { padding:.5rem .6rem; border-bottom:1px solid var(--panel-border); white-space:nowrap; }
   table.hud-table th { text-align:left; color:var(--text-color-light); cursor:pointer; user-select:none; position: sticky; top: 0; background: var(--bg-color); z-index: 2; }
   table.hud-table th .sort { opacity:.7; font-size:.85em; margin-left:.25rem; }
+  table.hud-table tbody tr { cursor: pointer; }
+  table.hud-table tbody tr:hover { background: rgba(34, 209, 238, 0.08); }
+
   .pager { display:flex; gap:.5rem; align-items:center; justify-content:flex-end; margin-top:.5rem; }
   .pager .hud-link[disabled] { opacity:.5; pointer-events:none; }
 
@@ -54,6 +57,29 @@
   .error-panel { display:none; margin-top:.75rem; padding:.6rem .8rem; border-radius:.5rem; border:1px solid #ef4444; background: rgba(239,68,68,.08); }
   .error-panel.show { display:block; }
   .error-panel code { white-space:pre-wrap; }
+
+  /* ====== 詳細モーダル ====== */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+    display: none; align-items: center; justify-content: center; z-index: 10000;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal-card {
+    width: min(880px, 92vw); max-height: 86vh; overflow: auto;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 12px; box-shadow: 0 0 20px var(--glow-primary); padding: 1rem 1.2rem;
+  }
+  .modal-header { display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem; }
+  .modal-title { font-weight: 800; color: var(--text-color-normal); font-size: 1.2rem; display:flex; gap:.5rem; align-items:center; }
+  .modal-sub { color: var(--text-color-light); font-size:.9rem; }
+  .modal-actions { margin-left:auto; display:flex; gap:.5rem; }
+  .modal-body { display:grid; grid-template-columns: 1fr; gap:.75rem; }
+  .kv { display:grid; grid-template-columns: 160px 1fr; gap:.5rem; }
+  .kv div:first-child { color: var(--text-color-light); }
+  .link-row { display:flex; flex-wrap:wrap; gap:.5rem; }
+  .json-pre { background: rgba(0,0,0,0.25); border:1px solid var(--panel-border); padding:.5rem .6rem; border-radius:8px; overflow:auto; max-height: 240px; font-size:.85rem; }
+  .chip { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .5rem; border-radius:999px; background: rgba(34,209,238,.12); border:1px solid var(--panel-border); }
+  .kbd { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size:.8em; padding:.05rem .35rem; border:1px solid var(--panel-border); border-radius:4px; }
 </style>
 
 <script src="/static/vendor/chart.umd.js"></script>
@@ -185,8 +211,43 @@
   </div>
 </section>
 
-<!-- エラー詳細（ユーザー向け簡易表示） -->
+<!-- エラー詳細 -->
 <div id="error-panel" class="error-panel" role="alert" aria-live="assertive"></div>
+
+<!-- ===== 詳細モーダル ===== -->
+<div id="detailModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-circle-info"></i><span id="detailModalTitle">詳細</span></div>
+      <div class="modal-actions">
+        <button id="openDecisionBtn" class="hud-link" type="button">🗄 Decisionへ</button>
+        <button id="openRunBtn" class="hud-link" type="button">🌀 Runへ</button>
+        <button id="closeDetailBtn" class="hud-link" type="button"><span class="kbd">Esc</span> 閉じる</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="kv">
+        <div>日付</div><div id="d_date">-</div>
+        <div>タグ</div><div id="d_tag">-</div>
+        <div>評価 / 採用</div><div><span class="chip"><i class="fas fa-clipboard-check"></i><span id="d_evals">-</span></span> <span class="chip"><i class="fas fa-check-circle"></i><span id="d_adopted">-</span></span></div>
+        <div>勝率 / 最大DD</div><div><span class="chip">Win <span id="d_win">-</span>%</span> <span class="chip">DD <span id="d_dd">-</span>%</span></div>
+        <div>再評価 / 取引数</div><div><span class="chip">Re <span id="d_re">-</span></span> <span class="chip">Tr <span id="d_tr">-</span></span></div>
+      </div>
+      <div>
+        <div class="modal-sub">関連リンク</div>
+        <div class="link-row">
+          <a id="d_link_adoptions" class="hud-link" target="_blank" rel="noopener">🧩 Adoptions</a>
+          <a id="d_link_decisions" class="hud-link" target="_blank" rel="noopener">🗂 Decisions</a>
+          <a id="d_link_runs" class="hud-link" target="_blank" rel="noopener">🌀 Airflow Runs</a>
+        </div>
+      </div>
+      <div>
+        <div class="modal-sub">Raw JSON</div>
+        <pre id="d_json" class="json-pre">{}</pre>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="grid-quicklinks">
   <a class="card link-card" href="/adoptions"><div class="card-header">🗂 採用タグ × Decision 一覧</div><div class="card-body muted">GitタグとDecision台帳の総覧。CSV/JSON対応。</div></a>
@@ -292,16 +353,28 @@ const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir
 let vSpacerEl=null;
 let vScrollHandler=null;
 
-function coerceRow(r){ return { date:r.date??r.day??'', tag:r.tag??r.strategy??r.name??'',
-  evals:(+r.evals)||0, adopted:(+r.adopted)||0,
-  win_rate:(r.win_rate==null?null:+(+r.win_rate*100).toFixed(2)),
-  max_drawdown:(r.max_drawdown==null?null:+(+r.max_drawdown*100).toFixed(2)),
-  rechecks:(+r.rechecks||+r.recheck_count||0), trades:(+r.trades||+r.num_trades||0) }; }
+function coerceRow(r){
+  return {
+    date:r.date??r.day??'',
+    tag:r.tag??r.strategy??r.name??'',
+    evals:(+r.evals)||0,
+    adopted:(+r.adopted)||0,
+    win_rate:(r.win_rate==null?null:+(+r.win_rate*100).toFixed(2)),
+    max_drawdown:(r.max_drawdown==null?null:+(+r.max_drawdown*100).toFixed(2)),
+    rechecks:(+r.rechecks||+r.recheck_count||0),
+    trades:(+r.trades||+r.num_trades||0),
+    // ドリルダウン用に可能な限り識別子を保持
+    decision_id: r.decision_id || r.decision?.id || null,
+    run_id: r.run_id || r.airflow_run_id || null,
+    detail_id: r.id || r.detail_id || null,
+    __raw: r
+  };
+}
 
 function sortView(){ const k=tableState.sortKey,d=tableState.sortDir; tableState.view=[...tableState.raw].sort((a,b)=>{
   const va=a[k],vb=b[k]; if(va==null&&vb==null)return 0; if(va==null)return 1; if(vb==null)return -1;
   if(typeof va==='number' && typeof vb==='number') return d==='asc'?va-vb:vb-va;
-  return d==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));}); }
+  return d==='asc'?String(va).localeCompare(String(vb)):String(va).localeCompare(String(vb))*-1;}); }
 
 function ensureSpacer(){
   const wrap=$('wrapTable');
@@ -330,6 +403,27 @@ function setVirtualMode(on){
   }
 }
 
+function trHtml(r, idx){
+  return `<tr data-idx="${idx}">
+    <td>${r.date||''}</td><td>${r.tag||''}</td><td>${r.evals}</td><td>${r.adopted}</td>
+    <td>${r.win_rate==null?'—':r.win_rate.toFixed(2)}</td>
+    <td>${r.max_drawdown==null?'—':r.max_drawdown.toFixed(2)}</td>
+    <td>${r.rechecks}</td><td>${r.trades}</td>
+  </tr>`;
+}
+
+function hookRowClicks(){
+  const body=$('details-body');
+  if(!body) return;
+  body.querySelectorAll('tr[data-idx]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      const idx = +tr.getAttribute('data-idx');
+      const row = tableState.view[idx];
+      if(row) openDetailModal(row);
+    });
+  });
+}
+
 function renderTableVirtual(){
   const wrap=$('wrapTable'); const tbody=$('details-body');
   if(!wrap||!tbody) return;
@@ -346,16 +440,11 @@ function renderTableVirtual(){
   const last = Math.min(total, first + visRows);
 
   const rows = [];
-  for(let i=first;i<last;i++){
-    const r = tableState.view[i];
-    rows.push(`<tr><td>${r.date||''}</td><td>${r.tag||''}</td><td>${r.evals}</td><td>${r.adopted}</td>
-      <td>${r.win_rate==null?'—':r.win_rate.toFixed(2)}</td>
-      <td>${r.max_drawdown==null?'—':r.max_drawdown.toFixed(2)}</td>
-      <td>${r.rechecks}</td><td>${r.trades}</td></tr>`);
-  }
+  for(let i=first;i<last;i++){ rows.push(trHtml(tableState.view[i], i)); }
   tbody.innerHTML = rows.join('');
   tbody.style.transform = `translateY(${first*ROW_H}px)`;
   setText('details-info', `全 ${total} 件（仮想表示 ${last-first} 行）`);
+  hookRowClicks();
 }
 
 function renderTablePage(){
@@ -368,12 +457,11 @@ function renderTablePage(){
   const ps=tableState.pageSize,total=tableState.view.length;
   const totalPages=Math.max(1,Math.ceil(total/ps)); if(tableState.page>totalPages) tableState.page=totalPages;
   const start=(tableState.page-1)*ps; const slice=tableState.view.slice(start,start+ps);
-  body.innerHTML=slice.map(r=>`<tr><td>${r.date||''}</td><td>${r.tag||''}</td><td>${r.evals}</td><td>${r.adopted}</td>
-  <td>${r.win_rate==null?'—':r.win_rate.toFixed(2)}</td><td>${r.max_drawdown==null?'—':r.max_drawdown.toFixed(2)}</td>
-  <td>${r.rechecks}</td><td>${r.trades}</td></tr>`).join('');
+  body.innerHTML=slice.map((r,i)=>trHtml(r, start+i)).join('');
   setText('pageStatus', `${tableState.page} / ${totalPages}`); setText('details-info', `全 ${total} 件`);
   $('prevPage')?.toggleAttribute?.('disabled', tableState.page<=1);
   $('nextPage')?.toggleAttribute?.('disabled', tableState.page>=totalPages);
+  hookRowClicks();
 }
 
 function attachTableEvents(){
@@ -464,30 +552,64 @@ async function fetchDetailsFallback(qs){
 window.NoctriaPDCA = window.NoctriaPDCA || {};
 function getCharts(){ if(!window.NoctriaPDCA.charts) window.NoctriaPDCA.charts={counts:null,winDiff:null}; return window.NoctriaPDCA.charts; }
 
-/* === ここが今回の復活ポイント：一括再評価 === */
-async function triggerRecheckAll(){
-  const reason = prompt("一括再評価の理由（任意）", "") || "";
-  const p = inputsToParamsAllKeys();
-  const url = new URL('/pdca/recheck_all', location.origin);
-  url.searchParams.set('reason', reason);
-  url.searchParams.set('filter_date_from', p.get('date_from'));
-  url.searchParams.set('filter_date_to', p.get('date_to'));
-  try{
-    const res = await fetch(url.toString(), { method:'POST' });
-    const js = await res.json().catch(()=>({message:'未知の応答'}));
-    toast(js.message || '起動しました', res.ok);
-  }catch(e){
-    toast('再評価の起動に失敗: ' + (e?.message || e), false);
-  }
+/* ====== ドリルダウン：詳細モーダル ====== */
+function closeDetailModal(){ const m=$('detailModal'); if(!m) return; m.classList.remove('show'); m.setAttribute('aria-hidden','true'); }
+function openDetailModal(row){
+  const m=$('detailModal'); if(!m) return;
+
+  // ヘッダ
+  setText('detailModalTitle', `${row.tag || '—'} @ ${row.date || '—'}`);
+  // 概要
+  setText('d_date', row.date||'—'); setText('d_tag', row.tag||'—');
+  setText('d_evals', row.evals); setText('d_adopted', row.adopted);
+  setText('d_win', row.win_rate==null?'—':row.win_rate.toFixed(2));
+  setText('d_dd', row.max_drawdown==null?'—':row.max_drawdown.toFixed(2));
+  setText('d_re', row.rechecks); setText('d_tr', row.trades);
+
+  // 関連リンク（フォールバックはクエリリンク）
+  const q = new URLSearchParams({ tag: row.tag || '', date: row.date || '' }).toString();
+  const decUrl = row.decision_id ? `/decisions/${row.decision_id}` : `/decisions?${q}`;
+  const runUrl = row.run_id ? `/airflow/runs/${row.run_id}` : `/airflow/runs?${q}`;
+  const adoptUrl = `/adoptions?${q}`;
+
+  $('d_link_decisions').href = decUrl;
+  $('d_link_runs').href = runUrl;
+  $('d_link_adoptions').href = adoptUrl;
+
+  // 追加情報をAPIから引く（あれば）
+  (async ()=>{
+    let payload = row.__raw || {};
+    try{
+      // まず id 優先、なければ date+tag で詳細を試す
+      let detailRes = null;
+      if(row.detail_id){
+        try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?id=${encodeURIComponent(row.detail_id)}`); }catch(_){}
+      }
+      if(!detailRes && row.date && row.tag){
+        try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?date=${encodeURIComponent(row.date)}&tag=${encodeURIComponent(row.tag)}`); }catch(_){}
+      }
+      if(detailRes?.data){ payload = detailRes.data; }
+    }catch(e){ console.debug('detail fetch skipped', e); }
+    $('d_json').textContent = JSON.stringify(payload, null, 2);
+  })();
+
+  m.classList.add('show');
+  m.setAttribute('aria-hidden','false');
 }
 
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeDetailModal(); }});
+</script>
+
+<script>
 async function doRefresh(){
   const p=inputsToParamsAllKeys(); const qs=p.toString();
   history.replaceState(null,'',location.pathname+'?'+qs);
   showErrorPanel(null);
 
+  // summary
   const {data:s, requestId:rid1} = await fetchJsonWithDetail('/pdca/api/summary?'+qs);
 
+  // KPI
   const t = s?.totals || {};
   setText('kpi-count', intFmt(s?.count_rows));
   setText('kpi-adopted', intFmt(t?.adopted));
@@ -495,6 +617,7 @@ async function doRefresh(){
   setText('kpi-winrate', percentFmt(t?.win_rate));
   setText('kpi-maxdd',   percentFmt(t?.max_drawdown));
 
+  // charts
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
   const labels = by.map(r => r?.date ?? '');
   const evals  = by.map(r => (+r?.evals)||0);
@@ -520,12 +643,14 @@ async function doRefresh(){
     options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:0 }}, y:{ beginAtZero:true }}}
   });
 
+  // details（summaryに含まれなければ fallback）
   let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
   if(Array.isArray(details) && details.length){
     tableState.raw = details.map(coerceRow);
     sortView();
     $('wrapTable').scrollTop = 0;
 
+    // 仮想モード判定
     const sizeSel = $('page-size')?.value || '20';
     if(sizeSel==='all' || tableState.view.length > VIRTUAL_THRESHOLD){
       setVirtualMode(true);
@@ -562,10 +687,7 @@ window.pdcaRefresh = async function(){
     toast('更新しました');
   }catch(e){
     const d = e?.__detail || {};
-    console.group('%cPDCA refresh error','color:#ef4444');
-    console.error('Error:', e);
-    console.log('detail:', d);
-    console.groupEnd();
+    console.group('%cPDCA refresh error','color:#ef4444'); console.error('Error:', e); console.log('detail:', d); console.groupEnd();
     showErrorPanel({ where:'/pdca/api/summary', status:d.status, statusText:d.statusText, message:d.message||e?.message, requestId:d.requestId, bodySnippet:d.bodySnippet });
     toast(`取得に失敗 (HTTP ${d.status||'—'})`, false);
   }finally{
@@ -647,12 +769,25 @@ document.addEventListener('DOMContentLoaded', function(){
   })();
 
   $('applyBtn')?.addEventListener('click', ()=> window.pdcaRefresh());
-  if (typeof triggerRecheckAll === 'function') {
-    $('recheckAllBtn')?.addEventListener('click', triggerRecheckAll);
-  }
+  $('recheckAllBtn')?.addEventListener('click', ()=> {
+    const reason = prompt("一括再評価の理由（任意）", "") || "";
+    const p = inputsToParamsAllKeys();
+    const url = new URL('/pdca/recheck_all', location.origin);
+    url.searchParams.set('reason', reason);
+    url.searchParams.set('filter_date_from', p.get('date_from'));
+    url.searchParams.set('filter_date_to', p.get('date_to'));
+    fetch(url.toString(), { method:'POST' })
+      .then(r=>r.json().catch(()=>({message:'未知の応答'})).then(js=>({ok:r.ok, js})))
+      .then(({ok,js})=> toast(js.message || (ok?'起動しました':'失敗しました'), ok))
+      .catch(e=> toast('再評価の起動に失敗: '+(e?.message||e), false));
+  });
   $('copyLinkBtn')?.addEventListener('click', copyShareUrl);
   $('exportCsvBtn')?.addEventListener('click', exportDetailsCSV);
   $('exportJsonBtn')?.addEventListener('click', exportDetailsJSON);
+  $('closeDetailBtn')?.addEventListener('click', closeDetailModal);
+  // モーダル外クリックで閉じる
+  $('detailModal')?.addEventListener('click', (e)=>{ if(e.target===e.currentTarget) closeDetailModal(); });
+
   wirePresets();
   attachTableEvents();
   wireCsvButton();
