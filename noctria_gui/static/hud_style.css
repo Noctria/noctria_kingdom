@@ -245,3 +245,74 @@ html, body {
   box-shadow: 0 0 8px var(--glow-primary);
   border-color: var(--glow-primary);
 }
+
+/* ========== PDCA details table: 横スクロール + 左2列固定 ========== */
+
+/* 列幅は変数で管理：必要に応じて調整 */
+:root {
+  --col-date-w: 120px;  /* 日付列の幅 */
+  --col-tag-w:  220px;  /* タグ列の幅 */
+}
+
+/* 横スクロールを許容（既に .table-wrap があるページで機能） */
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* テーブル全体に最低幅（横スクロールを発生させる） */
+#details-table {
+  min-width: calc(var(--col-date-w) + var(--col-tag-w) + 720px); /* 右側の数値列分の余白 */
+  border-collapse: collapse;
+  background: transparent;
+}
+
+/* ヘッダは上部固定（既にページ側で設定済みなら重複OK） */
+#details-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;                /* 本文セルより前面に */
+  background: var(--panel-bg);
+}
+
+/* ===== 1列目：日付を固定 ===== */
+#details-table th[data-key="date"],
+#details-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--panel-bg);
+  z-index: 2;                /* 本文より上、ヘッダより下 */
+  /* 幅固定（ズレ防止） */
+  width: var(--col-date-w);
+  min-width: var(--col-date-w);
+  max-width: var(--col-date-w);
+  /* 視認性用の右側シャドウ */
+  box-shadow: 2px 0 0 rgba(34, 209, 238, 0.25);
+}
+
+/* ===== 2列目：タグを固定（1列目の幅だけ右へずらす） ===== */
+#details-table th[data-key="tag"],
+#details-table td:nth-child(2) {
+  position: sticky;
+  left: var(--col-date-w);
+  background: var(--panel-bg);
+  z-index: 2;
+  width: var(--col-tag-w);
+  min-width: var(--col-tag-w);
+  max-width: var(--col-tag-w);
+  box-shadow: 2px 0 0 rgba(34, 209, 238, 0.18);
+}
+
+/* セル共通（既存テーブルに合わせた見た目） */
+#details-table th, 
+#details-table td {
+  white-space: nowrap;
+  border-bottom: 1px solid var(--panel-border);
+  padding: .5rem .6rem;
+}
+
+/* ヘッダのソートUI（参考：既存と重複OK） */
+#details-table th .sort {
+  opacity: .7;
+  font-size: .85em;
+  margin-left: .25rem;
+}
