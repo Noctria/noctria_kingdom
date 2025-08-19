@@ -282,17 +282,41 @@ function $(id){ return document.getElementById(id); }
 function setText(id, t){ const el=$(id); if(el) el.textContent = (t ?? '—'); }
 function show(el, b){ if(el) el.style.display = b ? '' : 'none'; }
 function toast(msg, ok=true){ const t=$('toast'); if(!t) return; t.className='toast '+(ok?'ok':'err')+' show'; t.textContent=msg; setTimeout(()=>{t.className='toast';},2000); }
-function isoDateDaysAgo(days){ const now=new Date(); const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-days); const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
-function normalizeDate(s){ if(!s) return s; const t=String(s).trim(); if(/^\d{8}$/.test(t)) return `${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}`; if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; const d=new Date(t); if(!isNaN(d)){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; } return t; }
+function isoDateDaysAgo(days){
+  const now=new Date();
+  const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-days);
+  const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function normalizeDate(s){
+  if(!s) return s;
+  const t=String(s).trim();
+  if(/^\d{8}$/.test(t)) return `${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}`;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const d=new Date(t);
+  if(!isNaN(d)){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  }
+  return t;
+}
 function intFmt(v){ if(v==null || isNaN(+v)) return '—'; return String(Math.trunc(+v)); }
 function percentFmt(v){ if(v==null || isNaN(+v)) return '—'; return (Number(v)*100).toFixed(1) + '%'; }
 
 /* PNG保存 */
 function downloadChartPNG(canvasId, baseName){
   const el=$(canvasId); if(!el) return;
-  try{ const url=el.toDataURL('image/png',1.0); const a=document.createElement('a'); const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-    a.href=url; a.download=`pdca-${baseName}-${stamp}.png`; document.body.appendChild(a); a.click(); a.remove(); toast('画像を書き出しました'); }
-  catch(e){ console.error('png export failed', e); toast('画像の書き出しに失敗', false); }
+  try{
+    const url=el.toDataURL('image/png',1.0);
+    const a=document.createElement('a');
+    const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.href=url; a.download=`pdca-${baseName}-${stamp}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('画像を書き出しました');
+  }catch(e){
+    console.error('png export failed', e);
+    toast('画像の書き出しに失敗', false);
+  }
 }
 
 /* ===== ローディング制御（Skeleton表示） ===== */
@@ -339,8 +363,10 @@ async function copyShareUrl(){
   const url=buildShareUrl();
   try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }
   catch(e){
-    try{ const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました'); }
-    catch(e2){ prompt('このURLをコピーしてください:', url); }
+    try{
+      const ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('共有リンクをコピーしました');
+    }catch(e2){ prompt('このURLをコピーしてください:', url); }
   }
 }
 
@@ -363,7 +389,6 @@ function coerceRow(r){
     max_drawdown:(r.max_drawdown==null?null:+(+r.max_drawdown*100).toFixed(2)),
     rechecks:(+r.rechecks||+r.recheck_count||0),
     trades:(+r.trades||+r.num_trades||0),
-    // ドリルダウン用に可能な限り識別子を保持
     decision_id: r.decision_id || r.decision?.id || null,
     run_id: r.run_id || r.airflow_run_id || null,
     detail_id: r.id || r.detail_id || null,
@@ -371,10 +396,14 @@ function coerceRow(r){
   };
 }
 
-function sortView(){ const k=tableState.sortKey,d=tableState.sortDir; tableState.view=[...tableState.raw].sort((a,b)=>{
-  const va=a[k],vb=b[k]; if(va==null&&vb==null)return 0; if(va==null)return 1; if(vb==null)return -1;
-  if(typeof va==='number' && typeof vb==='number') return d==='asc'?va-vb:vb-va;
-  return d==='asc'?String(va).localeCompare(String(vb)):String(va).localeCompare(String(vb))*-1;}); }
+function sortView(){
+  const k=tableState.sortKey,d=tableState.sortDir;
+  tableState.view=[...tableState.raw].sort((a,b)=>{
+    const va=a[k],vb=b[k]; if(va==null&&vb==null)return 0; if(va==null)return 1; if(vb==null)return -1;
+    if(typeof va==='number' && typeof vb==='number') return d==='asc'?va-vb:vb-va;
+    return d==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+  });
+}
 
 function ensureSpacer(){
   const wrap=$('wrapTable');
@@ -453,7 +482,7 @@ function renderTablePage(){
 
   if(tableState.virtual){ renderTableVirtual(); return; }
 
-  const body=$('details-body'),info=$('details-info');
+  const body=$('details-body');
   const ps=tableState.pageSize,total=tableState.view.length;
   const totalPages=Math.max(1,Math.ceil(total/ps)); if(tableState.page>totalPages) tableState.page=totalPages;
   const start=(tableState.page-1)*ps; const slice=tableState.view.slice(start,start+ps);
@@ -492,9 +521,19 @@ function attachTableEvents(){
 }
 
 /* ===== エクスポート ===== */
-function downloadBlob(data, mime, filename){ const blob = new Blob([data], {type: mime}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+function downloadBlob(data, mime, filename){
+  const blob = new Blob([data], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
 function toCsvValue(v){ const s = (v==null) ? '' : String(v); if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"'; return s; }
-function getRangeSlug(){ const usp=new URLSearchParams(location.search); const from=normalizeDate(usp.get('date_from')||usp.get('from_date')||usp.get('from')||$('from-date')?.value||''); const to=normalizeDate(usp.get('date_to')||usp.get('to_date')||usp.get('to')||$('to-date')?.value||''); return `${from||'NA'}_${to||'NA'}`; }
+function getRangeSlug(){
+  const usp=new URLSearchParams(location.search);
+  const from=normalizeDate(usp.get('date_from')||usp.get('from_date')||usp.get('from')||$('from-date')?.value||'');
+  const to=normalizeDate(usp.get('date_to')||usp.get('to_date')||usp.get('to')||$('to-date')?.value||'');
+  return `${from||'NA'}_${to||'NA'}`;
+}
 function exportDetailsCSV(){
   if(!tableState.view.length){ toast('出力対象がありません', false); return; }
   const header = ['date','tag','evals','adopted','win_rate_pct','max_drawdown_pct','rechecks','trades'];
@@ -544,8 +583,11 @@ async function fetchJsonWithDetail(url){
 
 /* ===== API ===== */
 async function fetchDetailsFallback(qs){
-  try{ const {data} = await fetchJsonWithDetail('/pdca/api/details?'+qs); if(Array.isArray(data)) return data; if(Array.isArray(data?.items)) return data.items; }
-  catch(e){ console.error('[details] fallback error', e); }
+  try{
+    const {data} = await fetchJsonWithDetail('/pdca/api/details?'+qs);
+    if(Array.isArray(data)) return data;
+    if(Array.isArray(data?.items)) return data.items;
+  }catch(e){ console.error('[details] fallback error', e); }
   return [];
 }
 
@@ -557,16 +599,13 @@ function closeDetailModal(){ const m=$('detailModal'); if(!m) return; m.classLis
 function openDetailModal(row){
   const m=$('detailModal'); if(!m) return;
 
-  // ヘッダ
   setText('detailModalTitle', `${row.tag || '—'} @ ${row.date || '—'}`);
-  // 概要
   setText('d_date', row.date||'—'); setText('d_tag', row.tag||'—');
   setText('d_evals', row.evals); setText('d_adopted', row.adopted);
   setText('d_win', row.win_rate==null?'—':row.win_rate.toFixed(2));
   setText('d_dd', row.max_drawdown==null?'—':row.max_drawdown.toFixed(2));
   setText('d_re', row.rechecks); setText('d_tr', row.trades);
 
-  // 関連リンク（フォールバックはクエリリンク）
   const q = new URLSearchParams({ tag: row.tag || '', date: row.date || '' }).toString();
   const decUrl = row.decision_id ? `/decisions/${row.decision_id}` : `/decisions?${q}`;
   const runUrl = row.run_id ? `/airflow/runs/${row.run_id}` : `/airflow/runs?${q}`;
@@ -576,11 +615,9 @@ function openDetailModal(row){
   $('d_link_runs').href = runUrl;
   $('d_link_adoptions').href = adoptUrl;
 
-  // 追加情報をAPIから引く（あれば）
   (async ()=>{
     let payload = row.__raw || {};
     try{
-      // まず id 優先、なければ date+tag で詳細を試す
       let detailRes = null;
       if(row.detail_id){
         try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?id=${encodeURIComponent(row.detail_id)}`); }catch(_){}
@@ -666,6 +703,7 @@ async function doRefresh(){
     renderTablePage();
   }
 
+  // CSVリンク
   wireCsvButton();
 
   console.groupCollapsed('%cPDCA refresh ok','color:#22c55e');
@@ -700,9 +738,19 @@ function wirePresets(){
   document.querySelectorAll('.preset-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const mode=btn.dataset.mode, days=+btn.dataset.days;
-      if(mode==='year'){ const y=new Date().getFullYear(); $('from-date').value=`${y}-01-01`; $('to-date').value=isoDateDaysAgo(0); }
-      else if(mode==='reset'){ $('from-date').value=window.GLOBAL_DEFAULT_FROM||isoDateDaysAgo(14); $('to-date').value=window.GLOBAL_DEFAULT_TO||isoDateDaysAgo(0); }
-      else{ $('from-date').value=isoDateDaysAgo(days); $('to-date').value=isoDateDaysAgo(0); }
+      if(mode==='year'){
+        const y=new Date().getFullYear();
+        $('from-date').value=`${y}-01-01`;
+        $('to-date').value=isoDateDaysAgo(0);
+      }
+      else if(mode==='reset'){
+        $('from-date').value=window.GLOBAL_DEFAULT_FROM||isoDateDaysAgo(14);
+        $('to-date').value=window.GLOBAL_DEFAULT_TO||isoDateDaysAgo(0);
+      }
+      else{
+        $('from-date').value=isoDateDaysAgo(days);
+        $('to-date').value=isoDateDaysAgo(0);
+      }
       window.pdcaRefresh && window.pdcaRefresh();
     });
   });
@@ -715,10 +763,18 @@ function wirePresets(){
   const inputId='tag-input', listId='tag-ac-list';
   let cacheAll=null, lastQuery='', activeIndex=-1, pending=null;
   function el(){ return {inp:$(inputId), list:$(listId)}; }
-  function normalizeItems(js){ if(!js) return []; if(Array.isArray(js) && js.length && typeof js[0]==='string') return js; if(Array.isArray(js)) return js.map(o=>o?.name||o?.tag||o).filter(Boolean); return []; }
+  function normalizeItems(js){
+    if(!js) return [];
+    if(Array.isArray(js) && js.length && typeof js[0]==='string') return js;
+    if(Array.isArray(js)) return js.map(o=>o?.name||o?.tag||o).filter(Boolean);
+    return [];
+  }
   async function queryServer(q){
     try{ const r = await fetch('/pdca/api/tags?q='+encodeURIComponent(q||''), {cache:'no-store'}); if(r.ok){ return normalizeItems(await r.json()); } }catch{}
-    if(cacheAll==null){ try{ const r2 = await fetch('/pdca/api/tags', {cache:'no-store'}); if(r2.ok){ cacheAll = normalizeItems(await r2.json()); } }catch{ cacheAll = []; } }
+    if(cacheAll==null){
+      try{ const r2 = await fetch('/pdca/api/tags', {cache:'no-store'}); if(r2.ok){ cacheAll = normalizeItems(await r2.json()); }
+      }catch{ cacheAll = []; }
+    }
     const src = cacheAll||[]; const t=(q||'').toLowerCase();
     const starts = src.filter(s=>s.toLowerCase().startsWith(t));
     const contains = src.filter(s=>!s.toLowerCase().startsWith(t) && s.toLowerCase().includes(t));
@@ -727,7 +783,10 @@ function wirePresets(){
   function render(items){
     const {inp,list} = el(); if(!list) return;
     list.innerHTML = '';
-    if(!items.length){ list.innerHTML = '<div class="ac-empty">候補がありません</div>'; list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1; return; }
+    if(!items.length){
+      list.innerHTML = '<div class="ac-empty">候補がありません</div>';
+      list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1; return;
+    }
     items.forEach((s,idx)=>{
       const div=document.createElement('div'); div.className='ac-item'; div.setAttribute('role','option'); div.id=`ac-item-${idx}`;
       div.innerHTML = `<span># ${s}</span><span class="ac-kbd">Enterで決定</span>`;
@@ -741,13 +800,38 @@ function wirePresets(){
     activeIndex = (activeIndex + delta + list.children.length) % list.children.length;
     [...list.children].forEach((c,i)=>c.classList.toggle('active', i===activeIndex));
     inp.setAttribute('aria-activedescendant', list.children[activeIndex]?.id||'');
-    const act = list.children[activeIndex]; if(act){ const r=act.getBoundingClientRect(); const lr=list.getBoundingClientRect();
-      if(r.bottom>lr.bottom) act.scrollIntoView(false); else if(r.top<lr.top) act.scrollIntoView(); }
+    const act = list.children[activeIndex];
+    if(act){
+      const r=act.getBoundingClientRect(); const lr=list.getBoundingClientRect();
+      if(r.bottom>lr.bottom) act.scrollIntoView(false); else if(r.top<lr.top) act.scrollIntoView();
+    }
   }
   function close(){ const {list,inp}=el(); if(!list) return; list.classList.remove('show'); inp.setAttribute('aria-expanded','false'); activeIndex=-1; }
-  function pick(idx){ const {inp,list}=el(); if(!list) return; const sel = list.children[idx]?.textContent?.replace(/^#\s*/,'').replace(/\s*Enterで決定\s*$/,'') || ''; if(inp){ inp.value = sel; } close(); window.pdcaRefresh && window.pdcaRefresh(); }
-  function schedule(q){ if(pending) clearTimeout(pending); pending = setTimeout(async ()=>{ lastQuery=q; const items = await queryServer(q); if(lastQuery!==q) return; render(items); }, 120); }
-  function wire(){ const {inp,list}=el(); if(!inp||!list) return; inp.addEventListener('input', (e)=>{ const q=(e.target.value||'').trim(); schedule(q); }); inp.addEventListener('focus', ()=>{ schedule((inp.value||'').trim()); }); inp.addEventListener('blur', ()=>{ setTimeout(close, 120); }); inp.addEventListener('keydown', (e)=>{ if(e.key==='ArrowDown'){ e.preventDefault(); move(1); } else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); } else if(e.key==='Enter'){ if(activeIndex>=0){ e.preventDefault(); pick(activeIndex); } else { close(); } } else if(e.key==='Escape'){ close(); } }); }
+  function pick(idx){
+    const {inp,list}=el(); if(!list) return;
+    const sel = list.children[idx]?.textContent?.replace(/^#\s*/,'').replace(/\s*Enterで決定\s*$/,'') || '';
+    if(inp){ inp.value = sel; }
+    close(); window.pdcaRefresh && window.pdcaRefresh();
+  }
+  function schedule(q){
+    if(pending) clearTimeout(pending);
+    pending = setTimeout(async ()=>{
+      lastQuery=q; const items = await queryServer(q);
+      if(lastQuery!==q) return; render(items);
+    }, 120);
+  }
+  function wire(){
+    const {inp,list}=el(); if(!inp||!list) return;
+    inp.addEventListener('input', (e)=>{ const q=(e.target.value||'').trim(); schedule(q); });
+    inp.addEventListener('focus', ()=>{ schedule((inp.value||'').trim()); });
+    inp.addEventListener('blur', ()=>{ setTimeout(close, 120); });
+    inp.addEventListener('keydown', (e)=>{
+      if(e.key==='ArrowDown'){ e.preventDefault(); move(1); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); }
+      else if(e.key==='Enter'){ if(activeIndex>=0){ e.preventDefault(); pick(activeIndex); } else { close(); } }
+      else if(e.key==='Escape'){ close(); }
+    });
+  }
   document.addEventListener('DOMContentLoaded', wire);
 })();
 </script>
@@ -785,8 +869,13 @@ document.addEventListener('DOMContentLoaded', function(){
   $('exportCsvBtn')?.addEventListener('click', exportDetailsCSV);
   $('exportJsonBtn')?.addEventListener('click', exportDetailsJSON);
   $('closeDetailBtn')?.addEventListener('click', closeDetailModal);
+
   // モーダル外クリックで閉じる
   $('detailModal')?.addEventListener('click', (e)=>{ if(e.target===e.currentTarget) closeDetailModal(); });
+
+  // モーダル：右上ボタンはリンクを開く
+  $('openDecisionBtn')?.addEventListener('click', ()=>{ const a=$('d_link_decisions'); if(a?.href) window.open(a.href, '_blank'); });
+  $('openRunBtn')?.addEventListener('click', ()=>{ const a=$('d_link_runs'); if(a?.href) window.open(a.href, '_blank'); });
 
   wirePresets();
   attachTableEvents();
