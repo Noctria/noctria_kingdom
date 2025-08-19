@@ -532,6 +532,16 @@ curl -X POST https://example/api/v1/act/adopt \
 <!-- AUTODOC:BEGIN mode=git_log path_globs="noctria_gui/routes/**/*.py;noctria_gui/**/main.py;src/apis/**/*.py" title="API/GUI Routes 更新履歴（最近30）" limit=30 since=2025-08-01 -->
 ### API/GUI Routes 更新履歴（最近30）
 
+- **599513f** 2025-08-20T02:45:44+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **704d961** 2025-08-20T02:33:38+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **c809e15** 2025-08-20T02:14:50+09:00 — Create pdca_api.py (by Noctoria)
+  - `noctria_gui/routes/pdca_api.py`
+- **3b14d96** 2025-08-20T01:17:46+09:00 — Update main.py (by Noctoria)
+  - `noctria_gui/main.py`
+- **cabe7f6** 2025-08-20T01:16:26+09:00 — Create pdca_api_details.py (by Noctoria)
+  - `noctria_gui/routes/pdca_api_details.py`
 - **a6fedb9** 2025-08-18T02:17:15+09:00 — Update main.py (by Noctoria)
   - `noctria_gui/main.py`
 - **0f7b88b** 2025-08-18T01:05:27+09:00 — Update pdca_summary.py (by Noctoria)
@@ -582,14 +592,4 @@ curl -X POST https://example/api/v1/act/adopt \
   - `noctria_gui/routes/pdca_summary.py`
 - **aea152c** 2025-08-15T03:34:12+09:00 — Update strategy_detail.py (by Noctoria)
   - `noctria_gui/routes/strategy_detail.py`
-- **3bc997c** 2025-08-15T03:23:40+09:00 — Update strategy_detail.py (by Noctoria)
-  - `noctria_gui/routes/strategy_detail.py`
-- **482da8a** 2025-08-15T03:02:26+09:00 — Update pdca_recheck.py (by Noctoria)
-  - `noctria_gui/routes/pdca_recheck.py`
-- **e4c82d5** 2025-08-15T01:16:27+09:00 — Update pdca_recheck.py (by Noctoria)
-  - `noctria_gui/routes/pdca_recheck.py`
-- **47a5847** 2025-08-15T01:06:11+09:00 — Update main.py (by Noctoria)
-  - `noctria_gui/main.py`
-- **1b4c2ec** 2025-08-15T00:41:34+09:00 — Create statistics_routes.py (by Noctoria)
-  - `noctria_gui/routes/statistics_routes.py`
 <!-- AUTODOC:END -->

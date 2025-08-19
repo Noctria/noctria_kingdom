@@ -503,6 +503,27 @@ repos:
 <!-- AUTODOC:BEGIN mode=git_log path_globs="tests/**/*.py;docs/qa/*.md" title="テスト/QA 更新履歴（最近30）" limit=30 since=2025-08-01 -->
 ### テスト/QA 更新履歴（最近30）
 
+- **9643eb2** 2025-08-19T04:03:31+09:00 — docs: manual update from index [skip ci] (by Veritas Machina)
+  - `docs/00_index/00-INDEX.md`
+  - `docs/README.md`
+  - `docs/_generated/diff_report.md`
+  - `docs/_partials/apis/Do-Layer-Contract/01_scope_principles.md`
+  - `docs/_partials/apis/Do-Layer-Contract/02_flow_overview.md`
+  - `docs/_partials/apis/Do-Layer-Contract/03_entities_schemas.md`
+  - `docs/_partials/apis/Do-Layer-Contract/04_order_request.md`
+  - `docs/_partials/apis/Do-Layer-Contract/05_exec_result.md`
+  - `docs/_partials/apis/Do-Layer-Contract/06_audit_order.md`
+  - `docs/_partials/apis/Do-Layer-Contract/07_financial_correctness.md`
+  - `docs/_partials/apis/Do-Layer-Contract/08_idempotency_concurrency.md`
+  - `docs/_partials/apis/Do-Layer-Contract/09_error_codes.md`
+  - `docs/_partials/apis/Do-Layer-Contract/10_samples_min.md`
+  - `docs/_partials/apis/Do-Layer-Contract/11_contract_tests.md`
+  - `docs/_partials/apis/Do-Layer-Contract/12_changelog.md`
+  - `docs/adrs/ADRs.md`
+  - `docs/apis/Do-Layer-Contract.md`
+  - `docs/architecture/Plan-Layer.md`
+  - `docs/governance/Coding-Standards.md`
+  - `docs/governance/Vision-Governance.md`
 - **2ec153a** 2025-08-19T03:43:50+09:00 — docs: manual update from index [skip ci] (by Veritas Machina)
   - `docs/00_index/00-INDEX.md`
   - `docs/README.md`

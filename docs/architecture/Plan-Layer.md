@@ -136,6 +136,8 @@ class DECISION_MINI,TEST_E2E demo;
 <!-- AUTODOC:BEGIN mode=git_log path_globs="src/plan_data/*.py;src/plan_data/**/*.py" title="PLAN層 変更履歴（最近30）" limit=30 since=2025-08-01 -->
 ### PLAN層 変更履歴（最近30）
 
+- **6a2294c** 2025-08-20T02:31:07+09:00 — Update pdca_summary_service.py (by Noctoria)
+  - `src/plan_data/pdca_summary_service.py`
 - **0a246cf** 2025-08-19T02:37:10+09:00 — Update pdca_summary_service.py (by Noctoria)
   - `src/plan_data/pdca_summary_service.py`
 - **73b1b0d** 2025-08-18T03:37:41+09:00 — Update pdca_summary_service.py (by Noctoria)
@@ -193,8 +195,6 @@ class DECISION_MINI,TEST_E2E demo;
 - **1de46ad** 2025-08-13T01:49:35+09:00 — Create contracts.py (by Noctoria)
   - `src/plan_data/contracts.py`
 - **e7251f7** 2025-08-11T15:20:16+09:00 — Update observation_adapter.py (by Noctoria)
-  - `src/plan_data/observation_adapter.py`
-- **189ce11** 2025-08-11T15:14:42+09:00 — Update observation_adapter.py (by Noctoria)
   - `src/plan_data/observation_adapter.py`
 <!-- AUTODOC:END -->
 

@@ -823,6 +823,8 @@ class DECISION_MINI,TEST_E2E demo;
 <!-- AUTODOC:BEGIN mode=git_log path_globs=src/**/*.py title=コードベース更新履歴（最近30） limit=30 since=2025-08-01 -->
 ### コードベース更新履歴（最近30）
 
+- **6a2294c** 2025-08-20T02:31:07+09:00 — Update pdca_summary_service.py (by Noctoria)
+  - `src/plan_data/pdca_summary_service.py`
 - **0a246cf** 2025-08-19T02:37:10+09:00 — Update pdca_summary_service.py (by Noctoria)
   - `src/plan_data/pdca_summary_service.py`
 - **73b1b0d** 2025-08-18T03:37:41+09:00 — Update pdca_summary_service.py (by Noctoria)
@@ -881,6 +883,4 @@ class DECISION_MINI,TEST_E2E demo;
   - `src/plan_data/observability.py`
 - **b1453a0** 2025-08-13T16:03:47+09:00 — Update order_execution.py (by Noctoria)
   - `src/execution/order_execution.py`
-- **9ed85b3** 2025-08-13T15:53:16+09:00 — Update risk_policy.py (by Noctoria)
-  - `src/execution/risk_policy.py`
 <!-- AUTODOC:END -->

@@ -22,6 +22,9 @@
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
 ### `order_request`（Plan → Do）
 
+<!-- AUTODOC:BEGIN mode=file_content path_globs=docs/_partials/apis/Do-Layer-Contract/04_order_request.md title="`order_request`（Plan → Do）" -->
+### `order_request`（Plan → Do）
+
 **必須**：`symbol`, `side`, `proposed_qty`, `time`, `meta.strategy`  
 **オプション**：`max_slippage_pct`, `time_in_force`, `constraints.qty_step/price_tick`, `meta.shadow`
 
