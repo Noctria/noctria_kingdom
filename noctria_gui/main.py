@@ -37,42 +37,32 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 from markupsafe import Markup
-from noctria_gui.routes.pdca_api_details import router as details_router
-app.include_router(details_router)
-from noctria_gui.routes import pdca_api
-app.include_router(pdca_api.router)
 
-
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
-# -----------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parents[1]  # <repo_root>/noctria_gui/ -> parents[1] == <repo_root>
+# ---------------------------------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# -----------------------------------------------------------------------------
-# .env を確実に読み込む（python-dotenv 前提）
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# .env 読み込み（python-dotenv が無くても起動継続）
+# ---------------------------------------------------------------------------
 try:
     from dotenv import load_dotenv  # type: ignore
-    # 読み込み順：プロジェクト直下 → GUI配下（重複変数は上書きしない）
     for _env_path in (PROJECT_ROOT / ".env", PROJECT_ROOT / "noctria_gui" / ".env"):
         if _env_path.exists():
             load_dotenv(_env_path, override=False)
 except Exception:
-    # dotenv が未インストールでも起動は継続（環境変数だけで動作可）
     pass
 
-# -----------------------------------------------------------------------------
-# 集中管理パス設定（path_config が無くても動くようにフォールバック）
-# -----------------------------------------------------------------------------
-# 既定のフォールバック
+# ---------------------------------------------------------------------------
+# 集中管理パス設定（path_config が無くてもフォールバック）
+# ---------------------------------------------------------------------------
 _FALLBACK_STATIC_DIR = PROJECT_ROOT / "noctria_gui" / "static"
 _FALLBACK_TEMPLATES_DIR = PROJECT_ROOT / "noctria_gui" / "templates"
-
 try:
-    # 統一方針：src.* の絶対インポート
     from src.core.path_config import (  # type: ignore
         NOCTRIA_GUI_STATIC_DIR as _STATIC_DIR,
         NOCTRIA_GUI_TEMPLATES_DIR as _TEMPLATES_DIR,
@@ -80,13 +70,12 @@ try:
     NOCTRIA_GUI_STATIC_DIR: Path = Path(str(_STATIC_DIR))
     NOCTRIA_GUI_TEMPLATES_DIR: Path = Path(str(_TEMPLATES_DIR))
 except Exception:
-    # path_config が未整備でも落とさない
     NOCTRIA_GUI_STATIC_DIR = _FALLBACK_STATIC_DIR
     NOCTRIA_GUI_TEMPLATES_DIR = _FALLBACK_TEMPLATES_DIR
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # logging
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -94,35 +83,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("noctria_gui.main")
 
-# -----------------------------------------------------------------------------
-# FastAPI app
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# FastAPI app（← ここで最初に定義するのが重要！）
+# ---------------------------------------------------------------------------
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
     version="2.6.0",
 )
 
-# セッション（HUDトーストやフォーム結果の一時通知に使用）
+# セッション
 SESSION_SECRET = os.getenv("NOCTRIA_SESSION_SECRET", "noctria-dev-only-change-me")
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
-# -----------------------------------------------------------------------------
-# 静的/テンプレートの安全マウント（存在しない場合も落ちないように）
-# -----------------------------------------------------------------------------
-# /static
+# ---------------------------------------------------------------------------
+# 静的/テンプレートの安全マウント
+# ---------------------------------------------------------------------------
 if NOCTRIA_GUI_STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=str(NOTRIA_GUI_STATIC_DIR if 'NOTRIA_GUI_STATIC_DIR' in globals() else NOCTRIA_GUI_STATIC_DIR)), name="static")
     logger.info("Static mounted: %s", NOCTRIA_GUI_STATIC_DIR)
 else:
     logger.warning("Static dir not found: %s (skip mounting)", NOCTRIA_GUI_STATIC_DIR)
 
-# templates（存在しない場合はフォールバック）
 _tpl_dir = NOCTRIA_GUI_TEMPLATES_DIR if NOCTRIA_GUI_TEMPLATES_DIR.exists() else _FALLBACK_TEMPLATES_DIR
 templates = Jinja2Templates(directory=str(_tpl_dir))
 logger.info("Templates dir: %s", _tpl_dir)
 
-# 便利フィルタ
 def from_json(value: Any) -> Any:
     if isinstance(value, str):
         try:
@@ -140,25 +126,23 @@ def tojson_filter(value: Any, indent: int = 2) -> Markup:
 templates.env.filters["from_json"] = from_json
 templates.env.filters["tojson"] = tojson_filter
 
-# 互換用: ルーター側で request.app.state.jinja_env を参照できるように公開
+# ルーターから参照できるように公開
 app.state.jinja_env = templates.env
 
-# 便利: ルーターから使えるレンダラ（request をテンプレに渡す版）
 def render_template(request: Request, template_name: str, **ctx: Any) -> str:
     tmpl = templates.env.get_template(template_name)
     return tmpl.render(request=request, **ctx)
 
-app.state.render_template = render_template  # ルーターから利用可
+app.state.render_template = render_template
 
-# -----------------------------------------------------------------------------
-# PDCAサマリーDB: 起動時に ensure/health を best-effort で実行
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# PDCAサマリーDB: ensure/health（best-effort）
+# ---------------------------------------------------------------------------
 _SUMMARY_AVAILABLE = False
 _SUMMARY_DSN = None
 try:
     from src.plan_data import pdca_summary_service as _P  # type: ignore
     _SUMMARY_AVAILABLE = True
-    # 利用予定 DSN を保持（healthz で表示用）
     try:
         _SUMMARY_DSN = getattr(_P, "_get_dsn", lambda: None)()
     except Exception:
@@ -176,12 +160,11 @@ def _startup_pdca_summary() -> None:
         ok, msg = _P.healthcheck()
         logger.info(("✅" if ok else "⚠️") + " PDCA summary DB: %s", msg)
     except Exception as e:
-        # 起動阻害はしない（ログのみ）
         logger.warning("PDCA summary DB init skipped: %r", e)
 
-# -----------------------------------------------------------------------------
-# ルーターの取り込み（存在しないモジュールはスキップ）
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# ルーター安全取り込みユーティリティ
+# ---------------------------------------------------------------------------
 HAS_DASHBOARD = False
 
 def _safe_include(
@@ -191,9 +174,6 @@ def _safe_include(
     prefix: Optional[str] = None,
     tags: Optional[Sequence[str]] = None,
 ) -> bool:
-    """
-    ルーターを安全に取り込み。成功/失敗を bool で返す。
-    """
     global HAS_DASHBOARD
     try:
         mod = import_module(module_path)
@@ -203,7 +183,6 @@ def _safe_include(
         else:
             app.include_router(router)
         logger.info("Included router: %s", module_path)
-        # ダッシュボード判定を少し緩める（例: routes.dashboard_v2 でも検出）
         if ".dashboard" in module_path:
             HAS_DASHBOARD = True
         return True
@@ -215,9 +194,9 @@ logger.info("Integrating routers...")
 
 # 主要ルーター群（存在しなくてもスキップ可）
 _safe_include("noctria_gui.routes.home_routes")
-_safe_include("noctria_gui.routes.dashboard")            # ダッシュボード（あれば HAS_DASHBOARD=True）
+_safe_include("noctria_gui.routes.dashboard")
 
-# 王の統治系
+# 王系
 _safe_include("noctria_gui.routes.king_routes")
 _safe_include("noctria_gui.routes.trigger")
 _safe_include("noctria_gui.routes.hermes")
@@ -227,16 +206,17 @@ _safe_include("noctria_gui.routes.act_history")
 _safe_include("noctria_gui.routes.act_history_detail")
 _safe_include("noctria_gui.routes.logs_routes")
 _safe_include("noctria_gui.routes.upload_history")
-# 新規: Act手動トリガ（前回追加）
 _safe_include("noctria_gui.routes.act_adopt")
 
 # --- PDCA関連 ---
-_safe_include("noctria_gui.routes.pdca")                 # 既存：PDCAトップ/補助
-_safe_include("noctria_gui.routes.pdca_recheck")         # /pdca/control, /pdca/recheck
-_safe_include("noctria_gui.routes.pdca_routes")          # /pdca-dashboard（HUDダッシュボード）
-_safe_include("noctria_gui.routes.pdca_summary")         # /pdca/summary & /pdca/api/summary
-_safe_include("noctria_gui.routes.pdca_recent")          # 直近採用タグカード
+_safe_include("noctria_gui.routes.pdca")
+_safe_include("noctria_gui.routes.pdca_recheck")
+_safe_include("noctria_gui.routes.pdca_routes")
+_safe_include("noctria_gui.routes.pdca_summary")
+_safe_include("noctria_gui.routes.pdca_recent")
 _safe_include("noctria_gui.routes.pdca_widgets")
+# API（←これが /pdca/api/* の実体。**必ず app 定義後に include**）
+_safe_include("noctria_gui.routes.pdca_api")
 
 # 戦略・統計・タグ
 _safe_include("noctria_gui.routes.push")
@@ -273,24 +253,23 @@ _safe_include("noctria_gui.routes.path_checker")
 _safe_include("noctria_gui.routes.prometheus_routes")
 _safe_include("noctria_gui.routes.upload")
 
-# チャット履歴API（循環importの可能性があるため安全取り込み）
+# チャット履歴API（循環importのリスクがあるため安全取り込み）
 _safe_include("noctria_gui.routes.chat_history_api")
-# _safe_include("noctria_gui.routes.chat_api")  # APIキー未設定環境での誤爆防止
+# _safe_include("noctria_gui.routes.chat_api")
 
 # 可観測性ビュー
 _safe_include("noctria_gui.routes.observability")
 
-# 統治ルール可視化（metrics/timeline + HTML）
+# 統治ルール可視化
 _safe_include("noctria_gui.routes.governance_rules")
 
 logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBOARD)
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Routes (root / favicon / toast-clear / health / exception handler)
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 @app.get("/", include_in_schema=False)
 async def root_redirect():
-    # ダッシュボードが読み込めていれば /dashboard、なければ PDCA サマリーへ
     return RedirectResponse(url="/dashboard" if HAS_DASHBOARD else "/pdca/summary")
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -311,7 +290,6 @@ async def __clear_toast(request: Request):
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz():
-    # DB ヘルスは Optional（失敗しても API は 200 を返し、情報で示す）
     db_ok, db_msg = (False, "pdca summary not available")
     dsn_preview = _SUMMARY_DSN
     if _SUMMARY_AVAILABLE:
@@ -323,16 +301,15 @@ async def healthz():
     return JSONResponse(
         {
             "ok": True,
-            "static_dir": str(NOCTRIA_GUI_STATIC_DIR),
+            "static_dir": str(NOTRIA_GUI_STATIC_DIR if 'NOTRIA_GUI_STATIC_DIR' in globals() else NOCTRIA_GUI_STATIC_DIR),
             "templates_dir": str(_tpl_dir),
             "has_dashboard": HAS_DASHBOARD,
             "session_enabled": True,
-            "version": app.version if hasattr(app, "version") else "unknown",
+            "version": getattr(app, "version", "unknown"),
             "pdca_summary": {
                 "available": _SUMMARY_AVAILABLE,
                 "db_ok": db_ok,
                 "message": db_msg,
-                # DSN は漏えい対策でホスト/DB 名程度のみ表示（フルはログに出さない）
                 "dsn": dsn_preview,
             },
         }
@@ -342,17 +319,13 @@ async def healthz():
 async def global_exception_handler(request: Request, exc: Exception):
     tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     logger.error("Unhandled exception on %s %s: %s\nTraceback:\n%s", request.method, request.url, exc, tb)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"},
-    )
+    return JSONResponse(status_code=500, content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"})
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Local dev (optional)
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-
     port = int(os.getenv("GUI_PORT", "8001"))
     reload_flag = os.getenv("UVICORN_RELOAD", "0").lower() in ("1", "true", "on")
     uvicorn.run("noctria_gui.main:app", host="0.0.0.0", port=port, reload=reload_flag)
