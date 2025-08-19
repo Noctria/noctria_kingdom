@@ -4,12 +4,20 @@
 PDCAサマリー用のデータ取得＆KPI集計ユーティリティ
 
 優先ソース: Postgres テーブル/ビュー `obs_infer_calls`
-  必須カラム: started_at, ended_at, ai_name, status, params_json, metrics_json
+  想定カラム:
+    - started_at (timestamp/timestamptz)
+    - ended_at   (timestamp/timestamptz, nullable)
+    - ai_name    (text)
+    - status     (text) 例: 'success' / 'failed' / ...
+    - params_json  (json/jsonb) 例: {tag, decision_id, run_id, action, ...}
+    - metrics_json (json/jsonb) 例: {win_rate, max_drawdown, trades, ...}
+    - （任意）id (uuid/text) — 無ければ派生IDを生成して返す
 
 役割:
   1) 期間指定で obs_infer_calls を取得（接続不可や未作成時は安全に空配列）
   2) KPI（評価件数/再評価件数/採用件数/採用率/平均勝率/最大DD/取引数）を集計
   3) 日次集計（勝率・件数・取引数）を生成
+  4) フロント期待形式の details/summary/entry API用データを返却
 
 環境変数:
   - NOCTRIA_OBS_PG_DSN （推奨）
@@ -17,17 +25,18 @@ PDCAサマリー用のデータ取得＆KPI集計ユーティリティ
   - もしくは POSTGRES_HOST/PORT/DB/USER/PASSWORD からDSNを組み立て
 
 返却値の単位:
-  - win_rate: 0〜1 の比率（UI側で%表記に変換してください）
-  - max_drawdown: 0〜1 の比率（負の値を返せる実装でも可。ここではそのまま）
+  - win_rate: 0〜1 の比率（UI側で%表記に変換）
+  - max_drawdown: 0〜1 の比率（負値の実装でもそのまま返す）
 """
 
 from __future__ import annotations
 
 import os
 import json
+import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, List, Optional, Tuple, Iterable
 
 # ---- DB 接続（psycopg v3 → v2 フォールバック）----
 try:
@@ -105,6 +114,7 @@ class InferRow:
     status: str
     params_json: Dict[str, Any]
     metrics_json: Dict[str, Any]
+    raw_id: Optional[str] = None  # テーブルにidがある場合のみ
 
 
 def _load_json(val: Any) -> Dict[str, Any]:
@@ -120,6 +130,49 @@ def _load_json(val: Any) -> Dict[str, Any]:
     return {}
 
 
+def _first_str(d: Dict[str, Any], *keys: str) -> Optional[str]:
+    for k in keys:
+        v = d.get(k)
+        if v is None:
+            continue
+        if isinstance(v, (str, int, float, bool)):
+            s = str(v)
+            return s if s != "" else None
+    return None
+
+
+def _first_num(d: Dict[str, Any], *keys: str) -> Optional[float]:
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, (int, float)):
+            try:
+                return float(v)
+            except Exception:
+                continue
+    return None
+
+
+def _first_int(d: Dict[str, Any], *keys: str) -> Optional[int]:
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, int):
+            return v
+        if isinstance(v, float):
+            try:
+                return int(v)
+            except Exception:
+                continue
+    return None
+
+
+def _derived_id(started_at: datetime, ai_name: str, decision_id: Optional[str], run_id: Optional[str]) -> str:
+    """
+    テーブルに id が無い場合の安定ID（ビューでも同一行なら同じIDになるよう構成）
+    """
+    base = f"{started_at.astimezone(timezone.utc).isoformat()}|{ai_name}|{decision_id or ''}|{run_id or ''}"
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()  # 40文字hex
+
+
 # ---------------------------------------------------------------------
 # 取得
 # ---------------------------------------------------------------------
@@ -132,43 +185,59 @@ def fetch_infer_calls(from_date: datetime, to_date: datetime) -> List[InferRow]:
     if conn is None:
         return []
 
-    q = """
+    # id列の有無に依らず動くよう、SELECT句を2通り試す
+    # まず id あり想定のクエリを実行し、失敗したら id なし版へフォールバック
+    start_utc = _to_utc_start(from_date)
+    end_utc = _to_utc_end(to_date)
+
+    rows: List[InferRow] = []
+    q_with_id = """
+        SELECT id, started_at, ended_at, ai_name, status, params_json, metrics_json
+          FROM obs_infer_calls
+         WHERE started_at >= %s AND started_at <= %s
+         ORDER BY started_at ASC
+    """
+    q_no_id = """
         SELECT started_at, ended_at, ai_name, status, params_json, metrics_json
           FROM obs_infer_calls
          WHERE started_at >= %s AND started_at <= %s
          ORDER BY started_at ASC
     """
-    start_utc = _to_utc_start(from_date)
-    end_utc = _to_utc_end(to_date)
 
-    rows: List[InferRow] = []
     try:
         with conn:
             with conn.cursor() as cur:
-                cur.execute(q, (start_utc, end_utc))
-                for rec in cur.fetchall():
-                    started_at = rec[0]
-                    ended_at = rec[1]
-                    ai_name = rec[2] or ""
-                    status = rec[3] or ""
-                    params = _load_json(rec[4])
-                    metrics = _load_json(rec[5])
-
-                    if isinstance(started_at, str):
-                        started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-                    if isinstance(ended_at, str):
-                        ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-
-                    rows.append(
-                        InferRow(
-                            started_at=started_at,
-                            ended_at=ended_at,
-                            ai_name=ai_name,
-                            status=status,
-                            params_json=params,
-                            metrics_json=metrics,
-                        )
-                    )
+                # try with id
+                try:
+                    cur.execute(q_with_id, (start_utc, end_utc))
+                    for rec in cur.fetchall():
+                        raw_id = str(rec[0]) if rec[0] is not None else None
+                        started_at = rec[1]
+                        ended_at = rec[2]
+                        ai_name = rec[3] or ""
+                        status = rec[4] or ""
+                        params = _load_json(rec[5])
+                        metrics = _load_json(rec[6])
+                        if isinstance(started_at, str):
+                            started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                        if isinstance(ended_at, str):
+                            ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+                        rows.append(InferRow(started_at, ended_at, ai_name, status, params, metrics, raw_id))
+                except Exception:
+                    # fallback: no id column
+                    cur.execute(q_no_id, (start_utc, end_utc))
+                    for rec in cur.fetchall():
+                        started_at = rec[0]
+                        ended_at = rec[1]
+                        ai_name = rec[2] or ""
+                        status = rec[3] or ""
+                        params = _load_json(rec[4])
+                        metrics = _load_json(rec[5])
+                        if isinstance(started_at, str):
+                            started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                        if isinstance(ended_at, str):
+                            ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+                        rows.append(InferRow(started_at, ended_at, ai_name, status, params, metrics, None))
     except Exception:
         # DBクエリが失敗してもUIを止めない
         return []
@@ -188,18 +257,18 @@ def _is_eval(row: InferRow) -> bool:
     name = row.ai_name.lower()
     if "eval" in name or "recheck" in name:
         return True
-    act = str(row.params_json.get("action", "")).lower()
-    phase = str(row.params_json.get("phase", "")).lower()
-    return act in ("evaluate", "re-evaluate", "recheck", "eval") or phase in ("evaluate", "recheck", "eval")
+    act = _first_str(row.params_json, "action", "mode", "phase")
+    act = (act or "").lower()
+    return act in ("evaluate", "re-evaluate", "recheck", "eval")
 
 
 def _is_recheck(row: InferRow) -> bool:
     name = row.ai_name.lower()
     if "recheck" in name:
         return True
-    if str(row.params_json.get("recheck", "")).lower() in ("1", "true", "yes", "on"):
+    if _first_str(row.params_json, "recheck") in ("1", "true", "yes", "on", "True", "TRUE"):
         return True
-    reason = str(row.params_json.get("reason", "")).lower()
+    reason = (_first_str(row.params_json, "reason") or "").lower()
     return "recheck" in reason
 
 
@@ -207,34 +276,12 @@ def _is_adopt(row: InferRow) -> bool:
     name = row.ai_name.lower()
     if "adopt" in name or "act" in name or "push" in name:
         return True
-    act = str(row.params_json.get("action", "")).lower()
+    act = (_first_str(row.params_json, "action") or "").lower()
     return act in ("adopt", "push", "act")
 
 
-def _get_num(d: Dict[str, Any], *keys: str) -> Optional[float]:
-    for k in keys:
-        if k in d and isinstance(d[k], (int, float)):
-            try:
-                return float(d[k])
-            except Exception:
-                continue
-    return None
-
-
-def _get_int(d: Dict[str, Any], *keys: str) -> Optional[int]:
-    for k in keys:
-        if k in d and isinstance(d[k], int):
-            return int(d[k])
-        if k in d and isinstance(d[k], float):
-            try:
-                return int(d[k])
-            except Exception:
-                continue
-    return None
-
-
 # ---------------------------------------------------------------------
-# 集計
+# 集計（KPI/日次）
 # ---------------------------------------------------------------------
 def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
     """
@@ -261,23 +308,23 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
         m = r.metrics_json
 
         # --- 勝率 ---
-        wr = _get_num(m, "win_rate", "success_ratio", "accuracy")
-        if wr is not None and 0.0 <= wr <= 1.0:
+        wr = _first_num(m, "win_rate", "success_ratio", "accuracy")
+        if wr is not None and -1.0 <= wr <= 1.0:  # （負値実装が来ても0〜1に丸めない：生値を尊重）
             win_rates.append(wr)
         else:
-            wins = _get_int(m, "wins", "n_wins", "successful_trades")
-            total = _get_int(m, "trades", "num_trades", "n_trades", "total_trades", "episodes")
+            wins = _first_int(m, "wins", "n_wins", "successful_trades")
+            total = _first_int(m, "trades", "num_trades", "n_trades", "total_trades", "episodes")
             if wins is not None and total and total > 0:
                 wins_sum += wins
                 trades_sum_for_win += total
 
-        # --- 最大DD（より小さいほど悪い想定。ここではそのまま最小値を代表値に）---
-        dd = _get_num(m, "max_drawdown", "max_dd", "mdd")
+        # --- 最大DD ---
+        dd = _first_num(m, "max_drawdown", "max_dd", "mdd")
         if dd is not None:
             dd_values.append(dd)
 
         # --- 取引数 ---
-        t = _get_int(m, "trades", "num_trades", "n_trades", "total_trades")
+        t = _first_int(m, "trades", "num_trades", "n_trades", "total_trades")
         if t is not None:
             trades_sum += t
 
@@ -288,22 +335,21 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
     elif trades_sum_for_win > 0:
         agg_win_rate = wins_sum / trades_sum_for_win
 
-    # 最大DD: 最悪値（最小値）を採用
+    # 最大DD: 「より小さいほど悪い」という前提の最悪値を代表（最小値）
     agg_max_dd: Optional[float] = min(dd_values) if dd_values else None
 
-    # --- 採用率: 分母ゼロ(評価=0)でも採用データだけある場合にフォールバック ---
+    # 採用率: 分母ゼロ(評価=0)でも採用データだけある場合にフォールバック
     effective_total = total_evals if total_evals > 0 else (total_evals + total_adopted)
     adopt_rate = (total_adopted / effective_total) if effective_total > 0 else None
 
-    # 後方互換: adopt_rate を正式キーに、adoption_rate も併記
     return {
         "evals": total_evals,
         "rechecks": total_rechecks,
         "adopted": total_adopted,
-        "adopt_rate": adopt_rate,        # 正式
-        "adoption_rate": adopt_rate,     # 互換（フロント実装差異に配慮）
-        "win_rate": agg_win_rate,        # 0-1 or None
-        "max_drawdown": agg_max_dd,      # 例: -0.12（-12%）/ 0.12（12%）
+        "adopt_rate": adopt_rate,        # 0-1 or None
+        "adoption_rate": adopt_rate,     # 互換
+        "win_rate": agg_win_rate,        # 0-1 or None / （負値実装ならそのまま）
+        "max_drawdown": agg_max_dd,      # 例: -0.12 / 0.12
         "trades": trades_sum,
     }
 
@@ -342,15 +388,15 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
         if _is_adopt(r) and r.status.lower() == "success":
             b["adopted"] += 1
 
-        t = _get_int(r.metrics_json, "trades", "num_trades", "n_trades", "total_trades") or 0
+        t = _first_int(r.metrics_json, "trades", "num_trades", "n_trades", "total_trades") or 0
         b["trades"] += t
 
-        wr = _get_num(r.metrics_json, "win_rate", "success_ratio", "accuracy")
-        if wr is not None and 0 <= wr <= 1.0:
+        wr = _first_num(r.metrics_json, "win_rate", "success_ratio", "accuracy")
+        if wr is not None and -1.0 <= wr <= 1.0:
             b["_win_rates"].append(wr)
         else:
-            wins = _get_int(r.metrics_json, "wins", "n_wins", "successful_trades")
-            total = _get_int(r.metrics_json, "trades", "num_trades", "n_trades", "total_trades", "episodes")
+            wins = _first_int(r.metrics_json, "wins", "n_wins", "successful_trades")
+            total = _first_int(r.metrics_json, "trades", "num_trades", "n_trades", "total_trades", "episodes")
             if wins is not None and total:
                 b["_wins"] += wins
                 b["_total"] += total
@@ -375,12 +421,256 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
                 "evals": b["evals"],
                 "adopted": b["adopted"],
                 "trades": b["trades"],
-                "win_rate": wr,       # 0-1 or None
+                "win_rate": wr,       # 0-1 or None / （負値実装でもそのまま）
                 "adopt_rate": adopt_rate,  # 0-1 or None
             }
         )
 
     return out
+
+
+# ---------------------------------------------------------------------
+# フロント期待形式の生成（details / summary / entry）
+# ---------------------------------------------------------------------
+def _rows_to_details(rows: Iterable[InferRow]) -> List[Dict[str, Any]]:
+    """
+    InferRow -> details[] (フロント期待形)
+      必須キー:
+        id, decision_id, run_id, date(YYYY-MM-DD), tag, win_rate, max_drawdown, rechecks, trades, evals(dict), adopted(bool)
+    """
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        p = r.params_json
+        m = r.metrics_json
+
+        decision_id = _first_str(p, "decision_id", "decisionId", "decision", "dec_id")
+        run_id = _first_str(p, "run_id", "runId", "run", "airflow_run_id", "execution_id")
+        tag = _first_str(p, "tag", "strategy_tag", "strategyTag", "label") or r.ai_name
+
+        # KPI
+        win_rate = _first_num(m, "win_rate", "success_ratio", "accuracy")
+        if win_rate is None:
+            wins = _first_int(m, "wins", "n_wins", "successful_trades")
+            total = _first_int(m, "trades", "num_trades", "n_trades", "total_trades", "episodes")
+            win_rate = (wins / total) if (wins is not None and total and total > 0) else None
+
+        max_dd = _first_num(m, "max_drawdown", "max_dd", "mdd")
+        trades = _first_int(m, "trades", "num_trades", "n_trades", "total_trades") or 0
+
+        # 再評価フラグ（行単位）
+        recheck_flag = 1 if _is_recheck(r) else 0
+
+        # 採用フラグ
+        adopted = bool(_is_adopt(r) and r.status.lower() == "success")
+
+        # id
+        _id = r.raw_id or _derived_id(r.started_at, r.ai_name, decision_id, run_id)
+
+        out.append(
+            {
+                "id": _id,
+                "decision_id": decision_id or "",
+                "run_id": run_id or "",
+                "date": r.started_at.astimezone(timezone.utc).date().isoformat(),
+                "tag": tag,
+                "win_rate": float(win_rate) if win_rate is not None else None,
+                "max_drawdown": float(max_dd) if max_dd is not None else None,
+                "rechecks": recheck_flag,
+                "trades": int(trades),
+                "evals": m if isinstance(m, dict) else {},
+                "adopted": adopted,
+            }
+        )
+    return out
+
+
+def get_details(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    フィルタを適用した details[] を返す。
+      受け取る可能性のあるキー:
+        - date_from, date_to (YYYY-MM-DD)
+        - tag
+        - win_diff (float, 下限) / dd_diff (float, 上限) / min_trades (int, 下限)
+        - sort (win_rate|max_drawdown|maxdd|trades|date)
+        - limit, offset
+    """
+    # 期間解決（未指定は「直近14日」）
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=14)
+    if filters.get("date_from"):
+        start = datetime.strptime(filters["date_from"], "%Y-%m-%d").date()
+    if filters.get("date_to"):
+        end = datetime.strptime(filters["date_to"], "%Y-%m-%d").date()
+
+    rows = fetch_infer_calls(datetime.combine(start, datetime.min.time()), datetime.combine(end, datetime.min.time()))
+    det = _rows_to_details(rows)
+
+    # フィルタ
+    tag = filters.get("tag")
+    if tag:
+        det = [r for r in det if r["tag"] == tag]
+
+    win_diff = filters.get("win_diff")
+    if win_diff is not None:
+        try:
+            thr = float(win_diff)
+            det = [r for r in det if r["win_rate"] is not None and r["win_rate"] >= thr]
+        except Exception:
+            pass
+
+    dd_diff = filters.get("dd_diff")
+    if dd_diff is not None:
+        try:
+            thr = float(dd_diff)
+            det = [r for r in det if r["max_drawdown"] is not None and r["max_drawdown"] <= thr]
+        except Exception:
+            pass
+
+    min_trades = filters.get("min_trades")
+    if min_trades is not None:
+        try:
+            thr = int(min_trades)
+            det = [r for r in det if r["trades"] >= thr]
+        except Exception:
+            pass
+
+    # ソート
+    sort = (filters.get("sort") or "").lower()
+    if sort == "win_rate":
+        det.sort(key=lambda r: (r["win_rate"] is None, r["win_rate"]), reverse=True)
+    elif sort in ("max_drawdown", "maxdd"):
+        det = [r for r in det if r["max_drawdown"] is not None] + [r for r in det if r["max_drawdown"] is None]
+        det.sort(key=lambda r: (r["max_drawdown"] is None, r["max_drawdown"]))  # 小さい方が先
+    elif sort == "trades":
+        det.sort(key=lambda r: r["trades"], reverse=True)
+    else:  # date/tag/id
+        det.sort(key=lambda r: (r["date"], r["tag"], r["id"]))
+
+    # limit/offset
+    off = int(filters.get("offset") or 0)
+    lim = int(filters.get("limit") or len(det))
+    return det[off: off + lim]
+
+
+def get_summary(filters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    summary: { totals, by_day[], details[] }
+      - totals: { rows, trades, adopted, avg_win_rate, avg_max_drawdown }
+      - by_day: [{ date, rows, trades, avg_win_rate, avg_max_drawdown }]
+      - details: 上記 get_details() と同型（必要に応じてAPI側で非含有にできる）
+    """
+    det = get_details({**filters, "limit": filters.get("limit") or 100000})
+    # totals/by_day を再計算
+    rows_for_agg: List[InferRow] = []
+    # detailsからInferRowへ戻す必要は本来ないが、既存集計関数を活用するため最小限リフレーム
+    for d in det:
+        started = datetime.fromisoformat(d["date"])  # naive (UTC日付だけ持つ)
+        started = datetime(started.year, started.month, started.day, tzinfo=timezone.utc)
+        rows_for_agg.append(
+            InferRow(
+                started_at=started,
+                ended_at=None,
+                ai_name=d.get("tag", ""),
+                status=("success" if d.get("adopted") else "unknown"),
+                params_json={"action": "evaluate", "tag": d.get("tag", "")},
+                metrics_json={
+                    "win_rate": d.get("win_rate"),
+                    "max_drawdown": d.get("max_drawdown"),
+                    "trades": d.get("trades"),
+                },
+            )
+        )
+
+    # totals
+    k = aggregate_kpis(rows_for_agg)
+    totals = {
+        "rows": len(det),
+        "trades": int(k.get("trades") or 0),
+        "adopted": int(k.get("adopted") or 0),
+        "avg_win_rate": float(k.get("win_rate")) if k.get("win_rate") is not None else None,
+        "avg_max_drawdown": float(k.get("max_drawdown")) if k.get("max_drawdown") is not None else None,
+    }
+
+    # by_day
+    byday_raw = aggregate_by_day(rows_for_agg)
+    # aggregate_by_day は evals/adopted/trades/win_rate/adopt_rate を返すので、
+    # 期待形に正規化（rows=evals相当）
+    by_day = []
+    for b in byday_raw:
+        rows_cnt = int(b.get("evals") or 0)
+        wr = b.get("win_rate")
+        dd = None  # 詳細粒度が無いのでby_dayのDD平均は省略（必要なら別集約を追加）
+        by_day.append(
+            {
+                "date": b["date"],
+                "rows": rows_cnt,
+                "trades": int(b.get("trades") or 0),
+                "avg_win_rate": float(wr) if wr is not None else None,
+                "avg_max_drawdown": dd,
+            }
+        )
+
+    return {"totals": totals, "by_day": by_day, "details": det}
+
+
+def get_entry_by_id(entry_id: str) -> Optional[Dict[str, Any]]:
+    """
+    id優先で1件返す。テーブルにid列が無い場合は期間を広めにして探索。
+    """
+    # まず直接クエリを試す（id列がある場合）
+    conn = _connect()
+    if conn is not None:
+        q = """
+            SELECT id, started_at, ended_at, ai_name, status, params_json, metrics_json
+              FROM obs_infer_calls
+             WHERE id = %s
+             LIMIT 1
+        """
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    try:
+                        cur.execute(q, (entry_id,))
+                        rec = cur.fetchone()
+                        if rec:
+                            raw_id = str(rec[0]) if rec[0] is not None else None
+                            started_at = rec[1]
+                            ended_at = rec[2]
+                            ai_name = rec[3] or ""
+                            status = rec[4] or ""
+                            params = _load_json(rec[5])
+                            metrics = _load_json(rec[6])
+                            if isinstance(started_at, str):
+                                started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                            if isinstance(ended_at, str):
+                                ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+                            row = InferRow(started_at, ended_at, ai_name, status, params, metrics, raw_id)
+                            return _rows_to_details([row])[0]
+                    except Exception:
+                        # id列が無い／エラー → フォールバック（期間探索）
+                        pass
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    # フォールバック：過去90日を探索（コストを抑えるなら14〜30日に調整）
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=90)
+    det = get_details({"date_from": start.isoformat(), "date_to": end.isoformat()})
+    for r in det:
+        if r["id"] == entry_id:
+            return r
+    return None
+
+
+def get_entry_by_date_tag(date: str, tag: str) -> Optional[Dict[str, Any]]:
+    """
+    (date, tag) で最初の1件を返す
+    """
+    det = get_details({"date_from": date, "date_to": date, "tag": tag, "limit": 1})
+    return det[0] if det else None
 
 
 # ---------------------------------------------------------------------
