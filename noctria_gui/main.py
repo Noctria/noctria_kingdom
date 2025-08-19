@@ -39,6 +39,9 @@ from starlette.responses import FileResponse
 from markupsafe import Markup
 from noctria_gui.routes.pdca_api_details import router as details_router
 app.include_router(details_router)
+from noctria_gui.routes import pdca_api
+app.include_router(pdca_api.router)
+
 
 # -----------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
