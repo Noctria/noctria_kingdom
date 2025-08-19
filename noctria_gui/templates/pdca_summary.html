@@ -284,12 +284,12 @@ async function copyShareUrl(){
 }
 
 /* ===== テーブル（ページング + 仮想スクロール） ===== */
-const VIRTUAL_THRESHOLD = 800;     // これ以上は自動で仮想化
-const ROW_H = 36;                   // 行の概算高さ(px)
-const BUFFER_ROWS = 8;              // 先読み/後読み
+const VIRTUAL_THRESHOLD = 800;
+const ROW_H = 36;
+const BUFFER_ROWS = 8;
 
 const tableState={ raw:[], view:[], page:1, pageSize:20, sortKey:'date', sortDir:'desc', virtual:false };
-let vSpacerEl=null; // 仮想スクロール用スペーサ
+let vSpacerEl=null;
 let vScrollHandler=null;
 
 function coerceRow(r){ return { date:r.date??r.day??'', tag:r.tag??r.strategy??r.name??'',
@@ -321,7 +321,6 @@ function setVirtualMode(on){
     if(!vScrollHandler){ vScrollHandler = ()=> renderTableVirtual(); wrap.addEventListener('scroll', vScrollHandler, { passive:true }); }
     renderTableVirtual();
   }else{
-    // 解除
     if(vScrollHandler){ wrap.removeEventListener('scroll', vScrollHandler); vScrollHandler=null; }
     if(vSpacerEl){ vSpacerEl.style.height='0px'; }
     const tbody=$('details-body'); if(tbody){ tbody.style.transform=''; }
@@ -363,7 +362,6 @@ function renderTablePage(){
   const panel=$('details-panel'); if(!panel) return;
   if(!tableState.view.length){ panel.style.display='none'; return; } panel.style.display='';
 
-  // 仮想モードならそちらで描画
   if(tableState.virtual){ renderTableVirtual(); return; }
 
   const body=$('details-body'),info=$('details-info');
@@ -384,7 +382,6 @@ function attachTableEvents(){
     if(tableState.sortKey===key){ tableState.sortDir = (tableState.sortDir==='asc'?'desc':'asc'); }
     else { tableState.sortKey=key; tableState.sortDir=(key==='date'||key==='tag')?'asc':'desc'; }
     sortView();
-    // 両モードで先頭へ
     tableState.page=1;
     $('wrapTable').scrollTop = 0;
     renderTablePage();
@@ -467,15 +464,30 @@ async function fetchDetailsFallback(qs){
 window.NoctriaPDCA = window.NoctriaPDCA || {};
 function getCharts(){ if(!window.NoctriaPDCA.charts) window.NoctriaPDCA.charts={counts:null,winDiff:null}; return window.NoctriaPDCA.charts; }
 
+/* === ここが今回の復活ポイント：一括再評価 === */
+async function triggerRecheckAll(){
+  const reason = prompt("一括再評価の理由（任意）", "") || "";
+  const p = inputsToParamsAllKeys();
+  const url = new URL('/pdca/recheck_all', location.origin);
+  url.searchParams.set('reason', reason);
+  url.searchParams.set('filter_date_from', p.get('date_from'));
+  url.searchParams.set('filter_date_to', p.get('date_to'));
+  try{
+    const res = await fetch(url.toString(), { method:'POST' });
+    const js = await res.json().catch(()=>({message:'未知の応答'}));
+    toast(js.message || '起動しました', res.ok);
+  }catch(e){
+    toast('再評価の起動に失敗: ' + (e?.message || e), false);
+  }
+}
+
 async function doRefresh(){
   const p=inputsToParamsAllKeys(); const qs=p.toString();
   history.replaceState(null,'',location.pathname+'?'+qs);
   showErrorPanel(null);
 
-  // summary
   const {data:s, requestId:rid1} = await fetchJsonWithDetail('/pdca/api/summary?'+qs);
 
-  // KPI
   const t = s?.totals || {};
   setText('kpi-count', intFmt(s?.count_rows));
   setText('kpi-adopted', intFmt(t?.adopted));
@@ -483,7 +495,6 @@ async function doRefresh(){
   setText('kpi-winrate', percentFmt(t?.win_rate));
   setText('kpi-maxdd',   percentFmt(t?.max_drawdown));
 
-  // charts
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
   const labels = by.map(r => r?.date ?? '');
   const evals  = by.map(r => (+r?.evals)||0);
@@ -509,14 +520,12 @@ async function doRefresh(){
     options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:0 }}, y:{ beginAtZero:true }}}
   });
 
-  // details（summaryに含まれなければ fallback）
   let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
   if(Array.isArray(details) && details.length){
     tableState.raw = details.map(coerceRow);
     sortView();
     $('wrapTable').scrollTop = 0;
 
-    // 仮想モード判定
     const sizeSel = $('page-size')?.value || '20';
     if(sizeSel==='all' || tableState.view.length > VIRTUAL_THRESHOLD){
       setVirtualMode(true);
@@ -532,7 +541,6 @@ async function doRefresh(){
     renderTablePage();
   }
 
-  // CSVリンク
   wireCsvButton();
 
   console.groupCollapsed('%cPDCA refresh ok','color:#22c55e');
@@ -639,7 +647,9 @@ document.addEventListener('DOMContentLoaded', function(){
   })();
 
   $('applyBtn')?.addEventListener('click', ()=> window.pdcaRefresh());
-  $('recheckAllBtn')?.addEventListener('click', triggerRecheckAll);
+  if (typeof triggerRecheckAll === 'function') {
+    $('recheckAllBtn')?.addEventListener('click', triggerRecheckAll);
+  }
   $('copyLinkBtn')?.addEventListener('click', copyShareUrl);
   $('exportCsvBtn')?.addEventListener('click', exportDetailsCSV);
   $('exportJsonBtn')?.addEventListener('click', exportDetailsJSON);
