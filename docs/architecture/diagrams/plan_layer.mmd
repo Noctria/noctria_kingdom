@@ -5,17 +5,18 @@ classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7;
 classDef ai fill:#2f3136,stroke:#a97e2c,color:#ffe476;
 classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
 classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
+classDef partial fill:#2e2e2e,stroke:#ffcc66,color:#fff2cc;
 classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
 classDef demo fill:#202020,stroke:#8a8a8a,color:#eaeaea;
 
 %% ====== PLAN layer ======
 subgraph PLAN ["PLAN layer (src/plan_data)"]
-  COLLECT["collector.py<br/>market data collection"]:::plan
-  FEATURES["features.py<br/>feature engineering"]:::plan
-  FEATDF["FeatureBundle output<br/>(df + context)<br/>v1.0"]:::plan
-  ANALYZER["analyzer.py<br/>factor extraction"]:::plan
-  STATS["statistics.py<br/>KPI aggregation"]:::plan
-  ADAPTER["strategy_adapter.py<br/>propose_with_logging<br/>logs obs_infer_calls"]:::plan
+  COLLECT["collector.py<br/>market data collection<br/>(IMPLEMENTED)"]:::plan
+  FEATURES["features.py<br/>feature engineering<br/>(IMPLEMENTED)"]:::plan
+  FEATDF["FeatureBundle output<br/>(df + context)<br/>v1.0（schemaあり）"]:::plan
+  ANALYZER["analyzer.py<br/>factor extraction<br/>(IMPLEMENTED)"]:::plan
+  STATS["statistics.py<br/>KPI aggregation<br/>(IMPLEMENTED)"]:::plan
+  ADAPTER["strategy_adapter.py<br/>propose_with_logging<br/>logs obs_infer_calls<br/>(IMPLEMENTED)"]:::plan
 end
 
 %% ====== AI underlings ======
@@ -28,33 +29,33 @@ subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
 end
 
 %% ====== Decision & Risk ======
-DECISION["DecisionEngine (min)<br/>integrate & log<br/>(IMPLEMENTED)"]:::plan
-NOCTUSGATE["Noctus Gate<br/>mandatory risk & lot filter<br/>(TODO)"]:::todo
-QUALITY["DataQualityGate<br/>missing_ratio / data_lag → SCALE/FLAT<br/>(TODO)"]:::todo
-PROFILES["profiles.yaml<br/>weights & rollout 7->30->100%<br/>(TODO)"]:::todo
+DECISION["DecisionEngine<br/>integrate & log<br/>(IMPLEMENTED)"]:::plan
+NOCTUSGATE["Noctus Gate（最終リスクゲート手前の計画側チェック）<br/>基本ルール/ロット制限<br/>(PARTIAL)"]:::partial
+QUALITY["DataQualityGate<br/>missing_ratio / data_lag → SCALE/FLAT<br/>(PARTIAL)"]:::partial
+PROFILES["profiles.yaml（configs）<br/>weights & rollout 7→30→100%<br/>(PARTIAL)"]:::partial
 
 %% ====== Contracts ======
-CONTRACTS["Contracts<br/>FeatureBundle & StrategyProposal v1.0<br/>OrderRequest (TBD)"]:::todo
+CONTRACTS["Contracts<br/>FeatureBundle & StrategyProposal v1.0（実装）<br/>OrderRequest（Do契約に準拠）"]:::partial
 TRACEID["Correlation ID trace_id<br/>PLAN/AI/Decision/Exec implemented"]:::plan
 
 %% ====== Do layer (handoff) ======
 subgraph DO_LAYER ["Do layer (handoff)"]
-  ORDER["order_execution.py<br/>execution API (dummy ok)"]:::do
+  ORDER["order_execution.py<br/>execution API（連携OK）"]:::do
 end
 
 %% ====== Demo & tests ======
 subgraph DEMO ["Demo and tests"]
-  DECISION_MINI["e2e/decision_minidemo.py<br/>E2E (IMPLEMENTED)"]:::demo
-  TEST_E2E["tests/test_trace_decision_e2e.py<br/>integration (IMPLEMENTED)"]:::demo
+  DECISION_MINI["e2e/decision_minidemo.py<br/>E2E（IMPLEMENTED）"]:::demo
+  TEST_E2E["tests/test_trace_decision_e2e.py<br/>integration（IMPLEMENTED）"]:::demo
 end
 
 %% ====== Observability taps ======
 subgraph OBS ["Observability taps (tables)"]
-  OBS_PLAN["obs_plan_runs<br/>collector/features/statistics/analyzer<br/>trace_id present"]:::obs
-  OBS_INFER["obs_infer_calls<br/>AI propose/predict latency<br/>trace_id present"]:::obs
-  OBS_DEC["obs_decisions<br/>decision metrics & reasons<br/>trace_id present (NEW)"]:::obs
-  OBS_EXEC["obs_exec_events<br/>send status / provider response<br/>trace_id present (NEW)"]:::obs
-  OBS_ALT["obs_alerts<br/>quality or risk alerts<br/>(TODO)"]:::obs
+  OBS_PLAN["obs_plan_runs<br/>collector/features/statistics/analyzer<br/>trace_id present（READY）"]:::obs
+  OBS_INFER["obs_infer_calls<br/>AI propose/predict latency<br/>trace_id present（READY）"]:::obs
+  OBS_DEC["obs_decisions<br/>decision metrics & reasons<br/>trace_id present（READY）"]:::obs
+  OBS_EXEC["obs_exec_events<br/>send status / provider response<br/>trace_id present（READY）"]:::obs
+  OBS_ALT["obs_alerts<br/>quality/risk alerts<br/>(PARTIAL: quality/riskの定義拡充TODO)"]:::partial
 end
 
 %% ====== PLAN flow ======
@@ -110,18 +111,18 @@ ORDER    -->|log| OBS_EXEC
 NOCTUSGATE -->|alert| OBS_ALT
 
 %% ====== trace_id notes ======
-FEATDF -. "trace_id (PLAN & AI implemented)" .-> AURUS
-FEATDF -. "trace_id (PLAN & AI implemented)" .-> LEVIA
-FEATDF -. "trace_id (PLAN & AI implemented)" .-> PROM
-FEATDF -. "trace_id (PLAN & AI implemented)" .-> VERITAS
-DECISION -. "trace_id (P->D->Exec implemented)" .-> ORDER
+FEATDF -. "trace_id（PLAN/AI実装済）" .-> AURUS
+FEATDF -. "trace_id（PLAN/AI実装済）" .-> LEVIA
+FEATDF -. "trace_id（PLAN/AI実装済）" .-> PROM
+FEATDF -. "trace_id（PLAN/AI実装済）" .-> VERITAS
+DECISION -. "trace_id（P→D→Exec実装済）" .-> ORDER
 
 %% ====== class bindings ======
 class COLLECT,FEATURES,FEATDF,ANALYZER,STATS,ADAPTER plan;
 class AURUS,LEVIA,PROM,VERITAS,HERMES ai;
 class ORDER do;
 class DECISION plan;
-class NOCTUSGATE,QUALITY,PROFILES,CONTRACTS todo;
+class NOCTUSGATE,QUALITY,PROFILES,CONTRACTS partial;
 class TRACEID plan;
 class OBS_PLAN,OBS_INFER,OBS_DEC,OBS_EXEC,OBS_ALT obs;
 class DECISION_MINI,TEST_E2E demo;
