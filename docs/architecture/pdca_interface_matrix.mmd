@@ -1,0 +1,178 @@
+# 🧩 PDCA Interface Matrix — Canonical
+**File role:** Single source of truth for **all interfaces between PDCA layers** (data contracts, producers/consumers, transport, observability, and invariants).  
+**Status:** Stable (design-first) / Code follows this spec  
+**Last Updated (JST):** 2025-08-23
+
+> 本書は **設計を先に固定** し、あとから実装を整合させるための「接続台帳」です。  
+> 各契約の本文は Contracts セクションの責任ファイルを参照し、ここでは **境界・運用・結合ルール** を統一します。
+
+---
+
+## 0) References (責任ファイル)
+- **Architecture Overview:** `docs/architecture/Architecture-Overview.md`
+- **Mermaid (PDCA):** `docs/architecture/diagrams/plan_layer.mmd`, `do_layer.mmd`, `check_layer.mmd`, `act_layer.mmd`
+- **Contracts (Data/API):**
+  - FeatureBundle v1.0 — `docs/architecture/contracts/FeatureBundle.md`
+  - StrategyProposal v1.0 — `docs/architecture/contracts/StrategyProposal.md`
+  - DecisionRecord v1.0 — `docs/architecture/contracts/DecisionRecord.md`
+  - **OrderRequest v1.1** — `docs/architecture/contracts/OrderRequest.md`（`idempotency_key` 追加）
+- **Observability (Guide / APIs):**
+  - High-level: `docs/observability/Observability.md`
+  - APIs & GUI: `docs/apis/observability/Observability.md`
+
+---
+
+## 1) Global Conventions（全体規約）
+- **Time:** All timestamps are **UTC ISO-8601** (`YYYY-MM-DDTHH:MM:SSZ`); GUIでTZ変換。
+- **SemVer:** Contracts follow **SemVer**. Minor (`v1.x`) = backward compatible. Major (`v2.0+`) = breaking.
+- **Correlation:** `trace_id` is **MUST** at all edges; generated in Plan (`src/plan_data/trace.py`) and propagated E2E.
+- **Idempotency:** For **mutating / side-effecting** actions (placing orders, releasing configs), an **idempotency key** is **SHOULD / MUST** as specified per edge. In Do層, `OrderRequest.idempotency_key` is **MUST** (v1.1).
+- **Transport:** In-process Python objects unless明記; audit/exportは JSON（immutable snapshot）。
+- **Observability:** Each edge **MUST** log to `obs_*` tables; GUI reads `obs_trace_timeline`, `obs_trace_latency`, `obs_latency_daily`.
+
+---
+
+## 2) Matrix (Edges at a Glance)
+| From | To | Contract(s) | Producer (files) | Consumer (files) | Transport | Observability |
+|---|---|---|---|---|---|---|
+| PLAN | AI | **FeatureBundle v1.0** | `src/plan_data/{collector,features,analyzer}.py` → `strategy_adapter.py` | `src/strategies/*.py` | In-proc obj (dict/DF) | `obs_plan_runs`, `obs_infer_calls` |
+| AI | DECISION | **StrategyProposal v1.0** (N件) | `src/strategies/*.py` | `src/decision/decision_engine.py` | In-proc obj | `obs_infer_calls`, `obs_decisions` |
+| DECISION | DO | **DecisionRecord v1.0**（常時）, **OrderRequest v1.1**（発注時） | `decision_engine.py` | `execution/order_execution.py` | In-proc obj → JSON audit | `obs_decisions`, `obs_exec_events` |
+| DO | CHECK | `exec_result.json`, `risk_event.json`, `audit_order.json` | `execution/*.py` | `src/check/{evaluation,challenge_monitor}.py` | JSON files / events | `obs_exec_events`, `obs_alerts` |
+| CHECK | ACT | `kpi_summary.json` | `src/check/evaluation.py` | `noctria_gui/routes/pdca_*` / `src/act/*` | JSON → GUI | `obs_act_runs` (summary ops) |
+| ACT | PLAN | `plan_update.json`, `strategy_release.json` | `src/act/*.py` | `src/plan_data/*` | JSON / API | `obs_act_runs`, `obs_alerts` |
+
+> 詳細必須フィールドは各 Contract の責任ファイルを参照。以下では **接続・運用上の要件** を固定。
+
+---
+
+## 3) PLAN → AI
+**Contract:** FeatureBundle v1.0  
+**Flow:** `collector.py → features.py → analyzer.py → strategy_adapter.propose_with_logging()` が FeatureBundle を構築し、各 AI へ渡す。
+
+**Rules**
+- `trace_id`（MUST）: Plan開始で生成し、FeatureBundleに含める。
+- **Determinism（推奨）**: 同一 `trace_id` と同一データなら FeatureBundle は再現可能であること。
+- **Logging（MUST）**:  
+  - `obs_plan_runs`: phase=`PLAN:START|END`  
+  - `obs_infer_calls`: 各AI呼び出しの `model`, `ver`, `dur_ms`, `success`
+
+---
+
+## 4) AI → DECISION
+**Contract:** StrategyProposal v1.0（AIごとに 0..N件）  
+**Flow:** `strategy_adapter.py` が proposer を呼び、結果を集約して DecisionEngine に渡す。
+
+**Rules**
+- **Multiplicity**: N件をソート（score/priority）して渡す。Top-N は DecisionEngine で制御。
+- **trace_id（MUST）**: 各 Proposal に同封。
+- **Logging（MUST）**: `obs_infer_calls` に latency, success, meta（symbol, horizon 等）を記録。
+
+---
+
+## 5) DECISION → DO
+**Contracts:**  
+- **DecisionRecord v1.0**（常時・監査用）  
+- **OrderRequest v1.1**（実発注時のみ）  
+  - `idempotency_key`（MUST）: 生成規則は OrderRequest.md（v1.1）に準拠。
+
+**Flow:** `decision_engine.py` が各 Proposal を評価・統合（profiles.yaml / quality gate 反映）。  
+アクションが「取引必要」の場合 `OrderRequest` を生成、`order_execution.py` に手渡し。常に `DecisionRecord` を永続化。
+
+**Rules**
+- **Idempotency（MUST）**:  
+  - `OrderRequest.idempotency_key` を必須。  
+  - Do層 Outbox（`outbox_orders.idempotency_key UNIQUE`）で二重送信を抑止。  
+  - `exec_result` に同キーを反映。
+- **trace_id（MUST）**: DecisionRecord / OrderRequest に共通で含める。
+- **Logging（MUST）**:  
+  - `obs_decisions`：action / confidence / reasons / selected sources  
+  - handoff 以後は `obs_exec_events` に連なる。
+
+---
+
+## 6) DO → CHECK
+**Artifacts:**  
+- `exec_result.json`（fills, avg_price, fee, status, **trace_id**, **idempotency_key**）  
+- `risk_event.json`（policy, severity, reason, **trace_id**）  
+- `audit_order.json`（送信スナップショット：OrderRequest + broker payload）
+
+**Rules**
+- **Idempotency（MUST）**: `exec_result.json` に `idempotency_key` を含め、同キーの重複は集計側で **同一イベント** と扱う。
+- **FSM（準拠）**: `NEW → SENT → ACCEPTED → PARTIALLY_FILLED → FILLED | REJECTED | CANCELLED | EXPIRED`  
+  - `obs_exec_events.status` は上記いずれか。  
+- **Observability（MUST）**:  
+  - `obs_exec_events`: 送信/応答/約定・失敗  
+  - `obs_alerts`: ガード違反/ブローカー異常/再送過多 等
+
+---
+
+## 7) CHECK → ACT
+**Artifact:** `kpi_summary.json`（戦略別/銘柄別 KPI、期間集計）  
+**Consumers:** `noctria_gui/routes/pdca_summary.py`, `src/act/pdca_recheck.py` など。
+
+**Rules**
+- **Determinism**: 入力が同じなら集計結果は同一。  
+- **GUI**: `/pdca/summary` が主要閲覧口。  
+- **Observability**: サマリ更新を `obs_act_runs` に記録（duration / status）。
+
+---
+
+## 8) ACT → PLAN
+**Artifacts:**  
+- `plan_update.json`（feature/threshold提案。TBD: schema semver）  
+- `strategy_release.json`（採用バージョン/設定。TBD: schema semver）
+
+**Rules**
+- **Governance**: Two-Person + King の承認フロー（GUIでレビュー → push/tag）。  
+- **Observability**: 採用/差し戻し/失敗は `obs_act_runs`・`obs_alerts` に反映。
+
+---
+
+## 9) Observability Bindings（ログ結線の標準）
+- **Tables（原始）**:  
+  - `obs_plan_runs`, `obs_infer_calls`, `obs_decisions`, `obs_exec_events`, `obs_alerts`
+- **Views / MView**:  
+  - `obs_trace_timeline`, `obs_trace_latency`, `obs_latency_daily`
+- **GUI Routes**:  
+  - `GET /pdca/timeline`, `GET /pdca/latency/daily`, `POST /pdca/observability/refresh`
+- **MUST**: すべてのエッジで `trace_id` を記録。Do層は `idempotency_key` も可能な限り記録。
+
+---
+
+## 10) Error, Retry, Idempotency（横断規約）
+- **Retry Budget**: 各エッジは **最大N回**（実装側設定）まで指数バックオフ。Do層は **Outbox パターン**で冪等に再送。
+- **Duplicate Handling**: `idempotency_key` 重複は **安全に無視**（幂等成功として扱う）。
+- **Poison Messages**: 連続失敗は `obs_alerts`（severity=Critical）に記録し、以降の自動再送を停止。
+
+---
+
+## 11) Profiles & Policy（Decision統制）
+- **profiles.yaml**（計画）: `weights`, `rollout_percent`, `min_confidence`, `combine`, `alpha_risk`。  
+- **risk_policy.yml**（Do層）: `max_position_notional`, `max_order_qty`, `trading_hours_utc`, `max_consecutive_losses`, `shrink_after_losses_pct`, `forbidden_symbols`。  
+- **QualityGate（Plan→Decision手前）**: `missing_ratio` / `data_lag` → `OK/SCALE/FLAT`（理由は DecisionRecord に残す）。
+
+---
+
+## 12) Validation Checklist（運用チェック）
+- **Contracts 引用整合**：`rg -n "FeatureBundle|StrategyProposal|DecisionRecord|OrderRequest" docs` が期待箇所に出現。  
+- **Mermaid 参照**：`plan_layer.mmd` 等に契約注釈コメントが残っている。  
+- **Observability**：ビュー作成済み & GUI で可視化（/pdca/timeline, /pdca/latency/daily が描画OK）。  
+- **Idempotency 実効性**：同一 `OrderRequest` を2回投入しても **Broker送信1回**、`obs_exec_events` 重複なし。  
+- **FSM 整合**：`obs_exec_events.status` が仕様の有限集合に限定されている。
+
+---
+
+## 13) Appendix A — Do層 Outbox（DDL 例）
+> 実装は別責任だが、**設計前提**としての一意制約と監査項目。
+
+```sql
+CREATE TABLE IF NOT EXISTS outbox_orders (
+  id BIGSERIAL PRIMARY KEY,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  trace_id TEXT,
+  payload JSONB NOT NULL,              -- OrderRequest snapshot
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_at TIMESTAMPTZ,
+  broker_response JSONB                -- last response snapshot
+);
