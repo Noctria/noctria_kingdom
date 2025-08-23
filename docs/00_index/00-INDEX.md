@@ -10,7 +10,6 @@
 ## 0. クイックアクセス / Quick Access
 - 🏠 Dashboard (GUI HUD): `/dashboard`
 - 🔁 PDCA Summary: `/pdca/summary`
-- 🧭 **PDCA Spec (Design SoT)**: `docs/architecture/PDCA-Spec.md`
 - ⏱ Timeline: `/pdca/timeline` ・ 📈 Latency (daily): `/pdca/latency/daily`
 - 🤖 AI Council Overview: `docs/architecture/Architecture-Overview.md`
 - 🛠 Runbooks: `docs/operations/Runbooks.md`
@@ -23,18 +22,16 @@
 - **Vision & Governance**: `docs/governance/Vision-Governance.md`
 - **Coding Standards**: `docs/governance/Coding-Standards.md`
 - **Structure Principles**: `docs/structure_principles.md`
-- **PDCA Spec (設計SoT)**: `docs/architecture/PDCA-Spec.md`
 
 **運用ルール要点 / Highlights**
 - `.bak` ファイルは段階的廃止（Git履歴を参照）。This repo deprecates `.bak` duplicates.
-- 図(Mermaid)は `docs/architecture/diagrams/` に集約。
+- 図(Mermaid)は `docs/architecture/diagrams/` に集約（※移設 **済**）。
 - API系は `docs/apis/`、観測/可視化は `docs/observability/` に集約。
-- **編集順序**: まず本INDEX→PDCA-Spec→各設計書→実装、の順で更新。
+- **編集順序**: まず INDEX → 各設計書 → 実装、の順で更新。
 
 ---
 
 ## 2. アーキテクチャ / Architecture
-- **PDCA Spec (Source of Truth)**: `docs/architecture/PDCA-Spec.md`
 - **Overview**: `docs/architecture/Architecture-Overview.md`
 - **Plan Layer**: `docs/architecture/Plan-Layer.md`
 - **Do/Check/Act Diagrams**:
@@ -44,8 +41,8 @@
   - `docs/architecture/diagrams/act_layer.mmd`
 - **System Design (v2025-08)**: `docs/Noctria_Kingdom_System_Design_v2025-08.md`
 
-> ✅ **統合方針**: ルート直下の `Noctria全体.mmd` / `完全形.mmd` / `Noctria連携図.mmd` は  
-> `architecture/diagrams/` へ移設し、ファイル名を `*_overview.mmd` に統一。
+> ✅ **図面の統合方針**: ルート直下にあった `Noctria全体.mmd` / `完全形.mmd` / `Noctria連携図.mmd` は  
+> `architecture/diagrams/` へ移設 **済**。ファイル名は `*_overview.mmd` に統一。
 
 ---
 
@@ -107,8 +104,7 @@
 
 ## 9. データ取扱い / Data Handling
 - **Data Handling**: `docs/data_handling.md`
-- **Plan Feature Spec (v2025.08)**: `docs/plan_feature_spec.md`  
-  ↔ 参考シート（外部/任意参照）: *Noctria Kingdom Plan層 標準特徴量セット（v2025.08）*
+- **Plan Feature Spec (v2025.08)**: `docs/plan_feature_spec.md`
 
 ---
 
@@ -132,7 +128,7 @@
 - **Generated Diffs**: `docs/_generated/diff_report.md`
 
 **運用手順 / Ops**
-1. `scripts/update_docs_from_index.py` を実行（またはGitHub UIで等価反映）して差分適用  
+1. `scripts/update_docs_from_index.py` で差分適用（または GitHub UI で等価反映）  
 2. `_build/logs/changes_*.log` を確認し、重複・逸脱を修正  
 3. `.bak` は削除し Git 履歴を参照（※下「整理方針」参照）
 
@@ -144,7 +140,7 @@
   - `observability/Observability.md`（高レベル）  
   - `apis/observability/Observability.md`（API詳細）  
   → 役割を明記し本文先頭に相互リンクを追加。
-- **図面の一元化**：Mermaidは `architecture/diagrams/` 固定。
+- **図面の一元化**：Mermaidは `architecture/diagrams/` 固定（**移設済**）。
 - **単一ソース原則**：INDEXが唯一のナビ。各章は「責任ファイル」を明示。
 
 ---
@@ -156,10 +152,10 @@
 ---
 
 ## 15. 次アクション / Next Actions
-- [ ] `.bak` 一括整理（下のスクリプト参照）
-- [ ] Mermaid 図の移設とファイル名統一
+- [ ] `.bak` 一括整理
+- [x] Mermaid 図の移設とファイル名統一（**完了**）
 - [ ] `observability` 二層化の本文修正＆相互リンク追記
-- [ ] `plan_feature_spec.md` と外部シートの内容整合チェック
+- [ ] `plan_feature_spec.md` と実装の内容整合チェック
 - [ ] `Noctria_Kingdom_System_Design_v2025-08.md` を Overview と整合性チェック
 
 ---
