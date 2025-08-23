@@ -1,4 +1,8 @@
 # 👁️ Observability.md  
+
+> This document is the **high-level guide** for observability (metrics, logs, dashboards).  
+> For API contracts and endpoints, see `docs/apis/observability/Observability.md`.
+
 <!-- AUTODOC:BEGIN mode=file_content path_globs=docs/architecture/diagrams/act_layer.mmd title="Act Layer Mermaid図（最新）" fence=mermaid -->
 ### Act Layer Mermaid図（最新）
 
