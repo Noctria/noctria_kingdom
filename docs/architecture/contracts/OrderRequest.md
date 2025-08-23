@@ -95,3 +95,22 @@
 - `idempotency_key` は **broker送信・Outbox一意制御・exec_result照合** すべてに利用。
 - 生成方法は `make_idem_key(symbol, side, qty, trace_id, ts_floor_minute)` に準拠。
 - v1.0 クライアントは `idempotency_key` 未対応でも許容されるが、Do層で付与される。
+
+## Idempotency & Outbox (v1.1)
+
+**目的**: 同一発注の重複送信を防ぎ、再送でも外部ブローカ送信が1回に保たれること。
+
+### キー定義
+- `idempotency_key`（**必須推奨**）: 同一性を表す32〜64hex。
+- 推奨生成式（分丸め & 量丸め6桁）  
+  `base = "symbol|side|qty_rounded6|ts_floor_minute|trace_id"` → `HMAC-SHA256(base, SECRET)`
+
+### 例（Python）
+```python
+import hmac, hashlib, os
+SECRET = os.getenv("NOCTRIA_IDEMPOTENCY_SECRET", "dev-secret")
+def make_idem_key(symbol, side, qty, trace_id, ts_iso):
+    ts_floor_min = ts_iso[:16] + "Z"           # "YYYY-MM-DDTHH:MMZ"
+    qty_s = f"{float(qty):.6f}"
+    base = f"{symbol}|{side}|{qty_s}|{ts_floor_min}|{trace_id}"
+    return hmac.new(SECRET.encode(), base.encode(), hashlib.sha256).hexdigest()[:32]
