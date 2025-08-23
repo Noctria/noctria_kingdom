@@ -1,0 +1,8 @@
+# Backup / temp
+**/*.bak
+**/*~
+**/*.tmp
+
+# Generated
+_generated/
+_partials/

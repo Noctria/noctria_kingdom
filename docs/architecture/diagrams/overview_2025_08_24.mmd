@@ -1,0 +1,78 @@
+flowchart TD
+  %% ===== PLAN 層 =====
+  subgraph PLAN["🗺️ PLAN 層 (src/plan_data)"]
+    COLLECT[collector.py<br/>市場/マクロ/ニュース収集]
+    FEATURES[features.py<br/>特徴量生成]
+    STATS[statistics.py<br/>KPI集計]
+    ANALYZER[analyzer.py<br/>要因抽出/説明]
+  end
+
+  %% ===== STRATEGY AI 層 =====
+  subgraph STRATS["🤖 戦略AI (src/strategies)"]
+    AURUS[AurusSingularis]
+    LEVIA[LeviaTempest]
+    PROME[PrometheusOracle]
+    VERITAS[VeritasMachina]
+  end
+
+  %% ===== DO 層 =====
+  subgraph DO["⚙️ DO 層 (実行/注文/監視)"]
+    EXEC[execution/order_router.py]
+    RISK[core/risk_control.py]
+    MONI[execution/challenge_monitor.py]
+  end
+
+  %% ===== CHECK 層 =====
+  subgraph CHECK["🔎 CHECK 層 (検証/評価)"]
+    EVAL[veritas_evaluator.py]
+    METRICS[metrics_aggregator.py]
+  end
+
+  %% ===== ACT 層 =====
+  subgraph ACT["✅ ACT 層 (採用/Push)"]
+    ADOPT[act_adopt.py]
+    GIT[src/core/git_utils.py]
+    REG[src/core/decision_registry.py]
+  end
+
+  %% ===== KING =====
+  subgraph KING["👑 KING 統治 (src/king_noctria.py)"]
+    DECIDE[最終意思決定 / PDCA統治]
+  end
+
+  %% ===== GUI =====
+  subgraph GUI["🖥️ GUI HUD (noctria_gui)"]
+    ROUTES[routes/*]
+    TEMPL[templates/*]
+  end
+
+  %% ===== ORCHESTRATOR =====
+  subgraph ORCH["🕸️ Orchestrator (Airflow DAGs)"]
+    DAGS[airflow_docker/dags/*]
+  end
+
+  %% ===== OBSERVABILITY =====
+  subgraph OBS["📡 Observability (Postgres/Logs)"]
+    DB[(Postgres: obs_plan_runs<br/>obs_infer_calls<br/>idempo_ledger)]
+    LOGS[(logs/*)]
+  end
+
+  %% ===== Connections =====
+  PLAN --> STRATS
+  STRATS --> DO
+  DO --> CHECK
+  CHECK --> ACT
+  ACT --> KING
+  KING --> DO
+  KING --> ORCH
+  ORCH --> STRATS
+  ORCH --> CHECK
+  ORCH --> ACT
+  GUI --> KING
+  GUI --> ORCH
+  PLAN --> OBS
+  STRATS --> OBS
+  DO --> OBS
+  CHECK --> OBS
+  ACT --> OBS
+  KING --> OBS
