@@ -32,9 +32,10 @@
 ---
 
 ## 2. アーキテクチャ / Architecture
+- **PDCA Spec (Normative hub)**: `docs/architecture/PDCA-Spec.md`
 - **Overview**: `docs/architecture/Architecture-Overview.md`
 - **Plan Layer**: `docs/architecture/Plan-Layer.md`
-- **Do/Check/Act Diagrams**:
+- **Diagrams**:
   - `docs/architecture/diagrams/plan_layer.mmd`
   - `docs/architecture/diagrams/do_layer.mmd`
   - `docs/architecture/diagrams/check_layer.mmd`
