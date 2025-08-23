@@ -36,11 +36,10 @@ default:
 overrides:
   USDJPY:
     max_position_notional: 150000
-Outbox DDL（PostgreSQL）
+```
 
-sql
-コピーする
-編集する
+**Outbox DDL（PostgreSQL）**
+```sql
 CREATE TABLE IF NOT EXISTS outbox_orders (
   id BIGSERIAL PRIMARY KEY,
   idempotency_key TEXT NOT NULL UNIQUE,
@@ -50,11 +49,10 @@ CREATE TABLE IF NOT EXISTS outbox_orders (
   sent_at TIMESTAMPTZ,
   broker_response JSONB
 );
-Idempotency Key 生成（Python片）
+```
 
-python
-コピーする
-編集する
+**Idempotency Key 生成（Python片）**
+```python
 import hmac, hashlib, os
 
 SECRET = os.getenv("NOCTRIA_IDEMPOTENCY_SECRET", "dev-secret")
@@ -70,20 +68,18 @@ def make_idem_key(symbol, side, qty, trace_id, ts_iso):
     qty_s = f"{float(qty):.6f}"
     base = f"{symbol}|{side}|{qty_s}|{ts_floor_minute}|{trace_id}"
     return hmac.new(SECRET.encode(), base.encode(), hashlib.sha256).hexdigest()
-M2. Decision/Config の拡張（今週）
- profiles.yaml で weights / rollout_percent / combine / min_confidence / alpha_risk を管理
+```
 
- RoyalDecisionEngine を weighted_sum までE2E実証（方向一致合算）
+---
 
- obs_decisions.features.top_candidates を 上位5件まで記録（今は3件）
+## M2. Decision/Config の拡張（今週）
+- [ ] `profiles.yaml` で **weights / rollout_percent / combine / min_confidence / alpha_risk** を管理
+- [ ] RoyalDecisionEngine を **`weighted_sum`** までE2E実証（方向一致合算）
+- [ ] `obs_decisions.features.top_candidates` を **上位5件**まで記録（今は3件）
+- [ ] A/B ロールアウト（7%→30%→100%）の **スイッチをGUIに露出**（read-onlyでもOK）
 
- A/B ロールアウト（7%→30%→100%）の スイッチをGUIに露出（read-onlyでもOK）
-
-configs/profiles.yaml の例
-
-yaml
-コピーする
-編集する
+**`configs/profiles.yaml` の例**
+```yaml
 default:
   rollout_percent: 30
   min_confidence: 0.4
@@ -94,48 +90,43 @@ weights:
   Levia: 0.7
   Prometheus: 0.9
   Veritas: 1.0
-M3. 運用の自動化（来週以降）
- Airflow DAG：pdca_minidemo_dag.py
+```
 
- PLAN→AI→DECISION→DO の最小チェーンを 1h 間隔で実行
+---
 
- X-Trace-Id をタスク間で XCom 伝搬
+## M3. 運用の自動化（来週以降）
+- [ ] **Airflow DAG**：`pdca_minidemo_dag.py`
+  - [ ] PLAN→AI→DECISION→DO の最小チェーンを **1h** 間隔で実行
+  - [ ] `X-Trace-Id` をタスク間で XCom 伝搬
+  - [ ] 失敗時リトライ＋冪等設計確認（Outbox が効くこと）
+- [ ] **アラート閾値**：`obs_slo_violations_24h` をベースに Slack/Webhook 通知
+- [ ] **日次マテビュー更新**：`obs_latency_daily` を cron で自動 `REFRESH CONCURRENTLY`
 
- 失敗時リトライ＋冪等設計確認（Outbox が効くこと）
+---
 
- アラート閾値：obs_slo_violations_24h をベースに Slack/Webhook 通知
-
- 日次マテビュー更新：obs_latency_daily を cron で自動 REFRESH CONCURRENTLY
-
-参考：受け入れテスト（psql一発）
- タイムライン整合
-
-sql
-コピーする
-編集する
+## 参考：受け入れテスト（psql一発）
+- [ ] タイムライン整合
+```sql
 SELECT ts,kind,action FROM obs_trace_timeline WHERE trace_id='{TID}' ORDER BY ts;
- レイテンシ分解
+```
 
-sql
-コピーする
-編集する
+- [ ] レイテンシ分解
+```sql
 SELECT * FROM obs_trace_latency WHERE trace_id='{TID}';
- 重複送信防止（idempotency）
+```
 
-sql
-コピーする
-編集する
+- [ ] 重複送信防止（idempotency）
+```sql
 SELECT idempotency_key, COUNT(*) FROM outbox_orders GROUP BY 1 HAVING COUNT(*)>1;
 -- → 0 行が合格
-さらに先（バックログ）
- DO層FSM（place→ack→partial_fill→filled/expired/rejected）
+```
 
- Broker Capabilities ハンドシェイク（min_qty, step, tif, replace可否）
+---
 
- CHECK層の P95 KPI ダッシュボード（Grafana/Metabase）
-
- ACT層の自動昇格/ロールバック（Two-Person + King 承認フロー付き）
-
- モデルレジストリの署名/指紋/評価リンク（SoT強化）
-
+## さらに先（バックログ）
+- [ ] DO層FSM（place→ack→partial_fill→filled/expired/rejected）
+- [ ] Broker Capabilities ハンドシェイク（min_qty, step, tif, replace可否）
+- [ ] CHECK層の **P95 KPI** ダッシュボード（Grafana/Metabase）
+- [ ] ACT層の自動昇格/ロールバック（Two-Person + King 承認フロー付き）
+- [ ] モデルレジストリの署名/指紋/評価リンク（SoT強化）
 <!-- AUTODOC:END -->
