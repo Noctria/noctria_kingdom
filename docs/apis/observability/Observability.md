@@ -1,4 +1,10 @@
+# 👁️ Observability API  
+
+> This document contains the **API contracts and endpoints**.  
+> For the high-level guide (metrics, logs, dashboards), see `docs/observability/Observability.md`.
+
 <!-- AUTODOC:BEGIN mode=file_content path_globs=/mnt/d/noctria_kingdom/docs/_partials_full/docs/apis/observability/Observability.md -->
+...（既存内容）
 
 
 <!-- AUTOGEN:CHANGELOG START -->
