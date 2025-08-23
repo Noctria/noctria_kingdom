@@ -45,6 +45,14 @@
 
 ---
 
+### Contracts (Data/API)
+- FeatureBundle — `docs/architecture/contracts/FeatureBundle.md`
+- StrategyProposal — `docs/architecture/contracts/StrategyProposal.md`
+- DecisionRecord — `docs/architecture/contracts/DecisionRecord.md`
+- OrderRequest — `docs/architecture/contracts/OrderRequest.md`
+
+---
+
 ## 3. モデル & 戦略 / Models & Strategies
 - **Model Card (Prometheus PPO)**: `docs/models/ModelCard-Prometheus-PPO.md`
 - **Strategy Lifecycle**: `docs/models/Strategy-Lifecycle.md`
