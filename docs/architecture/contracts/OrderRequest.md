@@ -8,6 +8,8 @@
 - **Schema Version**: `1.1.0` (semver)
 - **Content-Type**: `application/json; charset=utf-8`
 
+---
+
 ## JSON Schema
 ```json
 {
