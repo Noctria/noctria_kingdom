@@ -11,6 +11,13 @@ _対象ファイルが見つかりませんでした。_
 <!-- AUTODOC:BEGIN mode=git_log path_globs="src/core/risk_control.py;src/execution/**/*.py" title="Do層 契約/実装更新履歴（最近30）" limit=30 since=2025-08-01 -->
 ### Do層 契約/実装更新履歴（最近30）
 
+## Idempotency (API Contract)
+
+- 変更系リクエストは `Idempotency-Key` ヘッダ **必須推奨**。ボディの `order_request.idempotency_key` と一致させること。
+- サーバ側は Outbox パターンで一意性を担保し、**重複送信を回避**する。
+- レスポンス (`exec_result`) には **同一 `idempotency_key`** を含める。
+
+
 - **b1453a0** 2025-08-13T16:03:47+09:00 — Update order_execution.py (by Noctoria)
   - `src/execution/order_execution.py`
 - **9ed85b3** 2025-08-13T15:53:16+09:00 — Update risk_policy.py (by Noctoria)
