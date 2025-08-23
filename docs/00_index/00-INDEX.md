@@ -171,3 +171,28 @@ rg -n --glob '**/*.bak' '' docs || true
 # 本削除（コミット前提）
 git ls-files -z 'docs/**/*.bak' | xargs -0 git rm -f
 git commit -m 'docs: remove legacy .bak files (use git history instead)'
+
+---
+## 付録A：SLO & クイックチェック
+
+### 初期SLO（Observability起点）
+- `p95(ms_total)`（Plan→Exec 合計） < **10,000ms**
+- 当日の Exec 失敗率 < **1%**（Warn しきい値）
+
+### 受け入れワンライナー（psql）
+```sql
+-- タイムライン整合（traceの時系列）
+SELECT ts,kind,action FROM obs_trace_timeline
+WHERE trace_id='{TID}' ORDER BY ts;
+
+-- レイテンシ分解
+SELECT * FROM obs_trace_latency
+WHERE trace_id='{TID}';
+
+-- 幣等性（Outbox 重複なし）
+SELECT idempotency_key, COUNT(*)
+FROM outbox_orders GROUP BY 1 HAVING COUNT(*)>1;  -- → 0 行が合格
+
+-- 観測がGUIに出る（直近30日）
+SELECT * FROM obs_latency_daily ORDER BY day DESC LIMIT 7;
+
