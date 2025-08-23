@@ -51,3 +51,7 @@ sequenceDiagram
   else FLAT/HOLD
     D-->>D: record DecisionRecord only
   end
+```
+
+> NOTE: この文書で言う **OrderRequest** は **v1.1（idempotency_key 追加）** を前提とします。詳細は `docs/architecture/contracts/OrderRequest.md` を参照。
+

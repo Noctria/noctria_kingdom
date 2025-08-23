@@ -365,6 +365,9 @@ flowchart TD
 ## 8. Airflow 連携（`pdca_plan_workflow`）
 ```python
 # airflow_docker/dags/pdca_plan_workflow.py（骨子）
+
+> NOTE: この文書で言う **OrderRequest** は **v1.1（idempotency_key 追加）** を前提とします。詳細は `docs/architecture/contracts/OrderRequest.md` を参照。
+
 t_collect = PythonOperator(task_id="collect_market_data", python_callable=collect)
 t_feat    = PythonOperator(task_id="generate_features",   python_callable=generate_features)
 t_stats   = PythonOperator(task_id="compute_statistics",  python_callable=compute_statistics)
