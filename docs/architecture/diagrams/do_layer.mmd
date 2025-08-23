@@ -1,112 +1,29 @@
 flowchart TD
+  %% --- Plan/Check層（入口部分） ---
+  subgraph Plan層
+    PLAN[plan_data/feature_spec.py<br>plan_data/collector.py<br>plan_data/features.py<br>plan_data/statistics.py<br>plan_data/analyzer.py]
+    STRAT[strategies/aurus_singularis.py<br>levia_tempest.py<br>prometheus_oracle.py]
+  end
 
-%% ====== styles (GitHub-safe) ======
-classDef inputs fill:#243447,stroke:#4f86c6,color:#e6f0ff;
-classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
-classDef outputs fill:#1f3b2d,stroke:#6bbf59,color:#d7fbe8;
-classDef gov fill:#2e2e2e,stroke:#b7b7b7,color:#ffffff;
-classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
-classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
+  subgraph Check層
+    CHECK[core/risk_control.py<br>execution/challenge_monitor.py]
+  end
 
-%% ====== INPUTS from PLAN/AI ======
-subgraph INPUTS ["Upstream inputs (from PLAN / AI)"]
-  REQ["order_request.json<br/>symbol / intent / qty / reasons<br/><b>MUST</b> trace_id; <b>SHOULD</b> idempotency_key"]
-  RISKPOL["risk_policy.json<br/>risk caps / lot rules / stops / DD thresholds"]
-end
+  %% --- Do層メイン ---
+  subgraph Do層["Do層（実オーダー執行/リスク/監視）"]
+    ORDER[execution/order_execution.py<br>（発注API本体/新I/F統一）]
+    OPTORDER[execution/optimized_order_execution.py<br>（分割/リトライ案）]
+    CHALMON[execution/challenge_monitor.py<br>（リスク/損失アラート）]
+    GENORDER[execution/generate_order_json.py<br>（シグナル記録・JSON化）]
+  end
 
-%% ====== DO layer ======
-subgraph DO_LAYER ["Do layer (src/execution)"]
-  ORDER["order_execution.py<br/>basic place / cancel / replace<br/>state tracking<br/><i>TODO:</i> finite state machine"]
-  RISK_GATE["risk_gate.py<br/>final risk & lot filter<br/>enforce policy at send-time<br/><i>status:</i> alerts implemented"]
-  OPT["optimized_order_execution.py<br/>slippage & fee aware / split & timing<br/>plugin tactics<br/><i>TODO:</i> strategy plugins"]
-  GENJSON["generate_order_json.py<br/>build immutable envelope for audit<br/><i>TODO:</i> HMAC sign snapshot"]
-  OUTBOX["outbox store<br/>persist before send / retry-safe<br/><i>TODO:</i> implement outbox pattern"]
-  BROKER["broker_adapter.py<br/>external API abstraction (mt5 / ccxt / rest)<br/><i>TODO:</i> capabilities & rate limiter"]
-  LOGFILE["/data/execution_logs/*.json<br/>place / fill / failure / retry"]
-end
+  %% --- 接続部分 ---
+  PLAN -- "特徴量・判断・注文信号" --> ORDER
+  STRAT -- "エントリーシグナル/発注リクエスト" --> ORDER
+  CHECK -- "リスク監視・アラート/lot制限" --> ORDER
+  CHECK -- "リスク閾値/損失監視" --> CHALMON
 
-%% ====== OUTPUTS to CHECK / ACT ======
-subgraph OUTPUTS ["Downstream outputs (to CHECK / ACT)"]
-  EXECRES["exec_result.json<br/>fills / avg price / cost<br/>include trace_id & (ideally) idempotency_key"]
-  ALERTSRC["risk_event.json<br/>drawdown / streak / abnormal fill<br/>emitted by gate & recon"]
-  AUDIT["audit_order.json<br/>complete reproducibility snapshot"]
-end
+  ORDER -- "注文内容・実行結果" --> GENORDER
 
-%% ====== GOVERNANCE / ORCHESTRATION ======
-subgraph GOVERNANCE ["Governance and operations"]
-  GUI_DO["GUI: /pdca/timeline<br/>+ /trigger (manual ops)"]
-  DAG_DO["Airflow DAG: do_layer_flow.py<br/>schedule / retry<br/><i>TODO:</i> service vs DAG boundary"]
-end
-
-%% ====== OBSERVABILITY TAPS ======
-subgraph OBS ["Observability taps (tables)"]
-  OBS_EXEC["obs_exec_events<br/>send status / provider response<br/><b>trace_id implemented</b>"]
-  OBS_ALT["obs_alerts<br/>policy blocks / broker issues<br/><b>trace_id implemented</b>"]
-  OBS_DO["obs_do_metrics<br/>child_orders / retry_counts<br/><i>TODO:</i> add coverage"]
-end
-
-%% ====== AUX: broker hardening ======
-subgraph AUX ["Broker hardening"]
-  CAPS["capabilities handshake<br/>partial fill / replace / tif / min qty<br/><i>TODO</i>"]
-  RLIM["rate limiter & backoff<br/>429 / 5xx handling<br/><i>TODO</i>"]
-  RECON["reconciliation<br/>positions & trades match<br/>emit risk_event on mismatch<br/><i>TODO</i>"]
-end
-
-%% ====== FLOW ======
-REQ --> ORDER
-RISKPOL --> RISK_GATE
-ORDER --> RISK_GATE
-RISK_GATE --> OPT
-OPT --> GENJSON
-GENJSON --> OUTBOX
-OUTBOX --> BROKER
-BROKER --> EXECRES
-EXECRES --> LOGFILE
-
-%% ====== AUDIT PATHS ======
-GENJSON --> AUDIT
-ORDER -. audit .-> AUDIT
-OPT -. audit .-> AUDIT
-
-%% ====== GOVERNANCE LINKS ======
-GUI_DO --> ORDER
-DAG_DO --> ORDER
-
-%% ====== DOWNSTREAM LINKS ======
-EXECRES --> ALERTSRC
-
-%% ====== OBS LINKS ======
-ORDER -->|log| OBS_EXEC
-RISK_GATE -->|alert| OBS_ALT
-OPT -->|log| OBS_DO
-BROKER -->|log| OBS_EXEC
-EXECRES -->|log| OBS_EXEC
-
-%% ====== AUX LINKS ======
-BROKER --> CAPS
-BROKER --> RLIM
-BROKER --> RECON
-RECON --> ALERTSRC
-
-%% ====== IDENTITY / CORRELATION ======
-REQ -. trace_id .-> ORDER
-ORDER -. trace_id .-> RISK_GATE
-RISK_GATE -. trace_id .-> OPT
-OPT -. trace_id .-> GENJSON
-GENJSON -. trace_id .-> OUTBOX
-OUTBOX -. trace_id .-> BROKER
-BROKER -. trace_id .-> EXECRES
-EXECRES -. trace_id .-> AUDIT
-
-%% ====== IDEMPOTENCY ======
-GENJSON -. idempotency_key .-> OUTBOX
-OUTBOX -. idempotency_key .-> BROKER
-EXECRES -. idempotency_key .-> AUDIT
-
-%% ====== class bindings ======
-class REQ,RISKPOL inputs;
-class ORDER,RISK_GATE,OPT,GENJSON,OUTBOX,BROKER,LOGFILE do;
-class EXECRES,ALERTSRC,AUDIT outputs;
-class GUI_DO,DAG_DO gov;
-class OBS_EXEC,OBS_ALT,OBS_DO obs;
-class CAPS,RLIM,RECON gov;
+  %% 補足（分割/リトライ案）
+  ORDER -. "高度な発注最適化案" .-> OPTORDER
