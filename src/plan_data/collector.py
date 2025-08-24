@@ -4,7 +4,7 @@ import os
 import time
 import random
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple, Union
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -200,7 +200,14 @@ class PlanDataCollector:
                 last_exc = None
                 for attempt in range(3):
                     try:
-                        df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
+                        df = yf.download(
+                            ticker,
+                            start=start,
+                            end=end,
+                            interval=interval,
+                            progress=False,
+                            auto_adjust=True,  # ★ FutureWarning抑止 & 一貫性
+                        )
                         break
                     except Exception as e:
                         last_exc = e
@@ -297,8 +304,13 @@ class PlanDataCollector:
 
     # ---------- 経済カレンダー ----------
     def fetch_event_calendar(self) -> pd.DataFrame:
+        path = Path(self.event_calendar_csv)
+        if not path.exists():
+            # 初期起動時などは静かにスキップ
+            print(f"[collector] ℹ️ イベントCSVが見つかりません: {path}（スキップ）")
+            return pd.DataFrame()
         try:
-            df = pd.read_csv(self.event_calendar_csv)
+            df = pd.read_csv(path)
             df.columns = [col.lower() for col in df.columns]
             if "date" in df.columns:
                 df["date"] = pd.to_datetime(df["date"], errors="coerce")
@@ -503,11 +515,20 @@ class PlanDataCollector:
         return df[["date", "news_count", "news_positive", "news_negative"]].sort_values("date")
 
     # ---------- 収集一括 ----------
-    def collect_all(self, lookback_days: int = 365, trace_id: Optional[str] = None):
+    def collect_all(
+        self,
+        lookback_days: int = 365,
+        trace_id: Optional[str] = None,
+        *,
+        return_trace: bool = False,
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
         """
         収集一括。各フェーズ末尾で obs_plan_runs に計測を記録（失敗しても本処理は継続）。
         phase: collector / fred / events / news
-        戻り値: (df, trace_id)
+
+        戻り値:
+          - 互換デフォルト: DataFrame
+          - return_trace=True のとき: (DataFrame, trace_id)
         """
         end = datetime.today()
         start = end - timedelta(days=lookback_days)
@@ -593,20 +614,21 @@ class PlanDataCollector:
         if df is not None:
             df = df.reset_index(drop=True)
             df = align_to_feature_spec(df)
-            # 下流へtrace_idを明示的に受け渡す
+            # 下流へ trace_id を attrs で受け渡し（破壊しないメタ）
             try:
                 df.attrs["trace_id"] = trace_id
             except Exception:
                 pass
 
-        # タプル返し（dfのみでも使えるが、trace_idも明示的に返す）
-        return df, trace_id
+        if return_trace:
+            return df, trace_id
+        return df
 
 
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
-    df, tid = collector.collect_all(lookback_days=14)
+    df, tid = collector.collect_all(lookback_days=14, return_trace=True)
     cols = [c for c in df.columns if "news" in c or c == "date"]
     pd.set_option("display.max_columns", 120)
     print("trace_id:", df.attrs.get("trace_id"), tid)
