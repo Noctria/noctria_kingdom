@@ -78,4 +78,3 @@ def api_event_impact(
             {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()},
             status_code=500,
         )
-PY
