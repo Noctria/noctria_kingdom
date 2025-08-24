@@ -4,9 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 
-from src.plan_data.observability import log_decision
+ENGINE_VERSION = "decision-min-0.1.2"
 
-ENGINE_VERSION = "decision-min-0.1.1"
+# 観測ログ: 実行環境の import 事情に左右されないようフォールバック付き
+try:
+    from plan_data.observability import log_decision  # type: ignore
+except Exception:
+    from src.plan_data.observability import log_decision  # type: ignore
 
 
 # -----------------------------
@@ -116,18 +120,20 @@ class DecisionEngine:
             "params": {"tp": self._tp, "sl": self._sl},
         }
 
-        # 観測ログ（決定）
-        # features には入力生値をそのまま格納（将来の解析に役立つ）
-        log_decision(
-            trace_id=req.trace_id,
-            engine_version=ENGINE_VERSION,
-            strategy_name=strategy,
-            score=score,
-            reason=reason,
-            features=req.features,
-            decision=decision_payload,
-            conn_str=conn_str,  # DSNが未指定なら環境変数 NOCTRIA_OBS_PG_DSN を使用
-        )
+        # 観測ログ（決定）: 失敗は握りつぶして本処理を継続（他モジュールと整合）
+        try:
+            log_decision(
+                trace_id=req.trace_id,
+                engine_version=ENGINE_VERSION,
+                strategy_name=strategy,
+                score=score,
+                reason=reason,
+                features=req.features,   # 入力の生値を保存
+                decision=decision_payload,
+                conn_str=conn_str,       # DSN未指定なら env NOCTRIA_OBS_PG_DSN
+            )
+        except Exception:
+            pass
 
         return DecisionResult(
             strategy_name=strategy,
