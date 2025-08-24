@@ -18,7 +18,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 # - ensure_views() / refresh_latency_daily() あり
 # =============================================================================
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # logger
 # -----------------------------------------------------------------------------
 logger = logging.getLogger("noctria.observability")
@@ -28,7 +28,7 @@ if not logger.handlers:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # small utils
 # -----------------------------------------------------------------------------
 def _utcnow() -> datetime:
@@ -58,7 +58,7 @@ def _get_dsn(conn_str: Optional[str]) -> str:
         )
     return dsn
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # driver loader (lazy import)
 # -----------------------------------------------------------------------------
 _DRIVER: Optional[object] = None
@@ -121,7 +121,7 @@ def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
             cur.execute(sql, params or ())
             return cur.fetchone()
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # schema bootstrap (for dev/PoC)
 # -----------------------------------------------------------------------------
 _CREATE_PLAN_RUNS = """
@@ -263,7 +263,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_trace ON obs_alerts(trace_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_time  ON obs_alerts(created_at);
 """
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # Views / Materialized Views（互換: 旧/新の両カラムを COALESCE）
 # -----------------------------------------------------------------------------
 _CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW = """
@@ -374,7 +374,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_obs_latency_daily_day
   ON obs_latency_daily(day);
 """
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # ensure (tables & views)
 # -----------------------------------------------------------------------------
 def ensure_tables(conn_str: Optional[str] = None) -> None:
@@ -421,7 +421,7 @@ def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = N
 def refresh_materialized(conn_str: Optional[str] = None) -> None:
     refresh_latency_daily(concurrently=True, conn_str=conn_str)
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # public API（旧API互換 + 新API）
 # -----------------------------------------------------------------------------
 def log_plan_run(*args, **kwargs) -> Optional[int]:
@@ -485,9 +485,12 @@ def _log_plan_status(*, trace_id: str,
 def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     """
     互換API：
-      新: log_infer_call(trace_id=..., model_name=..., call_at=..., duration_ms=..., success=True, inputs={}, outputs={})
+      新:   log_infer_call(trace_id=..., model_name=..., call_at=..., duration_ms=..., success=True,
+                           inputs={}, outputs={}, model_version=..., feature_staleness_min=...)
       旧々: log_infer_call(conn_str, model, ver, dur_ms, success, feature_staleness_min, trace_id=None)
-      旧GUI互換(pdca_recheck): log_infer_call(trace_id=..., ai_name=..., started_at=ISO, ended_at=ISO, params_json={}, metrics_json={}, status='success'|'failed', note='')
+      旧GUI:log_infer_call(trace_id=..., ai_name=..., started_at=ISO, ended_at=ISO,
+                           params_json={}, metrics_json={}, status='success'|'failed', note='')
+    正規化して `obs_infer_calls` の **duration_ms と dur_ms の両方**に保存します。
     """
     dsn = _get_dsn(conn_str)
 
@@ -512,20 +515,21 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             if started_at_raw and ended_at_raw:
                 s = datetime.fromisoformat(str(started_at_raw).replace("Z", "+00:00"))
                 e = datetime.fromisoformat(str(ended_at_raw).replace("Z", "+00:00"))
-                duration_ms = int((e - s).total_seconds() * 1000)
+                duration_ms = max(0, int((e - s).total_seconds() * 1000))
         except Exception:
             duration_ms = None
 
         sql = (
             "INSERT INTO obs_infer_calls "
-            "(trace_id, ai_name, started_at, ended_at, status, note, params_json, metrics_json, duration_ms, call_at) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s) "
+            "(trace_id, ai_name, started_at, ended_at, status, note, params_json, metrics_json, "
+            " duration_ms, dur_ms, call_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s) "
             "RETURNING id"
         )
         params = (
             trace_id, ai_name, started_at, ended_at, status, note,
             _json(params_json), _json(metrics_json),
-            duration_ms, started_at or _utcnow()
+            duration_ms, duration_ms, started_at or _utcnow()
         )
         try:
             row = _fetchone(dsn, sql, params)
@@ -534,21 +538,44 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             logger.warning("log_infer_call(gui-compat) failed: %s (ai_name=%s, trace_id=%s)", e, ai_name, trace_id)
             return None
 
-    # --- 新フォーム ---
-    if any(k in kwargs for k in ("model_name", "inputs", "outputs", "duration_ms", "call_at")):
+    # --- 新フォーム（model_name / duration_ms / inputs / outputs など） ---
+    if any(k in kwargs for k in ("model_name", "model", "inputs", "outputs", "duration_ms", "dur_ms", "call_at")):
         trace_id: Optional[str] = kwargs.get("trace_id")
-        model_name: Optional[str] = kwargs.get("model_name")
+        model_name: Optional[str] = kwargs.get("model_name") or kwargs.get("model")
+        model: Optional[str] = kwargs.get("model") or kwargs.get("model_name")
+        ver: Optional[str] = kwargs.get("ver") or kwargs.get("model_version")
         call_at: Optional[datetime] = kwargs.get("call_at")
-        duration_ms: Optional[int] = kwargs.get("duration_ms")
+        # どちらで来ても OK
+        duration_ms_kw = kwargs.get("duration_ms")
+        dur_ms_kw = kwargs.get("dur_ms")
+        try:
+            ms_val = duration_ms_kw if duration_ms_kw is not None else dur_ms_kw
+            ms_val = int(ms_val) if ms_val is not None else 0
+        except Exception:
+            ms_val = 0
+
         success: Optional[bool] = kwargs.get("success", True)
+        staleness = kwargs.get("feature_staleness_min") or kwargs.get("staleness_min") or 0
+        try:
+            staleness = int(staleness)
+        except Exception:
+            staleness = 0
+
         inputs = kwargs.get("inputs")
         outputs = kwargs.get("outputs")
 
         sql = (
-            "INSERT INTO obs_infer_calls (trace_id, model_name, call_at, duration_ms, success, inputs, outputs) "
-            "VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id"
+            "INSERT INTO obs_infer_calls "
+            "(trace_id, model_name, model, ver, call_at, duration_ms, dur_ms, success, feature_staleness_min, "
+            " inputs, outputs) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) "
+            "RETURNING id"
         )
-        params = (trace_id, model_name, call_at or _utcnow(), duration_ms, success, _json(inputs or {}), _json(outputs or {}))
+        params = (
+            trace_id, model_name, model, ver, call_at or _utcnow(),
+            ms_val, ms_val, bool(success), staleness,
+            _json(inputs or {}), _json(outputs or {})
+        )
         try:
             row = _fetchone(dsn, sql, params)
             return row[0] if row else None  # type: ignore[index]
@@ -556,18 +583,28 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             logger.warning("log_infer_call(new) failed: %s (model_name=%s, trace_id=%s)", e, model_name, trace_id)
             return None
 
-    # --- 旧々フォーム ---
-    model: str = kwargs["model"]
-    ver: Optional[str] = kwargs.get("ver")
-    dur_ms: int = kwargs["dur_ms"]
-    success: bool = kwargs["success"]
-    feature_staleness_min: int = kwargs.get("feature_staleness_min", 0)
+    # --- 旧々フォーム（model/ver/dur_ms/...） ---
+    try:
+        model: str = kwargs["model"]
+        ver: Optional[str] = kwargs.get("ver")
+        dur_ms: int = int(kwargs["dur_ms"])
+        success: bool = bool(kwargs["success"])
+    except Exception as e:
+        logger.warning("log_infer_call(old) missing args: %s; kwargs keys=%s", e, list(kwargs.keys()))
+        return None
+
+    feature_staleness_min: int = 0
+    try:
+        feature_staleness_min = int(kwargs.get("feature_staleness_min", 0))
+    except Exception:
+        feature_staleness_min = 0
+
     trace_id: Optional[str] = kwargs.get("trace_id")
     sql = (
-        "INSERT INTO obs_infer_calls (ts, model, ver, dur_ms, success, feature_staleness_min, trace_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
+        "INSERT INTO obs_infer_calls (ts, model, ver, dur_ms, success, feature_staleness_min, trace_id, duration_ms) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
     )
-    params = (_utcnow(), model, ver, dur_ms, success, feature_staleness_min, trace_id)
+    params = (_utcnow(), model, ver, dur_ms, success, feature_staleness_min, trace_id, dur_ms)
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
@@ -670,7 +707,7 @@ def log_alert(*,
         logger.warning("log_alert failed: %s (policy=%s, trace_id=%s)", e, policy_name, trace_id)
         return None
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 # ping
 # -----------------------------------------------------------------------------
 def ping(conn_str: Optional[str] = None) -> bool:
