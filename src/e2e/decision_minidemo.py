@@ -20,11 +20,13 @@ import time
 import random
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
-import inspect
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # import 安定化:
-# ---------------------------------------------------------------------------
+#   - このファイルは src/e2e/decision_minidemo.py に置かれている前提。
+#   - <repo>/src を sys.path に追加。
+#   - それでも失敗した場合は importlib でファイルパスから直接ロード。
+# -----------------------------------------------------------------------------
 SRC_DIR = Path(__file__).resolve().parents[1]  # .../<repo>/src
 PROJECT_ROOT = SRC_DIR.parent
 if str(SRC_DIR) not in sys.path:
@@ -32,14 +34,26 @@ if str(SRC_DIR) not in sys.path:
 
 
 def _safe_import(module_name: str) -> Optional[object]:
+    """
+    3段階で import を試みる:
+      1) importlib.import_module(module_name)
+      2) importlib.import_module('src.' + module_name)
+      3) <repo>/src 直下の .py をファイルパスから直ロード
+    失敗したら None を返す。
+    """
+    # 1) 標準 import
     try:
         return importlib.import_module(module_name)
     except Exception:
         pass
+
+    # 2) src. プレフィックス
     try:
         return importlib.import_module(f"src.{module_name}")
     except Exception:
         pass
+
+    # 3) 直接ロード
     mod_path = SRC_DIR / (module_name.replace(".", "/") + ".py")
     if mod_path.exists():
         spec = importlib.util.spec_from_file_location(module_name, mod_path)
@@ -56,6 +70,7 @@ mod_trace = _safe_import("plan_data.trace")
 if mod_trace and hasattr(mod_trace, "new_trace_id"):
     new_trace_id = getattr(mod_trace, "new_trace_id")
 else:
+    # 最低限のローカル実装（フォールバック）
     import uuid
 
     def new_trace_id(*, symbol: str = "MULTI", timeframe: str = "demo") -> str:  # type: ignore[override]
@@ -92,7 +107,7 @@ if not mod_dec:
 DecisionEngine = getattr(mod_dec, "DecisionEngine")
 DecisionRequest = getattr(mod_dec, "DecisionRequest")
 
-# --- DO層は任意 ------------------------------------------------------------
+# --- DO層は任意（存在すれば使う）。不足していればダミー実行へフォールバック ---
 HAVE_DO = True
 try:
     mod_contracts = _safe_import("plan_data.contracts")
@@ -122,79 +137,25 @@ def fake_plan_features() -> Dict[str, float]:
     }
 
 
-# --- 互換ロガー（log_infer_call のシグネチャ差吸収） -----------------------
-def _log_infer_compat(*, dur_ms: int, trace_id: str, features: Dict[str, Any], pred: Dict[str, Any]) -> None:
-    fn = log_infer_call
-    try:
-        sig = inspect.signature(fn)
-        names = set(sig.parameters.keys())
-        kw: Dict[str, Any] = {}
-
-        # conn_str / dsn 系
-        for n in ("conn_str", "dsn", "db", "pg_dsn"):
-            if n in names:
-                kw[n] = None
-                break
-
-        # model 名
-        if "model" in names:
-            kw["model"] = "DummyPredictor"
-        elif "model_name" in names:
-            kw["model_name"] = "DummyPredictor"
-
-        # version
-        if "ver" in names:
-            kw["ver"] = "demo"
-        elif "model_version" in names:
-            kw["model_version"] = "demo"
-
-        # duration
-        if "dur_ms" in names:
-            kw["dur_ms"] = int(dur_ms)
-        elif "duration_ms" in names:
-            kw["duration_ms"] = int(dur_ms)
-
-        # success
-        if "success" in names:
-            kw["success"] = True
-
-        # staleness
-        for n in ("feature_staleness_min", "staleness_min", "features_staleness_min"):
-            if n in names:
-                kw[n] = 0
-                break
-
-        # trace_id
-        if "trace_id" in names:
-            kw["trace_id"] = trace_id
-
-        # inputs/outputs あれば埋める（ある実装では payload に落ちる）
-        if "inputs" in names:
-            kw["inputs"] = {"features": features}
-        if "outputs" in names:
-            kw["outputs"] = pred
-
-        fn(**kw)
-        return
-    except Exception:
-        pass
-
-    # 最終手段：典型的な位置引数シグネチャ
-    try:
-        fn(None, "DummyPredictor", "demo", int(dur_ms), True, 0, trace_id)  # type: ignore[misc]
-    except Exception as e:
-        print(f"[WARN] log_infer_call failed with all variants: {e}")
-
-
 def fake_infer(trace_id: str, features: Dict[str, Any]) -> Dict[str, Any]:
     """予測器ダミー（例: Prometheus の簡易呼び出し代替）"""
-    t0_ns = time.perf_counter_ns()
+    t0 = time.time()
     pred = {
         "next_return_pred": round(random.uniform(-0.003, 0.003), 6),
         "confidence": round(random.uniform(0.4, 0.9), 3),
     }
-    dur_ms = max(1, (time.perf_counter_ns() - t0_ns) // 1_000_000)
-    _log_infer_compat(dur_ms=dur_ms, trace_id=trace_id, features=features, pred=pred)
+    duration_ms = int((time.time() - t0) * 1000)
+
+    # ✅ 新API：必ずキーワード引数で渡す
+    log_infer_call(
+        trace_id=trace_id,
+        model_name="DummyPredictor",
+        call_at=datetime.now(timezone.utc),
+        duration_ms=duration_ms,
+        success=True,
+        inputs={"features": features},
+        outputs=pred,
+    )
     return pred
 
 
@@ -217,28 +178,29 @@ def main() -> None:
     # 0) 観測テーブル・ビューの存在保証（dev/PoC 向け）
     ensure_tables()
     if callable(ensure_views):
-        ensure_views()
+        ensure_views()  # タイムライン/レイテンシビューを先に作っておく
 
     # 1) トレースID
     trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
 
-    # 2) PLAN スパン開始ログ
+    # 2) PLAN スパン開始ログ（新API）
     log_plan_run(trace_id=trace_id, status="START", started_at=_now_utc(), meta={"demo": "decision_minidemo"})
 
-    # 3) 特徴量（ダミー生成）
+    # 3) 特徴量（ダミー生成）※本来は collector→features→analyzer
     features = fake_plan_features()
 
-    # 4) Infer 呼び出し（ダミー）
+    # 4) （任意）Infer 呼び出し（ダミー）
     _ = fake_infer(trace_id, features)
 
     # 5) Decision
     engine = DecisionEngine()
     req = DecisionRequest(trace_id=trace_id, symbol=SYMBOL, features=features)
-    result = engine.decide(req)
+    result = engine.decide(req)  # NOCTRIA_OBS_PG_DSN が設定されていれば obs_decisions に記録
 
-    # 6) Exec
+    # 6) Exec: DO層があれば gate→idempotency→outbox→EXEC（ALERTも出ることがある）
     if HAVE_DO:
         try:
+            # qty は大きめにして gate の clamp / ALERT 発火を狙う
             ord_req = OrderRequest(
                 symbol=req.symbol,
                 intent="LONG" if result.decision.get("action") in ("enter_trend", "range_trade") else "SHORT",
@@ -253,15 +215,17 @@ def main() -> None:
             if isinstance(do_result, dict) and do_result.get("gate_alerts"):
                 print("ALERTS:", do_result["gate_alerts"])
         except Exception as e:
+            # DOパスで失敗した場合はフォールバックでダミー実行
             print(f"[WARN] DO path failed ({e}); fallback to fake_exec.")
             fake_exec(trace_id, result.decision)
     else:
+        # DO層無し → ダミー実行
         fake_exec(trace_id, result.decision)
 
     # 7) PLAN スパン終了ログ
     log_plan_run(trace_id=trace_id, status="END", finished_at=_now_utc())
 
-    # 8) マテビュー更新（存在すれば）
+    # 8) ついでに日次レイテンシをリフレッシュ（存在する場合のみ）
     if callable(refresh_materialized):
         try:
             refresh_materialized()
