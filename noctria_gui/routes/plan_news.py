@@ -1,4 +1,4 @@
-# noctria_gui/routes/plan_news.py
+cat > noctria_gui/routes/plan_news.py <<'PY'
 from __future__ import annotations
 from typing import Optional
 from pathlib import Path
@@ -9,12 +9,8 @@ from fastapi.templating import Jinja2Templates
 router = APIRouter(prefix="", tags=["Plan News"])
 
 def _templates() -> Jinja2Templates:
-    """
-    main の templates を再利用できるなら使い、無ければローカルの templates を使う。
-    import は関数内に閉じて循環を避ける。
-    """
+    # main側のJinja設定があれば再利用、なければローカルtemplatesを使用
     try:
-        # main 側でフィルタや env を仕込んでいる場合はこちらを使う
         from noctria_gui.main import templates as main_templates  # type: ignore
         return main_templates
     except Exception:
@@ -49,13 +45,14 @@ def api_news_timeline(
 ):
     try:
         from noctria_gui.services.plan_news_service import fetch_news_timeline
+        data = fetch_news_timeline(asset=asset, date_from=date_from, date_to=date_to)
+        return JSONResponse(data)
     except Exception as e:
+        import traceback
         return JSONResponse(
-            {"error": f"plan_news_service not available: {type(e).__name__}: {e}"},
+            {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()},
             status_code=500,
         )
-    data = fetch_news_timeline(asset=asset, date_from=date_from, date_to=date_to)
-    return JSONResponse(data)
 
 @router.get("/api/plan/event_impact")
 def api_event_impact(
@@ -68,16 +65,18 @@ def api_event_impact(
 ):
     try:
         from noctria_gui.services.plan_news_service import fetch_event_impact
+        data = fetch_event_impact(
+            event_tag=event_tag,
+            asset=asset,
+            window=(start, end),
+            date_from=date_from,
+            date_to=date_to,
+        )
+        return JSONResponse(data)
     except Exception as e:
+        import traceback
         return JSONResponse(
-            {"error": f"plan_news_service not available: {type(e).__name__}: {e}"},
+            {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()},
             status_code=500,
         )
-    data = fetch_event_impact(
-        event_tag=event_tag,
-        asset=asset,
-        window=(start, end),
-        date_from=date_from,
-        date_to=date_to,
-    )
-    return JSONResponse(data)
+PY
