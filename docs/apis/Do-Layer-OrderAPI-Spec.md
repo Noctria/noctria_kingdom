@@ -55,12 +55,12 @@
 ## 2. ステートマシン（idempo_ledger 連携）
 ```mermaid
 stateDiagram-v2
-  [*] --> Received: POST /do/order
-  Received --> Accepted: insert(idempo_ledger: accepted, 201)
-  Accepted --> Routing: validate & broker route
-  Routing --> Executing: send to BrokerAdapter
-  Executing --> Succeeded: result stored (200)
-  Executing --> Failed: error mapped (4xx/5xx)
+  [*] --> Received: "POST /do/order"
+  Received --> Accepted: "insert ledger=accepted"
+  Accepted --> Routing: "validate & broker route"
+  Routing --> Executing: "send to BrokerAdapter"
+  Executing --> Succeeded: "result stored"
+  Executing --> Failed: "error mapped"
   Succeeded --> [*]
   Failed --> [*]
 
