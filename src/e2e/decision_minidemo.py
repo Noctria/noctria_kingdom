@@ -7,7 +7,7 @@ Plan(ダミー) -> Infer(ダミー) -> DecisionEngine -> Exec(実行: DO層 or �
 同一 trace_id が obs_* テーブルに連携されることを確認。
 
 実行例:
-    python -m src.e2e.decision_minidemo
+    python3 -m src.e2e.decision_minidemo
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ ensure_views = getattr(mod_obs, "ensure_views", None)
 refresh_materialized = getattr(mod_obs, "refresh_materialized", None)
 log_plan_run = getattr(mod_obs, "log_plan_run")
 log_infer_call = getattr(mod_obs, "log_infer_call")
-log_exec_event = getattr(mod_obs, "log_exec_event", None)  # 存在しない環境も想定
+log_exec_event = getattr(mod_obs, "log_exec_event")
 
 # --- decision engine --------------------------------------------------------
 mod_dec = _safe_import("decision.decision_engine")
@@ -138,7 +138,7 @@ def fake_plan_features() -> Dict[str, float]:
 
 
 def fake_infer(trace_id: str, features: Dict[str, float]) -> Dict[str, Any]:
-    """予測器ダミー（例: Prometheus の簡易呼び出し代替）"""
+    """予測器ダミー（例: Prometheus の簡易呼び出し代替）。観測ログは log_infer_call に最小項目で記録。"""
     t0 = time.time()
     pred = {
         "next_return_pred": round(random.uniform(-0.003, 0.003), 6),
@@ -146,66 +146,50 @@ def fake_infer(trace_id: str, features: Dict[str, float]) -> Dict[str, Any]:
     }
     duration_ms = int((time.time() - t0) * 1000)
 
-    # 既存API（strategy_adapter などと同じシグネチャ）に合わせる
-    try:
-        log_infer_call(
-            None,                       # conn_str（env NOCTRIA_OBS_PG_DSN を使用）
-            model="DummyPredictor",
-            ver="demo",
-            dur_ms=duration_ms,
-            success=True,
-            feature_staleness_min=0,
-            trace_id=trace_id,
-        )
-    except Exception:
-        pass
-
+    # 🔧 修正ポイント：observability.log_infer_call の実シグネチャに合わせる
+    #   conn_str(NoneでOK), model, ver, dur_ms, success, feature_staleness_min, trace_id
+    log_infer_call(
+        None,
+        model="DummyPredictor",
+        ver="demo",
+        dur_ms=duration_ms,
+        success=True,
+        feature_staleness_min=0,
+        trace_id=trace_id,
+    )
     return pred
 
 
 def fake_exec(trace_id: str, decision: Dict[str, Any]) -> None:
     """約定APIダミー（実送信の代わりに obs_exec_events に記録）"""
-    if not callable(log_exec_event):
-        # 観測の exec が無い環境では何もしない
-        return
     side = "BUY" if decision.get("action") in ("enter_trend", "range_trade") else "FLAT"
-    try:
-        log_exec_event(
-            trace_id=trace_id,
-            symbol=decision.get("symbol", SYMBOL),
-            side=side,
-            size=10000,
-            provider="DummyBroker",
-            status="SENT",
-            order_id="DUMMY-ORDER-001",
-            response={"ok": True},
-        )
-    except Exception:
-        pass
+    log_exec_event(
+        trace_id=trace_id,
+        symbol=decision.get("symbol", SYMBOL),
+        side=side,
+        size=10000,
+        provider="DummyBroker",
+        status="SENT",
+        order_id="DUMMY-ORDER-001",
+        response={"ok": True},
+    )
 
 
 def main() -> None:
     # 0) 観測テーブル・ビューの存在保証（dev/PoC 向け）
     ensure_tables()
     if callable(ensure_views):
-        ensure_views()  # タイムライン/レイテンシビューを先に作っておく
+        try:
+            ensure_views()  # タイムライン/レイテンシビューを先に作っておく
+        except TypeError:
+            # 実装差異で引数不一致などがあっても無視して継続
+            pass
 
     # 1) トレースID
     trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
 
-    # 2) PLAN スパン開始ログ（既存APIに合わせて phase を使う）
-    try:
-        log_plan_run(
-            None,
-            phase="demo_start",
-            rows=0,
-            dur_sec=0,
-            missing_ratio=0.0,
-            error_rate=0.0,
-            trace_id=trace_id,
-        )
-    except Exception:
-        pass
+    # 2) PLAN スパン開始ログ（新API）
+    log_plan_run(trace_id=trace_id, status="START", started_at=_now_utc(), meta={"demo": "decision_minidemo"})
 
     # 3) 特徴量（ダミー生成）※本来は collector→features→analyzer
     features = fake_plan_features()
@@ -244,18 +228,7 @@ def main() -> None:
         fake_exec(trace_id, result.decision)
 
     # 7) PLAN スパン終了ログ
-    try:
-        log_plan_run(
-            None,
-            phase="demo_end",
-            rows=1,
-            dur_sec=0,
-            missing_ratio=0.0,
-            error_rate=0.0,
-            trace_id=trace_id,
-        )
-    except Exception:
-        pass
+    log_plan_run(trace_id=trace_id, status="END", finished_at=_now_utc())
 
     # 8) ついでに日次レイテンシをリフレッシュ（存在する場合のみ）
     if callable(refresh_materialized):
