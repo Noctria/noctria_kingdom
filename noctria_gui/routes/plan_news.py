@@ -1,4 +1,3 @@
-cat > noctria_gui/routes/plan_news.py <<'PY'
 from __future__ import annotations
 from typing import Optional
 from pathlib import Path
