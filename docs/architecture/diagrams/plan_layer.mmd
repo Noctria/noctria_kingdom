@@ -12,7 +12,7 @@ classDef demo fill:#202020,stroke:#8a8a8a,color:#eaeaea;
 %% ====== PLAN layer ======
 subgraph PLAN ["PLAN layer (src/plan_data)"]
   COLLECT["collector.py<br/>market data collection<br/>(IMPLEMENTED)"]:::plan
-  FEATURES["features.py<br/>feature engineering<br/>(IMPLEMENTED)"]:::plan
+  FEATURES["features.py<br/>returns/volatility/RSI/MA/PO/volume_spike<br/>news ratios & count_change<br/>macro diff & spike, event_today_flag<br/>(IMPLEMENTED)"]:::plan
   FEATDF["FeatureBundle output<br/>(df + context)<br/>v1.0（schemaあり）"]:::plan
   ANALYZER["analyzer.py<br/>factor extraction<br/>(IMPLEMENTED)"]:::plan
   STATS["statistics.py<br/>KPI aggregation<br/>(IMPLEMENTED)"]:::plan
@@ -31,8 +31,8 @@ end
 %% ====== Decision & Risk ======
 DECISION["DecisionEngine<br/>integrate & log<br/>(IMPLEMENTED)"]:::plan
 NOCTUSGATE["Noctus Gate（最終リスクゲート手前の計画側チェック）<br/>基本ルール/ロット制限<br/>(PARTIAL)"]:::partial
-QUALITY["DataQualityGate<br/>missing_ratio / data_lag → SCALE/FLAT<br/>(PARTIAL)"]:::partial
-PROFILES["profiles.yaml（configs）<br/>weights & rollout 7→30→100%<br/>(PARTIAL)"]:::partial
+QUALITY["DataQualityGate<br/>missing_ratio / data_lag -> SCALE/FLAT<br/>(PARTIAL)"]:::partial
+PROFILES["profiles.yaml（configs）<br/>weights & rollout 7->30->100%<br/>(PARTIAL)"]:::partial
 
 %% ====== Contracts ======
 CONTRACTS["Contracts<br/>FeatureBundle & StrategyProposal v1.0（実装）<br/>OrderRequest（Do契約に準拠）"]:::partial
@@ -51,7 +51,7 @@ end
 
 %% ====== Observability taps ======
 subgraph OBS ["Observability taps (tables)"]
-  OBS_PLAN["obs_plan_runs<br/>collector/features/statistics/analyzer<br/>trace_id present（READY）"]:::obs
+  OBS_PLAN["obs_plan_runs<br/>collector / fred / events / news / features / analyzer<br/>trace_id present（READY）"]:::obs
   OBS_INFER["obs_infer_calls<br/>AI propose/predict latency<br/>trace_id present（READY）"]:::obs
   OBS_DEC["obs_decisions<br/>decision metrics & reasons<br/>trace_id present（READY）"]:::obs
   OBS_EXEC["obs_exec_events<br/>send status / provider response<br/>trace_id present（READY）"]:::obs
@@ -60,7 +60,7 @@ end
 
 %% ====== PLAN flow ======
 COLLECT --> FEATURES --> STATS
-FEATURES --> FEATDF
+FEATURES -- "wrap -> FeatureBundle v1.0" --> FEATDF
 FEATDF --> ANALYZER
 ANALYZER --> HERMES
 FEATDF --> ADAPTER
@@ -83,7 +83,7 @@ QUALITY --> DECISION
 AURUS --> DECISION
 LEVIA --> DECISION
 PROM  --> DECISION
-VERITAS --> DECISION
+VERITIS --> DECISION
 PROFILES -. "config" .-> DECISION
 DECISION --> NOCTUSGATE
 NOCTUSGATE --> ORDER
@@ -115,7 +115,7 @@ FEATDF -. "trace_id（PLAN/AI実装済）" .-> AURUS
 FEATDF -. "trace_id（PLAN/AI実装済）" .-> LEVIA
 FEATDF -. "trace_id（PLAN/AI実装済）" .-> PROM
 FEATDF -. "trace_id（PLAN/AI実装済）" .-> VERITAS
-DECISION -. "trace_id（P→D→Exec実装済）" .-> ORDER
+DECISION -. "trace_id（P->D->Exec実装済）" .-> ORDER
 
 %% ====== class bindings ======
 class COLLECT,FEATURES,FEATDF,ANALYZER,STATS,ADAPTER plan;
@@ -132,5 +132,4 @@ class DECISION_MINI,TEST_E2E demo;
 %% StrategyProposal: docs/architecture/contracts/StrategyProposal.md
 %% DecisionRecord: docs/architecture/contracts/DecisionRecord.md
 %% OrderRequest: docs/architecture/contracts/OrderRequest.md
-
-%% NOTE: この文書で言う OrderRequest は v1.1（idempotency_key 追加）を前提とします。詳細は docs/architecture/contracts/OrderRequest.md を参照。
+%% NOTE: 本図での OrderRequest は v1.1（idempotency_key 追加）を前提
