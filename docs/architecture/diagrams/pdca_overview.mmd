@@ -1,0 +1,135 @@
+flowchart TD
+
+%% ====== styles (GitHub-safe) ======
+classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7;
+classDef ai fill:#2f3136,stroke:#a97e2c,color:#ffe476;
+classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
+classDef check fill:#1f3a2e,stroke:#5fbf88,color:#d9f2e3;
+classDef act fill:#3a242a,stroke:#cf6b86,color:#ffe6ee;
+classDef partial fill:#2e2e2e,stroke:#ffcc66,color:#fff2cc;
+classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
+classDef demo fill:#202020,stroke:#8a8a8a,color:#eaeaea;
+
+%% ===================== P (PLAN) =====================
+subgraph PLAN ["P: Plan (src/plan_data)"]
+  COLLECT["collector.py<br/>market data collection"]:::plan
+  FEATURES["features.py<br/>returns/volatility/RSI/MA/PO/volume_spike<br/>news ratios & count_change<br/>macro diff & spike, event_today_flag"]:::plan
+  FEATDF["FeatureBundle (df+context) v1.0"]:::plan
+  ANALYZER["analyzer.py<br/>factor extraction"]:::plan
+  STATS["statistics.py<br/>KPI aggregation (also used in C)"]:::plan
+  ADAPTER["strategy_adapter.py<br/>propose_with_logging (obs_infer_calls)"]:::plan
+end
+
+%% ===================== AI =====================
+subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
+  AURUS["Aurus<br/>propose()"]:::ai
+  LEVIA["Levia<br/>propose()"]:::ai
+  PROM["Prometheus<br/>predict_future()"]:::ai
+  VERITAS["Veritas<br/>propose()"]:::ai
+  HERMES["Hermes<br/>LLM explain (non-exec)"]:::ai
+end
+
+%% ===================== D (DO) & Decision/Risk =====================
+subgraph DECISION_STACK ["Decision & Risk"]
+  DECISION["DecisionEngine<br/>integrate & log"]:::plan
+  QUALITY["DataQualityGate<br/>missing_ratio / data_lag -> SCALE/FLAT"]:::partial
+  NOCTUSGATE["Noctus Gate<br/>basic rules / lot cap"]:::partial
+  PROFILES["profiles.yaml (configs)<br/>weights & rollout 7->30->100%"]:::partial
+end
+
+subgraph DO_LAYER ["D: Do (handoff)"]
+  ORDER["order_execution.py<br/>execution API"]:::do
+end
+
+%% ===================== C (CHECK) =====================
+subgraph CHECK_LOOP ["C: Check (observe & review)"]
+  KPI["KPI review (statistics.py)<br/>win-rate / dd / tags"]:::check
+  VIEWS["obs views<br/>trace_timeline / infer_latency"]:::check
+  TESTS["tests/test_trace_decision_e2e.py<br/>integration checks"]:::check
+end
+
+%% ===================== A (ACT) =====================
+subgraph ACT_LOOP ["A: Act (improve & rollout)"]
+  TUNING["strategy/params tuning<br/>thresholds, prompts, retrain"]:::act
+  QA_RULES["quality/risk rule updates<br/>DataQualityGate / alerts"]:::act
+  PROFILE_ROLLOUT["profile rollout updates<br/>weights & stages"]:::act
+  SPEC_EVOLVE["feature_spec / analyzer tweaks"]:::act
+end
+
+%% ===================== Observability =====================
+subgraph OBS ["Observability taps (tables)"]
+  OBS_PLAN["obs_plan_runs"]:::obs
+  OBS_INFER["obs_infer_calls"]:::obs
+  OBS_DEC["obs_decisions"]:::obs
+  OBS_EXEC["obs_exec_events"]:::obs
+  OBS_ALT["obs_alerts"]:::partial
+end
+
+%% ===================== Demo =====================
+subgraph DEMO ["Demo and tests"]
+  DECISION_MINI["e2e/decision_minidemo.py"]:::demo
+end
+
+%% ====== PLAN flow ======
+COLLECT --> FEATURES --> FEATDF
+FEATDF --> ANALYZER
+FEATDF --> ADAPTER
+ADAPTER --> AURUS
+ADAPTER --> LEVIA
+ADAPTER --> PROM
+ADAPTER --> VERITAS
+ANALYZER --> HERMES
+
+%% ====== Decision integration path ======
+FEATDF --> QUALITY --> DECISION
+AURUS --> DECISION
+LEVIA --> DECISION
+PROM --> DECISION
+VERITAS --> DECISION
+PROFILES -. "config" .-> DECISION
+DECISION --> NOCTUSGATE --> ORDER
+
+%% ====== Check loop wiring ======
+OBS_PLAN --> KPI
+OBS_INFER --> VIEWS
+OBS_DEC --> VIEWS
+OBS_EXEC --> VIEWS
+OBS_ALT --> KPI
+STATS --> KPI
+TESTS -. "counts by trace_id" .-> OBS_PLAN
+DECISION_MINI -.-> OBS_PLAN
+DECISION_MINI -.-> OBS_INFER
+DECISION_MINI -.-> OBS_DEC
+DECISION_MINI -.-> OBS_EXEC
+
+%% ====== Act loop feedbacks ======
+KPI --> TUNING
+VIEWS --> QA_RULES
+KPI --> PROFILE_ROLLOUT
+KPI --> SPEC_EVOLVE
+QA_RULES --> QUALITY
+PROFILE_ROLLOUT --> PROFILES
+SPEC_EVOLVE --> FEATURES
+
+%% ====== Observability logging ======
+COLLECT  -->|log| OBS_PLAN
+FEATURES -->|log| OBS_PLAN
+STATS    -->|log| OBS_PLAN
+ANALYZER -->|log| OBS_PLAN
+DECISION -->|log| OBS_DEC
+ORDER    -->|log| OBS_EXEC
+AURUS    -->|log| OBS_INFER
+LEVIA    -->|log| OBS_INFER
+PROM     -->|log| OBS_INFER
+VERITAS  -->|log| OBS_INFER
+NOCTUSGATE -->|alert| OBS_ALT
+
+%% ====== class bindings ======
+class COLLECT,FEATURES,FEATDF,ANALYZER,STATS,ADAPTER plan;
+class AURUS,LEVIA,PROM,VERITAS,HERMES ai;
+class ORDER do;
+class DECISION,QUALITY,NOCTUSGATE,PROFILES plan;
+class KPI,VIEWS,TESTS check;
+class TUNING,QA_RULES,PROFILE_ROLLOUT,SPEC_EVOLVE act;
+class OBS_PLAN,OBS_INFER,OBS_DEC,OBS_EXEC,OBS_ALT obs;
+class DECISION_MINI demo;
