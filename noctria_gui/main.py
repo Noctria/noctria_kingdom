@@ -37,8 +37,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 from markupsafe import Markup
-from noctria_gui.routes import plan_news
-app.include_router(plan_news.router)
 
 # ---------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
@@ -102,7 +100,7 @@ app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 # 静的/テンプレートの安全マウント
 # ---------------------------------------------------------------------------
 if NOCTRIA_GUI_STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(NOTRIA_GUI_STATIC_DIR if 'NOTRIA_GUI_STATIC_DIR' in globals() else NOCTRIA_GUI_STATIC_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
     logger.info("Static mounted: %s", NOCTRIA_GUI_STATIC_DIR)
 else:
     logger.warning("Static dir not found: %s (skip mounting)", NOCTRIA_GUI_STATIC_DIR)
@@ -197,6 +195,7 @@ logger.info("Integrating routers...")
 # 主要ルーター群（存在しなくてもスキップ可）
 _safe_include("noctria_gui.routes.home_routes")
 _safe_include("noctria_gui.routes.dashboard")
+_safe_include("noctria_gui.routes.plan_news")   # ← 追加：Plan News 画面 & API
 
 # 王系
 _safe_include("noctria_gui.routes.king_routes")
