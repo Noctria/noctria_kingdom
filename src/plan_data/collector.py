@@ -1,7 +1,6 @@
 # src/plan_data/collector.py
 
 import os
-import math
 import time
 import random
 from datetime import datetime, timedelta
@@ -18,7 +17,13 @@ except ImportError:
     raise ImportError("yfinance が必要です: pip install yfinance")
 
 from dotenv import load_dotenv
-load_dotenv(dotenv_path="/mnt/d/noctria_kingdom/.env")
+
+# .env の柔軟読み込み（固定パスが無い/他環境でも動作）
+_DEFAULT_DOTENV = "/mnt/d/noctria_kingdom/.env"
+if os.path.exists(_DEFAULT_DOTENV):
+    load_dotenv(dotenv_path=_DEFAULT_DOTENV)
+else:
+    load_dotenv()
 
 # FEATURE_SPEC はリスト（標準カラム順）。snake_case で運用。
 from plan_data.feature_spec import FEATURE_SPEC
@@ -93,6 +98,12 @@ class PlanDataCollector:
 
         # 経済カレンダー
         self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
+        try:
+            Path(self.event_calendar_csv).parent.mkdir(parents=True, exist_ok=True)
+            if not os.path.exists(self.event_calendar_csv):
+                print(f"[collector] ℹ️ イベントCSVが見つかりません: {self.event_calendar_csv}（スキップ）")
+        except Exception:
+            pass
 
         # GNews
         self.gnews_api_key = gnews_api_key or os.getenv("GNEWS_API_KEY")
@@ -104,11 +115,11 @@ class PlanDataCollector:
         (self.cache_dir / "gnews").mkdir(parents=True, exist_ok=True)
 
         # GNews チューニング（.envで上書き可）
-        self.gnews_page_size = int(os.getenv("GNEWS_PAGE_SIZE", "50"))      # 10〜100
-        self.gnews_max_pages = int(os.getenv("GNEWS_MAX_PAGES", "2"))       # 1日最大ページ数
-        self.gnews_retry = int(os.getenv("GNEWS_RETRY", "3"))               # リトライ回数
-        self.gnews_backoff = float(os.getenv("GNEWS_BACKOFF", "1.5"))       # 指数バックオフ係数
-        self.gnews_rate_per_min = int(os.getenv("GNEWS_RATE_PER_MIN", "12"))  # 1分あたり上限（無料: 約12程度）
+        self.gnews_page_size = int(os.getenv("GNEWS_PAGE_SIZE", "50"))          # 10〜100
+        self.gnews_max_pages = int(os.getenv("GNEWS_MAX_PAGES", "2"))           # 1日最大ページ数
+        self.gnews_retry = int(os.getenv("GNEWS_RETRY", "3"))                   # リトライ回数
+        self.gnews_backoff = float(os.getenv("GNEWS_BACKOFF", "1.5"))           # 指数バックオフ係数
+        self.gnews_rate_per_min = int(os.getenv("GNEWS_RATE_PER_MIN", "12"))    # 1分あたり上限（無料: 約12程度）
         self._last_call_ts: List[float] = []  # レート制御用リングバッファ
 
         # セッション再利用
@@ -159,9 +170,7 @@ class PlanDataCollector:
 
     @staticmethod
     def _missing_ratio(df: Optional[pd.DataFrame]) -> float:
-        """
-        データ全体の欠損率。'date' 列は除外。空なら 1.0（全欠損扱い）。
-        """
+        """データ全体の欠損率。'date' 列は除外。空なら 1.0（全欠損扱い）。"""
         if df is None or df.empty:
             return 1.0
         cols = [c for c in df.columns if c != "date"]
@@ -184,9 +193,21 @@ class PlanDataCollector:
             symbols = ASSET_SYMBOLS
 
         dfs = []
+        errors = 0
         for key, ticker in symbols.items():
             try:
-                df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
+                # 軽いリトライ（最大3回指数バックオフ）
+                last_exc = None
+                for attempt in range(3):
+                    try:
+                        df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
+                        break
+                    except Exception as e:
+                        last_exc = e
+                        time.sleep(0.5 * (1.6 ** attempt))
+                else:
+                    raise last_exc or RuntimeError("yfinance unknown error")
+
                 if df is None or df.empty:
                     print(f"[collector] {ticker} のデータなし")
                     continue
@@ -217,6 +238,7 @@ class PlanDataCollector:
 
             except Exception as e:
                 print(f"[collector] {ticker} の取得中エラー: {e}")
+                errors += 1
 
         if not dfs:
             return pd.DataFrame(columns=["date"])
@@ -315,6 +337,13 @@ class PlanDataCollector:
             except Exception:
                 # 壊れていたら削除
                 path.unlink(missing_ok=True)
+        # CSVフォールバックの読み出し
+        csv_path = path.with_suffix(".csv")
+        if csv_path.exists():
+            try:
+                return pd.read_csv(csv_path, parse_dates=["date"])
+            except Exception:
+                csv_path.unlink(missing_ok=True)
         return None
 
     def _write_day_cache(self, day: datetime, query_key: str, df: pd.DataFrame) -> None:
@@ -322,8 +351,12 @@ class PlanDataCollector:
         try:
             df.to_parquet(path, index=False)
         except Exception:
-            # 書き込み失敗は無視
-            pass
+            # Parquet不可ならCSVにフォールバック（環境依存対策）
+            try:
+                csv_path = path.with_suffix(".csv")
+                df.to_csv(csv_path, index=False)
+            except Exception:
+                pass
 
     def _fetch_gnews_one_day(self, day: datetime, query: str, lang: str = "en") -> pd.DataFrame:
         """
@@ -395,14 +428,12 @@ class PlanDataCollector:
                         if any(w in title for w in neg_words):
                             neg_count += 1
 
-                    # GNewsは最大 10*page ほどで頭打ちになることが多いので早期終了判定
+                    # 1ページ未満なら早期終了
                     if len(articles) < self.gnews_page_size:
                         ok = True
                         break
 
                     ok = True
-                    # まだ記事が続きそうなら次ページへ
-                    # ただし無料版レートの都合で深追いしすぎない
                 except requests.HTTPError as e:
                     last_err = e
                     wait = (self.gnews_backoff ** attempt) + random.uniform(0, 0.25)
@@ -442,7 +473,7 @@ class PlanDataCollector:
     ) -> pd.DataFrame:
         """
         GNewsで日次ニュース件数＋ポジ/ネガワード件数を返す（最適化版）
-        - 日毎キャッシュ（Parquet）
+        - 日毎キャッシュ（Parquet/CSV）
         - レート制御・指数バックオフ
         - ページング
         """
@@ -469,14 +500,14 @@ class PlanDataCollector:
         for c in ["news_count", "news_positive", "news_negative"]:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
-        # 比率などは FeatureEngineer 側で計算する想定だが、最低限の列はここで用意しておく
         return df[["date", "news_count", "news_positive", "news_negative"]].sort_values("date")
 
     # ---------- 収集一括 ----------
-    def collect_all(self, lookback_days: int = 365, trace_id: Optional[str] = None) -> pd.DataFrame:
+    def collect_all(self, lookback_days: int = 365, trace_id: Optional[str] = None):
         """
         収集一括。各フェーズ末尾で obs_plan_runs に計測を記録（失敗しても本処理は継続）。
         phase: collector / fred / events / news
+        戻り値: (df, trace_id)
         """
         end = datetime.today()
         start = end - timedelta(days=lookback_days)
@@ -562,14 +593,21 @@ class PlanDataCollector:
         if df is not None:
             df = df.reset_index(drop=True)
             df = align_to_feature_spec(df)
+            # 下流へtrace_idを明示的に受け渡す
+            try:
+                df.attrs["trace_id"] = trace_id
+            except Exception:
+                pass
 
-        return df
+        # タプル返し（dfのみでも使えるが、trace_idも明示的に返す）
+        return df, trace_id
 
 
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
-    df = collector.collect_all(lookback_days=14)
+    df, tid = collector.collect_all(lookback_days=14)
     cols = [c for c in df.columns if "news" in c or c == "date"]
     pd.set_option("display.max_columns", 120)
+    print("trace_id:", df.attrs.get("trace_id"), tid)
     print(df[cols].tail())
