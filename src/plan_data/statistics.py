@@ -10,22 +10,20 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 from collections import defaultdict, Counter
 from statistics import mean, stdev
 
 import numpy as np
 import pandas as pd
 
-# ---- imports（相対/絶対の両対応） ----
+# ---- imports（相対/絶対の両対応）----
 try:
-    from plan_data.collector import PlanDataCollector, ASSET_SYMBOLS  # type: ignore
-    from plan_data.feature_spec import FEATURE_SPEC  # 互換のため残置（本ファイル内では未使用）  # type: ignore
+    from plan_data.collector import PlanDataCollector  # type: ignore
     from plan_data.observability import log_plan_run  # type: ignore
     from plan_data.trace import new_trace_id  # type: ignore
 except Exception:  # 実行環境により src. 付きでの実行も許容
-    from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS  # type: ignore
-    from src.plan_data.feature_spec import FEATURE_SPEC  # type: ignore
+    from src.plan_data.collector import PlanDataCollector  # type: ignore
     from src.plan_data.observability import log_plan_run  # type: ignore
     from src.plan_data.trace import new_trace_id  # type: ignore
 
@@ -175,7 +173,7 @@ def attach_kpis(
 
 
 # =========================
-# サマリ統計クラス（後方互換）
+# サマリ統計クラス
 # =========================
 class PlanStatistics:
     def __init__(
@@ -184,20 +182,44 @@ class PlanStatistics:
         use_timeseries: bool = True,
         lookback_days: int = 365,
         trace_id: Optional[str] = None,
-        df: Optional[pd.DataFrame] = None,  # 追加: 既存DFを直接渡せる
+        df: Optional[Union[pd.DataFrame, Tuple[pd.DataFrame, str]]] = None,  # DataFrame または (df, trace_id)
     ):
         """
         df を明示指定しない場合は collector.collect_all(...) を実行して取得。
+        - collect_all 新仕様: (df, trace_id)
+        - 旧仕様     : df のみ
         """
         self.collector = collector or PlanDataCollector()
-        self._data = df if isinstance(df, pd.DataFrame) else self.collector.collect_all(lookback_days=lookback_days)
+
+        collected_df: Optional[pd.DataFrame] = None
+        collected_tid: Optional[str] = None
+
+        if df is not None:
+            # 明示渡しがあれば最優先
+            if isinstance(df, tuple) and len(df) == 2 and isinstance(df[0], pd.DataFrame):
+                collected_df, collected_tid = df  # type: ignore[assignment]
+            elif isinstance(df, pd.DataFrame):
+                collected_df = df
+        else:
+            collected = self.collector.collect_all(lookback_days=lookback_days)
+            if isinstance(collected, tuple) and len(collected) == 2 and isinstance(collected[0], pd.DataFrame):
+                collected_df, collected_tid = collected
+            else:
+                collected_df = collected  # 旧仕様（df のみ）
+
+        self._data = collected_df if isinstance(collected_df, pd.DataFrame) else pd.DataFrame()
+        # trace_id 決定（引数優先 → collector 由来 → 新規）
+        self._trace_id = trace_id or collected_tid or new_trace_id(symbol="MULTI", timeframe="1d")
 
         # カラム名を安全に小文字へ
-        if isinstance(self._data, pd.DataFrame):
+        if isinstance(self._data, pd.DataFrame) and not self._data.empty:
             self._data.columns = [str(c).lower() for c in self._data.columns]
+            try:
+                self._data.attrs["trace_id"] = self._trace_id
+            except Exception:
+                pass
 
         self._is_timeseries = isinstance(self._data, pd.DataFrame) and "date" in self._data.columns
-        self._trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
 
         # 代表 KPI を内部にも付与しておく（存在時のみ）
         if self._is_timeseries:
@@ -367,8 +389,10 @@ class PlanStatistics:
         if self._is_timeseries:
             for ev in ["fomc", "cpi", "nfp", "ecb", "boj", "gdp"]:
                 if ev in self._data.columns:
-                    days = pd.to_datetime(self._data[pd.to_numeric(self._data[ev], errors="coerce") == 1]["date"], errors="coerce")
-                    days = days.dropna()
+                    days = pd.to_datetime(
+                        self._data[pd.to_numeric(self._data[ev], errors="coerce") == 1]["date"],
+                        errors="coerce",
+                    ).dropna()
                     result[ev] = {
                         "count": int(len(days)),
                         "recent": str(days.max()) if not days.empty else None,
@@ -418,11 +442,18 @@ __all__ = [
 
 # テスト/手動実行用
 if __name__ == "__main__":
-    # 1) 収集→KPI付与→概要統計
-    base_df = PlanDataCollector().collect_all(lookback_days=240)
-    df_kpi = attach_kpis(base_df)
+    # 1) 収集（新仕様に合わせてアンパック）
+    collected = PlanDataCollector().collect_all(lookback_days=240)
+    if isinstance(collected, tuple) and len(collected) == 2:
+        base_df, tid = collected
+    else:
+        base_df, tid = collected, None
 
-    stats = PlanStatistics(df=df_kpi)  # 既存DFを渡して再収集を省略
+    # 2) KPI付与
+    df_kpi = attach_kpis(base_df, trace_id=tid)
+
+    # 3) 概要統計
+    stats = PlanStatistics(df=(df_kpi, tid) if tid else df_kpi)
     summary = stats.get_summary()
 
     import json
