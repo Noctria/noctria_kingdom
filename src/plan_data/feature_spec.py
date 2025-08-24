@@ -2,60 +2,92 @@
 # -*- coding: utf-8 -*-
 
 """
-Noctria Kingdom - Plan層 標準特徴量セット・サンプルDataFrame
--------------------------------------------------------------
-- Plan（計画・戦略立案）フェーズで生成・出力される標準データセットの“仕様”
-- src/plan_data/以下の collector / statistics / features / analyzer 等が準拠
-- カラムや内容を拡張した場合は必ずここを“公式仕様”として更新する
+Noctria Kingdom - Plan層 標準特徴量セット・スキーマ & ユーティリティ
+-------------------------------------------------------------------
+- Plan（計画・戦略立案）フェーズで扱う“標準DataFrame”の仕様を定義
+- src/plan_data/ 以下の collector / features / analyzer / statistics 等が準拠
+- ここを更新するときは、下流の並び順や補完ロジックにも影響する点に注意
 
-★ 実データ → “標準8列(STANDARD_FEATURE_ORDER)” にそろえるユーティリティも収録
-  - align_to_feature_spec(df, required=STANDARD_FEATURE_ORDER)
-  - select_standard_8(df)  # 8列に一発で揃えるショートカット
+本モジュールが提供するもの
+- PLAN_FEATURE_COLUMNS : 代表的な列カタログ（仕様カタログ）
+- STANDARD_FEATURE_ORDER: “標準8列”の並び（下流が想定する基本観測ベクトル）
+- FEATURE_SPEC         : align_to_feature_spec のデフォルト（互換用）
+- align_to_feature_spec(df, required=..., fill_value=0.0)
+- select_standard_8(df)
+- get_plan_feature_order(obs_dim)
+- align_to_plan_features(df, required_features=None, fill_value=0.0)
 
-★ 後方互換ラッパ（observation_adapter 対応）
-  - align_to_plan_features(df, required_features=None, ...)
-  - get_plan_feature_order(obs_dim)
+変更点（2025-08）
+- 外部依存の FRED を段階的に縮小。列は前方互換のため残すが、値は NaN 可。
+- GNews を主要ニュース特徴として明示（news_count / positive / negative）。
+- import パスを `src.` で始めない形に是正（パッケージとして正しい相対）。
 """
 
-from typing import Iterable, Optional, List
+from __future__ import annotations
+
+from typing import Iterable, Optional, List, Sequence
 
 import numpy as np
 import pandas as pd
 
-from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
-
-# --- Plan層標準カラムセット（仕様） ---
-PLAN_FEATURE_COLUMNS = [
+# =====================================================================
+# 仕様カタログ（Plan が出力・整形後に“あり得る”代表列の一覧）
+# すべてを毎回埋める必要はない。collector が持っていない列は欠損(NaN)で良い。
+# =====================================================================
+PLAN_FEATURE_COLUMNS: List[str] = [
+    # タイムキー / メタ
     "date", "tag", "strategy",
+
+    # ===== USDJPY（基本パネル）=====
     "usdjpy_close", "usdjpy_volume", "usdjpy_return",
     "usdjpy_volatility_5d", "usdjpy_volatility_20d", "usdjpy_rsi_14d",
     "usdjpy_gc_flag", "usdjpy_po_up", "usdjpy_po_down",
 
-    # 市場関連の指標
+    # ===== 市場関連の代表指標 =====
     "sp500_close",
     "vix_close",
 
-    # ニュース関連
+    # ===== ニュース（GNews を主とする）=====
     "news_count", "news_positive", "news_negative",
     "news_positive_ratio", "news_negative_ratio", "news_spike_flag",
 
-    # マクロ
+    # ===== マクロ（FRED互換カラム：値は NaN 可）=====
     "cpiaucsl_value", "cpiaucsl_diff", "cpiaucsl_spike_flag",
     "fedfunds_value", "fedfunds_diff", "fedfunds_spike_flag",
-
-    # 経済指標
     "unrate_value",
 
-    # イベント
-    "fomc", "nfp",
+    # ===== 経済イベント（日次フラグ；CSV由来。無ければ欠損でOK）=====
+    "fomc", "cpi", "nfp", "ecb", "boj", "gdp",
 
-    # 検証系のメタ情報
+    # ===== 検証系（統計/評価ログ）=====
     "win_rate", "max_dd", "num_trades",
 ]
 
 
-# --- サンプルDataFrame（Planが出力する形の例） ---
+# =====================================================================
+# “標準8列”: 下流の観測ベクトルの最小構成（順序固定）
+# - まずは USDJPY の価格・リスク系 + 市場の温度感（SP500/VIX）
+# - collector/feature の最小互換を意識
+# =====================================================================
+STANDARD_FEATURE_ORDER: List[str] = [
+    "usdjpy_close",
+    "usdjpy_volume",
+    "usdjpy_return",
+    "usdjpy_volatility_5d",
+    "usdjpy_volatility_20d",
+    "usdjpy_rsi_14d",
+    "sp500_close",
+    "vix_close",
+]
+
+# 互換のため（旧コードが参照している場合）
+FEATURE_SPEC: Sequence[str] = STANDARD_FEATURE_ORDER
+
+
+# =====================================================================
+# サンプル DataFrame（仕様確認用）
+# =====================================================================
 SAMPLE_PLAN_DF = pd.DataFrame([
     {
         "Date": "2025-08-01", "tag": "bull_trend", "strategy": "v2-ma-cross",
@@ -85,29 +117,12 @@ SAMPLE_PLAN_DF = pd.DataFrame([
         "FOMC": 0, "NFP": 1,
         "win_rate": 0.75, "max_dd": -8.9, "num_trades": 28,
     },
-    {
-        "Date": "2025-08-03", "tag": "bear_trend", "strategy": "v2-ma-cross",
-        "USDJPY_Close": 154.56, "USDJPY_Volume": 3800, "USDJPY_Return": -0.0021,
-        "USDJPY_Volatility_5d": 0.010, "USDJPY_Volatility_20d": 0.011, "USDJPY_RSI_14d": 53.1,
-        "USDJPY_GC_Flag": 0, "USDJPY_PO_UP": 0, "USDJPY_PO_DOWN": 1,
-        "sp500_close": 5560.2, "vix_close": 15.1,
-        "News_Count": 20, "News_Positive": 4, "News_Negative": 11,
-        "News_Positive_Ratio": 0.20, "News_Negative_Ratio": 0.55, "News_Spike_Flag": 1,
-        "CPIAUCSL_Value": 310.15, "CPIAUCSL_Diff": 0.02, "CPIAUCSL_Spike_Flag": 0,
-        "FEDFUNDS_Value": 5.25, "FEDFUNDS_Diff": 0.00, "FEDFUNDS_Spike_Flag": 0,
-        "unrate_value": 4.2,
-        "FOMC": 0, "NFP": 0,
-        "win_rate": 0.68, "max_dd": -12.0, "num_trades": 27,
-    },
 ])
 
-# 互換のため（旧コードが参照している場合）
-FEATURE_SPEC = PLAN_FEATURE_COLUMNS
 
-
-# === 実データ → “標準8列” にそろえるユーティリティ ==========================
-
+# =====================================================================
 # CamelCase → snake_case の公式リネーム表（SAMPLE_PLAN_DF 由来）
+# =====================================================================
 _SNAKE_RENAMES = {
     "Date": "date",
     "USDJPY_Close": "usdjpy_close",
@@ -119,63 +134,75 @@ _SNAKE_RENAMES = {
     "USDJPY_GC_Flag": "usdjpy_gc_flag",
     "USDJPY_PO_UP": "usdjpy_po_up",
     "USDJPY_PO_DOWN": "usdjpy_po_down",
+
     "News_Count": "news_count",
     "News_Positive": "news_positive",
     "News_Negative": "news_negative",
     "News_Positive_Ratio": "news_positive_ratio",
     "News_Negative_Ratio": "news_negative_ratio",
     "News_Spike_Flag": "news_spike_flag",
+
     "CPIAUCSL_Value": "cpiaucsl_value",
     "CPIAUCSL_Diff": "cpiaucsl_diff",
     "CPIAUCSL_Spike_Flag": "cpiaucsl_spike_flag",
+
     "FEDFUNDS_Value": "fedfunds_value",
     "FEDFUNDS_Diff": "fedfunds_diff",
     "FEDFUNDS_Spike_Flag": "fedfunds_spike_flag",
+
     "FOMC": "fomc",
     "NFP": "nfp",
-    # すでに snake_case なもの（sp500_close, vix_close など）はそのまま
+    # すでに snake_case のもの（sp500_close, vix_close 等）はそのまま
 }
 
 
+# =====================================================================
+# 整形ユーティリティ
+# =====================================================================
 def align_to_feature_spec(
     df: pd.DataFrame,
     required: Optional[Iterable[str]] = None,
     fill_value: float = 0.0,
 ) -> pd.DataFrame:
     """
-    入力DataFrameを Plan 仕様にアラインするヘルパー。
+    入力 DataFrame を Plan 仕様にアラインするヘルパー。
 
     1) 既知の CamelCase 列を snake_case に改名（未定義はそのまま）
-    2) required で指定した列を補完（不足は fill_value で埋める）
+    2) required（既定は STANDARD_FEATURE_ORDER）に含まれる列を補完（不足は fill_value）
     3) required の順序に並べ替え
-    4) required 列のみ数値化（float32）し、NaN/Inf を安全に除去
+    4) 数値列は float32 化し、NaN/Inf を安全に除去（ffill/bfill→fillna(fill_value)）
+
+    注意:
+    - 'date' はタイムキーとして基本は object/datetime を許容。数値化対象から除外。
     """
     work = df.copy()
 
     # 1) リネーム（既知マッピングのみ置換）
-    if len(_SNAKE_RENAMES):
+    if _SNAKE_RENAMES:
         rename_map = {c: _SNAKE_RENAMES.get(c, c) for c in work.columns}
         work = work.rename(columns=rename_map)
 
-    # 2) “標準8列”がデフォルト
+    # 2) 必須列セット
     req = list(required) if required is not None else list(STANDARD_FEATURE_ORDER)
 
     # 3) 不足列は補完
     for col in req:
         if col not in work.columns:
-            work[col] = fill_value
+            work[col] = np.nan if col == "date" else fill_value
 
     # 4) 並べ替え（ここで列は req のみになる）
     work = work[req]
 
-    # 5) 数値化と安全化（必要列のみ）
-    work = (
-        work.apply(pd.to_numeric, errors="coerce")        # 文字列 → 数値 or NaN
-            .replace([np.inf, -np.inf], np.nan)           # ±inf → NaN
-            .ffill().bfill().fillna(fill_value)           # NaN を埋める
+    # 5) 数値化と安全化
+    numeric_cols = [c for c in work.columns if c != "date"]
+    if numeric_cols:
+        work[numeric_cols] = (
+            work[numeric_cols]
+            .apply(pd.to_numeric, errors="coerce")
+            .replace([np.inf, -np.inf], np.nan)
+            .ffill().bfill().fillna(fill_value)
             .astype(np.float32)
-    )
-
+        )
     return work
 
 
@@ -189,15 +216,14 @@ def select_standard_8(df: pd.DataFrame) -> pd.DataFrame:
     return align_to_feature_spec(df, required=STANDARD_FEATURE_ORDER, fill_value=0.0)
 
 
-# === 後方互換：observation_adapter からの参照関数 ============================
-
-# “標準8列”の後に、よく使う補助指標を優先的に連結した拡張候補。
-# ※ obs_dim が 8 を超える場合の拡張用（必要に応じてここを増減）。
+# 追加拡張候補（“標準8列”を超えるときに優先的に採用する列）
 _FALLBACK_NUMERIC_ORDER: List[str] = [
     # 市況系
     "sp500_close", "vix_close",
-    # ニュース/マクロの代表
-    "news_count", "cpiaucsl_value", "fedfunds_value", "unrate_value",
+    # ニュース代表
+    "news_count",
+    # マクロ代表（NaN 許容）
+    "cpiaucsl_value", "fedfunds_value", "unrate_value",
 ]
 
 # 文字列・メタ系は除外
@@ -255,13 +281,13 @@ def align_to_plan_features(
     return align_to_feature_spec(df, required=req, fill_value=float(kwargs.pop("fill_value", 0.0)))
 
 
-# --- ドキュメント出力例（スクリプト実行時） ---
+# --- スクリプト実行時の簡易ドキュメント出力 ---
 if __name__ == "__main__":
-    print("■ Plan層 標準特徴量セット（仕様）")
+    print("■ Plan層 仕様カタログ（代表列）")
     print(PLAN_FEATURE_COLUMNS)
 
-    print("\n■ サンプルDataFrame（冒頭3行）")
-    print(SAMPLE_PLAN_DF.head(3))
+    print("\n■ 標準8列（順序固定）")
+    print(STANDARD_FEATURE_ORDER)
 
     print("\n■ サンプル → 標準8列への整形結果（先頭2行）")
     print(select_standard_8(SAMPLE_PLAN_DF).head(2))
@@ -269,5 +295,16 @@ if __name__ == "__main__":
     print("\n■ get_plan_feature_order(6):")
     print(get_plan_feature_order(6))
 
-    print("\n■ get_plan_feature_order(10):")
-    print(get_plan_feature_order(10))
+    print("\n■ get_plan_feature_order(12):")
+    print(get_plan_feature_order(12))
+
+
+__all__ = [
+    "PLAN_FEATURE_COLUMNS",
+    "STANDARD_FEATURE_ORDER",
+    "FEATURE_SPEC",
+    "align_to_feature_spec",
+    "select_standard_8",
+    "get_plan_feature_order",
+    "align_to_plan_features",
+]
