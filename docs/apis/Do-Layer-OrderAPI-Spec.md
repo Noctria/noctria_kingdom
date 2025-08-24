@@ -23,8 +23,8 @@
     - `Authorization: Bearer <token>`（将来拡張、現状 optional）
 
 ### 1.1 リクエスト
-- Body: `OrderRequest v1.1`（成行は `price=null`）
-- バリデーション（抜粋）
+- Body: `OrderRequest v1.1`（成行は `price=null`）  
+- バリデーション（抜粋）:
   - `instrument` は許可リスト内
   - `qty` はブローカー最小LOT/STEPに整合
   - `time_in_force ∈ {IOC,FOK,GTC}`（既定 `IOC`）
@@ -71,7 +71,7 @@ stateDiagram-v2
   end note
 ```
 
-- `idempo_ledger` フィールド利用
+- `idempo_ledger` フィールド利用:
   - `status ∈ {accepted, succeeded, failed}`
   - `request_digest` = 正規化JSONの SHA-256
   - `result_digest` = `ExecResult` 主要フィールドから SHA-256
@@ -121,7 +121,7 @@ class BrokerAdapter:
         例外は Adapter 内でマッピングし、{error, reason_code} を返す。"""
 ```
 
-- 例外マッピング方針
+- 例外マッピング方針:
   - 接続/タイムアウト → `BROKER_TIMEOUT` / `BROKER_DOWN`（503）
   - 取引不可/数量不正 → `VALIDATION_ERROR`（422） or `BROKER_REJECTED`（400）
 - ペーパー実装 `PaperAdapter` を既定に用意。実ブローカーは差し替え。
@@ -190,3 +190,77 @@ async def do_order(req, idem_key):
 
 ## 10. 変更履歴
 - **2025-08-24**: 初版（OrderRequest v1.1 対応、幂等仕様・エラーマップ明記）
+
+---
+
+## 11. 正規化ルールと request_digest
+- キー順序: JSON オブジェクトは辞書順でソート  
+- 空白削除（`separators=(",",":")`）  
+- Unicode: NFC 正規化  
+- 数値: JSON 準拠表記  
+- 除外: `trace_id`, `idempotency_key`  
+- ハッシュ: `sha256(canonical_json)`  
+
+### 例
+入力:
+```json
+{"qty":10000,"instrument":"USDJPY","side":"BUY","trace_id":"cli-001","idempotency_key":"01JABC..."}
+```
+正規化:
+```json
+{"instrument":"USDJPY","qty":10000,"side":"BUY"}
+```
+digest = `sha256:3f3d3b...`
+
+---
+
+## 12. リクエスト例 / curl サンプル
+### 新規
+```bash
+curl -X POST /do/order -H "Idempotency-Key: 01J8TP..." -d '{"instrument":"USDJPY","side":"BUY","qty":10000,"idempotency_key":"01J8TP..."}'
+# -> 201 {"status":"accepted", ...}
+```
+
+### 再送（同一キー・同一ボディ）
+```bash
+# -> 200 {"status":"succeeded", ...}
+```
+
+### 衝突（同一キー・ボディ差分）
+```bash
+# -> 409 {"error":"IDEMPOTENCY_CONFLICT",...}
+```
+
+---
+
+## 13. JSON Schema 抜粋（OrderRequest v1.1）
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["instrument", "side", "qty", "idempotency_key"],
+  "properties": {
+    "instrument": { "type": "string", "pattern": "^[A-Z0-9._-]{3,20}$" },
+    "side": { "type": "string", "enum": ["BUY","SELL"] },
+    "qty": { "type": "number", "exclusiveMinimum": 0 },
+    "price": { "type": ["number","null"], "exclusiveMinimum": 0 },
+    "time_in_force": { "type": "string", "enum": ["IOC","FOK","GTC"] },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 32 },
+      "maxItems": 8
+    },
+    "risk_constraints": {
+      "type": "object",
+      "properties": {
+        "max_dd": { "type": "number" },
+        "max_consecutive_loss": { "type": "integer" },
+        "max_spread": { "type": "number" }
+      }
+    },
+    "trace_id": { "type": "string", "maxLength": 128 },
+    "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 64 }
+  },
+  "additionalProperties": false
+}
+```
