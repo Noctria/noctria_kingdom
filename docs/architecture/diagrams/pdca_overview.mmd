@@ -7,133 +7,117 @@ classDef dec fill:#1f3b2d,stroke:#29a36a,color:#d7ffe9;
 classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
 classDef check fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
 classDef cfg fill:#323232,stroke:#ff9f43,color:#ffd8a8;
-classDef partial fill:#2e2e2e,stroke:#ffcc66,color:#fff2cc;
 classDef demo fill:#202020,stroke:#8a8a8a,color:#eaeaea;
+classDef partial fill:#2e2e2e,stroke:#ffcc66,color:#fff2cc;
 
-%% =====================================================================
-%%                           P  (Plan)
-%% =====================================================================
-subgraph PLAN_P ["P = Plan layer (src/plan_data)"]
+%% =================== P (Plan) ===================
+subgraph PLAN_P ["P = Plan (src/plan_data)"]
   direction TB
-  COLLECT["collector.py<br/>PlanDataCollector<br/>yfinance + FRED + events(csv) + GNews<br/><code>collect_all</code> returns <b>(df, trace_id)</b><br/>(UPDATED)"]:::plan
-  FEATURES["features.py<br/>FeatureEngineer<br/>returns/vol/RSI/MA/PO/volume_spike<br/>news ratios & change / macro diff&spike / event_today_flag<br/>(UPDATED)"]:::plan
-  ANALYZER["analyzer.py<br/>PlanAnalyzer.extract_features() / analyze()<br/>(IMPLEMENTED)"]:::plan
-  STATS["statistics.py<br/>PlanStatistics.get_summary()<br/>(UPDATED)"]:::plan
-  ADAPTER["strategy_adapter.py<br/><code>FeatureBundle</code> / <code>StrategyProposal</code><br/><code>propose_with_logging()</code> → logs <i>obs_infer_calls</i><br/>(IMPLEMENTED)"]:::plan
+  COLLECT["collector.py<br/>collect_all(df, trace_id)"]:::plan
+  FEATURES["features.py<br/>FeatureEngineer"]:::plan
+  ANALYZER["analyzer.py<br/>PlanAnalyzer"]:::plan
+  STATS["statistics.py<br/>PlanStatistics"]:::plan
+  ADAPTER["strategy_adapter.py<br/>FeatureBundle / propose_with_logging"]:::plan
 end
 
-TRACE["trace.py<br/><code>new_trace_id()</code> / <code>get_trace_id()</code><br/>trace_id is propagated P→AI→D→Exec"]:::plan
+TRACE["trace.py<br/>new_trace_id / get_trace_id"]:::plan
 
-%% =====================================================================
-%%                           D  (Decide)
-%% =====================================================================
-subgraph DECIDE_D ["D = Decide layer (src/decision)"]
-  DECISION["decision_engine.py<br/>DecisionEngine.decide()<br/>simple rule: vol/trend → action<br/>logs <i>obs_decisions</i><br/>(IMPLEMENTED)"]:::dec
-  NOCTUSGATE["Noctus Gate (pre-exec checks)<br/>lot clamp / basic rules<br/>(PARTIAL)"]:::partial
-  QUALITY["DataQualityGate<br/>missing_ratio / data_lag → SCALE/FLAT<br/>(PARTIAL)"]:::partial
-  PROFILES["configs/profiles.yaml<br/>weights & rollout (7→30→100%)<br/>(PARTIAL)"]:::partial
+%% =================== D (Decide) ===================
+subgraph DECIDE_D ["D = Decide (src/decision)"]
+  DECISION["decision_engine.py<br/>DecisionEngine"]:::dec
+  NOCTUSGATE["Noctus Gate<br/>(partial)"]:::partial
+  QUALITY["DataQualityGate<br/>(partial)"]:::partial
+  PROFILES["configs/profiles.yaml<br/>(partial)"]:::partial
 end
 
-%% =====================================================================
-%%                           C  (Check)
-%% =====================================================================
-subgraph CHECK_C ["C = Check (Observability, QC)"]
-  OBSLIB["observability.py<br/><code>ensure_tables()</code> / <code>ensure_views()</code><br/><code>log_plan_run</code>, <code>log_infer_call</code>, <code>log_decision</code>, <code>log_exec_event</code>, <code>log_alert</code><br/>(UPDATED)"]:::check
-  VIEWS["views<br/><code>obs_trace_timeline</code><br/><code>obs_trace_latency</code> (COALESCE版)<br/>(UPDATED)"]:::check
-  MVIEW["materialized view<br/><code>obs_latency_daily</code> (+ index)<br/><code>refresh_materialized()</code><br/>(UPDATED)"]:::check
+%% =================== C (Check) ===================
+subgraph CHECK_C ["C = Check (Observability)"]
+  OBSLIB["observability.py<br/>ensure_* / log_*"]:::check
+  VIEWS["views<br/>obs_trace_timeline / obs_trace_latency"]:::check
+  MVIEW["mview<br/>obs_latency_daily (+index)"]:::check
 
   subgraph OBS_TABLES ["observability tables"]
-    OBS_PLAN["obs_plan_runs<br/>phase/stats + span START/END<br/>trace_id present（READY）"]:::check
-    OBS_INFER["obs_infer_calls<br/>new + legacy columns（READY）"]:::check
-    OBS_DEC["obs_decisions（READY）"]:::check
-    OBS_EXEC["obs_exec_events（READY）"]:::check
-    OBS_ALT["obs_alerts（READY, rules TBD）"]:::check
+    OBS_PLAN["obs_plan_runs"]:::check
+    OBS_INFER["obs_infer_calls"]:::check
+    OBS_DEC["obs_decisions"]:::check
+    OBS_EXEC["obs_exec_events"]:::check
+    OBS_ALT["obs_alerts"]:::check
   end
 end
 
-%% =====================================================================
-%%                           A  (Act)
-%% =====================================================================
-subgraph ACT_A ["A = Act (Execution & Alerts)"]
-  ORDER["execution/order_execution.py<br/>place_order()<br/>(INTEGRATION READY)"]:::do
-  RISK["execution/risk_policy.py<br/>load_policy() / gate alerts<br/>(INTEGRATION READY)"]:::do
+%% =================== A (Act) ===================
+subgraph ACT_A ["A = Act (execution)"]
+  ORDER["execution/order_execution.py"]:::do
+  RISK["execution/risk_policy.py"]:::do
 end
 
-%% =====================================================================
-%%                           AI Underlings
-%% =====================================================================
+%% =================== AI underlings ===================
 subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
   AURUS["Aurus.propose()"]:::ai
   LEVIA["Levia.propose()"]:::ai
   PROM["Prometheus.predict_future()"]:::ai
   VERITAS["Veritas.propose()"]:::ai
-  HERMES["Hermes (LLM explain, non-exec)"]:::ai
+  HERMES["Hermes (LLM explain)"]:::ai
 end
 
-%% =====================================================================
-%%                           Demo & Tests
-%% =====================================================================
+%% =================== Demo & Tests ===================
 subgraph DEMO ["Demo & Tests"]
-  MINI["e2e/decision_minidemo.py<br/>Plan(demo)→Infer(demo)→Decision→Exec(demo)<br/>logs end-to-end w/ trace_id<br/>(UPDATED)"]:::demo
-  TEST_E2E["tests/test_trace_decision_e2e.py<br/>integration（IMPLEMENTED）"]:::demo
+  MINI["e2e/decision_minidemo.py"]:::demo
+  TEST_E2E["tests/test_trace_decision_e2e.py"]:::demo
 end
 
-%% =====================================================================
-%%                       External / Data sources
-%% =====================================================================
+%% =================== External ===================
 subgraph EXT ["External inputs"]
   YF["Yahoo Finance (yfinance)"]:::cfg
   FRED["FRED API"]:::cfg
   GNEWS["GNews API"]:::cfg
-  ECAL["data/market/event_calendar.csv<br/>(optional)"]:::cfg
+  ECAL["event_calendar.csv (opt)"]:::cfg
 end
 
-%% =====================================================================
-%%                           Contracts & Context
-%% =====================================================================
-CONTRACTS["Contracts (lightweight)<br/>FeatureBundle & StrategyProposal<br/>(in strategy_adapter.py, v1.0.0)"]:::cfg
+CONTRACTS["Contracts (lightweight)<br/>FeatureBundle/StrategyProposal"]:::cfg
 
-%% =====================================================================
-%%                               WIRING
-%% =====================================================================
+%% -------- Wiring (separate lines; simple labels) --------
 
-%% ---- Plan flow ----
-COLLECT --> FEATURES --> ANALYZER --> STATS
+%% Plan flow
+COLLECT --> FEATURES
+FEATURES --> ANALYZER
+ANALYZER --> STATS
 FEATURES --> ADAPTER
-TRACE -. provides .- PLAN_P
 
-%% ---- AI calls via adapter ----
-ADAPTER -->|FeatureBundle| AURUS
-ADAPTER -->|FeatureBundle| LEVIA
-ADAPTER -->|FeatureBundle| PROM
-ADAPTER -->|FeatureBundle| VERITAS
+%% AI calls via adapter
+ADAPTER --> AURUS
+ADAPTER --> LEVIA
+ADAPTER --> PROM
+ADAPTER --> VERITAS
 ANALYZER --> HERMES
 
-%% ---- Decide path ----
+%% Decide path
 AURUS --> DECISION
-LEVIA  --> DECISION
-PROM   --> DECISION
-VERITAS--> DECISION
-STATS  --> QUALITY --> DECISION
-DECISION --> NOCTUSGATE --> ORDER
+LEVIA --> DECISION
+PROM --> DECISION
+VERITAS --> DECISION
+STATS --> QUALITY
+QUALITY --> DECISION
+DECISION --> NOCTUSGATE
+NOCTUSGATE --> ORDER
 
-%% ---- External data to collector ----
+%% External to collector
 YF --> COLLECT
 FRED --> COLLECT
 GNEWS --> COLLECT
 ECAL --> COLLECT
 
-%% ---- Observability taps ----
-COLLECT  -->|log phase=collector| OBS_PLAN
-FEATURES -->|log phase=features|  OBS_PLAN
-ANALYZER -->|log phase=analyzer| OBS_PLAN
-STATS    -->|log phase=statistics| OBS_PLAN
-ADAPTER  -->|log infer (new/legacy)| OBS_INFER
-DECISION -->|log decision| OBS_DEC
-ORDER    -->|log exec|     OBS_EXEC
-NOCTUSGATE -->|alert| OBS_ALT
+%% Observability taps (short labels to avoid parser quirks)
+COLLECT  -->|log:collector|  OBS_PLAN
+FEATURES -->|log:features|   OBS_PLAN
+ANALYZER -->|log:analyzer|   OBS_PLAN
+STATS    -->|log:stats|      OBS_PLAN
+ADAPTER  -->|log:infer|      OBS_INFER
+DECISION -->|log:decision|   OBS_DEC
+ORDER    -->|log:exec|       OBS_EXEC
+NOCTUSGATE -->|alert|        OBS_ALT
 
-%% ---- Views consumption ----
+%% Views & mview
 OBS_PLAN --> VIEWS
 OBS_INFER --> VIEWS
 OBS_DEC --> VIEWS
@@ -141,18 +125,23 @@ OBS_EXEC --> VIEWS
 OBS_ALT --> VIEWS
 VIEWS --> MVIEW
 
-%% ---- Demo edges ----
+%% Demo
 MINI --> VIEWS
 MINI --> MVIEW
 
-%% ---- Contracts references (docs only) ----
-CONTRACTS -. "used by" .- ADAPTER
-CONTRACTS -. "returned by" .- AURUS
-CONTRACTS -. "returned by" .- LEVIA
-CONTRACTS -. "returned by" .- PROM
-CONTRACTS -. "returned by" .- VERITAS
+%% Contracts
+CONTRACTS -. used by .- ADAPTER
+CONTRACTS -. returned by .- AURUS
+CONTRACTS -. returned by .- LEVIA
+CONTRACTS -. returned by .- PROM
+CONTRACTS -. returned by .- VERITAS
 
-%% ---- Class bindings ----
+%% Trace propagation (avoid linking to subgraph names)
+TRACE -. provides .- ADAPTER
+TRACE -. correlates .- DECISION
+TRACE -. correlates .- ORDER
+
+%% Classes
 class COLLECT,FEATURES,ANALYZER,STATS,ADAPTER,TRACE plan;
 class DECISION,NOCTUSGATE,QUALITY,PROFILES dec;
 class ORDER,RISK do;
@@ -160,8 +149,3 @@ class OBSLIB,OBS_PLAN,OBS_INFER,OBS_DEC,OBS_EXEC,OBS_ALT,VIEWS,MVIEW check;
 class AURUS,LEVIA,PROM,VERITAS,HERMES ai;
 class MINI,TEST_E2E demo;
 class CONTRACTS cfg;
-
-%% --- Notes ---
-%% - obs_trace_latency は COALESCE(plan_start, any_plan_ts, first_ts) 起点に更新済み
-%% - decision_minidemo.py は duration_ms を obs_infer_calls に記録（新APIカラム）
-%% - collector.collect_all は (df, trace_id) を返し、df.attrs['trace_id'] にも保持
