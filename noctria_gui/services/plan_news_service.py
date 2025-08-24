@@ -38,7 +38,7 @@ def fetch_news_timeline(
     """
     sql = """
     SELECT date, cnt_1d, cnt_7d_ma, senti_1d_avg, senti_7d_avg
-      FROM vw_news_daily_counts
+      FROM public.vw_news_daily_counts
      WHERE asset = %s
        AND (%s IS NULL OR date >= %s::date)
        AND (%s IS NULL OR date <= %s::date)
@@ -108,7 +108,7 @@ def fetch_event_impact(
     sql_rel = """
     WITH anchors AS (
       SELECT DISTINCT date
-        FROM vw_news_event_tags
+        FROM public.vw_news_event_tags
        WHERE asset = %(asset)s
          AND inferred_event_tag = %(tag)s
          AND (%(df)s IS NULL OR date >= %(df)s::date)
