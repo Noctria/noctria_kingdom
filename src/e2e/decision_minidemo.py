@@ -21,12 +21,12 @@ import random
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # import 安定化:
 #   - このファイルは src/e2e/decision_minidemo.py に置かれている前提。
 #   - <repo>/src を sys.path に追加。
 #   - それでも失敗した場合は importlib でファイルパスから直接ロード。
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 SRC_DIR = Path(__file__).resolve().parents[1]  # .../<repo>/src
 PROJECT_ROOT = SRC_DIR.parent
 if str(SRC_DIR) not in sys.path:
@@ -137,22 +137,24 @@ def fake_plan_features() -> Dict[str, float]:
     }
 
 
-def fake_infer(trace_id: str, features: Dict[str, float]) -> Dict[str, Any]:
-    """予測器ダミー（例: Prometheus の簡易呼び出し代替）。観測ログは log_infer_call に最小項目で記録。"""
-    t0 = time.time()
+def fake_infer(trace_id: str, features: Dict[str, Any]) -> Dict[str, Any]:
+    """予測器ダミー（例: Prometheus の簡易呼び出し代替）"""
+    t0_ns = time.perf_counter_ns()
+
     pred = {
         "next_return_pred": round(random.uniform(-0.003, 0.003), 6),
         "confidence": round(random.uniform(0.4, 0.9), 3),
     }
-    duration_ms = int((time.time() - t0) * 1000)
 
-    # 🔧 修正ポイント：observability.log_infer_call の実シグネチャに合わせる
-    #   conn_str(NoneでOK), model, ver, dur_ms, success, feature_staleness_min, trace_id
+    dur_ms = max(1, (time.perf_counter_ns() - t0_ns) // 1_000_000)
+
+    # observability.log_infer_call の正しい引数名で呼び出し
+    # シグネチャ: (conn_str, model, ver, dur_ms, success, feature_staleness_min, trace_id)
     log_infer_call(
-        None,
+        None,                   # conn_str: Noneなら NOCTRIA_OBS_PG_DSN を使用
         model="DummyPredictor",
         ver="demo",
-        dur_ms=duration_ms,
+        dur_ms=dur_ms,
         success=True,
         feature_staleness_min=0,
         trace_id=trace_id,
@@ -179,16 +181,12 @@ def main() -> None:
     # 0) 観測テーブル・ビューの存在保証（dev/PoC 向け）
     ensure_tables()
     if callable(ensure_views):
-        try:
-            ensure_views()  # タイムライン/レイテンシビューを先に作っておく
-        except TypeError:
-            # 実装差異で引数不一致などがあっても無視して継続
-            pass
+        ensure_views()  # タイムライン/レイテンシビューを先に作っておく
 
     # 1) トレースID
     trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
 
-    # 2) PLAN スパン開始ログ（新API）
+    # 2) PLAN スパン開始ログ（簡易）
     log_plan_run(trace_id=trace_id, status="START", started_at=_now_utc(), meta={"demo": "decision_minidemo"})
 
     # 3) 特徴量（ダミー生成）※本来は collector→features→analyzer
