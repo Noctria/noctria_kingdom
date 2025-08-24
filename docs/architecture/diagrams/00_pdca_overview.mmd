@@ -1,0 +1,102 @@
+flowchart TD
+
+%% ====== styles (GitHub-safe) ======
+classDef plan fill:#262e44,stroke:#47617a,color:#d8e0f7;
+classDef ai fill:#2f3136,stroke:#a97e2c,color:#ffe476;
+classDef do fill:#3d2d2d,stroke:#cc9999,color:#ffcccc;
+classDef check fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
+classDef act fill:#2e2e2e,stroke:#ffcc66,color:#fff2cc;
+classDef demo fill:#202020,stroke:#8a8a8a,color:#eaeaea;
+classDef partial fill:#2b2b2b,stroke:#888,color:#ddd;
+
+%% ====== PLAN (P) ======
+subgraph PLAN ["PLAN (src/plan_data)"]
+  COLLECT["collector.py<br/>market & macro & news"]:::plan
+  FEATURES["features.py<br/>returns/volatility/RSI/MA/PO<br/>news ratios & change<br/>macro diff & spike<br/>event_today_flag"]:::plan
+  ANALYZER["analyzer.py<br/>factor extraction & labels"]:::plan
+  STATS["statistics.py<br/>KPI aggregation & summary"]:::plan
+  ADAPTER["strategy_adapter.py<br/>propose_with_logging"]:::plan
+end
+
+%% ====== AI (aux for P) ======
+subgraph AI_UNDERLINGS ["AI underlings (src/strategies)"]
+  AURUS["Aurus.propose()"]:::ai
+  LEVIA["Levia.propose()"]:::ai
+  PROM["Prometheus.predict_future()"]:::ai
+  VERITAS["Veritas.propose()"]:::ai
+  HERMES["Hermes (LLM explain)"]:::ai
+end
+
+%% ====== DECIDE / ACT (A) ======
+DECISION["decision_engine.py<br/>rule-based min engine"]:::act
+PROFILES["profiles.yaml<br/>weights & rollout 7->30->100%"]:::act
+NOCTUSGATE["Noctus Gate<br/>pre-risk checks (position caps, basic rules)"]:::act
+
+%% ====== DO (D) ======
+subgraph DO_LAYER ["DO layer (handoff)"]
+  ORDER["execution/order_execution.py<br/>send orders (provider API)"]:::do
+end
+
+%% ====== CHECK (C) ======
+subgraph CHECK ["CHECK (observability tables)"]
+  OBS_PLAN["obs_plan_runs<br/>collector/fred/events/news/features/analyzer/statistics"]:::check
+  OBS_INFER["obs_infer_calls<br/>AI propose/predict latency"]:::check
+  OBS_DEC["obs_decisions<br/>decision metrics & reasons"]:::check
+  OBS_EXEC["obs_exec_events<br/>send status / provider response"]:::check
+  OBS_ALT["obs_alerts<br/>quality/risk alerts"]:::check
+end
+
+%% ====== DEMO / TESTS ======
+subgraph DEMO ["Demo & tests"]
+  MINI["e2e/decision_minidemo.py"]:::demo
+  INTEG["tests/test_trace_decision_e2e.py"]:::demo
+end
+
+%% ====== MAIN FLOWS ======
+COLLECT --> FEATURES --> ANALYZER --> ADAPTER
+ADAPTER --> AURUS
+ADAPTER --> LEVIA
+ADAPTER --> PROM
+ADAPTER --> VERITAS
+ANALYZER --> DECISION
+PROFILES -. "config" .-> DECISION
+DECISION --> NOCTUSGATE --> ORDER
+
+%% ====== CHECK LOGGING ======
+COLLECT  -->|log| OBS_PLAN
+FEATURES -->|log| OBS_PLAN
+ANALYZER -->|log| OBS_PLAN
+STATS    -->|log| OBS_PLAN
+AURUS    -->|log| OBS_INFER
+LEVIA    -->|log| OBS_INFER
+PROM     -->|log| OBS_INFER
+VERITAS  -->|log| OBS_INFER
+DECISION -->|log| OBS_DEC
+ORDER    -->|log| OBS_EXEC
+NOCTUSGATE -->|alert| OBS_ALT
+
+%% ====== FEEDBACK LOOPS ======
+OBS_PLAN --> STATS
+STATS --> PROFILES
+OBS_DEC -. insights .-> PROFILES
+OBS_EXEC -. fail/success .-> PROFILES
+OBS_ALT -. guardrails .-> PROFILES
+
+%% ====== DEMO EDGES ======
+MINI --> COLLECT
+MINI --> DECISION
+MINI --> ORDER
+INTEG -. trace id asserts .-> OBS_PLAN
+INTEG -.-> OBS_INFER
+INTEG -.-> OBS_DEC
+INTEG -.-> OBS_EXEC
+
+%% ====== class bindings ======
+class COLLECT,FEATURES,ANALYZER,STATS,ADAPTER plan;
+class AURUS,LEVIA,PROM,VERITAS,HERMES ai;
+class ORDER do;
+class DECISION,PROFILES,NOCTUSGATE act;
+class OBS_PLAN,OBS_INFER,OBS_DEC,OBS_EXEC,OBS_ALT check;
+class MINI,INTEG demo;
+
+%% NOTE: OrderRequest contract is v1.1 (idempotency_key) in Do layer.
