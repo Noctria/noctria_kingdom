@@ -4,7 +4,7 @@ import os
 import time
 import random
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Tuple, Union
+from typing import Optional, Dict, List
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -64,12 +64,6 @@ ASSET_SYMBOLS: Dict[str, str] = {
     "RUSSELL": "^RUT",
 }
 
-FRED_SERIES: Dict[str, str] = {
-    "UNRATE": "UNRATE",
-    "FEDFUNDS": "FEDFUNDS",
-    "CPI": "CPIAUCSL",
-}
-
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
     """FEATURE_SPEC（リスト）に合わせて不足カラムは追加（NaN）し、その順序で返す。"""
@@ -77,6 +71,7 @@ def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
     for col in columns:
         if col not in df.columns:
             df[col] = pd.NA
+    # 余分な列は残したい場合は下行をやめるが、既存仕様では並びを固定
     return df[columns]
 
 
@@ -84,18 +79,17 @@ def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
 # Collector
 # =========================
 class PlanDataCollector:
+    """
+    FRED 依存を廃止し、価格（yfinance）＋イベントCSV（任意）＋ GNews を主軸に収集する実装。
+    返り値: (df, trace_id)
+    ログ: obs_plan_runs に phase="collector" / "events" / "news" を記録
+    """
     def __init__(
         self,
-        fred_api_key: Optional[str] = None,
         event_calendar_csv: Optional[str] = None,
         gnews_api_key: Optional[str] = None,
         cache_dir: Optional[Path] = None,
     ):
-        # FRED
-        self.fred_api_key = fred_api_key or os.getenv("FRED_API_KEY")
-        if not self.fred_api_key:
-            print("[collector] ⚠️ FRED_API_KEYが未設定です")
-
         # 経済カレンダー
         self.event_calendar_csv = event_calendar_csv or "data/market/event_calendar.csv"
         try:
@@ -200,14 +194,7 @@ class PlanDataCollector:
                 last_exc = None
                 for attempt in range(3):
                     try:
-                        df = yf.download(
-                            ticker,
-                            start=start,
-                            end=end,
-                            interval=interval,
-                            progress=False,
-                            auto_adjust=True,  # ★ FutureWarning抑止 & 一貫性
-                        )
+                        df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
                         break
                     except Exception as e:
                         last_exc = e
@@ -273,44 +260,10 @@ class PlanDataCollector:
 
         return merged
 
-    # ---------- FRED ----------
-    def fetch_fred_data(self, series_id: str, start_date: str, end_date: str) -> pd.DataFrame:
-        if not self.fred_api_key:
-            print("[collector] ⚠️ FRED_API_KEY未設定。FREDデータをスキップ")
-            return pd.DataFrame()
-
-        url = "https://api.stlouisfed.org/fred/series/observations"
-        params = {
-            "series_id": series_id,
-            "api_key": self.fred_api_key,
-            "file_type": "json",
-            "observation_start": start_date,
-            "observation_end": end_date,
-        }
-        try:
-            r = self._session.get(url, params=params, timeout=10)
-            r.raise_for_status()
-            obs = r.json().get("observations", [])
-            if not obs:
-                return pd.DataFrame()
-            df = pd.DataFrame(obs)
-            df = df.rename(columns={"date": "date", "value": f"{series_id.lower()}_value"})
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
-            df[f"{series_id.lower()}_value"] = pd.to_numeric(df[f"{series_id.lower()}_value"], errors="coerce")
-            return df[["date", f"{series_id.lower()}_value"]]
-        except Exception as e:
-            print(f"[collector] FREDデータ({series_id})取得失敗: {e}")
-            return pd.DataFrame()
-
     # ---------- 経済カレンダー ----------
     def fetch_event_calendar(self) -> pd.DataFrame:
-        path = Path(self.event_calendar_csv)
-        if not path.exists():
-            # 初期起動時などは静かにスキップ
-            print(f"[collector] ℹ️ イベントCSVが見つかりません: {path}（スキップ）")
-            return pd.DataFrame()
         try:
-            df = pd.read_csv(path)
+            df = pd.read_csv(self.event_calendar_csv)
             df.columns = [col.lower() for col in df.columns]
             if "date" in df.columns:
                 df["date"] = pd.to_datetime(df["date"], errors="coerce")
@@ -397,7 +350,7 @@ class PlanDataCollector:
         pos_count = 0
         neg_count = 0
 
-        # ページング（GNews: page/ max param）
+        # ページング（GNews: page/max param）
         for page in range(1, self.gnews_max_pages + 1):
             # レート制御
             self._respect_rate_limit()
@@ -515,20 +468,11 @@ class PlanDataCollector:
         return df[["date", "news_count", "news_positive", "news_negative"]].sort_values("date")
 
     # ---------- 収集一括 ----------
-    def collect_all(
-        self,
-        lookback_days: int = 365,
-        trace_id: Optional[str] = None,
-        *,
-        return_trace: bool = False,
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
+    def collect_all(self, lookback_days: int = 365, trace_id: Optional[str] = None):
         """
         収集一括。各フェーズ末尾で obs_plan_runs に計測を記録（失敗しても本処理は継続）。
-        phase: collector / fred / events / news
-
-        戻り値:
-          - 互換デフォルト: DataFrame
-          - return_trace=True のとき: (DataFrame, trace_id)
+        phase: collector / events / news
+        戻り値: (df, trace_id)
         """
         end = datetime.today()
         start = end - timedelta(days=lookback_days)
@@ -552,20 +496,17 @@ class PlanDataCollector:
                 trace_id=trace_id,
             )
         except Exception:
-            # 観測ログの失敗は握りつぶす（処理継続）
             pass
 
-        # 2) FRED（CPI/失業率/FF金利など）
+        # 2) 経済カレンダー（任意）
         t1 = time.time()
-        for sid in FRED_SERIES.values():
-            fred_df = self.fetch_fred_data(sid, start_str, end_str)
-            if not fred_df.empty and not df.empty:
-                df = pd.merge(df, fred_df, on="date", how="left")
-                df = df.sort_values("date").ffill()
+        event_df = self.fetch_event_calendar()
+        if not event_df.empty and not df.empty:
+            df = pd.merge(df, event_df, on="date", how="left")
         try:
             log_plan_run(
                 None,
-                phase="fred",
+                phase="events",
                 rows=len(df) if df is not None else 0,
                 dur_sec=int(time.time() - t1),
                 missing_ratio=self._missing_ratio(df),
@@ -575,26 +516,8 @@ class PlanDataCollector:
         except Exception:
             pass
 
-        # 3) 経済カレンダー
+        # 3) GNews（日次ニュース件数・ポジネガ件数）
         t2 = time.time()
-        event_df = self.fetch_event_calendar()
-        if not event_df.empty and not df.empty:
-            df = pd.merge(df, event_df, on="date", how="left")
-        try:
-            log_plan_run(
-                None,
-                phase="events",
-                rows=len(df) if df is not None else 0,
-                dur_sec=int(time.time() - t2),
-                missing_ratio=self._missing_ratio(df),
-                error_rate=0.0,
-                trace_id=trace_id,
-            )
-        except Exception:
-            pass
-
-        # 4) GNews（日次ニュース件数・ポジネガ件数）
-        t3 = time.time()
         news_df = self.fetch_gnews_counts(start_str, end_str)
         if not news_df.empty and not df.empty:
             df = pd.merge(df, news_df, on="date", how="left")
@@ -603,7 +526,7 @@ class PlanDataCollector:
                 None,
                 phase="news",
                 rows=len(df) if df is not None else 0,
-                dur_sec=int(time.time() - t3),
+                dur_sec=int(time.time() - t2),
                 missing_ratio=self._missing_ratio(df),
                 error_rate=0.0,
                 trace_id=trace_id,
@@ -614,21 +537,20 @@ class PlanDataCollector:
         if df is not None:
             df = df.reset_index(drop=True)
             df = align_to_feature_spec(df)
-            # 下流へ trace_id を attrs で受け渡し（破壊しないメタ）
+            # 下流へtrace_idを明示的に受け渡す
             try:
                 df.attrs["trace_id"] = trace_id
             except Exception:
                 pass
 
-        if return_trace:
-            return df, trace_id
-        return df
+        # タプル返し（dfのみでも使えるが、trace_idも明示的に返す）
+        return df, trace_id
 
 
 # --- テスト実行例 ---
 if __name__ == "__main__":
     collector = PlanDataCollector()
-    df, tid = collector.collect_all(lookback_days=14, return_trace=True)
+    df, tid = collector.collect_all(lookback_days=14)
     cols = [c for c in df.columns if "news" in c or c == "date"]
     pd.set_option("display.max_columns", 120)
     print("trace_id:", df.attrs.get("trace_id"), tid)
