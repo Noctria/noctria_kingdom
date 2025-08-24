@@ -194,7 +194,7 @@ class PlanDataCollector:
                 last_exc = None
                 for attempt in range(3):
                     try:
-                        df = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
+                        df = yf.download(ticker, start=start, end=end, interval=interval, progress=False, auto_adjust=False)
                         break
                     except Exception as e:
                         last_exc = e
