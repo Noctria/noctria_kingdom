@@ -11,6 +11,18 @@ from plan_data.trace import new_trace_id
 
 
 class PlanAnalyzer:
+    """
+    P層の特徴量DataFrame（snake_case想定）から、軽量な要約特徴と説明ラベルを抽出。
+    観測ログ（phase="analyzer"）も送る。
+    """
+
+    # ======= 閾値（チューニング用に定数化） =======
+    WIN_RATE_DELTA7_THR = 3.0          # 勝率の7行差分がこのpp超なら急上昇
+    NEWS_DELTA3_THR = 50.0             # ニュース件数の3行差分スパイク閾値
+    ACTIVE_TRADES_THR = 20             # 取引回数がこの値超で「活発」
+    DD_ABS_THR = 10.0                  # max_dd の絶対値がこの%超で「悪化」
+    NEWS_COUNT_HIGH_THR = 200.0        # ニュース件数が多い判定
+
     def __init__(self, df: pd.DataFrame, *, trace_id: Optional[str] = None):
         """
         df: P層の特徴量DataFrame（snake_case想定）
@@ -26,18 +38,30 @@ class PlanAnalyzer:
 
         self._trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
 
-    # 安全に末尾値を取得
+    # ======= ヘルパ =======
     def _last(self, s: pd.Series):
+        """
+        末尾値を安全に取得。末尾がNaNなら前方埋め（ffill）後の末尾を返す。
+        取得不能なら NaN。
+        """
         s = pd.to_numeric(s, errors="coerce")
-        s = s.dropna()
-        return s.iloc[-1] if len(s) else np.nan
+        s_ffill = s.ffill()
+        v = s_ffill.iloc[-1] if len(s_ffill) else np.nan
+        return v if pd.notna(v) else np.nan
 
-    # 安全に n 日（行）差分を取得（末尾と n+1 個前の差）
     def _delta(self, s: pd.Series, n: int):
-        s = pd.to_numeric(s, errors="coerce").dropna()
-        if len(s) >= (n + 1):
-            return float(s.iloc[-1] - s.iloc[-(n + 1)])
-        return np.nan
+        """
+        “n行前との差分”を安全に取得。NaNは前方埋め（ffill）してから
+        末尾値と n 行前の値の差を取る。先頭側に十分なデータが無ければ NaN。
+        """
+        if n < 1 or s is None or len(s) == 0:
+            return np.nan
+        s = pd.to_numeric(s, errors="coerce").ffill()
+        if len(s) <= n:
+            return np.nan
+        last = s.iloc[-1]
+        earlier = s.shift(n).iloc[-1]
+        return float(last - earlier) if pd.notna(last) and pd.notna(earlier) else np.nan
 
     # NaN/NA を含む比較を安全にブールへ
     def _gt(self, value, threshold) -> bool:
@@ -60,6 +84,7 @@ class PlanAnalyzer:
             return 0.0
         return float(df[cols].isna().sum().sum()) / float(total)
 
+    # ======= 特徴抽出 =======
     def extract_features(self) -> Dict:
         feats: Dict = {}
 
@@ -69,33 +94,31 @@ class PlanAnalyzer:
             delta7 = self._delta(self.df["win_rate"], 7)
             feats["win_rate"] = last_wr
             feats["win_rate_delta7"] = delta7
-            feats["win_rate_rapid_increase"] = self._gt(delta7, 3)  # NaNならFalse
+            feats["win_rate_rapid_increase"] = self._gt(delta7, self.WIN_RATE_DELTA7_THR)  # NaNならFalse
 
-        # 最大ドローダウン（より小さいほど悪い）
+        # 最大ドローダウン（値は負方向。絶対値で評価する方が可読）
         if "max_dd" in self.df.columns:
-            last_dd = self._last(self.df["max_dd"])
+            last_dd = self._last(self.df["max_dd"])  # 例: -12.3
             feats["max_dd"] = last_dd
-            # 例：直近のドローダウンが閾値より悪化か
-            feats["dd_worse_than_10"] = self._gt(-last_dd, 10)  # max_dd が -10 以下で True 相当
+            feats["dd_worse_than_10"] = self._gt(abs(last_dd), self.DD_ABS_THR)
 
         # 取引回数
         if "num_trades" in self.df.columns:
             last_trades = self._last(self.df["num_trades"])
             feats["num_trades"] = last_trades
-            feats["active_market"] = self._gt(last_trades, 20)
+            feats["active_market"] = self._gt(last_trades, self.ACTIVE_TRADES_THR)
 
         # 市場関連の例（存在すれば）
         for col in ["usdjpy_close", "sp500_close", "vix_close"]:
             if col in self.df.columns:
-                last_val = self._last(self.df[col])
-                feats[col] = last_val
+                feats[col] = self._last(self.df[col])
 
-        # ニュース件数
+        # ニュース件数とスパイク
         if "news_count" in self.df.columns:
             last_news = self._last(self.df["news_count"])
             delta3 = self._delta(self.df["news_count"], 3)
             feats["news_count"] = last_news
-            feats["news_spike_recent"] = self._gt(delta3, 50)
+            feats["news_spike_recent"] = self._gt(delta3, self.NEWS_DELTA3_THR)
 
         # マクロ例
         for macro in ["cpiaucsl_value", "fedfunds_value", "unrate_value"]:
@@ -104,6 +127,7 @@ class PlanAnalyzer:
 
         return feats
 
+    # ======= ラベル生成 =======
     def make_explanation_labels(self, features: Dict) -> List[str]:
         labels: List[str] = []
         if features.get("win_rate_rapid_increase"):
@@ -112,11 +136,11 @@ class PlanAnalyzer:
             labels.append("ドローダウンが深く、リスクが高まっています。")
         if features.get("active_market"):
             labels.append("取引回数が多く、市場は活発です。")
-        if self._gt(features.get("news_count", np.nan), 200):
+        if self._gt(features.get("news_count", np.nan), self.NEWS_COUNT_HIGH_THR):
             labels.append("ニュース件数の増加が観測されます。")
         return labels
 
-    # 追加：一括実行 + 観測ログ
+    # ======= 一括実行 + 観測ログ =======
     def analyze(self) -> Dict[str, object]:
         """
         特徴抽出と説明ラベル生成をまとめて実行し、観測ログ（phase="analyzer"）を残す。
@@ -143,7 +167,7 @@ class PlanAnalyzer:
         return {"features": feats, "labels": labels}
 
 
-# テスト例
+# ======= テスト例 =======
 if __name__ == "__main__":
     # 依存の都合で相対/絶対 import の両方に対応
     try:
