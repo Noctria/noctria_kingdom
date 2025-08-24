@@ -1,0 +1,495 @@
+openapi: 3.0.3
+info:
+  title: Noctria PDCA API
+  version: "1.0.0"
+  description: |
+    PDCA 再チェック系（/pdca/*）と GUI 読み取り系（/gui/*）の統合 OpenAPI 定義。
+    - 認証: JWT (RS256) / Bearer
+    - 受理は非同期: 202 Accepted + request_id
+    - Idempotency-Key ヘッダで重複抑止
+servers:
+  - url: http://localhost:8001
+    description: dev
+  - url: https://pdca.api.noctria.local
+    description: prod
+
+tags:
+  - name: PDCA Recheck
+  - name: GUI Read
+
+paths:
+  /pdca/recheck:
+    post:
+      tags: [PDCA Recheck]
+      summary: 単一/少数戦略の再チェックを受理（非同期）
+      operationId: postRecheck
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecheckRequest' }
+            examples:
+              sample:
+                value:
+                  strategies: ["strat.meanrev.m1","strat.breakout.h1"]
+                  window: { from: "2025-08-01T00:00:00Z", to: "2025-08-24T00:00:00Z" }
+                  reason: "daily-healthcheck"
+                  dry_run: false
+                  params: { recalc_metrics: ["winrate","sharpe"], retrain: false }
+                  trace_id: "gui-req-1234"
+      responses:
+        "202":
+          description: 受理（非同期）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecheckAccepted' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/IdempotencyConflict' }
+        "429": { $ref: '#/components/responses/RateLimited' }
+        "502": { $ref: '#/components/responses/AirflowDown' }
+        "500": { $ref: '#/components/responses/InternalError' }
+
+  /pdca/recheck_all:
+    post:
+      tags: [PDCA Recheck]
+      summary: 一括再チェックの受理（非同期・分割実行）
+      operationId: postRecheckAll
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecheckAllRequest' }
+            examples:
+              sample:
+                value:
+                  filter:
+                    tags_any: ["daily","priority"]
+                    health: ["degraded","unknown"]
+                    instrument_any: ["USDJPY","EURUSD"]
+                  batch_size: 25
+                  window: { lookback_days: 14 }
+                  reason: "daily-bulk"
+                  dry_run: true
+                  trace_id: "gui-bulk-5678"
+      responses:
+        "202":
+          description: 受理（非同期）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecheckAccepted' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/IdempotencyConflict' }
+        "429": { $ref: '#/components/responses/RateLimited' }
+        "502": { $ref: '#/components/responses/AirflowDown' }
+        "500": { $ref: '#/components/responses/InternalError' }
+
+  /pdca/recheck/{request_id}:
+    get:
+      tags: [PDCA Recheck]
+      summary: 再チェックリクエストの進捗/結果概況
+      operationId: getRecheckStatus
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 現在の状態を返す
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecheckStatus' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /gui/strategies:
+    get:
+      tags: [GUI Read]
+      summary: 戦略一覧（最新健康状態つき）
+      operationId: listStrategies
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: tags_any, in: query, schema: { type: string }, description: CSV }
+        - { name: health, in: query, schema: { type: string }, description: CSV: healthy,degraded,unknown }
+        - { name: instrument, in: query, schema: { type: string }, description: CSV }
+        - { name: enabled, in: query, schema: { type: string, enum: [all,on,off] }, example: all }
+        - { name: sort, in: query, schema: { type: string, default: "last_checked_at.desc" } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, minimum: 10, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: ページングされた一覧
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StrategyListResponse' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /gui/strategies/{id}:
+    get:
+      tags: [GUI Read]
+      summary: 戦略の詳細（KPIサマリ・直近結果・成果物）
+      operationId: getStrategyDetail
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9._-]+$' } }
+        - { name: summary_window_days, in: query, schema: { type: integer, minimum: 1, default: 30 } }
+        - { name: limit_history, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: 戦略詳細
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StrategyDetailResponse' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /gui/strategies/{id}/results:
+    get:
+      tags: [GUI Read]
+      summary: 指定期間のPDCA結果一覧
+      operationId: listStrategyResults
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9._-]+$' } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+      responses:
+        "200":
+          description: 結果一覧
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResultsListResponse' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /gui/requests/{request_id}:
+    get:
+      tags: [GUI Read]
+      summary: 再チェックリクエストの集約ビュー
+      operationId: getGuiRequestStatus
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: request_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 集約済みステータス
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecheckStatus' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /gui/artifacts/{artifact_id}/url:
+    get:
+      tags: [GUI Read]
+      summary: 成果物の署名付きURLを払い出す
+      operationId: getArtifactSignedUrl
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: artifact_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: 期限付きURL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedUrl' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: aud=pdca|pdca.gui, iss=noctria.auth, scopesにより制御
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: 小規模/試験用の代替（本番はJWT推奨）
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 冪等キー（ULID/UUID）。同一ボディ完全一致で重複受理を抑止
+      schema: { type: string, minLength: 8, maxLength: 64 }
+
+  responses:
+    BadRequest:
+      description: パラメータ不正
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "BAD_REQUEST", message: "window is invalid" } } } } }
+    Unauthorized:
+      description: 認証失敗
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "UNAUTHORIZED" } } } } }
+    Forbidden:
+      description: 権限不足
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "FORBIDDEN" } } } } }
+    NotFound:
+      description: 対象なし
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "NOT_FOUND" } } } } }
+    IdempotencyConflict:
+      description: 同一キーでボディ差分
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "IDEMPOTENCY_CONFLICT" } } } } }
+    RateLimited:
+      description: レート制限
+      headers:
+        Retry-After: { schema: { type: integer }, description: 秒数 }
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "RATE_LIMITED", retry_after: 12 } } } } }
+    AirflowDown:
+      description: Airflow 未応答/ダウン
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "AIRFLOW_DOWN" } } } } }
+    InternalError:
+      description: サーバ内部エラー
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, examples: { ex: { value: { error: "INTERNAL_ERROR" } } } } }
+
+  schemas:
+    RecheckRequest:
+      type: object
+      required: [strategies, reason]
+      properties:
+        strategies:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { type: string, pattern: '^[a-z0-9._-]+$' }
+        window:
+          oneOf:
+            - type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date-time }
+                to:   { type: string, format: date-time }
+            - type: object
+              required: [lookback_days]
+              properties:
+                lookback_days: { type: integer, minimum: 1, maximum: 180 }
+        reason: { type: string, minLength: 1, maxLength: 64 }
+        dry_run: { type: boolean, default: true }
+        params:
+          type: object
+          properties:
+            recalc_metrics:
+              type: array
+              items: { type: string, enum: [winrate, sharpe, max_dd] }
+            retrain: { type: boolean, default: false }
+        trace_id: { type: string, maxLength: 128 }
+
+    RecheckAllRequest:
+      type: object
+      required: [filter, reason]
+      properties:
+        filter:
+          type: object
+          properties:
+            tags_any:       { type: array, items: { type: string } }
+            health:         { type: array, items: { type: string, enum: [healthy, degraded, unknown] } }
+            instrument_any: { type: array, items: { type: string } }
+        batch_size: { type: integer, minimum: 10, maximum: 100, default: 25 }
+        window:
+          oneOf:
+            - type: object
+              required: [lookback_days]
+              properties:
+                lookback_days: { type: integer, minimum: 1, maximum: 180 }
+            - type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date-time }
+                to:   { type: string, format: date-time }
+        reason:  { type: string, minLength: 1, maxLength: 64 }
+        dry_run: { type: boolean, default: true }
+        trace_id: { type: string, maxLength: 128 }
+
+    RecheckAccepted:
+      type: object
+      required: [status, request_id]
+      properties:
+        status: { type: string, enum: [accepted] }
+        request_id: { type: string }
+        estimated:
+          type: object
+          properties:
+            strategies: { type: integer }
+            batches:    { type: integer }
+        dag:
+          type: object
+          properties:
+            name:  { type: string, example: pdca_recheck }
+            run_id:{ type: string }
+
+    RecheckStatus:
+      type: object
+      required: [status, request_id]
+      properties:
+        status: { type: string, enum: [running, success, failed] }
+        request_id: { type: string }
+        submitted_at: { type: string, format: date-time }
+        progress:
+          type: object
+          properties:
+            total_batches:        { type: integer }
+            completed_batches:    { type: integer }
+            total_strategies:     { type: integer }
+            completed_strategies: { type: integer }
+        summary:
+          type: object
+          properties:
+            success: { type: integer }
+            failed:  { type: integer }
+            health:
+              type: object
+              properties:
+                healthy:  { type: integer }
+                degraded: { type: integer }
+                unknown:  { type: integer }
+        artifacts:
+          type: array
+          items: { $ref: '#/components/schemas/ArtifactBrief' }
+        dag:
+          type: object
+          properties:
+            name:   { type: string }
+            run_id: { type: string }
+            run_ids:
+              type: array
+              items: { type: string }
+
+    StrategyListResponse:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StrategySummary' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+
+    StrategySummary:
+      type: object
+      required: [id, instrument, enabled, last_health]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        instrument: { type: string }
+        enabled: { type: boolean }
+        last_health: { type: string, enum: [healthy, degraded, unknown] }
+        last_checked_at: { type: string, format: date-time, nullable: true }
+        tags:
+          type: array
+          items: { type: string }
+
+    StrategyDetailResponse:
+      type: object
+      properties:
+        strategy: { $ref: '#/components/schemas/StrategyDetail' }
+        summary:
+          type: object
+          properties:
+            window_days: { type: integer }
+            kpi_avg:
+              type: object
+              properties:
+                sharpe:  { type: number, nullable: true }
+                winrate: { type: number, nullable: true }
+                max_dd:  { type: number, nullable: true }
+            last_completed_at: { type: string, format: date-time, nullable: true }
+        recent_results:
+          type: array
+          items: { $ref: '#/components/schemas/ResultItem' }
+        artifacts:
+          type: array
+          items: { $ref: '#/components/schemas/ArtifactBrief' }
+
+    StrategyDetail:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        instrument: { type: string }
+        enabled: { type: boolean }
+        health: { type: string, enum: [healthy, degraded, unknown] }
+        tags:
+          type: array
+          items: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ResultsListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ResultItem' }
+
+    ResultItem:
+      type: object
+      properties:
+        completed_at: { type: string, format: date-time }
+        health: { type: string, enum: [healthy, degraded, unknown] }
+        metrics:
+          type: object
+          properties:
+            sharpe:  { type: number, nullable: true }
+            winrate: { type: number, nullable: true }
+            max_dd:  { type: number, nullable: true }
+        result_digest: { type: string }
+        request_id: { type: string }
+
+    ArtifactBrief:
+      type: object
+      properties:
+        artifact_id: { type: integer }
+        kind: { type: string, enum: [chart, report, csv, other] }
+        created_at: { type: string, format: date-time }
+        bytes_size: { type: integer, nullable: true }
+
+    SignedUrl:
+      type: object
+      required: [artifact_id, signed_url, expires_in]
+      properties:
+        artifact_id: { type: integer }
+        signed_url:  { type: string, format: uri }
+        expires_in:  { type: integer, description: seconds }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum:
+            - BAD_REQUEST
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - IDEMPOTENCY_CONFLICT
+            - RATE_LIMITED
+            - AIRFLOW_DOWN
+            - INTERNAL_ERROR
+        message: { type: string }
+        retry_after: { type: integer }
+security:
+  - bearerAuth: []
