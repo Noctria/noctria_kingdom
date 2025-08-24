@@ -1,0 +1,126 @@
+<!-- ===================================================================
+Noctria Kingdom — Plan News HUD Template
+用途:
+  - base_hud.html を継承したニュース/イベント用の可視化画面。
+  - フィルタフォーム（asset, from, to, event_tag）＋ Chart.js を2枚表示。
+  - データは /api/plan/news_timeline / /api/plan/event_impact を fetch して描画。
+=================================================================== -->
+
+{% extends "base_hud.html" %}
+
+{% block title %}{{ page_title or "🗞 Plan News & Events" }} - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-newspaper" aria-hidden="true"></i>{% endblock %}
+{% block header_title %}PLAN — NEWS & EVENTS{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
+
+{% block extra_head %}
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  .filter-form { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:.75rem; align-items:end; }
+  .hud-input, .hud-select { background: rgba(0,0,0,0.3); border:1px solid var(--panel-border,#3a3a3a); color:#e6e6e6; padding:.5rem .6rem; border-radius:.5rem; }
+  .hud-label { font-size:.85rem; opacity:.85; margin-bottom:.25rem; display:block; }
+  .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 1rem; padding: 1rem; box-shadow: 0 0 10px rgba(0,0,0,.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section>
+  <form class="filter-form" method="get" action="/plan/news">
+    <div>
+      <label class="hud-label">Asset</label>
+      <input class="hud-input" type="text" name="asset" value="{{ asset or 'USDJPY' }}" />
+    </div>
+    <div>
+      <label class="hud-label">From</label>
+      <input class="hud-input" type="date" name="date_from" value="{{ date_from or '' }}" />
+    </div>
+    <div>
+      <label class="hud-label">To</label>
+      <input class="hud-input" type="date" name="date_to" value="{{ date_to or '' }}" />
+    </div>
+    <div>
+      <label class="hud-label">Event Tag</label>
+      <input class="hud-input" type="text" name="event_tag" value="{{ event_tag or 'CPI' }}" />
+    </div>
+    <div>
+      <button class="btn btn-primary" style="padding:.6rem 1rem; border-radius:.6rem; border:1px solid #555; background: linear-gradient(180deg,#1b1b1b,#0f0f0f); color:#eee;">
+        Apply
+      </button>
+    </div>
+  </form>
+</section>
+
+<div class="grid" style="display:grid; grid-template-columns: 1fr; gap:1rem; margin-top:1rem;">
+  <div class="card">
+    <h3>📈 Daily News Count & Sentiment</h3>
+    <canvas id="chartTimeline" height="120"></canvas>
+  </div>
+  <div class="card">
+    <h3>🗓️ Event Impact (Relative Window)</h3>
+    <canvas id="chartEventImpact" height="120"></canvas>
+  </div>
+</div>
+
+<script>
+(async function() {
+  const usp = new URLSearchParams(window.location.search);
+  const asset = usp.get('asset') || '{{ asset or "USDJPY" }}';
+  const df = usp.get('date_from') || '{{ date_from or "" }}';
+  const dt = usp.get('date_to') || '{{ date_to or "" }}';
+  const etag = usp.get('event_tag') || '{{ event_tag or "CPI" }}';
+
+  // 1) Timeline
+  const tResp = await fetch(`/api/plan/news_timeline?asset=${encodeURIComponent(asset)}&date_from=${encodeURIComponent(df)}&date_to=${encodeURIComponent(dt)}`);
+  const tData = await tResp.json();
+
+  const ctx1 = document.getElementById('chartTimeline').getContext('2d');
+  new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: tData.labels,
+      datasets: [
+        { label: 'cnt_1d', data: tData.series.cnt_1d, borderWidth: 2, fill: false },
+        { label: 'cnt_7d_ma', data: tData.series.cnt_7d_ma, borderWidth: 2, borderDash: [5,5], fill: false },
+        { label: 'senti_1d_avg', data: tData.series.senti_1d_avg, yAxisID: 'y2', borderWidth: 2, fill: false },
+        { label: 'senti_7d_avg', data: tData.series.senti_7d_avg, yAxisID: 'y2', borderWidth: 2, borderDash: [5,5], fill: false },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      stacked: false,
+      scales: {
+        y: { type: 'linear', position: 'left', title: { display: true, text: 'Count' } },
+        y2: { type: 'linear', position: 'right', title: { display: true, text: 'Sentiment' }, min: -1, max: 1, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+
+  // 2) Event Impact
+  const eResp = await fetch(`/api/plan/event_impact?event_tag=${encodeURIComponent(etag)}&asset=${encodeURIComponent(asset)}&start=-3&end=3&date_from=${encodeURIComponent(df)}&date_to=${encodeURIComponent(dt)}`);
+  const eData = await eResp.json();
+  const ctx2 = document.getElementById('chartEventImpact').getContext('2d');
+  new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: eData.labels.map(String),
+      datasets: [
+        { label: 'cnt_avg', data: eData.series.cnt_avg, borderWidth: 2, fill: false },
+        { label: 'senti_avg', data: eData.series.senti_avg, yAxisID: 'y2', borderWidth: 2, fill: false },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      stacked: false,
+      scales: {
+        y: { type: 'linear', position: 'left', title: { display: true, text: 'Count (avg)' } },
+        y2: { type: 'linear', position: 'right', title: { display: true, text: 'Sentiment (avg)' }, min: -1, max: 1, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}
