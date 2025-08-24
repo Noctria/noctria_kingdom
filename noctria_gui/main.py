@@ -37,6 +37,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 from markupsafe import Markup
+from noctria_gui.routes import plan_news
+app.include_router(plan_news.router)
 
 # ---------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
