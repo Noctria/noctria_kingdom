@@ -14,7 +14,6 @@
      data-ai-names='{{ ai_names | tojson | safe }}'>
 </div>
 
-<!-- ===== Navigation: クイックリンク群（Plan News を追加） ===== -->
 <section class="hud-panel dashboard-nav" style="padding: 1rem; margin-bottom: 1rem;">
   <h2 class="panel-title text-normal"><i class="fas fa-compass"></i> Navigation</h2>
   <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
@@ -23,15 +22,15 @@
       {"href": "/strategies/compare",       "icon": "fas fa-balance-scale",   "text": "戦略比較"},
       {"href": "/pdca/summary",             "icon": "fas fa-chart-pie",       "text": "PDCAサマリー"},
       {"href": "/pdca/history",             "icon": "fas fa-history",         "text": "PDCA履歴"},
-      {"href": "/ai",                        "icon": "fas fa-robot",           "text": "AI管理"},
-      {"href": "/trigger",                   "icon": "fas fa-gavel",           "text": "王命発令"},
-      {"href": "/act-history",               "icon": "fas fa-file-alt",        "text": "Act履歴"},
-      {"href": "/push_history",              "icon": "fas fa-upload",          "text": "Push履歴"},
-      {"href": "/statistics",                "icon": "fas fa-chart-bar",       "text": "統計ダッシュボード"},
-      {"href": "/api/king/prometheus",       "icon": "fas fa-flask",           "text": "Prometheus学習"},
-      /* ▼ 追加：Plan News クイックリンク（デフォルト資産はUSDJPY。必要に応じて複製してください） */
-      {"href": "/plan/news?asset=USDJPY",    "icon": "fas fa-newspaper",       "text": "Plan News（USDJPY）"}
+      {"href": "/ai",                       "icon": "fas fa-robot",           "text": "AI管理"},
+      {"href": "/trigger",                  "icon": "fas fa-gavel",           "text": "王命発令"},
+      {"href": "/act-history",              "icon": "fas fa-file-alt",        "text": "Act履歴"},
+      {"href": "/push_history",             "icon": "fas fa-upload",          "text": "Push履歴"},
+      {"href": "/statistics",               "icon": "fas fa-chart-bar",       "text": "統計ダッシュボード"},
+      {"href": "/api/king/prometheus",      "icon": "fas fa-flask",           "text": "Prometheus学習"},
+      {"href": "/plan/news?asset=USDJPY",   "icon": "fas fa-newspaper",       "text": "Plan News（USDJPY）"}
     ] %}
+    {# ここで項目を追加したい場合は上の配列に辞書を1行足してください #}
     {% for item in nav_items %}
       <a href="{{ item.href }}" class="hud-link">
         <i class="{{ item.icon }}" style="font-size: 1.6rem; color: var(--text-color-normal);"></i>
@@ -41,7 +40,6 @@
   </div>
 </section>
 
-<!-- ===== 追加：Plan News 入力フォームカード（asset/event_tag をその場で指定） ===== -->
 <section class="hud-panel" style="margin-bottom: 1rem;">
   <h2 class="panel-title text-normal"><i class="fas fa-newspaper"></i> Plan News ショートカット</h2>
   <form action="/plan/news" method="get" class="controls"
