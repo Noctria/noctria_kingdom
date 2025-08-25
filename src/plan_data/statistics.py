@@ -94,6 +94,19 @@ def _rolling_max_drawdown(prices: pd.Series, window: int = 180) -> pd.Series:
     return roll.apply(_dd, raw=False)
 
 
+def _kpi_error_ratio(df: pd.DataFrame, kpi_cols: List[str]) -> float:
+    """KPI列における NaN 比率の粗い推定（観測ログ用）"""
+    if df is None or df.empty:
+        return 1.0
+    present = [c for c in kpi_cols if c in df.columns]
+    if not present:
+        return 1.0
+    denom = len(df) * len(present)
+    if denom == 0:
+        return 1.0
+    return float(df[present].isna().sum().sum()) / float(denom)
+
+
 # =========================
 # KPI 付与ユーティリティ
 # =========================
@@ -115,7 +128,16 @@ def attach_kpis(
     trace_id = trace_id or new_trace_id(symbol="MULTI", timeframe="1d")
 
     out = df.copy()
+
+    # 列名は小文字にそろえる（直接呼ばれるケースでも堅牢に）
+    try:
+        out.columns = [str(c).lower() for c in out.columns]
+    except Exception:
+        pass
+
+    # date は datetime へ
     if "date" in out.columns:
+        out["date"] = pd.to_datetime(out["date"], errors="coerce")
         out = out.sort_values("date").reset_index(drop=True)
 
     ccol = primary_close_col or _pick_primary_close(out)
@@ -157,13 +179,14 @@ def attach_kpis(
 
     # 観測ログ
     try:
+        kpi_cols = ["kpi_ret", "win_rate", "num_trades", "sharpe_30d", "max_dd"]
         log_plan_run(
             None,
             phase="statistics",
             rows=len(out),
             dur_sec=int(time.time() - t0),
             missing_ratio=_missing_ratio(out),
-            error_rate=0.0,
+            error_rate=_kpi_error_ratio(out, kpi_cols),
             trace_id=trace_id,
         )
     except Exception:
@@ -182,38 +205,51 @@ class PlanStatistics:
         use_timeseries: bool = True,
         lookback_days: int = 365,
         trace_id: Optional[str] = None,
-        df: Optional[Union[pd.DataFrame, Tuple[pd.DataFrame, str]]] = None,  # DataFrame または (df, trace_id)
+        df: Optional[Union[pd.DataFrame, Tuple[pd.DataFrame, str], dict]] = None,  # DataFrame / (df, trace_id) / dict(旧)
     ):
         """
         df を明示指定しない場合は collector.collect_all(...) を実行して取得。
         - collect_all 新仕様: (df, trace_id)
-        - 旧仕様     : df のみ
+        - 旧仕様     : df のみ or dict（評価ログ形式）
         """
         self.collector = collector or PlanDataCollector()
 
-        collected_df: Optional[pd.DataFrame] = None
+        collected_df: Optional[Union[pd.DataFrame, dict]] = None
         collected_tid: Optional[str] = None
 
         if df is not None:
             # 明示渡しがあれば最優先
             if isinstance(df, tuple) and len(df) == 2 and isinstance(df[0], pd.DataFrame):
                 collected_df, collected_tid = df  # type: ignore[assignment]
-            elif isinstance(df, pd.DataFrame):
-                collected_df = df
+            elif isinstance(df, (pd.DataFrame, dict)):
+                collected_df = df  # 旧仕様も許容
         else:
             collected = self.collector.collect_all(lookback_days=lookback_days)
             if isinstance(collected, tuple) and len(collected) == 2 and isinstance(collected[0], pd.DataFrame):
                 collected_df, collected_tid = collected
             else:
-                collected_df = collected  # 旧仕様（df のみ）
+                collected_df = collected  # 旧仕様（df のみ or dict）
 
-        self._data = collected_df if isinstance(collected_df, pd.DataFrame) else pd.DataFrame()
+        # 保持データは df or dict をそのまま持つ（下位メソッドが両対応）
+        self._data: Union[pd.DataFrame, dict]
+        if isinstance(collected_df, pd.DataFrame):
+            df0 = collected_df.copy()
+            df0.columns = [str(c).lower() for c in df0.columns]
+            # date → datetime
+            if "date" in df0.columns:
+                df0["date"] = pd.to_datetime(df0["date"], errors="coerce")
+                df0 = df0.sort_values("date").reset_index(drop=True)
+            self._data = df0
+        elif isinstance(collected_df, dict):
+            self._data = collected_df
+        else:
+            self._data = pd.DataFrame()
+
         # trace_id 決定（引数優先 → collector 由来 → 新規）
         self._trace_id = trace_id or collected_tid or new_trace_id(symbol="MULTI", timeframe="1d")
 
-        # カラム名を安全に小文字へ
+        # DataFrame の場合は attrs に trace_id を持たせる
         if isinstance(self._data, pd.DataFrame) and not self._data.empty:
-            self._data.columns = [str(c).lower() for c in self._data.columns]
             try:
                 self._data.attrs["trace_id"] = self._trace_id
             except Exception:
@@ -224,7 +260,7 @@ class PlanStatistics:
         # 代表 KPI を内部にも付与しておく（存在時のみ）
         if self._is_timeseries:
             try:
-                self._data = attach_kpis(self._data, trace_id=self._trace_id)
+                self._data = attach_kpis(self._data, trace_id=self._trace_id)  # type: ignore[arg-type]
             except Exception:
                 # KPI 付与失敗時も summary は続行可能
                 pass
@@ -236,8 +272,8 @@ class PlanStatistics:
         優先順: DFの 'win_rate' 列（%）→ 評価ログ 'win_rate' → DF の binary 'win_flag'
         """
         # DF の win_rate（rolling %）を優先
-        if self._is_timeseries and "win_rate" in self._data.columns:
-            vals = pd.to_numeric(self._data["win_rate"], errors="coerce").dropna().tolist()
+        if self._is_timeseries and "win_rate" in self._data.columns:  # type: ignore[union-attr]
+            vals = pd.to_numeric(self._data["win_rate"], errors="coerce").dropna().tolist()  # type: ignore[index]
             return {
                 "count": len(vals),
                 "mean": round(mean(vals), 2) if vals else None,
@@ -259,7 +295,7 @@ class PlanStatistics:
             }
 
         # binary フラグ
-        if self._is_timeseries and "win_flag" in self._data.columns:
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "win_flag" in self._data.columns:
             vals = pd.to_numeric(self._data["win_flag"], errors="coerce").dropna().tolist()
             return {
                 "count": len(vals),
@@ -276,10 +312,10 @@ class PlanStatistics:
         最大ドローダウンの基本統計
         優先順: DF の 'max_dd'（rolling）→ 'drawdown' → 評価ログの 'drawdown'
         """
-        # DF の max_dd を優先
-        if self._is_timeseries and "max_dd" in self._data.columns:
+        dd: List[float]
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "max_dd" in self._data.columns:
             dd = pd.to_numeric(self._data["max_dd"], errors="coerce").dropna().tolist()
-        elif self._is_timeseries and "drawdown" in self._data.columns:
+        elif self._is_timeseries and isinstance(self._data, pd.DataFrame) and "drawdown" in self._data.columns:
             dd = pd.to_numeric(self._data["drawdown"], errors="coerce").dropna().tolist()
         elif isinstance(self._data, dict) and "eval_results" in self._data:
             evals = self._data["eval_results"]
@@ -313,7 +349,7 @@ class PlanStatistics:
                 }
             return result
 
-        if self._is_timeseries and ("tag" in self._data.columns) and ("win_flag" in self._data.columns):
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and ("tag" in self._data.columns) and ("win_flag" in self._data.columns):
             df = self._data
             tag_stats = df.groupby("tag")["win_flag"].agg(["count", "mean", "std"]).reset_index()
             return tag_stats.to_dict(orient="records")
@@ -342,7 +378,7 @@ class PlanStatistics:
     def macro_stats(self) -> Dict[str, Any]:
         """マクロ経済指標（FRED, CPI, etc）ごとの統計量"""
         result: Dict[str, Any] = {}
-        if self._is_timeseries:
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame):
             for col in self._data.columns:
                 if isinstance(col, str) and col.endswith("_value"):
                     s = pd.to_numeric(self._data[col], errors="coerce").dropna()
@@ -357,7 +393,7 @@ class PlanStatistics:
     def news_stats(self) -> Dict[str, Any]:
         """ニュース件数とポジ/ネガ件数の統計"""
         stats: Dict[str, Any] = {}
-        if self._is_timeseries and "news_count" in self._data.columns:
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "news_count" in self._data.columns:
             nc = pd.to_numeric(self._data["news_count"], errors="coerce").dropna()
             stats["news_count"] = {
                 "mean": int(nc.mean()) if not nc.empty else 0,
@@ -365,7 +401,7 @@ class PlanStatistics:
                 "min": int(nc.min()) if not nc.empty else 0,
                 "max": int(nc.max()) if not nc.empty else 0,
             }
-        if self._is_timeseries and "news_positive" in self._data.columns:
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "news_positive" in self._data.columns:
             np_ = pd.to_numeric(self._data["news_positive"], errors="coerce").dropna()
             stats["news_positive"] = {
                 "mean": int(np_.mean()) if not np_.empty else 0,
@@ -373,7 +409,7 @@ class PlanStatistics:
                 "min": int(np_.min()) if not np_.empty else 0,
                 "max": int(np_.max()) if not np_.empty else 0,
             }
-        if self._is_timeseries and "news_negative" in self._data.columns:
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "news_negative" in self._data.columns:
             nn = pd.to_numeric(self._data["news_negative"], errors="coerce").dropna()
             stats["news_negative"] = {
                 "mean": int(nn.mean()) if not nn.empty else 0,
@@ -386,7 +422,7 @@ class PlanStatistics:
     def event_stats(self) -> Dict[str, Any]:
         """主要イベント（fomc等）の日数や発生日一覧"""
         result: Dict[str, Any] = {}
-        if self._is_timeseries:
+        if self._is_timeseries and isinstance(self._data, pd.DataFrame):
             for ev in ["fomc", "cpi", "nfp", "ecb", "boj", "gdp"]:
                 if ev in self._data.columns:
                     days = pd.to_datetime(
@@ -419,13 +455,14 @@ class PlanStatistics:
 
         # 観測ログ（失敗は握りつぶして継続）
         try:
+            df_for_missing = self._data if isinstance(self._data, pd.DataFrame) else None
             log_plan_run(
                 None,  # env NOCTRIA_OBS_PG_DSN を使用
                 phase="statistics",
                 rows=_rows_count(self._data),
                 dur_sec=int(time.time() - t0),
-                missing_ratio=_missing_ratio(self._data if isinstance(self._data, pd.DataFrame) else None),
-                error_rate=0.0,  # TODO: 集計失敗件数などを加味
+                missing_ratio=_missing_ratio(df_for_missing),
+                error_rate=0.0,  # TODO: 集計失敗件数などを加味（必要であれば拡張）
                 trace_id=self._trace_id,
             )
         except Exception:
@@ -444,10 +481,10 @@ __all__ = [
 if __name__ == "__main__":
     # 1) 収集（新仕様に合わせてアンパック）
     collected = PlanDataCollector().collect_all(lookback_days=240)
-    if isinstance(collected, tuple) and len(collected) == 2:
+    if isinstance(collected, tuple) and len(collected) == 2 and isinstance(collected[0], pd.DataFrame):
         base_df, tid = collected
     else:
-        base_df, tid = collected, None
+        base_df, tid = (collected if isinstance(collected, pd.DataFrame) else pd.DataFrame()), None
 
     # 2) KPI付与
     df_kpi = attach_kpis(base_df, trace_id=tid)
