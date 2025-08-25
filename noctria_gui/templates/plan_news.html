@@ -5,29 +5,42 @@
   <meta charset="utf-8" />
   <title>Plan News — {{ asset }}{% if event_tag %} / {{ event_tag }}{% endif %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Chart.js をCDNで -->
+
+  <!-- HUD系ベース（存在しない環境でも崩れないよう最小ダーク補助も併用） -->
+  <link rel="stylesheet" href="/static/hud_style.css">
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
-    h1 { margin: 0 0 12px; font-size: 20px; }
-    .wrap { display: grid; grid-template-columns: 1fr; gap: 24px; }
-    .card { padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; }
-    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    .row input, .row select { padding: 6px 10px; }
-    .muted { color: #6b7280; font-size: 12px; }
+    /* 最小ダーク補助（hud_style.css が無い環境向け） */
+    :root { color-scheme: dark; }
+    body { background:#111827; color:#e5e7eb; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:24px; }
+    h1 { margin:0 0 12px; font-size:20px; }
+    .wrap { display:grid; grid-template-columns:1fr; gap:24px; }
+    .card { padding:16px; border:1px solid #374151; border-radius:12px; background:#1f2937; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .row input { padding:6px 10px; background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius:8px; }
+    .row button { padding:6px 10px; background:#0b5; color:#fff; border:0; border-radius:8px; cursor:pointer; }
+    .row button:hover { filter:brightness(1.05); }
+    .muted { color:#9ca3af; font-size:12px; }
+    canvas { width:100%; height:280px; }
   </style>
 </head>
 <body>
   <h1>Plan News — <strong>{{ asset }}</strong>{% if event_tag %} / <strong>{{ event_tag }}</strong>{% endif %}</h1>
+
   <div class="wrap">
+    <!-- Timeline -->
     <div class="card">
       <div class="row">
         <div><strong>News Timeline</strong></div>
         <div class="muted">/api/plan/news_timeline?asset={{ asset }}</div>
       </div>
-      <canvas id="timelineChart" height="120"></canvas>
+      <canvas id="timelineChart"></canvas>
     </div>
 
+    <!-- Event Impact -->
     <div class="card">
       <div class="row">
         <div><strong>Event Impact</strong></div>
@@ -36,92 +49,120 @@
         </label>
         <label>start: <input id="startInput" type="number" value="-3" style="width:72px"></label>
         <label>end: <input id="endInput" type="number" value="3" style="width:72px"></label>
-        <button id="reloadBtn">Reload</button>
+        <button id="reloadBtn" type="button">Reload</button>
       </div>
       <div class="muted">/api/plan/event_impact?asset={{ asset }}&event_tag=...&start=...&end=...</div>
-      <canvas id="impactChart" height="120"></canvas>
+      <canvas id="impactChart"></canvas>
     </div>
   </div>
 
   <script>
+    'use strict';
+
+    // Jinja2 から安全に受け取る
     const asset = {{ asset|tojson }};
     const initialEventTag = {{ (event_tag or "")|tojson }};
 
-    async function fetchJson(url){
-      const r = await fetch(url);
-      if(!r.ok){ throw new Error(await r.text()); }
+    // Chart.js のインスタンスは要素IDとは別名で保持（window.timelineChart などは使わない）
+    let timelineChartInst = null;
+    let impactChartInst = null;
+
+    async function fetchJson(url) {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`HTTP ${r.status}: ${t}`);
+      }
       return r.json();
     }
 
+    function destroyIfExists(canvasId, instRef) {
+      // 同じキャンバスに既存チャートがあれば破棄（要素ID→グローバル変数衝突を避けるため Chart.getChart を使用）
+      const el = document.getElementById(canvasId);
+      const existing = Chart.getChart(el);
+      if (existing) existing.destroy();
+      if (instRef && typeof instRef.destroy === 'function') instRef.destroy();
+    }
+
     // Timeline
-    async function renderTimeline(){
+    async function renderTimeline() {
+      destroyIfExists('timelineChart', timelineChartInst);
+
       const url = `/api/plan/news_timeline?asset=${encodeURIComponent(asset)}`;
       const data = await fetchJson(url);
+
       const ctx = document.getElementById('timelineChart').getContext('2d');
-      if(window.timelineChart){ window.timelineChart.destroy(); }
-      window.timelineChart = new Chart(ctx, {
+      timelineChartInst = new Chart(ctx, {
         type: 'line',
         data: {
           labels: data.labels,
           datasets: [
-            { label: 'cnt_1d', data: data.series.cnt_1d },
-            { label: 'cnt_7d_ma', data: data.series.cnt_7d_ma },
-            { label: 'senti_1d_avg', data: data.series.senti_1d_avg },
-            { label: 'senti_7d_avg', data: data.series.senti_7d_avg },
+            { label: 'cnt_1d',        data: data.series.cnt_1d },
+            { label: 'cnt_7d_ma',     data: data.series.cnt_7d_ma },
+            { label: 'senti_1d_avg',  data: data.series.senti_1d_avg },
+            { label: 'senti_7d_avg',  data: data.series.senti_7d_avg },
           ]
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           scales: { y: { beginAtZero: false } }
         }
       });
     }
 
-    // Event impact
-    async function renderImpact(tag, start=-3, end=3){
-      if(!tag){
-        // イベントタグ未指定なら、初期表示はスキップ（空グラフ）
-        const ctx = document.getElementById('impactChart').getContext('2d');
-        if(window.impactChart){ window.impactChart.destroy(); }
-        window.impactChart = new Chart(ctx, {
-          type: 'line',
-          data: { labels: [], datasets: [] },
-        });
+    // Event Impact
+    async function renderImpact(tag, start=-3, end=3) {
+      destroyIfExists('impactChart', impactChartInst);
+
+      const ctx = document.getElementById('impactChart').getContext('2d');
+
+      if (!tag) {
+        // タグ未指定時は空グラフにしておく
+        impactChartInst = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { maintainAspectRatio:false } });
         return;
       }
-      const url = `/api/plan/event_impact?asset=${encodeURIComponent(asset)}&event_tag=${encodeURIComponent(tag)}&start=${start}&end=${end}`;
-      const data = await fetchJson(url);
-      const ctx = document.getElementById('impactChart').getContext('2d');
-      if(window.impactChart){ window.impactChart.destroy(); }
-      window.impactChart = new Chart(ctx, {
+
+      const u = new URL('/api/plan/event_impact', location.origin);
+      u.searchParams.set('asset', asset);
+      u.searchParams.set('event_tag', tag);
+      u.searchParams.set('start', String(start));
+      u.searchParams.set('end', String(end));
+
+      const data = await fetchJson(u.toString());
+
+      impactChartInst = new Chart(ctx, {
         type: 'line',
         data: {
           labels: data.labels.map(String),
           datasets: [
-            { label: 'cnt_avg', data: data.series.cnt_avg },
+            { label: 'cnt_avg',   data: data.series.cnt_avg },
             { label: 'senti_avg', data: data.series.senti_avg },
           ]
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
-          scales: { x: { title: { display:true, text:'days from event' } } }
+          scales: { x: { title: { display: true, text: 'days from event' } } }
         }
       });
     }
 
     // 初期描画
-    renderTimeline();
-    renderImpact(initialEventTag);
+    (async () => {
+      await renderTimeline();
+      await renderImpact(initialEventTag);
 
-    // UI: Reload
-    document.getElementById('reloadBtn').addEventListener('click', () => {
-      const tag = document.getElementById('eventTagInput').value.trim();
-      const start = parseInt(document.getElementById('startInput').value || '-3', 10);
-      const end   = parseInt(document.getElementById('endInput').value || '3', 10);
-      renderImpact(tag, start, end);
-    });
+      // Reload ボタン
+      document.getElementById('reloadBtn')?.addEventListener('click', async () => {
+        const tag = (document.getElementById('eventTagInput')?.value || '').trim();
+        const s = parseInt(document.getElementById('startInput')?.value || '-3', 10);
+        const e = parseInt(document.getElementById('endInput')?.value || '3', 10);
+        await renderImpact(tag, s, e);
+      });
+    })();
   </script>
 </body>
 </html>
