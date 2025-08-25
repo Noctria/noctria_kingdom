@@ -8,6 +8,8 @@ classDef todo fill:#323232,stroke:#ff9f43,color:#ffd8a8;
 classDef partial fill:#2e2e2e,stroke:#ffcc66,color:#fff2cc;
 classDef obs fill:#1e2a36,stroke:#5dade2,color:#d6eaf8;
 classDef demo fill:#202020,stroke:#8a8a8a,color:#eaeaea;
+classDef gui fill:#102a43,stroke:#38bdf8,color:#e0f2fe;
+classDef db fill:#0b253a,stroke:#2d6cdf,color:#dceefb;
 
 %% ====== PLAN layer ======
 subgraph PLAN ["PLAN layer (src/plan_data)"]
@@ -17,6 +19,14 @@ subgraph PLAN ["PLAN layer (src/plan_data)"]
   ANALYZER["analyzer.py<br/>factor extraction<br/>(IMPLEMENTED)"]:::plan
   STATS["statistics.py<br/>KPI aggregation<br/>(IMPLEMENTED)"]:::plan
   ADAPTER["strategy_adapter.py<br/>propose_with_logging<br/>logs obs_infer_calls<br/>(IMPLEMENTED)"]:::plan
+  SVCNEWS["plan_news_service.py<br/>news_timeline / event_impact<br/>SQL → vw_news_*<br/>(IMPLEMENTED)"]:::plan
+end
+
+%% ====== GUI (Noctria GUI) ======
+subgraph GUI ["Noctria GUI (noctria_gui)"]
+  PAGE["templates/plan_news.html<br/>HUD page (Chart.js)<br/>(IMPLEMENTED)"]:::gui
+  ROUTER["routes/plan_news.py<br/>GET /plan/news (page)<br/>GET /api/plan/news_timeline<br/>GET /api/plan/event_impact<br/>GET /api/plan/proposals<br/>(IMPLEMENTED)"]:::gui
+  HUDCSS["static/hud_style.css<br/>HUD theme<br/>(IMPLEMENTED)"]:::gui
 end
 
 %% ====== AI underlings ======
@@ -58,6 +68,9 @@ subgraph OBS ["Observability taps (tables)"]
   OBS_ALT["obs_alerts<br/>quality/risk alerts<br/>(PARTIAL: quality/risk の定義拡充 TODO)"]:::partial
 end
 
+%% ====== DB (for news views) ======
+PG["PostgreSQL (airflow.public)<br/>vw_news_daily_counts<br/>vw_news_event_tags"]:::db
+
 %% ====== PLAN flow ======
 COLLECT --> FEATURES --> STATS
 FEATURES -- "wrap → FeatureBundle v1.0" --> FEATDF
@@ -68,6 +81,16 @@ ADAPTER --> AURUS
 ADAPTER --> LEVIA
 ADAPTER --> PROM
 ADAPTER --> VERITAS
+
+%% ====== GUI wiring ======
+PAGE -- "XHR (Chart.js)" --> ROUTER
+ROUTER -- "/api/plan/news_timeline" --> SVCNEWS
+ROUTER -- "/api/plan/event_impact" --> SVCNEWS
+ROUTER -- "/api/plan/proposals" --> ADAPTER
+HUDCSS -. "style" .- PAGE
+
+%% ====== Service → DB ======
+SVCNEWS -->|SELECT| PG
 
 %% ====== Contracts wiring ======
 FEATDF -. "uses" .-> CONTRACTS
@@ -118,7 +141,7 @@ FEATDF -. "trace_id（PLAN/AI 実装済）" .-> VERITAS
 DECISION -. "trace_id（P→D→Exec 実装済）" .-> ORDER
 
 %% ====== class bindings ======
-class COLLECT,FEATURES,FEATDF,ANALYZER,STATS,ADAPTER plan;
+class COLLECT,FEATURES,FEATDF,ANALYZER,STATS,ADAPTER,SVCNEWS plan;
 class AURUS,LEVIA,PROM,VERITAS,HERMES ai;
 class ORDER do;
 class DECISION plan;
@@ -126,6 +149,8 @@ class NOCTUSGATE,QUALITY,PROFILES,CONTRACTS partial;
 class TRACEID plan;
 class OBS_PLAN,OBS_INFER,OBS_DEC,OBS_EXEC,OBS_ALT obs;
 class DECISION_MINI,TEST_E2E demo;
+class PAGE,ROUTER,HUDCSS gui;
+class PG db;
 
 %% --- Contracts references (docs only) ---
 %% FeatureBundle: docs/architecture/contracts/FeatureBundle.md
