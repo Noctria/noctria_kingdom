@@ -20,11 +20,20 @@ import pandas as pd
 # ---- imports（相対/絶対の両対応）----
 try:
     from plan_data.collector import PlanDataCollector  # type: ignore
-    from plan_data.observability import log_plan_run  # type: ignore
+    # emit_alert がなければ log_alert へフォールバックするため両方try
+    try:
+        from plan_data.observability import log_plan_run, emit_alert, log_alert  # type: ignore
+    except Exception:
+        from plan_data.observability import log_plan_run, log_alert  # type: ignore
+        emit_alert = None  # type: ignore
     from plan_data.trace import new_trace_id  # type: ignore
 except Exception:  # 実行環境により src. 付きでの実行も許容
     from src.plan_data.collector import PlanDataCollector  # type: ignore
-    from src.plan_data.observability import log_plan_run  # type: ignore
+    try:
+        from src.plan_data.observability import log_plan_run, emit_alert, log_alert  # type: ignore
+    except Exception:
+        from src.plan_data.observability import log_plan_run, log_alert  # type: ignore
+        emit_alert = None  # type: ignore
     from src.plan_data.trace import new_trace_id  # type: ignore
 
 
@@ -107,6 +116,20 @@ def _kpi_error_ratio(df: pd.DataFrame, kpi_cols: List[str]) -> float:
     return float(df[present].isna().sum().sum()) / float(denom)
 
 
+def _emit(kind: str, reason: str, *, trace_id: Optional[str], severity: str = "MEDIUM", details: Optional[Dict[str, Any]] = None) -> None:
+    """observability.emit_alert があれば使用、なければ log_alert で代替。"""
+    try:
+        if emit_alert is not None:  # type: ignore
+            emit_alert(kind=kind if kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI.")) else f"PLAN.{kind}",
+                       reason=reason, severity=severity, trace_id=trace_id, details=details)  # type: ignore
+        else:
+            # log_alert は policy_name で受ける想定
+            log_alert(policy_name=f"PLAN.{kind}", reason=reason, severity=severity, details=details, trace_id=trace_id)  # type: ignore
+    except Exception:
+        # 観測が落ちても本処理は止めない
+        pass
+
+
 # =========================
 # KPI 付与ユーティリティ
 # =========================
@@ -142,7 +165,14 @@ def attach_kpis(
 
     ccol = primary_close_col or _pick_primary_close(out)
     if not ccol or ccol not in out.columns:
-        # KPIは付与せずログだけ流して返す
+        # 代表列が見つからない → アラート & ログのみ
+        _emit(
+            kind="STATS.MISSING_CLOSE",
+            reason="primary close column not found (no *_close columns)",
+            severity="HIGH",
+            trace_id=trace_id,
+            details={"columns": list(map(str, out.columns))[:128]},
+        )
         try:
             log_plan_run(
                 None,
@@ -177,16 +207,27 @@ def attach_kpis(
     # max drawdown（rolling）
     out["max_dd"] = _rolling_max_drawdown(price, window=dd_window)
 
-    # 観測ログ
+    # 観測ログ + KPI NaN率に応じたアラート
     try:
         kpi_cols = ["kpi_ret", "win_rate", "num_trades", "sharpe_30d", "max_dd"]
+        err_ratio = _kpi_error_ratio(out, kpi_cols)
+
+        if err_ratio > 0.5:  # しきい値：0.5/0.8
+            _emit(
+                kind="STATS.KPI_NAN",
+                reason=f"kpi_nan_ratio={err_ratio:.3f} exceeds threshold",
+                severity=("HIGH" if err_ratio > 0.8 else "MEDIUM"),
+                trace_id=trace_id,
+                details={"kpi_cols": kpi_cols, "nan_ratio": round(err_ratio, 3), "rows": len(out)},
+            )
+
         log_plan_run(
             None,
             phase="statistics",
             rows=len(out),
             dur_sec=int(time.time() - t0),
             missing_ratio=_missing_ratio(out),
-            error_rate=_kpi_error_ratio(out, kpi_cols),
+            error_rate=err_ratio,
             trace_id=trace_id,
         )
     except Exception:
