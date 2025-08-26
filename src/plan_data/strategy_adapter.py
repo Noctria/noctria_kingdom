@@ -173,32 +173,24 @@ def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], 
     return base, (features.feature_order or None)
 
 
-def _maybe_retry_with_dict(strategy: Any, call_name: str, features: FeatureBundle, **kwargs) -> Any:
+def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: FeatureBundle, **kwargs) -> Any:
     """
-    propose()/predict_future() を FeatureBundle で呼び、典型的な AttributeError(.get) などの場合は
-    dict へ変換して **再試行** する互換レイヤ。
+    互換レイヤ：
+      1) まず dict 化して呼ぶ（旧API互換：.get を期待する実装に対応/Aurusなど）
+      2) ダメなら FeatureBundle をそのまま渡して再試行（新API対応）
     """
     fn = getattr(strategy, call_name)
 
-    # 1回目: そのまま FeatureBundle を渡して試す
+    # 1st: dict でトライ
+    feat_dict, order = _bundle_to_dict_and_order(features)
+    try_kwargs = dict(kwargs)
+    if order is not None and "feature_order" not in try_kwargs:
+        try_kwargs["feature_order"] = order
     try:
+        return fn(feat_dict, **try_kwargs)
+    except Exception:
+        # 2nd: FeatureBundle をそのまま渡す
         return fn(features, **kwargs)
-    except AttributeError as e:
-        msg = str(e)
-        # 代表的な互換パターン: 'FeatureBundle' object has no attribute 'get'
-        if "has no attribute 'get'" in msg or ".get" in msg:
-            feat_dict, order = _bundle_to_dict_and_order(features)
-            # feature_order を kwargs に補助的に入れる（必要な戦略がある）
-            if order is not None and "feature_order" not in kwargs:
-                kwargs = {**kwargs, "feature_order": order}
-            return fn(feat_dict, **kwargs)
-        raise
-    except TypeError as e:
-        # 引数ミスマッチ時も辞書で再試行してみる
-        feat_dict, order = _bundle_to_dict_and_order(features)
-        if order is not None and "feature_order" not in kwargs:
-            kwargs = {**kwargs, "feature_order": order}
-        return fn(feat_dict, **kwargs)
 
 
 # --- Adapter ---
@@ -217,7 +209,7 @@ def propose_with_logging(
     """
     どの戦略でも共通に呼べるラッパ:
       - .propose(...) があればそれを使用、無ければ .predict_future(...) を探す
-      - 引数が FeatureBundle 非対応の戦略には dict へ自動変換して再試行（Aurus 系対策）
+      - まず **dict で呼び**、失敗したら **FeatureBundle で再試行**（旧/新API自動互換）
       - 例外は上位に送出するが、観測ログは成功/失敗ともに記録
       - timeout_sec は簡易実装（実スレッド停止はしない）：計測超過時は success=False を log
       - 戻り値が dict/NamedTuple でも StrategyProposal に変換
@@ -236,11 +228,11 @@ def propose_with_logging(
     proposal: Optional[StrategyProposal] = None
 
     try:
-        # 構造的チェック or ダックタイピングで呼び分け、辞書再試行付き
+        # 構造的チェック or ダックタイピングで呼び分け、互換呼び出し実行
         if isinstance(strategy, _ProposeLike) or hasattr(strategy, "propose"):
-            raw = _maybe_retry_with_dict(strategy, "propose", features, **kwargs)
+            raw = _call_strategy_with_auto_compat(strategy, "propose", features, **kwargs)
         elif isinstance(strategy, _PredictLike) or hasattr(strategy, "predict_future"):
-            raw = _maybe_retry_with_dict(strategy, "predict_future", features, **kwargs)
+            raw = _call_strategy_with_auto_compat(strategy, "predict_future", features, **kwargs)
         else:
             raise AttributeError(f"{model} has neither propose() nor predict_future().")
 
