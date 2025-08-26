@@ -1,0 +1,13 @@
+flowchart LR
+  subgraph PLAN
+    COL[collector.py]
+    STAT[statistics.py]
+    QG[quality_gate.py]
+  end
+  subgraph OBS[Observability]
+    ALERT[(obs_alerts)]
+  end
+
+  COL -- "PLAN.COLLECT.EMPTY / DATA_LAG / EVENTS_MISSING_CSV / NEWS_DISABLED" --> ALERT
+  STAT -- "PLAN.STATS.MISSING_CLOSE / KPI_NAN" --> ALERT
+  QG -- "(必要なら) PLAN.QUALITY.*" --> ALERT
