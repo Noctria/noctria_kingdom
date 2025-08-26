@@ -1,9 +1,11 @@
 # src/plan_data/adapter_to_decision.py
 from __future__ import annotations
 
-from dataclasses import asdict
+import math
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+import numpy as np
 import pandas as pd
 
 # --- plan layer ---
@@ -13,11 +15,15 @@ from plan_data.strategy_adapter import (
     propose_with_logging,
 )
 from plan_data.trace import get_trace_id, new_trace_id
+from plan_data.quality_gate import evaluate_quality, QualityResult
 
 # --- decision layer ---
 from decision.decision_engine import DecisionEngine, DecisionRequest, DecisionResult
 
 
+# ==============================
+# 内部ユーティリティ
+# ==============================
 def _pick_trace_id(features: FeatureBundle, fallback_symbol: str = "MULTI", fallback_tf: str = "1d") -> str:
     """
     trace_id の決定：
@@ -35,28 +41,102 @@ def _pick_trace_id(features: FeatureBundle, fallback_symbol: str = "MULTI", fall
     )
 
 
-def _quality_hints_from_proposal(p: StrategyProposal) -> Dict[str, Any]:
+def _safe_series(s: pd.Series) -> pd.Series:
+    return pd.to_numeric(s, errors="coerce")
+
+
+def _derive_decision_features(df: pd.DataFrame) -> Dict[str, float]:
     """
-    strategy_adapter 側で付与した meta から quality 情報を抽出。
-    - quality_action: "OK" | "SCALE" | "FLAT"（無ければ "OK"）
-    - qty_scale:      float（無ければ 1.0）
-    - base_qty:       提案数量（float）
+    DecisionEngine 最小入力（volatility, trend_score）を DF から推定。
+      - volatility: 日次リターンの 20 期間標準偏差（HV20）
+      - trend_score: 30 期間 Sharpe を -1.5..+1.5 → 0..1 に線形射影
+    """
+    if df is None or df.empty:
+        return {"volatility": 0.20, "trend_score": 0.50}
+
+    df = df.copy()
+
+    # リターン系列の用意
+    if "kpi_ret" in df.columns:
+        ret = _safe_series(df["kpi_ret"])
+    else:
+        close_cols = [c for c in df.columns if isinstance(c, str) and c.endswith("_close")]
+        if not close_cols:
+            return {"volatility": 0.20, "trend_score": 0.50}
+        price = _safe_series(df[close_cols[0]])
+        ret = price.pct_change()
+
+    hv20 = float(ret.rolling(window=20, min_periods=10).std().iloc[-1])
+    mu = ret.rolling(window=30, min_periods=10).mean()
+    sd = ret.rolling(window=30, min_periods=10).std().replace(0.0, np.nan)
+    sharpe_30 = (mu / sd) * math.sqrt(252)
+    sh = float(sharpe_30.iloc[-1]) if not sharpe_30.empty else 0.0
+    trend_score = (max(-1.5, min(1.5, sh)) + 1.5) / 3.0  # → 0..1
+
+    # NaN/inf 防御
+    if math.isnan(hv20) or math.isinf(hv20):
+        hv20 = 0.20
+    if math.isnan(trend_score) or math.isinf(trend_score):
+        trend_score = 0.50
+
+    return {"volatility": hv20, "trend_score": trend_score}
+
+
+def _apply_quality_to_proposal(q: QualityResult, p: StrategyProposal) -> StrategyProposal:
+    """
+    QualityGate の出力に従って提案を補正。
+      - action == "FLAT" → FLAT/qty=0
+      - action == "SCALE" → qty *= qty_scale
+      - action == "OK" → そのまま
+    meta に quality 情報を埋め込み（GUI/ログで利用）
     """
     meta = dict(p.meta or {})
-    qa = str(meta.get("quality_action", "OK")).upper()
-    try:
-        qs = float(meta.get("qty_scale", 1.0))
-    except Exception:
-        qs = 1.0
+    meta.update(
+        {
+            "quality_action": q.action,
+            "qty_scale": float(q.qty_scale),
+            "quality_reasons": list(q.reasons or []),
+        }
+    )
 
-    try:
-        bq = float(p.qty)
-    except Exception:
-        bq = 0.0
+    if q.action == "FLAT":
+        return StrategyProposal(
+            symbol=p.symbol,
+            direction="FLAT",
+            qty=0.0,
+            confidence=min(float(p.confidence), 0.5),
+            reasons=[*list(p.reasons or []), "quality:FLAT"],
+            meta=meta,
+            schema_version=p.schema_version,
+        )
+    if q.action == "SCALE":
+        scaled = max(0.0, float(p.qty) * float(q.qty_scale))
+        return StrategyProposal(
+            symbol=p.symbol,
+            direction=p.direction,
+            qty=scaled,
+            confidence=float(p.confidence),
+            reasons=[*list(p.reasons or []), f"quality:SCALE x{q.qty_scale:.2f}"],
+            meta=meta,
+            schema_version=p.schema_version,
+        )
+    # OK
+    meta.setdefault("quality_action", "OK")
+    meta.setdefault("qty_scale", 1.0)
+    return StrategyProposal(
+        symbol=p.symbol,
+        direction=p.direction,
+        qty=float(p.qty),
+        confidence=float(p.confidence),
+        reasons=list(p.reasons or []),
+        meta=meta,
+        schema_version=p.schema_version,
+    )
 
-    return {"quality_action": qa, "qty_scale": qs, "base_qty": bq}
 
-
+# ==============================
+# Public API
+# ==============================
 def run_strategy_and_decide(
     strategy: Any,
     features: FeatureBundle,
@@ -67,21 +147,26 @@ def run_strategy_and_decide(
     timeout_sec: Optional[float] = None,
     conn_str: Optional[str] = None,
     extra_decision_features: Optional[Dict[str, Any]] = None,
+    quality_max_lag_min: int = 30,
+    quality_max_missing: float = 0.05,
     **strategy_kwargs: Any,
 ) -> Dict[str, Any]:
     """
-    1) plan_data.strategy_adapter.propose_with_logging(...) で戦略を実行
-    2) Proposal の quality 情報を DecisionEngine に橋渡し
+    1) strategy_adapter.propose_with_logging(...) で戦略実行（obs_infer_calls に計測）
+    2) QualityGate をここで適用（数量スケール/強制FLAT）
     3) DecisionEngine.decide(...) を呼び、結果を dict で返す（提案も同梱）
 
     戻り値:
     {
-      "proposal": <StrategyProposal as dict>,
-      "decision": <DecisionResult as dict>
+      "proposal": {...},           # Quality 適用済み
+      "decision": {...},
+      "trace_id": "<id>",
+      "quality": {"action": "...", "qty_scale": 1.0, "reasons": [...]},
+      "decision_features": {"volatility": ..., "trend_score": ... , ...}
     }
     """
-    # 1) 戦略実行（Quality Gate は adapter 内で適用済み）
-    proposal = propose_with_logging(
+    # 1) 戦略実行（ここでは品質調整はまだ）
+    proposal_raw = propose_with_logging(
         strategy,
         features,
         model_name=model_name,
@@ -92,81 +177,54 @@ def run_strategy_and_decide(
         **strategy_kwargs,
     )
 
-    # 2) DecisionEngine への入力を組み立て（quality hints と base_qty を含める）
-    hints = _quality_hints_from_proposal(proposal)
-    dec_features: Dict[str, Any] = {
-        # トレンド/ボラなど、呼び出し側で自由に足せる（なければデフォルトで判定）
-        "volatility": features.context.get("volatility", 0.20),
-        "trend_score": features.context.get("trend_score", 0.50),
-        # quality & sizing
-        **hints,
-    }
+    # 2) QualityGate（features.context の data_lag_min / missing_ratio を参照）
+    qres = evaluate_quality(
+        features,
+        max_lag_min=int(quality_max_lag_min),
+        max_missing=float(quality_max_missing),
+    )
+    proposal = _apply_quality_to_proposal(qres, proposal_raw)
+
+    # 3) DecisionEngine 入力（DFから最小特徴を推定し、extraで上書き可能）
+    dec_feats = _derive_decision_features(features.df)
     if extra_decision_features:
-        dec_features.update(extra_decision_features)
+        dec_feats.update(extra_decision_features)
 
     trace_id = _pick_trace_id(features)
     req = DecisionRequest(
         trace_id=trace_id,
         symbol=str(features.context.get("symbol", proposal.symbol)),
-        features=dec_features,
+        features=dec_feats,
     )
-
     eng = engine or DecisionEngine()
-    decision = eng.decide(req, conn_str=conn_str)
+    decision: DecisionResult = eng.decide(req, conn_str=conn_str)
 
-    # 3) まとめて返す（扱いやすい dict 形式）
+    # 4) まとめて返す
     out = {
         "proposal": {
             "symbol": proposal.symbol,
             "direction": proposal.direction,
-            "qty": proposal.qty,
-            "confidence": proposal.confidence,
+            "qty": float(proposal.qty),
+            "confidence": float(proposal.confidence),
             "reasons": list(proposal.reasons or []),
             "meta": dict(proposal.meta or {}),
-            "schema_version": proposal.schema_version,
+            "schema_version": str(proposal.schema_version),
         },
         "decision": {
             "strategy_name": decision.strategy_name,
-            "score": decision.score,
+            "score": float(decision.score),
             "reason": decision.reason,
             "decision": dict(decision.decision),
         },
         "trace_id": trace_id,
+        "quality": {
+            "action": qres.action,
+            "qty_scale": float(qres.qty_scale),
+            "reasons": list(qres.reasons or []),
+        },
+        "decision_features": dec_feats,
     }
     return out
 
 
-# --- 手動テスト用 ---
-if __name__ == "__main__":
-    # 最小ダミー戦略
-    class DummyStrategy:
-        def propose(self, features: FeatureBundle, **kw):
-            # Quality Gate（strategy_adapter 側）が SCALE を適用済みなら qty は既に縮小されている想定
-            return StrategyProposal(
-                symbol=str(features.context.get("symbol", "USDJPY")),
-                direction="LONG",
-                qty=100.0,
-                confidence=0.8,
-                reasons=["dummy ok"],
-                meta={},  # strategy_adapter 内で quality_action/qty_scale を追加
-            )
-
-    # 特徴量（最低限）
-    df = pd.DataFrame({"date": pd.date_range("2025-08-01", periods=5, freq="D")})
-    fb = FeatureBundle(
-        df=df,
-        context={
-            "symbol": "USDJPY",
-            "timeframe": "1d",
-            # DecisionEngine 用の判断材料（任意）
-            "volatility": 0.10,
-            "trend_score": 0.75,
-            # Quality Gate 判定材料（strategy_adapter 内 evaluate_quality が参照）
-            "data_lag_min": 0,
-            "missing_ratio": 0.12,  # > 0.05 で SCALE 想定
-        },
-    )
-
-    result = run_strategy_and_decide(DummyStrategy(), fb)
-    import json
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+__all__ = ["run_strategy_and_decide"]
