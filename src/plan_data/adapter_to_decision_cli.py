@@ -14,21 +14,16 @@ try:
 except Exception:
     pass
 
-# ---- plan_data imports（相対/絶対の両対応）----
-try:
-    from plan_data.collector import PlanDataCollector  # type: ignore
-    from plan_data.strategy_adapter import FeatureBundle  # type: ignore
-    from plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
-except Exception:
-    from src.plan_data.collector import PlanDataCollector  # type: ignore
-    from src.plan_data.strategy_adapter import FeatureBundle  # type: ignore
-    from src.plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
+# ---- 明示的に src.* で統一（plan_data/decision を混在させない）----
+from src.plan_data.collector import PlanDataCollector  # type: ignore
+from src.plan_data.strategy_adapter import FeatureBundle  # type: ignore
+from src.plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
 
 
 def _import_strategy(dotted: str):
     """
     例: "src.strategies.aurus_singularis:Aurus_Singularis"
-        "strategies.levia_tempest:Levia_Tempest"
+        "src.strategies.levia_tempest:Levia_Tempest"
     """
     if ":" not in dotted:
         raise ValueError(f"strategy format must be 'module:ClassName', got: {dotted}")
