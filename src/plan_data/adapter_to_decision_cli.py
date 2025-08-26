@@ -9,17 +9,28 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
-# plan layer
-from plan_data.collector import PlanDataCollector
-from plan_data.strategy_adapter import FeatureBundle
-from plan_data.adapter_to_decision import run_strategy_and_decide
-from plan_data.trace import new_trace_id
+# -----------------------------------------------------------------------------
+# imports: support both "plan_data.*" and "src.plan_data.*"
+# -----------------------------------------------------------------------------
+try:
+    # when PYTHONPATH=src or `python -m plan_data.*`
+    from plan_data.collector import PlanDataCollector  # type: ignore
+    from plan_data.strategy_adapter import FeatureBundle  # type: ignore
+    from plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
+    from plan_data.trace import new_trace_id  # type: ignore
+except Exception:
+    # when running `python -m src.plan_data.*`
+    from src.plan_data.collector import PlanDataCollector  # type: ignore
+    from src.plan_data.strategy_adapter import FeatureBundle  # type: ignore
+    from src.plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
+    from src.plan_data.trace import new_trace_id  # type: ignore
 
 
 def _dyn_load_strategy(target: str) -> Any:
     """
     "pkg.module:ClassName" 形式で戦略クラスをロードしてインスタンス化。
     例: strategies.aurus_singularis:Aurus_Singularis
+        src.strategies.aurus_singularis:Aurus_Singularis
     """
     if ":" not in target:
         raise ValueError('strategy must be "module.path:ClassName" format')
@@ -58,8 +69,11 @@ def _build_context(args: argparse.Namespace, df_tid: str) -> Dict[str, Any]:
         "volatility": float(args.volatility) if args.volatility is not None else 0.20,
         "trend_score": float(args.trend) if args.trend is not None else 0.50,
         # Quality Gate 用のヒント（存在すればadapter側で拾う想定）
-        # ここではユーザー指定がなければ未設定＝品質OK扱い
     }
+    if args.data_lag_min is not None:
+        ctx["data_lag_min"] = int(args.data_lag_min)
+    if args.missing_ratio is not None:
+        ctx["missing_ratio"] = float(args.missing_ratio)
     return ctx
 
 
@@ -71,7 +85,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--strategy",
         required=True,
         help='Target strategy as "module.path:ClassName" '
-             '(e.g., strategies.aurus_singularis:Aurus_Singularis)',
+             '(e.g., strategies.aurus_singularis:Aurus_Singularis or src.strategies.aurus_singularis:Aurus_Singularis)',
     )
     p.add_argument("--symbol", default="USDJPY", help="Symbol for context (default: USDJPY)")
     p.add_argument("--timeframe", default="1d", help="Timeframe label for context (default: 1d)")
@@ -106,11 +120,6 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # 3) FeatureBundle 準備
     ctx = _build_context(args, df_tid=tid)
-    if args.data_lag_min is not None:
-        ctx["data_lag_min"] = int(args.data_lag_min)
-    if args.missing_ratio is not None:
-        ctx["missing_ratio"] = float(args.missing_ratio)
-
     fb = FeatureBundle(df=df, context=ctx)
 
     # 4) 実行（Adapter -> Decision）
