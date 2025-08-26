@@ -3,7 +3,7 @@
 import os
 import time
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  # [added] timezone
 from typing import Optional, Dict, List
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -28,6 +28,13 @@ else:
 # FEATURE_SPEC はリスト（標準カラム順）。snake_case で運用。
 from plan_data.feature_spec import FEATURE_SPEC
 from plan_data.observability import log_plan_run
+# ---- observability alerts (emit_alert が無い環境でもフォールバック) ---- [added]
+try:
+    from plan_data.observability import emit_alert, log_alert  # type: ignore
+except Exception:
+    from plan_data.observability import log_alert  # type: ignore
+    emit_alert = None  # type: ignore
+# -------------------------------------------------------------------------
 from plan_data.trace import new_trace_id
 
 
@@ -64,6 +71,27 @@ ASSET_SYMBOLS: Dict[str, str] = {
     "RUSSELL": "^RUT",
 }
 
+# 収集系しきい値（環境変数で上書き可）------------------------------------ [added]
+MAX_DATA_LAG_MIN_DEFAULT = 60
+def _get_max_data_lag_min() -> int:
+    try:
+        return int(os.getenv("NOCTRIA_MAX_DATA_LAG_MIN", str(MAX_DATA_LAG_MIN_DEFAULT)))
+    except Exception:
+        return MAX_DATA_LAG_MIN_DEFAULT
+
+# アラート発火ヘルパ ------------------------------------------------------- [added]
+def _emit(kind: str, reason: str, *, severity: str = "MEDIUM", trace_id: Optional[str] = None, details: Optional[dict] = None) -> None:
+    try:
+        if emit_alert is not None:  # type: ignore
+            emit_alert(
+                kind=("PLAN."+kind if not kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI.")) else kind),
+                reason=reason, severity=severity, trace_id=trace_id, details=details
+            )  # type: ignore
+        else:
+            log_alert(policy_name="PLAN."+kind, reason=reason, severity=severity, details=details, trace_id=trace_id)  # type: ignore
+    except Exception:
+        pass
+
 
 def align_to_feature_spec(df: pd.DataFrame) -> pd.DataFrame:
     """FEATURE_SPEC（リスト）に合わせて不足カラムは追加（NaN）し、その順序で返す。"""
@@ -96,13 +124,18 @@ class PlanDataCollector:
             Path(self.event_calendar_csv).parent.mkdir(parents=True, exist_ok=True)
             if not os.path.exists(self.event_calendar_csv):
                 print(f"[collector] ℹ️ イベントCSVが見つかりません: {self.event_calendar_csv}（スキップ）")
-        except Exception:
-            pass
+                # フラグ保持（後でLOWアラート）                                   # [added]
+                self._missing_event_csv = True                                    # [added]
+            else:                                                                  # [added]
+                self._missing_event_csv = False                                   # [added]
+        except Exception:                                                          # [added]
+            self._missing_event_csv = True                                        # [added]
 
         # GNews
         self.gnews_api_key = gnews_api_key or os.getenv("GNEWS_API_KEY")
         if not self.gnews_api_key:
             print("[collector] ⚠️ GNEWS_API_KEYが未設定です（ニュース特徴は0埋め/欠損になります）")
+            # ここでは即アラートせず、collect_all の最後に一度だけ発火           # [added]
 
         # キャッシュ格納先
         self.cache_dir = Path(cache_dir or "data/cache")
@@ -498,6 +531,32 @@ class PlanDataCollector:
         except Exception:
             pass
 
+        # --- 価格データに対する品質アラート（EMPTY/DATA_LAG） ---------------- [added]
+        try:
+            if df is None or df.empty:
+                _emit("COLLECT.EMPTY", "no market price rows fetched", severity="HIGH", trace_id=trace_id,
+                      details={"lookback_days": lookback_days})
+            else:
+                # 最新日付の遅延（分）を計測（UTC基準で頑健に）
+                last_ts = pd.to_datetime(df["date"].dropna()).max()
+                if pd.isna(last_ts):
+                    _emit("COLLECT.EMPTY_DATE", "market df has no valid 'date'", severity="HIGH", trace_id=trace_id)
+                else:
+                    # 現在UTCと比較
+                    now_utc = datetime.now(timezone.utc)
+                    last_utc = last_ts.tz_convert("UTC") if getattr(last_ts, "tzinfo", None) else last_ts.tz_localize("UTC")
+                    lag_min = int((now_utc - last_utc).total_seconds() // 60)
+                    max_lag = _get_max_data_lag_min()
+                    if lag_min > max_lag:
+                        _emit("COLLECT.DATA_LAG",
+                              f"data_lag_min={lag_min} > max={max_lag}",
+                              severity=("HIGH" if lag_min > max_lag*2 else "MEDIUM"),
+                              trace_id=trace_id,
+                              details={"last_date_utc": str(last_utc), "lag_min": lag_min, "max_allowed_min": max_lag})
+        except Exception:
+            pass
+        # ---------------------------------------------------------------------
+
         # 2) 経済カレンダー（任意）
         t1 = time.time()
         event_df = self.fetch_event_calendar()
@@ -533,6 +592,20 @@ class PlanDataCollector:
             )
         except Exception:
             pass
+
+        # --- 補助アラート：CSV未配置／GNews無効 -------------------------------- [added]
+        try:
+            if getattr(self, "_missing_event_csv", False):
+                _emit("COLLECT.EVENTS_MISSING_CSV",
+                      f"event CSV not found: {self.event_calendar_csv}",
+                      severity="LOW", trace_id=trace_id)
+            if not self.gnews_api_key:
+                _emit("COLLECT.NEWS_DISABLED",
+                      "GNEWS_API_KEY not set; news features will be zeros/missing",
+                      severity="LOW", trace_id=trace_id)
+        except Exception:
+            pass
+        # ---------------------------------------------------------------------
 
         if df is not None:
             df = df.reset_index(drop=True)
