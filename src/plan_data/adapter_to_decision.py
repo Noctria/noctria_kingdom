@@ -1,4 +1,3 @@
-# src/plan_data/adapter_to_decision_cli.py
 #!/usr/bin/env python3
 # coding: utf-8
 """
@@ -16,12 +15,12 @@ import sys
 import traceback
 from typing import Any, Optional, Tuple
 
-# ===== ここが今回のポイント：公式の import 経路ブートストラップ =====
+# === 公式の import 経路ブートストラップ（最優先で実行） ===
 from src.core.path_config import ensure_import_path, ensure_strategy_packages
 ensure_import_path()          # repo ルート & src を sys.path に追加
 ensure_strategy_packages()    # strategies/** の __init__.py を用意（無ければ自動作成）
 
-# ----- 以降はトップレベル import で統一 -----
+# --- 以降はトップレベル import で統一 ---
 from plan_data.collector import PlanDataCollector
 from plan_data.strategy_adapter import FeatureBundle
 from plan_data.adapter_to_decision import run_strategy_and_decide
@@ -40,7 +39,6 @@ def _load_strategy(target: str) -> Any:
     if cls_name:
         cls = getattr(mod, cls_name)
         return cls()  # デフォルトコンストラクタ想定
-    # モジュール側で DEFAULT_CLASS = クラス を用意している場合
     if hasattr(mod, "DEFAULT_CLASS"):
         return getattr(mod, "DEFAULT_CLASS")()
     raise ValueError(f"Strategy class not specified and DEFAULT_CLASS not found in {mod_name}")
@@ -53,9 +51,7 @@ def _collect_features(symbol: str, timeframe: str, lookback: int) -> Tuple[Any, 
     """
     collector = PlanDataCollector()
     df, tid = collector.collect_all(lookback_days=lookback)
-    # DataFrame.attrs に trace_id が入っていれば尊重
     tid = df.attrs.get("trace_id", tid)
-    # 最低限のメタだけここで与える（詳細は adapter 側が使う）
     return df, str(tid)
 
 
@@ -116,7 +112,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         # 2) データ収集
         df, tid = _collect_features(args.symbol, args.timeframe, args.lookback)
 
-        # 3) FeatureBundle 構築（Quality/Decision ヒントを context に格納）
+        # 3) FeatureBundle 構築
         fb = _build_feature_bundle(
             df,
             tid,
@@ -132,10 +128,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         result = run_strategy_and_decide(
             strategy,
             fb,
-            model_name=None,           # 省略可（adapter が自動で決定）
-            model_version=None,        # 省略可
-            timeout_sec=None,          # 必要なら指定
-            conn_str=args.conn_dsn,    # None なら env NOCTRIA_OBS_PG_DSN を使用
+            model_name=None,
+            model_version=None,
+            timeout_sec=None,
+            conn_str=args.conn_dsn,
         )
 
         # 5) 出力
