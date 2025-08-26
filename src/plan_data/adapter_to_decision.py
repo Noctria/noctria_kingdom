@@ -1,152 +1,192 @@
-#!/usr/bin/env python3
-# coding: utf-8
-"""
-Adapter→Decision CLI
-- Strategy を読み込み、Feature を収集し、adapter→decision を実行して結果を表示
-- 重要: path_config.ensure_import_path() で import 経路を安定化
-"""
-
+# src/plan_data/adapter_to_decision.py
 from __future__ import annotations
 
-import argparse
-import importlib
-import json
-import sys
-import traceback
-from typing import Any, Optional, Tuple
+from dataclasses import asdict
+from typing import Any, Dict, Optional
 
-# === 公式の import 経路ブートストラップ（最優先で実行） ===
-from src.core.path_config import ensure_import_path, ensure_strategy_packages
-ensure_import_path()          # repo ルート & src を sys.path に追加
-ensure_strategy_packages()    # strategies/** の __init__.py を用意（無ければ自動作成）
+import pandas as pd
 
-# --- 以降はトップレベル import で統一 ---
-from plan_data.collector import PlanDataCollector
-from plan_data.strategy_adapter import FeatureBundle
-from plan_data.adapter_to_decision import run_strategy_and_decide
+# ---- plan layer imports（相対/絶対 両対応。※自分自身は絶対に import しない）----
+try:
+    from plan_data.strategy_adapter import (
+        FeatureBundle,
+        StrategyProposal,
+        propose_with_logging,
+    )  # type: ignore
+    from plan_data.trace import get_trace_id, new_trace_id  # type: ignore
+except Exception:
+    from src.plan_data.strategy_adapter import (  # type: ignore
+        FeatureBundle,
+        StrategyProposal,
+        propose_with_logging,
+    )
+    from src.plan_data.trace import get_trace_id, new_trace_id  # type: ignore
+
+# ---- decision layer ----
+try:
+    from decision.decision_engine import (  # type: ignore
+        DecisionEngine,
+        DecisionRequest,
+        DecisionResult,
+    )
+except Exception:
+    from src.decision.decision_engine import (  # type: ignore
+        DecisionEngine,
+        DecisionRequest,
+        DecisionResult,
+    )
 
 
-def _load_strategy(target: str) -> Any:
+def _pick_trace_id(features: FeatureBundle, fallback_symbol: str = "MULTI", fallback_tf: str = "1d") -> str:
     """
-    "pkg.mod:ClassName" または "pkg.mod"（モジュールに DEFAULT_CLASS がある場合）をロード
+    trace_id の決定：
+      1) features.context["trace_id"] があればそれ
+      2) get_trace_id() が返るならそれ
+      3) new_trace_id(symbol, timeframe)
     """
-    if ":" in target:
-        mod_name, cls_name = target.split(":", 1)
-    else:
-        mod_name, cls_name = target, None
-
-    mod = importlib.import_module(mod_name)
-    if cls_name:
-        cls = getattr(mod, cls_name)
-        return cls()  # デフォルトコンストラクタ想定
-    if hasattr(mod, "DEFAULT_CLASS"):
-        return getattr(mod, "DEFAULT_CLASS")()
-    raise ValueError(f"Strategy class not specified and DEFAULT_CLASS not found in {mod_name}")
+    ctx = features.context or {}
+    tid = ctx.get("trace_id") or get_trace_id()
+    if tid:
+        return str(tid)
+    return new_trace_id(
+        symbol=str(ctx.get("symbol", fallback_symbol)),
+        timeframe=str(ctx.get("timeframe", fallback_tf)),
+    )
 
 
-def _collect_features(symbol: str, timeframe: str, lookback: int) -> Tuple[Any, str]:
+def _quality_hints_from_proposal(p: StrategyProposal) -> Dict[str, Any]:
     """
-    Collector を使って features の生素材（DataFrame）を収集
-    戻り値は (df, trace_id)
+    strategy_adapter 側で付与した meta から quality 情報を抽出。
+    - quality_action: "OK" | "SCALE" | "FLAT"（無ければ "OK"）
+    - qty_scale:      float（無ければ 1.0）
+    - base_qty:       提案数量（float）
     """
-    collector = PlanDataCollector()
-    df, tid = collector.collect_all(lookback_days=lookback)
-    tid = df.attrs.get("trace_id", tid)
-    return df, str(tid)
-
-
-def _build_feature_bundle(
-    df,
-    trace_id: str,
-    *,
-    symbol: str,
-    timeframe: str,
-    trend: Optional[float],
-    volatility: Optional[float],
-    missing_ratio: Optional[float],
-    data_lag_min: Optional[int],
-) -> FeatureBundle:
-    context = {
-        "trace_id": trace_id,
-        "symbol": symbol,
-        "timeframe": timeframe,
-    }
-    if trend is not None:
-        context["trend_score"] = float(trend)
-    if volatility is not None:
-        context["volatility"] = float(volatility)
-    if missing_ratio is not None:
-        context["missing_ratio"] = float(missing_ratio)
-    if data_lag_min is not None:
-        context["data_lag_min"] = int(data_lag_min)
-
-    return FeatureBundle(df=df, context=context)
-
-
-def main(argv: Optional[list[str]] = None) -> int:
-    p = argparse.ArgumentParser(description="Run Strategy -> Adapter -> Decision (Plan layer CLI)")
-    p.add_argument("--strategy", required=True, help='Strategy spec: "pkg.module:ClassName"')
-    p.add_argument("--symbol", default="USDJPY")
-    p.add_argument("--timeframe", default="1d")
-    p.add_argument("--lookback", type=int, default=90)
-
-    # Decision ヒント上書き（任意）
-    p.add_argument("--trend", type=float, default=None, help="Override trend_score (0..1)")
-    p.add_argument("--volatility", type=float, default=None, help="Override volatility (>=0)")
-    # Quality Gate 用の疑似悪化入力（任意）
-    p.add_argument("--missing-ratio", type=float, default=None, help="Simulate missing_ratio (0..1)")
-    p.add_argument("--data-lag-min", type=int, default=None, help="Simulate data_lag_min (minutes)")
-
-    # 表示
-    p.add_argument("--pretty", action="store_true", help="Pretty print JSON")
-
-    # 観測 DB の明示 DSN（通常は環境変数 NOCTRIA_OBS_PG_DSN を利用）
-    p.add_argument("--conn-dsn", default=None, help="PostgreSQL DSN for observability (optional)")
-
-    args = p.parse_args(argv)
+    meta = dict(p.meta or {})
+    qa = str(meta.get("quality_action", "OK")).upper()
+    try:
+        qs = float(meta.get("qty_scale", 1.0))
+    except Exception:
+        qs = 1.0
 
     try:
-        # 1) Strategy ロード
-        strategy = _load_strategy(args.strategy)
+        bq = float(p.qty)
+    except Exception:
+        bq = 0.0
 
-        # 2) データ収集
-        df, tid = _collect_features(args.symbol, args.timeframe, args.lookback)
-
-        # 3) FeatureBundle 構築
-        fb = _build_feature_bundle(
-            df,
-            tid,
-            symbol=args.symbol,
-            timeframe=args.timeframe,
-            trend=args.trend,
-            volatility=args.volatility,
-            missing_ratio=args.missing_ratio,
-            data_lag_min=args.data_lag_min,
-        )
-
-        # 4) アダプタ→ディシジョン実行
-        result = run_strategy_and_decide(
-            strategy,
-            fb,
-            model_name=None,
-            model_version=None,
-            timeout_sec=None,
-            conn_str=args.conn_dsn,
-        )
-
-        # 5) 出力
-        if args.pretty:
-            print(json.dumps(result, indent=2, ensure_ascii=False))
-        else:
-            print(json.dumps(result, ensure_ascii=False))
-
-        return 0
-
-    except Exception as e:
-        sys.stderr.write(f"[ERROR] {e}\n")
-        traceback.print_exc()
-        return 2
+    return {"quality_action": qa, "qty_scale": qs, "base_qty": bq}
 
 
+def run_strategy_and_decide(
+    strategy: Any,
+    features: FeatureBundle,
+    *,
+    engine: Optional[DecisionEngine] = None,
+    model_name: Optional[str] = None,
+    model_version: Optional[str] = None,
+    timeout_sec: Optional[float] = None,
+    conn_str: Optional[str] = None,
+    extra_decision_features: Optional[Dict[str, Any]] = None,
+    **strategy_kwargs: Any,
+) -> Dict[str, Any]:
+    """
+    1) plan_data.strategy_adapter.propose_with_logging(...) で戦略を実行
+    2) Proposal の quality 情報を DecisionEngine に橋渡し
+    3) DecisionEngine.decide(...) を呼び、結果を dict で返す（提案も同梱）
+
+    戻り値:
+    {
+      "proposal": <StrategyProposal as dict>,
+      "decision": <DecisionResult as dict>,
+      "trace_id": "<id>"
+    }
+    """
+    # 1) 戦略実行（Quality Gate は adapter 内で適用済み）
+    proposal = propose_with_logging(
+        strategy,
+        features,
+        model_name=model_name,
+        model_version=model_version,
+        timeout_sec=timeout_sec,
+        trace_id=features.context.get("trace_id"),  # あれば引き継ぎ
+        conn_str=conn_str,
+        **strategy_kwargs,
+    )
+
+    # 2) DecisionEngine への入力を組み立て（quality hints と base_qty を含める）
+    hints = _quality_hints_from_proposal(proposal)
+    dec_features: Dict[str, Any] = {
+        # トレンド/ボラなど、呼び出し側で自由に足せる（なければデフォルトで判定）
+        "volatility": features.context.get("volatility", 0.20),
+        "trend_score": features.context.get("trend_score", 0.50),
+        # quality & sizing
+        **hints,
+    }
+    if extra_decision_features:
+        dec_features.update(extra_decision_features)
+
+    trace_id = _pick_trace_id(features)
+    req = DecisionRequest(
+        trace_id=trace_id,
+        symbol=str(features.context.get("symbol", proposal.symbol)),
+        features=dec_features,
+    )
+
+    eng = engine or DecisionEngine()
+    decision = eng.decide(req, conn_str=conn_str)
+
+    # 3) まとめて返す（扱いやすい dict 形式）
+    out = {
+        "proposal": {
+            "symbol": proposal.symbol,
+            "direction": proposal.direction,
+            "qty": proposal.qty,
+            "confidence": proposal.confidence,
+            "reasons": list(proposal.reasons or []),
+            "meta": dict(proposal.meta or {}),
+            "schema_version": proposal.schema_version,
+        },
+        "decision": {
+            "strategy_name": decision.strategy_name,
+            "score": decision.score,
+            "reason": decision.reason,
+            "decision": dict(decision.decision),
+        },
+        "trace_id": trace_id,
+    }
+    return out
+
+
+# --- 手動テスト用 ---
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # 最小ダミー戦略
+    class DummyStrategy:
+        def propose(self, features: FeatureBundle, **kw):
+            # Quality Gate（strategy_adapter 側）が SCALE を適用済みなら qty は既に縮小されている想定
+            return StrategyProposal(
+                symbol=str(features.context.get("symbol", "USDJPY")),
+                direction="LONG",
+                qty=100.0,
+                confidence=0.8,
+                reasons=["dummy ok"],
+                meta={},  # strategy_adapter 内で quality_action/qty_scale を追加
+            )
+
+    # 特徴量（最低限）
+    df = pd.DataFrame({"date": pd.date_range("2025-08-01", periods=5, freq="D")})
+    fb = FeatureBundle(
+        df=df,
+        context={
+            "symbol": "USDJPY",
+            "timeframe": "1d",
+            # DecisionEngine 用の判断材料（任意）
+            "volatility": 0.10,
+            "trend_score": 0.75,
+            # Quality Gate 判定材料（strategy_adapter 内 evaluate_quality が参照）
+            "data_lag_min": 0,
+            "missing_ratio": 0.12,  # > 0.05 で SCALE 想定
+        },
+    )
+
+    result = run_strategy_and_decide(DummyStrategy(), fb)
+    import json
+    print(json.dumps(result, indent=2, ensure_ascii=False))
