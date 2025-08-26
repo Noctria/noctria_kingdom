@@ -3,16 +3,19 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable, Tuple
 
 import pandas as pd
 
-# ---- imports（相対/絶対の両対応）----
+# 観測は失敗しても握りつぶす方針（オフラインでも動く）
 try:
     from plan_data.observability import log_infer_call  # type: ignore
-    from plan_data.trace import get_trace_id, new_trace_id  # type: ignore
 except Exception:
     from src.plan_data.observability import log_infer_call  # type: ignore
+
+try:
+    from plan_data.trace import get_trace_id, new_trace_id  # type: ignore
+except Exception:
     from src.plan_data.trace import get_trace_id, new_trace_id  # type: ignore
 
 
@@ -22,8 +25,8 @@ except Exception:
 class FeatureBundle:
     """
     共通入力コンテナ（最小版）
-    - df: 特徴量テーブル
-    - context: メタ情報（symbol, timeframe など）
+    - df: 特徴量テーブル（最新行が提案入力の主対象）
+    - context: メタ情報（symbol, timeframe, data_lag_min, missing_ratioなど）
     - feature_order: 並び順ヒント（必要な戦略向け）
     """
     df: pd.DataFrame
@@ -51,12 +54,12 @@ class StrategyProposal:
 
 @runtime_checkable
 class _ProposeLike(Protocol):
-    def propose(self, features: FeatureBundle, **kwargs) -> StrategyProposal: ...
+    def propose(self, features: Any, **kwargs) -> StrategyProposal: ...
 
 
 @runtime_checkable
 class _PredictLike(Protocol):
-    def predict_future(self, features: FeatureBundle, **kwargs) -> StrategyProposal: ...
+    def predict_future(self, features: Any, **kwargs) -> StrategyProposal: ...
 
 
 # --- 内部ユーティリティ ---
@@ -78,7 +81,6 @@ def _normalize_proposal(p: StrategyProposal) -> StrategyProposal:
     # direction 正規化
     direction = (p.direction or "FLAT").upper()
     if direction not in _VALID_DIRECTIONS:
-        # 既知外は FLAT 扱い
         direction = "FLAT"
 
     # qty, confidence 正規化
@@ -147,6 +149,58 @@ def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
         )
 
 
+def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], Optional[list[str]]]:
+    """
+    Aurus など「dict で .get する」戦略向けに FeatureBundle を辞書へ変換。
+    - ベース: 最新行（tail）を dict 化
+    - 併せて context も 'ctx_*' で補助的に混ぜる（キー衝突は tail が優先）
+    - feature_order はそのまま返す（必要なら戦略へ渡す）
+    """
+    base: Dict[str, Any] = {}
+    try:
+        tail = features.tail_row()
+        if isinstance(tail, pd.Series):
+            base.update({str(k): tail[k] for k in tail.index})
+    except Exception:
+        pass
+
+    ctx = dict(features.context or {})
+    for k, v in ctx.items():
+        key = f"ctx_{k}" if k not in base else k  # 衝突時は列名優先
+        if key not in base:
+            base[key] = v
+
+    return base, (features.feature_order or None)
+
+
+def _maybe_retry_with_dict(strategy: Any, call_name: str, features: FeatureBundle, **kwargs) -> Any:
+    """
+    propose()/predict_future() を FeatureBundle で呼び、典型的な AttributeError(.get) などの場合は
+    dict へ変換して **再試行** する互換レイヤ。
+    """
+    fn = getattr(strategy, call_name)
+
+    # 1回目: そのまま FeatureBundle を渡して試す
+    try:
+        return fn(features, **kwargs)
+    except AttributeError as e:
+        msg = str(e)
+        # 代表的な互換パターン: 'FeatureBundle' object has no attribute 'get'
+        if "has no attribute 'get'" in msg or ".get" in msg:
+            feat_dict, order = _bundle_to_dict_and_order(features)
+            # feature_order を kwargs に補助的に入れる（必要な戦略がある）
+            if order is not None and "feature_order" not in kwargs:
+                kwargs = {**kwargs, "feature_order": order}
+            return fn(feat_dict, **kwargs)
+        raise
+    except TypeError as e:
+        # 引数ミスマッチ時も辞書で再試行してみる
+        feat_dict, order = _bundle_to_dict_and_order(features)
+        if order is not None and "feature_order" not in kwargs:
+            kwargs = {**kwargs, "feature_order": order}
+        return fn(feat_dict, **kwargs)
+
+
 # --- Adapter ---
 
 def propose_with_logging(
@@ -163,6 +217,7 @@ def propose_with_logging(
     """
     どの戦略でも共通に呼べるラッパ:
       - .propose(...) があればそれを使用、無ければ .predict_future(...) を探す
+      - 引数が FeatureBundle 非対応の戦略には dict へ自動変換して再試行（Aurus 系対策）
       - 例外は上位に送出するが、観測ログは成功/失敗ともに記録
       - timeout_sec は簡易実装（実スレッド停止はしない）：計測超過時は success=False を log
       - 戻り値が dict/NamedTuple でも StrategyProposal に変換
@@ -181,19 +236,13 @@ def propose_with_logging(
     proposal: Optional[StrategyProposal] = None
 
     try:
-        # まず Protocol での構造的チェック
-        if isinstance(strategy, _ProposeLike):
-            raw = strategy.propose(features, **kwargs)
-        elif isinstance(strategy, _PredictLike):
-            raw = strategy.predict_future(features, **kwargs)
+        # 構造的チェック or ダックタイピングで呼び分け、辞書再試行付き
+        if isinstance(strategy, _ProposeLike) or hasattr(strategy, "propose"):
+            raw = _maybe_retry_with_dict(strategy, "propose", features, **kwargs)
+        elif isinstance(strategy, _PredictLike) or hasattr(strategy, "predict_future"):
+            raw = _maybe_retry_with_dict(strategy, "predict_future", features, **kwargs)
         else:
-            # 動的ディスパッチ（duck typing）
-            if hasattr(strategy, "propose"):
-                raw = getattr(strategy, "propose")(features, **kwargs)
-            elif hasattr(strategy, "predict_future"):
-                raw = getattr(strategy, "predict_future")(features, **kwargs)
-            else:
-                raise AttributeError(f"{model} has neither propose() nor predict_future().")
+            raise AttributeError(f"{model} has neither propose() nor predict_future().")
 
         proposal = _coerce_to_proposal(raw, default_symbol=str(features.context.get("symbol", "MULTI")))
         success = True
