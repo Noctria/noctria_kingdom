@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable, List
+from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable
 
 import pandas as pd
 
-from plan_data.observability import log_infer_call
-from plan_data.trace import get_trace_id, new_trace_id
-from plan_data.quality_gate import evaluate_quality, QualityResult
+# ---- imports（相対/絶対の両対応）----
+try:
+    from plan_data.observability import log_infer_call  # type: ignore
+    from plan_data.trace import get_trace_id, new_trace_id  # type: ignore
+except Exception:
+    from src.plan_data.observability import log_infer_call  # type: ignore
+    from src.plan_data.trace import get_trace_id, new_trace_id  # type: ignore
 
 
 # --- Contracts (超軽量版) ---
@@ -19,7 +23,7 @@ class FeatureBundle:
     """
     共通入力コンテナ（最小版）
     - df: 特徴量テーブル
-    - context: メタ情報（symbol, timeframe, data_lag_min, missing_ratio など）
+    - context: メタ情報（symbol, timeframe など）
     - feature_order: 並び順ヒント（必要な戦略向け）
     """
     df: pd.DataFrame
@@ -74,6 +78,7 @@ def _normalize_proposal(p: StrategyProposal) -> StrategyProposal:
     # direction 正規化
     direction = (p.direction or "FLAT").upper()
     if direction not in _VALID_DIRECTIONS:
+        # 既知外は FLAT 扱い
         direction = "FLAT"
 
     # qty, confidence 正規化
@@ -89,11 +94,8 @@ def _normalize_proposal(p: StrategyProposal) -> StrategyProposal:
 
     reasons = _to_list_str(p.reasons)
 
-    # symbol
-    sym = str(p.symbol or p.meta.get("symbol") or "UNKNOWN")
-
     return StrategyProposal(
-        symbol=sym,
+        symbol=str(p.symbol or p.meta.get("symbol") or "UNKNOWN"),
         direction=direction,
         qty=qty,
         confidence=conf,
@@ -145,79 +147,6 @@ def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
         )
 
 
-def _apply_quality(q: QualityResult, p: StrategyProposal) -> StrategyProposal:
-    """
-    Quality Gate 出力に基づいて提案を補正:
-      - FLAT: direction=FLAT, qty=0
-      - SCALE: qty *= qty_scale
-      - OK: そのまま
-    また meta に quality_* と context 重要値を埋め込む。
-    """
-    meta = dict(p.meta or {})
-    meta.update(
-        {
-            "quality_action": q.action,
-            "qty_scale": float(q.qty_scale),
-            "quality_reasons": list(q.reasons or []),
-        }
-    )
-
-    # 方向/数量の補正
-    if q.action == "FLAT":
-        return StrategyProposal(
-            symbol=p.symbol,
-            direction="FLAT",
-            qty=0.0,
-            confidence=min(float(p.confidence), 0.5),
-            reasons=[*list(p.reasons or []), "quality:FLAT"],
-            meta=meta,
-            schema_version=p.schema_version,
-        )
-    elif q.action == "SCALE":
-        scaled_qty = max(0.0, float(p.qty) * float(q.qty_scale))
-        return StrategyProposal(
-            symbol=p.symbol,
-            direction=p.direction,
-            qty=scaled_qty,
-            confidence=float(p.confidence),
-            reasons=[*list(p.reasons or []), f"quality:SCALE x{q.qty_scale:.2f}"],
-            meta=meta,
-            schema_version=p.schema_version,
-        )
-    else:
-        # OK
-        meta.setdefault("quality_action", "OK")
-        meta.setdefault("qty_scale", 1.0)
-        return StrategyProposal(
-            symbol=p.symbol,
-            direction=p.direction,
-            qty=float(p.qty),
-            confidence=float(p.confidence),
-            reasons=list(p.reasons or []),
-            meta=meta,
-            schema_version=p.schema_version,
-        )
-
-
-def _inject_context_meta(p: StrategyProposal, ctx: Dict[str, Any]) -> StrategyProposal:
-    """
-    監視・GUI用に context の重要値を meta に併記（欠けていても続行）。
-    """
-    meta = dict(p.meta or {})
-    for k in ("symbol", "timeframe", "data_lag_min", "missing_ratio", "trace_id"):
-        if k in ctx and k not in meta:
-            meta[k] = ctx[k]
-    return StrategyProposal(
-        symbol=p.symbol,
-        direction=p.direction,
-        qty=p.qty,
-        confidence=p.confidence,
-        reasons=list(p.reasons or []),
-        meta=meta,
-        schema_version=p.schema_version,
-    )
-
-
 # --- Adapter ---
 
 def propose_with_logging(
@@ -237,20 +166,19 @@ def propose_with_logging(
       - 例外は上位に送出するが、観測ログは成功/失敗ともに記録
       - timeout_sec は簡易実装（実スレッド停止はしない）：計測超過時は success=False を log
       - 戻り値が dict/NamedTuple でも StrategyProposal に変換
-      - **Quality Gate を自動適用**し、数量/方向/メタに反映
     """
     model = model_name or getattr(getattr(strategy, "__class__", None), "__name__", str(type(strategy).__name__))
     ver = model_version or getattr(strategy, "VERSION", "dev")
 
     # trace_id を決定（優先度: 引数 > コンテキスト > 自動生成）
-    trace_id = trace_id or features.context.get("trace_id") or get_trace_id() or new_trace_id(
+    trace_id = trace_id or get_trace_id() or new_trace_id(
         symbol=str(features.context.get("symbol", "MULTI")),
         timeframe=str(features.context.get("timeframe", "1d")),
     )
 
     t0 = time.time()
     success = False
-    final_proposal: Optional[StrategyProposal] = None
+    proposal: Optional[StrategyProposal] = None
 
     try:
         # まず Protocol での構造的チェック
@@ -267,24 +195,12 @@ def propose_with_logging(
             else:
                 raise AttributeError(f"{model} has neither propose() nor predict_future().")
 
-        # 正規化
-        proposal0 = _coerce_to_proposal(raw, default_symbol=str(features.context.get("symbol", "MULTI")))
-
-        # Quality Gate 評価 & 適用
-        qres: QualityResult = evaluate_quality(features)
-        proposal1 = _apply_quality(qres, proposal0)
-
-        # context の重要値を meta に合流（GUI/監視用）
-        proposal2 = _inject_context_meta(proposal1, features.context or {})
-
-        final_proposal = proposal2
+        proposal = _coerce_to_proposal(raw, default_symbol=str(features.context.get("symbol", "MULTI")))
         success = True
-        return final_proposal
-
+        return proposal
     except Exception:
         # 例外は上位に再送出（finally で log は必ず記録）
         raise
-
     finally:
         dur_ms = int((time.time() - t0) * 1000)
         # timeout 判定（簡易）
@@ -292,7 +208,6 @@ def propose_with_logging(
             success = False
 
         try:
-            # 旧々フォーム互換で記録（GUI でも見える dur_ms/ts を確保）
             log_infer_call(
                 conn_str or None,
                 model=model,
@@ -305,10 +220,3 @@ def propose_with_logging(
         except Exception:
             # 観測ログ失敗は握りつぶし
             pass
-
-
-__all__ = [
-    "FeatureBundle",
-    "StrategyProposal",
-    "propose_with_logging",
-]
