@@ -1,0 +1,10 @@
+flowchart TD
+    A[入力: FeatureBundle.context<br/>- data_lag_min<br/>- missing_ratio] --> B{data_lag_min > MAX?}
+    B -- Yes --> FLAT[Action: FLAT<br/>qty_scale=1.0<br/>理由: data_lag_min 超過]
+    B -- No --> C{missing_ratio > THRESH?}
+    C -- Yes --> SCALE[Action: SCALE<br/>qty_scale=1.0 - 2*(missing - THRESH) <br/>(下限0.3)]
+    C -- No --> OK[Action: OK<br/>qty_scale=1.0]
+    classDef ok fill:#163,stroke:#0a0,color:#fff
+    classDef warn fill:#624,stroke:#a66,color:#ffd
+    class OK ok
+    class SCALE,FLAT warn
