@@ -7,8 +7,9 @@ from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable
 
 import pandas as pd
 
-from plan_data.observability import log_infer_call
+from plan_data.observability import log_infer_call, log_alert
 from plan_data.trace import get_trace_id, new_trace_id
+from plan_data.quality_gate import evaluate_quality  # Quality Gate 評価
 
 
 # --- Contracts (超軽量版) ---
@@ -161,6 +162,7 @@ def propose_with_logging(
       - 例外は上位に送出するが、観測ログは成功/失敗ともに記録
       - timeout_sec は簡易実装（実スレッド停止はしない）：計測超過時は success=False を log
       - 戻り値が dict/NamedTuple でも StrategyProposal に変換
+      - Quality Gate を前段評価し、SCALE/FLAT を提案へ反映（アラートも発火）
     """
     model = model_name or getattr(getattr(strategy, "__class__", None), "__name__", str(type(strategy).__name__))
     ver = model_version or getattr(strategy, "VERSION", "dev")
@@ -176,13 +178,29 @@ def propose_with_logging(
     proposal: Optional[StrategyProposal] = None
 
     try:
-        # まず Protocol での構造的チェック
+        # 0) Quality Gate（前段チェック）
+        #   - data_lag / missing_ratio を確認し、SCALE/FLAT を指示
+        #   - 非OK時は obs_alerts へ記録
+        qres = evaluate_quality(features)  # duck-typing: features.context を参照
+        if qres.action != "OK":
+            try:
+                log_alert(
+                    policy_name=f"PLAN.QUALITY.{qres.action}",
+                    reason="; ".join(qres.reasons or []) or "quality gate triggered",
+                    severity="MEDIUM",
+                    details={"qty_scale": qres.qty_scale, "reasons": qres.reasons or []},
+                    trace_id=trace_id,
+                    conn_str=conn_str or None,
+                )
+            except Exception:
+                pass
+
+        # 1) 戦略呼び出し（Protocol 優先 → duck typing フォールバック）
         if isinstance(strategy, _ProposeLike):
             raw = strategy.propose(features, **kwargs)
         elif isinstance(strategy, _PredictLike):
             raw = strategy.predict_future(features, **kwargs)
         else:
-            # 動的ディスパッチ（duck typing）
             if hasattr(strategy, "propose"):
                 raw = getattr(strategy, "propose")(features, **kwargs)
             elif hasattr(strategy, "predict_future"):
@@ -191,11 +209,34 @@ def propose_with_logging(
                 raise AttributeError(f"{model} has neither propose() nor predict_future().")
 
         proposal = _coerce_to_proposal(raw, default_symbol=str(features.context.get("symbol", "MULTI")))
+
+        # 2) Quality Gate の指示を適用
+        if qres.action == "FLAT":
+            # 取引見送り（方向は FLAT、数量0）
+            proposal.direction = "FLAT"
+            proposal.qty = 0.0
+            proposal.reasons = list(proposal.reasons) + ["quality_gate: FLAT"]
+            proposal.meta = {**proposal.meta, "quality_action": "FLAT", "qty_scale": qres.qty_scale}
+        elif qres.action == "SCALE":
+            # 数量スケール（下限0.0〜上限そのまま）
+            try:
+                proposal.qty = max(0.0, float(proposal.qty) * float(qres.qty_scale))
+            except Exception:
+                proposal.qty = 0.0
+            proposal.meta = {**proposal.meta, "quality_action": "SCALE", "qty_scale": qres.qty_scale}
+            if "quality_gate: SCALE" not in proposal.reasons:
+                proposal.reasons = list(proposal.reasons) + ["quality_gate: SCALE"]
+        else:
+            # OK の場合も meta にメモ
+            proposal.meta = {**proposal.meta, "quality_action": "OK", "qty_scale": 1.0}
+
         success = True
         return proposal
+
     except Exception:
         # 例外は上位に再送出（finally で log は必ず記録）
         raise
+
     finally:
         dur_ms = int((time.time() - t0) * 1000)
         # timeout 判定（簡易）
