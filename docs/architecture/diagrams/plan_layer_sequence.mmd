@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant COL as PlanDataCollector
+    participant FEAT as features.py
+    participant STAT as statistics.py
+    participant QG as quality_gate.py
+    participant DEC as DecisionEngine
+    participant OBS as Observability(DB)
+
+    Note over COL,DEC: trace_id を一貫して引き回す
+    COL->>OBS: log_plan_run(phase="collector", trace_id)
+    COL->>FEAT: FeatureBundle(df, context, trace_id)
+    FEAT->>STAT: attach_kpis(df, trace_id)
+    STAT->>OBS: log_plan_run(phase="statistics", trace_id)
+    STAT-->>QG: FeatureBundle(+kpis), context
+    QG->>DEC: QualityResult(action, qty_scale, reasons)
+    DEC->>OBS: log_decision(trace_id, decision)
+    DEC->>OBS: (必要時) log_alert(policy="PLAN.NOCTUSGATE", ...)
+    DEC->>EXEC: OrderRequest(idempotency_key, trace_id)
