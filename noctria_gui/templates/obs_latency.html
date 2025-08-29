@@ -5,88 +5,124 @@
   <meta charset="utf-8" />
   <title>Noctria Observability — Latency</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- できるだけ軽量にCDNから -->
+  <meta name="theme-color" content="#0a0f2c" />
+  <link rel="stylesheet" href="/static/hud_style.css" />
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/mVP.css" />
-  <style>
-    body { padding: 16px; }
-    .grid { display: grid; gap: 16px; }
-    .grid-cols { grid-template-columns: 1fr; }
-    @media (min-width: 1000px) { .grid-cols { grid-template-columns: 2fr 1fr; } }
-    .card { padding: 12px 14px; border: 1px solid #ddd; border-radius: 12px; background: #fff; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 14px; }
-    .muted { color: #666; font-size: 13px; }
-    code { background: #fafafa; padding: 2px 6px; border-radius: 6px; }
-    .pill { display:inline-block; padding:2px 8px; border-radius: 999px; background:#f5f5f5; font-size:12px; }
-  </style>
 </head>
 <body>
-  <h2>⚙️ Observability — PLAN→INFER→DECISION Latency</h2>
-  <p class="muted">データソース: <code>obs_trace_timeline</code>, <code>obs_trace_latency</code>, <code>obs_latency_daily</code></p>
-
-  <div class="card">
-    <canvas id="latencyChart" height="100"></canvas>
-  </div>
-
-  <div class="grid grid-cols">
-    <div class="card">
-      <h3>🧭 最近のトレース</h3>
-      <table>
-        <thead>
-          <tr><th>trace_id</th><th>開始→終了</th><th>events</th><th></th></tr>
-        </thead>
-        <tbody>
-        {% for r in recent %}
-          <tr>
-            <td style="max-width: 360px; overflow: hidden; text-overflow: ellipsis;">
-              <code title="{{ r.trace_id }}">{{ r.trace_id }}</code>
-            </td>
-            <td class="muted">
-              {{ r.started_at }} → {{ r.finished_at }}
-            </td>
-            <td>{{ r.events }}</td>
-            <td>
-              <a class="pill" href="{{ url_for('observability_latency.latency_dashboard') }}?trace_id={{ r.trace_id }}">見る</a>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+  <header class="header">
+    <a class="nav-item-back" href="/dashboard" aria-label="Back to dashboard">← Dashboard</a>
+    <div class="hud-title"><i>⏱️</i><span>Observability: PLAN → INFER → DECISION Latency</span></div>
+    <div class="right">
+      <a class="hud-button hud-button--ghost" href="{{ url_for('observability_latency.latency_dashboard') }}">このページを更新</a>
     </div>
+  </header>
 
-    <div class="card">
-      <h3>🔎 トレース詳細</h3>
-      {% if not trace_id %}
-        <p class="muted">左の一覧から <em>見る</em> を押すと詳細が表示されます。</p>
-      {% else %}
-        <p><strong>trace_id:</strong> <code>{{ trace_id }}</code></p>
-        {% if infer %}
-          <p class="muted">INFER: {{ infer.name }} / {{ infer.dur_ms }} ms / {{ infer.success and "成功" or "失敗" }} @ {{ infer.at }}</p>
-        {% endif %}
-        {% if decision %}
-          <p class="muted">DECISION: {{ decision.strategy_name }} (score={{ decision.score }}) @ {{ decision.at }}</p>
-          <p class="muted">action=<code>{{ decision.action }}</code>, params=<code>{{ decision.params }}</code></p>
-        {% endif %}
+  <main class="hud-container-simple">
+    <!-- パーセンタイル チャート -->
+    <section class="hud-panel">
+      <div class="panel-title">日次パーセンタイル（p50 / p90 / p99）</div>
+      <div class="chart-card">
+        <canvas id="latencyChart" height="220"></canvas>
+      </div>
+    </section>
 
-        <table>
-          <thead>
-            <tr><th>at</th><th>stage</th><th>name</th><th>detail</th></tr>
-          </thead>
-          <tbody>
-          {% for ev in timeline %}
-            <tr>
-              <td class="muted">{{ ev.at }}</td>
-              <td>{{ ev.stage }}</td>
-              <td>{{ ev.name }}</td>
-              <td><code>{{ ev.detail }}</code></td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      {% endif %}
-    </div>
-  </div>
+    <!-- 最近のトレース + 詳細 -->
+    <section class="grid2">
+      <!-- 最近のトレース -->
+      <div class="hud-panel">
+        <div class="panel-title">🧭 最近のトレース</div>
+        <div class="table-wrap">
+          <table class="hud-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">trace_id</th>
+                <th>開始 → 終了</th>
+                <th>events</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for r in recent %}
+              <tr>
+                <td style="max-width: 420px;">
+                  <span class="truncate mono" title="{{ r.trace_id }}">{{ r.trace_id }}</span>
+                </td>
+                <td class="text-muted nowrap">
+                  {{ r.started_at }} → {{ r.finished_at }}
+                </td>
+                <td class="nowrap">{{ r.events }}</td>
+                <td class="right">
+                  <a class="pill" href="{{ url_for('observability_latency.latency_dashboard') }}?trace_id={{ r.trace_id }}">見る</a>
+                </td>
+              </tr>
+            {% endfor %}
+            {% if not recent %}
+              <tr><td colspan="4"><div class="skeleton" style="height:1.25rem;"></div></td></tr>
+            {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- トレース詳細 -->
+      <div class="hud-panel">
+        <div class="panel-title">🔎 トレース詳細</div>
+        {% if not trace_id %}
+          <p class="text-muted">左の一覧から <em>見る</em> を押すと詳細が表示されます。</p>
+        {% else %}
+          <div class="stack">
+            <div><span class="badge">trace</span> <span class="truncate mono">{{ trace_id }}</span></div>
+            {% if infer %}
+              <div class="small text-muted">
+                <span class="badge badge--ok">INFER</span>
+                {{ infer.name }} / {{ infer.dur_ms }} ms / {{ infer.success and "成功" or "失敗" }} @ {{ infer.at }}
+              </div>
+            {% endif %}
+            {% if decision %}
+              <div class="small text-muted">
+                <span class="badge badge--warn">DECISION</span>
+                {{ decision.strategy_name }} (score={{ decision.score }}) @ {{ decision.at }}
+              </div>
+              <div class="small text-muted">
+                action=<span class="mono">{{ decision.action }}</span>,
+                params=<span class="mono">{{ decision.params }}</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="table-wrap">
+            <table class="hud-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">at</th>
+                  <th>stage</th>
+                  <th>name</th>
+                  <th style="text-align:left">detail</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for ev in timeline %}
+                <tr>
+                  <td class="text-muted nowrap" style="text-align:left">{{ ev.at }}</td>
+                  <td class="nowrap">{{ ev.stage }}</td>
+                  <td class="nowrap">{{ ev.name }}</td>
+                  <td class="mono" style="text-align:left">{{ ev.detail }}</td>
+                </tr>
+              {% endfor %}
+              {% if not timeline %}
+                <tr><td colspan="4"><div class="skeleton" style="height:1.25rem;"></div></td></tr>
+              {% endif %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
 
   <script>
     const CHART_DATA = {{ chart_json|safe }};
@@ -95,9 +131,9 @@
     const data = {
       labels: CHART_DATA.labels,
       datasets: [
-        { label: 'p50 (ms)', data: CHART_DATA.p50 },
-        { label: 'p90 (ms)', data: CHART_DATA.p90 },
-        { label: 'p99 (ms)', data: CHART_DATA.p99 },
+        { label: 'p50 (ms)', data: CHART_DATA.p50, borderWidth: 2, tension: .2 },
+        { label: 'p90 (ms)', data: CHART_DATA.p90, borderWidth: 2, tension: .2 },
+        { label: 'p99 (ms)', data: CHART_DATA.p99, borderWidth: 2, tension: .2 },
       ]
     };
 
@@ -105,17 +141,14 @@
       type: 'line',
       data,
       options: {
-        interaction: { mode: 'index', intersect: false },
         responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top' },
-          tooltip: { enabled: true }
-        },
+        interaction: { mode: 'index', intersect: false },
+        animation: false,
         scales: {
-          y: { title: { display: true, text: 'milliseconds' } },
-          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }
-        }
+          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+          y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString() } }
+        },
+        plugins: { legend: { labels: { boxWidth: 12 } } }
       }
     });
   </script>
