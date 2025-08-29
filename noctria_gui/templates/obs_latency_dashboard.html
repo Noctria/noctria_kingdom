@@ -1,0 +1,141 @@
+<!-- noctria_gui/templates/obs_latency_dashboard.html -->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Observability — Latency</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 24px; color: #222; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 16px; }
+    .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .card { border: 1px solid #eee; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 6px rgba(0,0,0,.06); background: #fff; }
+    .muted { color:#666; font-size: 12px; }
+    canvas { width: 100%; height: 320px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    .badge { font-size: 11px; border:1px solid #ddd; border-radius: 999px; padding:2px 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1 style="margin:0;">Latency Dashboard</h1>
+      <div class="muted">obs_latency_daily（p50/p90/p99） / obs_trace_summary</div>
+    </div>
+    <div>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card">
+      <strong>p50 / p90 / p99 (ms)</strong>
+      <div class="muted">日次パーセンタイル</div>
+      <canvas id="latencyChart"></canvas>
+    </div>
+    <div class="card">
+      <strong>最新サマリ</strong>
+      <div id="latestSummary" class="muted">loading…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <strong>最近の日次分布</strong>
+    <table id="dailyTable">
+      <thead>
+        <tr><th>day</th><th>events</th><th>p50</th><th>p90</th><th>p99</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_URL = "{{ api_url }}";
+    let chart;
+
+    async function loadDaily() {
+      const res = await fetch(API_URL);
+      const json = await res.json();
+      return json.items || [];
+    }
+
+    async function loadSummary() {
+      const res = await fetch('/observability/summary?limit=10');
+      const json = await res.json();
+      return json.items || [];
+    }
+
+    function upsertChart(labels, p50, p90, p99) {
+      const ctx = document.getElementById('latencyChart').getContext('2d');
+      const data = {
+        labels,
+        datasets: [
+          { label: 'p50 ms', data: p50, borderWidth: 2, tension: .2 },
+          { label: 'p90 ms', data: p90, borderWidth: 2, tension: .2 },
+          { label: 'p99 ms', data: p99, borderWidth: 2, tension: .2 },
+        ]
+      };
+      const opts = {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } }
+        }
+      };
+      if (chart) { chart.data = data; chart.update(); }
+      else { chart = new Chart(ctx, { type: 'line', data, options: opts }); }
+    }
+
+    function fillDailyTable(items) {
+      const tbody = document.querySelector('#dailyTable tbody');
+      tbody.innerHTML = '';
+      for (const r of [...items].reverse()) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${new Date(r.day).toISOString().slice(0,10)}</td>
+          <td>${r.events}</td>
+          <td>${Math.round(r.p50_ms ?? 0).toLocaleString()}</td>
+          <td>${Math.round(r.p90_ms ?? 0).toLocaleString()}</td>
+          <td>${Math.round(r.p99_ms ?? 0).toLocaleString()}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function fillLatestSummary(items) {
+      const el = document.getElementById('latestSummary');
+      if (!items.length) { el.textContent = 'no data'; return; }
+      const s = items[0];
+      const started = new Date(s.started_at).toLocaleString();
+      const finished = new Date(s.finished_at).toLocaleString();
+      el.innerHTML = `
+        <div><span class="badge">trace</span> ${s.trace_id}</div>
+        <div><span class="badge">window</span> ${started} → ${finished}</div>
+        <div><span class="badge">total</span> ${s.total_ms?.toLocaleString()} ms
+             <span class="badge">infer</span> ${s.infer_ms?.toLocaleString?.() || '-'} ms
+             <span class="badge">i→d</span> ${s.infer_to_decision_ms?.toLocaleString?.() || '-'} ms
+             <span class="badge">events</span> ${s.events}</div>
+        <div><span class="badge">decision</span> ${s.strategy_name || '-'} / ${s.action || '-'}</div>
+      `;
+    }
+
+    async function boot() {
+      const [daily, summary] = await Promise.all([loadDaily(), loadSummary()]);
+      const labels = daily.map(d => new Date(d.day).toISOString().slice(0,10));
+      const p50 = daily.map(d => d.p50_ms ?? 0);
+      const p90 = daily.map(d => d.p90_ms ?? 0);
+      const p99 = daily.map(d => d.p99_ms ?? 0);
+      upsertChart(labels, p50, p90, p99);
+      fillDailyTable(daily);
+      fillLatestSummary(summary);
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', boot);
+    boot();
+  </script>
+</body>
+</html>
