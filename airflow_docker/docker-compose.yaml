@@ -14,6 +14,8 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
     - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-YourSecretKeyForWebServerSession}
+    - NOCTRIA_OBS_PG_DSN=postgresql://$${POSTGRES_USER:-airflow}:$${POSTGRES_PASSWORD:-airflow}@postgres:5432/$${POSTGRES_DB:-airflow}
+
 
     # ---- API 認証バックエンド（Basic + session を明示）----
     - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
