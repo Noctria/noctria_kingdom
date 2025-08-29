@@ -16,6 +16,7 @@ Noctria Kingdom GUI - main entrypoint
 - HAS_DASHBOARD を緩やかに判定（module名に ".dashboard" を含む場合を許容）
 - Act手動トリガ／Decision/Tags/Airflow 履歴ビューを配線
 - トースト閉じる用の /__clear_toast を追加
+- 🆕 GUIレイテンシ観測ミドルウェア（リングバッファ＋任意でJSONL追記）
 """
 
 from __future__ import annotations
@@ -24,18 +25,20 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
+from collections import deque
 from importlib import import_module
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
-from markupsafe import Markup
 
 # ---------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
@@ -88,7 +91,7 @@ logger = logging.getLogger("noctria_gui.main")
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.6.1",
+    version="2.6.2",
 )
 
 # セッション
@@ -99,7 +102,7 @@ app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 # 静的/テンプレートの安全マウント
 # ---------------------------------------------------------------------------
 if NOCTRIA_GUI_STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(NOTRIA_GUI_STATIC_DIR if 'NOTRIA_GUI_STATIC_DIR' in globals() else NOCTRIA_GUI_STATIC_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
     logger.info("Static mounted: %s", NOCTRIA_GUI_STATIC_DIR)
 else:
     logger.warning("Static dir not found: %s (skip mounting)", NOCTRIA_GUI_STATIC_DIR)
@@ -133,6 +136,51 @@ def render_template(request: Request, template_name: str, **ctx: Any) -> str:
     return tmpl.render(request=request, **ctx)
 
 app.state.render_template = render_template
+
+# ---------------------------------------------------------------------------
+# 🆕 GUIレイテンシ観測: リングバッファ & ミドルウェア（任意でJSONL追記）
+# ---------------------------------------------------------------------------
+class _LatencyStore:
+    def __init__(self, maxlen: int = 10000):
+        self._dq = deque(maxlen=maxlen)
+
+    def add(self, rec: Dict[str, Any]) -> None:
+        self._dq.append(rec)
+
+    def snapshot(self, limit: int = 300) -> list[Dict[str, Any]]:
+        return list(self._dq)[-limit:]
+
+if not hasattr(app.state, "latency_store"):
+    app.state.latency_store = _LatencyStore(maxlen=10000)
+
+LAT_LOG_PATH = os.getenv("NOCTRIA_LATENCY_LOG", "logs/observability_gui_latency.jsonl")
+
+@app.middleware("http")
+async def latency_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    resp = await call_next(request)
+    dur_ms = (time.perf_counter() - start) * 1000.0
+
+    path = request.url.path
+    # 自分自身や静的は除外
+    if not (path.startswith("/static") or path == "/favicon.ico"):
+        rec = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) + f".{int((time.time()%1)*1000):03d}Z",
+            "method": request.method,
+            "path": path,
+            "status": getattr(resp, "status_code", None),
+            "duration_ms": round(dur_ms, 3),
+            "trace_id": request.headers.get("X-Trace-Id"),
+        }
+        try:
+            request.app.state.latency_store.add(rec)
+            if LAT_LOG_PATH:
+                os.makedirs(os.path.dirname(LAT_LOG_PATH), exist_ok=True)
+                with open(LAT_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+    return resp
 
 # ---------------------------------------------------------------------------
 # PDCAサマリーDB: ensure/health（best-effort）
@@ -173,6 +221,12 @@ def _safe_include(
     prefix: Optional[str] = None,
     tags: Optional[Sequence[str]] = None,
 ) -> bool:
+    """
+    include_router の安全ラッパー。
+    - attr で指定した属性（既定: router）を取りに行く
+    - 失敗したら警告だけ出してスキップ
+    - ".dashboard" を含むモジュールは HAS_DASHBOARD を True に
+    """
     global HAS_DASHBOARD
     try:
         mod = import_module(module_path)
@@ -181,12 +235,12 @@ def _safe_include(
             app.include_router(router, prefix=prefix or "", tags=list(tags or []))
         else:
             app.include_router(router)
-        logger.info("Included router: %s", module_path)
+        logger.info("Included router: %s (%s)", module_path, attr)
         if ".dashboard" in module_path:
             HAS_DASHBOARD = True
         return True
     except Exception as e:
-        logger.warning("Skip router '%s': %s", module_path, e)
+        logger.warning("Skip router '%s' (%s): %s", module_path, attr, e)
         return False
 
 logger.info("Integrating routers...")
@@ -257,15 +311,22 @@ _safe_include("noctria_gui.routes.upload")
 _safe_include("noctria_gui.routes.chat_history_api")
 # _safe_include("noctria_gui.routes.chat_api")
 
-# 可観測性ビュー
+# 可観測性ビュー（既存）
 _safe_include("noctria_gui.routes.observability")
-# ★ 追加：レイテンシ可視化ダッシュボード
-try:
-    from noctria_gui.routes.observability_latency import bp_obs_latency  # type: ignore
-    app.include_router(bp_obs_latency)
-    logger.info("Included router: noctria_gui.routes.observability_latency")
-except Exception as e:
-    logger.warning("Skip router 'noctria_gui.routes.observability_latency': %s", e)
+
+# ★ レイテンシ可視化ダッシュボード（FastAPI/Flask両対応の柔軟取り込み）
+#   - FastAPI: router
+#   - 互換エイリアス: bp_obs_latency / obs_bp
+#   - Flask Blueprint が置いてあっても include 失敗 → 404 の原因になるため、優先的に 'router' を試す
+included = (
+    _safe_include("noctria_gui.routes.observability_latency", "router")
+    or _safe_include("noctria_gui.routes.observability_latency", "bp_obs_latency")
+    or _safe_include("noctria_gui.routes.observability_latency", "obs_bp")
+)
+if included:
+    logger.info("Included router: noctria_gui.routes.observability_latency (any attr)")
+else:
+    logger.warning("Observability latency router not mounted (router/bp_obs_latency/obs_bp not found or incompatible)")
 
 # 統治ルール可視化
 _safe_include("noctria_gui.routes.governance_rules")
