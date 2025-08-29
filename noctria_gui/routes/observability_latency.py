@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import psycopg2
@@ -22,7 +23,6 @@ import psycopg2.extras
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from starlette.templating import Jinja2Templates
-from pathlib import Path
 
 # ── DSN: 観測用 ENV を尊重（未設定ならローカル既定）
 OBS_DSN = os.getenv(
@@ -34,7 +34,7 @@ OBS_DSN = os.getenv(
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-# ✅ FastAPI ルーター
+# ✅ FastAPI ルーター（/observability 配下）
 router = APIRouter(prefix="/observability", tags=["observability"])
 
 # ---- DB helper ---------------------------------------------------------------
@@ -75,7 +75,11 @@ def _safe_float(x: Any, default: float | None = None) -> float | None:
 
 # ---- Routes ------------------------------------------------------------------
 
-@router.get("/latency", response_class=HTMLResponse)
+@router.get(
+    "/latency",
+    response_class=HTMLResponse,
+    name="observability_latency.latency_dashboard",  # ← 重要: テンプレの url_for と一致
+)
 def latency_dashboard(request: Request):
     """
     日次レイテンシ分布（p50/p90/p99）と、最近トレース一覧。
