@@ -1,4 +1,3 @@
-# noctria_gui/main.py
 #!/usr/bin/env python3
 # coding: utf-8
 """
@@ -84,12 +83,12 @@ logging.basicConfig(
 logger = logging.getLogger("noctria_gui.main")
 
 # ---------------------------------------------------------------------------
-# FastAPI app（← ここで最初に定義するのが重要！）
+# FastAPI app
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Noctria Kingdom GUI",
     description="王国の中枢制御パネル（DAG起動・戦略管理・評価表示など）",
-    version="2.6.0",
+    version="2.6.1",
 )
 
 # セッション
@@ -100,7 +99,7 @@ app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 # 静的/テンプレートの安全マウント
 # ---------------------------------------------------------------------------
 if NOCTRIA_GUI_STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=str(NOTRIA_GUI_STATIC_DIR if 'NOTRIA_GUI_STATIC_DIR' in globals() else NOCTRIA_GUI_STATIC_DIR)), name="static")
     logger.info("Static mounted: %s", NOCTRIA_GUI_STATIC_DIR)
 else:
     logger.warning("Static dir not found: %s (skip mounting)", NOCTRIA_GUI_STATIC_DIR)
@@ -195,7 +194,7 @@ logger.info("Integrating routers...")
 # 主要ルーター群（存在しなくてもスキップ可）
 _safe_include("noctria_gui.routes.home_routes")
 _safe_include("noctria_gui.routes.dashboard")
-_safe_include("noctria_gui.routes.plan_news")   # ← 追加：Plan News 画面 & API
+_safe_include("noctria_gui.routes.plan_news")   # Plan News 画面 & API
 
 # 王系
 _safe_include("noctria_gui.routes.king_routes")
@@ -216,7 +215,7 @@ _safe_include("noctria_gui.routes.pdca_routes")
 _safe_include("noctria_gui.routes.pdca_summary")
 _safe_include("noctria_gui.routes.pdca_recent")
 _safe_include("noctria_gui.routes.pdca_widgets")
-# API（←これが /pdca/api/* の実体。**必ず app 定義後に include**）
+# API（←これが /pdca/api/* の実体）
 _safe_include("noctria_gui.routes.pdca_api")
 
 # 戦略・統計・タグ
@@ -260,6 +259,13 @@ _safe_include("noctria_gui.routes.chat_history_api")
 
 # 可観測性ビュー
 _safe_include("noctria_gui.routes.observability")
+# ★ 追加：レイテンシ可視化ダッシュボード
+try:
+    from noctria_gui.routes.observability_latency import bp_obs_latency  # type: ignore
+    app.include_router(bp_obs_latency)
+    logger.info("Included router: noctria_gui.routes.observability_latency")
+except Exception as e:
+    logger.warning("Skip router 'noctria_gui.routes.observability_latency': %s", e)
 
 # 統治ルール可視化
 _safe_include("noctria_gui.routes.governance_rules")
@@ -302,7 +308,7 @@ async def healthz():
     return JSONResponse(
         {
             "ok": True,
-            "static_dir": str(NOTRIA_GUI_STATIC_DIR if 'NOTRIA_GUI_STATIC_DIR' in globals() else NOCTRIA_GUI_STATIC_DIR),
+            "static_dir": str(NOCTRIA_GUI_STATIC_DIR),
             "templates_dir": str(_tpl_dir),
             "has_dashboard": HAS_DASHBOARD,
             "session_enabled": True,
