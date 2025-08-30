@@ -12,6 +12,7 @@ router = APIRouter(
     tags=["statistics"]
 )
 
+# Jinja2Templatesのインスタンス化
 templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 
