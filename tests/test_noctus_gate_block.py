@@ -2,7 +2,7 @@
 import pandas as pd
 import importlib.util, sys, pathlib
 
-# 強制的に strategy_adapter を先に読み込ませる
+# strategy_adapter を直読みして強制登録
 path = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
 spec = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path)
 sa = importlib.util.module_from_spec(spec)
@@ -12,10 +12,17 @@ spec.loader.exec_module(sa)
 FeatureBundle = sa.FeatureBundle
 StrategyProposal = sa.StrategyProposal
 
-# adapter_to_decision を読む前に、内部で使う FeatureBundle を差し替える
-import plan_data.adapter_to_decision as ad
-ad.FeatureBundle = FeatureBundle  # 強制上書き
+# contracts のエイリアスも上書き
+import plan_data.contracts as contracts
+contracts.FeatureBundle = FeatureBundle
+contracts.StrategyProposal = StrategyProposal
 
+# decision_engine 内の参照も差し替え
+import plan_data.decision_engine as de
+de.FeatureBundle = FeatureBundle
+de.StrategyProposal = StrategyProposal
+
+# adapter_to_decision を import（内部で decision_engine を使う）
 from plan_data.adapter_to_decision import run_strategy_and_decide
 
 
