@@ -2,47 +2,59 @@
 # -*- coding: utf-8 -*-
 """
 📈 Observability: Latency Dashboard (FastAPI)
-Routes:
-- GET  /observability/latency                 : HUDページ (obs_latency.html)
-- GET  /observability/api/daily?limit=60      : 日次 p50/p90/p99 の配列
-- GET  /observability/api/daily.csv?limit=60  : 同CSV
-- GET  /observability/summary?limit=10        : 直近トレースのサマリ
+- 画面: GET /observability/latency
+    日次レイテンシ分布（p50/p90/p99）＋最近トレース一覧
+    ?trace_id=... を付けると該当トレースのタイムライン詳細を表示
 
-期待スキーマ:
-  - obs_latency_daily(day::date, events::int, p50_ms::numeric, p90_ms::numeric, p99_ms::numeric)
-  - obs_trace_timeline(trace_id::text, at::timestamptz, stage::text, name::text, detail::jsonb)
+データ前提:
+  - obs_trace_timeline は VIEW（列: trace_id, ts, kind, action, payload(jsonb)）
+    ※ 例: obs_decisions / obs_infer_calls などの UNION ALL
+  - obs_latency_daily は MATERIALIZED VIEW（列: day, events, p50_ms, p90_ms, p99_ms）
+
+DSN:
+  - 環境変数 NOCTRIA_OBS_PG_DSN を優先
+  - 未設定時はローカルDB既定: postgresql://noctria:noctria@localhost:5432/noctria_db
 """
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 import os
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import psycopg2
 import psycopg2.extras
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
 from starlette.templating import Jinja2Templates
 
-# ── DSN: 観測用 ENV を尊重（未設定ならローカル既定）
-OBS_DSN = os.getenv("NOCTRIA_OBS_PG_DSN", "postgresql://noctria:noctria@localhost:5432/noctria_db")
+# ---------------------------------------------------------------------------
+# DSN: 観測用 ENV を尊重（未設定ならローカル既定）
+# ---------------------------------------------------------------------------
+OBS_DSN = os.getenv(
+    "NOCTRIA_OBS_PG_DSN",
+    "postgresql://noctria:noctria@localhost:5432/noctria_db",
+)
 
-# ── Templates（noctria_gui/templates を解決）
+# ---------------------------------------------------------------------------
+# Templates: noctria_gui/templates を解決
+#   ※ main.py でも Jinja2 を作っていますが、本ルーター単体でも動くように
+#     念のためここでも解決しておく（重複しても問題なし）
+# ---------------------------------------------------------------------------
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-# ✅ FastAPI ルーター（/observability 配下）
+# ---------------------------------------------------------------------------
+# Router
+# ---------------------------------------------------------------------------
 router = APIRouter(prefix="/observability", tags=["observability"])
 
-# ---- DB helpers --------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Helper: クイック読み出し（例外時は空配列を返す）
+# ---------------------------------------------------------------------------
 def _query(sql: str, params: Tuple[Any, ...] | None = None) -> List[Dict[str, Any]]:
-    """クイック読み出し。例外時は空配列を返す（ページは表示継続）。"""
     try:
         conn = psycopg2.connect(OBS_DSN)
     except Exception:
@@ -51,15 +63,7 @@ def _query(sql: str, params: Tuple[Any, ...] | None = None) -> List[Dict[str, An
         with conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, params or ())
             rows = cur.fetchall()
-            # Decimal → float に変換（JSON化のため）
-            normed: List[Dict[str, Any]] = []
-            for r in rows:
-                d = dict(r)
-                for k, v in list(d.items()):
-                    if isinstance(v, Decimal):
-                        d[k] = float(v)
-                normed.append(d)
-            return normed
+            return [dict(r) for r in rows]
     except Exception:
         return []
     finally:
@@ -68,11 +72,13 @@ def _query(sql: str, params: Tuple[Any, ...] | None = None) -> List[Dict[str, An
         except Exception:
             pass
 
+
 def _safe_int(x: Any, default: int | None = None) -> int | None:
     try:
         return int(x) if x is not None else default
     except Exception:
         return default
+
 
 def _safe_float(x: Any, default: float | None = None) -> float | None:
     try:
@@ -80,44 +86,42 @@ def _safe_float(x: Any, default: float | None = None) -> float | None:
     except Exception:
         return default
 
-# ---- Pages -------------------------------------------------------------------
 
-@router.get(
-    "/latency",
-    response_class=HTMLResponse,
-    name="observability_latency.latency_dashboard",  # テンプレの url_for と一致
-)
+# ---------------------------------------------------------------------------
+# Route: /observability/latency (HTML)
+#   ※ エンドポイント名は関数名 'latency_dashboard' になる
+# ---------------------------------------------------------------------------
+@router.get("/latency", response_class=HTMLResponse)
 def latency_dashboard(request: Request):
     """
-    HUDページ:
-      - 上段: 日次パーセンタイル折れ線 (p50/p90/p99)
-      - 左: 最近のトレース
-      - 右: 選択トレース詳細（?trace_id=...）
+    日次レイテンシ分布（p50/p90/p99）＋最近トレース一覧。
+    ?trace_id=... で該当トレースのタイムライン詳細も表示。
     """
-    # 1) 日次レイテンシ
+
+    # 1) 日次レイテンシ分布（物理化ビュー）
     daily = _query(
         """
         SELECT day::date AS day, events, p50_ms, p90_ms, p99_ms
-        FROM obs_latency_daily
+        FROM public.obs_latency_daily
         ORDER BY day ASC
         """
     )
 
-    # 2) 最近のトレース（20件）
+    # 2) 最近のトレース20件（VIEW: obs_trace_timeline の列に合わせる）
     recent = _query(
         """
         SELECT trace_id,
-               MIN(at) AS started_at,
-               MAX(at) AS finished_at,
+               MIN(ts) AS started_at,
+               MAX(ts) AS finished_at,
                COUNT(*) AS events
-        FROM obs_trace_timeline
+        FROM public.obs_trace_timeline
         GROUP BY trace_id
-        ORDER BY MAX(at) DESC
+        ORDER BY MAX(ts) DESC
         LIMIT 20
         """
     )
 
-    # 3) 任意 trace_id のタイムライン詳細
+    # 3) 任意 trace_id のタイムライン詳細（列をアプリ期待名にエイリアス）
     trace_id = request.query_params.get("trace_id")
     timeline: List[Dict[str, Any]] = []
     decision: Dict[str, Any] | None = None
@@ -126,31 +130,41 @@ def latency_dashboard(request: Request):
     if trace_id:
         timeline = _query(
             """
-            SELECT at, stage, name, detail
-            FROM obs_trace_timeline
+            SELECT
+              ts      AS at,
+              kind    AS stage,
+              action  AS name,
+              payload AS detail
+            FROM public.obs_trace_timeline
             WHERE trace_id = %s
-            ORDER BY at ASC
+            ORDER BY ts ASC
             """,
             (trace_id,),
         )
+        # INFER / DECISION の1件目を拾って上段に要約表示
         for ev in timeline:
-            if (ev.get("stage") == "INFER") and (infer is None):
-                det = (ev.get("detail") or {}) if isinstance(ev.get("detail"), dict) else {}
+            stage = ev.get("stage")
+            if stage == "INFER" and infer is None:
+                det = ev.get("detail") or {}
+                # duration_ms / dur_ms の両対応
+                dur = det.get("duration_ms")
+                if dur is None:
+                    dur = det.get("dur_ms")
                 infer = {
                     "at": ev.get("at"),
                     "name": ev.get("name"),
-                    "dur_ms": _safe_int(det.get("dur_ms")),
-                    "success": bool(det.get("success", False)),
+                    "dur_ms": _safe_int(dur),
+                    "success": bool((det or {}).get("success", False)),
                 }
-            if (ev.get("stage") == "DECISION") and (decision is None):
-                det = (ev.get("detail") or {}) if isinstance(ev.get("detail"), dict) else {}
+            if stage == "DECISION" and decision is None:
+                det = ev.get("detail") or {}
                 decision = {
                     "at": ev.get("at"),
                     "strategy_name": ev.get("name"),
-                    "score": _safe_float(det.get("score")),
-                    "reason": det.get("reason"),
-                    "action": det.get("action"),
-                    "params": det.get("params"),
+                    "score": _safe_float((det or {}).get("score")),
+                    "reason": (det or {}).get("reason"),
+                    "action": (det or {}).get("action"),
+                    "params": (det or {}).get("params"),
                 }
 
     # Chart.js に渡す軽量配列
@@ -162,6 +176,7 @@ def latency_dashboard(request: Request):
         "events": [int(r["events"]) for r in daily] if daily else [],
     }
 
+    # HTML レンダリング（テンプレートは obs_latency.html）
     return templates.TemplateResponse(
         "obs_latency.html",
         {
@@ -176,85 +191,8 @@ def latency_dashboard(request: Request):
         },
     )
 
-# ---- APIs --------------------------------------------------------------------
 
-@router.get("/api/daily")
-def api_daily(limit: int = Query(60, ge=1, le=365)):
-    """日次 p50/p90/p99 を新しい順で limit 件。"""
-    rows = _query(
-        """
-        SELECT day::date AS day, events, p50_ms, p90_ms, p99_ms
-        FROM obs_latency_daily
-        ORDER BY day DESC
-        LIMIT %s
-        """,
-        (limit,),
-    )
-    return JSONResponse({"items": rows})
-
-@router.get("/api/daily.csv", response_class=PlainTextResponse)
-def api_daily_csv(limit: int = Query(60, ge=1, le=365)):
-    """CSVエクスポート（Excel/外部共有用）。"""
-    rows = _query(
-        """
-        SELECT day::date AS day, events, p50_ms, p90_ms, p99_ms
-        FROM obs_latency_daily
-        ORDER BY day DESC
-        LIMIT %s
-        """,
-        (limit,),
-    )
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["day", "events", "p50_ms", "p90_ms", "p99_ms"])
-    for r in rows:
-        w.writerow([
-            r.get("day"),
-            r.get("events"),
-            r.get("p50_ms"),
-            r.get("p90_ms"),
-            r.get("p99_ms"),
-        ])
-    return PlainTextResponse(buf.getvalue(), media_type="text/csv; charset=utf-8")
-
-@router.get("/summary")
-def api_summary(limit: int = Query(10, ge=1, le=200)):
-    """
-    直近トレースのサマリ。
-    - total_ms: detail.dur_ms の合計を近似（無い場合は 0）
-    - infer_ms: stage='INFER' の dur_ms 合計
-    - strategy_name / action: 最後の DECISION から拾う
-    - infer_to_decision_ms: window長(ms)を近似（started→finished）
-    """
-    rows = _query(
-        """
-        WITH base AS (
-          SELECT trace_id,
-                 MIN(at) AS started_at,
-                 MAX(at) AS finished_at,
-                 COUNT(*) AS events,
-                 SUM( (CASE WHEN (detail->>'dur_ms') ~ '^[0-9]+(\\.[0-9]+)?$' THEN (detail->>'dur_ms')::numeric ELSE 0 END) )
-                    AS total_ms,
-                 SUM( (CASE WHEN stage='INFER' AND (detail->>'dur_ms') ~ '^[0-9]+(\\.[0-9]+)?$'
-                            THEN (detail->>'dur_ms')::numeric ELSE 0 END) )
-                    AS infer_ms,
-                 MAX( CASE WHEN stage='DECISION' THEN (detail->>'strategy_name') END ) AS strategy_name,
-                 MAX( CASE WHEN stage='DECISION' THEN (detail->>'action') END ) AS action
-          FROM obs_trace_timeline
-          GROUP BY trace_id
-          ORDER BY MAX(at) DESC
-          LIMIT %s
-        )
-        SELECT *,
-               EXTRACT(EPOCH FROM (finished_at - started_at))*1000 AS infer_to_decision_ms
-        FROM base
-        ORDER BY finished_at DESC
-        """,
-        (limit,),
-    )
-    return JSONResponse({"items": rows})
-
-# 互換エクスポート（旧コードの参照名を生かす）
+# 互換エクスポート（既存コードの参照名を生かす）
 bp_obs_latency = router
 obs_bp = router
-__all__ = ["router", "bp_obs_latency", "obs_bp"]
+__all__ = ["router", "bp_obs_latency", "obs_bp", "latency_dashboard"]
