@@ -1,3 +1,4 @@
+# tests/test_noctus_gate_block.py
 import pandas as pd
 import importlib.util, sys, pathlib
 
@@ -47,10 +48,10 @@ def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
         },
     )
 
-    decision = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
+    record, decision = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
 
     # NoctusGate でブロックされることを期待
-    assert decision["decision"]["decision"]["action"] == "REJECT"
+    assert decision["action"] == "REJECT"
 
     # アラート発火を確認
     kinds = [a.get("kind") for a in capture_alerts]
