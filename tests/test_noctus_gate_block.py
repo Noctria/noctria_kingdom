@@ -2,41 +2,30 @@
 import pandas as pd
 import importlib.util, sys, pathlib
 
-# --- strategy_adapter を直読みして sys.modules に登録 ---
-path_sa = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
-spec_sa = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path_sa)
-sa = importlib.util.module_from_spec(spec_sa)
+# --- strategy_adapter を絶対ロードして dataclass 版を使う ---
+path = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
+spec = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path)
+sa = importlib.util.module_from_spec(spec)
 sys.modules["plan_data.strategy_adapter"] = sa
-spec_sa.loader.exec_module(sa)
+spec.loader.exec_module(sa)
 
 FeatureBundle = sa.FeatureBundle
 StrategyProposal = sa.StrategyProposal
 
-# --- contracts を strategy_adapter にリダイレクト ---
-import types
-fake_contracts = types.ModuleType("plan_data.contracts")
-fake_contracts.FeatureBundle = FeatureBundle
-fake_contracts.StrategyProposal = StrategyProposal
-sys.modules["plan_data.contracts"] = fake_contracts
+# --- contracts 内のエイリアスを強制上書き（Pydantic版を潰す） ---
+import plan_data
+import plan_data.contracts as contracts
+contracts.FeatureBundle = FeatureBundle
+contracts.StrategyProposal = StrategyProposal
+sys.modules["plan_data.contracts"] = contracts
 
-# --- decision_engine もロード ---
-path_de = pathlib.Path(__file__).resolve().parents[1] / "src" / "decision" / "decision_engine.py"
-spec_de = importlib.util.spec_from_file_location("decision.decision_engine", path_de)
-de = importlib.util.module_from_spec(spec_de)
-sys.modules["decision.decision_engine"] = de
-spec_de.loader.exec_module(de)
-
-# --- adapter_to_decision をロード ---
-path_ad = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "adapter_to_decision.py"
-spec_ad = importlib.util.spec_from_file_location("plan_data.adapter_to_decision", path_ad)
-ad = importlib.util.module_from_spec(spec_ad)
-sys.modules["plan_data.adapter_to_decision"] = ad
-spec_ad.loader.exec_module(ad)
-
-run_strategy_and_decide = ad.run_strategy_and_decide
+# --- 依存モジュールを再ロードして、この差し替えを反映させる ---
+import importlib
+import plan_data.adapter_to_decision as atd
+importlib.reload(atd)
+from plan_data.adapter_to_decision import run_strategy_and_decide
 
 
-# --- テスト用 Strategy ---
 class RiskyStrategy:
     def propose(self, features, **kw):
         symbol = "USDJPY"
@@ -56,7 +45,6 @@ class RiskyStrategy:
         )
 
 
-# --- 実際のテスト ---
 def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
     df = pd.DataFrame({"t": pd.date_range("2025-08-01", periods=3, freq="D")})
     fb = FeatureBundle(
