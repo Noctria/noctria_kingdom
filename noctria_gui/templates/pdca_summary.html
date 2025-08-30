@@ -657,10 +657,11 @@ async function doRefresh(){
 
   // charts
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
-  const labels = by.map(r => r?.date ?? '');
-  const evals  = by.map(r => (+r?.evals)||0);
-  const adopted= by.map(r => (+r?.adopted)||0);
-  const wrPct  = by.map(r => (r?.win_rate==null ? null : +(r.win_rate*100).toFixed(2)));
+  const labels = by.map(r => r?.date ?? r?.day ?? '');
+  const evals  = by.map(r => (+r?.evals) || (+r?.rows) || 0);
+  const adopted= by.map(r => (+r?.adopted) || 0);
+  const wrBase = by.map(r => (r?.win_rate ?? r?.avg_win_rate));
+  const wrPct  = wrBase.map(v => (v==null ? null : +(v*100).toFixed(2)));
 
   show($('noteCounts'),  labels.length===0);
   show($('noteWinDiff'), labels.length===0);
