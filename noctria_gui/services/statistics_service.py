@@ -1,138 +1,101 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
 """
-📊 統計ダッシュボード用ルート
-- Veritas戦略の統計スコア一覧表示
-- フィルタ／ソート／CSVエクスポートに対応
-- 戦略比較機能追加
+📊 統計データ処理サービス
+- ログファイルの読み込み、フィルタリング、集計を行う
+- ダッシュボードやAPIが必要とするデータ形式に整形する
 """
-
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-from datetime import datetime
+import json
+import csv
 from pathlib import Path
+from datetime import datetime
+from collections import Counter
+from typing import List, Dict, Any, Optional
 
-import sys
-from src.core.path_config import ensure_import_path
+from src.core.path_config import ACT_LOG_DIR, TOOLS_DIR
 
-# sys.pathの安定化
-ensure_import_path()
+def load_all_logs() -> List[Dict[str, Any]]:
+    if not ACT_LOG_DIR.exists():
+        return []
+    all_logs = []
+    for log_file in sorted(ACT_LOG_DIR.glob("*.json")):
+        try:
+            with log_file.open("r", encoding="utf-8") as f:
+                all_logs.append(json.load(f))
+        except (json.JSONDecodeError, IOError):
+            pass # エラーのあるファイルはスキップ
+    return all_logs
 
-from src.core.path_config import TOOLS_DIR, GUI_TEMPLATES_DIR
-from noctria_gui.services import statistics_service
+def get_available_strategies(logs: List[Dict[str, Any]]) -> List[str]:
+    return sorted(list(set(log.get("strategy", "N/A") for log in logs)))
 
-router = APIRouter(
-    prefix="/statistics",
-    tags=["statistics"]
-)
+def get_available_symbols(logs: List[Dict[str, Any]]) -> List[str]:
+    return sorted(list(set(log.get("symbol", "N/A") for log in logs)))
 
-templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
+def filter_logs(
+    logs: List[Dict[str, Any]],
+    strategy: Optional[str] = None,
+    symbol: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    filtered = logs
+    if strategy:
+        filtered = [log for log in filtered if log.get("strategy") == strategy]
+    if symbol:
+        filtered = [log for log in filtered if log.get("symbol") == symbol]
+    return filtered
 
+def sort_logs(
+    logs: List[Dict[str, Any]],
+    sort_key: str,
+    descending: bool = True
+) -> List[Dict[str, Any]]:
+    return sorted(logs, key=lambda log: log.get(sort_key, 0), reverse=descending)
 
-@router.get("/", response_class=HTMLResponse)
-@router.get("/dashboard", response_class=HTMLResponse)
-async def show_statistics(request: Request):
+def get_strategy_statistics() -> Dict[str, Any]:
     """
-    📈 統計スコアダッシュボードを表示（フィルタ付き）
-    - /statistics または /statistics/dashboard どちらでもアクセス可能
+    ダッシュボード用の全体的な集計データを生成する。
+    ★エラーの原因となっていた 'tag_distribution' を含めて返すように修正済み。
     """
-    strategy = request.query_params.get("strategy", "").strip() or None
-    symbol = request.query_params.get("symbol", "").strip() or None
-    start_date = request.query_params.get("start_date", "").strip() or None
-    end_date = request.query_params.get("end_date", "").strip() or None
+    logs = load_all_logs()
+    
+    # タグの分布を計算
+    all_tags = []
+    for log in logs:
+        tags = log.get("tags")
+        if tags and isinstance(tags, list):
+            all_tags.extend(tags)
+    tag_distribution = dict(Counter(all_tags))
+    
+    # テンプレートが必要とする全てのキーを含んだ辞書を返す
+    return {
+        'strategy_count': len(get_available_strategies(logs)),
+        'total_logs': len(logs),
+        'tag_distribution': tag_distribution,  # <--- エラーを修正
+    }
 
-    try:
-        logs = statistics_service.load_all_logs()
-        filtered = statistics_service.filter_logs(
-            logs=logs,
-            strategy=strategy,
-            symbol=symbol,
-            start_date=start_date,
-            end_date=end_date
-        )
-        sorted_logs = statistics_service.sort_logs(
-            logs=filtered,
-            sort_key="win_rate",
-            descending=True
-        )
-        stats = statistics_service.get_strategy_statistics()  # ここで集計データを取得
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"統計データの処理中にエラーが発生しました: {e}")
+def export_statistics_to_csv(logs: List[Dict[str, Any]], output_path: Path):
+    if not logs:
+        return
+    header = sorted(list(set(key for log in logs for key in log.keys())))
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=header)
+        writer.writeheader()
+        writer.writerows(logs)
 
-    return templates.TemplateResponse("statistics_dashboard.html", {
-        "request": request,
-        "statistics": sorted_logs,
-        "strategies": statistics_service.get_available_strategies(logs),
-        "symbols": statistics_service.get_available_symbols(logs),
-        "filters": {
-            "strategy": strategy or "",
-            "symbol": symbol or "",
-            "start_date": start_date or "",
-            "end_date": end_date or "",
-        },
-        "stats": stats  # stats をテンプレートに渡す
-    })
-
-
-@router.get("/export")
-async def export_statistics_csv():
-    """
-    📤 統計スコア一覧をCSVでエクスポート
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = TOOLS_DIR / f"strategy_statistics_{timestamp}.csv"
-
-    try:
-        logs = statistics_service.load_all_logs()
-        sorted_logs = statistics_service.sort_logs(
-            logs=logs,
-            sort_key="win_rate",
-            descending=True
-        )
-        if not sorted_logs:
-            raise ValueError("出力する統計ログが存在しません。")
-
-        statistics_service.export_statistics_to_csv(sorted_logs, output_path)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"CSVエクスポートに失敗しました: {e}")
-
-    return FileResponse(
-        path=output_path,
-        filename=output_path.name,
-        media_type="text/csv"
-    )
-
-
-@router.get("/strategy_compare", response_class=HTMLResponse)
-async def strategy_compare(request: Request):
-    """
-    戦略比較ダッシュボードを表示
-    - 戦略間の比較を行う画面を表示
-    """
-    strategy_1 = request.query_params.get("strategy_1", "").strip() or None
-    strategy_2 = request.query_params.get("strategy_2", "").strip() or None
-
-    if not strategy_1 or not strategy_2:
-        raise HTTPException(status_code=400, detail="両方の戦略を選択してください。")
-
-    try:
-        logs = statistics_service.load_all_logs()
-        
-        # 戦略1と戦略2の両方をフィルタリング
-        filtered_1 = statistics_service.filter_logs(logs=logs, strategy=strategy_1)
-        filtered_2 = statistics_service.filter_logs(logs=logs, strategy=strategy_2)
-        
-        # 戦略比較のロジックを適用
-        comparison_results = statistics_service.compare_strategies(filtered_1, filtered_2)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"戦略比較の処理中にエラーが発生しました: {e}")
-
-    return templates.TemplateResponse("strategy_compare.html", {
-        "request": request,
-        "comparison_results": comparison_results,
-        "strategy_1": strategy_1 or "",
-        "strategy_2": strategy_2 or "",
-    })
+def compare_strategies(logs: List[Dict[str, Any]], strategy_1: str, strategy_2: str) -> Dict[str, Any]:
+    filtered_1 = filter_logs(logs=logs, strategy=strategy_1)
+    filtered_2 = filter_logs(logs=logs, strategy=strategy_2)
+    
+    def _summarize(filtered_logs):
+        if not filtered_logs: return {"count": 0, "avg_win_rate": 0}
+        win_rates = [log.get("win_rate", 0) for log in filtered_logs]
+        return {
+            "count": len(filtered_logs),
+            "avg_win_rate": sum(win_rates) / len(win_rates) if win_rates else 0
+        }
+    return {
+        "strategy_1": _summarize(filtered_1),
+        "strategy_2": _summarize(filtered_2)
+    }
