@@ -37,6 +37,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
+from noctria_gui.routes.statistics import router as statistics_router
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 
