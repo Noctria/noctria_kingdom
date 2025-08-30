@@ -8,40 +8,14 @@
   <meta name="theme-color" content="#0a0f2c" />
   <link rel="stylesheet" href="/static/hud_style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <!-- HUDの補助ユーティリティ（hud_style.css に無い軽量クラスだけ補完） -->
-  <style>
-    .grid2{display:grid;gap:1rem}
-    @media(min-width:1024px){.grid2{grid-template-columns:2fr 1fr}}
-    .hud-table{width:100%;border-collapse:collapse}
-    .hud-table th,.hud-table td{border-bottom:1px solid var(--panel-border);padding:.6rem .7rem;font-size:.95rem}
-    .nowrap{white-space:nowrap}
-    .mono{font-family: var(--font-family, 'Roboto Mono', monospace)}
-    .truncate{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
-    .right{text-align:right}
-    .text-muted{opacity:.8;color:var(--text-color-light)}
-    .small{font-size:.9em}
-    .hr{height:1px;background:var(--panel-border);margin:.75rem 0}
-    .stack>*{margin:.25rem 0}
-    .badge{display:inline-block;border:1px solid var(--panel-border);border-radius:999px;padding:.1rem .5rem;font-size:.75rem}
-    .badge--ok{border-color:#34c759;color:#34c759}
-    .badge--warn{border-color:#ffcc00;color:#ffcc00}
-    .hud-button{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem .8rem;border-radius:8px;border:1px solid var(--panel-border);text-decoration:none;color:var(--text-color-light);background:transparent}
-    .hud-button--ghost:hover{background:rgba(34,209,238,.08)}
-    .chart-card{background:rgba(0,0,0,.15);border:1px solid var(--panel-border);border-radius:12px;padding:.5rem}
-    .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.15),rgba(255,255,255,.05));animation:s 1.2s infinite; border-radius:6px}
-    @keyframes s{0%{background-position:-200px 0}100%{background-position:200px 0}}
-    .pill{display:inline-block;padding:.25rem .7rem;border-radius:999px;border:1px solid var(--panel-border);text-decoration:none;color:var(--text-color-light)}
-    .pill:hover{background:rgba(34,209,238,.12)}
-  </style>
 </head>
 <body>
   <header class="header">
     <a class="nav-item-back" href="/dashboard" aria-label="Back to dashboard">← Dashboard</a>
     <div class="hud-title"><i>⏱️</i><span>Observability: PLAN → INFER → DECISION Latency</span></div>
     <div class="right">
-      <!-- ★ url_for は関数名（latency_dashboard）で解決 -->
-      <a class="hud-button hud-button--ghost" href="{{ url_for('latency_dashboard') }}">このページを更新</a>
+      <!-- ✅ url_for は request.url_for('関数名') を使う -->
+      <a class="hud-button hud-button--ghost" href="{{ request.url_for('latency_dashboard') }}">このページを更新</a>
     </div>
   </header>
 
@@ -58,7 +32,7 @@
     <section class="grid2">
       <!-- 最近のトレース -->
       <div class="hud-panel">
-        <div class="panel-title">🧭 最近のトレース</div>
+        <div class="panel-title">🧭 最近のトレース <span class="text-light small">(件数: {{ recent|length }})</span></div>
         <div class="table-wrap">
           <table class="hud-table">
             <thead>
@@ -70,23 +44,27 @@
               </tr>
             </thead>
             <tbody>
-            {% for r in recent %}
-              <tr>
-                <td style="max-width: 420px;">
-                  <span class="truncate mono" title="{{ r.trace_id }}">{{ r.trace_id }}</span>
-                </td>
-                <td class="text-muted nowrap">
-                  {{ r.started_at }} → {{ r.finished_at }}
-                </td>
-                <td class="nowrap">{{ r.events }}</td>
-                <td class="right">
-                  <!-- ★ 詳細リンクも関数名で -->
-                  <a class="pill" href="{{ url_for('latency_dashboard') }}?trace_id={{ r.trace_id }}">見る</a>
-                </td>
-              </tr>
-            {% endfor %}
-            {% if not recent %}
-              <tr><td colspan="4"><div class="skeleton" style="height:1.25rem;"></div></td></tr>
+            {% if recent and recent|length > 0 %}
+              {% for r in recent %}
+                <tr>
+                  <td style="max-width: 420px;">
+                    <span class="truncate mono" title="{{ r.trace_id }}">{{ r.trace_id }}</span>
+                  </td>
+                  <td class="text-muted nowrap">
+                    {{ r.started_at }} → {{ r.finished_at }}
+                  </td>
+                  <td class="nowrap">{{ r.events }}</td>
+                  <td class="right">
+                    <!-- ✅ ここも request.url_for を使用 -->
+                    <a class="pill" href="{{ request.url_for('latency_dashboard') }}?trace_id={{ r.trace_id }}">見る</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="4">
+                <div class="text-muted">最近のトレースは 0 件です。</div>
+                <div class="skeleton" style="height:1.25rem;"></div>
+              </td></tr>
             {% endif %}
             </tbody>
           </table>
@@ -132,18 +110,19 @@
                 </tr>
               </thead>
               <tbody>
-              {% for ev in timeline %}
-                <tr>
-                  <td class="text-muted nowrap" style="text-align:left">{{ ev.at }}</td>
-                  <td class="nowrap">{{ ev.stage }}</td>
-                  <td class="nowrap">{{ ev.name }}</td>
-                  <td class="mono" style="text-align:left">
-                    {{ (ev.detail|string)[:2000] }}{% if (ev.detail|string)|length>2000 %}…{% endif %}
-                  </td>
-                </tr>
-              {% endfor %}
-              {% if not timeline %}
-                <tr><td colspan="4"><div class="skeleton" style="height:1.25rem;"></div></td></tr>
+              {% if timeline and timeline|length > 0 %}
+                {% for ev in timeline %}
+                  <tr>
+                    <td class="text-muted nowrap" style="text-align:left">{{ ev.at }}</td>
+                    <td class="nowrap">{{ ev.stage }}</td>
+                    <td class="nowrap">{{ ev.name }}</td>
+                    <td class="mono" style="text-align:left">
+                      {{ (ev.detail|string)[:2000] }}{% if (ev.detail|string)|length>2000 %}…{% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="4"><div class="text-muted">このトレースのイベントはありません。</div></td></tr>
               {% endif %}
               </tbody>
             </table>
@@ -154,11 +133,9 @@
   </main>
 
   <script>
-    // サーバ側でJSON化済。safeで埋め込み
     const CHART_DATA = {{ chart_json|safe }};
     const ctx = document.getElementById('latencyChart').getContext('2d');
 
-    // SLA ライン（環境変数を渡すのが本筋だが、無ければ 250ms 採用）
     const SLA_MS = 250;
 
     const data = {
@@ -167,7 +144,6 @@
         { label: 'p50 (ms)', data: CHART_DATA.p50, borderWidth: 2, tension: .2 },
         { label: 'p90 (ms)', data: CHART_DATA.p90, borderWidth: 2, tension: .2 },
         { label: 'p99 (ms)', data: CHART_DATA.p99, borderWidth: 2, tension: .2 },
-        // 擬似的な水平SLAライン
         { label: 'SLA', data: CHART_DATA.labels.map(() => SLA_MS), borderWidth: 1, borderDash: [6,4], pointRadius: 0 }
       ]
     };
