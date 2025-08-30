@@ -1,4 +1,3 @@
-<!-- noctria_gui/templates/pdca_summary.html -->
 {% extends "base_hud.html" %}
 
 {% block title %}{{ page_title or "📊 PDCA サマリー" }} - Noctria Kingdom{% endblock %}
@@ -10,6 +9,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style>
+  /* Filtering */
   .filter-form { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:.75rem; align-items:end; }
   .hud-input, .hud-select { background: rgba(0,0,0,0.3); border:1px solid var(--panel-border); color: var(--text-color-base); font-family: var(--font-family); font-size:1rem; border-radius:4px; padding:.5rem .75rem; transition: box-shadow .25s ease; }
   .hud-input:focus, .hud-select:focus { outline:none; box-shadow:0 0 8px var(--glow-primary); border-color: var(--glow-primary); }
@@ -571,7 +571,7 @@ async function fetchJsonWithDetail(url){
   const rid = res.headers.get('x-request-id') || res.headers.get('x-amzn-requestid') || null;
   let data=null, bodySnippet='';
   try{ data = await res.clone().json(); }
-  catch(_){ try{ bodySnippet = (await res.clone().text()).slice(0,300); }catch{} }
+  catch{ try{ bodySnippet = (await res.clone().text()).slice(0,300); }catch{} }
   if(!res.ok){
     const apiMsg = data && (data.detail || data.message);
     const err = new Error(apiMsg || `HTTP ${res.status} ${res.statusText}`);
@@ -620,10 +620,10 @@ function openDetailModal(row){
     try{
       let detailRes = null;
       if(row.detail_id){
-        try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?id=${encodeURIComponent(row.detail_id)}`); }catch(_){}
+        try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?id=${encodeURIComponent(row.detail_id)}`); }catch(_){ }
       }
       if(!detailRes && row.date && row.tag){
-        try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?date=${encodeURIComponent(row.date)}&tag=${encodeURIComponent(row.tag)}`); }catch(_){}
+        try{ detailRes = await fetchJsonWithDetail(`/pdca/api/entry?date=${encodeURIComponent(row.date)}&tag=${encodeURIComponent(row.tag)}`); }catch(_){ }
       }
       if(detailRes?.data){ payload = detailRes.data; }
     }catch(e){ console.debug('detail fetch skipped', e); }
@@ -638,208 +638,7 @@ document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeDetailMod
 </script>
 
 <script>
-async function doRefresh(){
-  const p=inputsToParamsAllKeys(); const qs=p.toString();
-  history.replaceState(null,'',location.pathname+'?'+qs);
-  showErrorPanel(null);
-
-  // summary
-  const {data:s, requestId:rid1} = await fetchJsonWithDetail('/pdca/api/summary?'+qs);
-
-  // KPI
-  const t = s?.totals || {};
-  const rowsCount = (typeof s?.count_rows === 'number') ? s.count_rows : t?.rows;
-  setText('kpi-count', intFmt(rowsCount));
-  setText('kpi-adopted', intFmt(t?.adopted ?? t?.adoptions ?? 0));
-  setText('kpi-rechecks', intFmt(t?.rechecks ?? 0));
-  setText('kpi-winrate', percentFmt(t?.win_rate ?? t?.avg_win_rate));
-  setText('kpi-maxdd',   percentFmt(t?.max_drawdown ?? t?.avg_max_drawdown));
-
-  // charts
-  const by = Array.isArray(s?.by_day) ? s.by_day : [];
-  const labels = by.map(r => r?.date ?? r?.day ?? '');
-  const evals  = by.map(r => (+r?.evals) || (+r?.rows) || 0);
-  const adopted= by.map(r => (+r?.adopted) || 0);
-  const wrBase = by.map(r => (r?.win_rate ?? r?.avg_win_rate));
-  const wrPct  = wrBase.map(v => (v==null ? null : +(v*100).toFixed(2)));
-
-  show($('noteCounts'),  labels.length===0);
-  show($('noteWinDiff'), labels.length===0);
-
-  const charts=getCharts();
-  if (charts.counts?.destroy) { try{ charts.counts.destroy(); }catch{} }
-  if (charts.winDiff?.destroy) { try{ charts.winDiff.destroy(); }catch{} }
-  charts.counts=null; charts.winDiff=null;
-
-  const ctxCounts=$('chartCounts'), ctxWinDiff=$('chartWinDiff');
-  if (ctxCounts?.getContext) charts.counts = new Chart(ctxCounts.getContext('2d'), {
-    type:'bar', data:{ labels, datasets:[{label:'評価件数',data:evals,yAxisID:'y1'},{label:'採用件数',data:adopted,yAxisID:'y1'}]},
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      scales:{ y1:{ type:'linear', position:'left', beginAtZero:true }, x:{ ticks:{ maxRotation:0 }}}}
-  });
-  if (ctxWinDiff?.getContext) charts.winDiff = new Chart(ctxWinDiff.getContext('2d'), {
-    type:'line', data:{ labels, datasets:[{label:'勝率（平均 %）',data:wrPct,tension:.25}]},
-    options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:0 }}, y:{ beginAtZero:true }}}
-  });
-
-  // details（summaryに含まれなければ fallback）
-  let details = Array.isArray(s?.details)? s.details : await fetchDetailsFallback(qs);
-  if(Array.isArray(details) && details.length){
-    tableState.raw = details.map(coerceRow);
-    sortView();
-    $('wrapTable').scrollTop = 0;
-
-    // 仮想モード判定
-    const sizeSel = $('page-size')?.value || '20';
-    if(sizeSel==='all' || tableState.view.length > VIRTUAL_THRESHOLD){
-      setVirtualMode(true);
-    }else{
-      setVirtualMode(false);
-    }
-
-    tableState.page=1;
-    renderTablePage();
-  }else{
-    tableState.raw=[]; tableState.view=[];
-    setVirtualMode(false);
-    renderTablePage();
-  }
-
-  // CSVリンク
-  wireCsvButton();
-
-  console.groupCollapsed('%cPDCA refresh ok','color:#22c55e');
-  console.log('requestId(summary):', rid1);
-  console.log('labels:', labels.length, 'details:', details?.length||0, 'virtual:', tableState.virtual);
-  console.groupEnd();
-}
-
-window.pdcaRefresh = async function(){
-  if(fetching) return;
-  setApplying(true);
-  try{
-    localStorage.setItem('pdca_filters_v1', JSON.stringify({
-      from:$('from-date').value, to:$('to-date').value,
-      tag:$('tag-input')?.value||'', win:$('win-diff-input')?.value||'',
-      dd:$('dd-diff-input')?.value||'', mt:$('min-trades-input')?.value||''
-    }));
-    await doRefresh();
-    toast('更新しました');
-  }catch(e){
-    const d = e?.__detail || {};
-    console.group('%cPDCA refresh error','color:#ef4444'); console.error('Error:', e); console.log('detail:', d); console.groupEnd();
-    showErrorPanel({ where:'/pdca/api/summary', status:d.status, statusText:d.statusText, message:d.message||e?.message, requestId:d.requestId, bodySnippet:d.bodySnippet });
-    toast(`取得に失敗 (HTTP ${d.status||'—'})`, false);
-  }finally{
-    setApplying(false);
-  }
-}
-
-/* ===== Presets / Events / CSV ===== */
-function wirePresets(){
-  document.querySelectorAll('.preset-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const mode=btn.dataset.mode, days=+btn.dataset.days;
-      if(mode==='year'){
-        const y=new Date().getFullYear();
-        $('from-date').value=`${y}-01-01`;
-        $('to-date').value=isoDateDaysAgo(0);
-      }
-      else if(mode==='reset'){
-        $('from-date').value=window.GLOBAL_DEFAULT_FROM||isoDateDaysAgo(14);
-        $('to-date').value=window.GLOBAL_DEFAULT_TO||isoDateDaysAgo(0);
-      }
-      else{
-        $('from-date').value=isoDateDaysAgo(days);
-        $('to-date').value=isoDateDaysAgo(0);
-      }
-      window.pdcaRefresh && window.pdcaRefresh();
-    });
-  });
-}
-</script>
-
-<script>
-/* ====== タグ・オートコンプリート（既存維持） ====== */
-(function(){
-  const inputId='tag-input', listId='tag-ac-list';
-  let cacheAll=null, lastQuery='', activeIndex=-1, pending=null;
-  function el(){ return {inp:$(inputId), list:$(listId)}; }
-  function normalizeItems(js){
-    if(!js) return [];
-    if(Array.isArray(js) && js.length && typeof js[0]==='string') return js;
-    if(Array.isArray(js)) return js.map(o=>o?.name||o?.tag||o).filter(Boolean);
-    return [];
-  }
-  async function queryServer(q){
-    try{ const r = await fetch('/pdca/api/tags?q='+encodeURIComponent(q||''), {cache:'no-store'}); if(r.ok){ return normalizeItems(await r.json()); } }catch{}
-    if(cacheAll==null){
-      try{ const r2 = await fetch('/pdca/api/tags', {cache:'no-store'}); if(r2.ok){ cacheAll = normalizeItems(await r2.json()); }
-      }catch{ cacheAll = []; }
-    }
-    const src = cacheAll||[]; const t=(q||'').toLowerCase();
-    const starts = src.filter(s=>s.toLowerCase().startsWith(t));
-    const contains = src.filter(s=>!s.toLowerCase().startsWith(t) && s.toLowerCase().includes(t));
-    return [...new Set([...starts, ...contains])].slice(0,50);
-  }
-  function render(items){
-    const {inp,list} = el(); if(!list) return;
-    list.innerHTML = '';
-    if(!items.length){
-      list.innerHTML = '<div class="ac-empty">候補がありません</div>';
-      list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1; return;
-    }
-    items.forEach((s,idx)=>{
-      const div=document.createElement('div'); div.className='ac-item'; div.setAttribute('role','option'); div.id=`ac-item-${idx}`;
-      div.innerHTML = `<span># ${s}</span><span class="ac-kbd">Enterで決定</span>`;
-      div.addEventListener('mousedown',(e)=>{ e.preventDefault(); pick(idx); });
-      list.appendChild(div);
-    });
-    list.classList.add('show'); inp.setAttribute('aria-expanded','true'); activeIndex=-1;
-  }
-  function move(delta){
-    const {list,inp}=el(); if(!list?.children?.length) return;
-    activeIndex = (activeIndex + delta + list.children.length) % list.children.length;
-    [...list.children].forEach((c,i)=>c.classList.toggle('active', i===activeIndex));
-    inp.setAttribute('aria-activedescendant', list.children[activeIndex]?.id||'');
-    const act = list.children[activeIndex];
-    if(act){
-      const r=act.getBoundingClientRect(); const lr=list.getBoundingClientRect();
-      if(r.bottom>lr.bottom) act.scrollIntoView(false); else if(r.top<lr.top) act.scrollIntoView();
-    }
-  }
-  function close(){ const {list,inp}=el(); if(!list) return; list.classList.remove('show'); inp.setAttribute('aria-expanded','false'); activeIndex=-1; }
-  function pick(idx){
-    const {inp,list}=el(); if(!list) return;
-    const sel = list.children[idx]?.textContent?.replace(/^#\s*/,'').replace(/\s*Enterで決定\s*$/,'') || '';
-    if(inp){ inp.value = sel; }
-    close(); window.pdcaRefresh && window.pdcaRefresh();
-  }
-  function schedule(q){
-    if(pending) clearTimeout(pending);
-    pending = setTimeout(async ()=>{
-      lastQuery=q; const items = await queryServer(q);
-      if(lastQuery!==q) return; render(items);
-    }, 120);
-  }
-  function wire(){
-    const {inp,list}=el(); if(!inp||!list) return;
-    inp.addEventListener('input', (e)=>{ const q=(e.target.value||'').trim(); schedule(q); });
-    inp.addEventListener('focus', ()=>{ schedule((inp.value||'').trim()); });
-    inp.addEventListener('blur', ()=>{ setTimeout(close, 120); });
-    inp.addEventListener('keydown', (e)=>{
-      if(e.key==='ArrowDown'){ e.preventDefault(); move(1); }
-      else if(e.key==='ArrowUp'){ e.preventDefault(); move(-1); }
-      else if(e.key==='Enter'){ if(activeIndex>=0){ e.preventDefault(); pick(activeIndex); } else { close(); } }
-      else if(e.key==='Escape'){ close(); }
-    });
-  }
-  document.addEventListener('DOMContentLoaded', wire);
-})();
-</script>
-
-<script>
-/* ========== 起動 ========== */
+/* ====== 起動 ========== */
 document.addEventListener('DOMContentLoaded', function(){
   window.GLOBAL_DEFAULT_FROM = "{{ default_from or '' }}".trim() || isoDateDaysAgo(14);
   window.GLOBAL_DEFAULT_TO   = "{{ default_to or '' }}".trim()   || isoDateDaysAgo(0);
