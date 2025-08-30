@@ -2,24 +2,29 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📊 PDCA Summary Route (v3.5)
+📊 PDCA Summary Route (v3.6)
 
+提供:
 - HTML表示 (/pdca/summary)
 - JSON提供 (/pdca/summary/data)
 - CSVエクスポート (/pdca/summary.csv)
-- 互換API（旧フロント用）:
-    - /pdca/api/summary            ← 200でJSONを直接返す（リダイレクト廃止）
-    - /pdca/api/summary_timeseries ← 同上（当面は /summary/data と同形）
+
+互換API（旧フロント用）:
+- /pdca/api/summary
+- /pdca/api/summary_timeseries
+  ※どちらも 200 で JSON を直接返す（/summary/data と同形）
 
 堅牢化:
 - 依存サービスが無い環境でも空結果で継続
 - request.app.state.jinja_env があれば優先
+- デバッグ用: /pdca/summary/_debug, /pdca/summary/health
 """
 
 from __future__ import annotations
 
 import csv
 import logging
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from io import StringIO
@@ -72,6 +77,7 @@ def _load_pdca_services():
             aggregate_kpis,
             aggregate_by_day,
         )
+        logger.info("pdca_summary_service loaded.")
         return fetch_infer_calls, aggregate_kpis, aggregate_by_day
     except Exception as e:
         logger.warning("pdca_summary_service unavailable (%s) — fallback to empty dataset.", e)
@@ -114,6 +120,7 @@ def _parse_date_ymd(s: Optional[str]) -> Optional[datetime]:
         return None
 
 def _default_range_days(days: int = 30) -> Tuple[datetime, datetime]:
+    # ローカル日付（タイムゾーンを意識しつつ、日付のみを使う）
     today_local = datetime.now(timezone.utc).astimezone().date()
     start = today_local - timedelta(days=days - 1)
     return (
@@ -154,6 +161,7 @@ async def pdca_summary_page(
     to  = _parse_date_ymd(to_date)
     _, _, default_from, default_to = _normalize_range(frm, to)
 
+    # request.app.state.jinja_env を優先
     env = getattr(request.app.state, "jinja_env", templates.env)
     html = env.get_template("pdca_summary.html").render(
         request=request,
@@ -209,6 +217,7 @@ async def pdca_summary_data(
         logger.error("aggregate_by_day failed: %s", e, exc_info=True)
         series = []
 
+    headers = {"Cache-Control": "no-store"}
     return JSONResponse(
         {
             "ok": True,
@@ -218,7 +227,8 @@ async def pdca_summary_data(
             "totals": totals,
             "by_day": series,
             "count_rows": len(rows),
-        }
+        },
+        headers=headers,
     )
 
 @router.get("/summary.csv", response_class=Response, summary="PDCAサマリー（日次CSV）")
@@ -294,3 +304,52 @@ async def api_summary_timeseries_legacy(
     else:
         frm, to, from_s, to_s = _normalize_range(frm, to)
     return await pdca_summary_data(from_date=from_s, to_date=to_s)
+
+# ---------------------------------------------------------------------
+# Debug / Health
+# ---------------------------------------------------------------------
+@router.get("/summary/_debug", response_class=JSONResponse, include_in_schema=False)
+async def pdca_summary_debug(
+    from_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    to_date:   Optional[str] = Query(None, description="YYYY-MM-DD"),
+):
+    frm = _parse_date_ymd(from_date) if from_date else None
+    to  = _parse_date_ymd(to_date) if to_date else None
+    frm, to, from_s, to_s = _normalize_range(frm, to)
+
+    svc_loaded = fetch_infer_calls.__module__ != __name__
+
+    info: Dict[str, Any] = {
+        "ok": True,
+        "schema_version": SCHEMA_VERSION,
+        "service_loaded": svc_loaded,
+        "range": {"from": from_s, "to": to_s},
+        "env": {
+            "TZ": os.getenv("TZ"),
+            "PYTHONPATH": os.getenv("PYTHONPATH"),
+        },
+    }
+
+    try:
+        rows = fetch_infer_calls(frm, to)
+        info["rows_count"] = len(rows)
+    except Exception as e:
+        info["rows_error"] = str(e)
+
+    try:
+        series = aggregate_by_day(rows if "rows_count" in info else [])
+        info["series_sample_head"] = series[:3]
+    except Exception as e:
+        info["series_error"] = str(e)
+
+    try:
+        totals = aggregate_kpis(rows if "rows_count" in info else [])
+        info["totals"] = totals
+    except Exception as e:
+        info["totals_error"] = str(e)
+
+    return JSONResponse(info, headers={"Cache-Control": "no-store"})
+
+@router.get("/summary/health", response_class=JSONResponse, include_in_schema=False)
+async def pdca_summary_health():
+    return JSONResponse({"ok": True, "name": "pdca_summary"}, headers={"Cache-Control": "no-store"})
