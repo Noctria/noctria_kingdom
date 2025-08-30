@@ -8,13 +8,40 @@
   <meta name="theme-color" content="#0a0f2c" />
   <link rel="stylesheet" href="/static/hud_style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- HUDの補助ユーティリティ（hud_style.css に無い軽量クラスだけ補完） -->
+  <style>
+    .grid2{display:grid;gap:1rem}
+    @media(min-width:1024px){.grid2{grid-template-columns:2fr 1fr}}
+    .hud-table{width:100%;border-collapse:collapse}
+    .hud-table th,.hud-table td{border-bottom:1px solid var(--panel-border);padding:.6rem .7rem;font-size:.95rem}
+    .nowrap{white-space:nowrap}
+    .mono{font-family: var(--font-family, 'Roboto Mono', monospace)}
+    .truncate{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+    .right{text-align:right}
+    .text-muted{opacity:.8;color:var(--text-color-light)}
+    .small{font-size:.9em}
+    .hr{height:1px;background:var(--panel-border);margin:.75rem 0}
+    .stack>*{margin:.25rem 0}
+    .badge{display:inline-block;border:1px solid var(--panel-border);border-radius:999px;padding:.1rem .5rem;font-size:.75rem}
+    .badge--ok{border-color:#34c759;color:#34c759}
+    .badge--warn{border-color:#ffcc00;color:#ffcc00}
+    .hud-button{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem .8rem;border-radius:8px;border:1px solid var(--panel-border);text-decoration:none;color:var(--text-color-light);background:transparent}
+    .hud-button--ghost:hover{background:rgba(34,209,238,.08)}
+    .chart-card{background:rgba(0,0,0,.15);border:1px solid var(--panel-border);border-radius:12px;padding:.5rem}
+    .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.15),rgba(255,255,255,.05));animation:s 1.2s infinite; border-radius:6px}
+    @keyframes s{0%{background-position:-200px 0}100%{background-position:200px 0}}
+    .pill{display:inline-block;padding:.25rem .7rem;border-radius:999px;border:1px solid var(--panel-border);text-decoration:none;color:var(--text-color-light)}
+    .pill:hover{background:rgba(34,209,238,.12)}
+  </style>
 </head>
 <body>
   <header class="header">
     <a class="nav-item-back" href="/dashboard" aria-label="Back to dashboard">← Dashboard</a>
     <div class="hud-title"><i>⏱️</i><span>Observability: PLAN → INFER → DECISION Latency</span></div>
     <div class="right">
-      <a class="hud-button hud-button--ghost" href="{{ url_for('observability_latency.latency_dashboard') }}">このページを更新</a>
+      <!-- ★ url_for は関数名（latency_dashboard）で解決 -->
+      <a class="hud-button hud-button--ghost" href="{{ url_for('latency_dashboard') }}">このページを更新</a>
     </div>
   </header>
 
@@ -53,7 +80,8 @@
                 </td>
                 <td class="nowrap">{{ r.events }}</td>
                 <td class="right">
-                  <a class="pill" href="{{ url_for('observability_latency.latency_dashboard') }}?trace_id={{ r.trace_id }}">見る</a>
+                  <!-- ★ 詳細リンクも関数名で -->
+                  <a class="pill" href="{{ url_for('latency_dashboard') }}?trace_id={{ r.trace_id }}">見る</a>
                 </td>
               </tr>
             {% endfor %}
@@ -126,11 +154,11 @@
   </main>
 
   <script>
+    // サーバ側でJSON化済。safeで埋め込み
     const CHART_DATA = {{ chart_json|safe }};
     const ctx = document.getElementById('latencyChart').getContext('2d');
 
-    // SLA ライン（env に NOCTRIA_LATENCY_SLA_MS がありそうならテンプレから渡すのが本筋だが、
-    // 無ければ 250ms を採用）
+    // SLA ライン（環境変数を渡すのが本筋だが、無ければ 250ms 採用）
     const SLA_MS = 250;
 
     const data = {
