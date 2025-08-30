@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable, Tuple
 
 import pandas as pd
@@ -17,14 +18,32 @@ try:
 except Exception:
     from src.plan_data.trace import get_trace_id, new_trace_id  # type: ignore
 
-# 正典の contracts へ統一
-try:
-    from plan_data.contracts import FeatureBundle, StrategyProposal, adapt_proposal_dict_v1  # type: ignore
-except Exception:
-    from src.plan_data.contracts import FeatureBundle, StrategyProposal, adapt_proposal_dict_v1  # type: ignore
+
+# --- Contracts (超軽量版) ---
+
+@dataclass
+class FeatureBundle:
+    df: pd.DataFrame
+    context: Any
+    feature_order: Optional[list[str]] = None
+    version: str = "1.0.0"
+
+    def tail_row(self) -> pd.Series:
+        return self.df.iloc[-1] if len(self.df) else pd.Series(dtype="float64")
 
 
-# --- Strategy 呼出契約（プロトコル） ---
+@dataclass
+class StrategyProposal:
+    symbol: str
+    direction: str        # "LONG" / "SHORT" / "FLAT"
+    qty: float
+    confidence: float     # 0.0 ~ 1.0
+    reasons: list[str]
+    meta: Dict[str, Any]
+    schema_version: str = "1.0.0"
+
+
+# --- Protocols ---
 @runtime_checkable
 class _ProposeLike(Protocol):
     def propose(self, features: Any, **kwargs) -> StrategyProposal: ...
@@ -35,8 +54,7 @@ class _PredictLike(Protocol):
     def predict_future(self, features: Any, **kwargs) -> StrategyProposal: ...
 
 
-# --- 内部ユーティリティ ---
-
+# --- Utils ---
 _VALID_DIRECTIONS = {"LONG", "SHORT", "FLAT"}
 
 
@@ -50,98 +68,96 @@ def _to_list_str(x: Any) -> list[str]:
     return [str(x)]
 
 
-def _normalize_dict(d: Dict[str, Any]) -> Dict[str, Any]:
-    """方向・qty・confidence を軽く正規化して StrategyProposal に渡せる dict にする"""
-    d = dict(d)
-    # direction 正規化
-    direction = str(d.get("direction") or d.get("intent") or "FLAT").upper()
+def _normalize_proposal(p: StrategyProposal) -> StrategyProposal:
+    direction = (p.direction or "FLAT").upper()
     if direction not in _VALID_DIRECTIONS:
         direction = "FLAT"
-    d["intent"] = direction if direction in ("LONG", "SHORT") else "FLAT"
 
-    # qty/confidence 正規化
     try:
-        d["qty_raw"] = float(d.get("qty_raw", d.get("qty", 0.0)))
+        qty = float(p.qty)
     except Exception:
-        d["qty_raw"] = 0.0
+        qty = 0.0
     try:
-        conf = float(d.get("confidence", 0.0))
+        conf = float(p.confidence)
     except Exception:
         conf = 0.0
-    d["confidence"] = max(0.0, min(1.0, conf))
+    conf = max(0.0, min(1.0, conf))
 
-    # reasons
-    d["reasons"] = _to_list_str(d.get("reasons", []))
-    return d
+    reasons = _to_list_str(p.reasons)
+
+    return StrategyProposal(
+        symbol=str(p.symbol or p.meta.get("symbol") or "UNKNOWN"),
+        direction=direction,
+        qty=qty,
+        confidence=conf,
+        reasons=reasons,
+        meta=dict(p.meta or {}),
+        schema_version=str(p.schema_version or "1.0.0"),
+    )
 
 
 def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
-    """dict/NamedTuple/他クラスから StrategyProposal へ極力寄せる"""
     if isinstance(obj, StrategyProposal):
-        return obj
+        return _normalize_proposal(obj)
 
     if isinstance(obj, dict):
-        base = adapt_proposal_dict_v1(obj)
-        base.setdefault("symbol", default_symbol or "UNKNOWN")
-        return StrategyProposal(**_normalize_dict(base))
+        cand = StrategyProposal(
+            symbol=str(obj.get("symbol") or default_symbol or "UNKNOWN"),
+            direction=str(obj.get("direction") or "FLAT"),
+            qty=float(obj.get("qty") or 0.0),
+            confidence=float(obj.get("confidence") or 0.0),
+            reasons=_to_list_str(obj.get("reasons")),
+            meta=dict(obj.get("meta") or {}),
+            schema_version=str(obj.get("schema_version") or "1.0.0"),
+        )
+        return _normalize_proposal(cand)
 
-    # NamedTuple や属性持ちオブジェクト
     try:
-        base = {
-            "symbol": getattr(obj, "symbol", default_symbol or "UNKNOWN"),
-            "intent": getattr(obj, "intent", getattr(obj, "direction", "FLAT")),
-            "qty_raw": getattr(obj, "qty_raw", getattr(obj, "qty", 0.0)),
-            "confidence": getattr(obj, "confidence", 0.0),
-            "reasons": getattr(obj, "reasons", []),
-            "risk_score": getattr(obj, "risk_score", 0.5),
-            "strategy": getattr(obj, "strategy", type(obj).__name__),
-            "trace_id": getattr(obj, "trace_id", "N/A"),
-        }
-        return StrategyProposal(**_normalize_dict(base))
+        cand = StrategyProposal(
+            symbol=str(getattr(obj, "symbol", default_symbol) or default_symbol or "UNKNOWN"),
+            direction=str(getattr(obj, "direction", "FLAT")),
+            qty=float(getattr(obj, "qty", 0.0)),
+            confidence=float(getattr(obj, "confidence", 0.0)),
+            reasons=_to_list_str(getattr(obj, "reasons", [])),
+            meta=dict(getattr(obj, "meta", {}) or {}),
+            schema_version=str(getattr(obj, "schema_version", "1.0.0")),
+        )
+        return _normalize_proposal(cand)
     except Exception:
         return StrategyProposal(
-            strategy="invalid",
-            intent="FLAT",
-            qty_raw=0.0,
+            symbol=str(default_symbol or "UNKNOWN"),
+            direction="FLAT",
+            qty=0.0,
             confidence=0.0,
             reasons=["invalid proposal object"],
-            trace_id="N/A",
+            meta={"raw": repr(obj)},
+            schema_version="1.0.0",
         )
 
 
 def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], Optional[list[str]]]:
-    """
-    Aurus など「dict で .get する」戦略向けに FeatureBundle を辞書へ変換。
-    - ベース: 最新行（tail）を dict 化
-    - 併せて context も 'ctx_*' で補助的に混ぜる（キー衝突は tail が優先）
-    - feature_order はそのまま返す（必要なら戦略へ渡す）
-    """
     base: Dict[str, Any] = {}
     try:
-        tail = features.df.iloc[-1] if len(features.df) else None
-        if tail is not None and isinstance(tail, pd.Series):
+        tail = features.tail_row()
+        if isinstance(tail, pd.Series):
             base.update({str(k): tail[k] for k in tail.index})
     except Exception:
         pass
 
-    ctx = dict(features.context or {})
-    for k, v in ctx.items():
-        key = f"ctx_{k}" if k not in base else k
-        if key not in base:
-            base[key] = v
+    ctx = getattr(features, "context", None)
+    if ctx:
+        ctx_dict = ctx.dict() if hasattr(ctx, "dict") else dict(ctx)
+        for k, v in ctx_dict.items():
+            key = f"ctx_{k}" if k not in base else k
+            if key not in base:
+                base[key] = v
 
     return base, (features.feature_order or None)
 
 
 def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: FeatureBundle, **kwargs) -> Any:
-    """
-    互換レイヤ：
-      1) dict で呼ぶ（旧API互換）
-      2) ダメなら FeatureBundle をそのまま渡す（新API対応）
-    """
     fn = getattr(strategy, call_name)
 
-    # 1st: dict でトライ
     feat_dict, order = _bundle_to_dict_and_order(features)
     try_kwargs = dict(kwargs)
     if order is not None and "feature_order" not in try_kwargs:
@@ -152,8 +168,7 @@ def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: Fea
         return fn(features, **kwargs)
 
 
-# --- Adapter ---
-
+# --- Main wrapper ---
 def propose_with_logging(
     strategy: Any,
     features: FeatureBundle,
@@ -165,15 +180,19 @@ def propose_with_logging(
     conn_str: Optional[str] = None,
     **kwargs,
 ) -> StrategyProposal:
-    """
-    共通呼び出しラッパ
-    """
     model = model_name or getattr(getattr(strategy, "__class__", None), "__name__", str(type(strategy).__name__))
     ver = model_version or getattr(strategy, "VERSION", "dev")
 
-    trace_id = trace_id or get_trace_id() or new_trace_id(
-        symbol=str(features.context.get("symbol", "MULTI")),
-        timeframe=str(features.context.get("timeframe", "1d")),
+    # --- 修正: context は dict ではなく PydanticModel の可能性あり ---
+    ctx = getattr(features, "context", None)
+    trace_id = (
+        trace_id
+        or getattr(ctx, "trace_id", None)
+        or get_trace_id()
+        or new_trace_id(
+            symbol=str(getattr(ctx, "symbol", "MULTI")),
+            timeframe=str(getattr(ctx, "timeframe", "1d")),
+        )
     )
 
     t0 = time.time()
@@ -188,7 +207,7 @@ def propose_with_logging(
         else:
             raise AttributeError(f"{model} has neither propose() nor predict_future().")
 
-        proposal = _coerce_to_proposal(raw, default_symbol=str(features.context.get("symbol", "MULTI")))
+        proposal = _coerce_to_proposal(raw, default_symbol=str(getattr(ctx, "symbol", "MULTI")))
         success = True
         return proposal
     finally:
@@ -202,7 +221,7 @@ def propose_with_logging(
                 ver=str(ver),
                 dur_ms=dur_ms,
                 success=bool(success),
-                feature_staleness_min=int(features.context.get("feature_staleness_min", 0) or 0),
+                feature_staleness_min=int(getattr(ctx, "data_lag_min", 0) or 0),
                 trace_id=trace_id,
             )
         except Exception:
