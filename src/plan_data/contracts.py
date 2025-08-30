@@ -36,6 +36,11 @@ def _utcnow() -> datetime:
 
 # --- BaseModel 設定（extra 禁止 + 共通I/F） -----------------------------------
 class _StrictModel(BaseModel):
+    """
+    ・extra を forbid（意図しないフィールドの混入を防止）
+    ・arbitrary_types_allowed は True（将来の拡張を阻害しない）
+    ・v1/v2 両対応の dict 化 I/F を提供
+    """
     if _PYDANTIC_V2:
         model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     else:  # v1
@@ -53,8 +58,8 @@ class _StrictModel(BaseModel):
     def from_dict(cls, data: Dict[str, Any]):
         return cls(**data)
 
-    # 便宜: 明示validate（pydanticはinitで検証するが、呼び出し側が明示したい時用）
-    def validate_self(self) -> "._StrictModel":
+    # 明示validate（pydanticは__init__で検証するが、呼び出し側が明示したい時用）
+    def validate_self(self) -> "_StrictModel":
         return self
 
 
@@ -91,7 +96,7 @@ class FeatureContextV1(_StrictModel):
 class FeatureBundleV1(_StrictModel):
     """Plan層→AI へ渡す共通入力。"""
     schema_version: Literal["1.0"] = "1.0"
-    features: Dict[str, Any]              # 必要であれば df のパスや shape などを含める
+    features: Dict[str, Any]              # 必要に応じて df のパスや shape 等を含める
     context: FeatureContextV1
     trace_id: str
     ts: datetime = Field(default_factory=_utcnow)
@@ -116,6 +121,10 @@ class StrategyProposalV1(_StrictModel):
     """
     AI からの提案の標準形。
     返せない/見送り時は intent=FLAT で返す想定。
+
+    【後方互換】
+      - 旧来の "direction"(LONG/SHORT/FLAT) を受理し intent へ統合
+      - 旧来の "qty"      を受理し qty_raw へ統合
     """
     schema_version: Literal["1.0"] = "1.0"
     strategy: str
@@ -129,6 +138,34 @@ class StrategyProposalV1(_StrictModel):
     latency_ms: int = 0
     trace_id: str
     ts: datetime = Field(default_factory=_utcnow)
+
+    # ---- 後方互換: 旧キー受理（v2: model_validator / v1: __init__側で kwargs を前処理） ----
+    if _PYDANTIC_V2:
+        @model_validator(mode="before")  # type: ignore[misc]
+        @classmethod
+        def _coerce_legacy_keys(cls, data: Any) -> Any:
+            if not isinstance(data, dict):
+                return data
+            out = dict(data)
+            # direction -> intent
+            if "intent" not in out and "direction" in out:
+                dir_ = str(out.get("direction", "")).upper()
+                if dir_ in ("LONG", "SHORT", "FLAT"):
+                    out["intent"] = dir_
+            # qty -> qty_raw
+            if "qty_raw" not in out and "qty" in out:
+                out["qty_raw"] = out.get("qty")
+            return out
+    else:
+        # v1 系は __init__ で軽く前処理
+        def __init__(self, **data: Any):  # type: ignore[no-untyped-def]
+            if "intent" not in data and "direction" in data:
+                dir_ = str(data.get("direction", "")).upper()
+                if dir_ in ("LONG", "SHORT", "FLAT"):
+                    data["intent"] = dir_
+            if "qty_raw" not in data and "qty" in data:
+                data["qty_raw"] = data.get("qty")
+            super().__init__(**data)
 
     # strategy / trace_id 非空
     if _PYDANTIC_V2:
@@ -163,6 +200,27 @@ class StrategyProposalV1(_StrictModel):
             if intent == "FLAT" and v < 0:
                 raise ValueError("qty_raw must be >= 0 for FLAT intent")
             return v
+
+    # --- 旧I/Fの読みやすさのためのプロパティ ---
+    @property
+    def direction(self) -> str:
+        """旧I/F: LONG/SHORT/FLAT をそのまま返す（intent エイリアス）"""
+        return self.intent
+
+    @property
+    def qty(self) -> float:
+        """旧I/F: 数量（qty_raw エイリアス）"""
+        return self.qty_raw
+
+    @property
+    def side(self) -> str:
+        """BUY/SELL/FLAT の派生表現（便宜）"""
+        it = (self.intent or "FLAT").upper()
+        if it == "LONG":
+            return "BUY"
+        if it == "SHORT":
+            return "SELL"
+        return "FLAT"
 
 
 class OrderRequestV1(_StrictModel):
@@ -238,6 +296,7 @@ def adapt_proposal_dict_v1(d: Dict[str, Any]) -> Dict[str, Any]:
       - confidence_score     -> confidence
       - risk                 -> risk_score
       - reason(s) 正規化     -> reasons(list)
+      - direction            -> intent（LONG/SHORT/FLAT）
     """
     out = dict(d)
     if "qty_raw" not in out:
@@ -252,6 +311,10 @@ def adapt_proposal_dict_v1(d: Dict[str, Any]) -> Dict[str, Any]:
     if "reasons" not in out and "reason" in out:
         r = out.get("reason")
         out["reasons"] = [r] if isinstance(r, str) else (r or [])
+    if "intent" not in out and "direction" in out:
+        dir_ = str(out.get("direction", "")).upper()
+        if dir_ in ("LONG", "SHORT", "FLAT"):
+            out["intent"] = dir_
     return out
 
 
