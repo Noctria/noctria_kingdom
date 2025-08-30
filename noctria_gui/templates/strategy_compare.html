@@ -1,8 +1,8 @@
 {% extends "base_hud.html" %}
 
-{% block title %}📑 比較条件選択{% endblock %}
+{% block title %}📑 戦略比較{% endblock %}
 {% block header_icon %}<i class="fas fa-sliders-h"></i>{% endblock %}
-{% block header_title %}比較条件の選択{% endblock %}
+{% block header_title %}戦略比較{% endblock %}
 {% block header_nav %}
 <a href="/dashboard" class="nav-item-back">
   <i class="fas fa-chart-line"></i><span>ダッシュボードへ</span>
@@ -10,19 +10,46 @@
 {% endblock %}
 
 {% block content %}
-  <form id="compareForm" method="post" action="/statistics/compare/render">
+  <form id="compareForm" method="get" action="/statistics/strategy_compare">
     <div id="options" class="table-wrapper" style="max-height: 60vh; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
-      {% for k in all_keys %}
-        <label class="strategy-item-checkbox">
-          <input type="checkbox" name="selected" value="{{ k }}">
-          <span class="custom-checkbox"></span>
-          <span style="margin-left: 0.5rem;">{{ k }}</span>
-        </label>
-      {% endfor %}
-    </div>
-
-    <div style="margin-top: 2rem;">
-      <button type="submit" class="hud-btn">📈 比較する</button>
+      <!-- 戦略の選択肢を表示 -->
+      <label for="strategy_1" class="strategy-item-checkbox">
+        <input type="text" name="strategy_1" id="strategy_1" placeholder="戦略1" class="hud-input">
+      </label>
+      <label for="strategy_2" class="strategy-item-checkbox">
+        <input type="text" name="strategy_2" id="strategy_2" placeholder="戦略2" class="hud-input">
+      </label>
+      <div>
+        <button type="submit" class="hud-btn">📈 比較する</button>
+      </div>
     </div>
   </form>
+
+  <div id="comparisonResults" style="margin-top: 2rem;">
+    {% if comparison_results %}
+      <h3>比較結果</h3>
+      <table class="hud-table">
+        <thead>
+          <tr>
+            <th>戦略</th>
+            <th>勝率 (%)</th>
+            <th>最大ドローダウン (%)</th>
+            <th>取引数</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in comparison_results %}
+            <tr>
+              <td>{{ result.strategy_name }}</td>
+              <td>{{ result.win_rate | default('—') }}%</td>
+              <td>{{ result.max_drawdown | default('—') }}%</td>
+              <td>{{ result.trades }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>戦略比較の結果はまだありません。</p>
+    {% endif %}
+  </div>
 {% endblock %}
