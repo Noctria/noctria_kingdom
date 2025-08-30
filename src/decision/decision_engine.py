@@ -1,8 +1,8 @@
 # src/decision/decision_engine.py
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 try:
     # 正典：Plan層の contracts / gates / observability を使用
@@ -22,12 +22,31 @@ DictLike = Dict[str, Any]
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:
-    """obj が dict でもオブジェクトでも安全に属性を読むヘルパ."""
+    """obj が dict でもオブジェクトでも安全に属性を読むヘルパ。"""
     if obj is None:
         return default
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+
+# -----------------------------------------------------------------------------
+# 互換シム: 旧 adapter から import されることがある型を提供（本ファイル内では未使用）
+# -----------------------------------------------------------------------------
+@dataclass
+class DecisionRequest:
+    trace_id: str
+    symbol: str
+    features: Dict[str, Any]
+
+
+@dataclass
+class DecisionResult:
+    strategy_name: str
+    score: float
+    reason: str
+    decision: Dict[str, Any]
+# -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -220,4 +239,4 @@ class DecisionEngine:
         return {"context": ctx_dict}
 
 
-__all__ = ["DecisionEngine", "DecisionRecord"]
+__all__ = ["DecisionEngine", "DecisionRecord", "DecisionRequest", "DecisionResult"]
