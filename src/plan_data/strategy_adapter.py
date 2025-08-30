@@ -23,10 +23,16 @@ except Exception:
 
 @dataclass
 class FeatureBundle:
+    """
+    共通入力コンテナ（最小版）
+    - df: 特徴量テーブル（最新行が提案入力の主対象）
+    - context: メタ情報（symbol, timeframe, data_lag_min, missing_ratioなど）
+    - feature_order: 並び順ヒント（必要な戦略向け）
+    """
     df: pd.DataFrame
-    context: Any
+    context: Dict[str, Any]
     feature_order: Optional[list[str]] = None
-    version: str = "1.0.0"
+    version: str = "1.0.0"  # 将来の互換管理用
 
     def tail_row(self) -> pd.Series:
         return self.df.iloc[-1] if len(self.df) else pd.Series(dtype="float64")
@@ -34,6 +40,7 @@ class FeatureBundle:
 
 @dataclass
 class StrategyProposal:
+    """戦略の共通出力（最小版）"""
     symbol: str
     direction: str        # "LONG" / "SHORT" / "FLAT"
     qty: float
@@ -43,7 +50,8 @@ class StrategyProposal:
     schema_version: str = "1.0.0"
 
 
-# --- Protocols ---
+# --- Strategy 呼出契約（プロトコル） ---
+
 @runtime_checkable
 class _ProposeLike(Protocol):
     def propose(self, features: Any, **kwargs) -> StrategyProposal: ...
@@ -54,7 +62,8 @@ class _PredictLike(Protocol):
     def predict_future(self, features: Any, **kwargs) -> StrategyProposal: ...
 
 
-# --- Utils ---
+# --- 内部ユーティリティ ---
+
 _VALID_DIRECTIONS = {"LONG", "SHORT", "FLAT"}
 
 
@@ -69,10 +78,12 @@ def _to_list_str(x: Any) -> list[str]:
 
 
 def _normalize_proposal(p: StrategyProposal) -> StrategyProposal:
+    # direction 正規化
     direction = (p.direction or "FLAT").upper()
     if direction not in _VALID_DIRECTIONS:
         direction = "FLAT"
 
+    # qty, confidence 正規化
     try:
         qty = float(p.qty)
     except Exception:
@@ -97,6 +108,7 @@ def _normalize_proposal(p: StrategyProposal) -> StrategyProposal:
 
 
 def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
+    """dict/NamedTuple/他クラスから StrategyProposal へ極力寄せる"""
     if isinstance(obj, StrategyProposal):
         return _normalize_proposal(obj)
 
@@ -112,6 +124,7 @@ def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
         )
         return _normalize_proposal(cand)
 
+    # NamedTuple や属性持ちオブジェクト
     try:
         cand = StrategyProposal(
             symbol=str(getattr(obj, "symbol", default_symbol) or default_symbol or "UNKNOWN"),
@@ -124,6 +137,7 @@ def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
         )
         return _normalize_proposal(cand)
     except Exception:
+        # 最終フォールバック（何も読めない時）
         return StrategyProposal(
             symbol=str(default_symbol or "UNKNOWN"),
             direction="FLAT",
@@ -136,6 +150,12 @@ def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
 
 
 def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], Optional[list[str]]]:
+    """
+    Aurus など「dict で .get する」戦略向けに FeatureBundle を辞書へ変換。
+    - ベース: 最新行（tail）を dict 化
+    - 併せて context も 'ctx_*' で補助的に混ぜる（キー衝突は tail が優先）
+    - feature_order は存在すれば返す
+    """
     base: Dict[str, Any] = {}
     try:
         tail = features.tail_row()
@@ -152,12 +172,20 @@ def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], 
             if key not in base:
                 base[key] = v
 
-    return base, (features.feature_order or None)
+    # 修正点: feature_order が無い場合にも対応
+    order = getattr(features, "feature_order", None)
+    return base, order
 
 
 def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: FeatureBundle, **kwargs) -> Any:
+    """
+    互換レイヤ：
+      1) まず dict 化して呼ぶ（旧API互換：.get を期待する実装に対応/Aurusなど）
+      2) ダメなら FeatureBundle をそのまま渡して再試行（新API対応）
+    """
     fn = getattr(strategy, call_name)
 
+    # 1st: dict でトライ
     feat_dict, order = _bundle_to_dict_and_order(features)
     try_kwargs = dict(kwargs)
     if order is not None and "feature_order" not in try_kwargs:
@@ -165,10 +193,12 @@ def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: Fea
     try:
         return fn(feat_dict, **try_kwargs)
     except Exception:
+        # 2nd: FeatureBundle をそのまま渡す
         return fn(features, **kwargs)
 
 
-# --- Main wrapper ---
+# --- Adapter ---
+
 def propose_with_logging(
     strategy: Any,
     features: FeatureBundle,
@@ -177,22 +207,26 @@ def propose_with_logging(
     model_version: Optional[str] = None,
     timeout_sec: Optional[float] = None,
     trace_id: Optional[str] = None,
-    conn_str: Optional[str] = None,
+    conn_str: Optional[str] = None,  # None なら env NOCTRIA_OBS_PG_DSN
     **kwargs,
 ) -> StrategyProposal:
+    """
+    どの戦略でも共通に呼べるラッパ:
+      - .propose(...) があればそれを使用、無ければ .predict_future(...) を探す
+      - まず **dict で呼び**、失敗したら **FeatureBundle で再試行**（旧/新API自動互換）
+      - 例外は上位に送出するが、観測ログは成功/失敗ともに記録
+      - timeout_sec は簡易実装（実スレッド停止はしない）：計測超過時は success=False を log
+      - 戻り値が dict/NamedTuple でも StrategyProposal に変換
+    """
     model = model_name or getattr(getattr(strategy, "__class__", None), "__name__", str(type(strategy).__name__))
     ver = model_version or getattr(strategy, "VERSION", "dev")
 
-    # --- 修正: context は dict ではなく PydanticModel の可能性あり ---
+    # trace_id を決定（優先度: 引数 > コンテキスト > 自動生成）
     ctx = getattr(features, "context", None)
-    trace_id = (
-        trace_id
-        or getattr(ctx, "trace_id", None)
-        or get_trace_id()
-        or new_trace_id(
-            symbol=str(getattr(ctx, "symbol", "MULTI")),
-            timeframe=str(getattr(ctx, "timeframe", "1d")),
-        )
+    ctx_dict = ctx.dict() if hasattr(ctx, "dict") else dict(ctx or {})
+    trace_id = trace_id or get_trace_id() or new_trace_id(
+        symbol=str(ctx_dict.get("symbol", "MULTI")),
+        timeframe=str(ctx_dict.get("timeframe", "1d")),
     )
 
     t0 = time.time()
@@ -207,13 +241,16 @@ def propose_with_logging(
         else:
             raise AttributeError(f"{model} has neither propose() nor predict_future().")
 
-        proposal = _coerce_to_proposal(raw, default_symbol=str(getattr(ctx, "symbol", "MULTI")))
+        proposal = _coerce_to_proposal(raw, default_symbol=str(ctx_dict.get("symbol", "MULTI")))
         success = True
         return proposal
+    except Exception:
+        raise
     finally:
         dur_ms = int((time.time() - t0) * 1000)
         if timeout_sec is not None and (dur_ms / 1000.0) > timeout_sec:
             success = False
+
         try:
             log_infer_call(
                 conn_str or None,
@@ -221,7 +258,7 @@ def propose_with_logging(
                 ver=str(ver),
                 dur_ms=dur_ms,
                 success=bool(success),
-                feature_staleness_min=int(getattr(ctx, "data_lag_min", 0) or 0),
+                feature_staleness_min=int(ctx_dict.get("feature_staleness_min", 0) or 0),
                 trace_id=trace_id,
             )
         except Exception:
