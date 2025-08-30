@@ -13,16 +13,16 @@
     <div class="metric-item">
       <h3><i class="fas fa-chart-line"></i> 平均勝率</h3>
       <p class="metric-value text-green">
-        {% if stats.get("avg_win_rate") is not none %}
-          {{ "%.2f"|format(stats.get("avg_win_rate")) }}%
+        {% if stats and stats.get("avg_win_rate") is not none %}
+          {{ "%.2f"|format(stats["avg_win_rate"]) }}%
         {% else %}-{% endif %}
       </p>
     </div>
     <div class="metric-item">
       <h3><i class="fas fa-bolt"></i> 平均DD</h3>
       <p class="metric-value text-red">
-        {% if stats.get("avg_drawdown") is not none %}
-          {{ "%.2f"|format(stats.get("avg_drawdown")) }}%
+        {% if stats and stats.get("avg_drawdown") is not none %}
+          {{ "%.2f"|format(stats["avg_drawdown"]) }}%
         {% else %}-{% endif %}
       </p>
     </div>
@@ -37,17 +37,20 @@
 
 <section class="hud-panel">
   <h2 class="panel-title"><i class="fas fa-tags"></i> タグ別分布</h2>
-  <canvas id="tagPieChart" width="400" height="300"></canvas>
+  <canvas id="tagPieChart" style="max-width: 100%; height: auto;"></canvas>
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const tagDist = {{ stats.get("tag_distribution", {}) | tojson }};
+  
+  // グラフのコンテキストを取得
   const ctx = document.getElementById('tagPieChart').getContext('2d');
   const labels = Object.keys(tagDist);
   const data = Object.values(tagDist);
 
+  // Chart.js を使って円グラフを描画
   new Chart(ctx, {
     type: 'pie',
     data: {
