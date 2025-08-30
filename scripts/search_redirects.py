@@ -6,7 +6,7 @@ def search_redirects(directory: str):
         "RedirectResponse",  # FastAPI のリダイレクト
         "HTTPException",      # HTTPException でリダイレクトが発生する場合も
         "return redirect",    # Python標準のリダイレクト記法
-        "redirect("/statistics"  # URLに関するリダイレクト設定
+        'redirect("/statistics"'  # URLに関するリダイレクト設定（修正）
     ]
 
     # ファイル走査
