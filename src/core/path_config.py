@@ -103,6 +103,9 @@ LLM_SERVER_DIR = PROJECT_ROOT / "llm_server"
 DOCS_DIR = PROJECT_ROOT / "docs"
 TESTS_DIR = PROJECT_ROOT / "tests"
 
+# --- 互換性のためのエイリアス ---
+GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # <--- 修正: エイリアスを追加
+
 # =========================================================
 # 📄 主要ファイルパス（王国の記録物）
 # =========================================================
@@ -180,12 +183,12 @@ def ensure_import_path(
     sys.path を整備する共通関数。
     - エントリポイント（CLI/テスト/DAG/スクリプト）の冒頭で1回呼ぶだけで OK。
       例:
-        from src.core.path_config import ensure_import_path
-        ensure_import_path()   # 以降は 'from plan_data...','from decision...' が安定
+          from src.core.path_config import ensure_import_path
+          ensure_import_path()    # 以降は 'from plan_data...','from decision...' が安定
     Args:
       include_project_root: repo ルートを import 経路に含める（'src.' 付き import 用）
-      include_src:          'src' を import 経路に含める（トップレベル import 用）
-      extra:                追加したい Path（任意）
+      include_src:           'src' を import 経路に含める（トップレベル import 用）
+      extra:                 追加したい Path（任意）
     """
     targets: list[str] = []
     if include_project_root:
@@ -258,6 +261,7 @@ __all__ = [
     # GUI/Docs/Tests/LLM
     "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
     "NOCTRIA_GUI_ROUTES_DIR", "NOCTRIA_GUI_SERVICES_DIR",
+    "GUI_TEMPLATES_DIR",  # <--- 修正: エイリアスを公開リストに追加
     "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
     # 主要ファイル
     "VERITAS_EVAL_LOG", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
