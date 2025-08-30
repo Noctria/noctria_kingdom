@@ -14,6 +14,12 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
 
+import sys
+from src.core.path_config import ensure_import_path
+
+# sys.pathの安定化
+ensure_import_path()
+
 from src.core.path_config import TOOLS_DIR, GUI_TEMPLATES_DIR
 from noctria_gui.services import statistics_service
 
