@@ -1,206 +1,223 @@
 # src/decision/decision_engine.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from dataclasses import dataclass, asdict
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-ENGINE_VERSION = "decision-min-0.2.0"  # bump: quality hints support
-
-# 観測ログ: 実行環境の import 事情に左右されないようフォールバック付き
 try:
-    from plan_data.observability import log_decision  # type: ignore
+    # 正典：Plan層の contracts / gates / observability を使用
+    from plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
+    from plan_data import observability  # type: ignore
+    from plan_data import quality_gate as quality_gate_mod  # type: ignore
+    from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
 except Exception:
-    from src.plan_data.observability import log_decision  # type: ignore
+    # 互換: 旧来の import パス（存在すれば）
+    from ..plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
+    from ..plan_data import observability  # type: ignore
+    from ..plan_data import quality_gate as quality_gate_mod  # type: ignore
+    from ..plan_data import noctus_gate as noctus_gate_mod  # type: ignore
 
 
-# -----------------------------
-# Data models
-# -----------------------------
-@dataclass(frozen=True)
-class DecisionRequest:
-    """
-    最小入力: 相関ID・シンボル・特徴量辞書
-    features 例:
-        {
-          "volatility": 0.12,         # 0.0 以上
-          "trend_score": 0.70,        # 0.0..1.0 を想定
+DictLike = Dict[str, Any]
 
-          # --- 任意（あれば品質に基づくサイズ調整を適用）---
-          "base_qty": 100.0,          # 提案元の推奨サイズ（任意）
-          "quality_action": "SCALE",  # "OK"|"SCALE"|"FLAT"（任意）
-          "qty_scale": 0.5            # SCALE時のスケール係数（任意）
-        }
-    """
+
+def _get(obj: Any, key: str, default: Any = None) -> Any:
+    """obj が dict でもオブジェクトでも安全に属性を読むヘルパ."""
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+@dataclass
+class DecisionRecord:
     trace_id: str
-    symbol: str
-    features: Dict[str, float | int | str]
-
-
-@dataclass(frozen=True)
-class DecisionResult:
-    """
-    最小出力: 採択した（想定）戦略名・スコア・理由・決定ペイロード
-    decision 例:
-        {
-          "symbol": "USDJPY",
-          "action": "enter_trend",
-          "params": {"tp": 0.5, "sl": 0.3},
-          "size": 50.0,                              # <- 任意（base_qty があれば出力）
-          "quality": {"action": "SCALE", "scale": 0.5}
-        }
-    """
+    engine_version: str
     strategy_name: str
     score: float
     reason: str
-    decision: Dict[str, Any]
+    features: DictLike
+    decision: DictLike
 
 
-# -----------------------------
-# Engine
-# -----------------------------
 class DecisionEngine:
     """
-    最小版 Decision Engine（単純な閾値ルール）
-      - 低ボラ + 強トレンド  : Prometheus_Oracle → enter_trend
-      - 高ボラ + 弱トレンド  : Levia_Tempest     → scalp
-      - それ以外（中庸）      : default_strategy   → range_trade
-
-    観測:
-      - obs_decisions に決定内容を1行保存（log_decision）
-      - 既存のタイムラインビュー（obs_trace_timeline）で decision->>'action' を参照可能
-
-    拡張:
-      - features に `base_qty` / `quality_action` / `qty_scale` が含まれていれば、
-        FLAT/SCALE を反映して `decision["size"]` と `decision["quality"]` を出力・保存。
-      - 指定が無ければ従来どおり（サイズ未設定）。
+    最終意思決定エンジン（軽量版）
+    - 入力: FeatureBundle + 各AIの StrategyProposal 群
+    - 品質チェック（QualityGate）は Plan 側で行う前提だが、情報は受け取って理由へ反映可能
+    - NoctusGate（プレ実行リスクゲート）で違反提案はブロック
     """
 
-    def __init__(
+    def __init__(self, version: str = "DecisionEngine/1.0"):
+        self.version = version
+
+    # --- 公開エントリ ---------------------------------------------------------
+    def decide(
+        self,
+        bundle: FeatureBundle,
+        proposals: Iterable[StrategyProposal],
+        *,
+        quality: Optional[quality_gate_mod.QualityResult] = None,
+        profiles: Optional[DictLike] = None,
+        conn_str: Optional[str] = None,
+    ) -> Tuple[DecisionRecord, DictLike]:
+        """
+        proposals から 1件選択し、NoctusGate チェックを適用して最終決定を返す。
+        - quality: Plan 側の QualityGate の結果（省略可）。理由に反映。
+        - profiles: 将来の重み/ロールアウト設定など（未使用なら None でOK）。
+        戻り値: (DecisionRecord, decision_dict)
+        """
+        trace_id = _get(bundle.context, "trace_id", None) or _get(bundle, "trace_id", "N/A")
+
+        # 1) 候補整形
+        proposals_list: List[StrategyProposal] = list(proposals or [])
+        if not proposals_list:
+            # 候補無し → HOLD 決定
+            decision = {
+                "action": "HOLD",
+                "reason": "no proposals",
+                "size": 0.0,
+                "symbol": _get(bundle.context, "symbol", "USDJPY"),
+            }
+            record = self._log_and_build_record(
+                trace_id=trace_id,
+                bundle=bundle,
+                decision=decision,
+                reason="no proposals",
+                strategy_name="(none)",
+                score=0.0,
+                conn_str=conn_str,
+            )
+            return record, decision
+
+        # 2) スコア最大（または先頭）を暫定採用
+        best = self._pick_best(proposals_list)
+
+        # 3) NoctusGate で実行前リスクチェック
+        ng_res = noctus_gate_mod.check_proposal(best, conn_str=conn_str)
+        if not ng_res.ok:
+            # ブロック → REJECT 決定
+            decision = {
+                "action": "REJECT",
+                "reason": "NoctusGate blocked: " + "; ".join(ng_res.reasons),
+                "size": float(_get(best, "lot", _get(best, "size", 0.0)) or 0.0),
+                "symbol": _get(best, "symbol", _get(bundle.context, "symbol", "USDJPY")),
+                "proposal": self._proposal_to_dict(best),
+            }
+            record = self._log_and_build_record(
+                trace_id=trace_id,
+                bundle=bundle,
+                decision=decision,
+                reason=decision["reason"],
+                strategy_name=str(_get(best, "name", _get(best, "strategy", "unknown"))),
+                score=float(_get(best, "score", 0.0) or 0.0),
+                conn_str=conn_str,
+            )
+            return record, decision
+
+        # 4) 実行アクションの組み立て（BUY/SELL/HOLD などは proposal に準拠）
+        action = str(_get(best, "action", _get(best, "side", "HOLD")) or "HOLD").upper()
+        size = float(_get(best, "lot", _get(best, "size", 0.0)) or 0.0)
+        symbol = _get(best, "symbol", _get(bundle.context, "symbol", "USDJPY"))
+
+        reason_list: List[str] = []
+        if quality is not None and not quality.ok:
+            # QualityGate の結果を理由に追記
+            reason_list.append(f"quality={quality.action}({', '.join(quality.reasons)})")
+
+        decision = {
+            "action": action,
+            "symbol": symbol,
+            "size": size,
+            "proposal": self._proposal_to_dict(best),
+        }
+        if reason_list:
+            decision["reason"] = "; ".join(reason_list)
+
+        # 5) 決定レコードを記録
+        record = self._log_and_build_record(
+            trace_id=trace_id,
+            bundle=bundle,
+            decision=decision,
+            reason=decision.get("reason", ""),
+            strategy_name=str(_get(best, "name", _get(best, "strategy", "unknown"))),
+            score=float(_get(best, "score", 0.0) or 0.0),
+            conn_str=conn_str,
+        )
+        return record, decision
+
+    # --- 内部ユーティリティ ---------------------------------------------------
+    def _pick_best(self, proposals: List[StrategyProposal]) -> StrategyProposal:
+        # score があれば最大、無ければ先頭
+        scored = [(float(_get(p, "score", 0.0) or 0.0), idx, p) for idx, p in enumerate(proposals)]
+        scored.sort(key=lambda t: t[0], reverse=True)
+        return scored[0][2] if scored else proposals[0]
+
+    def _proposal_to_dict(self, p: StrategyProposal) -> DictLike:
+        if isinstance(p, dict):
+            return dict(p)
+        # 代表的なフィールドのみ抜粋（存在すれば）
+        keys = (
+            "name", "strategy", "symbol", "side", "action", "lot", "size",
+            "price", "tp", "sl", "ttl", "risk_score", "score", "extra",
+        )
+        out = {}
+        for k in keys:
+            v = getattr(p, k, None)
+            if v is not None:
+                out[k] = v
+        return out
+
+    def _log_and_build_record(
         self,
         *,
-        thr_vol_low: float = 0.15,
-        thr_trend_strong: float = 0.60,
-        default_strategy: str = "Aurus_Singularis",
-        sl: float = 0.3,
-        tp: float = 0.5,
-    ) -> None:
-        self.thr_vol_low = float(thr_vol_low)
-        self.thr_trend_strong = float(thr_trend_strong)
-        self.default_strategy = str(default_strategy)
-        self._sl = float(sl)
-        self._tp = float(tp)
-
-    # -------- helpers --------
-    @staticmethod
-    def _get_float(d: Dict[str, Any], key: str, default: float) -> float:
+        trace_id: str,
+        bundle: FeatureBundle,
+        decision: DictLike,
+        reason: str,
+        strategy_name: str,
+        score: float,
+        conn_str: Optional[str],
+    ) -> DecisionRecord:
+        features_dict = self._features_to_dict(bundle)
         try:
-            v = float(d.get(key, default))
-        except (TypeError, ValueError):
-            v = default
-        return v
-
-    @staticmethod
-    def _get_str(d: Dict[str, Any], key: str, default: str) -> str:
-        v = d.get(key, default)
-        return str(v) if v is not None else default
-
-    @staticmethod
-    def _clamp(x: float, lo: float, hi: float) -> float:
-        return max(lo, min(hi, x))
-
-    # -------- main --------
-    def decide(self, req: DecisionRequest, *, conn_str: Optional[str] = None) -> DecisionResult:
-        f = req.features
-
-        # 特徴量の安全取得
-        vol = max(0.0, self._get_float(f, "volatility", 0.20))
-        trend = self._clamp(self._get_float(f, "trend_score", 0.0), 0.0, 1.0)
-
-        # ルール判定
-        if vol < self.thr_vol_low and trend >= self.thr_trend_strong:
-            strategy = "Prometheus_Oracle"   # 低ボラ + 強トレンド
-            action = "enter_trend"
-            score = 0.90
-            reason = f"trend={trend:.2f} strong & vol={vol:.2f} low"
-        elif vol >= self.thr_vol_low and trend < self.thr_trend_strong:
-            strategy = "Levia_Tempest"       # 高ボラ + 弱トレンド
-            action = "scalp"
-            score = 0.70
-            reason = f"trend={trend:.2f} weak & vol={vol:.2f} high"
-        else:
-            strategy = self.default_strategy  # 中庸
-            action = "range_trade"
-            score = 0.60
-            reason = f"trend={trend:.2f} mid & vol={vol:.2f} mid"
-
-        decision_payload: Dict[str, Any] = {
-            "symbol": req.symbol,
-            "action": action,
-            "params": {"tp": self._tp, "sl": self._sl},
-        }
-
-        # ---- optional: quality-based sizing ----
-        # adapter 側で proposal.meta に付与された "quality_action"/"qty_scale" を
-        # 上位から features で受け取る設計（互換性のため任意）。
-        base_qty = f.get("base_qty", None)
-        if base_qty is not None:
-            try:
-                base_qty = float(base_qty)
-            except (TypeError, ValueError):
-                base_qty = None
-
-        quality_action = self._get_str(f, "quality_action", "").upper() if isinstance(f, dict) else ""
-        qty_scale = self._get_float(f, "qty_scale", 1.0)
-
-        final_qty: Optional[float] = None
-        quality_out: Optional[Dict[str, Any]] = None
-
-        if base_qty is not None:
-            if quality_action == "FLAT":
-                final_qty = 0.0
-                quality_out = {"action": "FLAT", "scale": 0.0}
-                reason += " | quality=FLAT"
-            elif quality_action == "SCALE":
-                final_qty = max(0.0, base_qty * max(0.0, qty_scale))
-                quality_out = {"action": "SCALE", "scale": float(qty_scale)}
-                reason += f" | quality=SCALE({qty_scale:.2f})"
-            else:
-                final_qty = max(0.0, base_qty)
-                if quality_action:
-                    # 何かしら文字列が来ていたらメモだけ残す
-                    quality_out = {"action": quality_action, "scale": float(qty_scale)}
-                else:
-                    quality_out = {"action": "OK", "scale": 1.0}
-
-            decision_payload["size"] = final_qty
-            decision_payload["quality"] = quality_out
-
-        # 観測ログ（決定）: 失敗は握りつぶして本処理を継続（他モジュールと整合）
-        try:
-            log_decision(
-                trace_id=req.trace_id,
-                engine_version=ENGINE_VERSION,
-                strategy_name=strategy,
-                score=score,
+            observability.log_decision(
+                trace_id=trace_id,
+                engine_version=self.version,
+                strategy_name=strategy_name,
+                score=float(score),
                 reason=reason,
-                features=req.features,   # 入力の生値を保存（quality hintsも含む）
-                decision=decision_payload,
-                conn_str=conn_str,       # DSN未指定なら env NOCTRIA_OBS_PG_DSN
+                features=features_dict,
+                decision=decision,
+                conn_str=conn_str,
             )
-        except Exception:
-            pass
-
-        return DecisionResult(
-            strategy_name=strategy,
-            score=score,
+        except Exception as e:
+            import logging
+            logging.getLogger("noctria.decision_engine").warning(
+                "log_decision failed: %s (trace_id=%s)", e, trace_id
+            )
+        return DecisionRecord(
+            trace_id=trace_id,
+            engine_version=self.version,
+            strategy_name=strategy_name,
+            score=float(score),
             reason=reason,
-            decision=decision_payload,
+            features=features_dict,
+            decision=decision,
         )
 
+    def _features_to_dict(self, bundle: FeatureBundle) -> DictLike:
+        # FeatureBundle(df + context) 想定。重い df はここでは落とし、ヘッダのみ。
+        ctx = getattr(bundle, "context", None)
+        ctx_dict = {}
+        if ctx is not None:
+            # よく使う情報を抜粋
+            for key in ("symbol", "t0", "trace_id", "data_lag_min", "missing_ratio"):
+                val = getattr(ctx, key, None)
+                if val is not None:
+                    ctx_dict[key] = val
+        return {"context": ctx_dict}
 
-__all__ = [
-    "ENGINE_VERSION",
-    "DecisionRequest",
-    "DecisionResult",
-    "DecisionEngine",
-]
+
+__all__ = ["DecisionEngine", "DecisionRecord"]
