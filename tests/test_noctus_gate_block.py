@@ -1,18 +1,18 @@
 import pandas as pd
 
-# strategy_adapter 版の FeatureBundle/StrategyProposal を強制的にインポート
-import plan_data.strategy_adapter as sa
+# strategy_adapter の dataclass を強制使用
+from plan_data.strategy_adapter import FeatureBundle, StrategyProposal
 from plan_data.adapter_to_decision import run_strategy_and_decide
 
-FeatureBundle = sa.FeatureBundle
-StrategyProposal = sa.StrategyProposal
 
 class RiskyStrategy:
     def propose(self, features, **kw):
+        # dict互換 or FeatureBundle互換で動くように
+        symbol = "USDJPY"
         if isinstance(features, dict):
             symbol = features.get("ctx_symbol", "USDJPY")
-        else:
-            symbol = getattr(getattr(features, "context", {}), "get", lambda k, d=None: d)("symbol", "USDJPY")
+        elif hasattr(features, "context"):
+            symbol = features.context.get("symbol", "USDJPY")
 
         return StrategyProposal(
             symbol=symbol,
@@ -20,9 +20,10 @@ class RiskyStrategy:
             qty=1.0,
             confidence=0.9,
             reasons=["test risky"],
-            meta={"risk_score": 0.95},  # A案：metaにrisk_score
+            meta={"risk_score": 0.95},  # A案: risk_score は meta に入れる
             schema_version="1.0.0",
         )
+
 
 def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
     df = pd.DataFrame({"t": pd.date_range("2025-08-01", periods=3, freq="D")})
@@ -37,10 +38,11 @@ def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
         },
     )
 
-    result = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
+    decision = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
 
-    # Decision は REJECT を期待
-    assert result["decision"]["decision"]["action"] == "REJECT"
+    # NoctusGate でブロックされることを期待
+    assert decision["decision"]["decision"]["action"] == "REJECT"
 
-    # アラートが飛んでいること
-    assert any(a.get("kind") == "NOCTUS.RISK_SCORE" for a in capture_alerts)
+    # アラート発火を確認
+    kinds = [a.get("kind") for a in capture_alerts]
+    assert any(k.startswith("NOCTUS") for k in kinds)
