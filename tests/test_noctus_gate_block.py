@@ -1,13 +1,14 @@
 import pandas as pd
 
-# NoctusGate 連携は adapter を通すので strategy_adapter 版を使う
-from plan_data.strategy_adapter import FeatureBundle, StrategyProposal
+# strategy_adapter 版の FeatureBundle/StrategyProposal を強制的にインポート
+import plan_data.strategy_adapter as sa
 from plan_data.adapter_to_decision import run_strategy_and_decide
 
-# RiskyStrategy は dict/FeatureBundle 両対応にしておく（adapterは最初にdictで呼ぶ）
+FeatureBundle = sa.FeatureBundle
+StrategyProposal = sa.StrategyProposal
+
 class RiskyStrategy:
     def propose(self, features, **kw):
-        # dict でも FeatureBundle でも取れるように分岐
         if isinstance(features, dict):
             symbol = features.get("ctx_symbol", "USDJPY")
         else:
@@ -19,8 +20,7 @@ class RiskyStrategy:
             qty=1.0,
             confidence=0.9,
             reasons=["test risky"],
-            # A案：risk_score は meta で渡す（adapter側の最小提案型に合わせる）
-            meta={"risk_score": 0.95},
+            meta={"risk_score": 0.95},  # A案：metaにrisk_score
             schema_version="1.0.0",
         )
 
@@ -39,10 +39,8 @@ def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
 
     result = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
 
-    # Decision は REJECT を期待（NoctusGate でブロック）
+    # Decision は REJECT を期待
     assert result["decision"]["decision"]["action"] == "REJECT"
 
-    # アラートが飛んでいること（A案の命名：NOCTUS.RISK_SCORE）
-    assert len(capture_alerts) >= 1
-    kinds = [a.get("kind") for a in capture_alerts]
-    assert "NOCTUS.RISK_SCORE" in kinds
+    # アラートが飛んでいること
+    assert any(a.get("kind") == "NOCTUS.RISK_SCORE" for a in capture_alerts)
