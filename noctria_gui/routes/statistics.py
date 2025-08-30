@@ -107,14 +107,18 @@ async def strategy_compare(request: Request):
     strategy_1 = request.query_params.get("strategy_1", "").strip() or None
     strategy_2 = request.query_params.get("strategy_2", "").strip() or None
 
+    if not strategy_1 or not strategy_2:
+        raise HTTPException(status_code=400, detail="両方の戦略を選択してください。")
+
     try:
         logs = statistics_service.load_all_logs()
-        filtered = statistics_service.filter_logs(
-            logs=logs,
-            strategy=strategy_1  # strategy_1 と strategy_2 で比較する
-        )
-        # 比較のロジックを適用
-        comparison_results = statistics_service.compare_strategies(filtered, strategy_1, strategy_2)
+        
+        # 戦略1と戦略2の両方をフィルタリング
+        filtered_1 = statistics_service.filter_logs(logs=logs, strategy=strategy_1)
+        filtered_2 = statistics_service.filter_logs(logs=logs, strategy=strategy_2)
+        
+        # 戦略比較のロジックを適用
+        comparison_results = statistics_service.compare_strategies(filtered_1, filtered_2)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"戦略比較の処理中にエラーが発生しました: {e}")
 
