@@ -10,14 +10,18 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+# パス設定が正しいか確認
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, STATS_DIR
 from strategies.prometheus_oracle import PrometheusOracle
 
+# ロギング設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
 
+# ルーター設定
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+# ダッシュボードメトリクスの定義
 DASHBOARD_METRICS = [
     {"key": "win_rate",       "label": "勝率",      "unit": "%",    "dec": 2},
     {"key": "max_drawdown",   "label": "最大DD",    "unit": "%",    "dec": 2},
@@ -25,25 +29,31 @@ DASHBOARD_METRICS = [
     {"key": "profit_factor",  "label": "PF",        "unit": "",     "dec": 2},
 ]
 
+# AIメトリクスのトレンドと分布をロードする関数
 def load_ai_metrics_trend_and_dist() -> Tuple[List[Dict[str, Any]], List[str], Dict[str, Dict[str, List[float]]]]:
     date_ai_metrics = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     ai_metric_dist = defaultdict(lambda: defaultdict(list))
+
+    # STATS_DIRが存在しない場合は早期リターン
     if not os.path.isdir(STATS_DIR):
         return [], [], {}
 
     for fname in os.listdir(STATS_DIR):
+        # ファイルがjsonで、特定のファイルを除外
         if not fname.endswith(".json") or fname == "veritas_eval_result.json":
             continue
+        
         path = os.path.join(STATS_DIR, fname)
         try:
             with open(path, "r", encoding="utf-8") as f:
                 d = json.load(f)
             ai = d.get("ai") or "Unknown"
-            date = d.get("evaluated_at", "")[:10]
+            date = d.get("evaluated_at", "")[:10]  # 日付を取得
             for m in DASHBOARD_METRICS:
                 k = m["key"]
                 v = d.get(k)
                 if v is not None:
+                    # 勝率と最大ドローダウンの値をパーセンテージに変換
                     if k in ["win_rate", "max_drawdown"] and v <= 1.0:
                         v = v * 100
                     if date:
@@ -55,6 +65,7 @@ def load_ai_metrics_trend_and_dist() -> Tuple[List[Dict[str, Any]], List[str], D
     ai_names = set()
     for d in date_ai_metrics.values():
         ai_names.update(d.keys())
+    
     ai_names = sorted(ai_names)
     trend = []
     for date in sorted(date_ai_metrics.keys()):
@@ -67,6 +78,7 @@ def load_ai_metrics_trend_and_dist() -> Tuple[List[Dict[str, Any]], List[str], D
         trend.append(entry)
     return trend, ai_names, ai_metric_dist
 
+# ダッシュボード表示のルート
 @router.get("/", response_class=HTMLResponse)
 async def dashboard_view(request: Request):
     logging.info("📥 ダッシュボード表示要求を受理しました")
@@ -80,6 +92,7 @@ async def dashboard_view(request: Request):
     }
     forecast_data = []
 
+    # メトリクスのトレンドと分布をロード
     metric_trend, ai_names, ai_metric_dist = load_ai_metrics_trend_and_dist()
 
     ai_progress = [
