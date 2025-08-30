@@ -1,7 +1,16 @@
 import pandas as pd
+import importlib.util, sys, pathlib
 
-# strategy_adapter の dataclass を強制使用
-from plan_data.strategy_adapter import FeatureBundle, StrategyProposal
+# contracts.py によるエイリアスを避けて strategy_adapter を直読みする
+path = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
+spec = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path)
+sa = importlib.util.module_from_spec(spec)
+sys.modules["plan_data.strategy_adapter"] = sa
+spec.loader.exec_module(sa)
+
+FeatureBundle = sa.FeatureBundle
+StrategyProposal = sa.StrategyProposal
+
 from plan_data.adapter_to_decision import run_strategy_and_decide
 
 
