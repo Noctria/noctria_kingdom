@@ -1,15 +1,5 @@
-#!/usr/bin/env python3
-# coding: utf-8
-
-"""
-📊 統計ダッシュボード用ルート
-- Veritas戦略の統計スコア一覧表示
-- フィルタ／ソート／CSVエクスポートに対応
-- 戦略比較機能追加
-"""
-
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +16,13 @@ templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 
 @router.get("/", response_class=HTMLResponse)
+async def statistics_home(request: Request):
+    """
+    /statistics ルートへのアクセスは /statistics/dashboard へリダイレクト
+    """
+    return RedirectResponse(url="/statistics/dashboard")
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def show_statistics(request: Request):
     """
