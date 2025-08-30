@@ -48,6 +48,7 @@ async def show_statistics(request: Request):
             sort_key="win_rate",
             descending=True
         )
+        stats = statistics_service.get_strategy_statistics()  # ここで集計データを取得
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"統計データの処理中にエラーが発生しました: {e}")
 
@@ -61,7 +62,8 @@ async def show_statistics(request: Request):
             "symbol": symbol or "",
             "start_date": start_date or "",
             "end_date": end_date or "",
-        }
+        },
+        "stats": stats  # stats をテンプレートに渡す
     })
 
 
