@@ -648,11 +648,12 @@ async function doRefresh(){
 
   // KPI
   const t = s?.totals || {};
-  setText('kpi-count', intFmt(s?.count_rows));
-  setText('kpi-adopted', intFmt(t?.adopted));
-  setText('kpi-rechecks', intFmt(t?.rechecks));
-  setText('kpi-winrate', percentFmt(t?.win_rate));
-  setText('kpi-maxdd',   percentFmt(t?.max_drawdown));
+  const rowsCount = (typeof s?.count_rows === 'number') ? s.count_rows : t?.rows;
+  setText('kpi-count', intFmt(rowsCount));
+  setText('kpi-adopted', intFmt(t?.adopted ?? t?.adoptions ?? 0));
+  setText('kpi-rechecks', intFmt(t?.rechecks ?? 0));
+  setText('kpi-winrate', percentFmt(t?.win_rate ?? t?.avg_win_rate));
+  setText('kpi-maxdd',   percentFmt(t?.max_drawdown ?? t?.avg_max_drawdown));
 
   // charts
   const by = Array.isArray(s?.by_day) ? s.by_day : [];
