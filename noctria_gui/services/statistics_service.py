@@ -55,7 +55,7 @@ async def show_statistics(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"統計データの処理中にエラーが発生しました: {e}")
 
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse("statistics_dashboard.html", {
         "request": request,
         "statistics": sorted_logs,
         "strategies": statistics_service.get_available_strategies(logs),
