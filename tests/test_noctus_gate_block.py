@@ -2,7 +2,7 @@
 import pandas as pd
 import importlib.util, sys, pathlib
 
-# --- strategy_adapter を直読みして強制登録 ---
+# --- strategy_adapter を直読みして sys.modules に登録 ---
 path_sa = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
 spec_sa = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path_sa)
 sa = importlib.util.module_from_spec(spec_sa)
@@ -12,23 +12,21 @@ spec_sa.loader.exec_module(sa)
 FeatureBundle = sa.FeatureBundle
 StrategyProposal = sa.StrategyProposal
 
-# --- contracts のエイリアスを strategy_adapter の dataclass に差し替え ---
-import plan_data.contracts as contracts
-contracts.FeatureBundle = FeatureBundle
-contracts.StrategyProposal = StrategyProposal
+# --- contracts を strategy_adapter にリダイレクト ---
+import types
+fake_contracts = types.ModuleType("plan_data.contracts")
+fake_contracts.FeatureBundle = FeatureBundle
+fake_contracts.StrategyProposal = StrategyProposal
+sys.modules["plan_data.contracts"] = fake_contracts
 
-# --- decision_engine を正しい場所からロードして差し替え ---
+# --- decision_engine もロード ---
 path_de = pathlib.Path(__file__).resolve().parents[1] / "src" / "decision" / "decision_engine.py"
 spec_de = importlib.util.spec_from_file_location("decision.decision_engine", path_de)
 de = importlib.util.module_from_spec(spec_de)
 sys.modules["decision.decision_engine"] = de
 spec_de.loader.exec_module(de)
 
-# contracts を差し替えたので decision_engine 側にも反映
-de.FeatureBundle = FeatureBundle
-de.StrategyProposal = StrategyProposal
-
-# --- adapter_to_decision を import（内部で decision_engine を使う） ---
+# --- adapter_to_decision をロード ---
 path_ad = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "adapter_to_decision.py"
 spec_ad = importlib.util.spec_from_file_location("plan_data.adapter_to_decision", path_ad)
 ad = importlib.util.module_from_spec(spec_ad)
@@ -41,7 +39,6 @@ run_strategy_and_decide = ad.run_strategy_and_decide
 # --- テスト用 Strategy ---
 class RiskyStrategy:
     def propose(self, features, **kw):
-        # dict互換 or FeatureBundle互換で動くように
         symbol = "USDJPY"
         if isinstance(features, dict):
             symbol = features.get("ctx_symbol", "USDJPY")
