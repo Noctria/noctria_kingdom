@@ -2,7 +2,7 @@
 import pandas as pd
 import importlib.util, sys, pathlib
 
-# contracts.py によるエイリアスを避けて strategy_adapter を直読みする
+# 強制的に strategy_adapter を先に読み込ませる
 path = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
 spec = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path)
 sa = importlib.util.module_from_spec(spec)
@@ -12,12 +12,15 @@ spec.loader.exec_module(sa)
 FeatureBundle = sa.FeatureBundle
 StrategyProposal = sa.StrategyProposal
 
+# adapter_to_decision を読む前に、内部で使う FeatureBundle を差し替える
+import plan_data.adapter_to_decision as ad
+ad.FeatureBundle = FeatureBundle  # 強制上書き
+
 from plan_data.adapter_to_decision import run_strategy_and_decide
 
 
 class RiskyStrategy:
     def propose(self, features, **kw):
-        # dict互換 or FeatureBundle互換で動くように
         symbol = "USDJPY"
         if isinstance(features, dict):
             symbol = features.get("ctx_symbol", "USDJPY")
