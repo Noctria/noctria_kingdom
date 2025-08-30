@@ -5,6 +5,7 @@
 📊 統計ダッシュボード用ルート
 - Veritas戦略の統計スコア一覧表示
 - フィルタ／ソート／CSVエクスポートに対応
+- 戦略比較機能追加
 """
 
 from fastapi import APIRouter, Request, HTTPException
@@ -95,3 +96,31 @@ async def export_statistics_csv():
         filename=output_path.name,
         media_type="text/csv"
     )
+
+
+@router.get("/strategy_compare", response_class=HTMLResponse)
+async def strategy_compare(request: Request):
+    """
+    戦略比較ダッシュボードを表示
+    - 戦略間の比較を行う画面を表示
+    """
+    strategy_1 = request.query_params.get("strategy_1", "").strip() or None
+    strategy_2 = request.query_params.get("strategy_2", "").strip() or None
+
+    try:
+        logs = statistics_service.load_all_logs()
+        filtered = statistics_service.filter_logs(
+            logs=logs,
+            strategy=strategy_1  # strategy_1 と strategy_2 で比較する
+        )
+        # 比較のロジックを適用
+        comparison_results = statistics_service.compare_strategies(filtered, strategy_1, strategy_2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"戦略比較の処理中にエラーが発生しました: {e}")
+
+    return templates.TemplateResponse("strategy_compare.html", {
+        "request": request,
+        "comparison_results": comparison_results,
+        "strategy_1": strategy_1 or "",
+        "strategy_2": strategy_2 or "",
+    })
