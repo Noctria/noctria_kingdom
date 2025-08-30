@@ -12,7 +12,7 @@ spec_sa.loader.exec_module(sa)
 FeatureBundle = sa.FeatureBundle
 StrategyProposal = sa.StrategyProposal
 
-# --- contracts のエイリアスも上書き ---
+# --- contracts のエイリアスを strategy_adapter の dataclass に差し替え ---
 import plan_data.contracts as contracts
 contracts.FeatureBundle = FeatureBundle
 contracts.StrategyProposal = StrategyProposal
@@ -38,8 +38,10 @@ spec_ad.loader.exec_module(ad)
 run_strategy_and_decide = ad.run_strategy_and_decide
 
 
+# --- テスト用 Strategy ---
 class RiskyStrategy:
     def propose(self, features, **kw):
+        # dict互換 or FeatureBundle互換で動くように
         symbol = "USDJPY"
         if isinstance(features, dict):
             symbol = features.get("ctx_symbol", "USDJPY")
@@ -57,6 +59,7 @@ class RiskyStrategy:
         )
 
 
+# --- 実際のテスト ---
 def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
     df = pd.DataFrame({"t": pd.date_range("2025-08-01", periods=3, freq="D")})
     fb = FeatureBundle(
@@ -70,10 +73,10 @@ def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
         },
     )
 
-    record, decision = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
+    decision = run_strategy_and_decide(RiskyStrategy(), fb, conn_str=None)
 
     # NoctusGate でブロックされることを期待
-    assert decision["action"] == "REJECT"
+    assert decision["decision"]["decision"]["action"] == "REJECT"
 
     # アラート発火を確認
     kinds = [a.get("kind") for a in capture_alerts]
