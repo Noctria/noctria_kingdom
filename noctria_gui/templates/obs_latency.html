@@ -7,7 +7,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0a0f2c" />
   <link rel="stylesheet" href="/static/hud_style.css" />
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -110,7 +109,9 @@
                   <td class="text-muted nowrap" style="text-align:left">{{ ev.at }}</td>
                   <td class="nowrap">{{ ev.stage }}</td>
                   <td class="nowrap">{{ ev.name }}</td>
-                  <td class="mono" style="text-align:left">{{ ev.detail }}</td>
+                  <td class="mono" style="text-align:left">
+                    {{ (ev.detail|string)[:2000] }}{% if (ev.detail|string)|length>2000 %}…{% endif %}
+                  </td>
                 </tr>
               {% endfor %}
               {% if not timeline %}
@@ -128,12 +129,18 @@
     const CHART_DATA = {{ chart_json|safe }};
     const ctx = document.getElementById('latencyChart').getContext('2d');
 
+    // SLA ライン（env に NOCTRIA_LATENCY_SLA_MS がありそうならテンプレから渡すのが本筋だが、
+    // 無ければ 250ms を採用）
+    const SLA_MS = 250;
+
     const data = {
       labels: CHART_DATA.labels,
       datasets: [
         { label: 'p50 (ms)', data: CHART_DATA.p50, borderWidth: 2, tension: .2 },
         { label: 'p90 (ms)', data: CHART_DATA.p90, borderWidth: 2, tension: .2 },
         { label: 'p99 (ms)', data: CHART_DATA.p99, borderWidth: 2, tension: .2 },
+        // 擬似的な水平SLAライン
+        { label: 'SLA', data: CHART_DATA.labels.map(() => SLA_MS), borderWidth: 1, borderDash: [6,4], pointRadius: 0 }
       ]
     };
 
