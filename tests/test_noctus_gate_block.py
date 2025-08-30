@@ -9,7 +9,7 @@ sa = importlib.util.module_from_spec(spec)
 sys.modules["plan_data.strategy_adapter"] = sa
 spec.loader.exec_module(sa)
 
-FeatureBundle = sa.FeatureBundle
+FeatureBundle = sa.FeatureBundle  # dataclass版
 StrategyProposal = sa.StrategyProposal
 
 from plan_data.adapter_to_decision import run_strategy_and_decide
@@ -20,15 +20,15 @@ class RiskyStrategy:
         """dict / dataclass FeatureBundle / Pydantic FeatureBundleV1 の全部に対応"""
         symbol = "USDJPY"
 
-        # 1) dict互換呼び出し
+        # dict互換
         if isinstance(features, dict):
             symbol = features.get("ctx_symbol", symbol)
 
-        # 2) dataclass FeatureBundle
+        # dataclass FeatureBundle
         elif hasattr(features, "context") and isinstance(features.context, dict):
             symbol = features.context.get("symbol", symbol)
 
-        # 3) Pydantic FeatureBundleV1 (context は FeatureContextV1)
+        # Pydantic FeatureBundleV1
         elif hasattr(features, "context") and hasattr(features.context, "symbol"):
             symbol = getattr(features.context, "symbol", symbol)
 
@@ -49,9 +49,9 @@ def test_noctus_gate_blocks_and_emits_alert(capture_alerts):
     """
     df = pd.DataFrame({"t": pd.to_datetime(["2025-08-01", "2025-08-02", "2025-08-03"])})
 
+    # 修正: dataclass版 FeatureBundle は 'df' を受け取る
     fb = FeatureBundle(
-        features=df,                      # 'df' を 'features' に変更
-        trace_id="test-trace-noctus-001", # トップレベルに移動
+        df=df,
         context={
             "symbol": "GBPUSD",
             "timeframe": "1h",
