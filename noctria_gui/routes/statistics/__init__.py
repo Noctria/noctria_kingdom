@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 
 # テンプレート設定
 from src.core.path_config import GUI_TEMPLATES_DIR
-from noctria_gui.services import statistics_service  # <--- 修正: 統計サービスをインポート
+from noctria_gui.services import statistics_service
 
 router = APIRouter(tags=["statistics"])
 
@@ -18,21 +18,20 @@ router.include_router(strategy_compare_router, prefix="/strategy_compare")
 @router.get("/", summary="Statistics Root", response_class=HTMLResponse)
 async def statistics_root(request: Request):
     try:
-        # <--- 修正: 統計サービスからサマリーデータを取得 ---
-        # 実際の関数名はプロジェクトに合わせてください (例: get_dashboard_stats())
+        # サービスからサマリーデータを取得
         summary_stats = statistics_service.get_summary_stats()
 
-        # <--- 修正: 取得したデータを "stats" というキーでテンプレートに渡す ---
         return templates.TemplateResponse("statistics_dashboard.html", {
             "request": request,
             "stats": summary_stats
         })
     except Exception as e:
-        # <--- 修正: データ取得に失敗した場合のエラーハンドリング ---
-        # エラーログを出力するなど、実際の運用に合わせて調整してください
-        print(f"Error fetching statistics: {e}")
-        # ユーザーには分かりやすいエラーメッセージを表示
+        # エラーログに本来の原因を出力
+        print(f"!!! Original Error in statistics_service: {e}")
+        
+        # ユーザーにはエラーメッセージを表示しつつ、テンプレートがクラッシュしないようにする
         return templates.TemplateResponse("statistics_dashboard.html", {
             "request": request,
-            "error": "統計データの取得中にエラーが発生しました。"
+            "error": "統計データの取得中にエラーが発生しました。",
+            "stats": {}  # <--- 修正: エラー時でもstatsを空の辞書として渡す
         })
