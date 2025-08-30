@@ -1,37 +1,10 @@
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+# noctria_gui/routes/statistics/__init__.py
 
-# テンプレート設定
-from src.core.path_config import GUI_TEMPLATES_DIR
-from noctria_gui.services import statistics_service
+# このファイルは、statistics関連のルーターを外部に提供するための「窓口」です。
+# 実際のURL処理は、statistics_dashboard.py に記述されています。
 
-router = APIRouter(tags=["statistics"])
+from .statistics_dashboard import router
 
-# Jinja2 テンプレートのインスタンスを作成
-templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
-
-# 既存の戦略比較ルーターをインクルード
-from .strategy_compare import router as strategy_compare_router
-router.include_router(strategy_compare_router, prefix="/strategy_compare")
-
-@router.get("/", summary="Statistics Root", response_class=HTMLResponse)
-async def statistics_root(request: Request):
-    try:
-        # サービスからサマリーデータを取得
-        summary_stats = statistics_service.get_summary_stats()
-
-        return templates.TemplateResponse("statistics_dashboard.html", {
-            "request": request,
-            "stats": summary_stats
-        })
-    except Exception as e:
-        # エラーログに本来の原因を出力
-        print(f"!!! Original Error in statistics_service: {e}")
-        
-        # ユーザーにはエラーメッセージを表示しつつ、テンプレートがクラッシュしないようにする
-        return templates.TemplateResponse("statistics_dashboard.html", {
-            "request": request,
-            "error": "統計データの取得中にエラーが発生しました。",
-            "stats": {}  # <--- 修正: エラー時でもstatsを空の辞書として渡す
-        })
+# 上記の1行により、アプリケーションの他の部分（main.pyなど）が
+# from noctria_gui.routes.statistics import router
+# と書いた際に、正しく statistics_dashboard.py の機能が読み込まれるようになります。
