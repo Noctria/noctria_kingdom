@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
+# テンプレート設定
+from src.core.path_config import GUI_TEMPLATES_DIR
 
 router = APIRouter(tags=["statistics"])
+
+# Jinja2 テンプレートのインスタンスを作成
+templates = Jinja2Templates(directory=str(GUI_TEMPLATES_DIR))
 
 # 既存の戦略比較ルーターをインクルード
 from .strategy_compare import router as strategy_compare_router
