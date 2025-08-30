@@ -2,28 +2,40 @@
 import pandas as pd
 import importlib.util, sys, pathlib
 
-# strategy_adapter を直読みして強制登録
-path = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
-spec = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path)
-sa = importlib.util.module_from_spec(spec)
+# --- strategy_adapter を直読みして強制登録 ---
+path_sa = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "strategy_adapter.py"
+spec_sa = importlib.util.spec_from_file_location("plan_data.strategy_adapter", path_sa)
+sa = importlib.util.module_from_spec(spec_sa)
 sys.modules["plan_data.strategy_adapter"] = sa
-spec.loader.exec_module(sa)
+spec_sa.loader.exec_module(sa)
 
 FeatureBundle = sa.FeatureBundle
 StrategyProposal = sa.StrategyProposal
 
-# contracts のエイリアスも上書き
+# --- contracts のエイリアスも上書き ---
 import plan_data.contracts as contracts
 contracts.FeatureBundle = FeatureBundle
 contracts.StrategyProposal = StrategyProposal
 
-# decision_engine 内の参照も差し替え
-import plan_data.decision_engine as de
+# --- decision_engine を正しい場所からロードして差し替え ---
+path_de = pathlib.Path(__file__).resolve().parents[1] / "src" / "decision" / "decision_engine.py"
+spec_de = importlib.util.spec_from_file_location("decision.decision_engine", path_de)
+de = importlib.util.module_from_spec(spec_de)
+sys.modules["decision.decision_engine"] = de
+spec_de.loader.exec_module(de)
+
+# contracts を差し替えたので decision_engine 側にも反映
 de.FeatureBundle = FeatureBundle
 de.StrategyProposal = StrategyProposal
 
-# adapter_to_decision を import（内部で decision_engine を使う）
-from plan_data.adapter_to_decision import run_strategy_and_decide
+# --- adapter_to_decision を import（内部で decision_engine を使う） ---
+path_ad = pathlib.Path(__file__).resolve().parents[1] / "src" / "plan_data" / "adapter_to_decision.py"
+spec_ad = importlib.util.spec_from_file_location("plan_data.adapter_to_decision", path_ad)
+ad = importlib.util.module_from_spec(spec_ad)
+sys.modules["plan_data.adapter_to_decision"] = ad
+spec_ad.loader.exec_module(ad)
+
+run_strategy_and_decide = ad.run_strategy_and_decide
 
 
 class RiskyStrategy:
