@@ -11,4 +11,4 @@ router.include_router(strategy_compare_router, prefix="/strategy_compare")
 async def statistics_root():
     # リダイレクトを削除して、統計のホームページに遷移
     # ここでリダイレクトを行わず、直接統計ページを表示する
-    return {"message": "Welcome to the statistics dashboard. Use '/statistics/strategy_compare' to view strategy comparison."}
+    return RedirectResponse(url="/statistics/dashboard")
