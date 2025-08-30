@@ -1,4 +1,3 @@
-# noctria_gui/routes/pdca_summary.py
 #!/usr/bin/env python3
 # coding: utf-8
 """
@@ -90,10 +89,10 @@ def _load_pdca_services():
                 "evals": 0,
                 "rechecks": 0,
                 "adopted": 0,
-                "adopt_rate": None,
-                "adoption_rate": None,  # 互換キー（あればそのまま使うUI向け）
-                "win_rate": None,
-                "max_drawdown": None,
+                "adopt_rate": 0.0,  # 初期値設定
+                "adoption_rate": 0.0,
+                "win_rate": 0.0,  # 初期値設定
+                "max_drawdown": 0.0,  # 初期値設定
                 "trades": 0,
             }
 
@@ -204,10 +203,10 @@ async def pdca_summary_data(
             "evals": 0,
             "rechecks": 0,
             "adopted": 0,
-            "adopt_rate": None,
-            "adoption_rate": None,
-            "win_rate": None,
-            "max_drawdown": None,
+            "adopt_rate": 0.0,
+            "adoption_rate": 0.0,
+            "win_rate": 0.0,
+            "max_drawdown": 0.0,
             "trades": 0,
         }
 
@@ -304,52 +303,3 @@ async def api_summary_timeseries_legacy(
     else:
         frm, to, from_s, to_s = _normalize_range(frm, to)
     return await pdca_summary_data(from_date=from_s, to_date=to_s)
-
-# ---------------------------------------------------------------------
-# Debug / Health
-# ---------------------------------------------------------------------
-@router.get("/summary/_debug", response_class=JSONResponse, include_in_schema=False)
-async def pdca_summary_debug(
-    from_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    to_date:   Optional[str] = Query(None, description="YYYY-MM-DD"),
-):
-    frm = _parse_date_ymd(from_date) if from_date else None
-    to  = _parse_date_ymd(to_date) if to_date else None
-    frm, to, from_s, to_s = _normalize_range(frm, to)
-
-    svc_loaded = fetch_infer_calls.__module__ != __name__
-
-    info: Dict[str, Any] = {
-        "ok": True,
-        "schema_version": SCHEMA_VERSION,
-        "service_loaded": svc_loaded,
-        "range": {"from": from_s, "to": to_s},
-        "env": {
-            "TZ": os.getenv("TZ"),
-            "PYTHONPATH": os.getenv("PYTHONPATH"),
-        },
-    }
-
-    try:
-        rows = fetch_infer_calls(frm, to)
-        info["rows_count"] = len(rows)
-    except Exception as e:
-        info["rows_error"] = str(e)
-
-    try:
-        series = aggregate_by_day(rows if "rows_count" in info else [])
-        info["series_sample_head"] = series[:3]
-    except Exception as e:
-        info["series_error"] = str(e)
-
-    try:
-        totals = aggregate_kpis(rows if "rows_count" in info else [])
-        info["totals"] = totals
-    except Exception as e:
-        info["totals_error"] = str(e)
-
-    return JSONResponse(info, headers={"Cache-Control": "no-store"})
-
-@router.get("/summary/health", response_class=JSONResponse, include_in_schema=False)
-async def pdca_summary_health():
-    return JSONResponse({"ok": True, "name": "pdca_summary"}, headers={"Cache-Control": "no-store"})
