@@ -37,17 +37,17 @@ except Exception:
 def _pick_trace_id(features: FeatureBundle, fallback_symbol: str = "MULTI", fallback_tf: str = "1d") -> str:
     """
     trace_id の決定：
-      1) features.context["trace_id"] があればそれ
+      1) features.context.trace_id があればそれ
       2) get_trace_id() が返るならそれ
       3) new_trace_id(symbol, timeframe)
     """
-    ctx = features.context or {}
-    tid = ctx.get("trace_id") or get_trace_id()
+    ctx = getattr(features, "context", None)
+    tid = getattr(ctx, "trace_id", None) or get_trace_id()
     if tid:
         return str(tid)
     return new_trace_id(
-        symbol=str(ctx.get("symbol", fallback_symbol)),
-        timeframe=str(ctx.get("timeframe", fallback_tf)),
+        symbol=str(getattr(ctx, "symbol", fallback_symbol)),
+        timeframe=str(getattr(ctx, "timeframe", fallback_tf)),
     )
 
 
@@ -104,7 +104,7 @@ def run_strategy_and_decide(
         model_name=model_name,
         model_version=model_version,
         timeout_sec=timeout_sec,
-        trace_id=features.context.get("trace_id"),  # あれば引き継ぎ
+        trace_id=getattr(features.context, "trace_id", None),  # ← 修正
         conn_str=conn_str,
         **strategy_kwargs,
     )
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     class DummyStrategy:
         def propose(self, features: FeatureBundle, **kw):
             return StrategyProposal(
-                symbol=str(features.context.get("symbol", "USDJPY")),
+                symbol=str(getattr(features.context, "symbol", "USDJPY")),
                 direction="LONG",
                 qty=100.0,
                 confidence=0.8,
@@ -150,7 +150,8 @@ if __name__ == "__main__":
 
     df = pd.DataFrame({"date": pd.date_range("2025-08-01", periods=5, freq="D")})
     fb = FeatureBundle(
-        df=df,
+        features=df,
+        trace_id="manual-trace-001",
         context={
             "symbol": "USDJPY",
             "timeframe": "1d",
