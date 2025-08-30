@@ -4,8 +4,11 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from pathlib import Path
 import os, json, csv, io
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR  # インポートを追加
 
 router = APIRouter()
+
+# テンプレートディレクトリの設定
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # 日付文字列を解析する関数
