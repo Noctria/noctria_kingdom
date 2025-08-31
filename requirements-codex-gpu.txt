@@ -1,0 +1,7 @@
+# 基本ユーティリティ
+numpy
+pandas
+pytest
+
+# GPU版 TensorFlow (CUDA/cuDNN がある環境では GPU を自動使用)
+tensorflow
