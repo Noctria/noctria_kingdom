@@ -398,3 +398,58 @@ canvas { max-width: 100%; }
 .badge--pass { background: rgba(123, 241, 168, .12); border-color: rgba(123,241,168,.45); color:#a1f2c6; }
 .badge--fail { background: rgba(255, 107, 107, .12); border-color: rgba(255,107,107,.45); color:#ffc0c0; }
 .badge--other { background: rgba(255, 209, 102, .12); border-color: rgba(255,209,102,.45); color:#ffe9a8; }
+
+/* === Codex HUD table tuning (append) ======================= */
+:root {
+  --ok-color: #7bf1a8;
+  --warn-color: #ffd166;
+  --err-color: #ff6b6b;
+
+  --row-stripe: rgba(255,255,255,.025);
+  --row-hover: rgba(34,209,238,.08);
+  --row-fail: rgba(255, 107, 107, .06);
+  --row-pass: rgba(123, 241, 168, .06);
+}
+
+/* レイアウトの安定化・はみ出し抑制 */
+table.hud-table {
+  table-layout: fixed;      /* 列幅を固定ベースにして崩れにくく */
+}
+table.hud-table th,
+table.hud-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* 列幅（Codex用） */
+.col-test     { width: auto; }     /* 可変（大部分） */
+.col-outcome  { width: 140px; text-align: center; }
+.col-duration { width: 140px; text-align: right; }
+
+/* ゼブラ & ホバー */
+.hud-table.zebra tbody tr:nth-child(odd) {
+  background: var(--row-stripe);
+}
+.hud-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+/* 行ステート（左端ラインと軽い背景） */
+.hud-table tbody tr.is-pass td {
+  border-left: 2px solid var(--ok-color);
+  background-image: linear-gradient(90deg, var(--row-pass), transparent);
+}
+.hud-table tbody tr.is-fail td {
+  border-left: 2px solid var(--err-color);
+  background-image: linear-gradient(90deg, var(--row-fail), transparent);
+}
+.hud-table tbody tr.is-other td {
+  border-left: 2px solid var(--warn-color);
+}
+
+/* Outcome バッジ（既存 .badge と色味統一） */
+.badge--ok   { background: rgba(123, 241, 168, .12); border-color: rgba(123,241,168,.45); color:#a1f2c6; }
+.badge--warn { background: rgba(255, 209, 102, .12); border-color: rgba(255,209,102,.45); color:#ffe9a8; }
+.badge--err  { background: rgba(255, 107, 107, .12); border-color: rgba(255,107,107,.45); color:#ffc0c0; }
+
