@@ -1,0 +1,5 @@
+# requirements-codex.txt
+pytest
+black
+ruff
+# 他 Codexで使うものを追加
