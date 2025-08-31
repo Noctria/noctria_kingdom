@@ -17,6 +17,7 @@ Noctria Kingdom GUI - main entrypoint
 - Act手動トリガ／Decision/Tags/Airflow 履歴ビューを配線
 - トースト閉じる用の /__clear_toast を追加
 - 🆕 GUIレイテンシ観測ミドルウェア（リングバッファ＋任意でJSONL追記）
+- 🆕 Codex Mini-Loop 連携（/codex 画面 & /codex_reports 静的配信）
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
-from noctria_gui.routes.statistics import router as statistics_router
+from noctria_gui.routes.statistics import router as statistics_router  # noqa: F401 (side-effects)
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 
@@ -76,6 +77,13 @@ except Exception:
     NOCTRIA_GUI_STATIC_DIR = _FALLBACK_STATIC_DIR
     NOCTRIA_GUI_TEMPLATES_DIR = _FALLBACK_TEMPLATES_DIR
 
+# 🆕 Codex レポートディレクトリ（存在しなければ作成）
+CODEX_REPORTS_DIR = PROJECT_ROOT / "codex_reports"
+try:
+    CODEX_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
 # ---------------------------------------------------------------------------
 # logging
 # ---------------------------------------------------------------------------
@@ -108,6 +116,13 @@ if NOCTRIA_GUI_STATIC_DIR.exists():
 else:
     logger.warning("Static dir not found: %s (skip mounting)", NOCTRIA_GUI_STATIC_DIR)
 
+# 🆕 Codex の生成物（Markdown/JSON）をそのまま配信
+if CODEX_REPORTS_DIR.exists():
+    app.mount("/codex_reports", StaticFiles(directory=str(CODEX_REPORTS_DIR)), name="codex_reports")
+    logger.info("Codex reports mounted: %s", CODEX_REPORTS_DIR)
+else:
+    logger.warning("Codex reports dir not found: %s (skip mounting)", CODEX_REPORTS_DIR)
+
 _tpl_dir = NOCTRIA_GUI_TEMPLATES_DIR if NOCTRIA_GUI_TEMPLATES_DIR.exists() else _FALLBACK_TEMPLATES_DIR
 templates = Jinja2Templates(directory=str(_tpl_dir))
 logger.info("Templates dir: %s", _tpl_dir)
@@ -129,7 +144,7 @@ def tojson_filter(value: Any, indent: int = 2) -> Markup:
 templates.env.filters["from_json"] = from_json
 templates.env.filters["tojson"] = tojson_filter
 
-# ルーターから参照できるように公開
+# ルーターから参照できるように公開（codex ルーターも利用）
 app.state.jinja_env = templates.env
 
 def render_template(request: Request, template_name: str, **ctx: Any) -> str:
@@ -164,7 +179,7 @@ async def latency_middleware(request: Request, call_next):
 
     path = request.url.path
     # 自分自身や静的は除外
-    if not (path.startswith("/static") or path == "/favicon.ico"):
+    if not (path.startswith("/static") or path.startswith("/codex_reports") or path == "/favicon.ico"):
         rec = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) + f".{int((time.time()%1)*1000):03d}Z",
             "method": request.method,
@@ -316,9 +331,6 @@ _safe_include("noctria_gui.routes.chat_history_api")
 _safe_include("noctria_gui.routes.observability")
 
 # ★ レイテンシ可視化ダッシュボード（FastAPI/Flask両対応の柔軟取り込み）
-#   - FastAPI: router
-#   - 互換エイリアス: bp_obs_latency / obs_bp
-#   - Flask Blueprint が置いてあっても include 失敗 → 404 の原因になるため、優先的に 'router' を試す
 included = (
     _safe_include("noctria_gui.routes.observability_latency", "router")
     or _safe_include("noctria_gui.routes.observability_latency", "bp_obs_latency")
@@ -331,6 +343,9 @@ else:
 
 # 統治ルール可視化
 _safe_include("noctria_gui.routes.governance_rules")
+
+# 🆕 Codex HUD（Mini-Loop 実行 & レポート閲覧）
+_safe_include("noctria_gui.routes.codex")
 
 logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBOARD)
 
@@ -372,6 +387,7 @@ async def healthz():
             "ok": True,
             "static_dir": str(NOCTRIA_GUI_STATIC_DIR),
             "templates_dir": str(_tpl_dir),
+            "codex_reports_dir": str(CODEX_REPORTS_DIR),
             "has_dashboard": HAS_DASHBOARD,
             "session_enabled": True,
             "version": getattr(app, "version", "unknown"),
