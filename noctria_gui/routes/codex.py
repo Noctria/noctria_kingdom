@@ -1,10 +1,10 @@
 # noctria_gui/routes/codex.py
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional
-
+from typing import Dict, Optional, List
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
 
@@ -15,14 +15,13 @@ CODEX_DIR.mkdir(exist_ok=True, parents=True)
 router = APIRouter(prefix="/codex", tags=["Codex"])
 
 
-def _scan_reports() -> Dict[str, Optional[str]]:
-    """
-    codex_reports 下の既知ファイルをスキャンし、存在すれば
-    /codex_reports/xxx の形で返す。
-    """
-    def pick(name: str) -> Optional[str]:
+# ------------------------------------------------------------
+# レポートスキャン
+# ------------------------------------------------------------
+def _scan_reports() -> Dict[str, Optional[Path]]:
+    def pick(name: str) -> Optional[Path]:
         p = CODEX_DIR / name
-        return f"/codex_reports/{name}" if p.exists() else None
+        return p if p.exists() else None
 
     return {
         "latest_cycle": pick("latest_codex_cycle.md"),
@@ -31,6 +30,27 @@ def _scan_reports() -> Dict[str, Optional[str]]:
         "harmonia": pick("harmonia_review.md"),
         "mini_summary": pick("mini_loop_summary.md"),
     }
+
+
+# ------------------------------------------------------------
+# JSONレポート（pytest結果）のパース
+# ------------------------------------------------------------
+def _parse_json_report(path: Path) -> List[Dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        tests = data.get("tests", [])
+        rows = []
+        for t in tests:
+            rows.append(
+                {
+                    "nodeid": t.get("nodeid"),
+                    "outcome": t.get("outcome"),
+                    "duration": round(t.get("call", {}).get("duration", 0), 4),
+                }
+            )
+        return rows
+    except Exception:
+        return []
 
 
 def _read_tail(path: Path, lines: int = 80) -> str:
@@ -42,42 +62,45 @@ def _read_tail(path: Path, lines: int = 80) -> str:
         return f"(read error: {e})"
 
 
+# ------------------------------------------------------------
+# Codex Home
+# ------------------------------------------------------------
 @router.get("")
 async def codex_home(request: Request) -> HTMLResponse:
     reports = _scan_reports()
+    previews: Dict[str, str] = {
+        k: (_read_tail(p, 120) if isinstance(p, Path) else "(not found)")
+        for k, p in reports.items()
+    }
 
-    # previews 用は実ファイルパスで読む必要あり
-    previews: Dict[str, str] = {}
-    for k, webpath in reports.items():
-        if webpath:
-            fname = webpath.replace("/codex_reports/", "")
-            fpath = CODEX_DIR / fname
-            previews[k] = _read_tail(fpath, 120)
-        else:
-            previews[k] = "(not found)"
+    # pytest結果のテーブル
+    tests_table: List[Dict] = []
+    if reports.get("tmp_json"):
+        tests_table = _parse_json_report(reports["tmp_json"])
 
     html = request.app.state.render_template(
         request,
         "codex.html",
         page_title="🧪 Codex Mini-Loop",
-        reports=reports,
+        reports={k: (str(v) if isinstance(v, Path) else None) for k, v in reports.items()},
         previews=previews,
+        tests_table=tests_table,
     )
     return HTMLResponse(html)
 
 
+# ------------------------------------------------------------
+# Codex Run
+# ------------------------------------------------------------
 @router.post("/run")
 async def codex_run(request: Request, pytest_args: str = Form(default="")):
-    """
-    codex/mini_loop をサブプロセスで実行。
-    pytest_args は未使用だが将来引数に渡す想定。
-    """
     cmd = ["python", "-m", "codex.mini_loop"]
+    # pytest_args は現状 mini_loop 側が処理する設計（未使用）
     try:
         proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
         rc = proc.returncode
         request.session["toast"] = {
-            "level": "info" if rc == 0 else "warning",
+            "level": ("info" if rc == 0 else "warning"),
             "text": f"Codex Mini-Loop finished (exit={rc})",
         }
     except Exception as e:
