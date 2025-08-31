@@ -2,7 +2,10 @@ from __future__ import annotations
 import os, sys, yaml
 from typing import List
 from pathlib import Path
-from tools.patch_notes import make_patch_notes
+
+# codex.tools から読み込むように変更
+from codex.tools.patch_notes import make_patch_notes
+
 
 def load_config() -> dict:
     cfg_path = Path("codex_config/agents.yaml")
