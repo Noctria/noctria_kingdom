@@ -1,0 +1,54 @@
+project: Noctria
+policy_version: 1
+
+agents:
+  inventor_scriptus:
+    level: 1   # 1..5
+    allowed_actions:
+      - propose_patch
+      - open_draft_pr
+    forbidden_actions:
+      - merge_to_main
+    constraints:
+      max_changed_files: 10
+      max_patch_lines: 500
+      require_tests_for_code: true
+      require_review_by: [harmonia_ordinis]
+  harmonia_ordinis:
+    level: 1
+    allowed_actions:
+      - review_patch
+      - request_changes
+      - approve_with_conditions
+    forbidden_actions: []
+    constraints:
+      require_alignment_score_min: 0.8
+
+governance:
+  observability_required: true
+  log_sink: postgres
+  block_if:
+    - metric: roadmap_alignment
+      op: "<"
+      value: 0.75
+    - metric: failing_tests
+      op: ">"
+      value: 0
+
+promotion_rules:
+  to_level_2:
+    min_pass_rate_7d: 0.85
+    min_alignment_7d: 0.85
+    max_reject_rate_7d: 0.20
+  to_level_3:
+    min_pass_rate_14d: 0.9
+    min_alignment_14d: 0.9
+    max_reject_rate_14d: 0.15
+  to_level_4:
+    min_pass_rate_30d: 0.92
+    min_alignment_30d: 0.92
+    max_reject_rate_30d: 0.10
+  to_level_5:
+    min_pass_rate_60d: 0.95
+    min_alignment_60d: 0.95
+    manual_king_approval: true
