@@ -57,10 +57,10 @@ async def codex_home(request: Request) -> HTMLResponse:
         else:
             previews[k] = "(not found)"
 
-    # main.py で公開されているレンダラを利用して描画
+    # ✅ 引数順: (request, template_name, **ctx)
     html = request.app.state.render_template(
+        request,
         "codex.html",
-        request=request,
         page_title="🧪 Codex Mini-Loop",
         reports={k: (str(v) if isinstance(v, Path) else None) for k, v in reports.items()},
         previews=previews,
@@ -73,7 +73,7 @@ async def codex_run(request: Request, pytest_args: str = Form(default="-q")):
     """
     codex/mini_loop を実行。pytest 引数は任意（既定 -q）。
     ※ 現状 mini_loop 側は pytest_args を引数で受けていないため、そのまま起動。
-      （必要なら環境変数や引数受け取りを mini_loop.py に追記してください）
+       （必要なら mini_loop.py に引数受け取りを追記してください）
     """
     cmd = ["python", "-m", "codex.mini_loop"]
     try:
