@@ -108,3 +108,22 @@ async def codex_run(request: Request, pytest_args: str = Form(default="")):
     except Exception as e:
         request.session["toast"] = {"level": "error", "text": f"Exec failed: {e}"}
     return RedirectResponse(url="/codex", status_code=303)
+
+
+@router.post("/review")
+async def codex_review(request: Request):
+    """
+    Inventor 提案 → Harmonia レビュー生成を手動トリガ。
+    codex/tools/review_pipeline.py を呼び出す。
+    """
+    cmd = ["python", "-m", "codex.tools.review_pipeline"]
+    try:
+        proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+        rc = proc.returncode
+        msg = "Review pipeline finished"
+        if rc != 0:
+            msg += f" (exit={rc})"
+        request.session["toast"] = {"level": ("info" if rc == 0 else "warning"), "text": msg}
+    except Exception as e:
+        request.session["toast"] = {"level": "error", "text": f"Review exec failed: {e}"}
+    return RedirectResponse(url="/codex", status_code=303)
