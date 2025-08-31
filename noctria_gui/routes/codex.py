@@ -32,6 +32,16 @@ def _scan_reports() -> Dict[str, Optional[Path]]:
     }
 
 
+def _web_url(p: Optional[Path]) -> Optional[str]:
+    """
+    StaticFiles('/codex_reports' -> CODEX_DIR) で配信しているため、
+    ブラウザからは /codex_reports/<filename> を叩く必要がある。
+    """
+    if isinstance(p, Path):
+        return f"/codex_reports/{p.name}"
+    return None
+
+
 # ------------------------------------------------------------
 # JSONレポート（pytest結果）のパース
 # ------------------------------------------------------------
@@ -68,6 +78,8 @@ def _read_tail(path: Path, lines: int = 80) -> str:
 @router.get("")
 async def codex_home(request: Request) -> HTMLResponse:
     reports = _scan_reports()
+
+    # プレビュー（tail）
     previews: Dict[str, str] = {
         k: (_read_tail(p, 120) if isinstance(p, Path) else "(not found)")
         for k, p in reports.items()
@@ -76,13 +88,19 @@ async def codex_home(request: Request) -> HTMLResponse:
     # pytest結果のテーブル
     tests_table: List[Dict] = []
     if reports.get("tmp_json"):
-        tests_table = _parse_json_report(reports["tmp_json"])
+        tests_table = _parse_json_report(reports["tmp_json"])  # type: ignore[arg-type]
+
+    # 🔗 ブラウザ用の配信URL（/codex_reports/<filename>）
+    links: Dict[str, Optional[str]] = {k: _web_url(p) for k, p in reports.items()}
 
     html = request.app.state.render_template(
         request,
         "codex.html",
         page_title="🧪 Codex Mini-Loop",
+        # 既存のファイルパス（サーバ側で読む用）
         reports={k: (str(v) if isinstance(v, Path) else None) for k, v in reports.items()},
+        # ブラウザが開くべきURL
+        links=links,
         previews=previews,
         tests_table=tests_table,
     )
@@ -95,7 +113,6 @@ async def codex_home(request: Request) -> HTMLResponse:
 @router.post("/run")
 async def codex_run(request: Request, pytest_args: str = Form(default="")):
     cmd = ["python", "-m", "codex.mini_loop"]
-    # pytest_args は現状 mini_loop 側が処理する設計（未使用）
     try:
         proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
         rc = proc.returncode
