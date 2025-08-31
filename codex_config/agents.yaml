@@ -1,0 +1,19 @@
+# 権限フェーズは Codex_Noctria_Agents.md と対応
+phase: LV1  # LV1 → LV2 → LV3 ...（昇格は人間承認が必須）
+
+tests:
+  light:
+    - tests/test_quality_gate_alerts.py
+    - tests/test_noctus_gate_block.py
+  heavy:
+    - tests/test_meta_ai_rl.py
+    - tests/test_meta_ai_env_rl.py
+    - tests/test_meta_ai_rl_longrun.py
+    - tests/test_meta_ai_rl_real_data.py
+    - tests/test_mt5_connection.py
+
+policy:
+  allow_write_files: false     # LV1: 直接修正しない（提案のみ）
+  allow_git_patch: false       # LV2 以降で true
+  require_review: true         # 常にレビュワー確認
+  max_suggestions: 3
