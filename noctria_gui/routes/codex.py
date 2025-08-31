@@ -1,4 +1,21 @@
 # noctria_gui/routes/codex.py
+# -*- coding: utf-8 -*-
+"""
+🧪 Codex GUI Routes — v3.0
+- GET  /codex           : HUDで Codex レビュー/パッチ状況を表示
+- POST /codex/run       : codex.mini_loop を実行（pytest → tmp.json 生成）
+- GET/POST /codex/review: codex.tools.review_pipeline を実行（MD & .patch & index 生成）
+
+テンプレ側（codex.html）が参照するコンテキスト:
+- page_title
+- pytest_json            : tmp.json をロードした dict（なければ {}）
+- pytest_summary_md      : codex_reports/pytest_summary.md の中身（文字列）
+- inventor_md            : inventor_suggestions_render.md があればそれ、なければ inventor_suggestions.md
+- harmonia_md            : harmonia_review.md の中身
+- patches_index_md       : patches_index.md の中身
+- patches                : [{"filename","size","relpath"}...] （codex_reports/patches/ 配下）
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,89 +26,101 @@ from typing import Dict, Optional, Any, Tuple, List
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
 
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
-CODEX_DIR = ROOT / "codex_reports"
-CODEX_DIR.mkdir(exist_ok=True, parents=True)
+REPORTS_DIR = ROOT / "codex_reports"
+REPORTS_DIR.mkdir(exist_ok=True, parents=True)
+
+PATCHES_DIR = REPORTS_DIR / "patches"
+PATCHES_DIR.mkdir(exist_ok=True, parents=True)
 
 router = APIRouter(prefix="/codex", tags=["Codex"])
 
 
-def _scan_reports() -> Dict[str, Optional[Path]]:
-    def pick(name: str) -> Optional[Path]:
-        p = CODEX_DIR / name
-        return p if p.exists() else None
-
-    return {
-        "latest_cycle": pick("latest_codex_cycle.md"),
-        "tmp_json": pick("tmp.json"),
-        "inventor": pick("inventor_suggestions.md"),
-        "harmonia": pick("harmonia_review.md"),
-        "mini_summary": pick("mini_loop_summary.md"),
-    }
-
-
-def _read_tail(path: Path, lines: int = 80) -> str:
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _read_text_safe(path: Path, max_bytes: int = 800_000) -> str:
+    """
+    ファイルを最大 max_bytes まで読み込んで返す。存在しない場合は空文字。
+    """
     try:
-        txt = path.read_text(encoding="utf-8")
-        arr = txt.splitlines()
-        return "\n".join(arr[-lines:])
+        if not path.exists():
+            return ""
+        b = path.read_bytes()
+        if len(b) > max_bytes:
+            return b[:max_bytes].decode("utf-8", errors="ignore") + "\n\n... (clipped)"
+        return b.decode("utf-8", errors="ignore")
     except Exception as e:
         return f"(read error: {e})"
 
 
-def _load_tmp_json(path: Optional[Path]) -> Optional[Dict[str, Any]]:
-    if not path or not path.exists():
-        return None
+def _load_json_safe(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
     try:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        return None
+        return {}
 
 
-def _extract_pytest_results(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """tmp.json から summary と tests を抽出。summary に failed を補完。"""
-    summary = dict(data.get("summary") or {})
-    passed = int(summary.get("passed") or 0)
-    total = int(summary.get("total") or summary.get("collected") or 0)
-    failed = max(0, total - passed)
-    summary_out = {"passed": passed, "failed": failed, "total": total}
+def _scan_patches() -> List[Dict[str, Any]]:
+    """
+    codex_reports/patches/ の .patch を列挙してメタ情報を返す。
+    """
+    items: List[Dict[str, Any]] = []
+    for f in sorted(PATCHES_DIR.glob("*.patch")):
+        try:
+            stat = f.stat()
+            items.append({
+                "filename": f.name,
+                "size": stat.st_size,
+                "relpath": f"codex_reports/patches/{f.name}",
+            })
+        except Exception:
+            continue
+    return items
 
-    tests = data.get("tests") or []
-    # tests 各要素の call.duration を安全に参照できるよう補正
-    for t in tests:
-        call = t.get("call") or {}
-        dur = call.get("duration", 0.0) if isinstance(call, dict) else 0.0
-        t["call"] = {"duration": float(dur)}
-    return summary_out, tests
 
-
+# ---------------------------------------------------------------------------
+# Page
+# ---------------------------------------------------------------------------
 @router.get("")
 async def codex_home(request: Request) -> HTMLResponse:
-    reports = _scan_reports()
-    previews: Dict[str, str] = {
-        k: (_read_tail(p, 120) if isinstance(p, Path) else "(not found)") for k, p in reports.items()
+    """
+    Codex HUD ページ表示。
+    """
+    context: Dict[str, Any] = {
+        "page_title": "🧪 Codex Mini-Loop",
+        # JSON（pytest結果）
+        "pytest_json": _load_json_safe(REPORTS_DIR / "tmp.json"),
+        # MD 群
+        "pytest_summary_md": _read_text_safe(REPORTS_DIR / "pytest_summary.md"),
+        "inventor_md": (
+            _read_text_safe(REPORTS_DIR / "inventor_suggestions_render.md")
+            or _read_text_safe(REPORTS_DIR / "inventor_suggestions.md")
+        ),
+        "harmonia_md": _read_text_safe(REPORTS_DIR / "harmonia_review.md"),
+        "patches_index_md": _read_text_safe(REPORTS_DIR / "patches_index.md"),
+        # パッチ一覧
+        "patches": _scan_patches(),
     }
 
-    # tmp.json を読み込んで pytest サマリーと明細を作る
-    pytest_summary = None
-    pytest_tests: List[Dict[str, Any]] = []
-    data = _load_tmp_json(reports.get("tmp_json"))
-    if data:
-        pytest_summary, pytest_tests = _extract_pytest_results(data)
-
+    # 環境に合わせてテンプレ描画（app.state.render_template を採用）
     html = request.app.state.render_template(
         request,
         "codex.html",
-        page_title="🧪 Codex Mini-Loop",
-        reports={k: (str(v) if isinstance(v, Path) else None) for k, v in reports.items()},
-        previews=previews,
-        pytest_summary=pytest_summary,
-        pytest_tests=pytest_tests,
+        **context,
     )
     return HTMLResponse(html)
 
 
+# ---------------------------------------------------------------------------
+# Actions
+# ---------------------------------------------------------------------------
 @router.post("/run")
 async def codex_run(request: Request, pytest_args: str = Form(default="")):
     """
@@ -110,11 +139,10 @@ async def codex_run(request: Request, pytest_args: str = Form(default="")):
     return RedirectResponse(url="/codex", status_code=303)
 
 
-# ========= ここから: レビュー実行エンドポイント（GET/POST 両対応） =========
-
+# ========= レビュー実行エンドポイント（GET/POST 両対応） =========
 async def _run_review(request: Request) -> RedirectResponse:
     """
-    codex/tools/review_pipeline を実行して Markdown 出力を更新し、/codex に戻す。
+    codex/tools/review_pipeline を実行して Markdown / .patch / index を更新し、/codex に戻す。
     """
     cmd = ["python", "-m", "codex.tools.review_pipeline"]
     try:
