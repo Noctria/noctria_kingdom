@@ -73,9 +73,27 @@
   </div>
 </div>
 
-<!-- Pytest Results Table -->
+<!-- Pytest Results -->
 <div class="hud-panel">
   <div class="panel-title">Pytest Results (tmp.json)</div>
+
+  {% if tests_summary %}
+  <div class="metrics mb-2">
+    <div class="metric-item">
+      <div class="metric-label">Passed</div>
+      <div class="metric-value text-green">{{ tests_summary.passed }}</div>
+    </div>
+    <div class="metric-item">
+      <div class="metric-label">Failed</div>
+      <div class="metric-value text-red">{{ tests_summary.failed }}</div>
+    </div>
+    <div class="metric-item">
+      <div class="metric-label">Total</div>
+      <div class="metric-value">{{ tests_summary.total }}</div>
+    </div>
+  </div>
+  {% endif %}
+
   {% if tests_table and tests_table|length > 0 %}
     <div class="table-wrap">
       <table class="hud-table zebra">
