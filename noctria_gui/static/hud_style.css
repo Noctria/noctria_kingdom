@@ -388,3 +388,13 @@ canvas { max-width: 100%; }
 .mb-0{margin-bottom:0}.mb-1{margin-bottom:.25rem}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:1rem}
 .p-1{padding:.25rem}.p-2{padding:.5rem}.p-3{padding:1rem}.px-2{padding-left:.5rem;padding-right:.5rem}
 .round { border-radius: 10px; }
+
+/* === Codex HUD helpers (append) === */
+.surface { background: rgba(0,0,0,.35); border: 1px solid var(--panel-border); }
+.scrollbox { overflow: auto; }
+.max-h-420 { max-height: 420px; }
+
+/* Outcome badges (reuse .badge base) */
+.badge--pass { background: rgba(123, 241, 168, .12); border-color: rgba(123,241,168,.45); color:#a1f2c6; }
+.badge--fail { background: rgba(255, 107, 107, .12); border-color: rgba(255,107,107,.45); color:#ffc0c0; }
+.badge--other { background: rgba(255, 209, 102, .12); border-color: rgba(255,209,102,.45); color:#ffe9a8; }
