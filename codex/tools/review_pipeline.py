@@ -1,9 +1,47 @@
 # codex/tools/review_pipeline.py
+# -*- coding: utf-8 -*-
+"""
+📦 Codex Review Pipeline — v3.0 (Harmonia Ordinis + Inventor Scriptus)
+- pytest JSON を解析して Inventor/Harmonia の Markdown を生成
+- Inventor の PatchSuggestion（pseudo_diff）を .patch に書き出し、索引を作成
+- 🆕 外部提案ファイル `codex_reports/inventor_suggestions.json`（before/after または unified diff `patch`）にも対応
+- 🆕 pytest のサマリを `codex_reports/pytest_summary.md` にも保存（GUI表示用）
+
+入出力（標準配置）:
+  PROJECT_ROOT/
+    codex_reports/
+      tmp.json                        ... pytest-json-report 出力
+      inventor_suggestions.md         ... Inventor（本文）
+      harmonia_review.md              ... Harmonia（本文）
+      pytest_summary.md               ... Pytestサマリ（HUD表示用）
+      inventor_suggestions.json       ... 🆕 外部提案（任意）
+      patches/
+        0001_xxx_YYYYmmdd-HHMMSS.patch
+        0002_yyy_YYYYmmdd-HHMMSS.patch
+      patches_index.md                ... パッチ一覧
+
+`inventor_suggestions.json` の例:
+[
+  {
+    "title": "Fix missing import in pdca_summary.py",
+    "file": "noctria_gui/routes/pdca_summary.py",
+    "before": "from __future__ import annotations\n\n# ...",
+    "after":  "from __future__ import annotations\nimport json\n\n# ..."
+  },
+  {
+    "title": "Refactor template context building",
+    "file": "noctria_gui/routes/codex.py",
+    "patch": "--- a/noctria_gui/routes/codex.py\n+++ b/noctria_gui/routes/codex.py\n@@ ...\n- old line\n+ new line\n"
+  }
+]
+"""
+
 from __future__ import annotations
 
 import datetime as _dt
 import json
 import re
+import difflib
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
@@ -13,6 +51,9 @@ from codex.tools.json_parse import load_json, build_pytest_result_for_inventor
 from codex.agents.inventor import propose_fixes, InventorOutput, PatchSuggestion
 from codex.agents.harmonia import review, ReviewResult
 
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "codex_reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -20,6 +61,10 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 TMP_JSON = REPORTS_DIR / "tmp.json"
 INV_MD = REPORTS_DIR / "inventor_suggestions.md"
 HAR_MD = REPORTS_DIR / "harmonia_review.md"
+
+# 🆕 追加出力
+PYTEST_SUMMARY_MD = REPORTS_DIR / "pytest_summary.md"
+INV_JSON = REPORTS_DIR / "inventor_suggestions.json"  # 外部提案（任意）
 
 # 🆕 パッチ保存先 & インデックス
 PATCHES_DIR = REPORTS_DIR / "patches"
@@ -76,13 +121,34 @@ def _extract_summary_and_failed_tests(data: Dict[str, Any]) -> Tuple[Dict[str, i
     return summ, failed_tests
 
 
+def _render_pytest_summary_md(summary: Dict[str, int], failed_tests: List[Dict[str, Any]]) -> str:
+    lines: List[str] = []
+    lines.append("# 🧪 Pytest Summary")
+    lines.append("")
+    lines.append(f"- Generated: `{_now_iso()}`")
+    lines.append(f"- Passed: **{summary.get('passed',0)}**")
+    lines.append(f"- Failed: **{summary.get('failed',0)}**")
+    lines.append(f"- Total : **{summary.get('total',0)}**")
+    lines.append("")
+    if failed_tests:
+        lines.append("## ❌ Failures")
+        for f in failed_tests:
+            tc = f.get("nodeid") or "unknown::test"
+            msg = (f.get("message") or "").strip()
+            lines.append(f"- **{tc}**")
+            if msg:
+                lines.append(f"  - `{msg[:350] + ('...' if len(msg)>350 else '')}`")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _slugify(text: str, max_len: int = 40) -> str:
     """
     ファイル名に使える安全なスラッグへ。日本語等もある程度通すが、制御文字や空白を整形。
     """
     if not text:
         return "patch"
-    txt = re.sub(r"[^\w\-\.\u00A0-\uFFFF]+", "-", text, flags=re.UNICODE)  # ざっくり非単語→ハイフン
+    txt = re.sub(r"[^\w\-\.\u00A0-\uFFFF]+", "-", text, flags=re.UNICODE)  # おおざっぱ非単語→ハイフン
     txt = re.sub(r"-{2,}", "-", txt).strip("-_.")
     if not txt:
         txt = "patch"
@@ -130,6 +196,24 @@ def _scan_patch_files() -> List[Dict[str, Any]]:
     return items
 
 
+def _make_unified_diff_from_before_after(file_path: str, before: str, after: str) -> str:
+    """
+    before/after の文字列から unified diff を生成。
+    """
+    before_lines = before.splitlines(keepends=True)
+    after_lines = after.splitlines(keepends=True)
+    a_label = f"a/{file_path}"
+    b_label = f"b/{file_path}"
+
+    diff = difflib.unified_diff(
+        before_lines, after_lines,
+        fromfile=a_label, tofile=b_label,
+        fromfiledate=_now_iso(), tofiledate=_now_iso(),
+        n=3,
+    )
+    return "".join(diff)
+
+
 # ---------------------------------------------------------------------------
 # Markdown writers (Inventor/Harmonia)
 # ---------------------------------------------------------------------------
@@ -139,6 +223,7 @@ def write_inventor_markdown(
     header_note: Optional[str] = None,
     pytest_summary: Optional[Dict[str, int]] = None,
     generated_patches: Optional[List[Tuple[Path, PatchSuggestion]]] = None,
+    external_generated: Optional[List[Tuple[Path, Dict[str, Any]]]] = None,
 ) -> None:
     lines: List[str] = []
     lines.append("# Inventor Scriptus — 修正案")
@@ -179,6 +264,7 @@ def write_inventor_markdown(
     else:
         lines.append("- (no suggestions)")
         lines.append("")
+
     lines.append("## Follow-up tests")
     if out.followup_tests:
         for t in out.followup_tests:
@@ -187,13 +273,24 @@ def write_inventor_markdown(
         lines.append("- `pytest -q`")
     lines.append("")
 
-    # 🆕 生成済みパッチの一覧（クリックでダウンロード可）
+    # 🆕 生成済みパッチの一覧（内部：InventorOutput）
     if generated_patches:
-        lines.append("## Generated Patches")
+        lines.append("## Generated Patches (from InventorOutput)")
         lines.append("")
         for path, p in generated_patches:
             rel = path.relative_to(REPORTS_DIR).as_posix()
             lines.append(f"- [{path.name}]({rel}) — `{p.file}` :: `{p.function}`")
+        lines.append("")
+
+    # 🆕 外部JSONから生成されたパッチ一覧
+    if external_generated:
+        lines.append("## Generated Patches (from inventor_suggestions.json)")
+        lines.append("")
+        for path, item in external_generated:
+            rel = path.relative_to(REPORTS_DIR).as_posix()
+            title = item.get("title") or path.stem
+            tgt = item.get("file") or "N/A"
+            lines.append(f"- [{path.name}]({rel}) — **{_md_escape(title)}** → `{tgt}`")
         lines.append("")
 
     INV_MD.write_text("\n".join(lines), encoding="utf-8")
@@ -248,7 +345,6 @@ def _write_single_patch(seq: int, suggestion: PatchSuggestion) -> Optional[Path]
     fname = f"{seq:04d}_{slug_core}_{ts}.patch"
     path = PATCHES_DIR / fname
 
-    # そのまま diff を保存（末尾に改行付与）
     if not diff_text.endswith("\n"):
         diff_text += "\n"
 
@@ -271,6 +367,23 @@ def write_patch_files(out: InventorOutput) -> List[Tuple[Path, PatchSuggestion]]
             saved.append((p, ps))
             seq += 1
     return saved
+
+
+def _write_single_patch_from_external(seq: int, title: str, file_path: str, patch_text: str) -> Optional[Path]:
+    """
+    外部 JSON アイテム（unified diff テキスト）から .patch を書き出す。
+    """
+    diff_text = (patch_text or "").strip()
+    if not diff_text:
+        return None
+    ts = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    slug_core = _slugify(f"{file_path}_{title}") if title else _slugify(file_path)
+    fname = f"{seq:04d}_{slug_core}_{ts}.patch"
+    out = PATCHES_DIR / fname
+    if not diff_text.endswith("\n"):
+        diff_text += "\n"
+    out.write_text(diff_text, encoding="utf-8")
+    return out
 
 
 def write_patches_index() -> None:
@@ -303,6 +416,56 @@ def write_patches_index() -> None:
 
 
 # ---------------------------------------------------------------------------
+# External suggestions support
+# ---------------------------------------------------------------------------
+def _load_external_suggestions() -> List[Dict[str, Any]]:
+    """
+    inventor_suggestions.json を読み込み（存在しなければ空配列）
+    """
+    if not INV_JSON.exists():
+        return []
+    try:
+        return json.loads(INV_JSON.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def generate_patches_from_external() -> List[Tuple[Path, Dict[str, Any]]]:
+    """
+    外部 JSON から .patch を生成。
+    - 'patch' があればそれを保存
+    - 'before'/'after' があれば unified diff を生成して保存
+    返り値: [(path, item), ...]
+    """
+    items = _load_external_suggestions()
+    if not items:
+        return []
+
+    seq = _next_seq_num()
+    saved: List[Tuple[Path, Dict[str, Any]]] = []
+
+    for item in items:
+        title = str(item.get("title") or "update")
+        file_path = str(item.get("file") or "UNKNOWN")
+
+        patch_text = ""
+        if isinstance(item.get("patch"), str) and item["patch"].strip():
+            patch_text = item["patch"]
+        elif item.get("before") is not None and item.get("after") is not None:
+            patch_text = _make_unified_diff_from_before_after(file_path, str(item["before"]), str(item["after"]))
+        else:
+            # 生成できない
+            continue
+
+        out_path = _write_single_patch_from_external(seq, title, file_path, patch_text)
+        if out_path:
+            saved.append((out_path, item))
+            seq += 1
+
+    return saved
+
+
+# ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
 def _build_outputs_from_json(py_data: Dict[str, Any]) -> Tuple[InventorOutput, ReviewResult]:
@@ -323,12 +486,16 @@ def main() -> int:
     """
     - codex_reports/tmp.json を読み取り
     - Inventor 修正案 / Harmonia レビューを Markdown で生成
-    - さらに Inventor の pseudo_diff を .patch として保存し、パッチ索引を更新
+    - Inventor の pseudo_diff を .patch として保存し、パッチ索引を更新
+    - 🆕 外部提案 inventor_suggestions.json があれば、それも .patch 生成
     - 失敗が無い場合も、空の提案と軽いコメントでファイルを出力（GUI 側で常に閲覧可能）
+    - 🆕 pytest summary を pytest_summary.md に保存
     """
     header_note = None
     pytest_summary: Optional[Dict[str, int]] = None
     generated_patches: List[Tuple[Path, PatchSuggestion]] = []
+    external_generated: List[Tuple[Path, Dict[str, Any]]] = []
+    failed_tests: List[Dict[str, Any]] = []
 
     if not TMP_JSON.exists():
         # まだ小ループが走っていない等
@@ -339,10 +506,14 @@ def main() -> int:
             patch_suggestions=[],
             followup_tests=["pytest -q"],
         )
-        rv = review(empty_inv)  # 既存レビューロジックに委ねる（空提案だと REVISE になる設計）
+        rv = review(empty_inv)  # 既存レビューロジックに委ねる
+
+        # pytest summary（空）も一応出力
+        PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []), encoding="utf-8")
+
         write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None, generated_patches=None)
         write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
-        write_patches_index()  # 索引は常に再生成（空でも）
+        write_patches_index()  # 空でも再生成
         return 0
 
     # JSON 読込
@@ -357,6 +528,8 @@ def main() -> int:
             followup_tests=["pytest -q"],
         )
         rv = review(empty_inv)
+
+        PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []), encoding="utf-8")
         write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None, generated_patches=None)
         write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
         write_patches_index()
@@ -367,18 +540,32 @@ def main() -> int:
     if pytest_summary.get("failed", 0) == 0:
         header_note = "All tests passed. Keeping suggestions minimal."
 
+    # pytest サマリ MD を保存（GUIで表示）
+    PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md(pytest_summary, failed_tests), encoding="utf-8")
+
     # Inventor/Harmonia 生成
     inv, rv = _build_outputs_from_json(data)
 
-    # 🆕 パッチ出力 & 索引更新
+    # パッチ出力（内部）
     try:
         generated_patches = write_patch_files(inv)
-    except Exception as _e:
-        # パッチ出力失敗は致命ではないため継続
+    except Exception:
         generated_patches = []
 
+    # パッチ出力（外部 JSON）
+    try:
+        external_generated = generate_patches_from_external()
+    except Exception:
+        external_generated = []
+
     # 出力
-    write_inventor_markdown(inv, header_note=header_note, pytest_summary=pytest_summary, generated_patches=generated_patches if generated_patches else None)
+    write_inventor_markdown(
+        inv,
+        header_note=header_note,
+        pytest_summary=pytest_summary,
+        generated_patches=generated_patches if generated_patches else None,
+        external_generated=external_generated if external_generated else None,
+    )
     write_harmonia_markdown(rv, header_note=header_note, pytest_summary=pytest_summary)
     write_patches_index()
 
