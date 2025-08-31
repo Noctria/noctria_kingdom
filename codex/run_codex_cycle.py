@@ -1,34 +1,70 @@
-from __future__ import annotations
-import os, sys, yaml
-from typing import List
+# codex/run_codex_cycle.py
+import subprocess
+import json
 from pathlib import Path
+import datetime
 
-# codex.tools から読み込むように変更
-from codex.tools.patch_notes import make_patch_notes
+REPORT_DIR = Path("codex_reports")
+REPORT_DIR.mkdir(exist_ok=True)
+JSON_FILE = REPORT_DIR / "latest_codex_report.json"
+MD_FILE = REPORT_DIR / "latest_codex_cycle.md"
 
+def run_pytest_with_report():
+    cmd = [
+        "pytest",
+        "-q",
+        "tests",
+        "--json-report",
+        f"--json-report-file={JSON_FILE}",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result.returncode
 
-def load_config() -> dict:
-    cfg_path = Path("codex_config/agents.yaml")
-    if not cfg_path.exists():
-        raise SystemExit("codex_config/agents.yaml が見つかりません")
-    with open(cfg_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def generate_md_report(returncode: int):
+    if not JSON_FILE.exists():
+        MD_FILE.write_text("## Codex Cycle Report\n(no JSON report generated)\n")
+        return
 
-def main():
-    cfg = load_config()
-    phase = cfg.get("phase", "LV1")
-    tests_light: List[str] = cfg.get("tests", {}).get("light", [])
-    if not tests_light:
-        raise SystemExit("tests.light が未設定です")
+    data = json.loads(JSON_FILE.read_text())
+    summary = data.get("summary", {})
+    tests = data.get("tests", [])
 
-    notes = make_patch_notes(tests_light)
-    out_dir = Path("codex_reports")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_file = out_dir / "latest_codex_cycle.md"
-    out_file.write_text(notes, encoding="utf-8")
+    total = summary.get("total", 0)
+    passed = summary.get("passed", 0)
+    failed = summary.get("failed", 0)
+    skipped = summary.get("skipped", 0)
 
-    print("== Codex cycle complete ==")
-    print(f"Report: {out_file}")
+    lines = []
+    lines.append("## Codex Cycle Report")
+    lines.append(f"- datetime: {datetime.datetime.now().isoformat()}")
+    lines.append(f"- returncode: {returncode}")
+    lines.append(f"- total: {total}, passed: {passed}, failed: {failed}, skipped: {skipped}")
+    lines.append("")
+
+    lines.append("### Tests executed")
+    for t in tests:
+        outcome = t.get("outcome")
+        symbol = "✅" if outcome == "passed" else "❌" if outcome == "failed" else "⚠️"
+        lines.append(f"- {t.get('nodeid')} {symbol}")
+    lines.append("")
+
+    if failed > 0:
+        lines.append("### Failures")
+        for t in tests:
+            if t.get("outcome") == "failed":
+                nodeid = t.get("nodeid")
+                msg = t.get("longrepr", "")
+                short_msg = "\n".join(msg.splitlines()[:5])  # 最初の数行だけ抜粋
+                lines.append(f"- **{nodeid}**\n```\n{short_msg}\n```")
+        lines.append("\n❌ Some tests failed. Next step: generate patch proposal.")
+
+    else:
+        lines.append("✅ All selected tests passed.")
+
+    MD_FILE.write_text("\n".join(lines), encoding="utf-8")
 
 if __name__ == "__main__":
-    main()
+    rc = run_pytest_with_report()
+    generate_md_report(rc)
+    print("== Codex cycle complete ==")
+    print(f"Report: {MD_FILE}")
