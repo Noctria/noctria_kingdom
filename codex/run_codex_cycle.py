@@ -6,118 +6,177 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-# 自動生成するレポートのパス
-JSON_REPORT = Path("codex_reports/tmp.json")
-LATEST_MD = Path("codex_reports/latest_codex_cycle.md")
-PATCH_NOTES_MD = Path("codex_reports/patch_notes.md")
+# --- ルート/出力ディレクトリの解決 ---
+THIS_DIR = Path(__file__).resolve().parent
+REPO_ROOT = THIS_DIR.parent
+SRC_DIR = REPO_ROOT / "src"
+TESTS_DIR = REPO_ROOT / "tests"
+REPORT_DIR = REPO_ROOT / "codex_reports"
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
+JSON_REPORT_PATH = REPORT_DIR / "tmp.json"
+LATEST_MD_PATH = REPORT_DIR / "latest_codex_cycle.md"
+PATCH_NOTES_PATH = REPORT_DIR / "patch_notes.md"
 
-# 必要: tools/patch_notes.py（既に追加済みの想定）
+# --- patch_notes を安全に import ---
 try:
-    from tools.patch_notes import make_patch_notes  # type: ignore
+    from codex.tools.patch_notes import make_patch_notes  # type: ignore
 except Exception:
-    # 相対経路でも試す
-    sys.path.append(str(Path(__file__).resolve().parent))
-    from tools.patch_notes import make_patch_notes  # type: ignore
+    # 実行方法の違いに備えてパスを調整
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.append(str(REPO_ROOT))
+    from codex.tools.patch_notes import make_patch_notes  # type: ignore
 
 
-def _ensure_dirs() -> None:
-    JSON_REPORT.parent.mkdir(parents=True, exist_ok=True)
-    LATEST_MD.parent.mkdir(parents=True, exist_ok=True)
+def _select_tests() -> List[str]:
+    """
+    CODEX_FULL=1 のときは全テスト、そうでなければ軽量サブセット。
+    """
+    if os.environ.get("CODEX_FULL") == "1":
+        print("📦 Running FULL test suite (CODEX_FULL=1)")
+        return [str(TESTS_DIR)]
+
+    # 軽量サブセット（品質ゲート＋ノクタスゲート）
+    print("🧪 Running LIGHT test subset for Codex:")
+    subset = [
+        TESTS_DIR / "test_quality_gate_alerts.py",
+        TESTS_DIR / "test_noctus_gate_block.py",
+    ]
+    for p in subset:
+        print(f"  - {p.relative_to(REPO_ROOT)}")
+    return [str(p) for p in subset]
 
 
-def _selected_tests() -> List[str]:
-    """環境変数 CODEX_FULL=1 でフル、それ以外はライトサブセット"""
-    if os.environ.get("CODEX_FULL", "0") == "1":
-        # フル: tests ディレクトリ全体
-        return ["tests"]
-    # ライト: 速い安全な2本
-    return ["tests/test_quality_gate_alerts.py", "tests/test_noctus_gate_block.py"]
-
-
-def _run_pytest_and_json(tests: List[str]) -> int:
-    """pytest を JSON レポート付きで実行し、returncode を返す"""
-    # pytest の自動プラグイン抑制 + src を PYTHONPATH に追加
+def _run_pytest_and_json_report(test_paths: List[str]) -> subprocess.CompletedProcess:
+    """
+    pytest を JSON レポート付きで実行。プロセスは常に完了させる（失敗してもレポート生成を試みる）。
+    """
+    # 環境変数：プラグイン自動ロード抑制＆PYTHONPATH設定（src を優先）
     env = os.environ.copy()
-    env.setdefault("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
-    env.setdefault("PYTHONPATH", str(Path("src").resolve()))
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+    # 既存 PYTHONPATH を活かしつつ src を先頭に追加
+    py_path = str(SRC_DIR)
+    if env.get("PYTHONPATH"):
+        env["PYTHONPATH"] = f"{py_path}{os.pathsep}{env['PYTHONPATH']}"
+    else:
+        env["PYTHONPATH"] = py_path
 
-    # 既存 JSON を消す（前回の残骸防止）
-    if JSON_REPORT.exists():
-        JSON_REPORT.unlink()
+    # 既存の JSON を一旦消す（前回の残骸防止）
+    if JSON_REPORT_PATH.exists():
+        JSON_REPORT_PATH.unlink()
 
     cmd = [
-        sys.executable, "-m", "pytest",
-        "-q", *tests,
+        "pytest",
+        "-q",
+        *test_paths,
         "--json-report",
-        f"--json-report-file={JSON_REPORT.as_posix()}",
+        f"--json-report-file={JSON_REPORT_PATH}",
     ]
-    print("Running:", " ".join(cmd))
-    proc = subprocess.run(cmd, env=env)
-    return proc.returncode
+    print("== Running pytest ==")
+    proc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env, text=True, capture_output=True)
+    return proc
 
 
-def _load_json(path: Path) -> Dict[str, Any]:
+def _load_json_report(path: Path) -> Optional[Dict[str, Any]]:
     if not path.exists():
-        return {}
+        return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        return {}
+        return None
 
 
-def _summarize(json_obj: Dict[str, Any]) -> str:
-    if not json_obj:
-        return "## Codex Cycle Report\n(no JSON report generated)"
-    s = json_obj.get("summary", {}) or {}
-    total = s.get("total") or len(json_obj.get("tests", []))
-    parts = {
-        "passed": s.get("passed", 0),
-        "failed": s.get("failed", 0),
-        "error": s.get("errors", 0) or s.get("error", 0),
-        "skipped": s.get("skipped", 0),
-        "xfailed": s.get("xfailed", 0),
-        "xpassed": s.get("xpassed", 0),
-        "duration": s.get("duration", "N/A"),
-    }
-    lines = [
-        "## Codex Cycle Report",
-        f"- scope: `{os.environ.get('CODEX_FULL', '0') and 'full' or 'light'}`",
-        "",
-        "| total | passed | failed | error | skipped | xfailed | xpassed | duration |",
-        "|------:|------:|------:|-----:|-------:|-------:|--------:|---------:|",
-        f"| {total} | {parts['passed']} | {parts['failed']} | {parts['error']} | "
-        f"{parts['skipped']} | {parts['xfailed']} | {parts['xpassed']} | {parts['duration']} |",
-        "",
-    ]
-    # 失敗/エラーの一覧（nodeidのみ簡易）
-    tests = json_obj.get("tests", [])
-    bad = [t for t in tests if t.get("outcome") in ("failed", "error")]
-    if bad:
-        lines.append("### Failed/Error tests")
-        for t in bad:
-            lines.append(f"- {t.get('nodeid', '<unknown>')}")
+def _write_latest_markdown(proc: subprocess.CompletedProcess, report_json: Optional[Dict[str, Any]]) -> None:
+    """
+    Markdown レポート（latest_codex_cycle.md）を生成。
+    """
+    lines: List[str] = []
+    lines.append("## Codex Cycle Report")
+
+    # return code
+    lines.append(f"- returncode: {proc.returncode}")
+
+    if report_json:
+        summary = report_json.get("summary", {}) or {}
+        total = summary.get("total", "N/A")
+        passed = summary.get("passed", 0)
+        failed = summary.get("failed", 0)
+        errors = summary.get("errors", 0)
+        skipped = summary.get("skipped", 0)
+        xfailed = summary.get("xfailed", 0)
+        xpassed = summary.get("xpassed", 0)
+
         lines.append("")
+        lines.append("### Summary")
+        lines.append(f"- total: {total}")
+        lines.append(f"- passed: {passed}")
+        lines.append(f"- failed: {failed}")
+        lines.append(f"- errors: {errors}")
+        lines.append(f"- skipped: {skipped}")
+        lines.append(f"- xfailed: {xfailed}")
+        lines.append(f"- xpassed: {xpassed}")
+
+        # 失敗があれば、失敗テストを列挙（短く）
+        if failed or errors:
+            lines.append("")
+            lines.append("### Failed/Errored tests (short)")
+            tests = report_json.get("tests", []) or []
+            count = 0
+            for t in tests:
+                outc = (t.get("outcome") or "").lower()
+                if outc in ("failed", "error"):
+                    nodeid = t.get("nodeid", "<?>")
+                    lines.append(f"- {outc.upper()}: {nodeid}")
+                    count += 1
+                    if count >= 20:
+                        lines.append("- ... (truncated)")
+                        break
     else:
-        lines.append("✅ All selected tests passed.")
-    return "\n".join(lines)
+        lines.append("")
+        lines.append("(no JSON report generated)")
+
+    # 末尾に stdout/stderr の要約（長すぎるときは末尾だけ）
+    def _tail(text: str, limit: int = 1200) -> str:
+        if len(text) <= limit:
+            return text
+        return text[-limit:]
+
+    lines.append("")
+    lines.append("### Pytest stdout (tail)")
+    lines.append("```")
+    lines.append(_tail(proc.stdout or "", 2000))
+    lines.append("```")
+
+    if proc.returncode != 0:
+        lines.append("")
+        lines.append("### Pytest stderr (tail)")
+        lines.append("```")
+        lines.append(_tail(proc.stderr or "", 2000))
+        lines.append("```")
+
+    LATEST_MD_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> None:
-    _ensure_dirs()
-    tests = _selected_tests()
-    rc = _run_pytest_and_json(tests)
+    test_paths = _select_tests()
+    proc = _run_pytest_and_json_report(test_paths)
+    report_json = _load_json_report(JSON_REPORT_PATH)
 
-    # patch_notes 生成（JSON が無くても placeholder を出す）
-    make_patch_notes(JSON_REPORT.as_posix(), PATCH_NOTES_MD.as_posix())
+    # patch_notes.md を生成（JSON が無い/壊れている場合は空で）
+    try:
+        patch_md = make_patch_notes(report_json or {})
+        PATCH_NOTES_PATH.write_text(patch_md, encoding="utf-8")
+    except Exception as e:
+        # 生成失敗時は空のプレースホルダを置く
+        PATCH_NOTES_PATH.write_text(f"# Patch Notes\n\n(Generation error: {e})\n", encoding="utf-8")
 
-    # latest_md 出力
-    report_json = _load_json(JSON_REPORT)
-    LATEST_MD.write_text(_summarize(report_json), encoding="utf-8")
+    # latest_codex_cycle.md を更新
+    _write_latest_markdown(proc, report_json)
 
-    # 終了コードはテストの returncode に合わせる（CI 的に便利）
-    sys.exit(rc)
+    print("== Codex cycle complete ==")
+    print(f"Report: {LATEST_MD_PATH.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":
