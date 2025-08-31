@@ -1,9 +1,10 @@
 # noctria_gui/routes/codex.py
 from __future__ import annotations
+
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple, List
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -15,9 +16,6 @@ CODEX_DIR.mkdir(exist_ok=True, parents=True)
 router = APIRouter(prefix="/codex", tags=["Codex"])
 
 
-# ------------------------------------------------------------
-# レポートスキャン
-# ------------------------------------------------------------
 def _scan_reports() -> Dict[str, Optional[Path]]:
     def pick(name: str) -> Optional[Path]:
         p = CODEX_DIR / name
@@ -41,75 +39,64 @@ def _read_tail(path: Path, lines: int = 80) -> str:
         return f"(read error: {e})"
 
 
-# ------------------------------------------------------------
-# pytest JSON 結果をロードしてテーブル化
-# ------------------------------------------------------------
-def _load_tests_from_json(path: Path) -> tuple[list[Dict[str, Any]], Dict[str, int]]:
+def _load_tmp_json(path: Optional[Path]) -> Optional[Dict[str, Any]]:
+    if not path or not path.exists():
+        return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        return [], {}
-
-    tests = []
-    passed = failed = 0
-    for t in data.get("tests", []):
-        nodeid = t.get("nodeid")
-        outcome = t.get("outcome")
-        duration = None
-        if "call" in t and isinstance(t["call"], dict):
-            duration = t["call"].get("duration")
-
-        tests.append({
-            "nodeid": nodeid,
-            "outcome": outcome,
-            "duration": duration,
-        })
-
-        if outcome == "passed":
-            passed += 1
-        elif outcome == "failed":
-            failed += 1
-
-    summary = {
-        "passed": passed,
-        "failed": failed,
-        "total": len(tests),
-    }
-    return tests, summary
+        return None
 
 
-# ------------------------------------------------------------
-# Routes
-# ------------------------------------------------------------
+def _extract_pytest_results(data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """tmp.json から summary と tests を抽出。summary に failed を補完。"""
+    summary = dict(data.get("summary") or {})
+    passed = int(summary.get("passed") or 0)
+    total = int(summary.get("total") or summary.get("collected") or 0)
+    failed = max(0, total - passed)
+    summary_out = {"passed": passed, "failed": failed, "total": total}
+
+    tests = data.get("tests") or []
+    # tests 各要素の call.duration を安全に参照できるよう補正
+    for t in tests:
+        call = t.get("call") or {}
+        dur = call.get("duration", 0.0) if isinstance(call, dict) else 0.0
+        t["call"] = {"duration": float(dur)}
+    return summary_out, tests
+
+
 @router.get("")
 async def codex_home(request: Request) -> HTMLResponse:
     reports = _scan_reports()
     previews: Dict[str, str] = {
-        k: (_read_tail(p, 120) if isinstance(p, Path) else "(not found)")
-        for k, p in reports.items()
+        k: (_read_tail(p, 120) if isinstance(p, Path) else "(not found)") for k, p in reports.items()
     }
 
-    # pytest JSON 結果
-    tests_table: list[Dict[str, Any]] = []
-    tests_summary: Dict[str, int] = {}
-    if reports.get("tmp_json"):
-        tests_table, tests_summary = _load_tests_from_json(reports["tmp_json"])
+    # tmp.json を読み込んで pytest サマリーと明細を作る
+    pytest_summary = None
+    pytest_tests: List[Dict[str, Any]] = []
+    data = _load_tmp_json(reports.get("tmp_json"))
+    if data:
+        pytest_summary, pytest_tests = _extract_pytest_results(data)
 
     html = request.app.state.render_template(
         request,
         "codex.html",
         page_title="🧪 Codex Mini-Loop",
         reports={k: (str(v) if isinstance(v, Path) else None) for k, v in reports.items()},
-        links={k: ("/codex_reports/" + v.name if isinstance(v, Path) else None) for k, v in reports.items()},
         previews=previews,
-        tests_table=tests_table,
-        tests_summary=tests_summary,
+        pytest_summary=pytest_summary,
+        pytest_tests=pytest_tests,
     )
     return HTMLResponse(html)
 
 
 @router.post("/run")
 async def codex_run(request: Request, pytest_args: str = Form(default="")):
+    """
+    codex/mini_loop を実行。pytest 引数は現状未使用（mini_loop 側の既定を使用）。
+    """
     cmd = ["python", "-m", "codex.mini_loop"]
     try:
         proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
