@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 import datetime as _dt
-import json
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
 from codex.tools.json_parse import load_json, build_pytest_result_for_inventor
 
 # 既存ヒューリスティック Inventor/Harmonia を利用
-from codex.agents.inventor import propose_fixes, InventorOutput, PatchSuggestion
+from codex.agents.inventor import propose_fixes, InventorOutput
 from codex.agents.harmonia import review, ReviewResult
+
+# 🆕 自動パッチ生成ユーティリティ
+from codex.tools.patch_gen import generate_patches, write_index_md, PATCHES_DIR
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "codex_reports"
@@ -48,12 +50,10 @@ def _extract_summary_and_failed_tests(data: Dict[str, Any]) -> Tuple[Dict[str, i
     failed_tests: List[Dict[str, Any]] = []
     for t in tests:
         if (t.get("outcome") or "").lower() == "failed":
-            # 可能なら longrepr / message を拾う
             msg = ""
             for phase in ("setup", "call", "teardown"):
                 phase_obj = t.get(phase)
                 if isinstance(phase_obj, dict) and (phase_obj.get("outcome") == "failed"):
-                    # pytest-json-report では "longrepr" や "crash" 等がある場合あり
                     cand = phase_obj.get("longrepr") or phase_obj.get("crash")
                     if cand:
                         msg = str(cand)
@@ -68,13 +68,21 @@ def _extract_summary_and_failed_tests(data: Dict[str, Any]) -> Tuple[Dict[str, i
     return summ, failed_tests
 
 
-def write_inventor_markdown(out: InventorOutput, *, header_note: Optional[str] = None, pytest_summary: Optional[Dict[str, int]] = None) -> None:
+def write_inventor_markdown(
+    out: InventorOutput,
+    *,
+    header_note: Optional[str] = None,
+    pytest_summary: Optional[Dict[str, int]] = None,
+) -> None:
     lines: List[str] = []
     lines.append("# Inventor Scriptus — 修正案")
     lines.append("")
     lines.append(f"- Generated at: `{_now_iso()}`")
     if pytest_summary:
-        lines.append(f"- Pytest Summary: **{pytest_summary.get('passed',0)}/{pytest_summary.get('total',0)} passed**, failed={pytest_summary.get('failed',0)}")
+        lines.append(
+            f"- Pytest Summary: **{pytest_summary.get('passed',0)}/{pytest_summary.get('total',0)} passed**, "
+            f"failed={pytest_summary.get('failed',0)}"
+        )
     if header_note:
         lines.append(f"- Note: {_md_escape(header_note)}")
     lines.append("")
@@ -116,13 +124,21 @@ def write_inventor_markdown(out: InventorOutput, *, header_note: Optional[str] =
     INV_MD.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_harmonia_markdown(rv: ReviewResult, *, header_note: Optional[str] = None, pytest_summary: Optional[Dict[str, int]] = None) -> None:
+def write_harmonia_markdown(
+    rv: ReviewResult,
+    *,
+    header_note: Optional[str] = None,
+    pytest_summary: Optional[Dict[str, int]] = None,
+) -> None:
     lines: List[str] = []
     lines.append("# Harmonia Ordinis — レビューレポート")
     lines.append("")
     lines.append(f"- Generated at: `{_now_iso()}`")
     if pytest_summary:
-        lines.append(f"- Pytest Summary: **{pytest_summary.get('passed',0)}/{pytest_summary.get('total',0)} passed**, failed={pytest_summary.get('failed',0)}")
+        lines.append(
+            f"- Pytest Summary: **{pytest_summary.get('passed',0)}/{pytest_summary.get('total',0)} passed**, "
+            f"failed={pytest_summary.get('failed',0)}"
+        )
     if header_note:
         lines.append(f"- Context: {_md_escape(header_note)}")
     lines.append("")
@@ -140,10 +156,6 @@ def write_harmonia_markdown(rv: ReviewResult, *, header_note: Optional[str] = No
 
 
 def _build_outputs_from_json(py_data: Dict[str, Any]) -> Tuple[InventorOutput, ReviewResult]:
-    """
-    tmp.json を解析して Inventor/Harmonia 出力を構築。
-    - 失敗が無い場合は「軽い承認ムード」のノートを付与しつつ、既存レビュアルールは尊重。
-    """
     pytest_result_for_inventor = build_pytest_result_for_inventor(py_data)
     inv = propose_fixes(pytest_result_for_inventor)
     rv = review(inv)
@@ -154,13 +166,12 @@ def main() -> int:
     """
     - codex_reports/tmp.json を読み取り
     - Inventor 修正案 / Harmonia レビューを Markdown で生成
-    - 失敗が無い場合も、空の提案と軽いコメントでファイルを出力（GUI 側で常に閲覧可能）
+    - さらに自動パッチを生成して patches/ 以下に保存
     """
     header_note = None
     pytest_summary: Optional[Dict[str, int]] = None
 
     if not TMP_JSON.exists():
-        # まだ小ループが走っていない等
         header_note = "No pytest JSON found. Skipped proposing fixes."
         empty_inv = InventorOutput(
             summary="No pytest result available.",
@@ -168,12 +179,14 @@ def main() -> int:
             patch_suggestions=[],
             followup_tests=["pytest -q"],
         )
-        rv = review(empty_inv)  # 既存レビューロジックに委ねる（空提案だと REVISE になる設計）
+        rv = review(empty_inv)
         write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None)
         write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
+        # パッチも空 index を出力
+        PATCHES_DIR.mkdir(parents=True, exist_ok=True)
+        write_index_md(empty_inv, [])
         return 0
 
-    # JSON 読込
     try:
         data = load_json(TMP_JSON)
     except Exception as e:
@@ -187,19 +200,24 @@ def main() -> int:
         rv = review(empty_inv)
         write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None)
         write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
+        PATCHES_DIR.mkdir(parents=True, exist_ok=True)
+        write_index_md(empty_inv, [])
         return 0
 
-    # 失敗の有無をざっくり要約
     pytest_summary, failed_tests = _extract_summary_and_failed_tests(data)
     if pytest_summary.get("failed", 0) == 0:
         header_note = "All tests passed. Keeping suggestions minimal."
 
-    # Inventor/Harmonia 生成
     inv, rv = _build_outputs_from_json(data)
 
-    # 出力
+    # Markdown 出力
     write_inventor_markdown(inv, header_note=header_note, pytest_summary=pytest_summary)
     write_harmonia_markdown(rv, header_note=header_note, pytest_summary=pytest_summary)
+
+    # 🆕 パッチ生成
+    PATCHES_DIR.mkdir(parents=True, exist_ok=True)
+    generated = generate_patches(inv)
+    write_index_md(inv, generated)
 
     return 0
 
