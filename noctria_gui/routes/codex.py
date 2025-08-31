@@ -110,20 +110,32 @@ async def codex_run(request: Request, pytest_args: str = Form(default="")):
     return RedirectResponse(url="/codex", status_code=303)
 
 
-@router.post("/review")
-async def codex_review(request: Request):
+# ========= ここから: レビュー実行エンドポイント（GET/POST 両対応） =========
+
+async def _run_review(request: Request) -> RedirectResponse:
     """
-    Inventor 提案 → Harmonia レビュー生成を手動トリガ。
-    codex/tools/review_pipeline.py を呼び出す。
+    codex/tools/review_pipeline を実行して Markdown 出力を更新し、/codex に戻す。
     """
     cmd = ["python", "-m", "codex.tools.review_pipeline"]
     try:
         proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
         rc = proc.returncode
-        msg = "Review pipeline finished"
-        if rc != 0:
-            msg += f" (exit={rc})"
-        request.session["toast"] = {"level": ("info" if rc == 0 else "warning"), "text": msg}
+        request.session["toast"] = {
+            "level": ("info" if rc == 0 else "warning"),
+            "text": f"Review pipeline finished (exit={rc})",
+        }
     except Exception as e:
-        request.session["toast"] = {"level": "error", "text": f"Review exec failed: {e}"}
+        request.session["toast"] = {"level": "error", "text": f"Review failed: {e}"}
     return RedirectResponse(url="/codex", status_code=303)
+
+
+@router.get("/review")
+async def codex_review_get(request: Request):
+    # ブラウザ直叩きに対応
+    return await _run_review(request)
+
+
+@router.post("/review")
+async def codex_review_post(request: Request):
+    # フォームボタンからの POST に対応
+    return await _run_review(request)
