@@ -21,9 +21,7 @@
   <div class="hud-panel">
     <h3 class="panel-title">Latest Cycle (Markdown)</h3>
     {% if reports.latest_cycle %}
-      <p class="small">
-        <a class="hud-link" href="/codex_reports/latest_codex_cycle.md" target="_blank">Open file</a>
-      </p>
+      <p class="small"><a class="hud-link" href="/codex_reports/latest_codex_cycle.md" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.latest_cycle }}</pre>
     {% else %}
       <p class="text-muted small">まだ生成されていません。</p>
@@ -33,9 +31,7 @@
   <div class="hud-panel">
     <h3 class="panel-title">Mini-Loop Summary</h3>
     {% if reports.mini_summary %}
-      <p class="small">
-        <a class="hud-link" href="/codex_reports/mini_loop_summary.md" target="_blank">Open file</a>
-      </p>
+      <p class="small"><a class="hud-link" href="/codex_reports/mini_loop_summary.md" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.mini_summary }}</pre>
     {% else %}
       <p class="text-muted small">未実行。</p>
@@ -45,9 +41,7 @@
   <div class="hud-panel">
     <h3 class="panel-title">Inventor Suggestions</h3>
     {% if reports.inventor %}
-      <p class="small">
-        <a class="hud-link" href="/codex_reports/inventor_suggestions.md" target="_blank">Open file</a>
-      </p>
+      <p class="small"><a class="hud-link" href="/codex_reports/inventor_suggestions.md" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.inventor }}</pre>
     {% else %}
       <p class="text-muted small">まだ提案なし。</p>
@@ -57,9 +51,7 @@
   <div class="hud-panel">
     <h3 class="panel-title">Harmonia Review</h3>
     {% if reports.harmonia %}
-      <p class="small">
-        <a class="hud-link" href="/codex_reports/harmonia_review.md" target="_blank">Open file</a>
-      </p>
+      <p class="small"><a class="hud-link" href="/codex_reports/harmonia_review.md" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.harmonia }}</pre>
     {% else %}
       <p class="text-muted small">まだレビューなし。</p>
@@ -70,6 +62,8 @@
 {% if pytest_summary %}
 <div class="hud-panel">
   <h3 class="panel-title">Pytest Results (tmp.json)</h3>
+
+  <!-- Summary metrics -->
   <div class="metrics">
     <div class="metric-item">
       <div class="metric-label">Passed</div>
@@ -85,13 +79,14 @@
     </div>
   </div>
 
+  <!-- Details table -->
   <div class="table-wrap mt-2">
     <table class="hud-table">
       <thead>
         <tr>
-          <th>Test</th>
-          <th>Outcome</th>
-          <th>Duration (s)</th>
+          <th style="min-width: 640px">Test</th>
+          <th style="min-width: 120px">Outcome</th>
+          <th style="min-width: 140px">Duration (s)</th>
         </tr>
       </thead>
       <tbody>
@@ -115,9 +110,7 @@
   </div>
 
   <p class="mt-2 small">
-    <a class="hud-link" href="/codex_reports/tmp.json" target="_blank">
-      <i class="fas fa-file-code"></i> tmp.json を開く
-    </a>
+    <a class="hud-link" href="/codex_reports/tmp.json" target="_blank"><i class="fas fa-file-code"></i> tmp.json を開く</a>
   </p>
 </div>
 {% endif %}
