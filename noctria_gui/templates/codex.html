@@ -11,21 +11,18 @@
 <div class="hud-section">
   <div class="hud-actions">
     <form action="/codex/run" method="post">
-      <button class="hud-button" type="submit">
-        <i class="fas fa-play"></i> Run Mini-Loop
-      </button>
+      <button class="hud-button" type="submit"><i class="fas fa-play"></i> Run Mini-Loop</button>
     </form>
     <span class="text-muted small">pytestは既定 <code>-q</code>。詳細は <code>codex/mini_loop.py</code> を参照。</span>
   </div>
 </div>
 
 <div class="grid2">
-  <!-- Latest Cycle -->
   <div class="hud-panel">
-    <div class="panel-title">Latest Cycle (Markdown)</div>
+    <h3 class="panel-title">Latest Cycle (Markdown)</h3>
     {% if reports.latest_cycle %}
       <p class="small">
-        <a class="hud-link" href="{{ links.latest_cycle }}" target="_blank">Open file</a>
+        <a class="hud-link" href="/codex_reports/latest_codex_cycle.md" target="_blank">Open file</a>
       </p>
       <pre class="hud-pre">{{ previews.latest_cycle }}</pre>
     {% else %}
@@ -33,12 +30,11 @@
     {% endif %}
   </div>
 
-  <!-- Mini-Loop Summary -->
   <div class="hud-panel">
-    <div class="panel-title">Mini-Loop Summary</div>
+    <h3 class="panel-title">Mini-Loop Summary</h3>
     {% if reports.mini_summary %}
       <p class="small">
-        <a class="hud-link" href="{{ links.mini_summary }}" target="_blank">Open file</a>
+        <a class="hud-link" href="/codex_reports/mini_loop_summary.md" target="_blank">Open file</a>
       </p>
       <pre class="hud-pre">{{ previews.mini_summary }}</pre>
     {% else %}
@@ -46,12 +42,11 @@
     {% endif %}
   </div>
 
-  <!-- Inventor Suggestions -->
   <div class="hud-panel">
-    <div class="panel-title">Inventor Suggestions</div>
+    <h3 class="panel-title">Inventor Suggestions</h3>
     {% if reports.inventor %}
       <p class="small">
-        <a class="hud-link" href="{{ links.inventor }}" target="_blank">Open file</a>
+        <a class="hud-link" href="/codex_reports/inventor_suggestions.md" target="_blank">Open file</a>
       </p>
       <pre class="hud-pre">{{ previews.inventor }}</pre>
     {% else %}
@@ -59,12 +54,11 @@
     {% endif %}
   </div>
 
-  <!-- Harmonia Review -->
   <div class="hud-panel">
-    <div class="panel-title">Harmonia Review</div>
+    <h3 class="panel-title">Harmonia Review</h3>
     {% if reports.harmonia %}
       <p class="small">
-        <a class="hud-link" href="{{ links.harmonia }}" target="_blank">Open file</a>
+        <a class="hud-link" href="/codex_reports/harmonia_review.md" target="_blank">Open file</a>
       </p>
       <pre class="hud-pre">{{ previews.harmonia }}</pre>
     {% else %}
@@ -73,75 +67,58 @@
   </div>
 </div>
 
-<!-- Pytest Results -->
+{% if pytest_summary %}
 <div class="hud-panel">
-  <div class="panel-title">Pytest Results (tmp.json)</div>
-
-  {% if tests_summary %}
-  <div class="metrics mb-2">
+  <h3 class="panel-title">Pytest Results (tmp.json)</h3>
+  <div class="metrics">
     <div class="metric-item">
       <div class="metric-label">Passed</div>
-      <div class="metric-value text-green">{{ tests_summary.passed }}</div>
+      <div class="metric-value text-green">{{ pytest_summary.passed }}</div>
     </div>
     <div class="metric-item">
       <div class="metric-label">Failed</div>
-      <div class="metric-value text-red">{{ tests_summary.failed }}</div>
+      <div class="metric-value text-red">{{ pytest_summary.failed }}</div>
     </div>
     <div class="metric-item">
       <div class="metric-label">Total</div>
-      <div class="metric-value">{{ tests_summary.total }}</div>
+      <div class="metric-value">{{ pytest_summary.total }}</div>
     </div>
   </div>
-  {% endif %}
 
-  {% if tests_table and tests_table|length > 0 %}
-    <div class="table-wrap">
-      <table class="hud-table zebra">
-        <thead>
-          <tr>
-            <th class="col-test">Test</th>
-            <th class="col-outcome">Outcome</th>
-            <th class="col-duration">Duration (s)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in tests_table %}
-          <tr class="
-              {% if t.outcome == 'passed' %}is-pass
-              {% elif t.outcome == 'failed' %}is-fail
-              {% else %}is-other{% endif %}
-          ">
-            <td class="mono col-test">{{ t.nodeid }}</td>
-            <td class="col-outcome">
-              {% if t.outcome == "passed" %}
-                <span class="badge badge--ok">PASSED</span>
-              {% elif t.outcome == "failed" %}
-                <span class="badge badge--err">FAILED</span>
-              {% else %}
-                <span class="badge badge--warn">{{ t.outcome|upper }}</span>
-              {% endif %}
-            </td>
-            <td class="mono col-duration">
-              {% if t.duration is not none %}
-                {{ "%.4f"|format(t.duration) }}
-              {% else %}
-                -
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if links.tmp_json %}
-      <div class="mt-2">
-        <a class="hud-link" href="{{ links.tmp_json }}" target="_blank">
-          <i class="fas fa-file-code"></i> tmp.json を開く
-        </a>
-      </div>
-    {% endif %}
-  {% else %}
-    <p class="text-muted small">まだ pytest JSON 結果がありません。</p>
-  {% endif %}
+  <div class="table-wrap mt-2">
+    <table class="hud-table">
+      <thead>
+        <tr>
+          <th>Test</th>
+          <th>Outcome</th>
+          <th>Duration (s)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in pytest_tests %}
+        <tr>
+          <td class="mono small">{{ t.nodeid }}</td>
+          <td>
+            {% if t.outcome == "passed" %}
+              <span class="badge badge--ok">PASSED</span>
+            {% elif t.outcome == "failed" %}
+              <span class="badge badge--err">FAILED</span>
+            {% else %}
+              <span class="badge">{{ t.outcome }}</span>
+            {% endif %}
+          </td>
+          <td>{{ "%.4f"|format(t.call.duration if t.call and t.call.duration else 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="mt-2 small">
+    <a class="hud-link" href="/codex_reports/tmp.json" target="_blank">
+      <i class="fas fa-file-code"></i> tmp.json を開く
+    </a>
+  </p>
 </div>
+{% endif %}
 {% endblock %}
