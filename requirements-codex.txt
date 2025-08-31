@@ -5,3 +5,4 @@ pytest
 
 # ローカル開発で軽く試す用 (CPU版)
 tensorflow-cpu
+pytest-json-report
