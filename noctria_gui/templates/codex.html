@@ -7,81 +7,126 @@
 {% block header_nav_href %}/dashboard{% endblock %}
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
-{% block extra_head %}
-<style>
-  .codex-grid { display:grid; grid-template-columns: 1fr; gap: 1rem; }
-  @media (min-width: 1100px) { .codex-grid { grid-template-columns: 1fr 1fr; } }
-  .hud-card { background: rgba(0,0,0,.35); border:1px solid var(--panel-border, #2b2b2b); border-radius: 12px; padding: 1rem; box-shadow: 0 0 20px rgba(0,255,180,.06) inset; }
-  .hud-pre { background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.06); padding:.75rem; border-radius:8px; max-height: 420px; overflow:auto; font-size: .9rem; }
-  .hud-actions { display:flex; gap:.5rem; align-items:center; }
-  .hud-btn { padding:.5rem .9rem; border-radius: 10px; border:1px solid var(--panel-border,#2b2b2b); background: linear-gradient(180deg, rgba(0,255,180,.10), rgba(0,255,180,.02)); cursor:pointer; }
-  .hud-btn:hover { filter:brightness(1.1); }
-  .hud-small { opacity:.8; font-size:.85rem; }
-  .hud-link { color: var(--glow-primary, #0ff); text-decoration: none; }
-
-  table.hud-table { width: 100%; border-collapse: collapse; margin-top: .75rem; font-size: .9rem; }
-  table.hud-table th, table.hud-table td { padding: .5rem .6rem; border-bottom: 1px solid var(--panel-border); text-align: left; }
-  table.hud-table th { color: var(--text-color-light); font-weight: 700; background: rgba(255,255,255,.05); }
-  .outcome-pass { color: #7bf1a8; font-weight: 700; }
-  .outcome-fail { color: #ff6b6b; font-weight: 700; }
-</style>
-{% endblock %}
+{# 追加CSSは一切なし。hud_style.css のユーティリティのみ使用 #}
 
 {% block content %}
-<div class="hud-section">
-  <div class="hud-actions">
-    <form action="/codex/run" method="post">
-      <button class="hud-btn" type="submit"><i class="fas fa-play"></i> Run Mini-Loop</button>
-    </form>
-    <span class="hud-small">pytestは既定 <code>-q</code>。詳細は <code>codex/mini_loop.py</code> を参照。</span>
+
+<!-- Runner -->
+<div class="hud-panel">
+  <div class="title">
+    <i class="fas fa-rocket"></i> Mini-Loop Runner
+  </div>
+  <div class="controls">
+    <div>
+      <div class="label">Run</div>
+      <form action="/codex/run" method="post">
+        <button class="hud-button" type="submit">
+          <i class="fas fa-play"></i> Run Mini-Loop
+        </button>
+      </form>
+    </div>
+    <div>
+      <div class="label">Notes</div>
+      <div class="text-muted small">
+        pytest は既定 <code>-q</code>。詳細は <code>codex/mini_loop.py</code> を参照。
+      </div>
+    </div>
+    {% if reports.tmp_json %}
+    <div>
+      <div class="label">Raw JSON</div>
+      <a class="hud-link" href="{{ reports.tmp_json }}" target="_blank">
+        <i class="fas fa-file-code"></i> tmp.json を開く
+      </a>
+    </div>
+    {% endif %}
   </div>
 </div>
 
-<div class="codex-grid">
-  <div class="hud-card">
-    <h3>Latest Cycle (Markdown)</h3>
+<!-- Reports -->
+<div class="grid2">
+  <!-- Latest Cycle -->
+  <div class="hud-panel">
+    <div class="title">
+      <i class="fas fa-scroll"></i> Latest Cycle (Markdown)
+      {% if reports.latest_cycle %}
+        <span class="right" style="margin-left:auto">
+          <a class="pill" href="{{ reports.latest_cycle }}" target="_blank">
+            <i class="fas fa-external-link-alt"></i> Open file
+          </a>
+        </span>
+      {% endif %}
+    </div>
     {% if reports.latest_cycle %}
-      <p class="hud-small"><a class="hud-link" href="/codex_reports/latest_codex_cycle.md" target="_blank">Open file</a></p>
-      <pre class="hud-pre">{{ previews.latest_cycle }}</pre>
+      <pre class="mono p-2 round surface scrollbox max-h-420">{{ previews.latest_cycle }}</pre>
     {% else %}
-      <p class="hud-small">まだ生成されていません。</p>
+      <div class="text-muted">まだ生成されていません。</div>
     {% endif %}
   </div>
 
-  <div class="hud-card">
-    <h3>Mini-Loop Summary</h3>
+  <!-- Mini-Loop Summary -->
+  <div class="hud-panel">
+    <div class="title">
+      <i class="fas fa-clipboard-check"></i> Mini-Loop Summary
+      {% if reports.mini_summary %}
+        <span class="right" style="margin-left:auto">
+          <a class="pill" href="{{ reports.mini_summary }}" target="_blank">
+            <i class="fas fa-external-link-alt"></i> Open file
+          </a>
+        </span>
+      {% endif %}
+    </div>
     {% if reports.mini_summary %}
-      <p class="hud-small"><a class="hud-link" href="/codex_reports/mini_loop_summary.md" target="_blank">Open file</a></p>
-      <pre class="hud-pre">{{ previews.mini_summary }}</pre>
+      <pre class="mono p-2 round surface scrollbox max-h-420">{{ previews.mini_summary }}</pre>
     {% else %}
-      <p class="hud-small">未実行。</p>
+      <div class="text-muted">未実行。</div>
     {% endif %}
   </div>
 
-  <div class="hud-card">
-    <h3>Inventor Suggestions</h3>
+  <!-- Inventor -->
+  <div class="hud-panel">
+    <div class="title">
+      <i class="fas fa-lightbulb"></i> Inventor Suggestions
+      {% if reports.inventor %}
+        <span class="right" style="margin-left:auto">
+          <a class="pill" href="{{ reports.inventor }}" target="_blank">
+            <i class="fas fa-external-link-alt"></i> Open file
+          </a>
+        </span>
+      {% endif %}
+    </div>
     {% if reports.inventor %}
-      <p class="hud-small"><a class="hud-link" href="/codex_reports/inventor_suggestions.md" target="_blank">Open file</a></p>
-      <pre class="hud-pre">{{ previews.inventor }}</pre>
+      <pre class="mono p-2 round surface scrollbox max-h-420">{{ previews.inventor }}</pre>
     {% else %}
-      <p class="hud-small">まだ提案なし。</p>
+      <div class="text-muted">まだ提案なし。</div>
     {% endif %}
   </div>
 
-  <div class="hud-card">
-    <h3>Harmonia Review</h3>
+  <!-- Harmonia -->
+  <div class="hud-panel">
+    <div class="title">
+      <i class="fas fa-shield-alt"></i> Harmonia Review
+      {% if reports.harmonia %}
+        <span class="right" style="margin-left:auto">
+          <a class="pill" href="{{ reports.harmonia }}" target="_blank">
+            <i class="fas fa-external-link-alt"></i> Open file
+          </a>
+        </span>
+      {% endif %}
+    </div>
     {% if reports.harmonia %}
-      <p class="hud-small"><a class="hud-link" href="/codex_reports/harmonia_review.md" target="_blank">Open file</a></p>
-      <pre class="hud-pre">{{ previews.harmonia }}</pre>
+      <pre class="mono p-2 round surface scrollbox max-h-420">{{ previews.harmonia }}</pre>
     {% else %}
-      <p class="hud-small">まだレビューなし。</p>
+      <div class="text-muted">まだレビューなし。</div>
     {% endif %}
   </div>
 </div>
 
+<!-- Pytest Results Table -->
 {% if tests_table and tests_table|length > 0 %}
-<div class="hud-card mt-3">
-  <h3>Pytest Results (from tmp.json)</h3>
+<div class="hud-panel">
+  <div class="title">
+    <i class="fas fa-stream"></i> Pytest Results (from tmp.json)
+  </div>
   <div class="table-wrap">
     <table class="hud-table">
       <thead>
@@ -94,17 +139,17 @@
       <tbody>
         {% for row in tests_table %}
         <tr>
-          <td>{{ row.nodeid }}</td>
+          <td class="mono">{{ row.nodeid }}</td>
           <td>
             {% if row.outcome == "passed" %}
-              <span class="outcome-pass">PASSED</span>
+              <span class="badge badge--pass">passed</span>
             {% elif row.outcome == "failed" %}
-              <span class="outcome-fail">FAILED</span>
+              <span class="badge badge--fail">failed</span>
             {% else %}
-              {{ row.outcome }}
+              <span class="badge badge--other">{{ row.outcome }}</span>
             {% endif %}
           </td>
-          <td>{{ row.duration }}</td>
+          <td class="mono">{{ row.duration }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -112,4 +157,5 @@
   </div>
 </div>
 {% endif %}
+
 {% endblock %}
