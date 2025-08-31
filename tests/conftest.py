@@ -1,32 +1,52 @@
 # tests/conftest.py
-from __future__ import annotations
-import os, sys, pytest
+"""
+pytest の共通設定 (Codex/Noctria テスト制御)
 
-# --- ensure project src/ on sys.path ---
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SRC = os.path.join(ROOT, "src")
-for p in (SRC, ROOT):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+目的:
+- Codex (CPU/tensorflow-cpu 環境) では重いテストを自動 skip
+- GPU/本番環境 (torch, gym, MetaTrader5 あり) では全テスト実行
+"""
 
-@pytest.fixture()
-def capture_alerts(monkeypatch):
+import pytest
+import importlib.util
+import os
+
+
+def pytest_ignore_collect(path, config):
     """
-    - PLAN: observability.emit_alert をキャプチャ
-    - AIログ: observability.log_infer_call をダミー化（DB不要にする）
+    テスト収集時にライブラリが無ければ、そのテストファイルを無視する。
     """
-    from plan_data import observability
+    skip_map = {
+        # PyTorch (RL/DQN 系)
+        "torch": [
+            "tests/test_dqn_agent.py",
+        ],
+        # Gym (MetaAI 強化学習系)
+        "gym": [
+            "tests/test_meta_ai_env_rl.py",
+            "tests/test_meta_ai_rl.py",
+            "tests/test_meta_ai_rl_longrun.py",
+            "tests/test_meta_ai_rl_real_data.py",
+        ],
+        # MetaTrader5 (外部ブローカー接続)
+        "MetaTrader5": [
+            "tests/test_mt5_connection.py",
+        ],
+    }
 
-    recorded: list[dict] = []
+    for lib, files in skip_map.items():
+        if not importlib.util.find_spec(lib):  # ライブラリが存在しない場合
+            if any(str(path).endswith(f) for f in files):
+                return True  # → pytest がそのファイルをスキップ
 
-    def _fake_emit_alert(**kwargs):
-        recorded.append(dict(kwargs))
-        return 1  # dummy id
 
-    def _fake_log_infer_call(*args, **kwargs):
-        # propose_with_logging() から呼ばれるが、DB不要化のため no-op
-        return 1
-
-    monkeypatch.setattr(observability, "emit_alert", _fake_emit_alert)
-    monkeypatch.setattr(observability, "log_infer_call", _fake_log_infer_call)
-    return recorded
+def pytest_collection_modifyitems(config, items):
+    """
+    環境変数などで制御したい場合に使える hook。
+    例: CODEX_LIGHT=1 のときは integration テストを skip。
+    """
+    if os.getenv("CODEX_LIGHT"):
+        skip_integration = pytest.mark.skip(reason="Skipping integration tests in CODEX_LIGHT mode")
+        for item in items:
+            if "integration" in item.keywords:
+                item.add_marker(skip_integration)
