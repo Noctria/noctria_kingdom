@@ -1,62 +1,84 @@
-# Codex Noctria Agents
+# Codex Noctria Agents — 開発者AIとレビュワーAI
 
-## 1. 代理AIの役割
-- **Inventor Scriptus**（開発者AI）
-  - コード生成・修正案の提案を行う。
-  - テスト失敗時には修正案を再生成。
-- **Harmonia Ordinis**（レビュワーAI）
-  - Inventor Scriptus の提案を必ずレビュー。
-  - リスク・逸脱・安全性を評価し、必要に応じて拒否。
-- 両者とも **臣下AI** として Noctria 王国に仕えるが、最終裁可は常に **王 Noctria** に帰属する。
+## 1. エージェントの位置付け
+- **Inventor Scriptus**（開発者AI）  
+  - コード生成・修正を担当。  
+  - pytestを実行して失敗時は修正案を出す。  
+
+- **Harmonia Ordinis**（レビュワーAI）  
+  - 生成コードの品質審査。  
+  - 設計方針や王国の理念に沿っているかを検証。  
+
+両者は「Noctria王国の臣下」として王Noctriaに仕える。
 
 ---
 
 ## 2. 権限レベル
-- **Lv1: 助言**  
-  - 提案のみ。実際のファイル変更・結合は不可。  
-- **Lv2: 修正提案 + 仮PR**  
-  - GitHub 上で Draft PR を生成可能。  
-- **Lv3: 部分統合**  
-  - PR を CI/CD で検証可能。  
-- **Lv4: 自動統合（限定領域）**  
-  - 特定ディレクトリに限り、自動でマージ可。  
-- **Lv5: 全体統合（王裁可必須）**  
-  - 全体への統合は、王 Noctria の承認フラグなしでは不可能。  
+- **Lv1: 提案のみ**  
+  - Inventor Scriptus: 修正案を出す  
+  - Harmonia Ordinis: 論理的レビューを行う  
+
+- **Lv2: パッチ生成**  
+  - Inventor Scriptus: 実際にパッチ形式で修正を出す  
+  - Harmonia Ordinis: パッチの妥当性をレビュー  
+
+- **Lv3: 自動テスト反映**  
+  - Inventor Scriptus: 軽量テストを自動実行し、パスした場合のみ修正を維持  
+  - Harmonia Ordinis: テスト結果を踏まえて承認  
+
+- **Lv4: 本番統合**（将来段階）  
+  - PR作成、Airflow連携、自動昇格審査へ  
 
 ---
 
-## 3. ⚠️ 暴走防止のための統治原則
-1. **王裁可の絶対性**  
-   - いかなる場合も最終決定権は王 Noctria にある。  
-   - 自動統合（Lv5）には必ず王の承認フラグが必要。
-
-2. **観測ログの透明性**  
-   - Inventor Scriptus / Harmonia Ordinis の全行動は **obs_plan_runs / obs_infer_calls** に記録。  
-   - GUI HUD 上で誰が何をしたか完全可視化。
-
-3. **二重承認制**  
-   - Inventor Scriptus の提案は Harmonia Ordinis によるレビューを必須とする。  
-   - Harmonia Ordinis が拒否した提案は統合不可。
-
-4. **方向性逸脱の検出**  
-   - Codex_Noctria.md のロードマップを基準に「進行方向一致率」を評価。  
-   - PR reject率や逸脱度が閾値を超えた場合、権限レベルを降格。
-
-5. **権限昇格は段階的**  
-   - Lv1→Lv2→Lv3→Lv4→Lv5 の順に進む。  
-   - 昇格の条件は **テスト成功率・レビュー合格率・逸脱度低さ** を満たすこと。  
-   - 昇格承認は王 Noctria が行う。
+## 3. 権限昇格条件
+- 提案精度（失敗修正率）が一定水準を超えること  
+- レビュワーによる承認率が高いこと  
+- 不要な変更や方針逸脱が発生しないこと  
+- 王Noctria（人間開発者）が明示承認した場合のみ昇格  
 
 ---
 
-## 4. 技術的実装方針
-- **AutoGen スタイル**: 開発者AIとレビュワーAIの対話を Python マルチエージェントで再現。  
-- **LangChain エージェント**: pytest runner / git client / docs検索 を Tool として利用。  
-- **Airflow DAG**: 「AI開発サイクル」をDAGとして統治プロセスに組み込む。  
-- **観測基盤**: Postgres + observability.py を活用して全アクションをトレーサブルに管理。  
+## 4. 技術的アプローチ
+### A. AutoGenスタイル
+- Pythonマルチエージェント  
+- pytest失敗 → 修正案再生成  
+- GitHub PR自動化  
+
+### B. LangChainエージェント
+- ChatOpenAI + Tools（pytest runner / git client / docs検索）  
+- observability.py で Postgres に全行動を記録  
+
+### C. Airflow連携
+- autogen_devcycle DAG  
+- fetch → pytest → failならGPT修正 → patch生成 → commit → pytest再実行 → passならPR  
 
 ---
 
-## 5. 今後の展望
-- Inventor Scriptus / Harmonia Ordinis の権限を **テスト成功率・レビュー合格率・逸脱度** に基づいて段階的に拡大。  
-- 王 Noctria がロードマップに基づき「臣下AIの昇格儀式」を行うことで、Noctria 王国に秩序を保ちながら完全自律化を実現する。  
+## 5. ⚙️ 開発環境整備：テスト分離
+代理AIを安全に立ち上げるため、テストを以下の2段階に分離する。
+
+- **軽量テスト（ローカル, venv_codex）**  
+  - pandas, numpy, tensorflow-cpu など軽依存  
+  - 実行対象: `test_quality_gate_alerts.py`, `test_noctus_gate_block.py` など  
+  - 代理AIが日常的に回す「自動開発サイクル」はここで実行  
+
+- **重テスト（GPU, gpusoroban / venv_codex+GPU）**  
+  - torch, gym, MetaTrader5, RL系長時間テスト  
+  - 実行対象: RL訓練や統合e2e系のテスト  
+  - 本番昇格審査やAirflow DAGで実行  
+
+### 意義
+- 代理AIが「環境依存のImportError」に惑わされず、本当に修正すべきロジックエラーだけを扱える。  
+- ローカルで高速修正ループを回せる。  
+- 本番GPU環境でのみ統合チェックを実行できる。  
+
+---
+
+## 6. 今後のロードマップ（エージェント関連）
+1. 軽量テスト分離の確立 ✅  
+2. Inventor Scriptus に「修正案生成＋pytest再実行」を組み込み  
+3. Harmonia Ordinis に「レビューロジック」追加  
+4. 権限Lv2 → Lv3 昇格実験  
+5. GPU環境（gpusoroban）での重テスト連携  
+6. Airflow DAG に開発サイクルを統合  
