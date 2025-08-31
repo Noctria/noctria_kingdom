@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from typing import Dict, Optional
+
+from fastapi import APIRouter, Request, Form
+from fastapi.responses import RedirectResponse, HTMLResponse
 
 # 既存プロジェクトのルート推定（noctria_kingdom 直下想定）
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,8 +23,9 @@ CODEX_DIR.mkdir(exist_ok=True, parents=True)
 
 router = APIRouter(prefix="/codex", tags=["Codex"])
 
-def _scan_reports() -> Dict[str, Path | None]:
-    def pick(name: str) -> Path | None:
+
+def _scan_reports() -> Dict[str, Optional[Path]]:
+    def pick(name: str) -> Optional[Path]:
         p = CODEX_DIR / name
         return p if p.exists() else None
 
@@ -36,6 +37,7 @@ def _scan_reports() -> Dict[str, Path | None]:
         "mini_summary": pick("mini_loop_summary.md"),
     }
 
+
 def _read_tail(path: Path, lines: int = 80) -> str:
     try:
         txt = path.read_text(encoding="utf-8")
@@ -44,8 +46,9 @@ def _read_tail(path: Path, lines: int = 80) -> str:
     except Exception as e:
         return f"(read error: {e})"
 
+
 @router.get("")
-async def codex_home(request: Request, templates: Jinja2Templates = Depends(lambda: request.app.state.jinja_env)):
+async def codex_home(request: Request) -> HTMLResponse:
     reports = _scan_reports()
     previews: Dict[str, str] = {}
     for k, p in reports.items():
@@ -53,31 +56,36 @@ async def codex_home(request: Request, templates: Jinja2Templates = Depends(lamb
             previews[k] = _read_tail(p, 120)
         else:
             previews[k] = "(not found)"
-    return templates.TemplateResponse(
+
+    # main.py で公開されているレンダラを利用して描画
+    html = request.app.state.render_template(
         "codex.html",
-        {
-            "request": request,
-            "page_title": "🧪 Codex Mini-Loop",
-            "reports": {k: str(v) if isinstance(v, Path) else None for k, v in reports.items()},
-            "previews": previews,
-        },
+        request=request,
+        page_title="🧪 Codex Mini-Loop",
+        reports={k: (str(v) if isinstance(v, Path) else None) for k, v in reports.items()},
+        previews=previews,
     )
+    return HTMLResponse(html)
+
 
 @router.post("/run")
 async def codex_run(request: Request, pytest_args: str = Form(default="-q")):
     """
     codex/mini_loop を実行。pytest 引数は任意（既定 -q）。
+    ※ 現状 mini_loop 側は pytest_args を引数で受けていないため、そのまま起動。
+      （必要なら環境変数や引数受け取りを mini_loop.py に追記してください）
     """
     cmd = ["python", "-m", "codex.mini_loop"]
-    # mini_loop 側で pytest_args を扱いたい場合は環境変数／引数へ
-    env = dict(**dict(Path, **{}))  # dummy to ensure isolation on some envs
     try:
-        # 直下ルートで実行（ROOT）
-        proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=None)
+        # プロジェクトルートで実行（成果物は codex_reports/ に出力）
+        proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
         rc = proc.returncode
-        # Flash 的な簡易メッセージ（セッショントーストがあればそこへ統合）
-        msg = f"Codex Mini-Loop finished (exit={rc})"
-        request.session.setdefault("toasts", []).append({"level": "info" if rc == 0 else "warning", "text": msg})
+        # トースト（main.py の /__clear_toast と揃える）
+        request.session["toast"] = {
+            "level": "info" if rc == 0 else "warning",
+            "text": f"Codex Mini-Loop finished (exit={rc})",
+        }
     except Exception as e:
-        request.session.setdefault("toasts", []).append({"level": "error", "text": f"Exec failed: {e}"})
+        request.session["toast"] = {"level": "error", "text": f"Exec failed: {e}"}
+
     return RedirectResponse(url="/codex", status_code=303)
