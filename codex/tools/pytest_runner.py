@@ -1,28 +1,42 @@
+# codex/tools/pytest_runner.py
 from __future__ import annotations
-import json, os, subprocess
-from typing import List, Dict, Any
 
-def run_pytest(tests: List[str]) -> Dict[str, Any]:
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import List, Tuple, Optional, Dict
+import os
+
+
+def run_pytest(
+    targets: List[str],
+    *,
+    json_report: bool = True,
+    json_path: Path = Path("codex_reports/tmp.json"),
+    extra_env: Optional[Dict[str, str]] = None,
+) -> Tuple[int, str, str]:
     """
-    軽量テストだけを実行。外部プラグインを抑止し、src を PYTHONPATH に通す。
-    失敗を簡易パースして返す（詳細は raw_log に格納）。
+    pytest を実行して (returncode, stdout, stderr) を返す。
+    - json_report=True のとき、pytest-json-report を強制ロードして JSON を出力。
     """
+    # ベースコマンド
+    cmd = [sys.executable, "-m", "pytest", "-q"]
+
+    # JSON レポートを有効化する場合、プラグインを明示ロード
     env = os.environ.copy()
-    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
-    env["PYTHONPATH"] = os.path.abspath("./src")
+    if json_report:
+        # オートロードが無効でもプラグインを読み込む
+        cmd += ["-p", "pytest_jsonreport", "--json-report", f"--json-report-file={str(json_path)}"]
+        # それでも環境側で抑止される可能性に備え、環境変数を解除/上書き
+        env.pop("PYTEST_DISABLE_PLUGIN_AUTOLOAD", None)
 
-    cmd = ["pytest", "-q"] + tests
-    p = subprocess.run(cmd, env=env, capture_output=True, text=True)
-    out = p.stdout + "\n" + p.stderr
+    if extra_env:
+        env.update(extra_env)
 
-    failures: List[Dict[str, Any]] = []
-    # 超簡易パース： "E   AssertionError: ..." 行や "FAILED test_x.py::..." を拾う
-    for line in out.splitlines():
-        if line.startswith("FAILED ") or line.strip().startswith("E   "):
-            failures.append({"message": line})
+    # 対象のテストを追加
+    cmd += targets
 
-    return {
-        "returncode": p.returncode,
-        "failures": failures,
-        "raw_log": out,
-    }
+    # 実行
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    return proc.returncode, proc.stdout, proc.stderr
