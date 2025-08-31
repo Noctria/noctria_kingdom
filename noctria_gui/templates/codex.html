@@ -35,7 +35,7 @@
   <div class="hud-card">
     <h3>Latest Cycle (Markdown)</h3>
     {% if reports.latest_cycle %}
-      <p class="hud-small"><a class="hud-link" href="/{{ reports.latest_cycle|replace('\\','/') }}" target="_blank">Open file</a></p>
+      <p class="hud-small"><a class="hud-link" href="{{ reports.latest_cycle }}" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.latest_cycle }}</pre>
     {% else %}
       <p class="hud-small">まだ生成されていません。</p>
@@ -45,7 +45,7 @@
   <div class="hud-card">
     <h3>Mini-Loop Summary</h3>
     {% if reports.mini_summary %}
-      <p class="hud-small"><a class="hud-link" href="/{{ reports.mini_summary|replace('\\','/') }}" target="_blank">Open file</a></p>
+      <p class="hud-small"><a class="hud-link" href="{{ reports.mini_summary }}" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.mini_summary }}</pre>
     {% else %}
       <p class="hud-small">未実行。</p>
@@ -55,7 +55,7 @@
   <div class="hud-card">
     <h3>Inventor Suggestions</h3>
     {% if reports.inventor %}
-      <p class="hud-small"><a class="hud-link" href="/{{ reports.inventor|replace('\\','/') }}" target="_blank">Open file</a></p>
+      <p class="hud-small"><a class="hud-link" href="{{ reports.inventor }}" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.inventor }}</pre>
     {% else %}
       <p class="hud-small">まだ提案なし。</p>
@@ -65,7 +65,7 @@
   <div class="hud-card">
     <h3>Harmonia Review</h3>
     {% if reports.harmonia %}
-      <p class="hud-small"><a class="hud-link" href="/{{ reports.harmonia|replace('\\','/') }}" target="_blank">Open file</a></p>
+      <p class="hud-small"><a class="hud-link" href="{{ reports.harmonia }}" target="_blank">Open file</a></p>
       <pre class="hud-pre">{{ previews.harmonia }}</pre>
     {% else %}
       <p class="hud-small">まだレビューなし。</p>
