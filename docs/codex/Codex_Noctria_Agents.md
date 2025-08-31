@@ -1,91 +1,52 @@
-# ⚙️ Codex Noctria Agents — 技術的アプローチ・実装方式
+# docs/codex/Codex_Noctria_Agents.md
 
-本書は **Codex-Noctria.md（全体ロードマップ）** を補完し、Noctria 王国における代理AI（Inventor Scriptus / Harmonia Ordinis）および Hermes・Veritas の自律開発サイクルを支える技術的方式を記述する。
-
----
+# 🤖 Codex Noctria Agents - 技術的アプローチと権限レベル
 
 ## 1. 技術的アプローチ
 
-### A. AutoGen スタイル（Pythonマルチエージェント）
-- **Inventor Scriptus**（開発者AI）と **Harmonia Ordinis**（レビュワーAI）を並走
-- pytest を実行 → 失敗したら修正案生成 → 再試行
-- 成功時に GitHub PR を自動化
-- 利点: 自律的開発ループをシンプルに構築可能
+### A. AutoGenスタイル（Pythonマルチエージェント）
+- Inventor Scriptus と Harmonia Ordinis がエージェントとして会話
+- pytest失敗時 → 修正案生成 / レビュー
+- GitHub PRを自動化可能
 
-### B. LangChain エージェント
-- LangChain + ChatOpenAI を利用し、NoctriaAgent を実装
-- Tools:
-  - pytest runner
-  - git client
-  - docs 検索
-- observability.py 経由で Postgres に全行動を記録可能
-- 利点: 強い拡張性、toolchain の容易な追加
+### B. LangChainエージェント
+- ChatOpenAI + Tools(pytest runner, git client, docs検索)
+- Plan層の observability.py を利用し、行動をPostgresに記録
+- 「NoctriaAgent」としてHUDから実行可能
 
-### C. Airflow 連携
-- **AI開発サイクルそのものを DAG 化**
-- 例: `autogen_devcycle` DAG
-  1. 最新コード fetch
-  2. pytest 実行
-  3. 失敗なら GPT に修正依頼
-  4. パッチ生成 → commit
-  5. pytest 再実行
-  6. 成功時に GitHub PR
-- 利点: スケジューラ・監視・再実行が標準化される
+### C. Airflow連携
+- AI開発サイクルそのものを Airflow DAG 化
+- DAG例: `autogen_devcycle`
+  1. fetch 最新コード
+  2. run pytest
+  3. fail → GPT修正案生成
+  4. patch → commit
+  5. 再度 pytest
+  6. pass → PR作成
 
 ---
 
-## 2. 実装方式（臣下ごと）
+## 2. 権限レベル設計
 
-### Inventor Scriptus（開発者AI）
-- ChatGPT API を利用
-- pytest ログを解析し、修正案コードを生成
-- `generated_code/` にパッチ保存
-- GitHub CLI または pygit2 で PR 作成
+### 権限レベル 1: 助言フェーズ
+- **Inventor Scriptus**: 修正提案をテキスト提示
+- **Harmonia Ordinis**: pytestログを解析し自然言語でレビュー
+- 実装: AutoGen + pytest log parser
 
-### Harmonia Ordinis（レビュワーAI）
-- Scriptus 提案を精査
-- コード規約・依存性・統治ルールとの整合性を検証
-- 自動レビューコメントを生成し、PR に付与
-- 重大リスクがあれば **REJECT**
+### 権限レベル 2: 自動パッチフェーズ
+- **Inventor Scriptus**: 修正コードを生成しPRを作成
+- **Harmonia Ordinis**: PRをレビューしapprove/reject
+- 実装: GitHub Actions + LangChain agent
 
-### Hermes Cognitor（LLM戦略生成AI）
-- LLM API（ChatGPT）で戦略アイデアを自然言語から生成
-- 提案戦略をコード化（EA / Python戦略）
-- Veritas への入力フォーマットに変換
+### 権限レベル 3: 自律結合フェーズ
+- **Inventor Scriptus**: nightly Airflow DAGで修正を自動実行
+- **Harmonia Ordinis**: Observabilityに行動を記録
+- 実装: Airflow DAG + observability.py
 
-### Veritas Machina（ML評価AI）
-- GPUクラウドで戦略を訓練
-- 評価: 勝率 / 最大DD / Sharpe / RMSE / MAPE
-- 評価結果を Hermes にフィードバックし、改善ループを形成
-
----
-
-## 3. 部分結合・統合結合の工程
-
-- **部分結合**
-  - Hermes + Veritas … 戦略生成と評価の自動ループ
-  - Scriptus + Harmonia … コード修正とレビューの開発ループ
-- **統合結合**
-  - 全エージェントを Airflow DAG に統合
-  - Observability (Postgres) で統一的に行動ログを保存
-  - King Noctria が最終裁定を自動下す
-
----
-
-## 4. 使用インフラ
-
-- **LLM**: OpenAI ChatGPT API（Hermes / Scriptus / Harmonia）
-- **ML**: GPUクラウドサービス（AWS / GCP / Azure）
-- **Orchestration**: Apache Airflow
-- **Logging**: PostgreSQL（observability.py）
-- **CI/CD**: GitHub Actions + PR 自動生成
-
----
-
-## 5. 今後の拡張
-- 🛠️ CI/CD → GitHub Actions から Airflow DAG へ移行
-- 🧠 複数 LLM モデルを併用（Hermes=GPT-4.1, Scriptus=GPT-5-mini）
-- 🔄 PDCAループ全体の完全自動化
-- 🏰 王の意思決定を「Chain-of-Council」としてモデル化
+### 権限レベル 4: 王裁可フェーズ
+- **Inventor Scriptus**: 全工程を自律的に完遂
+- **Harmonia Ordinis**: 自動リリース承認提案
+- **王Noctria**: GUIから承認を与えるだけで全体が進行
+- 実装: FastAPI HUD + 「王の裁可」UI
 
 ---
