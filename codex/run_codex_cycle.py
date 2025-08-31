@@ -12,7 +12,7 @@ JSON_PATH = REPORTS_DIR / "tmp.json"
 JUNIT_PATH = REPORTS_DIR / "tmp.junit.xml"
 LATEST_MD = REPORTS_DIR / "latest_codex_cycle.md"
 
-# 小ループで収集する対象（pytest.ini は触らない）
+# 🎯 小ループで回す対象（pytest.ini は変更しない）
 DEFAULT_MINILOOP_TARGETS = [
     "tests/test_quality_gate_alerts.py",
     "tests/test_noctus_gate_block.py",
@@ -22,12 +22,14 @@ def _has_pytest_json_report() -> bool:
     return importlib.util.find_spec("pytest_jsonreport") is not None
 
 def _pytest_env() -> dict:
+    """src レイアウトを解決。全体テスト用 pytest.ini は触らず両立。"""
     env = os.environ.copy()
     add = f"{PROJECT_ROOT/'src'}:{PROJECT_ROOT}"
     env["PYTHONPATH"] = f"{add}:{env.get('PYTHONPATH','')}".strip(":")
     return env
 
 def _run_pytest(pytest_args: List[str]) -> Tuple[int, str, str, bool]:
+    """pytest を実行して (rc, stdout, stderr, used_json_plugin) を返す"""
     used_json = _has_pytest_json_report()
     cmd = [sys.executable, "-m", "pytest", "-q", *pytest_args]
     if used_json:
@@ -38,10 +40,14 @@ def _run_pytest(pytest_args: List[str]) -> Tuple[int, str, str, bool]:
     return proc.returncode, proc.stdout, proc.stderr, used_json
 
 def _load_result(used_json: bool) -> dict[str, Any]:
+    """pytest-json-report か JUnit を統一フォーマットへ"""
     if used_json and JSON_PATH.exists():
         return json.loads(JSON_PATH.read_text(encoding="utf-8"))
+
+    # フォールバック: JUnit → ざっくりJSON化
     if not JUNIT_PATH.exists():
-        return {}
+        return {"pytest": {"total": 0, "failed": 0, "errors": 0, "skipped": 0, "duration_sec": 0.0, "cases": []}}
+
     root = ET.parse(JUNIT_PATH).getroot()
     suite = root.find("testsuite") or root
     total = int(suite.attrib.get("tests", 0))
@@ -94,13 +100,17 @@ def run_cycle(pytest_args: str | None, base_ref: str, head_ref: str, title: str,
     args = pytest_args.split() if (pytest_args and pytest_args.strip()) else list(DEFAULT_MINILOOP_TARGETS)
     rc, out, err, used_json = _run_pytest(args)
     result_dict = _load_result(used_json)
-    if result_dict:
-        JSON_PATH.write_text(json.dumps(result_dict, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # ✅ pytestの結果JSONを必ず保存（以前の CycleResult の文字列保存を修正）
+    JSON_PATH.write_text(json.dumps(result_dict, ensure_ascii=False, indent=2), encoding="utf-8")
+
     _write_latest_md(rc, out or "", err or "", used_json)
+
     result = CycleResult(pytest=result_dict.get("pytest", {}), git={"branch": "", "commit": "", "is_dirty": False})
     return result, str(LATEST_MD)
 
 if __name__ == "__main__":
     rc, out, err, used_json = _run_pytest(list(DEFAULT_MINILOOP_TARGETS))
     _write_latest_md(rc, out, err, used_json)
+    # CLI実行時は終了コードだけ返す
     sys.exit(rc)
