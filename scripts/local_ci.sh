@@ -12,8 +12,6 @@ fi
 # --- requirements の選択 ---
 if [ -f requirements-codex.txt ]; then
   REQ=requirements-codex.txt
-elif [ -f requirements-dev.txt ]; then
-  REQ=requirements-dev.txt
 else
   echo "⚠️ requirements-codex.txt が見つかりません"
   exit 1
