@@ -1,5 +1,7 @@
-# requirements-codex.txt
+# 基本ユーティリティ
+numpy
+pandas
 pytest
-black
-ruff
-# 他 Codexで使うものを追加
+
+# ローカル開発で軽く試す用 (CPU版)
+tensorflow-cpu
