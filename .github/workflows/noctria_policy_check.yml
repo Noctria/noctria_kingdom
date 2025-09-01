@@ -1,14 +1,22 @@
 name: noctria_policy_check
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+
+# 同じブランチの古いRunを自動キャンセル（分数節約）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   policy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+        with:
+          python-version: "3.12"
       - run: pip install pyyaml
       - name: Validate codex policy YAML
         run: python - <<'PY'
