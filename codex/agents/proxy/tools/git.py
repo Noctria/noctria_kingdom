@@ -9,8 +9,8 @@ from typing import Dict, Any, List
 class GitTool:
     """
     安全サブセットの git 操作。
-    - apply_patch(check_only=True/False): -p1 を指定して a/ b/ プレフィクスを剥がす
-    - restore_worktree(): 追跡ファイルの変更を破棄 + 未追跡のうち keep_dirs は残す
+    - apply_patch(check_only=True/False): -p1 を基本に、失敗時は -p2, -p0 を自動フォールバック
+    - restore_worktree(): 追跡ファイル変更を破棄 + 未追跡のうち keep_dirs は残す
     """
     name = "git"
 
@@ -26,13 +26,19 @@ class GitTool:
 
         if act == "apply_patch":
             path = kwargs["path"]
-            check = kwargs.get("check_only", False)
-            # -p1 で a/ or b/ を剥がす。check_only 時は --check を併用
-            cmd = f"git apply -p1 {'--check' if check else ''} {shlex.quote(path)}".strip()
-            cp = self._run(cmd)
-            if cp.returncode != 0:
-                return {"ok": False, "error": (cp.stderr or cp.stdout).strip()}
-            return {"ok": True}
+            check = bool(kwargs.get("check_only", False))
+
+            # a/a/<file> のようなヘッダに対応するため p-strip をフォールバック
+            p_strips = [1, 2, 0]  # 通常は -p1、二重 a/ の場合は -p2、最後に -p0 を試す
+            last_err = ""
+            for p in p_strips:
+                cmd = f"git apply -p{p} {'--check' if check else ''} {shlex.quote(path)}".strip()
+                cp = self._run(cmd)
+                if cp.returncode == 0:
+                    return {"ok": True, "pstrip": p}
+                last_err = (cp.stderr or cp.stdout).strip()
+
+            return {"ok": False, "error": last_err or "git apply failed"}
 
         if act == "restore_worktree":
             # 追跡ファイルのローカル変更を破棄
