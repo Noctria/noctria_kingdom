@@ -95,3 +95,8 @@ docs/_generated/**
 *.bak
 # secrets (念のため)
 docs/misc/API_Keys.md
+
+# build artifacts
+codex_reports/
+__pycache__/
+*.pyc
