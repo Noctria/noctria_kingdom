@@ -1,4 +1,4 @@
-# codex/agents/proxy/tools/pytest_runner.py
+cat > codex/agents/proxy/tools/pytest_runner.py << 'PY'
 from __future__ import annotations
 
 import os
@@ -20,7 +20,7 @@ class PytestTool:
         rc==1 -> "failed:{n}"
         それ以外 -> "error:rc={rc}"
     - ログは codex_reports/proxy_pytest_last.log に保存
-    - デフォルト timeout=180s（必要なら kwargs["timeout"] で上書き）
+    - デフォルト timeout=180s（kwargs["timeout"] で上書き可）
     """
     name = "pytest"
 
@@ -104,3 +104,4 @@ class PytestTool:
             pass
 
         return {"ok": ok, "returncode": rc, "failed": failed, "status": status, "cmd": " ".join(cmd)}
+PY
