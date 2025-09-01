@@ -4,11 +4,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-# 同じブランチの古いRunを自動キャンセル（分数節約）
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   policy:
     runs-on: ubuntu-latest
@@ -19,11 +14,12 @@ jobs:
           python-version: "3.12"
       - run: pip install pyyaml
       - name: Validate codex policy YAML
-        run: python - <<'PY'
-import yaml
-yaml.safe_load(open("docs/codex/codex_noctria_policy.yaml","r",encoding="utf-8"))
-print("policy ok")
-PY
+        run: |
+          python - <<'PY'
+          import yaml
+          yaml.safe_load(open("docs/codex/codex_noctria_policy.yaml","r",encoding="utf-8"))
+          print("policy ok")
+          PY
       - name: Block bot direct-to-main
         run: |
           PR_TARGET="${{ github.base_ref }}"
