@@ -103,3 +103,18 @@ codex_reports/*
 !codex_reports/graphs/
 !codex_reports/graphs/pages_svg/
 !codex_reports/graphs/pages_svg/*.png
+
+# --- reports/buildを丸ごと無視 ---
+codex_reports/**
+
+# --- ここから許可するものだけ解除 ---
+# dead_code ツール本体と keep
+!codex_reports/dead_code/
+!codex_reports/dead_code/quarantine.py
+!codex_reports/dead_code/keep.txt
+
+# グラフのPNGだけ（SVG, DOT, PDF 等は無視）
+!codex_reports/graphs/
+!codex_reports/graphs/pages_svg/
+!codex_reports/graphs/pages_svg/*.png
+
