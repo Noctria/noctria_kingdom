@@ -1,4 +1,3 @@
-cat > codex_reports/graphs/gen_repo_graphs.py <<'PY'
 import os, re, sys, csv, json, hashlib, pathlib
 ROOT = pathlib.Path(".").resolve()
 OUT  = ROOT/"codex_reports"/"graphs"
@@ -191,4 +190,4 @@ print("[OK] manifest:", (OUT/'manifest.csv'))
 print("[OK] files_tree.dot:", (OUT/'files_tree.dot'))
 print("[OK] imports.dot:", (OUT/'imports.dot'))
 print("[OK] mermaid pages:", (PAGEDIR))
-PY
+
