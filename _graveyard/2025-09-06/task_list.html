@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>開発タスク管理 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/hud_style.css" />
+</head>
+<body class="hud-container-simple">
+  <header class="header">
+    <h1 class="hud-title"><i class="fas fa-tasks"></i> 開発タスク一覧</h1>
+  </header>
+
+  <section class="hud-panel">
+    <table id="task-table" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--panel-border);">
+          <th style="text-align: left; padding: 0.75rem;">ファイル名</th>
+          <th style="text-align: left; padding: 0.75rem;">ステータス</th>
+          <th style="text-align: left; padding: 0.75rem;">コメント</th>
+          <th style="text-align: center; padding: 0.75rem;">操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script>
+    async function fetchTasks() {
+      const res = await fetch("/tasks/");
+      const data = await res.json();
+      const tbody = document.querySelector("#task-table tbody");
+      tbody.innerHTML = "";
+      for (const [file, info] of Object.entries(data)) {
+        const tr = document.createElement("tr");
+        tr.style.borderBottom = "1px solid var(--panel-border)";
+        tr.innerHTML = `
+          <td style="padding: 0.75rem;">${file}</td>
+          <td style="padding: 0.75rem; color: var(--text-color-normal); font-weight: 600;">${info.status}</td>
+          <td style="padding: 0.75rem; white-space: pre-wrap;">${info.comments.join("<br>")}</td>
+          <td style="padding: 0.75rem; text-align: center;">
+            <button class="hud-link" onclick="updateStatus('${file}', 'reviewing')">レビュー中</button>
+            <button class="hud-link" onclick="updateStatus('${file}', 'completed')">完了</button>
+            <button class="hud-link" onclick="updateStatus('${file}', 'rejected')">差戻し</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function updateStatus(file, status) {
+      const res = await fetch(`/tasks/${file}/status?status=${status}`, {method: "POST"});
+      if (res.ok) {
+        alert("ステータスを更新しました。");
+        fetchTasks();
+      } else {
+        alert("更新に失敗しました。");
+      }
+    }
+
+    fetchTasks();
+  </script>
+</body>
+</html>

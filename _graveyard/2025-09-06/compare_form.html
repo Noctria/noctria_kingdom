@@ -1,0 +1,38 @@
+{% extends "base_hud.html" %}
+
+{% block title %}⚔️ Strategy Comparison - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-balance-scale"></i>{% endblock %}
+{% block header_title %}STRATEGY COMPARISON{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+{% endblock %}
+
+{% block content %}
+<div class="hud-panel selection-panel">
+  <h2 class="panel-title">SELECT STRATEGIES TO COMPARE</h2>
+
+  <form method="post" action="/statistics/compare/render" class="strategy-compare-form" style="display: flex; flex-direction: column; gap: 1rem;">
+    {% if strategies %}
+      <div class="strategy-list" style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+        {% for s in strategies %}
+          <label class="strategy-item-checkbox">
+            <input type="checkbox" name="selected" value="{{ s.strategy }}">
+            <span class="custom-checkbox"></span>
+            <span style="margin-left: 0.5rem;">
+              {{ s.strategy }}（勝率: {{ s.win_rate }}%、DD: {{ s.max_drawdown }}%、取引数: {{ s.num_trades }}）
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="padding: 2rem; text-align: center;">No strategy logs found.</p>
+    {% endif %}
+
+    <div style="margin-top: 2rem;">
+      <button type="submit" class="hud-btn">
+        <i class="fas fa-chart-bar"></i> 比較する
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

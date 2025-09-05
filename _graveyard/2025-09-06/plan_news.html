@@ -1,0 +1,198 @@
+<!-- noctria_gui/templates/plan_news.html -->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Plan News — {{ asset }}{% if event_tag %} / {{ event_tag }}{% endif %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- HUDテーマ -->
+  <link rel="stylesheet" href="/static/hud_style.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+
+  <style>
+    /* レイアウトだけローカルで補助 */
+    .hud-container-simple { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .panel-title small { opacity: .7; margin-left: .5rem; font-weight: 400; }
+    .controls { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin:.5rem 0 0; }
+    .controls input { padding: .35rem .5rem; background: rgba(0,0,0,.25); border: 1px solid var(--panel-border); color: var(--text-color-base); border-radius: 6px; }
+    .controls button { padding: .4rem .7rem; border:1px solid var(--panel-border); background: transparent; color: var(--text-color-light); border-radius: 8px; }
+    .chart-wrap { height: 260px; } /* 固定高で無限スクロール感を抑制 */
+    canvas { width: 100% !important; height: 100% !important; }
+  </style>
+</head>
+<body>
+  <div class="hud-container-simple">
+    <div class="header">
+      <a class="nav-item-back" href="/dashboard">⟵ ダッシュボード</a>
+      <div class="hud-title">Plan News — <strong>{{ asset }}</strong>{% if event_tag %} / <strong>{{ event_tag }}</strong>{% endif %}</div>
+    </div>
+
+    <!-- News Timeline -->
+    <section class="hud-panel">
+      <div class="panel-title">News Timeline
+        <small>GET /api/plan/news_timeline?asset={{ asset }}</small>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="timelineChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Event Impact -->
+    <section class="hud-panel">
+      <div class="panel-title">Event Impact</div>
+      <div class="controls">
+        <label>event_tag:
+          <input id="eventTagInput" value="{{ event_tag or '' }}" placeholder="例: CPI, FOMC, BOJ">
+        </label>
+        <label>start:
+          <input id="startInput" type="number" value="-3" style="width:72px">
+        </label>
+        <label>end:
+          <input id="endInput" type="number" value="3" style="width:72px">
+        </label>
+        <button id="reloadBtn">Reload</button>
+      </div>
+      <small class="text-light">GET /api/plan/event_impact?asset={{ asset }}&event_tag=...&start=...&end=...</small>
+      <div class="chart-wrap" style="margin-top:.5rem">
+        <canvas id="impactChart"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ========== CSS変数の取得ユーティリティ ==========
+    const cssVar = (name, fallback='') =>
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+
+    // 8桁HEX(#RRGGBBAA)や6桁HEX(#RRGGBB)を rgba(...) に
+    function hexToRgba(hex, alphaOverride=null) {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})?$/i.exec(hex);
+      if (!m) return hex; // そのまま返す
+      const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+      let a = 1;
+      if (m[4]) a = parseInt(m[4], 16)/255;
+      if (alphaOverride != null) a = alphaOverride;
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+
+    // ========== HUDテーマの色束 ==========
+    const COLORS = {
+      base:   cssVar('--text-color-base',  '#d0e9ff'),
+      light:  cssVar('--text-color-light', '#a0d8ff'),
+      normal: cssVar('--text-color-normal','#22d1ee'),
+      dark:   cssVar('--text-color-dark',  '#0a7cbc'),
+      glow:   cssVar('--glow-primary',     '#22d1ee'),
+      border: cssVar('--panel-border',     '#22d1ee44'), // 8桁HEX
+      panel:  cssVar('--panel-bg',         '#131a4f'),
+    };
+    const GRID = hexToRgba(COLORS.border);         // グリッド線
+    const TICK = hexToRgba(COLORS.base);           // 目盛り文字
+    const LEGEND = hexToRgba(COLORS.light);        // 凡例文字
+    const TOOLTIP_BG = hexToRgba(COLORS.panel, .96);
+
+    // Chart.js 全体デフォルト（HUD寄せ）
+    Chart.defaults.color = TICK;
+    Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() || 'system-ui';
+    Chart.defaults.plugins.legend.labels.color = LEGEND;
+    Chart.defaults.plugins.tooltip.backgroundColor = TOOLTIP_BG;
+    Chart.defaults.plugins.tooltip.titleColor = COLORS.light;
+    Chart.defaults.plugins.tooltip.bodyColor  = COLORS.base;
+    Chart.defaults.scale.grid.color = GRID;
+    Chart.defaults.scale.ticks.color = TICK;
+
+    const asset = {{ asset|tojson }};
+    const initialEventTag = {{ (event_tag or "")|tojson }};
+
+    async function fetchJson(url){
+      const r = await fetch(url);
+      if(!r.ok){ throw new Error(await r.text()); }
+      return r.json();
+    }
+
+    // ========== Timeline ==========
+    async function renderTimeline(){
+      const url = `/api/plan/news_timeline?asset=${encodeURIComponent(asset)}`;
+      const data = await fetchJson(url);
+      const ctx = document.getElementById('timelineChart').getContext('2d');
+      if(window.timelineChart && typeof window.timelineChart.destroy === 'function') window.timelineChart.destroy();
+
+      window.timelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            { label: 'cnt_1d',      data: data.series.cnt_1d,      borderColor: COLORS.light,  pointRadius: 2, borderWidth: 2, tension: .3 },
+            { label: 'cnt_7d_ma',   data: data.series.cnt_7d_ma,   borderColor: COLORS.normal, pointRadius: 0, borderWidth: 2, tension: .3 },
+            { label: 'senti_1d_avg',data: data.series.senti_1d_avg,borderColor: COLORS.dark,   pointRadius: 2, borderWidth: 2, tension: .3 },
+            { label: 'senti_7d_avg',data: data.series.senti_7d_avg,borderColor: COLORS.glow,   pointRadius: 0, borderWidth: 2, tension: .3 },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { grid: { color: GRID }, ticks: { color: TICK } },
+            y: { grid: { color: GRID }, ticks: { color: TICK } },
+          }
+        }
+      });
+    }
+
+    // ========== Event Impact ==========
+    async function renderImpact(tag, start=-3, end=3){
+      const ctx = document.getElementById('impactChart').getContext('2d');
+      if(window.impactChart && typeof window.impactChart.destroy === 'function') window.impactChart.destroy();
+
+      if(!tag){
+        // 未指定なら空グラフ
+        window.impactChart = new Chart(ctx, {
+          type: 'line',
+          data: { labels: [], datasets: [] },
+          options: { responsive:true, maintainAspectRatio:false }
+        });
+        return;
+      }
+      const url = `/api/plan/event_impact?asset=${encodeURIComponent(asset)}&event_tag=${encodeURIComponent(tag)}&start=${start}&end=${end}`;
+      const data = await fetchJson(url);
+
+      window.impactChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels.map(String),
+          datasets: [
+            { label: 'cnt_avg',   data: data.series.cnt_avg,   borderColor: COLORS.normal, pointRadius: 2, borderWidth: 2, tension:.3 },
+            { label: 'senti_avg', data: data.series.senti_avg, borderColor: COLORS.light,  pointRadius: 2, borderWidth: 2, tension:.3 },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { title: { display:true, text:'days from event', color: LEGEND }, grid:{ color: GRID }, ticks:{ color: TICK } },
+            y: { grid: { color: GRID }, ticks: { color: TICK } },
+          }
+        }
+      });
+    }
+
+    // 初期描画
+    renderTimeline();
+    renderImpact(initialEventTag);
+
+    // UI: Reload + URL反映
+    document.getElementById('reloadBtn').addEventListener('click', () => {
+      const tag   = document.getElementById('eventTagInput').value.trim();
+      const start = parseInt(document.getElementById('startInput').value || '-3', 10);
+      const end   = parseInt(document.getElementById('endInput').value   || '3', 10);
+      const params = new URLSearchParams({ asset, ...(tag && {event_tag:tag}) });
+      history.replaceState(null, '', `/plan/news?${params.toString()}`);
+      renderImpact(tag, start, end);
+    });
+  </script>
+</body>
+</html>

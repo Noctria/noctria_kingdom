@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <title>📊 Strategy Statistics - Noctria Kingdom HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 専用CSSファイル -->
+    <link rel="stylesheet" href="/static/hud_style.css" />
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .hud-tag {
+            background-color: #0a74da;
+            color: #fff;
+            border-radius: 0.4rem;
+            padding: 0.1rem 0.5rem;
+            font-size: 0.85rem;
+            margin-right: 0.3rem;
+            display: inline-block;
+        }
+        .action-links a {
+            margin-right: 0.8rem;
+            color: #0cf;
+            text-decoration: none;
+        }
+        .action-links a:hover {
+            text-decoration: underline;
+        }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hud-container-simple">
+        <!-- Header -->
+        <header class="hud-panel header">
+            <h1 class="hud-title"><i class="fas fa-chart-pie"></i> VERITAS STRATEGY STATISTICS</h1>
+            <a href="/dashboard" class="nav-item-back"><i class="fas fa-tachometer-alt"></i><span>DASHBOARD</span></a>
+        </header>
+
+        <!-- Controls Panel -->
+        <section class="hud-panel controls-panel">
+            <form method="get" action="/strategies/search" class="filter-form">
+                <input type="text" name="keyword" placeholder="Search by strategy name or tag..." value="{{ keyword if keyword else '' }}">
+                <button type="submit" class="hud-btn"><i class="fas fa-search"></i> 検索</button>
+            </form>
+            <div class="separator"></div>
+            <button onclick="plotComparison()" class="hud-btn" title="選択した戦略をグラフで比較します"><i class="fas fa-chart-bar"></i> 選択戦略を比較グラフで表示</button>
+        </section>
+
+        <!-- Main Analysis Panel -->
+        <main class="hud-panel analysis-panel">
+            <div class="chart-container-half" style="height: 320px;">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+            <div class="table-wrapper">
+                {% if strategies %}
+                <form id="strategy-form">
+                <table class="hud-table" id="strategy-table">
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-check-square"></i></th>
+                            <th>戦略名</th>
+                            <th class="sortable" onclick="sortTable(2, true)">勝率 <i class="fas fa-sort"></i></th>
+                            <th class="sortable" onclick="sortTable(3, true)">取引数 <i class="fas fa-sort"></i></th>
+                            <th class="sortable" onclick="sortTable(4, true)">最大DD <i class="fas fa-sort"></i></th>
+                            <th>タグ</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in strategies %}
+                        <tr>
+                            <td>
+                                <label class="strategy-item-checkbox">
+                                    <input type="checkbox" name="compare" value="{{ s.strategy }}"
+                                           data-winrate="{{ s.win_rate }}"
+                                           data-drawdown="{{ s.max_drawdown }}"
+                                           data-trades="{{ s.trade_count }}">
+                                    <span class="custom-checkbox"></span>
+                                </label>
+                            </td>
+                            <td class="tag-name-cell">
+                              <a href="/strategy/detail?name={{ s.strategy }}" title="戦略詳細を見る">{{ s.strategy }}</a>
+                            </td>
+                            <td>{{ '{:.1f}'.format(s.win_rate) if s.win_rate is not none else '―' }}</td>
+                            <td>{{ s.trade_count if s.trade_count is not none else '―' }}</td>
+                            <td>{{ s.max_drawdown if s.max_drawdown is not none else '―' }}</td>
+                            <td>
+                                {% for tag in s.tags or [] %}
+                                    <span class="hud-tag">{{ tag }}</span>
+                                {% endfor %}
+                            </td>
+                            <td class="action-links">
+                                <a class="table-link" href="/strategy/detail?name={{ s.strategy }}">📄 詳細</a>
+                                <a class="table-link" href="/strategies/view?name={{ s.strategy }}.py">📜 コード</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </form>
+                {% else %}
+                    <p style="text-align: center; padding: 2rem;">⚠️ 表示できる戦略が見つかりませんでした。</p>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let strategyChart;
+
+        function plotComparison() {
+            const checkboxes = document.querySelectorAll('input[name="compare"]:checked');
+            if (checkboxes.length === 0) {
+                alert("比較する戦略を1つ以上選択してください。");
+                return;
+            }
+            const labels = [];
+            const winrates = [];
+            const drawdowns = [];
+
+            checkboxes.forEach(cb => {
+                labels.push(cb.value);
+                winrates.push(parseFloat(cb.dataset.winrate) || 0);
+                drawdowns.push(parseFloat(cb.dataset.drawdown) || 0);
+            });
+
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            if (strategyChart) strategyChart.destroy();
+
+            strategyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '勝率（%）',
+                            data: winrates,
+                            backgroundColor: 'rgba(125, 249, 255, 0.7)', // accent-color-1
+                            borderColor: 'rgb(125, 249, 255)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '最大ドローダウン',
+                            data: drawdowns,
+                            backgroundColor: 'rgba(75, 144, 255, 0.7)', // accent-color-2
+                            borderColor: 'rgb(75, 144, 255)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#a8b2d1' }, grid: { color: 'rgba(0, 229, 255, 0.2)' } },
+                        x: { ticks: { color: '#a8b2d1' }, grid: { color: 'rgba(0, 229, 255, 0.2)' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e6f1ff' } }
+                    }
+                }
+            });
+        }
+
+        function sortTable(colIndex, isNumeric) {
+            const table = document.getElementById("strategy-table");
+            const tbody = table.tBodies[0];
+            const rows = Array.from(tbody.rows);
+            const th = table.querySelectorAll("th")[colIndex];
+            const currentDir = th.dataset.sortDir || 'desc';
+            const newDir = currentDir === 'asc' ? 'desc' : 'asc';
+
+            table.querySelectorAll("th.sortable").forEach(h => h.dataset.sortDir = '');
+            th.dataset.sortDir = newDir;
+
+            rows.sort((a, b) => {
+                const aText = a.cells[colIndex].innerText.trim();
+                const bText = b.cells[colIndex].innerText.trim();
+                const aVal = isNumeric ? parseFloat(aText) || -Infinity : aText;
+                const bVal = isNumeric ? parseFloat(bText) || -Infinity : bText;
+                if (aVal < bVal) return newDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return newDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            tbody.append(...rows);
+        }
+    </script>
+</body>
+</html>

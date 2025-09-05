@@ -1,0 +1,160 @@
+<!-- noctria_gui/templates/decision_registry.html -->
+{% extends "base_hud.html" %}
+{% block title %}{{ page_title or "🗂 Decision Registry" }} | Noctria HUD{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <h1 class="panel-title">{{ page_title or "🗂 Decision Registry" }}</h1>
+
+  {% if mode == "index" %}
+    <form method="get" action="/decisions" class="form-grid" style="margin-bottom:1rem">
+      <div class="form-row">
+        <label>件数 (tail)</label>
+        <input type="number" name="n" value="{{ n or 200 }}" min="1" max="5000">
+      </div>
+      <div class="form-row">
+        <label>kind</label>
+        <input type="text" name="kind" value="{{ kind or '' }}" placeholder="act / recheck など">
+      </div>
+      <div class="form-row">
+        <label>phase</label>
+        <input type="text" name="phase" value="{{ phase or '' }}" placeholder="issued / started / completed">
+      </div>
+      <div class="form-row">
+        <label>issued_by</label>
+        <input type="text" name="issued_by" value="{{ issued_by or '' }}" placeholder="king / ui / hermes">
+      </div>
+      <div class="form-row">
+        <label>検索 (free text)</label>
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="decision_id / extra_json 部分一致">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">🔎 検索</button>
+        <a class="btn" href="/decisions.json?n={{ n }}&q={{ query }}&kind={{ kind }}&phase={{ phase }}&issued_by={{ issued_by }}" target="_blank">⬇️ JSON</a>
+        <a class="btn" href="/decisions.csv?n={{ n }}&q={{ query }}&kind={{ kind }}&phase={{ phase }}&issued_by={{ issued_by }}">⬇️ CSV</a>
+      </div>
+    </form>
+
+    {% if rows and rows|length > 0 %}
+      <div class="table-wrap">
+        <table class="hud-table">
+          <thead>
+            <tr>
+              <th>ts_utc</th>
+              <th>phase</th>
+              <th>decision_id</th>
+              <th>kind</th>
+              <th>issued_by</th>
+              <th>extra</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              {% set did = r.decision_id %}
+              <tr>
+                <td><code>{{ r.ts_utc }}</code></td>
+                <td>{{ r.phase }}</td>
+                <td><a href="/decisions/{{ did }}"><code>{{ did }}</code></a></td>
+                <td>{{ r.kind }}</td>
+                <td>{{ r.issued_by }}</td>
+                <td class="truncate">
+                  {# extra_json を軽く覗く（Airflowリンクを拾えたら表示） #}
+                  {% set extra = (r.extra_json is string) and (r.extra_json|from_json) or r.extra_json %}
+                  {% if extra and extra.airflow and extra.airflow.dag_run_id %}
+                    <a href="/airflow/runs/{{ extra.airflow.dag_run_id }}?dag_id={{ extra.airflow.dag_id or '' }}">Airflow: {{ extra.airflow.dag_run_id }}</a>
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">表示するレコードがありません。</p>
+    {% endif %}
+  {% endif %}
+
+  {% if mode == "detail" %}
+    <div class="grid-2" style="display:grid;gap:1rem;grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div class="card">
+        <div class="card-header">最新イベント</div>
+        <div class="card-body">
+          <ul class="kv">
+            <li><span>decision_id</span><code>{{ decision_id }}</code></li>
+            <li><span>ts_utc</span><code>{{ latest.ts_utc }}</code></li>
+            <li><span>phase</span>{{ latest.phase }}</li>
+            <li><span>kind</span>{{ latest.kind }}</li>
+            <li><span>issued_by</span>{{ latest.issued_by }}</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">intent / extra (latest)</div>
+        <div class="card-body">
+          {% set intent = latest_intent or {} %}
+          {% set extra  = latest_extra  or {} %}
+          <h4 class="muted">intent</h4>
+          <pre class="json">{{ intent|tojson(indent=2) }}</pre>
+          <h4 class="muted">extra</h4>
+          <pre class="json">{{ extra|tojson(indent=2) }}</pre>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="panel-title" style="margin-top:1rem">Airflow Links</h2>
+    {% if airflow_refs and airflow_refs|length > 0 %}
+      <ul class="link-list">
+        {% for ref in airflow_refs %}
+          <li>
+            <a href="/airflow/runs/{{ ref.dag_run_id }}?dag_id={{ ref.dag_id or '' }}">
+              {{ ref.dag_id or '(unknown dag)' }} / <code>{{ ref.dag_run_id }}</code>
+            </a>
+            <span class="muted"> @ <code>{{ ref.ts_utc }}</code></span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">関連する Airflow Run は見つかりませんでした。</p>
+    {% endif %}
+
+    <h2 class="panel-title" style="margin-top:1rem">全イベント</h2>
+    <div class="table-wrap">
+      <table class="hud-table">
+        <thead>
+          <tr>
+            <th>ts_utc</th>
+            <th>phase</th>
+            <th>kind</th>
+            <th>issued_by</th>
+            <th>intent</th>
+            <th>extra</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in events %}
+            {% set it = (e.intent_json is string) and (e.intent_json|from_json) or e.intent_json %}
+            {% set ex = (e.extra_json  is string) and (e.extra_json|from_json)  or e.extra_json %}
+            <tr>
+              <td><code>{{ e.ts_utc }}</code></td>
+              <td>{{ e.phase }}</td>
+              <td>{{ e.kind }}</td>
+              <td>{{ e.issued_by }}</td>
+              <td><pre class="json small">{{ it|tojson(indent=2) }}</pre></td>
+              <td><pre class="json small">{{ ex|tojson(indent=2) }}</pre></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="form-actions" style="margin-top:1rem">
+      <a class="btn" href="/decisions">⟵ 一覧へ</a>
+      <a class="btn" href="/decisions/{{ decision_id }}.json" target="_blank">⬇️ JSON (this decision)</a>
+    </div>
+  {% endif %}
+</div>
+
+{% include "partials/toast.html" ignore missing %}
+{% endblock %}

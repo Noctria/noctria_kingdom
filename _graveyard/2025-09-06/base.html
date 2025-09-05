@@ -1,0 +1,67 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}🏰 Noctria Kingdom{% endblock %}</title>
+
+  <!-- ✅ Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ✅ Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- ✅ レスポンシブ対応 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- ✅ HUDスタイル用 外部CSSがある場合は以下を活用 -->
+  <link rel="stylesheet" href="/static/css/style.css">
+
+  {% block style %}{% endblock %}
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition duration-300 font-sans p-4 md:p-6">
+  
+  <!-- 🔰 ヘッダー -->
+  <header class="flex flex-col md:flex-row justify-between items-center mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold">🏰 Noctria Kingdom - GUI統治</h1>
+    <button id="darkToggle" class="mt-2 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+      🌗 モード切替
+    </button>
+  </header>
+
+  <!-- 🔗 ナビゲーションバー -->
+  <nav class="flex flex-wrap gap-3 md:gap-5 mb-6">
+    <a href="/dashboard" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">📊 ダッシュボード</a>
+    <a href="/statistics/compare" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🔍 比較</a>
+    <a href="/statistics/heatmap" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🔥 ヒートマップ</a>
+    <a href="/statistics/ranking" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🏅 ランキング</a>
+    <a href="/act-history" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🧾 昇格ログ</a>
+    <a href="/push-history" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">🚀 Push履歴</a>
+  </nav>
+
+  <!-- 📄 メインコンテンツ -->
+  <main class="container mx-auto">
+    {% block content %}
+    <!-- 各ページ固有の内容 -->
+    {% endblock %}
+  </main>
+
+  <!-- 🌗 ダークモード切替スクリプト -->
+  <script>
+    const toggleBtn = document.getElementById("darkToggle");
+    const bodyEl = document.body;
+
+    // ページ読み込み時にテーマ設定を保持
+    if (localStorage.theme === 'dark') {
+      bodyEl.classList.add('dark');
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      bodyEl.classList.toggle("dark");
+      localStorage.theme = bodyEl.classList.contains('dark') ? 'dark' : 'light';
+    });
+  </script>
+
+  {% block script %}{% endblock %}
+</body>
+</html>

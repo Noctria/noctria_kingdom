@@ -1,0 +1,186 @@
+<!-- noctria_gui/templates/obs_latency_dashboard.html -->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>⏱️ Observability — Latency</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0f2c" />
+  <link rel="stylesheet" href="/static/hud_style.css" />
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+  <header class="header">
+    <a class="nav-item-back" href="/dashboard" aria-label="Back to dashboard">← Dashboard</a>
+    <div class="hud-title"><i>⏱️</i><span>Observability: Latency</span></div>
+    <div class="right">
+      <button id="refreshBtn" class="hud-button">Refresh</button>
+    </div>
+  </header>
+
+  <main class="hud-container-simple">
+    <section class="hud-panel">
+      <div class="panel-title">日次パーセンタイル（p50 / p90 / p99）</div>
+      <div class="grid2">
+        <div class="chart-card">
+          <canvas id="latencyChart" height="220"></canvas>
+        </div>
+        <div class="hud-panel">
+          <div class="panel-title">最新サマリ</div>
+          <div id="latestSummary" class="stack small text-muted">
+            <div class="skeleton" style="height:1.1rem;"></div>
+            <div class="skeleton" style="height:1.1rem;"></div>
+            <div class="skeleton" style="height:1.1rem;"></div>
+          </div>
+          <div class="hr"></div>
+          <div class="metrics mt-2">
+            <div class="metric-item">
+              <div class="metric-label">p50 (ms)</div>
+              <div id="k-p50" class="metric-value">—</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">p90 (ms)</div>
+              <div id="k-p90" class="metric-value">—</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">p99 (ms)</div>
+              <div id="k-p99" class="metric-value">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hud-panel">
+      <div class="panel-title">最近の日次分布</div>
+      <div class="table-wrap">
+        <table id="dailyTable" class="hud-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">day</th>
+              <th>events</th>
+              <th>p50</th>
+              <th>p90</th>
+              <th>p99</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5"><div class="skeleton" style="height:1.25rem;"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_URL = "{{ api_url }}"; // 例: /observability/api/daily?limit=60 など
+    let chart;
+
+    async function loadDaily() {
+      const res = await fetch(API_URL, { credentials: "same-origin" });
+      if (!res.ok) throw new Error("daily fetch failed");
+      const json = await res.json();
+      return json.items || [];
+    }
+
+    async function loadSummary() {
+      const res = await fetch('/observability/summary?limit=10', { credentials: "same-origin" });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.items || [];
+    }
+
+    function upsertChart(labels, p50, p90, p99) {
+      const ctx = document.getElementById('latencyChart').getContext('2d');
+      const data = {
+        labels,
+        datasets: [
+          { label: 'p50 ms', data: p50, borderWidth: 2, tension: .2 },
+          { label: 'p90 ms', data: p90, borderWidth: 2, tension: .2 },
+          { label: 'p99 ms', data: p99, borderWidth: 2, tension: .2 },
+        ]
+      };
+      const opts = {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        animation: false,
+        scales: {
+          x: { ticks: { autoSkip: true, maxTicksLimit: 10 }},
+          y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString() } }
+        },
+        plugins: { legend: { labels: { boxWidth: 12 } } }
+      };
+      if (chart) { chart.data = data; chart.update(); }
+      else { chart = new Chart(ctx, { type: 'line', data, options: opts }); }
+    }
+
+    function fillDailyTable(items) {
+      const tbody = document.querySelector('#dailyTable tbody');
+      tbody.innerHTML = '';
+      for (const r of [...items].reverse()) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="text-align:left">${new Date(r.day).toISOString().slice(0,10)}</td>
+          <td>${(r.events ?? 0).toLocaleString()}</td>
+          <td>${Math.round(r.p50_ms ?? 0).toLocaleString()}</td>
+          <td>${Math.round(r.p90_ms ?? 0).toLocaleString()}</td>
+          <td>${Math.round(r.p99_ms ?? 0).toLocaleString()}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+      // 指標カード（最新日の値）
+      const last = items.at(-1) || {};
+      document.getElementById('k-p50').textContent = Math.round(last.p50_ms ?? 0).toLocaleString();
+      document.getElementById('k-p90').textContent = Math.round(last.p90_ms ?? 0).toLocaleString();
+      document.getElementById('k-p99').textContent = Math.round(last.p99_ms ?? 0).toLocaleString();
+    }
+
+    function fillLatestSummary(items) {
+      const el = document.getElementById('latestSummary');
+      if (!items.length) { el.textContent = 'no data'; return; }
+      const s = items[0];
+      const started = s.started_at ? new Date(s.started_at).toLocaleString() : '-';
+      const finished = s.finished_at ? new Date(s.finished_at).toLocaleString() : '-';
+      const total = (s.total_ms ?? 0).toLocaleString();
+      const infer = (s.infer_ms ?? 0).toLocaleString();
+      const i2d   = (s.infer_to_decision_ms ?? 0).toLocaleString();
+      const ev    = (s.events ?? 0).toLocaleString();
+      el.innerHTML = `
+        <div><span class="badge">trace</span> <span class="truncate mono">${s.trace_id || '-'}</span></div>
+        <div class="mt-1"><span class="badge">window</span> ${started} → ${finished}</div>
+        <div class="mt-1">
+          <span class="badge">total</span> ${total} ms
+          <span class="badge">infer</span> ${infer} ms
+          <span class="badge">i→d</span> ${i2d} ms
+          <span class="badge">events</span> ${ev}
+        </div>
+        <div class="mt-1"><span class="badge">decision</span> ${s.strategy_name || '-'} / ${s.action || '-'}</div>
+      `;
+    }
+
+    async function boot() {
+      try {
+        const [daily, summary] = await Promise.all([loadDaily(), loadSummary()]);
+        const labels = daily.map(d => new Date(d.day).toISOString().slice(0,10));
+        const p50 = daily.map(d => d.p50_ms ?? 0);
+        const p90 = daily.map(d => d.p90_ms ?? 0);
+        const p99 = daily.map(d => d.p99_ms ?? 0);
+        upsertChart(labels, p50, p90, p99);
+        fillDailyTable(daily);
+        fillLatestSummary(summary);
+      } catch (e) {
+        console.error(e);
+        const toast = document.createElement('div');
+        toast.className = 'toast error';
+        toast.textContent = 'データの取得に失敗しました。';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+      }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', boot);
+    boot();
+  </script>
+</body>
+</html>

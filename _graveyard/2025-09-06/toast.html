@@ -1,0 +1,22 @@
+<!-- noctria_gui/templates/partials/toast.html -->
+{% set toast = (request and request.session and request.session.get('toast')) or None %}
+{% if toast %}
+  <div class="toast {{ toast.type or 'info' }}">
+    <div class="toast-title">
+      {{ toast.message or 'Notification' }}
+      <button type="button" class="toast-close" onclick="this.closest('.toast').remove(); fetch('/__clear_toast').catch(()=>{});">×</button>
+    </div>
+    {% if toast.detail %}
+      <pre class="toast-detail">{{ toast.detail | safe }}</pre>
+    {% endif %}
+  </div>
+  <style>
+    .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999; padding: .75rem 1rem; border-radius: .5rem; box-shadow: 0 8px 24px rgba(0,0,0,.15); background: #111; color: #fff; max-width: 40rem; }
+    .toast .toast-title { font-weight: 600; display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+    .toast .toast-detail { margin:.5rem 0 0; max-height: 40vh; overflow:auto; background: rgba(255,255,255,.06); padding:.5rem; border-radius:.25rem; }
+    .toast.info { background:#1e293b; }
+    .toast.success { background:#065f46; }
+    .toast.error { background:#7f1d1d; }
+    .toast .toast-close { all: unset; cursor: pointer; padding: 0 .25rem; font-weight: 700; }
+  </style>
+{% endif %}

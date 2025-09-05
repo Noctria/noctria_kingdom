@@ -1,0 +1,7 @@
+- noctria_gui/main.py
+- noctria_gui/routes
+- noctria_gui/templates
+- airflow_docker/dags
+- src/plan_data
+- src/plan_data/observability.py
+- src/core/decision_registry.py

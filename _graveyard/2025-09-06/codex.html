@@ -1,0 +1,151 @@
+<!-- noctria_gui/templates/codex.html -->
+{% extends "base_hud.html" %}
+
+{% block title %}{{ page_title or "🧪 Codex Mini-Loop" }} - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-vial"></i>{% endblock %}
+{% block header_title %}CODEX MINI-LOOP{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
+
+{% block content %}
+
+<!-- Controls -->
+<div class="hud-panel">
+  <div class="hud-actions">
+    <form action="/codex/run" method="post">
+      <button class="hud-button" type="submit"><i class="fas fa-play"></i> Run Mini-Loop</button>
+    </form>
+    <form action="/codex/review" method="post">
+      <button class="hud-button hud-button--ghost" type="submit"><i class="fas fa-search"></i> Run Review (Generate MD & .patch)</button>
+    </form>
+    <span class="text-muted small">pytestは既定 <code>-q</code>。詳細は <code>codex/mini_loop.py</code> を参照。</span>
+  </div>
+</div>
+
+<div class="grid2">
+
+  <!-- 🧪 Pytest Summary -->
+  <section class="hud-panel">
+    <h3 class="panel-title">🧪 Pytest Summary</h3>
+    {% set s = (pytest_json.get('summary') if pytest_json else {}) or {} %}
+    {% set passed = s.get('passed', 0) %}
+    {% set total  = (s.get('total') if s.get('total') is not none else s.get('collected', 0)) %}
+    {% set failed = (s.get('failed') if s.get('failed') is not none else (total - passed)) %}
+    <div class="metrics">
+      <div class="metric-item">
+        <div class="metric-label">Passed</div>
+        <div class="metric-value text-green">{{ passed }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Failed</div>
+        <div class="metric-value text-red">{{ failed }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Total</div>
+        <div class="metric-value">{{ total }}</div>
+      </div>
+    </div>
+
+    <div class="surface scrollbox max-h-420 mono">{{ pytest_summary_md or '(no summary)' }}</div>
+
+    <p class="mt-2 small">
+      <a class="hud-link" href="/codex_reports/tmp.json" target="_blank"><i class="fas fa-file-code"></i> tmp.json を開く</a>
+    </p>
+
+    {% set tests = (pytest_json.get('tests') if pytest_json else []) or [] %}
+    {% if tests and tests|length > 0 %}
+      <div class="table-wrap mt-2">
+        <table class="hud-table zebra">
+          <thead>
+            <tr>
+              <th class="col-test">Test</th>
+              <th class="col-outcome">Outcome</th>
+              <th class="col-duration">Duration (s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tests %}
+            {% set outcome = (t.outcome or '').lower() %}
+            {% set dur = (t.call.duration if t.call and t.call.duration else 0) %}
+            <tr class="
+              {% if outcome == 'passed' %}is-pass{% elif outcome == 'failed' %}is-fail{% else %}is-other{% endif %}
+            ">
+              <td class="mono small truncate" title="{{ t.nodeid }}">{{ t.nodeid }}</td>
+              <td class="center">
+                {% if outcome == 'passed' %}
+                  <span class="badge badge--ok">PASSED</span>
+                {% elif outcome == 'failed' %}
+                  <span class="badge badge--err">FAILED</span>
+                {% else %}
+                  <span class="badge badge--warn">{{ t.outcome or 'other' }}</span>
+                {% endif %}
+              </td>
+              <td class="right mono">{{ "%.4f"|format(dur) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- 💡 Inventor Suggestions -->
+  <section class="hud-panel">
+    <h3 class="panel-title">💡 Inventor Suggestions</h3>
+    <div class="surface scrollbox max-h-420 mono">{{ inventor_md or '(no inventor suggestions)' }}</div>
+    <p class="mt-2 small">
+      <a class="hud-link" href="/codex_reports/inventor_suggestions.md" target="_blank">
+        <i class="fas fa-file-alt"></i> inventor_suggestions.md
+      </a>
+      <span class="pill">auto-rendered if available</span>
+    </p>
+  </section>
+
+  <!-- 🧮 Harmonia Review -->
+  <section class="hud-panel">
+    <h3 class="panel-title">🧮 Harmonia Review</h3>
+    <div class="surface scrollbox max-h-420 mono">{{ harmonia_md or '(no harmonia review)' }}</div>
+    <p class="mt-2 small">
+      <a class="hud-link" href="/codex_reports/harmonia_review.md" target="_blank">
+        <i class="fas fa-file-alt"></i> harmonia_review.md
+      </a>
+    </p>
+  </section>
+
+  <!-- 🧩 Patches -->
+  <section class="hud-panel">
+    <h3 class="panel-title">🧩 Generated Patches</h3>
+    <p class="small"><span class="pill">dir: codex_reports/patches/</span></p>
+
+    {% if patches and patches|length > 0 %}
+      <div class="table-wrap mt-2">
+        <table class="hud-table zebra">
+          <thead>
+            <tr>
+              <th class="col-test">Patch file</th>
+              <th class="col-duration">Size (bytes)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in patches %}
+            <tr>
+              <td class="mono small">
+                <a class="hud-link" href="/codex_reports/patches/{{ p.filename }}" target="_blank">{{ p.filename }}</a>
+              </td>
+              <td class="right small mono">{{ p.size }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted small">パッチ一覧は空です。Mini-Loop 実行後に <em>Run Review</em> を実行してください。</p>
+    {% endif %}
+
+    <h4 class="mt-2">Index</h4>
+    <div class="surface scrollbox max-h-420 mono">{{ patches_index_md or '(no patches_index.md)' }}</div>
+  </section>
+
+</div>
+
+{% endblock %}

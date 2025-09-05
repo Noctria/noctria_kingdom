@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔍 Veritas戦略検索 - Noctria Kingdom</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      padding: 2rem;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      color: #333;
+    }
+    form {
+      margin-bottom: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    input[type="text"], input[type="number"] {
+      padding: 0.5rem;
+      width: 180px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    label {
+      font-size: 0.9rem;
+      color: #555;
+      margin-right: 0.3rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      padding: 0.3rem 0;
+      border-bottom: 1px solid #ddd;
+    }
+    a {
+      color: #007acc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .strategy-info {
+      font-size: 0.85rem;
+      color: #555;
+      margin-left: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Veritas戦略検索</h1>
+
+  <form method="get" action="/strategies/search">
+    <input type="text" name="keyword" placeholder="戦略名 or タグ" value="{{ keyword }}">
+    
+    <label for="min_win_rate">最小勝率（%）</label>
+    <input type="number" step="0.1" min="0" max="100" name="min_win_rate" id="min_win_rate" value="{{ min_win_rate if min_win_rate is not none else '' }}">
+    
+    <label for="max_drawdown">最大ドローダウン（%）</label>
+    <input type="number" step="0.01" min="0" max="100" name="max_drawdown" id="max_drawdown" value="{{ max_drawdown if max_drawdown is not none else '' }}">
+    
+    <label for="tags">タグ（カンマ区切り）</label>
+    <input type="text" name="tags" id="tags" placeholder="例: scalping, forex" value="{{ tags }}">
+    
+    <label for="ai">AI名</label>
+    <input type="text" name="ai" id="ai" placeholder="例: Veritas" value="{{ ai }}">
+    
+    <button type="submit">検索</button>
+  </form>
+
+  {% if strategies %}
+    <ul>
+      {% for s in strategies %}
+        <li>
+          <a href="/strategies/view?name={{ s.strategy }}.py">{{ s.strategy }}</a>
+          <span class="strategy-info">
+            {% if s.win_rate is not none %} 勝率: {{ '%.1f'|format(s.win_rate) }}% {% else %} 勝率: ― {% endif %}
+            ／
+            {% if s.max_drawdown is not none %} 最大DD: {{ '%.2f'|format(s.max_drawdown) }}% {% else %} 最大DD: ― {% endif %}
+            ／
+            取引数: {{ s.num_trades if s.num_trades is not none else '―' }}
+            ／
+            AI: {{ s.ai if s.ai else '―' }}
+            ／
+            タグ:
+            {% for tag in s.tags or [] %}
+              <span style="background:#eee; color:#333; padding:0 6px; margin-left:4px; border-radius:4px; font-size:0.85em;">{{ tag }}</span>
+            {% endfor %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>一致する戦略は見つかりませんでした。</p>
+  {% endif %}
+
+  <a href="/strategies">← 戦略一覧に戻る</a>
+</body>
+</html>

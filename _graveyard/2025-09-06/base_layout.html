@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>🏰 Noctria Kingdom Dashboard</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, #04121d, #0a0f2c);
+            color: #00f6ff;
+        }
+
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            margin-right: 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .tab-button:hover {
+            background-color: rgba(0, 255, 255, 0.2);
+        }
+
+        .tab-button.active {
+            background-color: rgba(0, 255, 255, 0.4);
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+            margin-top: 2rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .hud-panel {
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+
+    <script>
+        // ✅ 修正: ロジックをDOMContentLoaded内に集約
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            function switchTab(tabId) {
+                // すべて非アクティブ化
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(tab => tab.classList.remove('active'));
+
+                // 対象をアクティブ化
+                const selectedButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
+                const selectedContent = document.getElementById(tabId);
+                
+                if (selectedButton) selectedButton.classList.add('active');
+                if (selectedContent) selectedContent.classList.add('active');
+            }
+
+            // 各ボタンにイベントリスナーを登録
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.dataset.tab;
+                    switchTab(tabId);
+                });
+            });
+
+            // 初期表示タブを設定
+            const defaultTab = "{{ default_tab | default('run') }}";
+            switchTab(defaultTab);
+        });
+    </script>
+</head>
+<body class="p-6">
+
+    <h1 class="text-3xl font-bold mb-6">🏰 Noctria Kingdom ダッシュボード</h1>
+
+    <div class="tabs mb-4">
+        <button class="tab-button" data-tab="run">▶️ PDCA実行</button>
+        <button class="tab-button" data-tab="history">🕰 実行履歴</button>
+        <button class="tab-button" data-tab="upload">🆙 戦略アップロード</button>
+        <button class="tab-button" data-tab="upload_history">📜 アップロード履歴</button>
+    </div>
+
+    {% block content %}
+    {% endblock %}
+
+</body>
+</html>

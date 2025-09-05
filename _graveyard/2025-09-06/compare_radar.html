@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>🧩 レーダーチャート比較</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      padding: 2rem;
+      background-color: #f5f5f5;
+      font-family: "Segoe UI", sans-serif;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+    }
+    canvas {
+      max-width: 700px;
+      margin: auto;
+      display: block;
+    }
+    .back-link {
+      margin-top: 2rem;
+      display: block;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧩 選択戦略のレーダーチャート比較</h1>
+
+  <canvas id="radarChart" width="600" height="600"></canvas>
+
+  <script>
+    const strategies = {{ strategies | tojson }};
+
+    const metrics = ["win_rate", "max_drawdown", "num_trades"];
+    const metricLabels = {
+      win_rate: "勝率（%）",
+      max_drawdown: "最大DD",
+      num_trades: "取引数"
+    };
+
+    // 正規化（0〜1）用に全体の最大値取得
+    const maxValues = {};
+    for (const m of metrics) {
+      maxValues[m] = Math.max(...strategies.map(s => s[m] || 0), 1);
+    }
+
+    const data = {
+      labels: metrics.map(m => metricLabels[m]),
+      datasets: strategies.map((s, idx) => ({
+        label: s.strategy,
+        data: metrics.map(m => (s[m] || 0) / maxValues[m]),
+        fill: true,
+        backgroundColor: `rgba(${(idx * 75) % 255}, ${(idx * 150) % 255}, ${(idx * 200) % 255}, 0.2)`,
+        borderColor: `rgba(${(idx * 75) % 255}, ${(idx * 150) % 255}, ${(idx * 200) % 255}, 1)`,
+        pointBackgroundColor: "#fff",
+        pointBorderColor: "#000",
+        pointHoverBackgroundColor: "#000",
+        pointHoverBorderColor: "#fff"
+      }))
+    };
+
+    const config = {
+      type: "radar",
+      data: data,
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const s = strategies[ctx.datasetIndex];
+                return `${s.strategy} ｜ 🎯 ${s.win_rate ?? '―'}% / 📉 ${s.max_drawdown ?? '―'} / 📊 ${s.num_trades ?? '―'}`;
+              }
+            }
+          },
+          legend: {
+            position: 'top'
+          },
+          title: {
+            display: false
+          }
+        },
+        scales: {
+          r: {
+            min: 0,
+            max: 1,
+            ticks: {
+              callback: (value) => `${Math.round(value * 100)}%`
+            }
+          }
+        }
+      }
+    };
+
+    new Chart(document.getElementById("radarChart"), config);
+  </script>
+
+  <a class="back-link" href="/strategies/compare">← 戦略選択に戻る</a>
+</body>
+</html>

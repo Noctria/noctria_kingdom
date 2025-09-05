@@ -1,0 +1,137 @@
+<!-- noctria_gui/templates/pdca_control.html -->
+{% extends "base_hud.html" %}
+{% block title %}PDCA Control — Recheck All{% endblock %}
+
+{% block content %}
+<div class="hud-container-simple">
+
+  <!-- Header -->
+  <div class="header">
+    <a class="nav-item-back" href="/"><span>←</span> Back</a>
+    <div class="hud-title"><i>◆</i> PDCA Control — Recheck All</div>
+  </div>
+
+  <!-- Control Panel -->
+  <section class="hud-panel">
+    <div class="panel-title">🔁 一括再評価トリガ</div>
+    <p class="text-light">
+      Airflow REST（方式2）でDAGを起動します。期間・理由・dry-runを指定可能です。
+    </p>
+
+    <!-- Quick facts -->
+    <div class="metrics" style="margin-top: 0.75rem;">
+      <div class="metric-item">
+        <div class="text-dark">Default DAG</div>
+        <div class="metric-value">{{ default_dag_id }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="text-dark">Today (UTC)</div>
+        <div class="metric-value">{{ today }}</div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <form id="recheckForm" onsubmit="return false;" style="margin-top: 1rem;">
+      <div class="metrics">
+        <div class="metric-item">
+          <label class="text-light" for="from_date">From (YYYY-MM-DD)</label>
+          <input id="from_date" type="text" class="flatpickr-input" placeholder="YYYY-MM-DD" />
+        </div>
+        <div class="metric-item">
+          <label class="text-light" for="to_date">To (YYYY-MM-DD)</label>
+          <input id="to_date" type="text" class="flatpickr-input" value="{{ today }}" placeholder="YYYY-MM-DD" />
+        </div>
+      </div>
+
+      <div class="metrics" style="margin-top: 0.5rem;">
+        <div class="metric-item" style="flex: 1 1 100%;">
+          <label class="text-light" for="reason">Reason</label>
+          <input id="reason" type="text" class="flatpickr-input" placeholder="例: 8月スプリントの再集計" />
+        </div>
+      </div>
+
+      <div class="metrics" style="margin-top: 0.5rem;">
+        <div class="metric-item">
+          <label class="text-light" for="dag_id">DAG ID</label>
+          <input id="dag_id" type="text" class="flatpickr-input" value="{{ default_dag_id }}" />
+        </div>
+        <div class="metric-item" style="display:flex; align-items:center; gap:0.5rem;">
+          <input id="dry_run" type="checkbox" />
+          <label class="text-light" for="dry_run" style="margin: 0;">Dry Run</label>
+        </div>
+      </div>
+
+      <div style="display:flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+        <button id="triggerBtn" type="button" class="hud-link">🚀 Recheck All を起動</button>
+        <a class="hud-link" href="/pdca/summary">📊 サマリーへ</a>
+        <a class="hud-link" href="/statistics/detail">📑 統計詳細</a>
+      </div>
+    </form>
+
+    <!-- Result panel -->
+    <div class="hud-panel" style="margin-top: 1rem;">
+      <div class="panel-title">📣 結果</div>
+      <pre id="result" style="white-space: pre-wrap; margin: 0;"></pre>
+    </div>
+  </section>
+</div>
+
+<!-- Optional: Flatpickr loader (JSのみ・CSSはHUDで上書き) -->
+<script>
+(function ensureFlatpickr(){
+  if (!window.flatpickr) {
+    var s = document.createElement('script');
+    s.src = "https://cdn.jsdelivr.net/npm/flatpickr";
+    document.head.appendChild(s);
+  }
+})();
+</script>
+
+<script>
+(function init(){
+  // Initialize flatpickr once available
+  function initPickers(){
+    if (!window.flatpickr) { setTimeout(initPickers, 100); return; }
+    var opts = { dateFormat: "Y-m-d", allowInput: true, defaultHour: 0, defaultMinute: 0 };
+    try { window.flatpickr("#from_date", opts); } catch(e){}
+    try { window.flatpickr("#to_date", opts); } catch(e){}
+  }
+  initPickers();
+
+  const $result = document.getElementById('result');
+  const $btn = document.getElementById('triggerBtn');
+
+  function setResult(obj){
+    try {
+      $result.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+    } catch(e) {
+      $result.textContent = String(obj);
+    }
+  }
+
+  $btn.addEventListener('click', async () => {
+    const from_date = document.getElementById('from_date').value || null;
+    const to_date   = document.getElementById('to_date').value || null;
+    const reason    = document.getElementById('reason').value || null;
+    const dag_id    = document.getElementById('dag_id').value || null;
+    const dry_run   = !!document.getElementById('dry_run').checked;
+
+    const payload = { from_date, to_date, reason, dry_run, dag_id };
+    setResult('⏳ Triggering...');
+
+    try {
+      const res = await fetch('/pdca/recheck_all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Unknown error');
+      setResult(json);
+    } catch (err) {
+      setResult('❌ ' + (err?.message || String(err)));
+    }
+  });
+})();
+</script>
+{% endblock %}

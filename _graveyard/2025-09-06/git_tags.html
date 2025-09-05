@@ -1,0 +1,106 @@
+<!-- noctria_gui/templates/git_tags.html -->
+{% extends "base_hud.html" %}
+{% block title %}{{ page_title }} | Noctria HUD{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <h1 class="panel-title">{{ page_title }}</h1>
+
+  {% if mode == "index" %}
+    <form method="get" action="/tags" class="form-grid" style="margin-bottom:1rem">
+      <div class="form-row">
+        <label>パターン</label>
+        <input type="text" name="pattern" value="{{ pattern }}">
+      </div>
+      <div class="form-row">
+        <label>件数</label>
+        <input type="number" name="limit" min="1" max="500" value="{{ limit }}">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">🔎 フィルタ</button>
+        <a class="btn" href="/tags">↻ リセット</a>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-compact">
+        <thead>
+          <tr>
+            <th>tag</th>
+            <th>date</th>
+            <th>sha</th>
+            <th>annotated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tags %}
+            <tr>
+              <td><a href="/tags/{{ t.name }}"><code>{{ t.name }}</code></a></td>
+              <td><code>{{ t.date }}</code></td>
+              <td><code>{{ t.sha }}</code></td>
+              <td>{{ t.annotated }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="muted">タグが見つかりません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if mode == "detail" %}
+    <ul class="kv">
+      <li><span>tag</span><code>{{ tag }}</code></li>
+      <li><span>date</span><code>{{ info.date }}</code></li>
+      <li><span>sha</span><code>{{ info.sha }}</code></li>
+    </ul>
+
+    <details open>
+      <summary>message</summary>
+      <pre>{{ info.message }}</pre>
+    </details>
+
+    <h3 style="margin-top:1rem">関連 Decision Registry</h3>
+    {% if not registry_available %}
+      <div class="alert">Decision Registry が未配備です（src/core/decision_registry.py を配置）。</div>
+    {% endif %}
+
+    <div class="table-responsive">
+      <table class="table table-compact">
+        <thead>
+          <tr>
+            <th>ts_utc</th>
+            <th>phase</th>
+            <th>decision_id</th>
+            <th>kind</th>
+            <th>issued_by</th>
+            <th>extra(tag)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in related %}
+            {% set extra = r.extra_json | from_json %}
+            {% set tag_in_extra = (extra.adopt_result and extra.adopt_result.tag) or extra.tag %}
+            <tr>
+              <td><code>{{ r.ts_utc }}</code></td>
+              <td>{{ r.phase }}</td>
+              <td><a href="/decisions/{{ r.decision_id }}"><code>{{ r.decision_id }}</code></a></td>
+              <td>{{ r.kind }}</td>
+              <td>{{ r.issued_by }}</td>
+              <td><code>{{ tag_in_extra }}</code></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="muted">関連する Decision は見つかりません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="actions" style="margin-top:0.5rem">
+      <a class="btn" href="/tags">← タグ一覧へ</a>
+    </div>
+  {% endif %}
+</div>
+
+{% include "partials/toast.html" ignore missing %}
+{% endblock %}

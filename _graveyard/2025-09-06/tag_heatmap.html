@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔥 タグ別戦略指標ヒートマップ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      color: #222;
+    }
+    .controls {
+      max-width: 1000px;
+      margin: 1rem auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    select, input {
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    .legend {
+      max-width: 1000px;
+      margin: 1rem auto 2rem;
+      padding: 1rem;
+      background: #fff;
+      border-left: 4px solid #007acc;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    canvas {
+      max-width: 1000px;
+      margin: 2rem auto;
+      display: block;
+    }
+    a {
+      display: inline-block;
+      margin-top: 2rem;
+      text-decoration: none;
+      color: #007acc;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 タグ別戦略指標ヒートマップ</h1>
+
+  <div class="controls">
+    <label>
+      📊 指標選択：
+      <select id="metricSelect">
+        <option value="win_rate">勝率（%）</option>
+        <option value="max_drawdown">最大DD（%）</option>
+        <option value="num_trades">取引数</option>
+      </select>
+    </label>
+    <label>
+      🚫 件数しきい値：
+      <input type="number" id="minTrades" value="0" min="0" />
+    </label>
+  </div>
+
+  <div class="legend">
+    <strong>🎨 カラー凡例：</strong><br>
+    ✅ <b>勝率（緑）</b>: 高いほど濃く緑に<br>
+    ⚠️ <b>最大ドローダウン（赤）</b>: 高いほど濃く赤に（＝悪化）<br>
+    🔁 <b>取引数（青）</b>: 多いほど濃く青に<br>
+    各バーの中に数値ラベルも表示されます。
+  </div>
+
+  <canvas id="heatmapCanvas"></canvas>
+
+  <script>
+    const stats = {{ tag_stats | tojson }};
+    const displayLabels = {
+      win_rate: "勝率（%）",
+      max_drawdown: "最大DD（%）",
+      num_trades: "取引数"
+    };
+
+    function getColor(metric, value) {
+      if (value == null) return "#ccc";
+      // 色を HSL + 値による濃淡（lightness）で調整
+      if (metric === "win_rate") {
+        const hue = 120; // 緑
+        const lightness = 90 - Math.min(60, value * 0.7);  // 0〜100%
+        return `hsl(${hue}, 70%, ${lightness}%)`;
+      }
+      if (metric === "max_drawdown") {
+        const hue = 0; // 赤
+        const lightness = 90 - Math.min(60, value * 0.9);  // DDが高いほど濃赤に
+        return `hsl(${hue}, 70%, ${lightness}%)`;
+      }
+      if (metric === "num_trades") {
+        const hue = 210; // 青
+        const lightness = 90 - Math.min(60, value / 5);  // 多いほど濃青
+        return `hsl(${hue}, 70%, ${lightness}%)`;
+      }
+      return "#ccc";
+    }
+
+    let chart = null;
+
+    function renderChart(metric, minTrades = 0) {
+      const filtered = stats.filter(s => (s.num_trades || 0) >= minTrades);
+      const labels = filtered.map(s => s.type);
+      const values = filtered.map(s => s[metric] || 0);
+      const bgColors = filtered.map(s => getColor(metric, s[metric]));
+
+      const data = {
+        labels,
+        datasets: [{
+          label: displayLabels[metric],
+          data: values,
+          backgroundColor: bgColors,
+          datalabels: {
+            color: "#000",
+            anchor: "center",
+            align: "center",
+            formatter: (v) => {
+              if (v == null) return "―";
+              return metric === "num_trades" ? `${v}` : `${v.toFixed(2)}`;
+            }
+          }
+        }]
+      };
+
+      const config = {
+        type: "bar",
+        data,
+        options: {
+          responsive: true,
+          indexAxis: 'y',
+          plugins: {
+            title: {
+              display: true,
+              text: "タグ × 指標 ヒートマップ",
+              font: { size: 18 }
+            },
+            legend: { display: false },
+            datalabels: { clamp: true }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: metric === "num_trades" ? 20 : 10
+              }
+            }
+          }
+        },
+        plugins: [ChartDataLabels]
+      };
+
+      if (chart) {
+        chart.destroy();
+      }
+      chart = new Chart(document.getElementById("heatmapCanvas"), config);
+    }
+
+    document.getElementById("metricSelect").addEventListener("change", () => {
+      const metric = document.getElementById("metricSelect").value;
+      const minTrades = parseInt(document.getElementById("minTrades").value || "0");
+      renderChart(metric, minTrades);
+    });
+
+    document.getElementById("minTrades").addEventListener("input", () => {
+      const metric = document.getElementById("metricSelect").value;
+      const minTrades = parseInt(document.getElementById("minTrades").value || "0");
+      renderChart(metric, minTrades);
+    });
+
+    // 初期描画
+    renderChart("win_rate");
+  </script>
+
+  <p><a href="/dashboard">← ダッシュボードへ戻る</a></p>
+</body>
+</html>

@@ -1,0 +1,50 @@
+{% extends "base_hud.html" %}
+
+{% block title %}📊 戦略比較結果 - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-chart-bar"></i>{% endblock %}
+{% block header_title %}STRATEGY COMPARISON RESULT{% endblock %}
+{% block header_nav_href %}/strategies/compare{% endblock %}
+{% block header_nav_text %}← 比較条件に戻る{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <h2 class="panel-title">比較結果</h2>
+
+  {% if selected_strategies %}
+    <p>選択された戦略: 
+      {% for s in selected_strategies %}
+        <span class="hud-tag">{{ s }}</span>
+      {% endfor %}
+    </p>
+  {% else %}
+    <p>比較する戦略が選択されていません。</p>
+  {% endif %}
+
+  <!-- ここに比較結果のテーブルやグラフを埋め込む -->
+  {% if result %}
+    <!-- 例：resultがdictの戦略ごとの指標 -->
+    <table class="hud-table" style="margin-top:1rem;">
+      <thead>
+        <tr>
+          <th>戦略名</th>
+          <th>勝率</th>
+          <th>最大ドローダウン</th>
+          <th>その他指標</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for strat, metrics in result.items() %}
+          <tr>
+            <td>{{ strat }}</td>
+            <td>{{ metrics.win_rate | default("-") }}</td>
+            <td>{{ metrics.max_dd | default("-") }}</td>
+            <td>{{ metrics.other_metric | default("-") }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>比較結果がありません。</p>
+  {% endif %}
+</section>
+{% endblock %}

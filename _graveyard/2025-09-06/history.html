@@ -1,0 +1,39 @@
+{% extends "base_hud.html" %}
+
+{% block title %}🕰 PDCA実行履歴{% endblock %}
+{% block header_icon %}<i class="fas fa-history"></i>{% endblock %}
+{% block header_title %}PDCA実行履歴{% endblock %}
+{% block header_nav %}
+<a href="/dashboard" class="nav-item-back">
+  <i class="fas fa-tachometer-alt"></i><span>ダッシュボードへ</span>
+</a>
+{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <table class="hud-table">
+    <thead>
+      <tr>
+        <th>時刻</th>
+        <th>フェーズ</th>
+        <th>ステータス</th>
+        <th>詳細</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if logs %}
+        {% for log in logs %}
+          <tr>
+            <td>{{ log.timestamp }}</td>
+            <td>{{ log.phase }}</td>
+            <td>{{ log.status }}</td>
+            <td>{{ log.detail }}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="4" style="text-align:center;">ログが存在しません。</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
