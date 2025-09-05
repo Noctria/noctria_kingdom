@@ -4,8 +4,8 @@
 *.pyc
 *.pyo
 *.pyd
-__pycache__/
 *.py[cod]
+__pycache__/
 *.pkl
 *.log
 *.tmp
@@ -70,8 +70,12 @@ docker/*.tar
 # ==========================
 # 🔹 Veritas戦略生成（除外 → .gitkeepで保持）
 # ==========================
+# リポ直下レイアウト
 strategies/veritas_generated/*
 !strategies/veritas_generated/.gitkeep
+# src 配下レイアウトにも対応
+src/strategies/veritas_generated/*
+!src/strategies/veritas_generated/.gitkeep
 
 # 旧形式・一時的な戦略出力（必要に応じて保持）
 veritas_generated/
@@ -86,25 +90,23 @@ generated_code/*.tmp
 generated_code/path_config.py
 generated_code/generated_code/
 
-*.bak
-*.bak
-docs/misc/API_Keys.md
-# generated
+# ==========================
+# 🔹 ドキュメント生成物・バックアップなど
+# ==========================
 docs/_generated/**
-# backups
-*.bak
-# secrets (念のため)
 docs/misc/API_Keys.md
+*.bak
 
-# build artifacts
+# ==========================
+# 🔹 ビルド/レポート系（デフォルトは全部除外）
+# ==========================
 codex_reports/
-__pycache__/
-*.pyc
-# Dead-code quarantine script はバージョン管理対象
+
+# Dead-code quarantine ツールと PNG グラフは明示的に含める
+!codex_reports/dead_code/
 !codex_reports/dead_code/quarantine.py
-# === allow repo graph images ===
+
+# === allow repo graph images (GitHub でプレビュー用) ===
 !codex_reports/graphs/
 !codex_reports/graphs/pages_svg/
 !codex_reports/graphs/pages_svg/*.png
-
-
