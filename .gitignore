@@ -28,16 +28,13 @@ venv_*/
 Thumbs.db
 
 # ==========================
-# 🔹 Airflow 関連（/opt/airflow移行後）
+# 🔹 Airflow 関連
 # ==========================
-# 共通ログ・テンポラリ
 airflow_docker/logs/
 airflow_docker/tmp/
 airflow_docker/airflow.cfg
 airflow_docker/.env
 airflow_docker/.env.*
-
-# 初期検証用SQLite DB
 airflow.db
 
 # ==========================
@@ -60,7 +57,6 @@ kubeconfig_final.yaml
 *.pem
 *.crt
 
-# Helm, Docker
 *.tgz
 .cache/
 *.tar
@@ -70,14 +66,11 @@ docker/*.tar
 # ==========================
 # 🔹 Veritas戦略生成（除外 → .gitkeepで保持）
 # ==========================
-# リポ直下レイアウト
 strategies/veritas_generated/*
 !strategies/veritas_generated/.gitkeep
-# src 配下レイアウトにも対応
 src/strategies/veritas_generated/*
 !src/strategies/veritas_generated/.gitkeep
 
-# 旧形式・一時的な戦略出力（必要に応じて保持）
 veritas_generated/
 output_generated/
 
@@ -91,22 +84,22 @@ generated_code/path_config.py
 generated_code/generated_code/
 
 # ==========================
-# 🔹 ドキュメント生成物・バックアップなど
+# 🔹 ドキュメント生成物・バックアップ
 # ==========================
 docs/_generated/**
 docs/misc/API_Keys.md
 *.bak
 
 # ==========================
-# 🔹 ビルド/レポート系（デフォルトは全部除外）
+# 🔹 Codex レポート類
 # ==========================
-codex_reports/
+codex_reports/*
 
-# Dead-code quarantine ツールと PNG グラフは明示的に含める
+# Dead-code quarantine ツールはトラッキング対象
 !codex_reports/dead_code/
 !codex_reports/dead_code/quarantine.py
 
-# === allow repo graph images (GitHub でプレビュー用) ===
+# Graph ビジュアル類は PNG だけ許可
 !codex_reports/graphs/
 !codex_reports/graphs/pages_svg/
 !codex_reports/graphs/pages_svg/*.png
