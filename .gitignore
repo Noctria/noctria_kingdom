@@ -102,4 +102,9 @@ __pycache__/
 *.pyc
 # Dead-code quarantine script はバージョン管理対象
 !codex_reports/dead_code/quarantine.py
+# === allow repo graph images ===
+!codex_reports/graphs/
+!codex_reports/graphs/pages_svg/
+!codex_reports/graphs/pages_svg/*.png
+
 
