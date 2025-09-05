@@ -100,3 +100,6 @@ docs/misc/API_Keys.md
 codex_reports/
 __pycache__/
 *.pyc
+# Dead-code quarantine script はバージョン管理対象
+!codex_reports/dead_code/quarantine.py
+
