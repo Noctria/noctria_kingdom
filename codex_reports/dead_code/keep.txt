@@ -1,0 +1,7 @@
+^airflow_docker/dags/
+^noctria_gui/routes/
+^noctria_gui/templates/
+^src/core/airflow_client.py$
+^src/core/decision_registry.py$
+^src/plan_data/observability.py$
+^src/plan_data/pdca_summary_service.py$
