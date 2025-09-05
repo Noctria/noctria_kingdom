@@ -40,6 +40,14 @@ airflow_docker/.env.*
 # 🔹 codex_reports: デフォ無視 → 必要だけ許可
 # ==========================
 /codex_reports/**
+
+# 親ディレクトリを順に解除（再探索させるため）
+!codex_reports/
+!codex_reports/dead_code/
+!codex_reports/graphs/
+!codex_reports/graphs/pages_svg/
+
+# 個別許可
 !codex_reports/dead_code/quarantine.py
 !codex_reports/dead_code/keep.txt
 !codex_reports/graphs/pages_svg/*.png
