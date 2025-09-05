@@ -36,65 +36,10 @@ airflow_docker/airflow.cfg
 airflow_docker/.env
 airflow_docker/.env.*
 
-airflow.db
-
 # ==========================
-# 🔹 データ・学習系ログ・生成物
+# 🔹 codex_reports: デフォ無視 → 必要だけ許可
 # ==========================
-logs/ppo_tensorboard_logs/
-data/private_data/
-data/**/*.parquet
-data/**/*.feather
-data/**/*.pkl
-data/**/*.npy
-
-# ==========================
-# 🔹 セキュリティ・Kubernetes
-# ==========================
-.secrets/
-secrets/
-kubeconfig_final.yaml
-*.key
-*.pem
-*.crt
-
-*.tgz
-.cache/
-*.tar
-*.tar.gz
-docker/*.tar
-
-# ==========================
-# 🔹 Veritas戦略生成
-# ==========================
-strategies/veritas_generated/*
-!strategies/veritas_generated/.gitkeep
-
-veritas_generated/
-output_generated/
-
-# ==========================
-# 🔹 AI自動生成成果物・ログ除外
-# ==========================
-generated_code/*.txt
-generated_code/*.log
-generated_code/*.tmp
-generated_code/path_config.py
-generated_code/generated_code/
-
-docs/_generated/**
-docs/misc/API_Keys.md
-
-# ==========================
-# 🔹 codex_reports: デフォルト除外 → 必要なものだけ許可
-# ==========================
-codex_reports/**
-
-!codex_reports/
-!codex_reports/dead_code/
+/codex_reports/**
 !codex_reports/dead_code/quarantine.py
 !codex_reports/dead_code/keep.txt
-
-!codex_reports/graphs/
-!codex_reports/graphs/pages_svg/
 !codex_reports/graphs/pages_svg/*.png
