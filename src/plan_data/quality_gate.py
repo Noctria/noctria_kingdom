@@ -119,12 +119,18 @@ def evaluate_quality(
         _emit_alert(
             "QUALITY.DATA_LAG",
             message=f"data_lag_min={data_lag_min}",
-            # ★ テストが見る 'reason' に exceeds を入れる
+            # テストが参照する 'reason'
             reason=f"data_lag_min {data_lag_min}min exceeds limit {max_lag_min}",
             severity="HIGH",
             trace=trace,
             symbol=symbol,
             timeframe=timeframe,
+            # テストが参照する 'details' ネスト
+            details={
+                "data_lag_min": data_lag_min,
+                "max_lag_min": max_lag_min,
+            },
+            # 互換のため上位にも（あっても害はない）
             data_lag_min=data_lag_min,
             max_lag_min=max_lag_min,
             conn_str=conn_str,
@@ -136,12 +142,18 @@ def evaluate_quality(
         _emit_alert(
             "QUALITY.MISSING_RATIO",
             message=f"missing_ratio={missing_ratio:.3f}",
-            # ★ 同様に 'reason' を付与
+            # テストが参照する 'reason'
             reason=f"missing_ratio {missing_ratio:.3f} exceeds limit {max_missing:.3f}",
             severity="MEDIUM",
             trace=trace,
             symbol=symbol,
             timeframe=timeframe,
+            # テストが参照する 'details' ネスト
+            details={
+                "missing_ratio": missing_ratio,
+                "max_missing": max_missing,
+            },
+            # 互換のため上位にも
             missing_ratio=missing_ratio,
             max_missing=max_missing,
             conn_str=conn_str,
