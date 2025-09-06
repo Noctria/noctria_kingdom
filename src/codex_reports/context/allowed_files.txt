@@ -136,3 +136,5 @@ src/codex_reports/pytest_summary.md
 src/codex_reports/tmp.json
 src/codex_reports/context/allowed_files.txt
 src/codex_config/__init__.py
+src/codex/agents/harmonia.py
+src/plan_data/run_inventor.py
