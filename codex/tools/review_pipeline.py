@@ -40,6 +40,19 @@
 
 from __future__ import annotations
 
+# ---------------------------------------------------------------------------
+# Permanent import-path bootstrap (works for `python codex/tools/review_pipeline.py`)
+# Adds PROJECT_ROOT and PROJECT_ROOT/src into sys.path.
+# ---------------------------------------------------------------------------
+import sys as _sys
+from pathlib import Path as _P
+
+_ROOT = _P(__file__).resolve().parents[2]
+for _p in (_ROOT, _ROOT / "src"):
+    _sp = str(_p)
+    if _sp not in _sys.path:
+        _sys.path.insert(0, _sp)
+
 import datetime as _dt
 import json
 import os
