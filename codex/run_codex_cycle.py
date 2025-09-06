@@ -7,6 +7,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import importlib.util
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Tuple
@@ -220,14 +221,22 @@ class CycleResult:
 
 
 def run_cycle(
-    pytest_args: str | None,
+    pytest_args: str | list[str] | None,
     base_ref: str,
     head_ref: str,
     title: str,
     enable_patch_notes: bool,
 ) -> tuple[CycleResult, str]:
     # GUI/mini-loop で未指定なら“小ループ対象のみ”実行
-    args = pytest_args.split() if (pytest_args and pytest_args.strip()) else list(DEFAULT_MINILOOP_TARGETS)
+    if pytest_args:
+        if isinstance(pytest_args, str):
+            args = shlex.split(pytest_args)
+        elif isinstance(pytest_args, (list, tuple)):
+            args = list(pytest_args)
+        else:
+            raise TypeError(f"Invalid pytest_args type: {type(pytest_args)}")
+    else:
+        args = list(DEFAULT_MINILOOP_TARGETS)
 
     rc, out, err, used_json = _run_pytest(args)
     result_dict = _load_result(used_json)
