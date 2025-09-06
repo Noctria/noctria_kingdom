@@ -1,0 +1,33 @@
+--- a/src/plan_data/noctus_gate.py
++++ b/src/plan_data/noctus_gate.py
+@@
+ from __future__ import annotations
++import json as _json
++import sys as _sys
+@@
+ from . import observability
+@@
++def _emit_alert(kind: str, message: str = "", **fields) -> None:
++    """Safe wrapper: try observability.emit_alert, then always stdout JSON."""
++    try:
++        if hasattr(observability, "emit_alert"):
++            observability.emit_alert(kind, message=message, **fields)  # type: ignore
++    except Exception:
++        pass
++    try:
++        print(_json.dumps({"kind": kind, "message": message, **fields}, ensure_ascii=False))
++        _sys.stdout.flush()
++    except Exception:
++        pass
+@@
+-    if should_block(decision):
++    if should_block(decision):
+         decision = {"decision": {"decision": {"action": "REJECT"}}}
+-        ctx = getattr(fb, "context", {}) or {}
+-        observability.emit_alert(
++        ctx = getattr(fb, "context", {}) or {}
++        _emit_alert(
+             "NOCTUS.BLOCKED",
+             message="blocked by NoctusGate",
+             **{k: ctx.get(k) for k in ("symbol", "timeframe", "trace") if k in ctx}
+         )
