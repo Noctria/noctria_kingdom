@@ -2,3 +2,10 @@ noctria_gui/routes/pdca_api.py
 src/plan_data/noctus_gate.py
 src/plan_data/quality_gate.py
 codex_reports/inventor_suggestions.json
+src/plan_data/run_inventor.py
+src/plan_data/inventor.py
+airflow_docker/dags/inventor_pipeline_dag.py
+src/plan_data/run_inventor.py
+src/plan_data/inventor.py
+airflow_docker/dags/inventor_pipeline_dag.py
+airflow_docker/docker-compose.yaml
