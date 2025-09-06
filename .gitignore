@@ -49,3 +49,8 @@ codex_reports/**                 # まず配下を全無視
 !codex_reports/dead_code/quarantine.py
 !codex_reports/dead_code/keep.txt
 !codex_reports/graphs/pages_svg/*.png
+
+# --- allow specific graphs exports ---
+!codex_reports/graphs/imports.svg
+!codex_reports/graphs/imports.pdf
+!codex_reports/graphs/imports_preview.png
