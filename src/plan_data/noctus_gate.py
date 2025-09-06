@@ -1,3 +1,5 @@
+# ❶ 完全置換（そのまま貼り付け）
+cat > src/plan_data/noctus_gate.py <<'PY'
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -165,3 +167,25 @@ def check_proposal(
 def NoctusGate(proposal: Any, feature_bundle: Any | None = None, *, conn_str: str | None = None) -> NoctusGateResult:  # noqa: N802
     # feature_bundle は現状未使用だが、将来の拡張用に受け付ける
     return check_proposal(proposal, conn_str=conn_str)
+PY
+
+# ❷ __pycache__ を掃除（古いバイトコード排除）
+find src -name '__pycache__' -type d -exec rm -rf {} +
+
+# ❸ 先頭チェック（class になっているか）
+sed -n '1,60p' src/plan_data/noctus_gate.py
+
+# ❹ 最小インポートテスト
+export PYTHONPATH=src:. NOCTRIA_OBS_MODE=stdout
+python - <<'PY'
+from plan_data.noctus_gate import NoctusGate, check_proposal, NoctusGateResult
+print("OK:", NoctusGate, check_proposal, NoctusGateResult)
+PY
+
+# ❺ テスト（quality_gate 側はキーワード引数で呼ぶ必要あり）
+pytest -vv -rA tests/test_quality_gate_alerts.py tests/test_noctus_gate_block.py \
+  --json-report --json-report-file=codex_reports/tmp.json
+
+# ❻ レビュー/HUD更新
+python -m codex.tools.review_pipeline
+less codex_reports/pytest_summary.md
