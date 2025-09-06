@@ -1,16 +1,18 @@
 # codex/tools/review_pipeline.py
 # -*- coding: utf-8 -*-
 """
-📦 Codex Review Pipeline — v3.0 (Harmonia Ordinis + Inventor Scriptus)
+📦 Codex Review Pipeline — v3.1 (Harmonia Ordinis + Inventor Scriptus)
 - pytest JSON を解析して Inventor/Harmonia の Markdown を生成
 - Inventor の PatchSuggestion（pseudo_diff）を .patch に書き出し、索引を作成
 - 🆕 外部提案ファイル `codex_reports/inventor_suggestions.json`（before/after または unified diff `patch`）にも対応
 - 🆕 pytest のサマリを `codex_reports/pytest_summary.md` にも保存（GUI表示用）
+- 🆕 Harmonia を `NOCTRIA_HARMONIA_MODE` で切替（offline | api | auto）
 
 入出力（標準配置）:
   PROJECT_ROOT/
     codex_reports/
       tmp.json                        ... pytest-json-report 出力
+      latest_codex_cycle.md           ... Mini-Loop実行レポート（任意）
       inventor_suggestions.md         ... Inventor（本文）
       harmonia_review.md              ... Harmonia（本文）
       pytest_summary.md               ... Pytestサマリ（HUD表示用）
@@ -40,6 +42,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 import re
 import difflib
 from pathlib import Path
@@ -47,9 +50,15 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from codex.tools.json_parse import load_json, build_pytest_result_for_inventor
 
-# 既存ヒューリスティック Inventor/Harmonia を利用
+# 既存 Inventor / Harmonia(API) インターフェース
 from codex.agents.inventor import propose_fixes, InventorOutput, PatchSuggestion
-from codex.agents.harmonia import review, ReviewResult
+from codex.agents.harmonia import review, ReviewResult  # ← API版レビュー
+
+# 🆕 オフライン Harmonia（存在しなければ後述のフォールバックを使用）
+try:
+    from codex.agents.harmonia_offline import generate_offline_review  # type: ignore
+except Exception:
+    generate_offline_review = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -59,14 +68,15 @@ REPORTS_DIR = ROOT / "codex_reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 TMP_JSON = REPORTS_DIR / "tmp.json"
+LATEST_MD = REPORTS_DIR / "latest_codex_cycle.md"
 INV_MD = REPORTS_DIR / "inventor_suggestions.md"
 HAR_MD = REPORTS_DIR / "harmonia_review.md"
 
-# 🆕 追加出力
+# 追加出力
 PYTEST_SUMMARY_MD = REPORTS_DIR / "pytest_summary.md"
 INV_JSON = REPORTS_DIR / "inventor_suggestions.json"  # 外部提案（任意）
 
-# 🆕 パッチ保存先 & インデックス
+# パッチ保存先 & インデックス
 PATCHES_DIR = REPORTS_DIR / "patches"
 PATCHES_DIR.mkdir(parents=True, exist_ok=True)
 PATCHES_INDEX = REPORTS_DIR / "patches_index.md"
@@ -148,7 +158,7 @@ def _slugify(text: str, max_len: int = 40) -> str:
     """
     if not text:
         return "patch"
-    txt = re.sub(r"[^\w\-\.\u00A0-\uFFFF]+", "-", text, flags=re.UNICODE)  # おおざっぱ非単語→ハイフン
+    txt = re.sub(r"[^\w\-\.\u00A0-\uFFFF]+", "-", text, flags=re.UNICODE)
     txt = re.sub(r"-{2,}", "-", txt).strip("-_.")
     if not txt:
         txt = "patch"
@@ -184,7 +194,7 @@ def _scan_patch_files() -> List[Dict[str, Any]]:
             items.append(
                 {
                     "path": p,
-                    "rel": p.relative_to(REPORTS_DIR).as_posix(),  # "patches/xxx.patch"
+                    "rel": p.relative_to(REPORTS_DIR).as_posix(),
                     "name": p.name,
                     "size": stat.st_size,
                     "mtime": _dt.datetime.fromtimestamp(stat.st_mtime).astimezone(),
@@ -273,7 +283,7 @@ def write_inventor_markdown(
         lines.append("- `pytest -q`")
     lines.append("")
 
-    # 🆕 生成済みパッチの一覧（内部：InventorOutput）
+    # 生成済みパッチの一覧（内部：InventorOutput）
     if generated_patches:
         lines.append("## Generated Patches (from InventorOutput)")
         lines.append("")
@@ -282,7 +292,7 @@ def write_inventor_markdown(
             lines.append(f"- [{path.name}]({rel}) — `{p.file}` :: `{p.function}`")
         lines.append("")
 
-    # 🆕 外部JSONから生成されたパッチ一覧
+    # 外部JSONから生成されたパッチ一覧
     if external_generated:
         lines.append("## Generated Patches (from inventor_suggestions.json)")
         lines.append("")
@@ -468,15 +478,12 @@ def generate_patches_from_external() -> List[Tuple[Path, Dict[str, Any]]]:
 # ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
-def _build_outputs_from_json(py_data: Dict[str, Any]) -> Tuple[InventorOutput, ReviewResult]:
+def _build_inventor_from_json(py_data: Dict[str, Any]) -> InventorOutput:
     """
-    tmp.json を解析して Inventor/Harmonia 出力を構築。
-    - 失敗が無い場合は「軽い承認ムード」のノートを付与しつつ、既存レビュアルールは尊重。
+    tmp.json を解析して Inventor 出力を構築。
     """
     pytest_result_for_inventor = build_pytest_result_for_inventor(py_data)
-    inv = propose_fixes(pytest_result_for_inventor)
-    rv = review(inv)
-    return inv, rv
+    return propose_fixes(pytest_result_for_inventor)
 
 
 # ---------------------------------------------------------------------------
@@ -487,10 +494,17 @@ def main() -> int:
     - codex_reports/tmp.json を読み取り
     - Inventor 修正案 / Harmonia レビューを Markdown で生成
     - Inventor の pseudo_diff を .patch として保存し、パッチ索引を更新
-    - 🆕 外部提案 inventor_suggestions.json があれば、それも .patch 生成
+    - 外部提案 inventor_suggestions.json があれば、それも .patch 生成
     - 失敗が無い場合も、空の提案と軽いコメントでファイルを出力（GUI 側で常に閲覧可能）
-    - 🆕 pytest summary を pytest_summary.md に保存
+    - pytest summary を pytest_summary.md に保存
+    - 🆕 Harmonia を `NOCTRIA_HARMONIA_MODE` で切替（offline | api | auto）
     """
+    # ---- mode resolution ----------------------------------------------------
+    mode = (os.getenv("NOCTRIA_HARMONIA_MODE") or "offline").lower()  # default offline
+    api_key = os.getenv("OPENAI_API_KEY") or ""
+    if mode == "auto":
+        mode = "api" if api_key else "offline"
+
     header_note = None
     pytest_summary: Optional[Dict[str, int]] = None
     generated_patches: List[Tuple[Path, PatchSuggestion]] = []
@@ -506,13 +520,20 @@ def main() -> int:
             patch_suggestions=[],
             followup_tests=["pytest -q"],
         )
-        rv = review(empty_inv)  # 既存レビューロジックに委ねる
 
-        # pytest summary（空）も一応出力
+        # Harmonia（modeに応じて）
+        if mode == "api":
+            rv = review(empty_inv)
+            write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
+        else:
+            # offline — JSONが無いのでプレースホルダ
+            HAR_MD.write_text(
+                "# Harmonia Ordinis — オフラインレビュー\n\n- 解析対象の pytest JSON が見つかりませんでした。\n",
+                encoding="utf-8",
+            )
+
         PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []), encoding="utf-8")
-
         write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None, generated_patches=None)
-        write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
         write_patches_index()  # 空でも再生成
         return 0
 
@@ -527,11 +548,17 @@ def main() -> int:
             patch_suggestions=[],
             followup_tests=["pytest -q"],
         )
-        rv = review(empty_inv)
+        if mode == "api":
+            rv = review(empty_inv)
+            write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
+        else:
+            HAR_MD.write_text(
+                f"# Harmonia Ordinis — オフラインレビュー\n\n- 解析エラー: `{_md_escape(str(e))}`\n",
+                encoding="utf-8",
+            )
 
         PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []), encoding="utf-8")
         write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None, generated_patches=None)
-        write_harmonia_markdown(rv, header_note=header_note, pytest_summary=None)
         write_patches_index()
         return 0
 
@@ -543,8 +570,8 @@ def main() -> int:
     # pytest サマリ MD を保存（GUIで表示）
     PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md(pytest_summary, failed_tests), encoding="utf-8")
 
-    # Inventor/Harmonia 生成
-    inv, rv = _build_outputs_from_json(data)
+    # Inventor 生成
+    inv = _build_inventor_from_json(data)
 
     # パッチ出力（内部）
     try:
@@ -558,7 +585,7 @@ def main() -> int:
     except Exception:
         external_generated = []
 
-    # 出力
+    # Inventor 出力
     write_inventor_markdown(
         inv,
         header_note=header_note,
@@ -566,9 +593,31 @@ def main() -> int:
         generated_patches=generated_patches if generated_patches else None,
         external_generated=external_generated if external_generated else None,
     )
-    write_harmonia_markdown(rv, header_note=header_note, pytest_summary=pytest_summary)
-    write_patches_index()
 
+    # Harmonia（モード別）
+    if mode == "api":
+        rv = review(inv)
+        write_harmonia_markdown(rv, header_note=header_note, pytest_summary=pytest_summary)
+    else:
+        # offline: JSON/MD をオフラインレビュワーへ
+        pytest_md_text = LATEST_MD.read_text(encoding="utf-8") if LATEST_MD.exists() else None
+        if generate_offline_review:
+            offline = generate_offline_review(
+                pytest_json=str(TMP_JSON),
+                pytest_md=pytest_md_text,
+                repo_root=str(ROOT),
+            )
+            HAR_MD.write_text(offline.review_md, encoding="utf-8")
+        else:
+            # 万一モジュールが無い場合の最小フォールバック
+            HAR_MD.write_text(
+                "# Harmonia Ordinis — オフラインレビュー（簡易）\n\n- ツール未導入のため簡易モードで出力しました。\n- 失敗テスト数: "
+                f"{pytest_summary.get('failed', 0)} / {pytest_summary.get('total', 0)}\n",
+                encoding="utf-8",
+            )
+
+    # パッチ索引
+    write_patches_index()
     return 0
 
 
