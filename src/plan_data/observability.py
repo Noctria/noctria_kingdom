@@ -10,7 +10,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 # =============================================================================
-# Observability I/O (PostgreSQL)
+# Observability with graceful modes:
+#   auto   : DSNがあればDB、無ければstdout
+#   db     : 常にDB（DSN必須）
+#   stdout : 常に標準出力ログ（DBを使わない）
+#   off    : 完全無効（no-op）
 # =============================================================================
 
 logger = logging.getLogger("noctria.observability")
@@ -19,6 +23,28 @@ if not logger.handlers:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+_OBS_MODE = os.getenv("NOCTRIA_OBS_MODE", "auto").strip().lower()  # auto|db|stdout|off
+
+def _mode() -> str:
+    m = _OBS_MODE
+    if m not in ("auto", "db", "stdout", "off"):
+        return "auto"
+    return m
+
+def _dsn_from(conn_str: Optional[str]) -> Optional[str]:
+    return (conn_str or os.getenv("NOCTRIA_OBS_PG_DSN") or "").strip() or None
+
+def _effective_mode(conn_str: Optional[str]) -> str:
+    m = _mode()
+    if m == "off":
+        return "off"
+    if m == "stdout":
+        return "stdout"
+    if m == "db":
+        return "db"
+    # auto
+    return "db" if _dsn_from(conn_str) else "stdout"
 
 # --- severities & small utils -------------------------------------------------
 _SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
@@ -45,20 +71,12 @@ def _json(obj: Any) -> str:
         ensure_ascii=False,
     )
 
-def _get_dsn(conn_str: Optional[str]) -> str:
-    dsn = conn_str or os.getenv("NOCTRIA_OBS_PG_DSN")
-    if not dsn:
-        raise ValueError(
-            "PostgreSQL DSN is not provided. "
-            "Set NOCTRIA_OBS_PG_DSN or pass conn_str."
-        )
-    return dsn
-
 # --- driver loader (lazy import) ----------------------------------------------
 _DRIVER: Optional[object] = None
 _DB_KIND: Optional[str] = None  # "psycopg2" or "psycopg"
 
-def _import_driver() -> Tuple[object, str]:
+def _import_driver() -> Tuple[Optional[object], Optional[str]]:
+    """ドライバを動的ロード（見つからなければ (None, None) を返す）"""
     global _DRIVER, _DB_KIND
     if _DRIVER is not None and _DB_KIND is not None:
         return _DRIVER, _DB_KIND
@@ -72,26 +90,25 @@ def _import_driver() -> Tuple[object, str]:
         drv = importlib.import_module("psycopg")
         _DRIVER, _DB_KIND = drv, "psycopg"
         return _DRIVER, _DB_KIND
-    except ModuleNotFoundError as e:
-        raise RuntimeError(
-            "Neither 'psycopg2' nor 'psycopg' is installed.\n"
-            "  pip install 'psycopg2-binary>=2.9.9,<3.0'\n"
-            "  or\n"
-            "  pip install 'psycopg[binary]>=3.1,<3.2'"
-        ) from e
+    except ModuleNotFoundError:
+        return None, None
 
 @contextmanager
 def _get_conn(dsn: str):
     drv, kind = _import_driver()
+    if not drv or not kind:
+        # 呼び出し側で stdout/off にフォールバックすべきだが、念のため no-op にする
+        yield None
+        return
     if kind == "psycopg2":
-        conn = drv.connect(dsn)
+        conn = drv.connect(dsn)  # type: ignore[attr-defined]
         conn.autocommit = True
         try:
             yield conn
         finally:
             conn.close()
     else:
-        conn = drv.connect(dsn, autocommit=True)
+        conn = drv.connect(dsn, autocommit=True)  # type: ignore[attr-defined]
         try:
             yield conn
         finally:
@@ -99,14 +116,23 @@ def _get_conn(dsn: str):
 
 def _exec(dsn: str, sql: str, params: Optional[Iterable[Any]] = None) -> None:
     with _get_conn(dsn) as conn:
+        if conn is None:
+            # ドライバ無し：上位で stdout に回す想定。
+            raise RuntimeError("No DB driver available")
         with conn.cursor() as cur:
             cur.execute(sql, params or ())
 
 def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
     with _get_conn(dsn) as conn:
+        if conn is None:
+            raise RuntimeError("No DB driver available")
         with conn.cursor() as cur:
             cur.execute(sql, params or ())
             return cur.fetchone()
+
+# --- stdout helper ------------------------------------------------------------
+def _stdout_event(kind: str, payload: Dict[str, Any]) -> None:
+    logger.info("[obs:stdout] %s %s", kind, _json(payload))
 
 # --- schema bootstrap ---------------------------------------------------------
 _CREATE_PLAN_RUNS = """
@@ -339,23 +365,43 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_obs_latency_daily_day
 
 # --- ensure / refresh ---------------------------------------------------------
 def ensure_tables(conn_str: Optional[str] = None) -> None:
-    dsn = _get_dsn(conn_str)
-    _exec(dsn, _CREATE_PLAN_RUNS)
-    _exec(dsn, _CREATE_INFER_CALLS)
-    _exec(dsn, _CREATE_DECISIONS)
-    _exec(dsn, _CREATE_EXEC_EVENTS)
-    _exec(dsn, _CREATE_ALERTS)
-    _exec(dsn, _ALTER_PLAN_RUNS)
-    _exec(dsn, _ALTER_INFER_CALLS)
-    logger.info("observability tables ensured/altered.")
+    mode = _effective_mode(conn_str)
+    if mode in ("stdout", "off"):
+        logger.info("observability.ensure_tables skipped (mode=%s)", mode)
+        return
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        logger.info("observability.ensure_tables skipped: no DSN")
+        return
+    try:
+        _exec(dsn, _CREATE_PLAN_RUNS)
+        _exec(dsn, _CREATE_INFER_CALLS)
+        _exec(dsn, _CREATE_DECISIONS)
+        _exec(dsn, _CREATE_EXEC_EVENTS)
+        _exec(dsn, _CREATE_ALERTS)
+        _exec(dsn, _ALTER_PLAN_RUNS)
+        _exec(dsn, _ALTER_INFER_CALLS)
+        logger.info("observability tables ensured/altered.")
+    except Exception as e:
+        logger.warning("ensure_tables failed: %s", e)
 
 def ensure_views(conn_str: Optional[str] = None) -> None:
-    dsn = _get_dsn(conn_str)
-    _exec(dsn, _CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW)
-    _exec(dsn, _CREATE_OR_REPLACE_TRACE_LATENCY_VIEW)
-    _exec(dsn, _CREATE_LATENCY_DAILY_MV)
-    _exec(dsn, _CREATE_LATENCY_DAILY_INDEX)
-    logger.info("observability views ensured/refreshed (definitions).")
+    mode = _effective_mode(conn_str)
+    if mode in ("stdout", "off"):
+        logger.info("observability.ensure_views skipped (mode=%s)", mode)
+        return
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        logger.info("observability.ensure_views skipped: no DSN")
+        return
+    try:
+        _exec(dsn, _CREATE_OR_REPLACE_TRACE_TIMELINE_VIEW)
+        _exec(dsn, _CREATE_OR_REPLACE_TRACE_LATENCY_VIEW)
+        _exec(dsn, _CREATE_LATENCY_DAILY_MV)
+        _exec(dsn, _CREATE_LATENCY_DAILY_INDEX)
+        logger.info("observability views ensured/refreshed (definitions).")
+    except Exception as e:
+        logger.warning("ensure_views failed: %s", e)
 
 def ensure_views_and_mvs(conn_str: Optional[str] = None) -> None:
     ensure_tables(conn_str)
@@ -363,7 +409,14 @@ def ensure_views_and_mvs(conn_str: Optional[str] = None) -> None:
     logger.info("tables + views/mviews ensured.")
 
 def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = None) -> None:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    if mode in ("stdout", "off"):
+        logger.info("observability.refresh_latency_daily skipped (mode=%s)", mode)
+        return
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        logger.info("observability.refresh_latency_daily skipped: no DSN")
+        return
     if concurrently:
         try:
             _exec(dsn, "REFRESH MATERIALIZED VIEW CONCURRENTLY obs_latency_daily;")
@@ -371,8 +424,11 @@ def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = N
             return
         except Exception as e:
             logger.warning("CONCURRENTLY refresh failed: %s; falling back to non-concurrent refresh.", e)
-    _exec(dsn, "REFRESH MATERIALIZED VIEW obs_latency_daily;")
-    logger.info("obs_latency_daily refreshed.")
+    try:
+        _exec(dsn, "REFRESH MATERIALIZED VIEW obs_latency_daily;")
+        logger.info("obs_latency_daily refreshed.")
+    except Exception as e:
+        logger.warning("refresh_latency_daily failed: %s", e)
 
 def refresh_materialized(conn_str: Optional[str] = None) -> None:
     refresh_latency_daily(concurrently=True, conn_str=conn_str)
@@ -390,7 +446,23 @@ def _log_plan_phase(conn_str: Optional[str],
                     missing_ratio: float,
                     error_rate: float,
                     trace_id: Optional[str] = None) -> Optional[int]:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    payload = {
+        "phase": phase, "rows": rows, "dur_sec": dur_sec,
+        "missing_ratio": missing_ratio, "error_rate": error_rate, "trace_id": trace_id,
+        "ts": _utcnow().isoformat(),
+    }
+    if mode == "off":
+        return None
+    if mode == "stdout":
+        _stdout_event("PLAN_PHASE", payload)
+        return None
+
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        _stdout_event("PLAN_PHASE(no-dsn)", payload)
+        return None
+
     sql = (
         "INSERT INTO obs_plan_runs (ts, phase, dur_sec, rows, missing_ratio, error_rate, trace_id) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
@@ -409,18 +481,29 @@ def _log_plan_status(*, trace_id: str,
                      finished_at: Optional[datetime] = None,
                      meta: Optional[Dict[str, Any]] = None,
                      conn_str: Optional[str] = None) -> Optional[int]:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    payload = {
+        "trace_id": trace_id, "status": status,
+        "started_at": (started_at or (None if status != "START" else _utcnow())),
+        "finished_at": (finished_at or (None if status != "END" else _utcnow())),
+        "meta": meta or {},
+    }
+    if mode == "off":
+        return None
+    if mode == "stdout":
+        _stdout_event("PLAN_STATUS", payload)
+        return None
+
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        _stdout_event("PLAN_STATUS(no-dsn)", payload)
+        return None
+
     sql = (
         "INSERT INTO obs_plan_runs (trace_id, started_at, finished_at, status, meta) "
         "VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id"
     )
-    params = (
-        trace_id,
-        started_at or (None if status != "START" else _utcnow()),
-        finished_at or (None if status != "END" else _utcnow()),
-        status,
-        _json(meta or {}),
-    )
+    params = (trace_id, payload["started_at"], payload["finished_at"], status, _json(meta or {}))
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
@@ -429,9 +512,23 @@ def _log_plan_status(*, trace_id: str,
         return None
 
 def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
 
+    # GUI互換（ai_name/params_json/metrics_json系）
     if "ai_name" in kwargs or "params_json" in kwargs or "metrics_json" in kwargs:
+        payload = dict(kwargs)
+        payload["ts"] = _utcnow().isoformat()
+        if mode == "off":
+            return None
+        if mode == "stdout":
+            _stdout_event("INFER(gui)", payload)
+            return None
+
+        dsn = _dsn_from(conn_str)
+        if not dsn:
+            _stdout_event("INFER(gui,no-dsn)", payload)
+            return None
+
         trace_id: Optional[str] = kwargs.get("trace_id")
         ai_name: Optional[str] = kwargs.get("ai_name")
         started_at_raw = kwargs.get("started_at")
@@ -443,7 +540,6 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
 
         started_at = started_at_raw
         ended_at = ended_at_raw
-
         duration_ms: Optional[int] = None
         try:
             if started_at_raw and ended_at_raw:
@@ -472,7 +568,21 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             logger.warning("log_infer_call(gui-compat) failed: %s (ai_name=%s, trace_id=%s)", e, ai_name, trace_id)
             return None
 
+    # 新API（model_name/model/inputs/outputs/duration_ms など）
     if any(k in kwargs for k in ("model_name", "model", "inputs", "outputs", "duration_ms", "dur_ms", "call_at")):
+        payload = dict(kwargs)
+        payload["ts"] = _utcnow().isoformat()
+        if mode == "off":
+            return None
+        if mode == "stdout":
+            _stdout_event("INFER(new)", payload)
+            return None
+
+        dsn = _dsn_from(conn_str)
+        if not dsn:
+            _stdout_event("INFER(new,no-dsn)", payload)
+            return None
+
         trace_id: Optional[str] = kwargs.get("trace_id")
         model_name: Optional[str] = kwargs.get("model_name") or kwargs.get("model")
         model: Optional[str] = kwargs.get("model") or kwargs.get("model_name")
@@ -511,6 +621,20 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             logger.warning("log_infer_call(new) failed: %s (model_name=%s, trace_id=%s)", e, model_name, trace_id)
             return None
 
+    # 旧API（model/ver/dur_ms）
+    payload = dict(kwargs)
+    payload["ts"] = _utcnow().isoformat()
+    if mode == "off":
+        return None
+    if mode == "stdout":
+        _stdout_event("INFER(old)", payload)
+        return None
+
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        _stdout_event("INFER(old,no-dsn)", payload)
+        return None
+
     try:
         model: str = kwargs["model"]
         ver: Optional[str] = kwargs.get("ver")
@@ -547,7 +671,28 @@ def log_decision(*, trace_id: str,
                  decision: Dict[str, Any],
                  made_at: Optional[datetime] = None,
                  conn_str: Optional[str] = None) -> Optional[int]:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    payload = {
+        "trace_id": trace_id,
+        "engine_version": engine_version,
+        "strategy_name": strategy_name,
+        "score": float(score),
+        "reason": reason,
+        "features": features,
+        "decision": decision,
+        "made_at": (made_at or _utcnow()).isoformat(),
+    }
+    if mode == "off":
+        return None
+    if mode == "stdout":
+        _stdout_event("DECISION", payload)
+        return None
+
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        _stdout_event("DECISION(no-dsn)", payload)
+        return None
+
     sql = (
         "INSERT INTO obs_decisions (trace_id, made_at, engine_version, strategy_name, score, reason, features, decision) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id"
@@ -573,7 +718,23 @@ def log_exec_event(*, trace_id: str,
                    response: Optional[Dict[str, Any]] = None,
                    sent_at: Optional[datetime] = None,
                    conn_str: Optional[str] = None) -> Optional[int]:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    payload = {
+        "trace_id": trace_id, "symbol": symbol, "side": side, "size": float(size),
+        "provider": provider, "status": status, "order_id": order_id,
+        "response": response or {}, "sent_at": (sent_at or _utcnow()).isoformat(),
+    }
+    if mode == "off":
+        return None
+    if mode == "stdout":
+        _stdout_event("EXEC", payload)
+        return None
+
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        _stdout_event("EXEC(no-dsn)", payload)
+        return None
+
     sql = (
         "INSERT INTO obs_exec_events (trace_id, sent_at, symbol, side, size, provider, status, order_id, response) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING id"
@@ -596,7 +757,26 @@ def log_alert(*,
               trace_id: Optional[str] = None,
               created_at: Optional[datetime] = None,
               conn_str: Optional[str] = None) -> Optional[int]:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    payload = {
+        "created_at": (created_at or _utcnow()).isoformat(),
+        "policy_name": policy_name,
+        "reason": reason,
+        "severity": _normalize_severity(severity),
+        "details": details or {},
+        "trace_id": trace_id,
+    }
+    if mode == "off":
+        return None
+    if mode == "stdout":
+        _stdout_event("ALERT", payload)
+        return None
+
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        _stdout_event("ALERT(no-dsn)", payload)
+        return None
+
     sql = (
         "INSERT INTO obs_alerts (created_at, policy_name, reason, severity, details, trace_id) "
         "VALUES (%s, %s, %s, %s, %s::jsonb, %s) RETURNING id"
@@ -640,7 +820,14 @@ def emit_alert(*,
 
 # --- ping & exports -----------------------------------------------------------
 def ping(conn_str: Optional[str] = None) -> bool:
-    dsn = _get_dsn(conn_str)
+    mode = _effective_mode(conn_str)
+    if mode == "off":
+        return False
+    if mode == "stdout":
+        return True
+    dsn = _dsn_from(conn_str)
+    if not dsn:
+        return False
     try:
         _exec(dsn, "SELECT 1;")
         return True
