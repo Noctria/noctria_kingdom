@@ -69,10 +69,10 @@ def main() -> None:
     """
     # 事前に allowed_tests を決定
     allowed_tests = load_allowed_tests()
-    pytest_args = None
+    pytest_args: str | None = None
     if allowed_tests:
-        # pytest に nodeid を直接渡す形にする
-        pytest_args = allowed_tests
+        # pytest に渡すためスペース区切りの文字列に変換
+        pytest_args = " ".join(allowed_tests)
 
     # 1) pytest 実行
     result, md_path = run_cycle(
