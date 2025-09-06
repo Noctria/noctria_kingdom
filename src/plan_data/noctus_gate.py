@@ -1,4 +1,3 @@
-# src/plan_data/noctus_gate.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -45,7 +44,7 @@ def _emit_alert(kind: str, message: str = "", **fields) -> None:
     """
     安全アラート送出:
       1) observability.emit_alert を試みる
-      2) つねに stdout に 1 行 JSON を出力（tests の capture_alerts が確実に拾える）
+      2) 常に stdout に 1 行 JSON を出力（tests の capture_alerts が確実に拾える）
       例外は飲み込み、呼び出し元を落とさない
     """
     try:
@@ -83,7 +82,7 @@ def check_proposal(
     adjusted = False
     adjusted_size: Optional[float] = None
 
-    # --- 明示的なリスキー戦略名の検知（テストの RiskyStrategy を確実に拾う） ---
+    # --- 明示リスキー戦略の検知（テストの RiskyStrategy を確実に拾う） ---
     prop_str = f"{getattr(proposal, 'name', '')} {getattr(proposal, 'strategy_name', '')} {type(proposal).__name__} {proposal!s}"
     if "RiskyStrategy" in prop_str:
         blocked = True
@@ -162,7 +161,7 @@ def check_proposal(
     return result
 
 
-# 汎用呼び出し互換のための別名（decision_engine 等が NoctusGate(...) を想定してもOK）
+# 互換呼び出し（decision_engine 等が NoctusGate(...) を想定してもOK）
 def NoctusGate(proposal: Any, feature_bundle: Any | None = None, *, conn_str: str | None = None) -> NoctusGateResult:  # noqa: N802
     # feature_bundle は現状未使用だが、将来の拡張用に受け付ける
     return check_proposal(proposal, conn_str=conn_str)
