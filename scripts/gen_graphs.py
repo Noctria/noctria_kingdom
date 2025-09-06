@@ -13,8 +13,14 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 GRAPHS = ROOT / "codex_reports" / "graphs"
 CTXDIR = ROOT / "codex_reports" / "context"
+
+# graph artifacts
+DOT = GRAPHS / "imports.dot"          # 優先
+DOT_ALT = GRAPHS / "imports.gv"       # 代替
 SVG = GRAPHS / "imports.svg"
 PNG = GRAPHS / "imports_preview.png"
+
+# context files
 CTX = CTXDIR / "context_pack.json"
 ALLOWED = CTXDIR / "allowed_files.txt"
 
@@ -40,7 +46,6 @@ def _samepath(a: Path, b: Path) -> bool:
 def _safe_copy(src: Path, dst: Path):
     """Copy src -> dst if they are not the same file."""
     if _samepath(src, dst):
-        # Avoid SameFileError when dst is the same as src
         return
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
@@ -50,19 +55,19 @@ def _png_looks_suspicious(p: Path) -> bool:
     軽い健全性チェック:
       - 0バイト/極小サイズ
       - ほぼ単色（真っ黒/真っ白）に近い
-    Pillowが無ければチェックをスキップ（False）。
+    Pillowが無ければチェックスキップ（False）。
     """
     try:
         from PIL import Image  # type: ignore
     except Exception:
         return False
 
-    if not p.exists() or p.stat().st_size < 2_000:  # 2KB未満は怪しい
+    if not p.exists() or p.stat().st_size < 2_000:
         return True
 
     try:
         with Image.open(p) as im:
-            im = im.convert("L")  # グレースケール
+            im = im.convert("L")
             hist = im.histogram()
             total = float(sum(hist)) or 1.0
             share_black = hist[0] / total
@@ -73,9 +78,6 @@ def _png_looks_suspicious(p: Path) -> bool:
 
 # ------------------------------------------------------------
 # Static roots discovery (with safety)
-# - skip empty/relative paths
-# - skip roots that are the same as the repo root
-# - skip roots inside the source tree to avoid copying onto itself
 # ------------------------------------------------------------
 STATIC_ROOTS: list[Path] = []
 
@@ -96,8 +98,38 @@ _seen = set()
 STATIC_ROOTS = [p for p in STATIC_ROOTS if not (str(p) in _seen or _seen.add(str(p)))]
 
 # ------------------------------------------------------------
-# Actions
+# Build / Convert
 # ------------------------------------------------------------
+def _find_dot_file() -> Path | None:
+    if DOT.exists():
+        return DOT
+    if DOT_ALT.exists():
+        return DOT_ALT
+    return None
+
+def build_svg_from_dot(rankdir: str = "TB") -> bool:
+    """
+    .dot/.gv がある場合に Graphviz `dot` で SVG を生成（縦レイアウト: rankdir=TB）。
+    生成できたら True を返す。`dot` 未導入や .dot 不在なら False。
+    """
+    dot_bin = shutil.which("dot")
+    dot_file = _find_dot_file()
+    if not dot_bin or not dot_file:
+        # dot 未導入 or dot ファイル無し → 既存の SVG をそのまま使う
+        if not dot_bin and dot_file:
+            print("! graphviz 'dot' が見つかりません（apt install graphviz 推奨）")
+        return False
+
+    SVG.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [dot_bin, "-Tsvg", f"-Grankdir={rankdir}", str(dot_file), "-o", str(SVG)]
+    try:
+        subprocess.run(cmd, check=True)
+        print(f"+ built {SVG} from {dot_file.name} with rankdir={rankdir}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"! dot failed: {e}")
+        return False
+
 def svg_to_png():
     """
     Convert imports.svg -> imports_preview.png
@@ -118,7 +150,7 @@ def svg_to_png():
             url=str(SVG),
             write_to=str(PNG),
             output_width=1200,
-            background_color="white",  # 透過やCSS未解決の黒化対策
+            background_color="white",
         )
         tried_cairo = True
         print(f"+ wrote {PNG} via CairoSVG")
@@ -171,7 +203,6 @@ def sync_to_static():
     for sroot in STATIC_ROOTS:
         dst_root = _norm(sroot / "codex_reports")
 
-        # Safety: skip if dst == src or dst is inside src (would copy onto itself)
         if _samepath(dst_root, src_root):
             print(f"! skip sync: dst == src ({dst_root})")
             continue
@@ -200,5 +231,9 @@ def sync_to_static():
 # ------------------------------------------------------------
 if __name__ == "__main__":
     ensure_context()
+    # 1) .dot/.gv があれば縦レイアウトで SVG 再生成（なければ既存 SVG を利用）
+    built = build_svg_from_dot(rankdir="TB")
+    # 2) SVG → PNG（プレビュー用）
     svg_to_png()
+    # 3) static に同期
     sync_to_static()
