@@ -135,6 +135,45 @@ def run_strategy_and_decide(
     return out
 
 
+# --- ここから追記: Inventor → Decision までのワンストップ実行 ------------------
+def run_invent_and_decide(
+    bundle: FeatureBundle,
+    *,
+    max_candidates: int = 3,
+    conn_str: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Inventor で候補を生成 → DecisionEngine で最終決定。
+    - 循環インポートを避けるため、import は関数内で遅延ロード。
+    戻り値:
+    {
+      "record": {... minimal DecisionRecord ...},
+      "decision": { ... final decision ... },
+      "num_candidates": <int>
+    }
+    """
+    # 遅延 import（循環回避）
+    from plan_data import inventor  # type: ignore
+    from decision.decision_engine import DecisionEngine  # type: ignore
+
+    proposals = inventor.generate_proposals_safe(bundle, max_n=max_candidates)
+    engine = DecisionEngine()
+    record, decision = engine.decide(bundle, proposals, quality=None, profiles=None, conn_str=conn_str)
+    return {
+        "record": {
+            "trace_id": record.trace_id,
+            "engine_version": record.engine_version,
+            "strategy_name": record.strategy_name,
+            "score": record.score,
+            "reason": record.reason,
+            "features": record.features,
+        },
+        "decision": decision,
+        "num_candidates": len(proposals),
+    }
+# ------------------------------------------------------------------------------
+
+
 # --- 手動テスト用（任意） ---
 if __name__ == "__main__":
     class DummyStrategy:
