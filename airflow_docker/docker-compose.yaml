@@ -14,8 +14,11 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
     - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-YourSecretKeyForWebServerSession}
-    - NOCTRIA_OBS_PG_DSN=postgresql://$${POSTGRES_USER:-airflow}:$${POSTGRES_PASSWORD:-airflow}@postgres:5432/$${POSTGRES_DB:-airflow}
 
+    # ---- Observability（まずは stdout 運用）----
+    - NOCTRIA_OBS_MODE=stdout
+    # DB に書く場合は上を外し、下の DSN を有効化（Compose 展開のため ${...} を使用）
+    # - NOCTRIA_OBS_PG_DSN=postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
 
     # ---- API 認証バックエンド（Basic + session を明示）----
     - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
@@ -38,7 +41,7 @@ x-airflow-common: &airflow-common
     - ./plugins:/opt/airflow/plugins
     - ../src:/opt/airflow/src
     - ../data:/opt/airflow/data
-    - airflow-logs:/opt/airflow/logs         # ← ここで logs を永続化（※ environment ではなく volumes）
+    - airflow-logs:/opt/airflow/logs         # logs を永続化
   depends_on:
     postgres:
       condition: service_healthy
@@ -72,7 +75,7 @@ services:
         airflow db upgrade &&
         # 既定の管理ユーザー（GUIログイン用）
         airflow users create
-          --username ${AIRFLOW_USER:-admin}
+          --username ${AIRFLOW_USERNAME:-admin}
           --password ${AIRFLOW_PASSWORD:-admin}
           --firstname Noctria
           --lastname King
