@@ -44,14 +44,16 @@ def _get_meta(obj: Any) -> Dict[str, Any]:
 def _emit_alert(kind: str, message: str = "", **fields) -> None:
     """
     安全アラート送出:
-      1) observability.emit_alert を試みる
-      2) 常に stdout に 1行JSON を出す（tests が確実に拾える）
+      1) observability.emit_alert を試みる（未知kwargsも透過）
+      2) 常に stdout に 1行JSON を出力（テストが確実に拾える）
+      例外は飲み込み、呼び出し元を決して落とさない
     """
     try:
         if hasattr(observability, "emit_alert"):
             observability.emit_alert(kind=kind, message=message, **fields)  # type: ignore
     except Exception:
-        pass
+        pass  # stdout フォールバックに進む
+
     try:
         payload = {"kind": kind, "message": message}
         payload.update(fields)
@@ -99,7 +101,7 @@ def check_proposal(
         blocked = True
         reasons.append(f"lot size {lot_val} > max_lot_size {max_lot_size}")
 
-    # --- risk_score チェック（meta対応） ---
+    # --- risk_score チェック（A案: meta に入るケースにも対応） ---
     meta = _get_meta(proposal)
     risk_attr = _get(proposal, "risk_score", None)
     risk_meta = meta.get("risk_score", None)
@@ -128,11 +130,14 @@ def check_proposal(
 
     # --- 可観測性: アラート出力 ---
     if not ok:
+        trace = _get(proposal, "trace", _get(proposal, "trace_id", None))
+        symbol = _get(proposal, "symbol", None)
         _emit_alert(
-            kind="NOCTUS.BLOCK",
+            "NOCTUS.BLOCKED",
             message="; ".join(reasons) or "NoctusGate blocked proposal",
             severity="CRITICAL",
-            trace=_get(proposal, "trace", _get(proposal, "trace_id", None)),
+            trace=trace,
+            symbol=symbol,
             details={
                 "lot": lot_val,
                 "max_lot_size": max_lot_size,
