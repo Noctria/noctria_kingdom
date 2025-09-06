@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "generated_at": "manual-init",
+  "modules": {
+    "src/plan_data": { "owner": "PrometheusOracle", "risk": "medium" },
+    "noctria_gui": { "owner": "GUI", "risk": "low" }
+  },
+  "adjacency": {
+    "src/plan_data/statistics.py": [
+      "src/plan_data/analyzer.py",
+      "src/plan_data/features.py"
+    ]
+  },
+  "tests_map": {
+    "src/plan_data/statistics.py": ["tests/test_statistics.py"]
+  },
+  "allowlist_roots": [
+    "src/plan_data/",
+    "noctria_gui/"
+  ],
+  "banned_paths": [
+    "_graveyard/",
+    "*.bak",
+    "docs/**.bak"
+  ],
+  "critical_files": [
+    "src/core/path_config.py",
+    "noctria_gui/main.py"
+  ]
+}
