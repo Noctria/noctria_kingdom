@@ -107,7 +107,7 @@
     <div class="surface scrollbox max-h-420 mono">{{ harmonia_md or '(no harmonia review)' }}</div>
     <p class="mt-2 small">
       <a class="hud-link" href="/codex_reports/harmonia_review.md" target="_blank">
-        <i class="fas fa-file-alt"></i> harmonia_review.md
+        <i class="fas a-file-alt"></i> harmonia_review.md
       </a>
     </p>
   </section>
@@ -144,6 +144,110 @@
 
     <h4 class="mt-2">Index</h4>
     <div class="surface scrollbox max-h-420 mono">{{ patches_index_md or '(no patches_index.md)' }}</div>
+  </section>
+
+</div>
+
+<!-- =========================
+     📈 Graph + 🛡 Scope パネル
+     ========================= -->
+<div class="grid2">
+
+  <!-- 📈 Graph Preview -->
+  <section class="hud-panel">
+    <h3 class="panel-title">📈 Graph Preview</h3>
+    <p class="small text-muted">
+      <span class="pill">source: codex_reports/graphs/imports.svg</span>
+      <span class="pill">preview: imports.svg（クリックで原寸）</span>
+    </p>
+    <a href="/static/codex_reports/graphs/imports.svg" target="_blank" style="text-decoration:none;">
+      <img src="/static/codex_reports/graphs/imports.svg"
+           alt="Imports Graph Preview"
+           style="max-width:100%; height:auto; display:block; border:1px solid var(--panel-border); border-radius:10px;" />
+    </a>
+    <!-- PNGの軽量プレビューを使いたい場合は下記に切替
+    <a href="/static/codex_reports/graphs/imports.svg" target="_blank" style="text-decoration:none;">
+      <img src="/static/codex_reports/graphs/imports_preview.png"
+           alt="Imports Graph Preview (PNG)"
+           style="max-width:100%; height:auto; display:block; border:1px solid var(--panel-border); border-radius:10px;" />
+    </a>
+    -->
+    <div class="mt-2 small">
+      <a class="hud-link" href="/static/codex_reports/graphs/imports.svg" target="_blank"><i class="fas fa-external-link-alt"></i> 原寸SVGを開く</a>
+      &nbsp;|&nbsp;
+      <a class="hud-link" href="/static/codex_reports/graphs/imports_preview.png" target="_blank"><i class="fas fa-image"></i> PNGプレビュー</a>
+    </div>
+  </section>
+
+  <!-- 🛡 Allowed Scope & Related Tests -->
+  <section class="hud-panel">
+    <h3 class="panel-title">🛡 Allowed Scope &amp; Related Tests</h3>
+    <p class="small text-muted">
+      <span class="pill">dir: codex_reports/context/</span>
+      <span class="pill">policy: allowed_files.txt</span>
+    </p>
+
+    <div class="grid2">
+      <div>
+        <h4 class="mt-0">Allowed Files</h4>
+        <ul id="allowed-files" class="mono small" style="margin-bottom:.5rem;"></ul>
+      </div>
+      <div>
+        <h4 class="mt-0">Context Pack</h4>
+        <p class="small">
+          <a class="hud-link" href="/static/codex_reports/context/context_pack.json" target="_blank">
+            <i class="fas fa-file-code"></i> context_pack.json
+          </a>
+        </p>
+        <details>
+          <summary class="small">中身をちら見</summary>
+          <pre id="context-pack-preview" class="surface scrollbox mono" style="max-height:220px;"></pre>
+        </details>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        // Allowed files
+        fetch('/static/codex_reports/context/allowed_files.txt', {cache:'no-store'})
+          .then(r => r.ok ? r.text() : '')
+          .then(t => {
+            const ul = document.getElementById('allowed-files');
+            if (!ul) return;
+            const lines = t.split(/\r?\n/).filter(Boolean);
+            if (lines.length === 0) {
+              const li = document.createElement('li');
+              li.textContent = '(no allowed files)';
+              ul.appendChild(li);
+              return;
+            }
+            lines.forEach(f => {
+              const li = document.createElement('li');
+              li.textContent = f;
+              ul.appendChild(li);
+            });
+          })
+          .catch(()=>{});
+
+        // Context pack preview (先頭数行だけ整形)
+        fetch('/static/codex_reports/context/context_pack.json', {cache:'no-store'})
+          .then(r => r.ok ? r.json() : null)
+          .then(js => {
+            const pre = document.getElementById('context-pack-preview');
+            if (!pre || !js) return;
+            // 軽く整形してプレビュー
+            const preview = {
+              version: js.version,
+              modules: js.modules,
+              allowlist_roots: js.allowlist_roots,
+              banned_paths: js.banned_paths,
+              critical_files: js.critical_files
+            };
+            pre.textContent = JSON.stringify(preview, null, 2);
+          })
+          .catch(()=>{});
+      })();
+    </script>
   </section>
 
 </div>
