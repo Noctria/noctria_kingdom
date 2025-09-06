@@ -1,45 +1,42 @@
+cat > src/plan_data/run_inventor.py <<'PY'
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from decision.decision_engine import DecisionEngine
-from plan_data.inventor import generate_proposals  # 候補生成（純粋関数）
-from plan_data.noctus_gate import (
-    FeatureBundle,          # Pydantic BaseModel (V1/V2)
-    StrategyProposal,       # Pydantic BaseModel
-)
+from plan_data.inventor import generate_proposals
+from codex.agents.harmonia import rerank_candidates
 
-# Harmonia: リランク（存在すれば使う）
-try:
-    from codex.agents.harmonia import rerank_candidates as _harmonia_rerank
-except Exception:  # noqa: BLE001
-    _harmonia_rerank = None
+# --- 型ヒント（実体は別モジュール。ここでは厳密さより安全運用を優先）---
+FeatureBundle = Dict[str, Any]  # {"context": {...}, "features": {...}} を想定
+StrategyProposal = Any          # pydantic Model でも dict でも扱えるように
 
-
-def _get(obj: Any, key: str, default: Any = None) -> Any:
-    """attr / dict 両対応の安全取得"""
-    if hasattr(obj, key):
+# ----------------------------------------------------------------------
+# 小道具
+# ----------------------------------------------------------------------
+def _obj_get(o: Any, key: str, default: Any = None) -> Any:
+    """dict/オブジェクトの両対応 get"""
+    if isinstance(o, dict):
+        return o.get(key, default)
+    if hasattr(o, key):
         try:
-            return getattr(obj, key)
-        except Exception:  # noqa: BLE001
-            pass
-    if isinstance(obj, dict):
-        return obj.get(key, default)
+            return getattr(o, key)
+        except Exception:
+            return default
     return default
 
 
 def _summarize_proposals(proposals: List[StrategyProposal], k: int = 10) -> List[Dict[str, Any]]:
-    """StrategyProposal（Pydantic）を要約（属性アクセスで安全に）"""
+    """提案の概要（ログ/返却用に安全化）。pydantic/dict/任意オブジェクト両対応。"""
     out: List[Dict[str, Any]] = []
-    for p in proposals[:k]:
+    for p in (proposals or [])[:k]:
         out.append(
             {
-                "strategy": _get(p, "strategy"),
-                "intent": _get(p, "intent"),
-                "qty": _get(p, "qty_raw"),
-                "score": _get(p, "risk_adjusted", _get(p, "risk_score")),
-                "id": _get(p, "id"),
+                "strategy": _obj_get(p, "strategy") or _obj_get(p, "name"),
+                "intent": _obj_get(p, "intent"),
+                "qty": _obj_get(p, "qty") or _obj_get(p, "qty_raw") or _obj_get(p, "lot"),
+                "score": _obj_get(p, "risk_adjusted") or _obj_get(p, "risk_score"),
+                "id": _obj_get(p, "id"),
             }
         )
     return out
@@ -47,110 +44,125 @@ def _summarize_proposals(proposals: List[StrategyProposal], k: int = 10) -> List
 
 def _fallback_size(decision: Dict[str, Any], proposals: List[StrategyProposal]) -> bool:
     """
-    DecisionEngine の size が 0.0 の場合の保険。
-    最上位候補の qty_raw * min(1.0, risk_adjusted or risk_score) を採用。
+    サイズが 0 のときの保険。提案の qty_raw / risk_score から最小サイズを与える。
+    返り値: 適用したかどうか
     """
     try:
-        size = float(decision.get("size", 0.0) or 0.0)
-    except Exception:  # noqa: BLE001
+        size = float(decision.get("size") or 0.0)
+    except Exception:
         size = 0.0
 
     if size > 0:
         return False
 
-    if not proposals:
-        return False
+    # 提案から最小限のサイズを拾う
+    best = proposals[0] if proposals else None
+    if not best:
+        decision["size"] = 0.01  # 本当に何も無い最終保険
+        decision["reason"] = (decision.get("reason") or "") + " fallback_size_applied:min"
+        return True
 
-    top = proposals[0]
-    qty = _get(top, "qty_raw", 0.0) or 0.0
-    score = _get(top, "risk_adjusted", _get(top, "risk_score", 0.5)) or 0.5
+    qty = _obj_get(best, "qty_raw", 0.0) or _obj_get(best, "qty", 0.0)
     try:
-        qty = float(qty)
-    except Exception:  # noqa: BLE001
+        qty = float(qty or 0.0)
+    except Exception:
         qty = 0.0
-    try:
-        score = float(score)
-    except Exception:  # noqa: BLE001
-        score = 0.5
 
-    size_new = max(0.0, qty * min(1.0, score))
-    if size_new <= 0:
-        return False
+    if qty <= 0:
+        risk = _obj_get(best, "risk_score", 0.5) or 0.5
+        try:
+            risk = float(risk)
+        except Exception:
+            risk = 0.5
+        qty = max(0.01, 0.1 * risk)
 
-    reason = (decision.get("reason") or "") + " | fallback_size_applied"
-    decision.update({"size": size_new, "reason": reason})
+    decision["size"] = float(qty)
+    decision["reason"] = (decision.get("reason") or "") + " fallback_size_applied"
     return True
 
 
-def _ensure_bundle(fb: Optional[Any]) -> FeatureBundle:
+def _ensure_bundle(fb: Optional[FeatureBundle]) -> FeatureBundle:
     """
-    入力 fb（dict or FeatureBundle or None）を **確実に FeatureBundle** に整える。
-    - FeatureContext を *直接 new しない*（← Any の可能性があるため）
-    - context は辞書で組み立て、FeatureBundle に渡して Pydantic に解釈させる
+    FeatureBundle を安全に用意する。
+    - **FeatureContext のような型（= Any エイリアスの可能性がある）を new しない**
+    - dict で構築し、下流(pydantic)側にパースを任せる
     """
-    if isinstance(fb, FeatureBundle):
-        return fb
+    if not fb:
+        fb = {}
+    context = dict(_obj_get(fb, "context", {}) or {})
+    features = dict(_obj_get(fb, "features", {}) or {})
 
-    data: Dict[str, Any] = fb or {}
-    features = data.get("features") or {}
-    trace_id = data.get("trace_id") or str(uuid4())
-    context_in = data.get("context") or {}
+    # デフォルト文脈
+    symbol = context.get("symbol") or "USDJPY"
+    timeframe = context.get("timeframe") or "M15"
+    context.setdefault("symbol", symbol)
+    context.setdefault("timeframe", timeframe)
+    context.setdefault("data_lag_min", int(features.get("data_lag_min", 0) or 0))
+    context.setdefault("missing_ratio", float(features.get("missing_ratio", 0.0) or 0.0))
 
-    symbol = _get(context_in, "symbol", "USDJPY")
-    timeframe = _get(context_in, "timeframe", "M15")
-
-    ctx_dict: Dict[str, Any] = {"symbol": symbol, "timeframe": timeframe}
-    if "missing_ratio" in context_in:
-        ctx_dict["missing_ratio"] = _get(context_in, "missing_ratio", 0.0)
-    if "data_lag_min" in context_in:
-        ctx_dict["data_lag_min"] = _get(context_in, "data_lag_min", 0)
-
-    try:
-        return FeatureBundle(features=features, trace_id=trace_id, context=ctx_dict)
-    except Exception:
-        return FeatureBundle(features={}, trace_id=trace_id, context=ctx_dict)
+    return {"context": context, "features": features}
 
 
+# ----------------------------------------------------------------------
+# メイン
+# ----------------------------------------------------------------------
 def run_inventor_and_decide(
-    fb: Optional[Any] = None,
-    conn_str: Optional[str] = None,
-    use_harmonia: bool = True,
+    fb: Optional[FeatureBundle] = None,
+    symbol: Optional[str] = None,
+    timeframe: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Airflow から呼ぶブリッジ:
-      1) FeatureBundle を確実化
-      2) Inventor で候補生成
-      3) Harmonia で（あれば）リランク
-      4) DecisionEngine で決定
-      5) size==0 の場合にフォールバック適用
+    1) Inventor で提案群を生成
+    2) Harmonia で簡易リランク
+    3) 最良案から意思決定オブジェクトを合成（size=0 の場合は保険で埋める）
     """
-    bundle: FeatureBundle = _ensure_bundle(fb)
+    trace_id = str(uuid4())
+    bundle = _ensure_bundle(fb)
 
+    # 呼び出し引数で context を上書き可能に
+    if symbol:
+        bundle["context"]["symbol"] = symbol
+    if timeframe:
+        bundle["context"]["timeframe"] = timeframe
+
+    # 1) 提案生成（pydantic/dict どちらでも返ってOK）
     proposals: List[StrategyProposal] = generate_proposals(bundle)
 
-    if use_harmonia and _harmonia_rerank:
-        try:
-            quality = {}
-            ctx = _get(bundle, "context", {}) or {}
-            mr = _get(ctx, "missing_ratio", None)
-            if mr is not None:
-                quality["missing_ratio"] = mr
-            dl = _get(ctx, "data_lag_min", None)
-            if dl is not None:
-                quality["data_lag_min"] = dl
+    # 2) 簡易リランク（品質と文脈を与える）
+    quality = {
+        "missing_ratio": float(bundle["context"].get("missing_ratio", 0.0) or 0.0),
+        "data_lag_min": float(bundle["context"].get("data_lag_min", 0.0) or 0.0),
+    }
+    ranked: List[StrategyProposal] = rerank_candidates(
+        proposals,
+        context=bundle.get("context"),
+        quality=quality,
+    )
+    best = ranked[0] if ranked else None
 
-            proposals = list(_harmonia_rerank(proposals, context=ctx, quality=quality))
-        except Exception as e:  # noqa: BLE001
-            from airflow.utils.log.logging_mixin import LoggingMixin
-            LoggingMixin().log.info("[Harmonia] Rerank skipped or failed: %r", e)
+    # 3) 意思決定オブジェクトを合成
+    strategy_name = None
+    if best is not None:
+        strategy_name = _obj_get(best, "strategy") or _obj_get(best, "name")
 
-    eng = DecisionEngine()
-    record, decision = eng.decide(bundle, proposals=proposals, conn_str=conn_str)
+    decision: Dict[str, Any] = {
+        "action": "BUY",  # MVP: buy_simple 固定
+        "symbol": bundle["context"].get("symbol", "USDJPY"),
+        "size": float(_obj_get(best, "qty_raw", 0.0) or 0.0),
+        "proposal": {
+            "strategy": strategy_name or f"inventor/buy_simple@{bundle['context']['symbol']}-{bundle['context']['timeframe']}",
+            "side": "BUY",
+            "risk_score": _obj_get(best, "risk_adjusted", _obj_get(best, "risk_score", 0.5)),
+        },
+    }
 
-    _fallback_size(decision, proposals)
+    # size=0 のときは保険で埋める
+    _fallback_size(decision, ranked)
 
+    # 返り値（DAG側表示用）
     return {
-        "trace_id": _get(bundle, "trace_id"),
-        "proposal_summary": _summarize_proposals(proposals, k=10),
+        "trace_id": trace_id,
+        "proposal_summary": _summarize_proposals(ranked, k=10),
         "decision": decision,
     }
+PY
