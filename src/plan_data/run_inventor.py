@@ -165,4 +165,3 @@ def run_inventor_and_decide(
         "proposal_summary": _summarize_proposals(ranked, k=10),
         "decision": decision,
     }
-PY
