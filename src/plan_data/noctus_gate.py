@@ -1,4 +1,3 @@
-# src/plan_data/noctus_gate.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field

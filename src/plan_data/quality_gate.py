@@ -1,4 +1,3 @@
-# src/plan_data/quality_gate.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -48,13 +47,13 @@ def _emit_alert(kind: str, message: str = "", **fields) -> None:
     安全アラート送出:
       1) observability.emit_alert を試みる（未知kwargsも透過）
       2) 常に stdout に 1行JSON を出力（テストが確実に拾える）
-      例外は飲み込み、呼び出し元を決して落とさない
+      例外は握りつぶし、呼び出し元を落とさない
     """
     try:
         if hasattr(observability, "emit_alert"):
             observability.emit_alert(kind=kind, message=message, **fields)  # type: ignore
     except Exception:
-        pass  # stdout フォールバックに進む
+        pass  # stdout フォールバックへ
 
     try:
         payload = {"kind": kind, "message": message}
@@ -73,15 +72,15 @@ def evaluate_quality(
     conn_str: Optional[str] = None,
 ) -> QualityResult:
     """
-    データ品質ゲート（Plan層）:
+    データ品質ゲート（Plan層）
       - data_lag_min（分）: 最新データの遅延（大きいほど悪い）
       - missing_ratio（0.0〜1.0）: 特徴量DFの欠損率（大きいほど悪い）
 
-    判定ルール（簡易）:
+    判定（簡易）:
       - data_lag_min > max_lag_min → action = "FLAT"（提案抑制）
-      - missing_ratio > max_missing → action = "SCALE"（数量縮小; すでに FLAT なら FLAT を優先）
+      - missing_ratio > max_missing → action = "SCALE"（数量縮小; すでに FLAT なら FLAT 優先）
         * 縮小率は超過分に応じて線形に下げ、最小 0.3 にクランプ
-    しきい値超過時は obs_alerts へも出力する。
+    しきい値超過時は obs_alerts へも出力。
     """
     ctx = getattr(bundle, "context", None)
 
@@ -90,7 +89,7 @@ def evaluate_quality(
         max_lag_min = 0
     max_missing = _clamp(float(max_missing), 0.0, 1.0)
 
-    # コンテキスト側の値も安全化（dict/obj 両対応）
+    # コンテキスト値の安全化（dict/obj 両対応）
     data_lag_min = _ctx_get(ctx, "data_lag_min", 0) or 0
     missing_ratio = _ctx_get(ctx, "missing_ratio", 0.0) or 0.0
     try:
@@ -115,7 +114,7 @@ def evaluate_quality(
     # 1) データ遅延チェック
     if data_lag_min > max_lag_min:
         reasons.append(f"data_lag_min={data_lag_min} > max_lag_min={max_lag_min}")
-        action = "FLAT"  # 抑制（数量縮小より強い扱い）
+        action = "FLAT"  # 抑制（数量縮小より強い）
         _emit_alert(
             "QUALITY.DATA_LAG",
             message=f"data_lag_min={data_lag_min}",
