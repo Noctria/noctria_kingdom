@@ -15,26 +15,24 @@ for p in map(str, {ROOT, SRC}):
 # --- Fixtures ---------------------------------------------------------------
 import logging
 import typing as t
+import json as _json
 import pytest
 
 
 @pytest.fixture
 def capture_alerts(monkeypatch, capsys):
     """
-    Alerts を stdout / logging の両面からキャプチャするフィクスチャ。
-
+    Alerts を stdout / logging の両面からキャプチャ。
     - NOCTRIA_OBS_MODE=stdout を強制
-    - ルートロガーに WARNING+ のハンドラを装着（logging出力も拾う）
-    - stdout/ログをマージし、重複除去した「行配列」を list ライクに提供
-    - __getitem__ を実装しているので capture_alerts[-1] などの添字が使える
+    - ルート & noctria.observability のログを捕捉
+    - JSON 1行なら dict にパースして格納（tests 側で a.get('kind') が使える）
+    - list 風API（len(), iter, __getitem__）を提供
     """
-    # 1) stdout観測を強制
     monkeypatch.setenv("NOCTRIA_OBS_MODE", "stdout")
 
-    # 2) loggingキャプチャ用ハンドラ
     class _ListHandler(logging.Handler):
-        def __init__(self, sink: t.List[str]):
-            super().__init__(level=logging.WARNING)
+        def __init__(self, sink: t.List[t.Union[str, dict]]):
+            super().__init__(level=logging.INFO)
             self._sink = sink
 
         def emit(self, record: logging.LogRecord) -> None:
@@ -42,81 +40,100 @@ def capture_alerts(monkeypatch, capsys):
                 msg = self.format(record)
             except Exception:
                 msg = record.getMessage()
-            if msg:
-                self._sink.append(str(msg))
+            if not msg:
+                return
+            # JSONならdictへ
+            try:
+                obj = _json.loads(msg)
+                if isinstance(obj, dict):
+                    self._sink.append(obj)
+                    return
+            except Exception:
+                pass
+            self._sink.append(str(msg))
 
     class Capture:
         def __init__(self):
-            self._lines: t.List[str] = []
+            self._lines: t.List[t.Union[str, dict]] = []
             self._handler = _ListHandler(self._lines)
-            self._handler.setFormatter(
-                logging.Formatter("%(levelname)s:%(name)s:%(message)s")
-            )
-            self._root_logger = logging.getLogger()  # ルートに付ける（局所loggerでも拾える）
-            self._prev_level: int | None = None
+            self._handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+            self._root_logger = logging.getLogger()  # ルート
+            self._obs_logger = logging.getLogger("noctria.observability")  # 直接
+            self._prev_root_level: int | None = None
             self._attached = False
 
         def _attach(self):
-            if not self._attached:
-                self._root_logger.addHandler(self._handler)
-                # 低すぎると拾えないので WARNING 以上にそろえる
-                self._prev_level = self._root_logger.level
-                if (
-                    self._root_logger.level > logging.WARNING
-                    or self._root_logger.level == logging.NOTSET
-                ):
-                    self._root_logger.setLevel(logging.WARNING)
-                self._attached = True
+            if self._attached:
+                return
+            self._root_logger.addHandler(self._handler)
+            self._obs_logger.addHandler(self._handler)
+            self._prev_root_level = self._root_logger.level
+            # INFO以上を拾う
+            if self._root_logger.level in (logging.NOTSET, logging.WARNING + 10, logging.ERROR, logging.CRITICAL):
+                self._root_logger.setLevel(logging.INFO)
+            self._obs_logger.propagate = True
+            self._attached = True
 
         def _detach(self):
-            if self._attached:
-                try:
-                    self._root_logger.removeHandler(self._handler)
-                    if self._prev_level is not None:
-                        self._root_logger.setLevel(self._prev_level)
-                finally:
-                    self._attached = False
+            if not self._attached:
+                return
+            try:
+                self._root_logger.removeHandler(self._handler)
+                self._obs_logger.removeHandler(self._handler)
+                if self._prev_root_level is not None:
+                    self._root_logger.setLevel(self._prev_root_level)
+            finally:
+                self._attached = False
 
-        def flush(self) -> t.List[str]:
+        def flush(self) -> t.List[t.Union[str, dict]]:
             """stdout を flush し、ログとマージして重複除去した行配列を返す"""
             out = capsys.readouterr().out
             if out:
                 for ln in out.splitlines():
                     ln = ln.rstrip()
-                    if ln:
-                        self._lines.append(ln)
+                    if not ln:
+                        continue
+                    # JSONならdictへ
+                    try:
+                        obj = _json.loads(ln)
+                        if isinstance(obj, dict):
+                            self._lines.append(obj)
+                            continue
+                    except Exception:
+                        pass
+                    self._lines.append(ln)
             # 重複除去（順序保持）
             seen: set[str] = set()
-            uniq: list[str] = []
+            uniq: list[t.Union[str, dict]] = []
             for ln in self._lines:
-                if ln not in seen:
+                key = _json.dumps(ln, ensure_ascii=False) if isinstance(ln, dict) else ln
+                if key not in seen:
                     uniq.append(ln)
-                    seen.add(ln)
+                    seen.add(key)
             self._lines = uniq
             return list(self._lines)
 
-        # 便利API --------------------------------------------------------------
+        # 便利API
         def contains(self, substr: str) -> bool:
-            return any(substr in ln for ln in self.flush())
+            return any((substr in ln) if isinstance(ln, str) else (substr in _json.dumps(ln, ensure_ascii=False))
+                       for ln in self.flush())
 
-        # list-like: 反復/長さ/添字 --------------------------------------------
-        def __iter__(self):
-            return iter(self.flush())
-
+        # list風
         def __len__(self):
             return len(self.flush())
 
-        def __getitem__(self, idx: int | slice):
-            data = self.flush()
-            return data[idx]
+        def __iter__(self):
+            return iter(self.flush())
 
-        def __call__(self) -> t.List[str]:
+        def __getitem__(self, idx: int):
+            return self.flush()[idx]
+
+        def __call__(self) -> t.List[t.Union[str, dict]]:
             return self.flush()
 
-        # コンテキスト管理 -----------------------------------------------------
+        # コンテキスト管理
         def __enter__(self):
-            # 前残りを捨ててクリーン開始
-            capsys.readouterr()
+            capsys.readouterr()  # 前残りを捨てる
             self._lines.clear()
             self._attach()
             return self
@@ -126,12 +143,10 @@ def capture_alerts(monkeypatch, capsys):
                 self.flush()
             finally:
                 self._detach()
-            # 例外はpytestにそのまま流す
             return False
 
     cap = Capture()
-    # with を使わないスタイルでも即時有効化
-    cap._attach()
+    cap._attach()   # with を使わないスタイルでも有効化
     try:
         yield cap
     finally:
