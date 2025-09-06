@@ -91,10 +91,13 @@ def generate_proposals(bundle: Any) -> List[Any]:
     # strategy は **str** 必須（dictはNG）
     strategy_name = f"inventor/{'buy' if side == 'BUY' else 'sell'}_simple@{symbol}-{timeframe}"
 
-    # 最小スキーマで提案を1件返す
+    # ✅ intent に応じて qty_raw を決定（最低限の正の数量）
+    qty = 0.0 if intent == "FLAT" else 1.0
+
     proposal = StrategyProposal(
         strategy=strategy_name,
         intent=intent,
         trace_id=trace_id,
+        qty_raw=qty,         # ★ 追加（非FLATでは > 0）
     )
     return [proposal]
