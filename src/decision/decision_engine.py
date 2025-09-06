@@ -4,19 +4,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-try:
-    # 正典：Plan層の contracts / gates / observability を使用
-    from plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
-    from plan_data import observability  # type: ignore
-    from plan_data import quality_gate as quality_gate_mod  # type: ignore
-    from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
-except Exception:
-    # 互換: 旧来の import パス（存在すれば）
-    from ..plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
-    from ..plan_data import observability  # type: ignore
-    from ..plan_data import quality_gate as quality_gate_mod  # type: ignore
-    from ..plan_data import noctus_gate as noctus_gate_mod  # type: ignore
-
+# 正典：Plan層の contracts / gates / observability を使用（絶対インポート前提）
+from plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
+from plan_data import observability  # type: ignore
+from plan_data import quality_gate as quality_gate_mod  # type: ignore
+from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
 
 DictLike = Dict[str, Any]
 
