@@ -32,16 +32,10 @@ def derive_keywords(allowed_paths: list[str]) -> list[str]:
                 kws.add(str(p.with_suffix("")).replace("/", "."))
             except Exception:
                 pass
-        # ディレクトリ指定にも対応（最後の名前）
         kws.add(p.name)
-    # 短すぎるのは除外
     return [k for k in kws if len(k) >= 3]
 
 def collect_tests_via_pytest() -> list[str]:
-    """
-    pytest -q --collect-only の出力から tests/...::test_xxx 形式を拾う。
-    取りこぼしがある環境向けに、tests/**/*.py を補完として集める。
-    """
     nodeids: list[str] = []
     try:
         out = subprocess.run(
@@ -50,18 +44,16 @@ def collect_tests_via_pytest() -> list[str]:
         )
         for ln in (out.stdout or "").splitlines():
             ln = ln.strip()
-            # 典型的な nodeid 形式だけ拾う
             if ln.startswith("tests/") and ("::" in ln):
                 nodeids.append(ln)
     except FileNotFoundError:
         pass
 
-    # 補完：tests/**/*.py を nodeid 化（::test_ は後でpytestが解決する想定）
     if not nodeids:
         for p in ROOT.glob("tests/**/*.py"):
             rel = p.relative_to(ROOT).as_posix()
             nodeids.append(rel)
-    # 一意に
+
     seen=set(); uniq=[]
     for n in nodeids:
         if n not in seen:
@@ -69,12 +61,8 @@ def collect_tests_via_pytest() -> list[str]:
     return uniq
 
 def score_tests(nodeids: list[str], keywords: list[str]) -> list[tuple[str,int]]:
-    """
-    テストファイル本文に対する素朴な文字列ヒット数でスコアリング。
-    """
     scores: dict[str,int] = defaultdict(int)
     for node in nodeids:
-        # ファイルパス部分だけ見る
         test_path = node.split("::",1)[0]
         p = ROOT / test_path
         try:
@@ -83,30 +71,32 @@ def score_tests(nodeids: list[str], keywords: list[str]) -> list[tuple[str,int]]
             text = ""
         low = text.lower()
         base = p.stem.lower()
-        # ファイル名ヒントを少し加点
         if base in keywords:
             scores[node] += 2
-        # 本文ヒット
         for kw in keywords:
             k = kw.lower()
             if not k: continue
             cnt = low.count(k)
             if cnt: scores[node] += cnt
-    # 並び替え
     ranked = sorted(scores.items(), key=lambda kv:(-kv[1], kv[0]))
     return ranked
 
 def write_tests_map(out_path: Path, ranked: list[tuple[str,int]], top: int):
+    out_path = out_path.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     selected = [n for n,_ in ranked[:top]] if ranked else []
     data = {
         "generated_by": "scripts/map_tests.py",
         "top": top,
         "selected": selected,
-        "ranked": ranked,  # 参考用にスコアも残す
+        "ranked": ranked,
     }
     out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"+ wrote {out_path.relative_to(ROOT)} ({len(selected)} tests)")
+    try:
+        rel = out_path.relative_to(ROOT)
+    except Exception:
+        rel = out_path
+    print(f"+ wrote {rel} ({len(selected)} tests)")
 
 def main():
     ap = argparse.ArgumentParser()
