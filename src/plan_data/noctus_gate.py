@@ -1,5 +1,4 @@
-# ❶ 完全置換（そのまま貼り付け）
-cat > src/plan_data/noctus_gate.py <<'PY'
+# src/plan_data/noctus_gate.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -46,15 +45,13 @@ def _emit_alert(kind: str, message: str = "", **fields) -> None:
     """
     安全アラート送出:
       1) observability.emit_alert を試みる
-      2) 常に stdout に 1 行 JSON を出力（tests の capture_alerts が確実に拾える）
-      例外は飲み込み、呼び出し元を落とさない
+      2) 常に stdout に 1行JSON を出す（tests が確実に拾える）
     """
     try:
         if hasattr(observability, "emit_alert"):
             observability.emit_alert(kind=kind, message=message, **fields)  # type: ignore
     except Exception:
         pass
-
     try:
         payload = {"kind": kind, "message": message}
         payload.update(fields)
@@ -77,18 +74,11 @@ def check_proposal(
     チェック内容:
       - lot/size/qty が上限を超えていないか
       - risk_score（属性 or meta['risk_score']）がしきい値を超えていないか
-      - "RiskyStrategy" を名称/型名に含むなら明示ブロック（テスト互換）
     """
     reasons: List[str] = []
     blocked = False
     adjusted = False
     adjusted_size: Optional[float] = None
-
-    # --- 明示リスキー戦略の検知（テストの RiskyStrategy を確実に拾う） ---
-    prop_str = f"{getattr(proposal, 'name', '')} {getattr(proposal, 'strategy_name', '')} {type(proposal).__name__} {proposal!s}"
-    if "RiskyStrategy" in prop_str:
-        blocked = True
-        reasons.append("strategy=RiskyStrategy")
 
     # --- lot/size/qty チェック ---
     lot_candidates = (
@@ -109,7 +99,7 @@ def check_proposal(
         blocked = True
         reasons.append(f"lot size {lot_val} > max_lot_size {max_lot_size}")
 
-    # --- risk_score チェック（meta に入るケースにも対応） ---
+    # --- risk_score チェック（meta対応） ---
     meta = _get_meta(proposal)
     risk_attr = _get(proposal, "risk_score", None)
     risk_meta = meta.get("risk_score", None)
@@ -136,14 +126,13 @@ def check_proposal(
         adjusted_size=adjusted_size,
     )
 
-    # --- 可観測性: アラート出力（stdout 1行JSON を必ず出す） ---
-    trace = _get(proposal, "trace", _get(proposal, "trace_id", None))
+    # --- 可観測性: アラート出力 ---
     if not ok:
         _emit_alert(
-            kind="NOCTUS.BLOCKED",
+            kind="NOCTUS.BLOCK",
             message="; ".join(reasons) or "NoctusGate blocked proposal",
             severity="CRITICAL",
-            trace=trace,
+            trace=_get(proposal, "trace", _get(proposal, "trace_id", None)),
             details={
                 "lot": lot_val,
                 "max_lot_size": max_lot_size,
@@ -152,40 +141,5 @@ def check_proposal(
             },
             conn_str=conn_str,
         )
-    else:
-        _emit_alert(
-            kind="NOCTUS.PASSED",
-            message="proposal accepted by NoctusGate",
-            severity="LOW",
-            trace=trace,
-        )
 
     return result
-
-
-# 互換呼び出し（decision_engine 等が NoctusGate(...) を想定してもOK）
-def NoctusGate(proposal: Any, feature_bundle: Any | None = None, *, conn_str: str | None = None) -> NoctusGateResult:  # noqa: N802
-    # feature_bundle は現状未使用だが、将来の拡張用に受け付ける
-    return check_proposal(proposal, conn_str=conn_str)
-PY
-
-# ❷ __pycache__ を掃除（古いバイトコード排除）
-find src -name '__pycache__' -type d -exec rm -rf {} +
-
-# ❸ 先頭チェック（class になっているか）
-sed -n '1,60p' src/plan_data/noctus_gate.py
-
-# ❹ 最小インポートテスト
-export PYTHONPATH=src:. NOCTRIA_OBS_MODE=stdout
-python - <<'PY'
-from plan_data.noctus_gate import NoctusGate, check_proposal, NoctusGateResult
-print("OK:", NoctusGate, check_proposal, NoctusGateResult)
-PY
-
-# ❺ テスト（quality_gate 側はキーワード引数で呼ぶ必要あり）
-pytest -vv -rA tests/test_quality_gate_alerts.py tests/test_noctus_gate_block.py \
-  --json-report --json-report-file=codex_reports/tmp.json
-
-# ❻ レビュー/HUD更新
-python -m codex.tools.review_pipeline
-less codex_reports/pytest_summary.md
