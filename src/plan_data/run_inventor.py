@@ -1,13 +1,11 @@
+cat > src/plan_data/run_inventor.py <<'PY'
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-# ここは「from src 配下をtop-level import」前提（PYTHONPATH=src）
 from decision.decision_engine import DecisionEngine
 from plan_data.inventor import generate_proposals  # 候補生成（純粋関数）
-
-# Pydanticモデル（*直接インスタンス化は FeatureBundle だけ*）
 from plan_data.noctus_gate import (
     FeatureBundle,          # Pydantic BaseModel (V1/V2)
     StrategyProposal,       # Pydantic BaseModel
@@ -20,9 +18,6 @@ except Exception:  # noqa: BLE001
     _harmonia_rerank = None
 
 
-# ------------------------------
-# ユーティリティ
-# ------------------------------
 def _get(obj: Any, key: str, default: Any = None) -> Any:
     """attr / dict 両対応の安全取得"""
     if hasattr(obj, key):
@@ -39,7 +34,6 @@ def _summarize_proposals(proposals: List[StrategyProposal], k: int = 10) -> List
     """StrategyProposal（Pydantic）を要約（属性アクセスで安全に）"""
     out: List[Dict[str, Any]] = []
     for p in proposals[:k]:
-        # フィールド名はモデルに合わせて属性アクセス
         out.append(
             {
                 "strategy": _get(p, "strategy"),
@@ -106,24 +100,18 @@ def _ensure_bundle(fb: Optional[Any]) -> FeatureBundle:
     symbol = _get(context_in, "symbol", "USDJPY")
     timeframe = _get(context_in, "timeframe", "M15")
 
-    # 既知キーだけを安全に渡す（未知キーで extra_forbidden が出ても、FeatureBundle 側が面倒を見てくれる想定）
     ctx_dict: Dict[str, Any] = {"symbol": symbol, "timeframe": timeframe}
     if "missing_ratio" in context_in:
         ctx_dict["missing_ratio"] = _get(context_in, "missing_ratio", 0.0)
     if "data_lag_min" in context_in:
         ctx_dict["data_lag_min"] = _get(context_in, "data_lag_min", 0)
 
-    # ここで **FeatureContext(...)** は呼ばない。Pydantic に dict を渡して構築させる。
     try:
         return FeatureBundle(features=features, trace_id=trace_id, context=ctx_dict)
     except Exception:
-        # 最小形で再トライ（features を空に）
         return FeatureBundle(features={}, trace_id=trace_id, context=ctx_dict)
 
 
-# ------------------------------
-# メイン：Inventor → (Harmonia) → Decision
-# ------------------------------
 def run_inventor_and_decide(
     fb: Optional[Any] = None,
     conn_str: Optional[str] = None,
@@ -139,13 +127,10 @@ def run_inventor_and_decide(
     """
     bundle: FeatureBundle = _ensure_bundle(fb)
 
-    # 1) 候補生成（Inventor は純粋関数）
     proposals: List[StrategyProposal] = generate_proposals(bundle)
 
-    # 2) Harmonia リランク（存在すれば）
     if use_harmonia and _harmonia_rerank:
         try:
-            # quality 情報は bundle.features 配下/または context から組み立て
             quality = {}
             ctx = _get(bundle, "context", {}) or {}
             mr = _get(ctx, "missing_ratio", None)
@@ -158,19 +143,16 @@ def run_inventor_and_decide(
             proposals = list(_harmonia_rerank(proposals, context=ctx, quality=quality))
         except Exception as e:  # noqa: BLE001
             from airflow.utils.log.logging_mixin import LoggingMixin
-
             LoggingMixin().log.info("[Harmonia] Rerank skipped or failed: %r", e)
 
-    # 3) 決定
     eng = DecisionEngine()
     record, decision = eng.decide(bundle, proposals=proposals, conn_str=conn_str)
 
-    # 4) size フォールバック
     _fallback_size(decision, proposals)
 
-    # 5) 返却（軽量サマリ）
     return {
         "trace_id": _get(bundle, "trace_id"),
         "proposal_summary": _summarize_proposals(proposals, k=10),
         "decision": decision,
     }
+PY
