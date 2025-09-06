@@ -6,6 +6,8 @@ import json
 import os
 import shutil
 import subprocess
+import re
+import time
 
 # ------------------------------------------------------------
 # Paths
@@ -14,13 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 GRAPHS = ROOT / "codex_reports" / "graphs"
 CTXDIR = ROOT / "codex_reports" / "context"
 
-# graph artifacts
-DOT = GRAPHS / "imports.dot"          # 優先
-DOT_ALT = GRAPHS / "imports.gv"       # 代替
+DOT = GRAPHS / "imports.dot"
+DOT_ALT = GRAPHS / "imports.gv"
 SVG = GRAPHS / "imports.svg"
 PNG = GRAPHS / "imports_preview.png"
 
-# context files
 CTX = CTXDIR / "context_pack.json"
 ALLOWED = CTXDIR / "allowed_files.txt"
 
@@ -28,14 +28,12 @@ ALLOWED = CTXDIR / "allowed_files.txt"
 # Helpers
 # ------------------------------------------------------------
 def _norm(p: Path) -> Path:
-    """Resolve to an absolute, canonical path if possible."""
     try:
         return p.resolve()
     except Exception:
         return p.absolute()
 
 def _samepath(a: Path, b: Path) -> bool:
-    """Return True if a and b refer to the same file/dir."""
     try:
         return os.path.samefile(a, b)
     except FileNotFoundError:
@@ -44,35 +42,24 @@ def _samepath(a: Path, b: Path) -> bool:
         return _norm(a) == _norm(b)
 
 def _safe_copy(src: Path, dst: Path):
-    """Copy src -> dst if they are not the same file."""
     if _samepath(src, dst):
         return
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
 
 def _png_looks_suspicious(p: Path) -> bool:
-    """
-    軽い健全性チェック:
-      - 0バイト/極小サイズ
-      - ほぼ単色（真っ黒/真っ白）に近い
-    Pillowが無ければチェックスキップ（False）。
-    """
     try:
         from PIL import Image  # type: ignore
     except Exception:
         return False
-
     if not p.exists() or p.stat().st_size < 2_000:
         return True
-
     try:
         with Image.open(p) as im:
             im = im.convert("L")
             hist = im.histogram()
             total = float(sum(hist)) or 1.0
-            share_black = hist[0] / total
-            share_white = hist[-1] / total
-            return (share_black > 0.95) or (share_white > 0.95)
+            return (hist[0] / total > 0.95) or (hist[-1] / total > 0.95)
     except Exception:
         return False
 
@@ -80,20 +67,16 @@ def _png_looks_suspicious(p: Path) -> bool:
 # Static roots discovery (with safety)
 # ------------------------------------------------------------
 STATIC_ROOTS: list[Path] = []
-
-# Env override (absolute, existing, and not the repo itself/inside repo)
 env_static = os.getenv("NOCTRIA_GUI_STATIC_DIR", "").strip()
 if env_static:
     p = Path(env_static)
     if p.is_absolute() and p.exists() and not _samepath(p, ROOT) and ROOT not in p.parents:
         STATIC_ROOTS.append(_norm(p))
 
-# Default static dir: noctria_gui/static (if exists and safe)
 default_static = ROOT / "noctria_gui" / "static"
 if default_static.exists() and not _samepath(default_static, ROOT):
     STATIC_ROOTS.append(_norm(default_static))
 
-# Deduplicate while preserving order
 _seen = set()
 STATIC_ROOTS = [p for p in STATIC_ROOTS if not (str(p) in _seen or _seen.add(str(p)))]
 
@@ -107,24 +90,51 @@ def _find_dot_file() -> Path | None:
         return DOT_ALT
     return None
 
-def build_svg_from_dot(rankdir: str = "TB") -> bool:
+def _force_rankdir_tb(dot_src: Path) -> Path:
     """
-    .dot/.gv がある場合に Graphviz `dot` で SVG を生成（縦レイアウト: rankdir=TB）。
-    生成できたら True を返す。`dot` 未導入や .dot 不在なら False。
+    .dot 内に rankdir があれば TB に置換。無ければ先頭に rankdir=TB; を追加。
+    一時ファイルを返す。
+    """
+    txt = dot_src.read_text(encoding="utf-8", errors="ignore")
+    # 既存の rankdir=... を TB に置換（大小文字/空白/クォート対応）
+    pattern = re.compile(r'(rankdir\s*=\s*")?(LR|RL|TB|BT)(")?', re.IGNORECASE)
+    if "rankdir" in txt.lower():
+        txt2 = re.sub(r'rankdir\s*=\s*("?)(LR|RL|TB|BT)\1', 'rankdir=TB', txt, flags=re.IGNORECASE)
+    else:
+        # digraph/graph の直後に rankdir=TB; を挿入
+        m = re.search(r'^(digraph|graph)\s+[^{]*\{', txt, flags=re.IGNORECASE | re.MULTILINE)
+        if m:
+            idx = m.end()
+            txt2 = txt[:idx] + '\n  rankdir=TB;\n' + txt[idx:]
+        else:
+            txt2 = 'rankdir=TB;\n' + txt
+
+    tmp = dot_src.with_name(f"._tmp_imports_tb_{int(time.time())}.dot")
+    tmp.write_text(txt2, encoding="utf-8")
+    return tmp
+
+def build_svg_from_dot() -> bool:
+    """
+    Graphviz 'dot' で SVG を生成（縦レイアウト強制）。
     """
     dot_bin = shutil.which("dot")
     dot_file = _find_dot_file()
     if not dot_bin or not dot_file:
-        # dot 未導入 or dot ファイル無し → 既存の SVG をそのまま使う
         if not dot_bin and dot_file:
-            print("! graphviz 'dot' が見つかりません（apt install graphviz 推奨）")
+            print("! graphviz 'dot' が見つかりません（sudo apt install graphviz 推奨）")
         return False
 
     SVG.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [dot_bin, "-Tsvg", f"-Grankdir={rankdir}", str(dot_file), "-o", str(SVG)]
+
+    tmp_dot = _force_rankdir_tb(dot_file)
+    cmd = [dot_bin, "-Tsvg", str(tmp_dot), "-o", str(SVG)]
     try:
         subprocess.run(cmd, check=True)
-        print(f"+ built {SVG} from {dot_file.name} with rankdir={rankdir}")
+        print(f"+ built {SVG} from {dot_file.name} (forced rankdir=TB)")
+        try:
+            tmp_dot.unlink(missing_ok=True)
+        except Exception:
+            pass
         return True
     except subprocess.CalledProcessError as e:
         print(f"! dot failed: {e}")
@@ -132,9 +142,9 @@ def build_svg_from_dot(rankdir: str = "TB") -> bool:
 
 def svg_to_png():
     """
-    Convert imports.svg -> imports_preview.png
-    1) CairoSVG（白背景, 幅1200px）で出力
-    2) 結果が怪しければ rsvg-convert にフォールバック（存在すれば）
+    imports.svg -> imports_preview.png
+    1) CairoSVG（白背景, 幅1200px）
+    2) ダメ/怪しい時は rsvg-convert にフォールバック
     """
     if not SVG.exists():
         print("! missing imports.svg (skip PNG)")
@@ -142,10 +152,9 @@ def svg_to_png():
 
     PNG.parent.mkdir(parents=True, exist_ok=True)
 
-    # --- try CairoSVG first (white background) ---
     tried_cairo = False
     try:
-        import cairosvg  # pip install cairosvg (recommended in venv)
+        import cairosvg  # pip install cairosvg
         cairosvg.svg2png(
             url=str(SVG),
             write_to=str(PNG),
@@ -157,7 +166,6 @@ def svg_to_png():
     except Exception as e:
         print(f"! CairoSVG failed: {e}")
 
-    # --- sanity check; fallback if needed ---
     need_fallback = (not PNG.exists()) or _png_looks_suspicious(PNG)
     if need_fallback:
         rsvg = shutil.which("rsvg-convert")
@@ -175,7 +183,6 @@ def svg_to_png():
                 print("! no exporter worked; PNG not generated")
 
 def ensure_context():
-    """Ensure minimal context files exist."""
     CTXDIR.mkdir(parents=True, exist_ok=True)
     if not CTX.exists():
         CTX.write_text(json.dumps({
@@ -190,16 +197,11 @@ def ensure_context():
         print(f"+ wrote {ALLOWED}")
 
 def sync_to_static():
-    """
-    Copy codex_reports to each static root.
-    - Skips when destination equals source or is inside source
-    - Avoids SameFileError by using _safe_copy
-    """
     if not STATIC_ROOTS:
         print("! static ルートが見つからないためコピーはスキップ")
         return
 
-    src_root = _norm(GRAPHS.parent)  # codex_reports (source)
+    src_root = _norm(GRAPHS.parent)  # codex_reports
     for sroot in STATIC_ROOTS:
         dst_root = _norm(sroot / "codex_reports")
 
@@ -210,14 +212,12 @@ def sync_to_static():
             print(f"! skip sync: dst is inside src ({dst_root})")
             continue
 
-        # Copy graphs
         for src_dir, _, files in os.walk(GRAPHS):
             src_dir = Path(src_dir)
             rel = src_dir.relative_to(GRAPHS)
             for f in files:
                 _safe_copy(src_dir / f, dst_root / "graphs" / rel / f)
 
-        # Copy context
         for src_dir, _, files in os.walk(CTXDIR):
             src_dir = Path(src_dir)
             rel = src_dir.relative_to(CTXDIR)
@@ -231,9 +231,8 @@ def sync_to_static():
 # ------------------------------------------------------------
 if __name__ == "__main__":
     ensure_context()
-    # 1) .dot/.gv があれば縦レイアウトで SVG 再生成（なければ既存 SVG を利用）
-    built = build_svg_from_dot(rankdir="TB")
-    # 2) SVG → PNG（プレビュー用）
-    svg_to_png()
-    # 3) static に同期
-    sync_to_static()
+    built = build_svg_from_dot()   # 縦レイアウト強制でSVG再生成
+    svg_to_png()                   # PNGプレビュー作成
+    sync_to_static()               # staticに同期
+    if SVG.exists():
+        print(f"i SVG updated at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(SVG.stat().st_mtime))}")
