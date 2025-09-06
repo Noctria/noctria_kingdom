@@ -3,8 +3,9 @@
 from __future__ import annotations
 from pathlib import Path
 import json, os, re, shutil, subprocess, time, xml.etree.ElementTree as ET
+from collections import defaultdict, deque
 
-# ============== Paths ==============
+# ================== Paths ==================
 ROOT   = Path(__file__).resolve().parents[1]
 GRAPHS = ROOT / "codex_reports" / "graphs"
 CTXDIR = ROOT / "codex_reports" / "context"
@@ -17,15 +18,17 @@ PNG     = GRAPHS / "imports_preview.png"
 CTX     = CTXDIR / "context_pack.json"
 ALLOWED = CTXDIR / "allowed_files.txt"
 
-# ============== Options ==============
-# 1= _graveyard を完全に隠す, 0=隠さない
-HIDE_GRAVEYARD = os.getenv("CODEX_HIDE_GRAVEYARD", "1") not in ("0", "false", "False")
-# フィルタバックエンド: "text" を指定するとテキスト法を強制（pydotは使わない）
-FILTER_BACKEND = os.getenv("CODEX_FILTER_BACKEND", "").lower().strip()  # '', 'text'
-# アスペクト強制は使わず、必要なら viewport を使う（例: "1000,4000,1.0"）
+# ================== Options ==================
+# _graveyard を完全に隠す（デフォルトON）
+HIDE_GRAVEYARD = os.getenv("CODEX_HIDE_GRAVEYARD", "1") not in ("0","false","False")
+# フィルタバックエンド（"text" 推奨）
+FILTER_BACKEND = os.getenv("CODEX_FILTER_BACKEND", "text").lower().strip()
+# レイヤリングバックエンド：text（正規表現でエッジ抽出して rank=same 段組を付与）
+LAYER_BACKEND  = os.getenv("CODEX_LAYER_BACKEND", "text").lower().strip()  # 'text' or ''
+# viewport（任意）例: 1000,4000,1.0
 FORCE_VIEWPORT = os.getenv("CODEX_FORCE_VIEWPORT", "").strip()
 
-# ============== Helpers ==============
+# ================== Helpers ==================
 def _norm(p: Path) -> Path:
     try: return p.resolve()
     except Exception: return p.absolute()
@@ -45,7 +48,7 @@ def _find_dot_file() -> Path | None:
     if DOT_ALT.exists(): return DOT_ALT
     return None
 
-# ============== SVG quality checks ==============
+# ================== SVG checks ==================
 def _svg_aspect(svg_path: Path) -> float | None:
     try:
         tree = ET.parse(svg_path)
@@ -66,84 +69,24 @@ def _png_looks_suspicious(p: Path) -> bool:
         from PIL import Image  # type: ignore
     except Exception:
         return False
-    if not p.exists() or p.stat().st_size < 2_000:  # too tiny
+    if not p.exists() or p.stat().st_size < 2_000:
         return True
     try:
         with Image.open(p) as im:
             im = im.convert("L")
-            hist = im.histogram(); total = float(sum(hist)) or 1.0
-            return (hist[0]/total > 0.95) or (hist[-1]/total > 0.95)
+            hist = im.histogram(); tot = float(sum(hist)) or 1.0
+            return (hist[0]/tot > 0.95) or (hist[-1]/tot > 0.95)
     except Exception:
         return False
 
-# ============== DOT filtering (safe) ==============
+# ================== Filtering (_graveyard) ==================
 _GRAVEYARD = re.compile(r"_graveyard", re.IGNORECASE)
 
-def _filter_with_pydot(src: Path) -> tuple[Path, int]:
-    """pydot でDOTを読み、_graveyard を含むノード/エッジ/サブグラフを完全除去。"""
-    import pydot  # type: ignore
-    graphs = pydot.graph_from_dot_file(str(src))
-    if not graphs:
-        raise RuntimeError("pydot failed to parse DOT")
-
-    g: pydot.Dot = graphs[0]
-    new = pydot.Dot(graph_type=g.get_type() or "digraph")
-    for k, v in g.get_attributes().items():
-        new.set(k, v)
-
-    # keep subgraphs (skip graveyard)
-    keep_subgraphs = []
-    for sg in g.get_subgraphs():
-        name = (sg.get_name() or "").strip('"')
-        if _GRAVEYARD.search(name):
-            continue
-        keep_subgraphs.append(sg)
-
-    # collect nodes (skip graveyard & pseudo nodes)
-    keep_nodes: dict[str, "pydot.Node"] = {}
-    for n in g.get_nodes():
-        name = (n.get_name() or "").strip('"<>' )
-        if name in ("node","graph","edge"):  # pseudo
-            continue
-        if _GRAVEYARD.search(name):
-            continue
-        keep_nodes[name] = n
-    for sg in keep_subgraphs:
-        for n in sg.get_nodes():
-            name = (n.get_name() or "").strip('"<>' )
-            if name in ("node","graph","edge"): continue
-            if _GRAVEYARD.search(name): continue
-            keep_nodes[name] = n
-
-    for n in keep_nodes.values():
-        new.add_node(n)
-
-    kept_edges = 0
-    for e in g.get_edges():
-        s = (e.get_source() or "").strip('"<>' )
-        t = (e.get_destination() or "").strip('"<>' )
-        if _GRAVEYARD.search(s) or _GRAVEYARD.search(t):
-            continue
-        if s in keep_nodes and t in keep_nodes:
-            new.add_edge(e); kept_edges += 1
-
-    # default graph attributes（縦寄せ向け）
-    new.set("rankdir", "TB")
-    new.set("nodesep", "0.35")
-    new.set("ranksep", "0.55")
-    new.set("overlap", "false")
-    new.set("splines", "true")
-    new.set("concentrate", "true")
-
-    out = src.with_name(f"._tmp_filtered_{int(time.time())}.dot")
-    new.write(out, format="raw")
-    return out, len(keep_nodes)
-
-def _filter_with_text(src: Path) -> tuple[Path, int]:
-    """pydot なしの保守的フィルタ。subgraph _graveyard を丸ごと、行単位でも安全に除去。"""
+def _filter_with_text(src: Path) -> tuple[str, int]:
+    """subgraph名に _graveyard を含むブロック丸ごと削除 + 行単位で _graveyard を含む定義を削除"""
     txt = src.read_text(encoding="utf-8", errors="ignore")
 
-    # subgraph ... { } で _graveyard を含むブロックを削除
+    # subgraph ... { ... } をバランス取りで削除
     out, i, n = [], 0, len(txt)
     while i < n:
         m = re.search(r'\bsubgraph\b[^{]*\{', txt[i:], flags=re.IGNORECASE)
@@ -159,63 +102,153 @@ def _filter_with_text(src: Path) -> tuple[Path, int]:
                 if c == '{': depth += 1
                 elif c == '}': depth -= 1
                 j += 1
-            out.append(txt[i:start])
+            out.append(txt[i:start])  # ヘッダ前は保持
             i = j
         else:
             out.append(txt[i:brace+1]); i = brace + 1
     txt = ''.join(out)
 
-    kept, keep_nodes = [], set()
+    kept, node_names = [], set()
     for ln in txt.splitlines():
         if _GRAVEYARD.search(ln):
             if '->' in ln or '--' in ln or '[' in ln or ']' in ln or ';' in ln:
                 continue
         kept.append(ln)
         m = re.match(r'\s*"?(?P<id>[\w\.:/\\-]+)"?\s*(\[|;)', ln)
-        if m: keep_nodes.add(m.group("id"))
-    out_txt = "\n".join(kept)
+        if m: node_names.add(m.group("id"))
+    body = "\n".join(kept)
 
-    # 冒頭に既定値を注入（縦寄せ向け）
-    m = re.search(r'^(digraph|graph)\s+[^{]*\{', out_txt, flags=re.IGNORECASE | re.MULTILINE)
+    # 冒頭に既定値（“縦寄せ”向け）
+    m = re.search(r'^(digraph|graph)\s+[^{]*\{', body, flags=re.IGNORECASE | re.MULTILINE)
     if m:
         j = m.end()
         inject = (
             '\n  rankdir=TB;\n'
-            '  graph [overlap=false, splines=true, concentrate=true, nodesep=0.35, ranksep=0.55, ratio=compress, margin="0,0", pack=true, packmode=graph];\n'
+            '  graph [overlap=false, splines=true, concentrate=true, '
+            '         nodesep=0.35, ranksep=0.70, ratio=compress, '
+            '         margin="0,0", pack=true, packmode=graph];\n'
             '  node  [shape=box, fontsize=10];\n'
             '  edge  [arrowsize=0.7];\n'
         )
-        out_txt = out_txt[:j] + inject + out_txt[j:]
+        body = body[:j] + inject + body[j:]
+    return body, len(node_names)
 
-    out = src.with_name(f"._tmp_filtered_{int(time.time())}.dot")
-    out.write_text(out_txt, encoding="utf-8")
-    return out, len(keep_nodes)
-
-def make_filtered_dot(src: Path, hide_graveyard: bool) -> tuple[Path, int, bool]:
-    """return: (filtered_dot_path, kept_node_count, used_pydot)"""
+def make_filtered_text(src: Path, hide_graveyard: bool) -> tuple[Path, int]:
     if not hide_graveyard:
-        return src, -1, False
+        return src, -1
+    body, n = _filter_with_text(src)
+    out = src.with_name(f"._tmp_filtered_{int(time.time())}.dot")
+    out.write_text(body, encoding="utf-8")
+    return out, n
 
-    backend = FILTER_BACKEND
-    if backend == "text":
-        filtered, n = _filter_with_text(src)
-        return filtered, n, False
+# ================== Layering (text backend) ==================
+_EDGE_RE = re.compile(
+    r'(?P<lhs>"[^"]+"|[^\s\[\];]+)\s*->\s*(?P<rhs>"[^"]+"|[^\s\[\];]+)'
+)
 
-    # まず pydot を試し、ノード0等なら自動フォールバック
-    try:
-        import pydot  # noqa
-        filtered, n = _filter_with_pydot(src)
-        if n <= 0:
-            print("! pydot produced 0 nodes → fallback to text backend")
-            filtered2, n2 = _filter_with_text(src)
-            return filtered2, n2, False
-        return filtered, n, True
-    except Exception as e:
-        print(f"! pydot unavailable or failed ({e}); fallback to text filter")
-        filtered, n = _filter_with_text(src)
-        return filtered, n, False
+def _strip_id(s: str) -> str:
+    s = s.strip()
+    if s.startswith('"') and s.endswith('"'):
+        s = s[1:-1]
+    return s.strip('<>')  # HTML-like 名残をざっくり除去
 
-# ============== Build / Convert ==============
+def _build_layers_from_edges(dot_text: str) -> tuple[list[list[str]], set[tuple[str,str]]]:
+    """DOTテキストから A->B を抽出して、Kahn法でレイヤ（rank）割当て"""
+    edges: set[tuple[str,str]] = set()
+    nodes: set[str] = set()
+    for m in _EDGE_RE.finditer(dot_text):
+        a = _strip_id(m.group('lhs')); b = _strip_id(m.group('rhs'))
+        if not a or not b: continue
+        edges.add((a, b))
+        nodes.add(a); nodes.add(b)
+
+    if not nodes:
+        return [], set()
+
+    indeg = {u: 0 for u in nodes}
+    adj = defaultdict(list)
+    for a, b in edges:
+        adj[a].append(b)
+        indeg[b] += 1
+
+    layers: list[list[str]] = []
+    rem = set(nodes)
+    q = deque(sorted([u for u in rem if indeg[u] == 0]))
+    while rem:
+        if not q:
+            # サイクル: 入次数最小を拾って次レイヤへ
+            pick = min(rem, key=lambda u: indeg[u])
+            q.append(pick)
+        this = []
+        seen = set()
+        while q:
+            u = q.popleft()
+            if u in seen or u not in rem:
+                continue
+            seen.add(u)
+            this.append(u)
+        if not this:
+            break
+        for u in this:
+            rem.remove(u)
+            for v in adj[u]:
+                indeg[v] = max(0, indeg[v]-1)
+        # 次レイヤ候補
+        nextq = deque(sorted([u for u in rem if indeg[u] == 0]))
+        q = nextq
+        layers.append(this)
+
+    # もし残りがあれば最後のレイヤに付ける（強引に段を作る）
+    if rem:
+        layers.append(sorted(rem))
+    return layers, edges
+
+def _wrap_layered_dot(original_text: str) -> str:
+    """元DOTの属性セットを活かしつつ、rank=same の段組 subgraph を追記して返す"""
+    layers, edges = _build_layers_from_edges(original_text)
+    # グラフヘッダを抽出
+    m = re.search(r'^(digraph|graph)\s+[^{]*\{', original_text, flags=re.IGNORECASE | re.MULTILINE)
+    if not m or not layers:
+        return original_text  # 何もしない
+
+    head_end = m.end()
+    head = original_text[:head_end]
+    tail = original_text[head_end:]
+    # 既定属性（重複注入を避けるが、二重でもGraphvizは大抵大丈夫）
+    attrs = (
+        '\n  rankdir=TB;\n'
+        '  graph [overlap=false, splines=true, concentrate=true, '
+        '         nodesep=0.35, ranksep=0.80, ratio=compress, '
+        '         margin="0,0", pack=true, packmode=graph];\n'
+        '  node  [shape=box, fontsize=10];\n'
+        '  edge  [arrowsize=0.7];\n'
+    )
+    buf = [head, attrs]
+    # 段組 subgraph
+    for i, layer in enumerate(layers):
+        if not layer: 
+            continue
+        buf.append(f'  subgraph "cluster_rank_{i}" {{ rank=same;')
+        for u in layer:
+            # ノードの再宣言（存在しなくてもOK）
+            buf.append(f'    "{u}";')
+        buf.append('  }\n')
+    # エッジは元DOTにもあるが、足りない場合に備え追記（重複OK）
+    for a, b in edges:
+        buf.append(f'  "{a}" -> "{b}";\n')
+
+    # 残り本文（オリジナル）と合わせて閉じる
+    buf.append(tail)
+    return ''.join(buf)
+
+def make_layered_text(filtered_dot_path: Path) -> Path:
+    txt = filtered_dot_path.read_text(encoding="utf-8", errors="ignore")
+    layered = _wrap_layered_dot(txt)
+    out = filtered_dot_path.with_name(f"._tmp_layered_{int(time.time())}.dot")
+    out.write_text(layered, encoding="utf-8")
+    return out
+
+# ================== Build / Convert ==================
 def build_svg_from_dot() -> bool:
     dot_bin = shutil.which("dot")
     dot_file = _find_dot_file()
@@ -226,13 +259,34 @@ def build_svg_from_dot() -> bool:
 
     SVG.parent.mkdir(parents=True, exist_ok=True)
 
-    filtered_dot, kept_nodes, used_pydot = make_filtered_dot(dot_file, HIDE_GRAVEYARD)
+    # 1) フィルタ（_graveyard）
+    if FILTER_BACKEND == "text":
+        filtered_dot, kept_nodes = make_filtered_text(dot_file, HIDE_GRAVEYARD)
+        used_backend = "text"
+    else:
+        # 既定は text
+        filtered_dot, kept_nodes = make_filtered_text(dot_file, HIDE_GRAVEYARD)
+        used_backend = "text"
 
-    # dot 実行時の追加属性（“縦寄せ”重視。size は使わない）
+    # 2) レイヤリング（textバックエンド）
+    if LAYER_BACKEND == "text":
+        try:
+            layered_dot = make_layered_text(filtered_dot)
+            src_for_dot = layered_dot
+            layer_tag = "+layered(text)"
+        except Exception as e:
+            print(f"! text layering failed ({e}); fallback to filtered only")
+            src_for_dot = filtered_dot
+            layer_tag = ""
+    else:
+        src_for_dot = filtered_dot
+        layer_tag = ""
+
+    # dot 実行時の追加属性（“縦寄せ”重視）
     extra_graph_attrs = [
         "-Grankdir=TB",
         "-Gnodesep=0.35",
-        "-Granksep=0.55",
+        "-Granksep=0.80",
         "-Goverlap=false",
         "-Gsplines=true",
         "-Gconcentrate=true",
@@ -242,7 +296,6 @@ def build_svg_from_dot() -> bool:
         "-Gpackmode=graph",
     ]
     if FORCE_VIEWPORT:
-        # viewport=width,height,scale 例: 1000,4000,1.0
         extra_graph_attrs.append(f"-Gviewport={FORCE_VIEWPORT}")
 
     def _run_dot(src_dot: Path):
@@ -250,53 +303,46 @@ def build_svg_from_dot() -> bool:
         subprocess.run(cmd, check=True)
 
     try:
-        _run_dot(filtered_dot)
-        tag = ("hide_graveyard+pydot" if (HIDE_GRAVEYARD and used_pydot)
-               else ("hide_graveyard" if HIDE_GRAVEYARD else "no_hide"))
-        if FORCE_VIEWPORT:
-            tag += f"+viewport={FORCE_VIEWPORT}"
-        print(f"+ built {SVG} from {dot_file.name} ({tag})")
+        _run_dot(src_for_dot)
+        print(f"+ built {SVG} from {dot_file.name} (hide={'on' if HIDE_GRAVEYARD else 'off'}, "
+              f"filter={used_backend}{layer_tag}{', viewport='+FORCE_VIEWPORT if FORCE_VIEWPORT else ''})")
     except subprocess.CalledProcessError as e:
         print(f"! dot failed: {e}")
         return False
     finally:
-        if filtered_dot is not dot_file:
-            try: filtered_dot.unlink(missing_ok=True)
-            except Exception: pass
+        for tmp in (src_for_dot, filtered_dot):
+            if tmp is not dot_file:
+                try: tmp.unlink(missing_ok=True)
+                except Exception: pass
 
-    # 健全性チェック：空/極端に横長なら非フィルタで再生成 → さらに sfdp/twopi
+    # 健全性チェック → だめなら非フィルタ&フォールバック
     aspect = _svg_aspect(SVG)
     size_ok = SVG.exists() and SVG.stat().st_size >= 15_000
     aspect_ok = (aspect is not None and 0.2 <= aspect <= 8.0)
     nodes_ok = (not HIDE_GRAVEYARD) or (kept_nodes < 0 or kept_nodes >= 5)
     if not (size_ok and aspect_ok and nodes_ok):
-        print(f"! degenerate svg detected (size_ok={size_ok}, aspect={aspect}, nodes_ok={nodes_ok})")
-        tmp_dot, _, _ = make_filtered_dot(dot_file, hide_graveyard=False)
+        print(f"! degenerate svg (size_ok={size_ok}, aspect={aspect}, nodes_ok={nodes_ok}) → rebuild without filtering")
+        tmp_src = dot_file
         try:
-            cmd = [dot_bin, "-Tsvg",
-                   "-Grankdir=TB","-Gnodesep=0.35","-Granksep=0.55",
+            cmd = ["dot", "-Tsvg",
+                   "-Grankdir=TB","-Gnodesep=0.35","-Granksep=0.80",
                    "-Goverlap=false","-Gsplines=true","-Gconcentrate=true",
                    "-Gratio=compress","-Gmargin=0,0","-Gpack=true","-Gpackmode=graph",
-                   str(tmp_dot), "-o", str(SVG)]
+                   str(tmp_src), "-o", str(SVG)]
             subprocess.run(cmd, check=True)
-            print("+ rebuilt without graveyard filtering")
-        finally:
-            if tmp_dot is not dot_file:
-                try: tmp_dot.unlink(missing_ok=True)
-                except Exception: pass
-        # さらにダメなら力学/放射にフォールバック
-        if (not _svg_aspect(SVG)) or SVG.stat().st_size < 10_000:
+            print("+ rebuilt without filtering")
+        except subprocess.CalledProcessError:
             sfdp = shutil.which("sfdp")
             if sfdp:
                 try:
-                    subprocess.run([sfdp, "-Tsvg", str(dot_file), "-o", str(SVG)], check=True)
+                    subprocess.run([sfdp, "-Tsvg", str(tmp_src), "-o", str(SVG)], check=True)
                     print("+ rebuilt via sfdp (fallback)")
                 except subprocess.CalledProcessError:
                     pass
             twopi = shutil.which("twopi")
             if twopi:
                 try:
-                    subprocess.run([twopi, "-Tsvg", str(dot_file), "-o", str(SVG)], check=True)
+                    subprocess.run([twopi, "-Tsvg", str(tmp_src), "-o", str(SVG)], check=True)
                     print("+ rebuilt via twopi (fallback)")
                 except subprocess.CalledProcessError:
                     pass
@@ -326,7 +372,7 @@ def svg_to_png():
         elif tried_cairo:
             print("! PNG looks suspicious and librsvg is unavailable; keeping CairoSVG output")
 
-# ============== Context & static sync ==============
+# ================== Context & static sync ==================
 def ensure_context():
     CTXDIR.mkdir(parents=True, exist_ok=True)
     if not CTX.exists():
@@ -367,7 +413,7 @@ def sync_to_static():
             for f in files: _safe_copy(sd / f, dst_root / "context" / rel / f)
         print(f"+ synced codex_reports -> {dst_root}")
 
-# ============== Main ==============
+# ================== Main ==================
 if __name__ == "__main__":
     ensure_context()
     build_svg_from_dot()
