@@ -1,159 +1,128 @@
-# src/plan_data/run_inventor.py
 from __future__ import annotations
+from typing import Any, Dict, List, Optional
+from dataclasses import asdict, is_dataclass
+import logging
+import uuid
 
-from typing import Any, Dict, List
+from .inventor import generate_proposals  # returns list[StrategyProposalV1 or dict]
+from decision.decision_engine import DecisionEngine  # decide(bundle, proposals, conn_str)
 
+# ---------- helpers ----------
+def _get(obj: Any, key: str, default: Any = None) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    if hasattr(obj, key):
+        try:
+            return getattr(obj, key)
+        except Exception:
+            return default
+    return default
 
-# ---------- internal helpers ----------
-
-def _import_feature_bundle():
-    """
-    FeatureBundle (pydantic v2) のインポート互換。
-    プロジェクト内配置差異に対応するため contracts 優先・フォールバックあり。
-    """
-    try:
-        from src.plan_data.contracts import FeatureBundle  # 推奨: alias of FeatureBundleV1
-        return FeatureBundle
-    except Exception:
-        from src.plan_data.feature_bundle import FeatureBundle  # type: ignore
-        return FeatureBundle
-
-
-def _to_feature_bundle(fb_like: Any):
-    """
-    dict / pydantic BaseModel / dataclass いずれでも FeatureBundle に正規化する。
-    必須: features, trace_id
-    任意: context
-    """
-    FeatureBundle = _import_feature_bundle()
-
-    # pydantic v2 BaseModel らしきもの（model_dump を持つ & .features 属性あり）
-    if hasattr(fb_like, "model_dump") and hasattr(fb_like, "features"):
-        return fb_like
-
-    # 属性型（dataclass/通常クラス）
-    if hasattr(fb_like, "features") and hasattr(fb_like, "trace_id"):
-        ctx = getattr(fb_like, "context", None)
-        return FeatureBundle(features=fb_like.features, trace_id=fb_like.trace_id, context=ctx)
-
-    # dict 型
-    if isinstance(fb_like, dict):
-        feats = fb_like.get("features")
-        trace_id = fb_like.get("trace_id")
-        ctx = fb_like.get("context")
-        if feats is None or trace_id is None:
-            raise ValueError("FeatureBundle requires 'features' and 'trace_id'.")
-        return FeatureBundle(features=feats, trace_id=trace_id, context=ctx)
-
-    raise TypeError(f"Unsupported FeatureBundle-like object: {type(fb_like)}")
-
-
-def _to_plain_dict(obj: Any) -> Dict[str, Any]:
-    """
-    pydantic BaseModel / dict / 属性オブジェクトを防御的に dict 化。
-    """
-    if obj is None:
-        return {}
+def _to_dict(obj: Any) -> Dict[str, Any]:
     if isinstance(obj, dict):
         return obj
-    if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
+    # pydantic v2
+    if hasattr(obj, "model_dump"):
         try:
-            return obj.model_dump()  # pydantic v2
+            return obj.model_dump()  # type: ignore[attr-defined]
         except Exception:
             pass
-    try:
-        # よく使うキーを優先的に拾う（存在すれば）
-        keys = ("strategy", "intent", "trace_id", "qty_raw", "score", "id")
-        return {k: getattr(obj, k) for k in keys if hasattr(obj, k)}
-    except Exception:
-        return {}
+    # pydantic v1
+    if hasattr(obj, "dict"):
+        try:
+            return obj.dict()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+    if is_dataclass(obj):
+        try:
+            return asdict(obj)
+        except Exception:
+            pass
+    return {}
 
-
-def _summarize_proposals(proposals: List[Any], k: int = 10) -> List[Dict[str, Any]]:
-    """
-    proposals が pydantic BaseModel / dict / 混在でも落ちない要約器。
-    StrategyProposalV1 最小スキーマ: {strategy: str, intent: Literal, trace_id: str, qty_raw?: float}
-    """
+def _summarize_proposals(cands: List[Any], k: int = 10) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
-    for p in proposals[:k]:
-        d = _to_plain_dict(p)
+    for p in (cands or [])[:k]:
         out.append({
-            "strategy": d.get("strategy"),
-            "intent": d.get("intent"),
-            "qty": d.get("qty_raw"),
-            "score": d.get("score"),
-            "id": d.get("id"),
+            "strategy": _get(p, "strategy", _get(p, "name")),
+            "intent": _get(p, "intent"),
+            "qty": _get(p, "qty_raw", _get(p, "qty")),
+            "score": _get(p, "risk_adjusted", _get(p, "risk_score")),
+            "id": _get(p, "id"),
         })
     return out
 
+def _fallback_size(decision: Dict[str, Any], proposals: List[Any]) -> bool:
+    """size<=0 のとき、候補の qty と risk を用いて size を補完する。補完したら True。"""
+    try:
+        size = float(_get(decision, "size", 0) or 0.0)
+    except Exception:
+        size = 0.0
 
-def _decision_to_dict(decision: Any) -> Dict[str, Any]:
-    """
-    DecisionEngine の戻り値が pydantic / dict / クラスいずれでも JSON化。
-    """
-    if decision is None:
-        return {}
-    if isinstance(decision, dict):
-        return decision
-    if hasattr(decision, "model_dump") and callable(getattr(decision, "model_dump")):
-        try:
-            return decision.model_dump()
-        except Exception:
-            pass
-    # 最後の手段（代表的フィールドだけ抜く）
-    return _to_plain_dict(decision)
+    if size > 0.0:
+        return False
 
+    best = proposals[0] if proposals else None
+    if best is None:
+        # 最低でも 1e-3 を入れて「ゼロではない」ことを担保
+        decision["size"] = 1e-3
+        decision["reason"] = (decision.get("reason", "") + " [fallback_size_applied(min)]").strip()
+        return True
 
-# ---------- public entrypoint ----------
+    try:
+        qty = float(_get(best, "qty_raw", _get(best, "qty", 0.0)) or 0.0)
+    except Exception:
+        qty = 0.0
+    try:
+        risk = float(_get(best, "risk_adjusted", _get(best, "risk_score", 0.5)) or 0.5)
+    except Exception:
+        risk = 0.5
 
+    patched = max(1e-3, qty * max(0.1, risk))
+    decision["size"] = patched
+    decision["reason"] = (decision.get("reason", "") + " [fallback_size_applied(qty*risk)]").strip()
+    return True
+
+# ---------- main entry ----------
 def run_inventor_and_decide(
-    fb: Any,
-    conn_str: str | None = None,
+    bundle: Any,
+    conn_str: Optional[str] = None,
     use_harmonia: bool = True,
 ) -> Dict[str, Any]:
     """
-    Inventor → (Harmonia) → DecisionEngine の橋渡し。
-    - fb: dict / FeatureBundle / dataclass いずれでもOK（内部で正規化）
-    - conn_str: 観測ログ用（NOCTRIA_OBS_MODE=stdout なら None でもOK）
-    - use_harmonia: True の場合、存在すれば rerank_candidates を適用
-
-    Returns (XCom安全な軽量dict):
-      {
-        "trace_id": "...",
-        "proposal_summary": [ {strategy, intent, qty, score?, id?} ... ],
-        "decision": {...},
-      }
+    Inventor -> (optional Harmonia rerank) -> DecisionEngine
+    Returns:
+      {"trace_id": str, "proposal_summary": [...], "decision": {...}}
     """
-    # 遅延 import（DAG パース時に重い依存を避ける）
-    from src.plan_data.inventor import generate_proposals
-    from src.decision.decision_engine import DecisionEngine
-
-    # 1) FeatureBundle へ正規化
-    bundle = _to_feature_bundle(fb)
-    trace_id = getattr(bundle, "trace_id", None) or "N/A"
-
-    # 2) 候補生成（Inventor）
+    # proposals
     proposals: List[Any] = generate_proposals(bundle)
 
-    # 3) （任意）Harmonia rerank
+    # optional rerank by Harmonia (dict/model 両対応)
     if use_harmonia:
         try:
-            # 例: codex.agents.harmonia.rerank_candidates(proposals, bundle)
-            from codex.agents.harmonia import rerank_candidates  # type: ignore
-            new_props = rerank_candidates(proposals, bundle)
-            if new_props:
-                proposals = new_props
+            from codex.agents.harmonia import rerank_candidates  # added in our Harmonia
+            ctx = _to_dict(_get(bundle, "context", {}))
+            feats = _get(bundle, "features", {})
+            quality = _to_dict(feats if isinstance(feats, dict) else _get(feats, "quality", {}))
+            proposals = rerank_candidates(proposals, context=ctx, quality=quality)
         except Exception as e:
-            # 未実装や失敗は LOW 扱い（処理は継続）
-            print(f"[Harmonia] Rerank skipped or failed: {e!r}")
+            logging.info("[Harmonia] Rerank skipped or failed: %r", e)
 
-    # 4) 決定（DecisionEngine）
+    # decide
     eng = DecisionEngine()
     record, decision = eng.decide(bundle, proposals=proposals, conn_str=conn_str)
 
-    # 5) 返却（XCom向け軽量）
+    # normalize decision to dict (for return payload)
+    d = decision if isinstance(decision, dict) else _to_dict(decision)
+
+    # fallback size if needed（戻り値の decision は非ゼロにする）
+    _fallback_size(d, proposals)
+
+    # trace_id（bundle か decision 由来で確保。なければ生成）
+    trace_id = _get(bundle, "trace_id") or _get(d, "trace_id") or str(uuid.uuid4())
+
     return {
         "trace_id": trace_id,
         "proposal_summary": _summarize_proposals(proposals, k=10),
-        "decision": _decision_to_dict(decision),
+        "decision": d,
     }
