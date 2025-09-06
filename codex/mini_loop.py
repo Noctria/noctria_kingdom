@@ -1,4 +1,3 @@
-# codex/mini_loop.py
 from __future__ import annotations
 
 import json
@@ -11,30 +10,80 @@ from codex.run_codex_cycle import run_cycle, JSON_PATH, LATEST_MD
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # codex_reports 配下
-META_PATH = JSON_PATH.parent / "mini_loop_meta.json"
+REPORTS_DIR = JSON_PATH.parent
+META_PATH = REPORTS_DIR / "mini_loop_meta.json"
+CTXDIR = REPORTS_DIR / "context"
+ALLOWED = CTXDIR / "allowed_files.txt"
+TESTS_MAP = CTXDIR / "tests_map.json"
+
+
+def load_allowed_tests() -> list[str]:
+    """
+    tests_map.json の "selected" を優先。
+    なければ allowed_files.txt の stem をキーワードにして tests/**/*.py を拾う。
+    最後まで空なら空リストを返す（= 全部対象）。
+    """
+    # 1) tests_map.json があれば使う
+    if TESTS_MAP.exists():
+        try:
+            js = json.loads(TESTS_MAP.read_text(encoding="utf-8"))
+            sel = js.get("selected") or []
+            if sel:
+                return sel
+        except Exception:
+            pass
+
+    # 2) allowed_files.txt の stem から緩く拾う
+    kws: list[str] = []
+    if ALLOWED.exists():
+        for ln in ALLOWED.read_text(encoding="utf-8").splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            stem = Path(ln).stem
+            if len(stem) >= 3:
+                kws.append(stem.lower())
+
+    if kws:
+        found: list[str] = []
+        for p in (REPO_ROOT / "tests").rglob("test_*.py"):
+            try:
+                text = p.read_text(encoding="utf-8", errors="ignore").lower()
+            except Exception:
+                continue
+            if any(kw in text for kw in kws):
+                found.append(p.relative_to(REPO_ROOT).as_posix())
+        if found:
+            return found
+
+    # 3) fallback: 空リスト → run_cycle 側で「デフォルト挙動」に任せる
+    return []
 
 
 def main() -> None:
     """
     小ループ実行:
       1) run_codex_cycle.run_cycle() で軽量テスト → codex_reports に Markdown/JSON を出力
-      2) 直後に Inventor 提案 → Harmonia レビューを自動生成（静的Markdown）
+      2) Inventor 提案 → Harmonia レビューを自動生成（静的Markdown）
       3) ループのメタ情報を mini_loop_meta.json に保存
     """
-    # 1) pytest 実行（軽量2本: pytest_args=None は run_codex_cycle 側で解釈）
+    # 事前に allowed_tests を決定
+    allowed_tests = load_allowed_tests()
+    pytest_args = None
+    if allowed_tests:
+        # pytest に nodeid を直接渡す形にする
+        pytest_args = allowed_tests
+
+    # 1) pytest 実行
     result, md_path = run_cycle(
-        pytest_args=None,
+        pytest_args=pytest_args,
         base_ref="",
         head_ref="",
         title="Mini Loop",
         enable_patch_notes=False,
     )
 
-    # ❌ tmp.json を上書きしないこと！（run_codex_cycle が保存済み）
-    # JSON_PATH.write_text(str(result), encoding="utf-8")  # これはやらない
-
     # 2) Inventor → Harmonia の自然言語レビューを生成（ローカル静的版）
-    #    codex/tools/review_pipeline.py をサブプロセスで実行
     try:
         subprocess.run(
             ["python", "-m", "codex.tools.review_pipeline"],
@@ -53,6 +102,7 @@ def main() -> None:
         "git": result.git,
         "latest_md": str(md_path or LATEST_MD),
         "json_path": str(JSON_PATH),
+        "allowed_tests": allowed_tests,
     }
     META_PATH.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
