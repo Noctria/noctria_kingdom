@@ -23,7 +23,7 @@ x-airflow-common: &airflow-common
     - NOCTRIA_OBS_PG_DSN=
     # DB に書く場合は上の2行を調整し、下の DSN を有効化（Compose の ${...} 展開を利用）
     # - NOCTRIA_OBS_MODE=
-    # - NOCTRIA_OBS_PG_DSN=postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
+    - NOCTRIA_OBS_PG_DSN=postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
 
     # ---- API 認証バックエンド（Basic + session を明示）----
     - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
