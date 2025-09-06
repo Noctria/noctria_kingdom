@@ -45,24 +45,23 @@ def _ctx_get(ctx: Any, key: str, default: Any = None) -> Any:
 
 def _emit_alert(kind: str, message: str = "", **fields) -> None:
     """
-    安全アラート送出: まず observability.emit_alert を試み、
-    常に stdout に 1行JSON を出力する（テストで確実に捕捉できる）。
-    例外は飲み込み、呼び出し元を決して落とさない。
+    安全アラート送出:
+      1) observability.emit_alert を試みる（未知kwargsも透過）
+      2) 常に stdout に 1行JSON を出力（テストが確実に拾える）
+      例外は飲み込み、呼び出し元を決して落とさない
     """
     try:
         if hasattr(observability, "emit_alert"):
-            # 既存実装に合わせてそのまま委譲（未知のkwargsも透過）
             observability.emit_alert(kind=kind, message=message, **fields)  # type: ignore
     except Exception:
-        # フォールバック継続（stdoutは常に出す）
-        pass
+        pass  # stdout フォールバックに進む
+
     try:
         payload = {"kind": kind, "message": message}
         payload.update(fields)
         print(_json.dumps(payload, ensure_ascii=False))
         _sys.stdout.flush()
     except Exception:
-        # ここでも例外は握りつぶす
         pass
 
 
@@ -108,7 +107,7 @@ def evaluate_quality(
     action: Action = "OK"
     scale = 1.0
 
-    # テスト互換のtraceキーに配慮（trace優先、無ければtrace_id）
+    # テスト互換の trace キー（trace優先、無ければ trace_id）
     trace = _ctx_get(ctx, "trace", _ctx_get(ctx, "trace_id", None))
     symbol = _ctx_get(ctx, "symbol", "UNKNOWN")
     timeframe = _ctx_get(ctx, "timeframe", "UNKNOWN")
