@@ -18,10 +18,12 @@ CTX     = CTXDIR / "context_pack.json"
 ALLOWED = CTXDIR / "allowed_files.txt"
 
 # ============== Options ==============
-# 1= _graveyard を完全に隠す, 0=隠さない
+# 1= _graveyard を完全非表示, 0=隠さない
 HIDE_GRAVEYARD = os.getenv("CODEX_HIDE_GRAVEYARD", "1") not in ("0", "false", "False")
 # 縦長アスペクト強制（例: "12,120!"）; "auto" なら既定 "12,96!"
 FORCE_TALL = os.getenv("CODEX_FORCE_TALL", "").strip()
+# レイヤリング強制（入次数ベースで段=rankを作る）
+FORCE_LAYER = os.getenv("CODEX_FORCE_LAYER", "1") not in ("0", "false", "False")
 
 # ============== Helpers ==============
 def _norm(p: Path) -> Path:
@@ -202,6 +204,103 @@ def make_filtered_dot(src: Path, hide_graveyard: bool) -> tuple[Path, int, bool]
         filtered, n = _filter_with_text(src)
         return filtered, n, False
 
+# ============== Layered DOT (force vertical ranks) ==============
+def make_layered_dot(src: Path, hide_graveyard: bool) -> Path:
+    """
+    _graveyard除去後のDOTを読み、入次数ベースで段（rank）を割当て、
+    各段に subgraph { rank=same } を作って縦方向の段組を強制する。
+    """
+    import pydot  # type: ignore
+
+    filtered, _, _ = make_filtered_dot(src, hide_graveyard=hide_graveyard)
+    graphs = pydot.graph_from_dot_file(str(filtered))
+    if not graphs:
+        raise RuntimeError("pydot failed to parse DOT")
+    g: pydot.Dot = graphs[0]
+
+    # ノードとエッジを収集
+    nodes = []
+    node_names = set()
+    for n in g.get_nodes():
+        name = (n.get_name() or "").strip('"')
+        if name in ("node","graph","edge"):
+            continue
+        nodes.append(n)
+        node_names.add(name)
+
+    edges = []
+    indeg = {name: 0 for name in node_names}
+    for e in g.get_edges():
+        s = (e.get_source() or "").strip('"')
+        t = (e.get_destination() or "").strip('"')
+        if s in node_names and t in node_names:
+            edges.append((s, t, e))
+            indeg[t] += 1
+
+    # 段割り当て（Kahn風 + サイクル緩和）
+    from collections import deque, defaultdict
+    layer_of: dict[str, int] = {}
+    q = deque([n for n, d in indeg.items() if d == 0])
+    cur_layer = 0
+    remaining = set(node_names)
+
+    while remaining:
+        if not q:
+            # サイクル対応：入次数最小ノードを選出
+            pick = min(remaining, key=lambda n: indeg.get(n, 0))
+            q.append(pick)
+
+        while q:
+            u = q.popleft()
+            if u not in remaining:
+                continue
+            layer_of[u] = cur_layer
+            remaining.remove(u)
+            # u -> v のエッジで indeg を減らす
+            for (s, t, _e) in edges:
+                if s == u and t in remaining:
+                    indeg[t] = max(0, indeg[t] - 1)
+                    if indeg[t] == 0:
+                        q.append(t)
+        cur_layer += 1
+
+    # 新グラフに段組を構築
+    new = pydot.Dot(graph_type=g.get_type() or "digraph")
+    new.set("rankdir", "TB")
+    new.set("overlap", "false")
+    new.set("splines", "true")
+    new.set("concentrate", "true")
+    new.set("nodesep", "0.40")
+    new.set("ranksep", "0.60")
+
+    by_layer = defaultdict(list)
+    for n in nodes:
+        name = (n.get_name() or "").strip('"')
+        by_layer[layer_of[name]].append(n)
+
+    for k in sorted(by_layer.keys()):
+        sg = pydot.Subgraph(graph_name=f"cluster_rank_{k}")
+        sg.set("rank", "same")
+        for n in by_layer[k]:
+            sg.add_node(n)
+        new.add_subgraph(sg)
+
+    for (s, t, e) in edges:
+        new.add_edge(e)
+
+    if FORCE_TALL:
+        tall = "12,96!" if FORCE_TALL.lower() == "auto" else FORCE_TALL
+        new.set("size", tall)
+        new.set("pack", "true")
+        new.set("packmode", "graph")
+
+    out = src.with_name(f"._tmp_layered_{int(time.time())}.dot")
+    new.write(out, format="raw")
+    if filtered is not src:
+        try: filtered.unlink(missing_ok=True)
+        except Exception: pass
+    return out
+
 # ============== Build / Convert ==============
 def build_svg_from_dot() -> bool:
     dot_bin = shutil.which("dot")
@@ -215,7 +314,7 @@ def build_svg_from_dot() -> bool:
 
     filtered_dot, kept_nodes, used_pydot = make_filtered_dot(dot_file, HIDE_GRAVEYARD)
 
-    # 追加グラフ属性（縦長アスペクト強制など）
+    # dot 実行時の追加属性
     extra_graph_attrs = [
         "-Grankdir=TB",
         "-Gnodesep=0.45",
@@ -234,17 +333,35 @@ def build_svg_from_dot() -> bool:
         cmd = [dot_bin, "-Tsvg", *extra_graph_attrs, str(src_dot), "-o", str(SVG)]
         subprocess.run(cmd, check=True)
 
+    # レイヤリング（pydot必須）。失敗時は filtered のみで続行
+    if FORCE_LAYER:
+        try:
+            layered_dot = make_layered_dot(dot_file, hide_graveyard=HIDE_GRAVEYARD)
+            src_for_dot = layered_dot
+            layer_tag = "+layered"
+        except Exception as e:
+            print(f"! layered build failed ({e}); fallback to filtered only")
+            src_for_dot = filtered_dot
+            layer_tag = ""
+    else:
+        src_for_dot = filtered_dot
+        layer_tag = ""
+
     try:
-        _run_dot(filtered_dot)
+        _run_dot(src_for_dot)
         tag = "hide_graveyard+pydot" if (HIDE_GRAVEYARD and used_pydot) else ("hide_graveyard" if HIDE_GRAVEYARD else "no_hide")
         if FORCE_TALL:
             t = "12,96!" if FORCE_TALL.lower() == "auto" else FORCE_TALL
             tag += f"+size={t}"
+        tag += layer_tag
         print(f"+ built {SVG} from {dot_file.name} ({tag})")
     except subprocess.CalledProcessError as e:
         print(f"! dot failed: {e}")
         return False
     finally:
+        if src_for_dot is not dot_file:
+            try: src_for_dot.unlink(missing_ok=True)
+            except Exception: pass
         if filtered_dot is not dot_file:
             try: filtered_dot.unlink(missing_ok=True)
             except Exception: pass
