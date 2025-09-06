@@ -9,3 +9,4 @@ src/plan_data/run_inventor.py
 src/plan_data/inventor.py
 airflow_docker/dags/inventor_pipeline_dag.py
 airflow_docker/docker-compose.yaml
+.gitignore
