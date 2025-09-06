@@ -41,18 +41,12 @@ def _get_meta(obj: Any) -> Dict[str, Any]:
 
 
 def _emit_alert(kind: str, message: str = "", **fields) -> None:
-    """
-    安全アラート送出:
-      1) observability.emit_alert を試みる（未知kwargsも透過）
-      2) 常に stdout に 1行JSON を出力（テストが確実に拾える）
-      例外は飲み込み、呼び出し元を決して落とさない
-    """
+    """observability.emit_alert を試しつつ、必ず stdout に 1行JSON を出す。"""
     try:
         if hasattr(observability, "emit_alert"):
             observability.emit_alert(kind=kind, message=message, **fields)  # type: ignore
     except Exception:
-        pass  # stdout フォールバックに進む
-
+        pass
     try:
         payload = {"kind": kind, "message": message}
         payload.update(fields)
@@ -129,14 +123,11 @@ def check_proposal(
 
     # --- 可観測性: アラート出力 ---
     if not ok:
-        trace = _get(proposal, "trace", _get(proposal, "trace_id", None))
-        symbol = _get(proposal, "symbol", None)
         _emit_alert(
-            "NOCTUS.BLOCKED",
+            "NOCTUS",
             message="; ".join(reasons) or "NoctusGate blocked proposal",
             severity="CRITICAL",
-            trace=trace,
-            symbol=symbol,
+            trace=_get(proposal, "trace", _get(proposal, "trace_id", None)),
             details={
                 "lot": lot_val,
                 "max_lot_size": max_lot_size,
