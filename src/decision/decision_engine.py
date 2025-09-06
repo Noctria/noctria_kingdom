@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
-# 正典：Plan層の contracts / gates / observability を使用（絶対インポート前提）
+# 正典：Plan層の contracts / observability はそのまま（循環しない）
 from plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
 from plan_data import observability  # type: ignore
-from plan_data import quality_gate as quality_gate_mod  # type: ignore
-from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
+
+# 型チェック時のみ参照（実行時は遅延 import で循環を回避）
+if TYPE_CHECKING:
+    from plan_data import quality_gate as quality_gate_mod  # type: ignore
+    from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
 
 DictLike = Dict[str, Any]
 
@@ -69,7 +72,7 @@ class DecisionEngine:
         bundle: FeatureBundle,
         proposals: Iterable[StrategyProposal],
         *,
-        quality: Optional[quality_gate_mod.QualityResult] = None,
+        quality: Optional["quality_gate_mod.QualityResult"] = None,
         profiles: Optional[DictLike] = None,
         conn_str: Optional[str] = None,
     ) -> Tuple[DecisionRecord, DictLike]:
@@ -105,7 +108,9 @@ class DecisionEngine:
         # 2) スコア最大（または先頭）を暫定採用
         best = self._pick_best(proposals_list)
 
-        # 3) NoctusGate で実行前リスクチェック
+        # 3) NoctusGate で実行前リスクチェック（← ここでのみ遅延 import）
+        from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
+
         ng_res = noctus_gate_mod.check_proposal(best, conn_str=conn_str)
         if not ng_res.ok:
             # ブロック → REJECT 決定
