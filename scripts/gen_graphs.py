@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import os
 import shutil
+import subprocess
 
 # ------------------------------------------------------------
 # Paths
@@ -44,6 +45,32 @@ def _safe_copy(src: Path, dst: Path):
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
 
+def _png_looks_suspicious(p: Path) -> bool:
+    """
+    軽い健全性チェック:
+      - 0バイト/極小サイズ
+      - ほぼ単色（真っ黒/真っ白）に近い
+    Pillowが無ければチェックをスキップ（False）。
+    """
+    try:
+        from PIL import Image  # type: ignore
+    except Exception:
+        return False
+
+    if not p.exists() or p.stat().st_size < 2_000:  # 2KB未満は怪しい
+        return True
+
+    try:
+        with Image.open(p) as im:
+            im = im.convert("L")  # グレースケール
+            hist = im.histogram()
+            total = float(sum(hist)) or 1.0
+            share_black = hist[0] / total
+            share_white = hist[-1] / total
+            return (share_black > 0.95) or (share_white > 0.95)
+    except Exception:
+        return False
+
 # ------------------------------------------------------------
 # Static roots discovery (with safety)
 # - skip empty/relative paths
@@ -72,18 +99,48 @@ STATIC_ROOTS = [p for p in STATIC_ROOTS if not (str(p) in _seen or _seen.add(str
 # Actions
 # ------------------------------------------------------------
 def svg_to_png():
-    """Convert imports.svg -> imports_preview.png (optional if cairosvg exists)."""
+    """
+    Convert imports.svg -> imports_preview.png
+    1) CairoSVG（白背景, 幅1200px）で出力
+    2) 結果が怪しければ rsvg-convert にフォールバック（存在すれば）
+    """
+    if not SVG.exists():
+        print("! missing imports.svg (skip PNG)")
+        return
+
+    PNG.parent.mkdir(parents=True, exist_ok=True)
+
+    # --- try CairoSVG first (white background) ---
+    tried_cairo = False
     try:
         import cairosvg  # pip install cairosvg (recommended in venv)
-    except Exception:
-        print("! cairosvg 未導入のため PNG 生成はスキップ")
-        return
-    if SVG.exists():
-        PNG.parent.mkdir(parents=True, exist_ok=True)
-        cairosvg.svg2png(url=str(SVG), write_to=str(PNG), output_width=1200)
-        print(f"+ wrote {PNG}")
-    else:
-        print("! missing imports.svg (skip PNG)")
+        cairosvg.svg2png(
+            url=str(SVG),
+            write_to=str(PNG),
+            output_width=1200,
+            background_color="white",  # 透過やCSS未解決の黒化対策
+        )
+        tried_cairo = True
+        print(f"+ wrote {PNG} via CairoSVG")
+    except Exception as e:
+        print(f"! CairoSVG failed: {e}")
+
+    # --- sanity check; fallback if needed ---
+    need_fallback = (not PNG.exists()) or _png_looks_suspicious(PNG)
+    if need_fallback:
+        rsvg = shutil.which("rsvg-convert")
+        if rsvg:
+            try:
+                subprocess.run([rsvg, "-w", "1200", "-o", str(PNG), str(SVG)], check=True)
+                print(f"+ wrote {PNG} via rsvg-convert (fallback)")
+                return
+            except subprocess.CalledProcessError as e:
+                print(f"! rsvg-convert failed: {e}")
+        else:
+            if tried_cairo:
+                print("! PNG looks suspicious and librsvg is unavailable; keeping CairoSVG output")
+            else:
+                print("! no exporter worked; PNG not generated")
 
 def ensure_context():
     """Ensure minimal context files exist."""
