@@ -76,7 +76,7 @@ def main() -> None:
 
     # 1) pytest 実行
     result, md_path = run_cycle(
-        pytest_args=pytest_args,
+        pytest_args=[],
         base_ref="",
         head_ref="",
         title="Mini Loop",
