@@ -10,21 +10,17 @@ def _import_strategy_proposal():
     まず contracts を試し、無ければフォールバックに回す。
     """
     try:
-        from src.plan_data.contracts import StrategyProposal  # alias of StrategyProposalV1 (推奨)
+        from src.plan_data.contracts import StrategyProposal  # = StrategyProposalV1（推奨）
         return StrategyProposal
     except Exception:
-        # プロジェクト差異のフォールバック（必要に応じて調整）
+        # 必要に応じてプロジェクト差異のフォールバック
         from src.plan_data.strategy_proposal import StrategyProposal  # type: ignore
         return StrategyProposal
 
 
 def _to_plain_dict(obj: Any) -> Dict[str, Any]:
     """
-    pydantic v2 BaseModel / dataclass / 任意オブジェクトを防御的に dict 化。
-    - model_dump() があればそれを使う
-    - __dict__ があれば shallow 取得
-    - dict ならそのまま
-    - それ以外は空 dict
+    pydantic BaseModel / dataclass / 任意オブジェクトを防御的に dict 化。
     """
     if obj is None:
         return {}
@@ -35,20 +31,21 @@ def _to_plain_dict(obj: Any) -> Dict[str, Any]:
             return obj.model_dump()  # type: ignore[no-any-return]
         except Exception:
             pass
-    # 属性列挙（必要最低限）
     try:
-        return {k: getattr(obj, k) for k in dir(obj)
-                if not k.startswith("_")
-                and not callable(getattr(obj, k))
-                and k not in ("__class__", "Config")}
+        return {
+            k: getattr(obj, k)
+            for k in dir(obj)
+            if not k.startswith("_")
+            and not callable(getattr(obj, k))
+            and k not in ("__class__", "Config")
+        }
     except Exception:
         return {}
 
 
 def _side_from_features(features: Dict[str, Any]) -> str:
     """
-    ごく簡単な方向推定（デモ用）。
-    正のバイアスで BUY、負で SELL、ゼロは BUY に丸める。
+    ごく簡単な方向推定（デモ）。正のバイアスで BUY、負で SELL。
     """
     try:
         bias = float(features.get("bias", 0.0))
@@ -57,54 +54,47 @@ def _side_from_features(features: Dict[str, Any]) -> str:
     return "BUY" if bias >= 0 else "SELL"
 
 
-def generate_proposals(bundle: Any) -> List[Dict[str, Any] | Any]:
+def _side_to_intent(side: str) -> str:
+    """
+    StrategyProposalV1 の intent は 'LONG' / 'SHORT' / 'FLAT'
+    """
+    if side.upper() == "BUY":
+        return "LONG"
+    if side.upper() == "SELL":
+        return "SHORT"
+    return "FLAT"
+
+
+def generate_proposals(bundle: Any) -> List[Any]:
     """
     Inventor: FeatureBundle から最小セットの戦略提案を生成。
 
-    StrategyProposalV1 の必須フィールド:
-      - strategy: { name: str, params: dict }
-      - intent: str（例: "OPEN"）
-      - trace_id: str
+    ★ StrategyProposalV1 の最小スキーマに厳密準拠：
+        - strategy: str（モデル名）
+        - intent  : 'LONG' | 'SHORT' | 'FLAT'
+        - trace_id: str
 
-    トップレベルに name/lot/score/symbol/timeframe 等を置くと extra=forbid で弾かれるため、
-    それらは strategy.params に格納する。
+    余計な top-level フィールド（params/score/lot など）は付けない（extra=forbid 回避）。
     """
     StrategyProposal = _import_strategy_proposal()
 
-    # FeatureBundle は pydantic モデル想定だが、素直な dict とは限らないため防御的に扱う
     trace_id = getattr(bundle, "trace_id", None) or "N/A"
-
-    # context / features を安全に dict 化（pydantic BaseModel を考慮）
     context_dict: Dict[str, Any] = _to_plain_dict(getattr(bundle, "context", None))
     features_dict: Dict[str, Any] = _to_plain_dict(getattr(bundle, "features", None))
 
     symbol = context_dict.get("symbol", "USDJPY")
     timeframe = context_dict.get("timeframe", "M15")
+
     side = _side_from_features(features_dict)
+    intent = _side_to_intent(side)
 
-    # ---- シンプルな1件提案（デモ） ----
-    name = f"inventor/{'buy' if side == 'BUY' else 'sell'}_simple"
+    # strategy は **str** 必須（dictはNG）
+    strategy_name = f"inventor/{'buy' if side == 'BUY' else 'sell'}_simple@{symbol}-{timeframe}"
 
-    # params に各種パラメータを集約（トップに置かない！）
-    params: Dict[str, Any] = {
-        "lot": 0.5,
-        "side": side,
-        "symbol": symbol,
-        "timeframe": timeframe,
-        "generator": "inventor_v1",
-    }
-    # 例：quality用の簡易スコア（ダミー）
-    try:
-        mr = float(features_dict.get("missing_ratio", 0.0))
-    except Exception:
-        mr = 0.0
-    params["score"] = 0.5 + 0.5 * (1.0 - max(0.0, min(1.0, mr)))  # 欠損が少ないほど高スコア
-
+    # 最小スキーマで提案を1件返す
     proposal = StrategyProposal(
-        strategy={"name": name, "params": params},
-        intent="OPEN",
+        strategy=strategy_name,
+        intent=intent,
         trace_id=trace_id,
     )
-
-    # 呼び出し側（run_inventor_and_decide）で要約して XCom 返却する前提
     return [proposal]
