@@ -54,3 +54,8 @@ codex_reports/**                 # まず配下を全無視
 !codex_reports/graphs/imports.svg
 !codex_reports/graphs/imports.pdf
 !codex_reports/graphs/imports_preview.png
+codex_reports/tmp.json
+codex_reports/pytest_summary.md
+codex_reports/patches/
+logs/
+*.jsonl
