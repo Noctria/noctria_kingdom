@@ -1,4 +1,3 @@
-cat > src/plan_data/run_inventor.py <<'PY'
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -155,4 +154,3 @@ def run_inventor_and_decide(
         "proposal_summary": _summarize_proposals(proposals, k=10),
         "decision": decision,
     }
-PY
