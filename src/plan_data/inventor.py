@@ -1,134 +1,78 @@
 # src/plan_data/inventor.py
 from __future__ import annotations
 
-from dataclasses import asdict
-from typing import List, Optional, Any
-import math
-import time
-
-from .contracts import FeatureBundle, StrategyProposal  # type: ignore
-from . import observability
+from typing import Any, Dict, List
 
 
-def _safe_get(ctx: Any, key: str, default: Any = None) -> Any:
-    if ctx is None:
-        return default
-    if isinstance(ctx, dict):
-        return ctx.get(key, default)
-    return getattr(ctx, key, default)
-
-
-def _simple_score_from_df(fb: FeatureBundle) -> float:
+def _import_strategy_proposal():
     """
-    極めて軽量なスコア計算:
-    - df があれば行数と時系列のspreadっぽいものから 0.4〜0.8 の範囲で決める
-    - df が無ければ 0.5
-    これはあくまでスモーク用（本実装ではきちんと差し替える）
+    StrategyProposal (pydantic v2) のインポート互換。
+    配置差異に備えて contracts 優先・fallback を持つ。
     """
-    df = getattr(fb, "df", None)
-    if df is None or len(df) == 0:
-        return 0.5
-    n = max(len(df), 1)
-    # 疑似ボラ = 行数の平方根でスコアに微調整
-    base = 0.5 + min(0.3, 0.1 * math.log10(n + 9))
-    return float(max(0.4, min(0.8, base)))
-
-
-def generate_proposals(
-    fb: FeatureBundle,
-    *,
-    max_n: int = 3,
-    default_lot: float = 0.5,
-) -> List[StrategyProposal]:
-    """
-    最小の戦略候補ジェネレーター（スモーク版）
-      - BUY/SELL の2案 + 任意で HOLD 1案を返す
-      - score は df からの簡易指標で 0.4〜0.8 に収める
-      - risk_score は仮で score と同値（NoctusGateの動作確認に十分）
-    """
-    t0 = time.time()
-    ctx = getattr(fb, "context", None)
-    symbol = _safe_get(ctx, "symbol", "USDJPY")
-    trace = _safe_get(ctx, "trace", _safe_get(ctx, "trace_id", None))
-    timeframe = _safe_get(ctx, "timeframe", "1h")
-
-    # 簡易スコア
-    s = _simple_score_from_df(fb)
-
-    # 生成（最小限のフィールドのみ埋める）
-    cands: List[StrategyProposal] = []
-    cands.append(
-        StrategyProposal(
-            name="inventor/buy_simple",
-            action="BUY",
-            lot=default_lot,
-            score=s,
-            risk_score=s,
-            symbol=symbol,
-            extra={"timeframe": timeframe, "generator": "inventor_v1"},
-        )
-    )
-    cands.append(
-        StrategyProposal(
-            name="inventor/sell_simple",
-            action="SELL",
-            lot=default_lot,
-            score=max(0.0, 0.9 * s),
-            risk_score=max(0.0, 0.9 * s),
-            symbol=symbol,
-            extra={"timeframe": timeframe, "generator": "inventor_v1"},
-        )
-    )
-    if max_n >= 3:
-        cands.append(
-            StrategyProposal(
-                name="inventor/hold_simple",
-                action="HOLD",
-                lot=0.0,
-                score=0.4,
-                risk_score=0.4,
-                symbol=symbol,
-                extra={"timeframe": timeframe, "generator": "inventor_v1"},
-            )
-        )
-
-    # 観測: 推論ログ（候補数など）
     try:
-        observability.log_infer_call(
-            provider="inventor",
-            model="inventor_v1",
-            prompt={"trace": trace, "symbol": symbol, "timeframe": timeframe},
-            response={"num_candidates": len(cands), "scores": [p.score for p in cands]},
-            latency_ms=int((time.time() - t0) * 1000),
-            conn_str=None,
-        )
+        from src.plan_data.contracts import StrategyProposal  # 推奨: alias of StrategyProposalV1
+        return StrategyProposal
     except Exception:
-        # ログ失敗は握りつぶしてOK（本体処理は続行）
-        pass
+        # プロジェクト差異のフォールバック（必要に応じて調整）
+        from src.plan_data.strategy_proposal import StrategyProposal  # type: ignore
+        return StrategyProposal
 
-    return cands
 
-
-def generate_proposals_safe(
-    fb: FeatureBundle, *, max_n: int = 3, default_lot: float = 0.5
-) -> List[StrategyProposal]:
+def _side_from_features(features: Dict[str, Any]) -> str:
     """
-    失敗時も落とさない安全ラッパー。例外時は ALERT を出して空配列を返す。
+    超簡易な方向推定。必要なら本実装に差し替え。
+    正のバイアスなら BUY、負なら SELL、ゼロは HOLD 相当で BUY に丸める。
     """
-    ctx = getattr(fb, "context", None)
-    trace = _safe_get(ctx, "trace", _safe_get(ctx, "trace_id", None))
-    try:
-        return generate_proposals(fb, max_n=max_n, default_lot=default_lot)
-    except Exception as e:
-        try:
-            observability.emit_alert(
-                kind="INVENTOR.ERROR",
-                reason=str(e),
-                severity="HIGH",
-                trace=trace,
-                details={"where": "generate_proposals", "type": e.__class__.__name__},
-                conn_str=None,
-            )
-        except Exception:
-            pass
-        return []
+    bias = float(features.get("bias", 0.0))
+    return "BUY" if bias >= 0 else "SELL"
+
+
+def generate_proposals(bundle: Any) -> List[Dict[str, Any] | Any]:
+    """
+    Inventor: FeatureBundle から最小セットの戦略提案を生成。
+
+    StrategyProposalV1 の必須は:
+      - strategy: { name: str, params: dict }（想定）
+      - intent: str（例: "OPEN"）
+      - trace_id: str
+
+    トップレベルへ name/lot/score/symbol を置くと extra=forbid に当たるため、
+    それらは strategy.params などの下位へ格納する。
+    """
+    StrategyProposal = _import_strategy_proposal()
+
+    # FeatureBundle は pydantic モデル想定（model_dump を備えることが多い）
+    # ただし属性アクセスでも動くよう防御的に扱う
+    ctx = getattr(bundle, "context", {}) or {}
+    feats = getattr(bundle, "features", {}) or {}
+    trace_id = getattr(bundle, "trace_id", None) or "N/A"
+
+    symbol = ctx.get("symbol", "USDJPY")
+    timeframe = ctx.get("timeframe", "M15")
+    side = _side_from_features(feats)
+
+    # ---- 最小提案（例）----
+    # “inventor/buy_simple or sell_simple” のような名前をつけ、
+    # intent は OPEN、lot/score/symbol/timeframe などは strategy.params へ格納
+    name = f"inventor/{'buy' if side == 'BUY' else 'sell'}_simple"
+
+    params: Dict[str, Any] = {
+        "lot": 0.5,
+        "side": side,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "generator": "inventor_v1",
+        # スコアなどの補助値もトップではなく params へ
+        "score": float(feats.get("missing_ratio", 0.0)) * 0.5 + 0.5,  # 適当なダミー例
+    }
+
+    # StrategyProposalV1 に適合する形でモデル生成
+    proposal = StrategyProposal(
+        strategy={"name": name, "params": params},
+        intent="OPEN",
+        trace_id=trace_id,
+    )
+
+    # 返却は pydantic モデルのままでも良いが、XCom 軽量化を考えるなら dict 化も可
+    # ここでは呼び出し側(run_inventor_and_decide)に任せる
+    return [proposal]
