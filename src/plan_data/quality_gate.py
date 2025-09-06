@@ -118,6 +118,8 @@ def evaluate_quality(
         _emit_alert(
             "QUALITY.DATA_LAG",
             message=f"data_lag_min={data_lag_min}",
+            # ★ テストが見る 'reason' に exceeds を入れる
+            reason=f"data_lag_min {data_lag_min}min exceeds limit {max_lag_min}",
             severity="HIGH",
             trace=trace,
             symbol=symbol,
@@ -133,6 +135,8 @@ def evaluate_quality(
         _emit_alert(
             "QUALITY.MISSING_RATIO",
             message=f"missing_ratio={missing_ratio:.3f}",
+            # ★ 同様に 'reason' を付与
+            reason=f"missing_ratio {missing_ratio:.3f} exceeds limit {max_missing:.3f}",
             severity="MEDIUM",
             trace=trace,
             symbol=symbol,
