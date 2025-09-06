@@ -5,7 +5,9 @@ x-airflow-common: &airflow-common
     context: ..                                  # 実行ディレクトリ: airflow_docker/
     dockerfile: ./airflow_docker/docker/Dockerfile
   image: noctria-airflow:latest
-  env_file: ../.env
+  env_file:
+    - ../.env            # ルートの .env（共通設定）
+    - ./.env             # airflow_docker 専用の .env（FERNET 等）
   environment:
     # ---- Airflow core ----
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
@@ -17,7 +19,10 @@ x-airflow-common: &airflow-common
 
     # ---- Observability（まずは stdout 運用）----
     - NOCTRIA_OBS_MODE=stdout
-    # DB に書く場合は上を外し、下の DSN を有効化（Compose 展開のため ${...} を使用）
+    # ルート .env に DSN があっても拾わないよう、明示的に上書き無効化
+    - NOCTRIA_OBS_PG_DSN=
+    # DB に書く場合は上の2行を調整し、下の DSN を有効化（Compose の ${...} 展開を利用）
+    # - NOCTRIA_OBS_MODE=
     # - NOCTRIA_OBS_PG_DSN=postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
 
     # ---- API 認証バックエンド（Basic + session を明示）----
@@ -51,7 +56,8 @@ services:
   postgres:
     image: postgres:13
     container_name: noctria_postgres
-    env_file: ../.env
+    env_file:
+      - ../.env
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-airflow}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-airflow}
