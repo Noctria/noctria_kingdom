@@ -4,9 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 import json, os, re, shutil, subprocess, time, xml.etree.ElementTree as ET
 
-# ------------------------------------------------------------
-# Paths
-# ------------------------------------------------------------
+# ============== Paths ==============
 ROOT   = Path(__file__).resolve().parents[1]
 GRAPHS = ROOT / "codex_reports" / "graphs"
 CTXDIR = ROOT / "codex_reports" / "context"
@@ -19,15 +17,11 @@ PNG     = GRAPHS / "imports_preview.png"
 CTX     = CTXDIR / "context_pack.json"
 ALLOWED = CTXDIR / "allowed_files.txt"
 
-# ------------------------------------------------------------
-# Options
-# ------------------------------------------------------------
-# _graveyard を隠す（1=隠す, 0=隠さない）
+# ============== Options ==============
+# 1= _graveyard を完全に隠す, 0=隠さない
 HIDE_GRAVEYARD = os.getenv("CODEX_HIDE_GRAVEYARD", "1") not in ("0", "false", "False")
 
-# ------------------------------------------------------------
-# Small helpers
-# ------------------------------------------------------------
+# ============== Helpers ==============
 def _norm(p: Path) -> Path:
     try: return p.resolve()
     except Exception: return p.absolute()
@@ -47,101 +41,7 @@ def _find_dot_file() -> Path | None:
     if DOT_ALT.exists(): return DOT_ALT
     return None
 
-# ------------------------------------------------------------
-# DOT sanitization & filtering
-# ------------------------------------------------------------
-SANITIZE_RULES = [
-    (r'(?i)\brankdir\s*=\s*(LR|RL)\b', 'rankdir=TB'),
-    (r'(?i)\brankdir\s*=\s*"(LR|RL)"', 'rankdir=TB'),
-    (r'(?i)\brank\s*=\s*same\b', ''),
-    (r'(?i)\bconstraint\s*=\s*false\b', ''),
-    (r'(?i)\bnewrank\s*=\s*true\b', ''),
-    (r'(?i)\bpage\s*=\s*[^;\n]+', ''),
-    (r'(?i)\bsize\s*=\s*[^;\n]+', ''),
-    (r'(?i)\bratio\s*=\s*[^;\n]+', ''),
-]
-
-# _graveyard を含むノード/エッジ/サブグラフを除去
-GRAVEYARD_PAT = re.compile(r'_graveyard', re.IGNORECASE)
-
-def _strip_graveyard_blocks(text: str) -> str:
-    """
-    サブグラフやクラスタ名に _graveyard を含むブロックを波括弧レベルで丸ごと削除。
-    （単純パーサ：DOTが標準的な整形である前提）
-    """
-    out = []
-    i, n = 0, len(text)
-    while i < n:
-        m = re.search(r'(subgraph\s+[^\{]*\{)|\{', text[i:], flags=re.IGNORECASE)
-        if not m:
-            out.append(text[i:])
-            break
-        start = i + m.start()
-        brace = i + m.end() - 1  # '{' の位置
-        header = text[i:start]
-        head_str = text[start:brace]  # "subgraph cluster_x ..." or just whitespace before '{'
-
-        # 直前の行に _graveyard が含まれる subgraph ならスキップ
-        if GRAVEYARD_PAT.search(head_str):
-            # 対応する '}' まで読み飛ばす
-            depth = 0
-            j = brace
-            while j < n:
-                if text[j] == '{': depth += 1
-                elif text[j] == '}':
-                    depth -= 1
-                    if depth == 0:
-                        j += 1
-                        break
-                j += 1
-            # header は残す（たとえば改行）
-            out.append(header)
-            i = j
-        else:
-            # 通常の '{' → そのまま1文字進めて続行
-            out.append(text[i:brace+1])
-            i = brace+1
-    return ''.join(out)
-
-def sanitize_dot(dot_src: Path) -> Path:
-    txt = dot_src.read_text(encoding="utf-8", errors="ignore")
-
-    # 1) _graveyard ノード/エッジの行を丸ごと除去
-    if HIDE_GRAVEYARD:
-        lines = txt.splitlines()
-        kept = []
-        for ln in lines:
-            if GRAVEYARD_PAT.search(ln):
-                # 行内に _graveyard がある → 基本スキップ
-                continue
-            kept.append(ln)
-        txt = "\n".join(kept)
-        # 2) _graveyard サブグラフ/クラスタをブロックごと削除
-        txt = _strip_graveyard_blocks(txt)
-
-    # 3) rankdir/constraint などをサニタイズ
-    for pat, rep in SANITIZE_RULES:
-        txt = re.sub(pat, rep, txt)
-
-    # 4) digraph/graph 冒頭に安全な既定値を注入
-    m = re.search(r'^(digraph|graph)\s+[^{]*\{', txt, flags=re.IGNORECASE | re.MULTILINE)
-    if m:
-        i = m.end()
-        inject = (
-            '\n  rankdir=TB;\n'
-            '  graph [overlap=false, splines=true, concentrate=true];\n'
-            '  node  [shape=box, fontsize=10];\n'
-            '  edge  [arrowsize=0.7];\n'
-        )
-        txt = txt[:i] + inject + txt[i:]
-
-    tmp = dot_src.with_name(f"._tmp_sanitized_{int(time.time())}.dot")
-    tmp.write_text(txt, encoding="utf-8")
-    return tmp
-
-# ------------------------------------------------------------
-# SVG quality checks
-# ------------------------------------------------------------
+# ============== SVG quality checks ==============
 def _svg_aspect(svg_path: Path) -> float | None:
     try:
         tree = ET.parse(svg_path)
@@ -150,11 +50,10 @@ def _svg_aspect(svg_path: Path) -> float | None:
         if vb:
             _, _, w, h = map(float, vb.split())
             return (w / h) if h else None
-        w = root.attrib.get("width", "")
-        h = root.attrib.get("height", "")
-        if w.endswith(("pt","px")): w = w[:-2]
-        if h.endswith(("pt","px")): h = h[:-2]
-        return (float(w) / float(h)) if w and h else None
+        w = root.attrib.get("width", ""); h = root.attrib.get("height", "")
+        for s in ("pt","px"): w = w[:-len(s)] if w.endswith(s) else w
+        for s in ("pt","px"): h = h[:-len(s)] if h.endswith(s) else h
+        return (float(w)/float(h)) if w and h else None
     except Exception:
         return None
 
@@ -163,7 +62,7 @@ def _png_looks_suspicious(p: Path) -> bool:
         from PIL import Image  # type: ignore
     except Exception:
         return False
-    if not p.exists() or p.stat().st_size < 2_000:
+    if not p.exists() or p.stat().st_size < 2_000:  # too tiny
         return True
     try:
         with Image.open(p) as im:
@@ -173,9 +72,155 @@ def _png_looks_suspicious(p: Path) -> bool:
     except Exception:
         return False
 
-# ------------------------------------------------------------
-# Build graph images
-# ------------------------------------------------------------
+# ============== DOT filtering (safe) ==============
+_GRAVEYARD = re.compile(r"_graveyard", re.IGNORECASE)
+
+def _filter_with_pydot(src: Path) -> tuple[Path, int]:
+    """pydot でDOTを読み、_graveyard を含むノード/エッジ/サブグラフを完全除去。"""
+    import pydot  # type: ignore
+
+    graphs = pydot.graph_from_dot_file(str(src))
+    if not graphs:
+        raise RuntimeError("pydot failed to parse DOT")
+
+    g: pydot.Dot = graphs[0]
+    # 新しいグラフを同種で作成（有向/無向の別を維持）
+    new = pydot.Dot(graph_type=g.get_type() or "digraph")
+    # グラフ属性を継承
+    for k, v in g.get_attributes().items():
+        new.set(k, v)
+
+    # subgraphs：_graveyard を含む名前は丸ごとスキップ
+    keep_subgraphs = []
+    for sg in g.get_subgraphs():
+        name = (sg.get_name() or "").strip('"')
+        if _GRAVEYARD.search(name):
+            continue
+        keep_subgraphs.append(sg)
+
+    # ノードセット
+    keep_nodes: dict[str, pydot.Node] = {}
+    for n in g.get_nodes():
+        name = (n.get_name() or "").strip('"')
+        # pydot は "node","graph","edge" という擬似ノードを含むことがあるので除外
+        if name in ("node", "graph", "edge"):
+            continue
+        if _GRAVEYARD.search(name):
+            continue
+        keep_nodes[name] = n
+
+    # サブグラフ内のノードも拾う
+    for sg in keep_subgraphs:
+        for n in sg.get_nodes():
+            name = (n.get_name() or "").strip('"')
+            if name in ("node","graph","edge"): continue
+            if _GRAVEYARD.search(name): continue
+            keep_nodes[name] = n
+
+    # 新グラフへノード追加
+    for n in keep_nodes.values():
+        new.add_node(n)
+
+    # エッジ：端点が両方 keep に含まれるものだけ移植
+    kept_edges = 0
+    for e in g.get_edges():
+        s = (e.get_source() or "").strip('"')
+        t = (e.get_destination() or "").strip('"')
+        if _GRAVEYARD.search(s) or _GRAVEYARD.search(t):
+            continue
+        if s in keep_nodes and t in keep_nodes:
+            new.add_edge(e); kept_edges += 1
+    # サブグラフに関しては、「丸ごと除去」の方針なので追加はしない
+
+    # 仕上げ：rankdir=TB を強制（属性上書き）
+    new.set("rankdir", "TB")
+    # 適度に間隔
+    new.set("nodesep", "0.45")
+    new.set("ranksep", "0.70")
+    # 線滑らか
+    new.set("overlap", "false")
+    new.set("splines", "true")
+    new.set("concentrate", "true")
+
+    out = src.with_name(f"._tmp_filtered_{int(time.time())}.dot")
+    new.write(out, format="raw")
+    return out, len(keep_nodes)
+
+def _filter_with_text(src: Path) -> tuple[Path, int]:
+    """
+    pydot が無いときの保守的フィルタ：
+    - subgraph ヘッダに _graveyard を含むブロックだけ {} バランスで削除
+    - 行単位で _graveyard を含むノード/エッジ定義を削除
+    """
+    txt = src.read_text(encoding="utf-8", errors="ignore")
+
+    # subgraph ... { ブロック削除
+    out, i, n = [], 0, len(txt)
+    while i < n:
+        m = re.search(r'\bsubgraph\b[^{]*\{', txt[i:], flags=re.IGNORECASE)
+        if not m:
+            out.append(txt[i:]); break
+        start = i + m.start()
+        brace = i + m.end() - 1  # '{'
+        header = txt[start:brace]
+        if _GRAVEYARD.search(header):
+            depth, j = 1, brace + 1
+            while j < n and depth > 0:
+                c = txt[j]
+                if c == '{': depth += 1
+                elif c == '}': depth -= 1
+                j += 1
+            out.append(txt[i:start])  # ヘッダ前までは保持
+            i = j
+        else:
+            out.append(txt[i:brace+1]); i = brace + 1
+    txt = ''.join(out)
+
+    # 行単位フィルタ（ノード/エッジらしい行のみ）
+    kept, keep_nodes = [], set()
+    for ln in txt.splitlines():
+        if _GRAVEYARD.search(ln):
+            if '->' in ln or '--' in ln or '[' in ln or ']' in ln or ';' in ln:
+                continue  # 定義っぽい行は捨てる
+        kept.append(ln)
+        # 雑にノード名っぽいものを拾って数える（見積もり用）
+        m = re.match(r'\s*"?(?P<id>[\w\.:/\\-]+)"?\s*(\[|;)', ln)
+        if m:
+            keep_nodes.add(m.group("id"))
+    out_txt = "\n".join(kept)
+
+    # graph 冒頭に既定値を注入
+    m = re.search(r'^(digraph|graph)\s+[^{]*\{', out_txt, flags=re.IGNORECASE | re.MULTILINE)
+    if m:
+        i = m.end()
+        inject = (
+            '\n  rankdir=TB;\n'
+            '  graph [overlap=false, splines=true, concentrate=true, nodesep=0.45, ranksep=0.70];\n'
+            '  node  [shape=box, fontsize=10];\n'
+            '  edge  [arrowsize=0.7];\n'
+        )
+        out_txt = out_txt[:i] + inject + out_txt[i:]
+
+    out = src.with_name(f"._tmp_filtered_{int(time.time())}.dot")
+    out.write_text(out_txt, encoding="utf-8")
+    return out, len(keep_nodes)
+
+def make_filtered_dot(src: Path, hide_graveyard: bool) -> tuple[Path, int, bool]:
+    """
+    return: (filtered_dot_path, kept_node_count, used_pydot)
+    """
+    if not hide_graveyard:
+        return src, -1, False
+    try:
+        import pydot  # noqa
+        filtered, n = _filter_with_pydot(src)
+        return filtered, n, True
+    except Exception as e:
+        print(f"! pydot unavailable or failed ({e}); fallback to text filter")
+        filtered, n = _filter_with_text(src)
+        return filtered, n, False
+
+# ============== Build / Convert ==============
 def build_svg_from_dot() -> bool:
     dot_bin = shutil.which("dot")
     dot_file = _find_dot_file()
@@ -186,38 +231,60 @@ def build_svg_from_dot() -> bool:
 
     SVG.parent.mkdir(parents=True, exist_ok=True)
 
-    tmp = sanitize_dot(dot_file)
-    cmd = [dot_bin, "-Tsvg",
-           "-Grankdir=TB", "-Gnodesep=0.45", "-Granksep=0.7",
-           str(tmp), "-o", str(SVG)]
-    try:
+    # フィルタ（_graveyard 完全非表示）
+    filtered_dot, kept_nodes, used_pydot = make_filtered_dot(dot_file, HIDE_GRAVEYARD)
+
+    def _run_dot(src_dot: Path):
+        cmd = [dot_bin, "-Tsvg", "-Grankdir=TB", "-Gnodesep=0.45", "-Granksep=0.70",
+               str(src_dot), "-o", str(SVG)]
         subprocess.run(cmd, check=True)
-        print(f"+ built {SVG} from {dot_file.name} (sanitized + TB{' + hide_graveyard' if HIDE_GRAVEYARD else ''})")
+
+    try:
+        _run_dot(filtered_dot)
+        tag = "hide_graveyard+pydot" if (HIDE_GRAVEYARD and used_pydot) else ("hide_graveyard" if HIDE_GRAVEYARD else "no_hide")
+        print(f"+ built {SVG} from {dot_file.name} ({tag})")
     except subprocess.CalledProcessError as e:
         print(f"! dot failed: {e}")
         return False
     finally:
-        try: tmp.unlink(missing_ok=True)
-        except Exception: pass
+        # 一時ファイルの掃除
+        if filtered_dot is not dot_file:
+            try: filtered_dot.unlink(missing_ok=True)
+            except Exception: pass
 
-    aspect = _svg_aspect(SVG) or 9.99
-    if aspect > 2.6:
-        sfdp = shutil.which("sfdp")
-        if sfdp:
+    # 仕上げの健全性チェック：空や異常に横長なら「非隠蔽」で作り直す
+    aspect = _svg_aspect(SVG)
+    too_tiny = SVG.stat().st_size < 10_000
+    too_wide = (aspect is not None and aspect > 5.0)
+    too_few  = (HIDE_GRAVEYARD and kept_nodes >= 0 and kept_nodes < 5)
+    if too_tiny or too_wide or too_few:
+        if HIDE_GRAVEYARD:
+            print("! filtered graph looks degenerate → rebuilding WITHOUT graveyard")
+            tmp_dot, _, _ = make_filtered_dot(dot_file, hide_graveyard=False)
             try:
-                subprocess.run([sfdp, "-Tsvg", str(dot_file), "-o", str(SVG)], check=True)
-                print("+ rebuilt via sfdp (fallback)")
-                aspect = _svg_aspect(SVG) or aspect
-            except subprocess.CalledProcessError as e:
-                print(f"! sfdp failed: {e}")
-        if aspect > 2.6:
+                _run_dot(tmp_dot)
+                print("+ rebuilt without graveyard filtering")
+            finally:
+                if tmp_dot is not dot_file:
+                    try: tmp_dot.unlink(missing_ok=True)
+                    except Exception: pass
+        else:
+            # 最後の砦：sfdp / twopi フォールバック
+            sfdp = shutil.which("sfdp")
+            if sfdp:
+                try:
+                    subprocess.run([sfdp, "-Tsvg", str(dot_file), "-o", str(SVG)], check=True)
+                    print("+ rebuilt via sfdp (fallback)")
+                except subprocess.CalledProcessError:
+                    pass
             twopi = shutil.which("twopi")
             if twopi:
                 try:
                     subprocess.run([twopi, "-Tsvg", str(dot_file), "-o", str(SVG)], check=True)
                     print("+ rebuilt via twopi (fallback)")
-                except subprocess.CalledProcessError as e:
-                    print(f"! twopi failed: {e}")
+                except subprocess.CalledProcessError:
+                    pass
+
     return True
 
 def svg_to_png():
@@ -243,9 +310,7 @@ def svg_to_png():
         elif tried_cairo:
             print("! PNG looks suspicious and librsvg is unavailable; keeping CairoSVG output")
 
-# ------------------------------------------------------------
-# Context & static sync
-# ------------------------------------------------------------
+# ============== Context & static sync ==============
 def ensure_context():
     CTXDIR.mkdir(parents=True, exist_ok=True)
     if not CTX.exists():
@@ -286,9 +351,7 @@ def sync_to_static():
             for f in files: _safe_copy(sd / f, dst_root / "context" / rel / f)
         print(f"+ synced codex_reports -> {dst_root}")
 
-# ------------------------------------------------------------
-# Main
-# ------------------------------------------------------------
+# ============== Main ==============
 if __name__ == "__main__":
     ensure_context()
     build_svg_from_dot()
