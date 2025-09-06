@@ -10,7 +10,6 @@ from codex.agents.harmonia import rerank_candidates
 FeatureBundle = Dict[str, Any]  # {"context": {...}, "features": {...}} を想定
 StrategyProposal = Any          # pydantic Model でも dict でも扱えるように
 
-
 # ----------------------------------------------------------------------
 # 小道具
 # ----------------------------------------------------------------------
@@ -110,28 +109,14 @@ def run_inventor_and_decide(
     fb: Optional[FeatureBundle] = None,
     symbol: Optional[str] = None,
     timeframe: Optional[str] = None,
-    **_kw: Any,
+    **_: Any,  # ← DAG からの余剰キーワード（conn_str 等）を無視して受ける
 ) -> Dict[str, Any]:
     """
     1) Inventor で提案群を生成
     2) Harmonia で簡易リランク
     3) 最良案から意思決定オブジェクトを合成（size=0 の場合は保険で埋める）
-
-    後方互換ノート:
-    - 旧DAGから `conn_str=...` など未知の kw が来ても無視する。
-    - 旧呼び出しで `input={...}` / `context={...}` / `features={...}` が
-      渡ってきた場合は `fb` を内部で構成して取り込む。
+    ※ DAG から渡ってくる余剰キーワード（例: conn_str など）は **_ で受け取り無視します。
     """
-    # --- 後方互換取り込み（fb が未指定なら kwargs から組み立てを試みる） ---
-    if fb is None:
-        legacy_input = _kw.get("input")
-        legacy_ctx = _kw.get("context")
-        legacy_feat = _kw.get("features")
-        if isinstance(legacy_input, dict):
-            fb = legacy_input  # {"context":..., "features":...} 想定
-        elif isinstance(legacy_ctx, dict) or isinstance(legacy_feat, dict):
-            fb = {"context": legacy_ctx or {}, "features": legacy_feat or {}}
-
     trace_id = str(uuid4())
     bundle = _ensure_bundle(fb)
 
