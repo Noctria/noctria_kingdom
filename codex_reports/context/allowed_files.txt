@@ -1,3 +1,4 @@
-src/plan_data/statistics.py
-src/plan_data/analyzer.py
-noctria_gui/templates/codex.html
+noctria_gui/routes/pdca_api.py
+src/plan_data/noctus_gate.py
+src/plan_data/quality_gate.py
+codex_reports/inventor_suggestions.json
