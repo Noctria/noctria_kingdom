@@ -18,16 +18,25 @@ default_args = {
 
 def _qres_to_dict(obj: Any) -> Dict[str, Any]:
     """
-    QualityResult / pydantic BaseModel / dataclass / dict のいずれにも対応して
-    {passed, reason, details} を取り出すユーティリティ。
+    QualityResult / pydantic BaseModel(v1/v2) / dataclass / dict を許容して
+    {passed, reason, details} を抽出するユーティリティ。
     未提供フィールドは安全なデフォルトを補う。
     """
     if obj is None:
         return {"passed": True, "reason": "", "details": {}}
 
-    # pydantic v2 BaseModel 互換
+    # pydantic v2 BaseModel
     if hasattr(obj, "model_dump") and callable(obj.model_dump):
         d = obj.model_dump()
+        return {
+            "passed": bool(d.get("passed", True)),
+            "reason": d.get("reason", "") or "",
+            "details": d.get("details", {}) or {},
+        }
+
+    # pydantic v1 BaseModel
+    if hasattr(obj, "dict") and callable(getattr(obj, "dict")):
+        d = obj.dict()
         return {
             "passed": bool(d.get("passed", True)),
             "reason": d.get("reason", "") or "",
@@ -46,7 +55,6 @@ def _qres_to_dict(obj: Any) -> Dict[str, Any]:
     passed = getattr(obj, "passed", True)
     reason = getattr(obj, "reason", "") or ""
     details = getattr(obj, "details", {}) or {}
-    # details が dict でない場合の保険
     if not isinstance(details, dict):
         details = {"details": details}
     return {"passed": bool(passed), "reason": reason, "details": details}
@@ -72,8 +80,8 @@ with DAG(
 
         # ✅ 必須最小 context
         context = {
-            "symbol": "USDJPY",   # 必須
-            "timeframe": "M15",   # 必須（必要に応じて変更可）
+            "symbol": "USDJPY",  # 必須
+            "timeframe": "M15",  # 必須（必要に応じて変更可）
         }
 
         # ✅ 品質ゲートで使う値は context ではなく features に置く
@@ -95,9 +103,11 @@ with DAG(
         try:
             # 推奨の契約モデル
             from src.plan_data.contracts import FeatureBundle  # = FeatureBundleV1
+            use_model = True
         except Exception:
-            # フォールバック（環境差対応）
-            from src.plan_data.feature_bundle import FeatureBundle  # 例
+            # venvや依存差分へのフォールバック: 素の dict で渡す
+            FeatureBundle = dict  # type: ignore
+            use_model = False
 
         trace_id = payload["trace_id"]
         feats = payload["features"]
@@ -106,10 +116,13 @@ with DAG(
         ctx_in = payload.get("context") or {}
         ctx = {"symbol": ctx_in["symbol"], "timeframe": ctx_in["timeframe"]}
 
-        # pydantic v2: extra=forbid の想定。df など余計なキーは渡さない
-        fb = FeatureBundle(features=feats, trace_id=trace_id, context=ctx)
+        # pydantic v2: extra=forbid を想定。余計なキーは渡さない
+        fb = FeatureBundle(features=feats, trace_id=trace_id, context=ctx) if use_model else {
+            "features": feats,
+            "trace_id": trace_id,
+            "context": ctx,
+        }
 
-        # 実装に合わせて関数名を調整（evaluate_quality / evaluate / run 等）
         qres = evaluate_quality(fb)
         qd = _qres_to_dict(qres)
 
@@ -140,14 +153,13 @@ with DAG(
                 "details": payload.get("details", {}),
             }
 
+        # 余計な kwargs は渡さない（将来の契約変更に強くする）
         out = _run(
             fb={
                 "trace_id": payload["trace_id"],
                 "features": payload["features"],
                 "context": payload.get("context", {}),
             },
-            conn_str=None,     # NOCTRIA_OBS_MODE=stdout で DB 不要運用可能
-            use_harmonia=True, # rerank 未実装なら内部で LOW アラート & スキップ
         )
         # out 例: {"trace_id": "...", "proposal_summary": [...], "decision": {...}}
         return out
