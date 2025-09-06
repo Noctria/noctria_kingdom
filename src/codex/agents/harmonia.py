@@ -1,4 +1,4 @@
-# codex/agents/harmonia.py
+# src/codex/agents/harmonia.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -176,3 +176,70 @@ def review(inventor_out: InventorOutput) -> ReviewResult:
     """
     harmonia = HarmoniaOrdinis()
     return harmonia.review_structured(inventor_out)
+
+
+# =========================================
+# Harmonia リランク（Lv0: 安全な最小実装）
+# run_inventor_and_decide からの optional import 用
+# =========================================
+def rerank_candidates(
+    candidates: List[Any],
+    context: Optional[Dict[str, Any]] = None,
+    quality: Optional[Dict[str, Any]] = None,
+) -> List[Any]:
+    """
+    候補の簡易リランク関数（pydantic model / dict 両対応）。
+    - 基本スコア: candidate.risk_score（無ければ 0.5）
+    - 減点: quality.missing_ratio（大きいほど減点）、context/quality の data_lag_min（>5 で軽い減点）
+    - ボーナス: intent == 'LONG' に +0.01
+    戻り値はスコア降順の **新しいリスト**（元リストは破壊しない）。
+    """
+    ctx = context or {}
+    q = quality or {}
+
+    def _get(obj: Any, key: str, default: Any = None) -> Any:
+        if hasattr(obj, key):
+            try:
+                return getattr(obj, key)
+            except Exception:
+                pass
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return default
+
+    try:
+        missing = float(_get(q, "missing_ratio", 0.0) or 0.0)
+    except Exception:
+        missing = 0.0
+
+    try:
+        lag = float(_get(ctx, "data_lag_min", _get(q, "data_lag_min", 0.0)) or 0.0)
+    except Exception:
+        lag = 0.0
+
+    scored: List[tuple[float, Any]] = []
+    for c in candidates or []:
+        base = _get(c, "risk_score", 0.5)
+        try:
+            base = float(base if base is not None else 0.5)
+        except Exception:
+            base = 0.5
+
+        intent = (_get(c, "intent", "") or "").upper()
+        penalty = max(0.0, 1.0 - missing * 2.0) * (1.0 if lag <= 5.0 else 0.8)
+        side_bonus = 0.01 if intent == "LONG" else 0.0
+        adj = base * penalty + side_bonus
+
+        # 可能なら派生スコアを上書き付与（失敗しても無視）
+        try:
+            setattr(c, "risk_score", base)
+            setattr(c, "risk_adjusted", adj)
+        except Exception:
+            if isinstance(c, dict):
+                c["risk_score"] = base
+                c["risk_adjusted"] = adj
+
+        scored.append((adj, c))
+
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return [c for _, c in scored]
