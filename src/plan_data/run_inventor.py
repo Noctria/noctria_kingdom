@@ -7,11 +7,6 @@ import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-<<<<<<< HEAD
-=======
-from uuid import uuid4
-import logging
->>>>>>> 963a6ad9 (feat: run_inventor: fallback & observability & param pass)
 
 # =============================================================================
 # Logger（Airflow寄せ。ローカルでも動作）
@@ -180,24 +175,9 @@ def run_inventor_and_decide(
         LOGGER.exception("harmonia.rerank_candidates failed: %s", e)
         ranked = []
 
-<<<<<<< HEAD
     # ---- 3) Decision（size はフォールバックで最終確定）----
     decision = _decision_from_ranked(ranked)
     applied = _fallback_size(decision, ranked)
-=======
-    # 2) 簡易リランク（品質と文脈を与える）
-    quality = {
-        "missing_ratio": float(bundle["context"].get("missing_ratio", 0.0) or 0.0),
-        "data_lag_min": float(bundle["context"].get("data_lag_min", 0.0) or 0.0),
-    }
-    ranked: List[StrategyProposal] = rerank_candidates(
-        proposals,
-        context=bundle.get("context"),
-        quality=quality,
-    )
-    logging.getLogger("airflow.task").info("[Harmonia] reranked %s -> %s top %s", len(proposals or []), len(ranked or []), (getattr(ranked[0], "intent", None) if ranked else None))
-    best = ranked[0] if ranked else None
->>>>>>> 963a6ad9 (feat: run_inventor: fallback & observability & param pass)
 
     # ---- 観測ログ（Airflow ロガー）----
     try:
