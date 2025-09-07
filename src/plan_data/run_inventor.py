@@ -1,168 +1,120 @@
+# src/plan_data/run_inventor.py
 from __future__ import annotations
 
+import json
+import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
 
-from plan_data.inventor import generate_proposals
-from codex.agents.harmonia import rerank_candidates
+# 軽量依存のみ
+try:
+    from plan_data import inventor as inventor_mod  # repo構成に合わせて相対/絶対
+except Exception:
+    from . import inventor as inventor_mod  # fallback
 
-# --- 型ヒント（実体は別モジュール。ここでは厳密さより安全運用を優先）---
-FeatureBundle = Dict[str, Any]  # {"context": {...}, "features": {...}} を想定
-StrategyProposal = Any          # pydantic Model でも dict でも扱えるように
+try:
+    from codex.agents import harmonia as harmonia_mod
+except Exception:
+    # ローカル実行時の簡易相対
+    from ...codex.agents import harmonia as harmonia_mod  # type: ignore
 
-# ----------------------------------------------------------------------
-# 小道具
-# ----------------------------------------------------------------------
-def _obj_get(o: Any, key: str, default: Any = None) -> Any:
-    """dict/オブジェクトの両対応 get"""
-    if isinstance(o, dict):
-        return o.get(key, default)
-    if hasattr(o, key):
-        try:
-            return getattr(o, key)
-        except Exception:
-            return default
-    return default
+LOGGER = logging.getLogger("airflow.task")
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
-def _summarize_proposals(proposals: List[StrategyProposal], k: int = 10) -> List[Dict[str, Any]]:
-    """提案の概要（ログ/返却用に安全化）。pydantic/dict/任意オブジェクト両対応。"""
-    out: List[Dict[str, Any]] = []
-    for p in (proposals or [])[:k]:
-        out.append(
-            {
-                "strategy": _obj_get(p, "strategy") or _obj_get(p, "name"),
-                "intent": _obj_get(p, "intent"),
-                "qty": _obj_get(p, "qty") or _obj_get(p, "qty_raw") or _obj_get(p, "lot"),
-                "score": _obj_get(p, "risk_adjusted") or _obj_get(p, "risk_score"),
-                "id": _obj_get(p, "id"),
-            }
-        )
-    return out
+def _make_trace_id() -> str:
+    return f"invharm-{uuid.uuid4().hex[:12]}"
 
-
-def _fallback_size(decision: Dict[str, Any], proposals: List[StrategyProposal]) -> bool:
+def _fallback_size(decision: Dict[str, Any], ranked: List[Any]) -> bool:
     """
-    サイズが 0 のときの保険。提案の qty_raw / risk_score から最小サイズを与える。
-    返り値: 適用したかどうか
+    size==0 の場合のフォールバック。
+    - qty_raw / risk_score を使って最小ロットを決める簡易実装（重依存なし）
     """
     try:
-        size = float(decision.get("size") or 0.0)
-    except Exception:
-        size = 0.0
+        if (decision.get("size") or 0) > 0:
+            return False
+        top = ranked[0] if ranked else None
+        qty_raw = getattr(top, "qty_raw", None) if top else None
+        risk_score = getattr(top, "risk_score", None) if top else None
 
-    if size > 0:
+        base = 0.01  # 最小ロットのベース
+        bump = 0.0
+        if isinstance(qty_raw, (int, float)):
+            bump += float(qty_raw) * 0.001
+        if isinstance(risk_score, (int, float)):
+            bump += max(0.0, min(float(risk_score), 1.0)) * 0.02
+
+        size = round(base + bump, 3)
+        if size <= 0:
+            size = base
+        decision["size"] = size
+        decision["reason"] = (decision.get("reason") or "") + " | fallback:size"
+        return True
+    except Exception as e:
+        LOGGER.warning("fallback_size failed: %s", e)
         return False
 
-    # 提案から最小限のサイズを拾う
-    best = proposals[0] if proposals else None
-    if not best:
-        decision["size"] = 0.01  # 本当に何も無い最終保険
-        decision["reason"] = (decision.get("reason") or "") + " fallback_size_applied:min"
-        return True
-
-    qty = _obj_get(best, "qty_raw", 0.0) or _obj_get(best, "qty", 0.0)
-    try:
-        qty = float(qty or 0.0)
-    except Exception:
-        qty = 0.0
-
-    if qty <= 0:
-        risk = _obj_get(best, "risk_score", 0.5) or 0.5
-        try:
-            risk = float(risk)
-        except Exception:
-            risk = 0.5
-        qty = max(0.01, 0.1 * risk)
-
-    decision["size"] = float(qty)
-    decision["reason"] = (decision.get("reason") or "") + " fallback_size_applied"
-    return True
-
-
-def _ensure_bundle(fb: Optional[FeatureBundle]) -> FeatureBundle:
+def _decision_from_ranked(ranked: List[Any]) -> Dict[str, Any]:
     """
-    FeatureBundle を安全に用意する。
-    - **FeatureContext のような型（= Any エイリアスの可能性がある）を new しない**
-    - dict で構築し、下流(pydantic)側にパースを任せる
+    最上位提案から超軽量の意思決定を作る。
     """
-    if not fb:
-        fb = {}
-    context = dict(_obj_get(fb, "context", {}) or {})
-    features = dict(_obj_get(fb, "features", {}) or {})
+    if not ranked:
+        return {"side": "FLAT", "size": 0.0, "reason": "no_proposals"}
+    top = ranked[0]
+    side = getattr(top, "intent", "BUY")
+    if side not in ("BUY", "SELL"):
+        side = "BUY"
+    # 初期は 0（フォールバックで上書き想定）
+    return {"side": side, "size": 0.0, "reason": "ranked_top"}
 
-    # デフォルト文脈
+def run_inventor_and_decide(bundle: Optional[Dict[str, Any]] = None, **_) -> Dict[str, Any]:
+    """
+    軽量E2E：Inventor -> Harmonia -> Decision
+    - bundle: {"context": {"symbol": "...", "timeframe": "...", ...}, ...}
+    - 余剰kwargsは受け流し（DAGパラメータの互換確保）
+    """
+    bundle = bundle or {}
+    context = dict(bundle.get("context") or {})
     symbol = context.get("symbol") or "USDJPY"
     timeframe = context.get("timeframe") or "M15"
-    context.setdefault("symbol", symbol)
-    context.setdefault("timeframe", timeframe)
-    context.setdefault("data_lag_min", int(features.get("data_lag_min", 0) or 0))
-    context.setdefault("missing_ratio", float(features.get("missing_ratio", 0.0) or 0.0))
+    trace_id = context.get("trace_id") or _make_trace_id()
+    context.update({"symbol": symbol, "timeframe": timeframe, "trace_id": trace_id})
 
-    return {"context": context, "features": features}
+    # 1) Inventor 提案生成
+    proposals = inventor_mod.generate_proposals(context=context)
 
+    # 2) Harmonia リランク（risk_adjustedなど簡易重み付け）
+    ranked = harmonia_mod.rerank_candidates(proposals, context=context)
 
-# ----------------------------------------------------------------------
-# メイン
-# ----------------------------------------------------------------------
-def run_inventor_and_decide(
-    fb: Optional[FeatureBundle] = None,
-    symbol: Optional[str] = None,
-    timeframe: Optional[str] = None,
-    **_: Any,  # ← DAG からの余剰キーワード（conn_str 等）を無視して受ける
-) -> Dict[str, Any]:
-    """
-    1) Inventor で提案群を生成
-    2) Harmonia で簡易リランク
-    3) 最良案から意思決定オブジェクトを合成（size=0 の場合は保険で埋める）
-    ※ DAG から渡ってくる余剰キーワード（例: conn_str など）は **_ で受け取り無視します。
-    """
-    trace_id = str(uuid4())
-    bundle = _ensure_bundle(fb)
+    # 3) Decision（size はフォールバックで最終確定）
+    decision = _decision_from_ranked(ranked)
+    applied = _fallback_size(decision, ranked)
 
-    # 呼び出し引数で context を上書き可能に
-    if symbol:
-        bundle["context"]["symbol"] = symbol
-    if timeframe:
-        bundle["context"]["timeframe"] = timeframe
-
-    # 1) 提案生成（pydantic/dict どちらでも返ってOK）
-    proposals: List[StrategyProposal] = generate_proposals(bundle)
-
-    # 2) 簡易リランク（品質と文脈を与える）
-    quality = {
-        "missing_ratio": float(bundle["context"].get("missing_ratio", 0.0) or 0.0),
-        "data_lag_min": float(bundle["context"].get("data_lag_min", 0.0) or 0.0),
-    }
-    ranked: List[StrategyProposal] = rerank_candidates(
-        proposals,
-        context=bundle.get("context"),
-        quality=quality,
+    # 観測ログ（Airflow ロガー）
+    LOGGER.info(
+        "[Harmonia] reranked %s -> %s top=%s symbol=%s tf=%s trace=%s",
+        len(proposals or []),
+        len(ranked or []),
+        (getattr(ranked[0], "intent", None) if ranked else None),
+        symbol,
+        timeframe,
+        trace_id,
     )
-    best = ranked[0] if ranked else None
+    if applied:
+        LOGGER.info("[Decision] fallback_size_applied size=%s trace=%s", decision["size"], trace_id)
 
-    # 3) 意思決定オブジェクトを合成
-    strategy_name = None
-    if best is not None:
-        strategy_name = _obj_get(best, "strategy") or _obj_get(best, "name")
-
-    decision: Dict[str, Any] = {
-        "action": "BUY",  # MVP: buy_simple 固定
-        "symbol": bundle["context"].get("symbol", "USDJPY"),
-        "size": float(_obj_get(best, "qty_raw", 0.0) or 0.0),
-        "proposal": {
-            "strategy": strategy_name or f"inventor/buy_simple@{bundle['context']['symbol']}-{bundle['context']['timeframe']}",
-            "side": "BUY",
-            "risk_score": _obj_get(best, "risk_adjusted", _obj_get(best, "risk_score", 0.5)),
+    # 返却（XCom軽量化のため dict のみ）
+    result = {
+        "trace_id": trace_id,
+        "context": {"symbol": symbol, "timeframe": timeframe},
+        "decision": decision,
+        "meta": {
+            "created_at": _now_iso(),
+            "ranked_top_quality": getattr(ranked[0], "quality", None) if ranked else None,
         },
     }
-
-    # size=0 のときは保険で埋める
-    _fallback_size(decision, ranked)
-
-    # 返り値（DAG側表示用）
-    return {
-        "trace_id": trace_id,
-        "proposal_summary": _summarize_proposals(ranked, k=10),
-        "decision": decision,
-    }
+    # デバッグ用に1行 JSON （Airflowログで見やすく）
+    LOGGER.info("Returned value was: %s", json.dumps(result, ensure_ascii=False))
+    return result
