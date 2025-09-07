@@ -77,7 +77,7 @@ with DAG(
         """
         trace_id = str(uuid.uuid4())
 
-        # dag_run.conf の取り込み（Airflow 2系互換：get_current_context を安全に取得）
+        # Airflow 2系互換：get_current_context は operators.python 側にある環境が多い
         try:
             from airflow.operators.python import get_current_context  # type: ignore
             conf: Dict[str, Any] = (get_current_context().get("dag_run").conf) or {}
@@ -161,8 +161,11 @@ with DAG(
             reason = (reason + " | " if reason else "") + "quality_threshold_not_met: " + ", ".join(lack)
 
         # details に実測を明示
-        details.update({"missing_ratio": missing_ratio, "data_lag_min": data_lag_min,
-                        "thresholds": {"missing_max": miss_max, "lag_max_min": lag_max_min}})
+        details.update({
+            "missing_ratio": missing_ratio,
+            "data_lag_min": data_lag_min,
+            "thresholds": {"missing_max": miss_max, "lag_max_min": lag_max_min},
+        })
 
         return {
             "trace_id": trace_id,
