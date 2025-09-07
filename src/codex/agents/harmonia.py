@@ -2,10 +2,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple, Iterable
 import textwrap
+import logging
 
 from .inventor import InventorOutput, PatchSuggestion
+
+# =============================================================================
+# Logger（Airflow タスクロガーに寄せつつ、ローカル単体実行でも動作）
+# =============================================================================
+LOGGER = logging.getLogger("airflow.task")
+if not LOGGER.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
 HARMONIA_SYSTEM_PROMPT = """\
 あなたは Noctria 王国のレビュワーAI『Harmonia Ordinis』です。
@@ -178,59 +189,80 @@ def review(inventor_out: InventorOutput) -> ReviewResult:
     return harmonia.review_structured(inventor_out)
 
 
-# =========================================
+# =============================================================================
 # Harmonia リランク（Lv0: 安全な最小実装）
-# run_inventor_and_decide からの optional import 用
-# =========================================
+#   - run_inventor_and_decide から optional import で呼ばれる想定
+#   - ここでは "context" 情報をログに出す観測性を強化
+# =============================================================================
+def _safe_get(obj: Any, key: str, default: Any = None) -> Any:
+    if hasattr(obj, key):
+        try:
+            return getattr(obj, key)
+        except Exception:
+            pass
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return default
+
+
+def _intent_for_bonus(obj: Any) -> str:
+    """
+    ロング判定のための意図値取得：
+      - 'intent' が 'LONG' / 'SHORT' / 'FLAT' の場合を優先
+      - それ以外に 'BUY' / 'SELL' を許容（Inventor 側ビュー互換）
+    """
+    raw = (_safe_get(obj, "intent", "") or "").upper()
+    if raw in {"LONG", "SHORT", "FLAT"}:
+        return raw
+    if raw == "BUY":
+        return "LONG"
+    if raw == "SELL":
+        return "SHORT"
+    return "FLAT"
+
+
 def rerank_candidates(
-    candidates: List[Any],
+    candidates: List[Any] | Iterable[Any],
     context: Optional[Dict[str, Any]] = None,
     quality: Optional[Dict[str, Any]] = None,
 ) -> List[Any]:
     """
     候補の簡易リランク関数（pydantic model / dict 両対応）。
     - 基本スコア: candidate.risk_score（無ければ 0.5）
-    - 減点: quality.missing_ratio（大きいほど減点）、context/quality の data_lag_min（>5 で軽い減点）
-    - ボーナス: intent == 'LONG' に +0.01
+    - 減点     : quality.missing_ratio（大きいほど減点）、context/quality の data_lag_min（>5 で軽い減点）
+    - ボーナス : intent == 'LONG'（BUY等の同義含む）に +0.01
+    - 観測性   : symbol/timeframe/trace_id とトップの intent を INFO ログ出力
     戻り値はスコア降順の **新しいリスト**（元リストは破壊しない）。
     """
     ctx = context or {}
     q = quality or {}
 
-    def _get(obj: Any, key: str, default: Any = None) -> Any:
-        if hasattr(obj, key):
-            try:
-                return getattr(obj, key)
-            except Exception:
-                pass
-        if isinstance(obj, dict):
-            return obj.get(key, default)
-        return default
-
+    # --- ペナルティ係数の算出 ---
     try:
-        missing = float(_get(q, "missing_ratio", 0.0) or 0.0)
+        missing = float(_safe_get(q, "missing_ratio", 0.0) or 0.0)
     except Exception:
         missing = 0.0
-
     try:
-        lag = float(_get(ctx, "data_lag_min", _get(q, "data_lag_min", 0.0)) or 0.0)
+        lag = float(_safe_get(ctx, "data_lag_min", _safe_get(q, "data_lag_min", 0.0)) or 0.0)
     except Exception:
         lag = 0.0
 
-    scored: List[tuple[float, Any]] = []
-    for c in candidates or []:
-        base = _get(c, "risk_score", 0.5)
+    # --- スコアリング ---
+    scored: List[Tuple[float, Any]] = []
+    for c in list(candidates or []):
+        base = _safe_get(c, "risk_score", 0.5)
         try:
             base = float(base if base is not None else 0.5)
         except Exception:
             base = 0.5
 
-        intent = (_get(c, "intent", "") or "").upper()
+        intent_std = _intent_for_bonus(c)
+        side_bonus = 0.01 if intent_std == "LONG" else 0.0
+        # 欠損が多いほど、ラグが大きいほど減点（0.8〜1.0 の係数イメージ）
         penalty = max(0.0, 1.0 - missing * 2.0) * (1.0 if lag <= 5.0 else 0.8)
-        side_bonus = 0.01 if intent == "LONG" else 0.0
         adj = base * penalty + side_bonus
 
-        # 可能なら派生スコアを上書き付与（失敗しても無視）
+        # 可能なら派生スコアを書き戻し（失敗しても無視）
         try:
             setattr(c, "risk_score", base)
             setattr(c, "risk_adjusted", adj)
@@ -242,4 +274,25 @@ def rerank_candidates(
         scored.append((adj, c))
 
     scored.sort(key=lambda t: t[0], reverse=True)
-    return [c for _, c in scored]
+    ranked = [c for _, c in scored]
+
+    # --- 観測ログ（Airflow ロガー）---
+    try:
+        top_intent = _safe_get(ranked[0], "intent", None) if ranked else None
+        # BUY/SELL を LONG/SHORT へマッピングして統一表示
+        std_top = _intent_for_bonus(ranked[0]) if ranked else None
+        LOGGER.info(
+            "[Harmonia] reranked %s -> %s top=%s(std=%s) symbol=%s tf=%s trace=%s",
+            len(list(candidates or [])),
+            len(ranked),
+            top_intent,
+            std_top,
+            ctx.get("symbol"),
+            ctx.get("timeframe"),
+            ctx.get("trace_id"),
+        )
+    except Exception:
+        # ログで失敗しても本処理は継続
+        pass
+
+    return ranked
