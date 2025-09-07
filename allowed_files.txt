@@ -4,3 +4,4 @@ codex_reports/inventor_suggestions.json
 pytest.ini
 tests/test_decision_fallback_size.py
 tests/test_harmonia_rerank.py
+.github/workflows/pr-inventor-guard.yml
