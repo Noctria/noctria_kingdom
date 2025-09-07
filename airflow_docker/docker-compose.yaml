@@ -46,7 +46,8 @@ x-airflow-common: &airflow-common
     - ./plugins:/opt/airflow/plugins
     - ../src:/opt/airflow/src
     - ../data:/opt/airflow/data
-    - airflow-logs:/opt/airflow/logs         # logs を永続化
+    - ../scripts:/opt/airflow/scripts            # ★ ルート直下 scripts をマウント
+    - airflow-logs:/opt/airflow/logs             # logs を永続化
   depends_on:
     postgres:
       condition: service_healthy
