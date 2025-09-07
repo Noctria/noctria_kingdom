@@ -2,64 +2,38 @@ name: Inventor Decision Guard (PR only)
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [ main ]
     paths:
-      - "src/**"
+      - "**.py"
+      - "tests/**"
+      - "scripts/**"
+      - "pytest.ini"
+      - ".github/workflows/**"
       - "airflow_docker/dags/**"
       - "airflow_docker/scripts/show_last_inventor_decision.py"
       - "airflow_docker/codex_reports/inventor_last.json"
-      - ".github/workflows/inventor-pr-guard.yml"
 
 concurrency:
   group: inventor-guard-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  assert-decision-size:
-    name: Assert decision.size > 0 (if artifact present)
+  smoke:
     runs-on: ubuntu-latest
-
+    if: github.event.pull_request.draft == false
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Show context
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
         run: |
-          echo "PR: ${{ github.event.pull_request.number }}"
-          echo "Branch: ${{ github.head_ref || github.ref_name }}"
-          echo "Repo: ${{ github.repository }}"
-
-      - name: Check artifact presence
-        id: check_artifact
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Run smoke tests
         run: |
-          ART="airflow_docker/codex_reports/inventor_last.json"
-          if [ -f "$ART" ]; then
-            echo "found=true" >> $GITHUB_OUTPUT
-            echo "::notice::Found $ART in repo."
-          else
-            echo "found=false" >> $GITHUB_OUTPUT
-            echo "::notice::No $ART found. This job will skip with success."
-          fi
-
-      - name: Assert decision.size > 0
-        if: steps.check_artifact.outputs.found == 'true'
-        run: |
-          python - <<'PY'
-          import json, sys, pathlib
-          p = pathlib.Path("airflow_docker/codex_reports/inventor_last.json")
-          data = json.loads(p.read_text(encoding="utf-8"))
-          dec = (data.get("decision") or {})
-          size = float(dec.get("size", 0) or 0)
-          if size <= 0:
-              print("ASSERTION FAILED: decision.size <= 0")
-              print(json.dumps(data, ensure_ascii=False, indent=2))
-              sys.exit(1)
-          print("OK: decision.size =", size)
-          print(json.dumps(data, ensure_ascii=False, indent=2))
-          PY
-
-      - name: Soft-skip when artifact missing
-        if: steps.check_artifact.outputs.found != 'true'
-        run: |
-          echo "::notice::Skipping assertion because artifact is not in the PR."
-          echo "Tip: Commit airflow_docker/codex_reports/inventor_last.json from your Airflow run if you want this check to enforce size>0."
+          pytest -q tests/test_decision_fallback_size.py
