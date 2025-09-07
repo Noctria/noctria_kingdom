@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 # =============================================================================
-# Logger（Airflow寄せ。ローカル単体実行でも動作）
+# Logger（Airflow寄せ。ローカルでも動作）
 # =============================================================================
 LOGGER = logging.getLogger("airflow.task")
 if not LOGGER.handlers:
@@ -28,19 +28,19 @@ harmonia_mod = None
 # inventor
 if inventor_mod is None:
     try:
-        # 一般的：src.plan_data
+        # 推奨（srcパス経由）
         from src.plan_data import inventor as inventor_mod  # type: ignore
     except Exception:
         pass
 if inventor_mod is None:
     try:
-        # 利用者既存：plan_data
+        # 既存互換
         from plan_data import inventor as inventor_mod  # type: ignore
     except Exception:
         pass
 if inventor_mod is None:
     try:
-        # 相対（本ファイルと同一パッケージ）
+        # 相対（同一パッケージ）
         from . import inventor as inventor_mod  # type: ignore
     except Exception as e:
         raise ImportError("inventor module could not be imported") from e
@@ -48,18 +48,18 @@ if inventor_mod is None:
 # harmonia
 if harmonia_mod is None:
     try:
-        from codex.agents import harmonia as harmonia_mod  # type: ignore
-    except Exception:
-        pass
-if harmonia_mod is None:
-    try:
+        # 現在の構成は src/codex/agents/harmonia.py
         from src.codex.agents import harmonia as harmonia_mod  # type: ignore
     except Exception:
         pass
 if harmonia_mod is None:
     try:
-        # 相対（plan_data からみて上位に codex/ がある前提）
-        # 実プロジェクトでは src パッケージ化されているため、上記いずれかで解決される想定
+        from codex.agents import harmonia as harmonia_mod  # type: ignore
+    except Exception:
+        pass
+if harmonia_mod is None:
+    try:
+        # 相対フォールバック（プロジェクトによりけり）
         from ...codex.agents import harmonia as harmonia_mod  # type: ignore
     except Exception as e:
         raise ImportError("harmonia module could not be imported") from e
@@ -145,7 +145,8 @@ def run_inventor_and_decide(
     Parameters
     ----------
     bundle : dict | None
-        {"context": {"symbol": "...", "timeframe": "...", "trace_id": "..."}}
+        {"context": {"symbol": "...", "timeframe": "...", "trace_id": "..."},
+         "features": {...} など任意}
     artifact_path : str | None
         結果をJSON保存するパス（任意）。例: "codex_reports/inventor_last.json"
         None の場合は保存しない。
