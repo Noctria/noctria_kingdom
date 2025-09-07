@@ -163,7 +163,7 @@ def run_inventor_and_decide(
 
     # ---- 1) Inventor 提案生成 ----
     try:
-        proposals = inventor_mod.generate_proposals(context=context) or []
+        proposals = inventor_mod.generate_proposals(context) or []
     except Exception as e:
         LOGGER.exception("inventor.generate_proposals failed: %s", e)
         proposals = []
