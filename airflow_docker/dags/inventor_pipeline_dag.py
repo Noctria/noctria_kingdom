@@ -6,9 +6,11 @@ import uuid
 from typing import Any, Dict
 
 from airflow import DAG
-from airflow.decorators import task
+from airflow.decorators import task, get_current_context
 
-
+# =============================================================================
+# 共通ユーティリティ
+# =============================================================================
 default_args = {
     "owner": "noctria",
     "retries": 1,
@@ -26,7 +28,7 @@ def _qres_to_dict(obj: Any) -> Dict[str, Any]:
         return {"passed": True, "reason": "", "details": {}}
 
     # pydantic v2 BaseModel
-    if hasattr(obj, "model_dump") and callable(obj.model_dump):
+    if hasattr(obj, "model_dump") and callable(getattr(obj, "model_dump")):
         d = obj.model_dump()
         return {
             "passed": bool(d.get("passed", True)),
@@ -60,6 +62,12 @@ def _qres_to_dict(obj: Any) -> Dict[str, Any]:
     return {"passed": bool(passed), "reason": reason, "details": details}
 
 
+# =============================================================================
+# DAG 本体
+#  - dag_run.conf によるパラメータ化に対応（symbol / timeframe / bias / missing_ratio 等）
+#  - XCom は軽量 dict のみを返す
+#  - run_inventor_and_decide() へは bundle=... で渡す（fb ではなく）
+# =============================================================================
 with DAG(
     dag_id="inventor_pipeline",
     description="Inventor → (Harmonia) → DecisionEngine minimal pipeline",
@@ -75,20 +83,34 @@ with DAG(
         """
         XCom 膨張を避けるため軽量 dict のみを返す。
         context は FeatureBundleV1 のスキーマ（extra=forbid）に合わせて最小限。
+        dag_run.conf から symbol/timeframe/bias/missing_ratio を受け取って上書き可能。
         """
+        ctx = get_current_context()
+        conf = (ctx.get("dag_run") or {}).conf or {}
+
         trace_id = str(uuid.uuid4())
 
-        # ✅ 必須最小 context
+        # ✅ 必須最小 context（dag_run.conf で上書き可）
         context = {
-            "symbol": "USDJPY",  # 必須
-            "timeframe": "M15",  # 必須（必要に応じて変更可）
+            "symbol": conf.get("symbol", "USDJPY"),
+            "timeframe": conf.get("timeframe", "M15"),
         }
 
-        # ✅ 品質ゲートで使う値は context ではなく features に置く
+        # ✅ 品質ゲートで使う値は context ではなく features に置く（conf で上書き可）
         features = {
-            "bias": 1.0,
-            "missing_ratio": 0.02,  # quality_gate で参照するならここに
+            "bias": float(conf.get("bias", 1.0)),
+            "missing_ratio": float(conf.get("missing_ratio", 0.02)),
+            # 追加の軽量特徴があればここに記載
         }
+
+        # 参考：quality_gate で data_lag_min を使いたい場合は conf から拾って context 側で持つ
+        data_lag_min = conf.get("data_lag_min", None)
+        if data_lag_min is not None:
+            try:
+                context["data_lag_min"] = float(data_lag_min)
+            except Exception:
+                # 無効値は無視（extra=forbid のため最終的には弾く）
+                pass
 
         return {"trace_id": trace_id, "features": features, "context": context}
 
@@ -114,14 +136,20 @@ with DAG(
 
         # ✅ context は必須キーのみ（extra=forbid対策）
         ctx_in = payload.get("context") or {}
-        ctx = {"symbol": ctx_in["symbol"], "timeframe": ctx_in["timeframe"]}
-
-        # pydantic v2: extra=forbid を想定。余計なキーは渡さない
-        fb = FeatureBundle(features=feats, trace_id=trace_id, context=ctx) if use_model else {
-            "features": feats,
-            "trace_id": trace_id,
-            "context": ctx,
+        # 許容キー以外は削って最小化
+        ctx_min: Dict[str, Any] = {
+            "symbol": ctx_in["symbol"],
+            "timeframe": ctx_in["timeframe"],
         }
+        # data_lag_min を使う運用なら、contracts 側で許容されている前提で条件付きで付与
+        if "data_lag_min" in ctx_in:
+            ctx_min["data_lag_min"] = ctx_in["data_lag_min"]
+
+        fb = (
+            FeatureBundle(features=feats, trace_id=trace_id, context=ctx_min)
+            if use_model
+            else {"features": feats, "trace_id": trace_id, "context": ctx_min}
+        )
 
         qres = evaluate_quality(fb)
         qd = _qres_to_dict(qres)
@@ -132,7 +160,7 @@ with DAG(
             "reason": qd["reason"],
             "details": qd["details"],
             "features": feats,
-            "context": ctx,
+            "context": ctx_min,
         }
 
     @task
@@ -153,15 +181,20 @@ with DAG(
                 "details": payload.get("details", {}),
             }
 
-        # 余計な kwargs は渡さない（将来の契約変更に強くする）
+        # NOTE:
+        #   run_inventor_and_decide() は bundle=... を受け取る想定。
+        #   以前の fb=... だと無視されるため、ここで bundle=... に統一。
         out = _run(
-            fb={
-                "trace_id": payload["trace_id"],
-                "features": payload["features"],
+            bundle={
                 "context": payload.get("context", {}),
+                # features は現状 Decision 直結では未使用だが、将来のために含めてOK
+                "features": payload.get("features", {}),
+                "trace_id": payload.get("trace_id"),
             },
+            # 成果物保存を使いたい場合はパスを渡す（例：codex_reports/inventor_last.json）
+            # artifact_path="codex_reports/inventor_last.json",
         )
-        # out 例: {"trace_id": "...", "proposal_summary": [...], "decision": {...}}
+        # out 例: {"trace_id": "...", "context": {...}, "decision": {...}, "meta": {...}}
         return out
 
     # DAG wiring
