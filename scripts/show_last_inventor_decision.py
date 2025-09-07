@@ -1,4 +1,25 @@
-# scripts/show_last_inventor_decision.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+show_last_inventor_decision.py
+
+Airflow の inventor_pipeline の実行ログから直近 Run の結果を取得して表示するユーティリティ。
+CI 強化オプション:
+  - --since-minutes N: 直近 N 分以内の Run だけを対象にする（古い成功を誤検知しない）
+  - --only-passed: スキップではない成功 Run（decision あり）だけを対象
+  - --assert-size-passed: 対象 Run の decision.size > 0 を必須にする（満たさなければ非ゼロ終了）
+  - --emit-metrics: Prometheus 1行メトリクス出力（size, skipped）
+  - --save PATH: 表示した JSON を PATH に保存
+
+想定ログ:
+  /opt/airflow/logs/dag_id=inventor_pipeline/run_id=*/task_id=run_inventor_and_decide/*
+
+抽出対象の行:
+  "Returned value was: <JSON もしくは Python dict repr>"
+
+JSON優先、失敗したら ast.literal_eval で Python dict も受ける。
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -8,131 +29,200 @@ import json
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, Optional, Tuple
 
+LOG_GLOB = "/opt/airflow/logs/dag_id=inventor_pipeline/run_id=*/task_id=run_inventor_and_decide/*"
+RETURNED_PATTERN = re.compile(r"Returned value was:\s+(.*)")
 
-def _parse_returned_value_lines(text: str) -> List[str]:
-    # Airflow のログにある "Returned value was: ..." 行をすべて拾う
-    return [m.strip() for m in re.findall(r"Returned value was:\s+(.*)", text)]
-
-
-def parse_returned_value_from_log(text: str) -> Dict[str, Any]:
-    matches = _parse_returned_value_lines(text)
-    if not matches:
-        raise ValueError("no 'Returned value was:' line found in log")
-    raw = matches[-1]
+def _iso_to_dt(s: str) -> Optional[datetime]:
     try:
-        return json.loads(raw)
+        # "....Z" にも対応
+        s2 = s.replace("Z", "+00:00")
+        return datetime.fromisoformat(s2)
     except Exception:
-        return ast.literal_eval(raw)
+        return None
 
+def _file_mtime_dt(path: str) -> datetime:
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
+    except Exception:
+        return datetime.now(timezone.utc)
 
-def _all_attempt_logs(log_root: str, dag_id: str, task_id: str) -> List[str]:
-    # 例: /opt/airflow/logs/dag_id=inventor_pipeline/run_id=*/task_id=run_inventor_and_decide/*
-    pat = os.path.join(
-        log_root, f"dag_id={dag_id}", "run_id=*",
-        f"task_id={task_id}", "*"
-    )
-    # 新しい順（mtime降順）で返す
-    return sorted(glob.glob(pat), key=os.path.getmtime, reverse=True)
-
-
-def pick_log_path(
-    log_root: str,
-    dag_id: str,
-    task_id: str,
-    run_id: Optional[str],
-    latest_by: str = "mtime",
-    only_passed: bool = False,
-) -> str:
-    """
-    選択ロジック:
-      - run_id 指定あり: その run の最新 attempt ログ
-      - run_id 未指定:
-         - only_passed=False: 全attemptのうち最新
-         - only_passed=True : パースして skipped でないもののうち最新
-    """
-    if run_id:
-        pat = os.path.join(log_root, f"dag_id={dag_id}", f"run_id={run_id}", f"task_id={task_id}", "*")
-        cands = glob.glob(pat)
-        if not cands:
-            raise FileNotFoundError(f"no logs for run_id={run_id}")
-        return max(cands, key=os.path.getmtime) if latest_by == "mtime" else sorted(cands)[-1]
-
-    # run_id未指定 → すべてのattemptログから選ぶ
-    for p in _all_attempt_logs(log_root, dag_id, task_id):
-        if not only_passed:
-            return p  # 一番新しいもの
-        # only_passed: 中身を見て skip でないものを選ぶ
+def _load_result_from_log(path: str) -> Optional[Dict[str, Any]]:
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        m = RETURNED_PATTERN.findall(text)
+        if not m:
+            return None
+        raw = m[-1].strip()
+        # JSON優先
         try:
-            data = parse_returned_value_from_log(open(p, encoding="utf-8").read())
-            if not data.get("skipped"):
-                return p
+            return json.loads(raw)
         except Exception:
-            continue
-    raise FileNotFoundError("no suitable logs found (only_passed requested but none found)")
+            # Python dict repr も許容
+            return ast.literal_eval(raw)
+    except Exception:
+        return None
 
+def _extract_created_at(result: Dict[str, Any]) -> Optional[datetime]:
+    # 新スキーマ: result["meta"]["created_at"]
+    meta = result.get("meta") if isinstance(result, dict) else None
+    if isinstance(meta, dict):
+        ca = meta.get("created_at")
+        if isinstance(ca, str):
+            dt = _iso_to_dt(ca)
+            if dt:
+                return dt
+    # 旧スキーマ: 無し → None
+    return None
+
+def _is_passed_result(result: Dict[str, Any]) -> bool:
+    # スキップRun（quality_gate 未通過）は "skipped": True を持つ
+    if result.get("skipped") is True:
+        return False
+    # decision.size > 0 が成功Runの最低条件
+    dec = result.get("decision") or {}
+    size = dec.get("size", 0.0) if isinstance(dec, dict) else 0.0
+    try:
+        return float(size) > 0.0
+    except Exception:
+        return False
+
+def _format_json(obj: Any) -> str:
+    try:
+        return json.dumps(obj, ensure_ascii=False, indent=2)
+    except Exception:
+        return str(obj)
+
+def _emit_metrics(result: Dict[str, Any]) -> None:
+    """
+    Prometheus 1行メトリクスを標準出力へ。
+    - size: noctria_inventor_decision_size{symbol, timeframe} <value>
+    - skipped: noctria_inventor_decision_skipped{reason="<kind>"} 0|1
+    """
+    ctx = result.get("context") or {}
+    symbol = str(ctx.get("symbol", "UNKNOWN"))
+    timeframe = str(ctx.get("timeframe", "UNKNOWN"))
+
+    dec = result.get("decision") or {}
+    try:
+        size = float(dec.get("size", 0.0))
+    except Exception:
+        size = 0.0
+
+    skipped = bool(result.get("skipped", False))
+    reason = str(result.get("reason", "")) if skipped else ""
+
+    # reason タグはざっくり分類（長くなりすぎないよう簡略）
+    if "quality_gate not passed" in reason:
+        reason_tag = "quality_gate"
+    elif "quality_threshold_not_met" in reason:
+        reason_tag = "quality_gate"
+    elif skipped:
+        reason_tag = "other"
+    else:
+        reason_tag = "ok"
+
+    # size メトリクス
+    print(f'noctria_inventor_decision_size{{symbol="{symbol}",timeframe="{timeframe}"}} {size}')
+    # skipped メトリクス
+    val = 1 if skipped else 0
+    print(f'noctria_inventor_decision_skipped{{reason="{reason_tag}"}} {val}')
+
+def _pick_latest(
+    only_passed: bool,
+    since_minutes: Optional[int],
+) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """
+    ログファイル群から条件に合う「最新」を選ぶ。
+    - only_passed=True の場合は _is_passed_result(result) が True のもののみ
+    - since_minutes が指定されていれば、その時間内に「作成（meta.created_at or ファイル更新時刻）」されたもののみ
+    戻り値: (log_path, result) / 見つからなければ (None, None)
+    """
+    paths = sorted(glob.glob(LOG_GLOB))
+    if not paths:
+        return None, None
+
+    # 新しい順に見る（末尾が新しい想定のため逆順で走査）
+    paths = list(reversed(paths))
+
+    now = datetime.now(timezone.utc)
+    cutoff: Optional[datetime] = None
+    if since_minutes is not None and since_minutes > 0:
+        cutoff = now - timedelta(minutes=since_minutes)
+
+    for p in paths:
+        result = _load_result_from_log(p)
+        if not isinstance(result, dict):
+            continue
+
+        # 時間フィルタ
+        created_at = _extract_created_at(result) or _file_mtime_dt(p)
+        if cutoff and created_at < cutoff:
+            # 期間外（古すぎる）
+            continue
+
+        # 通過/任意のフィルタ
+        if only_passed and not _is_passed_result(result):
+            continue
+
+        return p, result
+
+    return None, None
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Show last inventor decision JSON from Airflow logs.")
-    ap.add_argument("--dag-id", default="inventor_pipeline")
-    ap.add_argument("--task-id", default="run_inventor_and_decide")
-    ap.add_argument("--log-root", default="/opt/airflow/logs")
-    ap.add_argument("--run-id", default=None, help="Specify a run_id (otherwise latest is used)")
-    ap.add_argument("--latest-by", default="mtime", choices=["mtime", "lex"], help="How to choose the latest log")
-    ap.add_argument("--only-passed", action="store_true", help="Pick the latest PASSED run (skip ones are ignored)")
-    ap.add_argument("--save", default=None, help="Save JSON to this path (inside container)")
-    ap.add_argument("--assert-size", action="store_true",
-                    help="Exit non-zero if decision.size <= 0 (fails on skipped)")
-    ap.add_argument("--assert-size-passed", action="store_true",
-                    help="Assert size>0 only when the picked run is not skipped (skipped -> exit 0)")
+    ap = argparse.ArgumentParser(description="Show last Inventor decision (from Airflow logs)")
+    ap.add_argument("--only-passed", action="store_true", help="通過Run（skippedでない & size>0）だけ対象にする")
+    ap.add_argument("--assert-size-passed", action="store_true", help="対象Runで decision.size>0 を必須にする（満たなければ非ゼロ終了）")
+    ap.add_argument("--since-minutes", type=int, default=None, help="直近 N 分の Run だけを対象にする（古い成功の誤検知防止）")
+    ap.add_argument("--emit-metrics", action="store_true", help="Prometheus 1行メトリクスを出力する（size/skipped）")
+    ap.add_argument("--save", type=str, default=None, help="表示した JSON をファイル保存するパス（コンテナ内パス）")
     args = ap.parse_args()
 
-    try:
-        log_path = pick_log_path(
-            log_root=args.log_root,
-            dag_id=args.dag_id,
-            task_id=args.task_id,
-            run_id=args.run_id,
-            latest_by=args.latest_by,
-            only_passed=args.only_passed,
-        )
-        print(f":: file => {log_path}", file=sys.stderr)
+    log_path, result = _pick_latest(only_passed=args.only_passed, since_minutes=args.since_minutes)
 
-        text = open(log_path, encoding="utf-8").read()
-        data = parse_returned_value_from_log(text)
-
-        print(json.dumps(data, ensure_ascii=False, indent=2))
-        if data.get("trace_id"):
-            print(f":: trace_id => {data['trace_id']}", file=sys.stderr)
-
-        if args.save:
-            os.makedirs(os.path.dirname(os.path.abspath(args.save)), exist_ok=True)
-            with open(args.save, "w", encoding="utf-8") as w:
-                json.dump(data, w, ensure_ascii=False, indent=2)
-            print(f":: saved => {args.save}", file=sys.stderr)
-
-        # Assertions
-        if args.assert_size:
-            size = float(((data.get("decision") or {}).get("size", 0) or 0))
-            if not (size > 0):
-                print("ASSERTION FAILED: decision.size <= 0 (or skipped)", file=sys.stderr)
-                return 2
-
+    if not log_path or not isinstance(result, dict):
+        msg = "no logs matched conditions"
         if args.assert_size_passed:
-            if data.get("skipped"):
-                # 最新が skip でも CI は成功扱いにする
-                return 0
-            size = float(((data.get("decision") or {}).get("size", 0) or 0))
-            if not (size > 0):
-                print("ASSERTION FAILED: decision.size <= 0", file=sys.stderr)
-                return 2
-
+            print(f"ERROR: {msg}", file=sys.stderr)
+            return 2
+        print(msg)
         return 0
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        return 1
 
+    print(f":: file => {log_path}")
+
+    # 通常表示
+    # 通過指定時は trace_id があれば出す（ない旧スキーマはスキップ）
+    trace_id = result.get("trace_id")
+    if trace_id:
+        print(f":: trace_id => {trace_id}")
+
+    # JSON本体
+    print(_format_json(result))
+
+    # 保存
+    if args.save:
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(args.save)), exist_ok=True)
+            with open(args.save, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            print(f":: saved => {args.save}")
+        except Exception as e:
+            print(f"WARN: save failed: {e}", file=sys.stderr)
+
+    # メトリクス
+    if args.emit_metrics:
+        _emit_metrics(result)
+
+    # アサート
+    if args.assert_size_passed:
+        if not _is_passed_result(result):
+            print("ASSERTION FAILED: decision.size <= 0 or skipped==True", file=sys.stderr)
+            return 1
+
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
