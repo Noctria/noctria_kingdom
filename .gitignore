@@ -60,3 +60,4 @@ codex_reports/patches/
 logs/
 *.jsonl
 !codex_reports/decision_registry.jsonl
+*.bak
