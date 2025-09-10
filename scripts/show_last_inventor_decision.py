@@ -11,6 +11,7 @@ Airflow の inventor_pipeline 実行ログから直近 Run の結果を抽出し
   - --assert-size-passed      : 対象 Run の decision.size>0 を必須に（満たさなければ非ゼロ終了）
   - --emit-metrics            : Prometheus 1行メトリクス（size / skipped）を標準出力へ
   - --save PATH               : 表示した JSON をファイル保存（コンテナ内パス）
+  - --json                    : 機械可読な JSON を「のみ」標準出力（見つからなければ {} を出力し exit 0）
 
 抽出対象のログ:
   /opt/airflow/logs/dag_id=inventor_pipeline/run_id=*/task_id=run_inventor_and_decide/*
@@ -181,10 +182,30 @@ def main() -> int:
                     help="Prometheus 1行メトリクスを出力する（size/skipped）")
     ap.add_argument("--save", type=str, default=None,
                     help="表示した JSON をファイル保存するパス（コンテナ内パス）")
+    # 追加: 機械可読JSONのみ吐く
+    ap.add_argument("--json", action="store_true",
+                    help="機械可読JSONを標準出力（見つからなければ {} を出力し、常に exit 0）")
     args = ap.parse_args()
 
     log_path, result = _pick_latest(only_passed=args.only_passed, since_minutes=args.since_minutes)
 
+    # --json 指定時は“純粋な JSON だけ”を出力し、常に exit 0
+    if args.json:
+        payload: Dict[str, Any] = result if isinstance(result, dict) else {}
+        # 保存オプションがあれば保存（エラーでも終了コードは 0 にする）
+        if args.save:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(args.save)), exist_ok=True)
+                with open(args.save, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                # JSON モードでは失敗しても終了コード 0 を維持
+                print(f"::warning:: save failed: {e}", file=sys.stderr)
+        # 純粋な JSON を標準出力
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    # ここから下は従来表示（人間向け）モード
     if not log_path or not isinstance(result, dict):
         msg = "ERROR: no logs matched conditions"
         if args.assert_size_passed:
