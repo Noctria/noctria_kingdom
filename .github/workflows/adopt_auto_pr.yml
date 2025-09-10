@@ -1,0 +1,92 @@
+name: Adopt Branch → Auto PR
+
+on:
+  push:
+    branches:
+      - "adopt/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (current branch)
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Collect last inventor decision (JSON, tolerant)
+        run: |
+          mkdir -p codex_reports
+          python - <<'PY' || true
+import json, subprocess, sys, pathlib
+out = pathlib.Path("codex_reports/last_inventor.json")
+try:
+    res = subprocess.run(
+        ["python", "scripts/show_last_inventor_decision.py", "--json"],
+        check=True, capture_output=True, text=True
+    )
+    data = res.stdout.strip() or "{}"
+except Exception:
+    data = "{}"
+out.write_text(data, encoding="utf-8")
+print("Wrote", out, "bytes:", len(data))
+PY
+
+      - name: Build PR body
+        id: body
+        run: |
+          echo "# Adopt Decision — $(date -u +"%Y-%m-%d %H:%M:%S UTC")" > pr_body.md
+          echo "" >> pr_body.md
+          echo "Source branch: \`${GITHUB_REF_NAME}\`" >> pr_body.md
+          echo "" >> pr_body.md
+          echo "## Last Inventor Decision (JSON)" >> pr_body.md
+          echo "" >> pr_body.md
+          echo "\`\`\`json" >> pr_body.md
+          cat codex_reports/last_inventor.json >> pr_body.md || echo "{}" >> pr_body.md
+          echo "\`\`\`" >> pr_body.md
+          echo "PR body prepared:"
+          wc -c pr_body.md
+
+      - name: Install GitHub CLI
+        uses: cli/cli@v2
+        with:
+          version: latest
+
+      - name: Create PR if not exists (to main)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          HEAD_BRANCH="${GITHUB_REF_NAME}"
+          BASE_BRANCH="main"
+
+          # If a PR from this branch already exists, skip creation.
+          if gh pr list --head "${HEAD_BRANCH}" --base "${BASE_BRANCH}" --state open --json number --jq '.[0].number' | grep -qE '^[0-9]+$'; then
+            echo "PR already exists for ${HEAD_BRANCH} → ${BASE_BRANCH}. Skipping."
+            exit 0
+          fi
+
+          TITLE="[Adopt] ${HEAD_BRANCH} → ${BASE_BRANCH}"
+          gh pr create \
+            --title "${TITLE}" \
+            --base "${BASE_BRANCH}" \
+            --head "${HEAD_BRANCH}" \
+            --body-file pr_body.md || {
+              echo "gh pr create failed."
+              exit 1
+            }
+
+      - name: Summary
+        run: |
+          echo "Created/verified PR for \`${GITHUB_REF_NAME}\` → \`main\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Body preview:" >> $GITHUB_STEP_SUMMARY
+          head -n 50 pr_body.md >> $GITHUB_STEP_SUMMARY
