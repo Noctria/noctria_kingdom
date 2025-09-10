@@ -59,3 +59,4 @@ codex_reports/pytest_summary.md
 codex_reports/patches/
 logs/
 *.jsonl
+!codex_reports/decision_registry.jsonl
