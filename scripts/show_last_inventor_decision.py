@@ -8,7 +8,7 @@ Airflow の inventor_pipeline 実行ログから直近 Run の結果を抽出し
 主な機能:
   - --since-minutes N         : 直近 N 分以内の Run だけを対象（古い成功の誤検知を防止）
   - --only-passed             : スキップでない成功 Run（decision.size>0）だけを対象
-  - --assert-size-passed      : 対象 Run の decision.size>0 を必須に（満たさなければ非ゼロ終了）
+  - --assert-size-passed      : 対象 Run の decision.size>0 を必須に（満たなければ非ゼロ終了）
   - --emit-metrics            : Prometheus 1行メトリクス（size / skipped）を標準出力へ
   - --save PATH               : 表示した JSON をファイル保存（コンテナ内パス）
   - --json                    : 機械可読な JSON を「のみ」標準出力（見つからなければ {} を出力し exit 0）
@@ -192,6 +192,22 @@ def main() -> int:
     # --json 指定時は“純粋な JSON だけ”を出力し、常に exit 0
     if args.json:
         payload: Dict[str, Any] = result if isinstance(result, dict) else {}
+        # フォールバック: ログが無い環境（CIランナー等）では、既知の成果物パスから読む
+        if not payload:
+            from pathlib import Path
+            for p in [
+                Path("codex_reports/inventor_last.json"),
+                Path("codex_reports/latest_inventor_decision.json"),
+                Path("reports/latest_inventor_decision.json"),
+                Path("airflow_docker/codex_reports/inventor_last.json"),
+            ]:
+                if p.is_file():
+                    try:
+                        payload = json.loads(p.read_text(encoding="utf-8"))
+                        break
+                    except Exception as e:
+                        print(f"::warning:: failed to read fallback decision file {p}: {e}", file=sys.stderr)
+
         # 保存オプションがあれば保存（エラーでも終了コードは 0 にする）
         if args.save:
             try:

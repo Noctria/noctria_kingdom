@@ -9,3 +9,4 @@ tests/test_harmonia_rerank.py
 scripts/pdca_agent.py
 codex_reports/decision_registry.jsonl
 scripts/show_last_inventor_decision.py
+codex_reports/inventor_last.json

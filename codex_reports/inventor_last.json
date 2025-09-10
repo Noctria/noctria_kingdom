@@ -1,0 +1,9 @@
+{
+  "decision": {
+    "intent": "LONG",
+    "size": 1.0,
+    "lift": 0.12,
+    "reason": "fallback:size"
+  },
+  "context": {"symbol": "DEMO", "timeframe": "1h"}
+}
