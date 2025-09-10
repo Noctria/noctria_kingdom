@@ -1,0 +1,54 @@
+name: PDCA Agent (recheck & adopt)
+
+on:
+  workflow_dispatch:
+    inputs:
+      auto_adopt:
+        description: "Adopt automatically if checks pass"
+        required: false
+        default: "false"
+      dryrun:
+        description: "Dry-run (no PR/push)"
+        required: false
+        default: "true"
+  schedule:
+    - cron: "15 6 * * *"  # 毎日 15:06 JST相当（例）
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pdca-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.pull_request.draft != true }} # 念のため
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Sanity (light tests)
+        run: |
+          pytest -q tests/test_decision_fallback_size.py
+
+      - name: Run PDCA agent (recheck & possibly adopt)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PDCA_DRYRUN: ${{ github.event.inputs.dryrun || 'true' }}
+          PDCA_AUTO_ADOPT: ${{ github.event.inputs.auto_adopt || 'false' }}
+          PDCA_MIN_LIFT: "0.0"        # 戦略採用の最小リフト（必要なら調整）
+          PDCA_REQUIRE_TESTS: "true"  # 追加の内部チェックを要求
+        run: |
+          python scripts/pdca_agent.py
