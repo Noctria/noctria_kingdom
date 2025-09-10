@@ -1,12 +1,13 @@
 # codex/tools/review_pipeline.py
 # -*- coding: utf-8 -*-
 """
-📦 Codex Review Pipeline — v3.1 (Harmonia Ordinis + Inventor Scriptus)
+📦 Codex Review Pipeline — v3.2 (Harmonia Ordinis + Inventor Scriptus)
 - pytest JSON を解析して Inventor/Harmonia の Markdown を生成
 - Inventor の PatchSuggestion（pseudo_diff）を .patch に書き出し、索引を作成
-- 🆕 外部提案ファイル `codex_reports/inventor_suggestions.json`（before/after または unified diff `patch`）にも対応
-- 🆕 pytest のサマリを `codex_reports/pytest_summary.md` にも保存（GUI表示用）
-- 🆕 Harmonia を `NOCTRIA_HARMONIA_MODE` で切替（offline | api | auto）
+- 外部提案ファイル `codex_reports/inventor_suggestions.json`（before/after または unified diff `patch`）にも対応
+- pytest のサマリを `codex_reports/pytest_summary.md` にも保存（GUI表示用）
+- Harmonia を `NOCTRIA_HARMONIA_MODE` で切替（offline | api | auto）
+- 🆕 Git ワークツリー差分から直接 .patch を出力する `save_patch_from_git_diff()` を追加
 
 入出力（標準配置）:
   PROJECT_ROOT/
@@ -16,7 +17,7 @@
       inventor_suggestions.md         ... Inventor（本文）
       harmonia_review.md              ... Harmonia（本文）
       pytest_summary.md               ... Pytestサマリ（HUD表示用）
-      inventor_suggestions.json       ... 🆕 外部提案（任意）
+      inventor_suggestions.json       ... 外部提案（任意）
       patches/
         0001_xxx_YYYYmmdd-HHMMSS.patch
         0002_yyy_YYYYmmdd-HHMMSS.patch
@@ -47,7 +48,7 @@ from __future__ import annotations
 import sys as _sys
 from pathlib import Path as _P
 
-_ROOT = _P(__file__).resolve().parents[2]
+_ROOT = _P(__file__).resolve().parents[2]  # repo/（典型配置: repo/codex/tools/review_pipeline.py）
 for _p in (_ROOT, _ROOT / "src"):
     _sp = str(_p)
     if _sp not in _sys.path:
@@ -58,6 +59,7 @@ import json
 import os
 import re
 import difflib
+import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
@@ -67,7 +69,7 @@ from codex.tools.json_parse import load_json, build_pytest_result_for_inventor
 from codex.agents.inventor import propose_fixes, InventorOutput, PatchSuggestion
 from codex.agents.harmonia import review, ReviewResult  # ← API版レビュー
 
-# 🆕 オフライン Harmonia（存在しなければ後述のフォールバックを使用）
+# オフライン Harmonia（存在しなければ後述のフォールバックを使用）
 try:
     from codex.agents.harmonia_offline import generate_offline_review  # type: ignore
 except Exception:
@@ -76,7 +78,23 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
+# まず既存の推定を採用
 ROOT = Path(__file__).resolve().parents[2]
+
+# 可能なら Git 上のルートを優先して利用（src/ 下に移動しても破綻しないように）
+def _git_repo_root_fallback() -> Path:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            check=True, capture_output=True, text=True, cwd=str(ROOT)
+        ).stdout.strip()
+        if out:
+            return Path(out)
+    except Exception:
+        pass
+    return ROOT
+
+ROOT = _git_repo_root_fallback()
 REPORTS_DIR = ROOT / "codex_reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -125,7 +143,6 @@ def _extract_summary_and_failed_tests(data: Dict[str, Any]) -> Tuple[Dict[str, i
     failed_tests: List[Dict[str, Any]] = []
     for t in tests:
         if (t.get("outcome") or "").lower() == "failed":
-            # 可能なら longrepr / message を拾う
             msg = ""
             for phase in ("setup", "call", "teardown"):
                 phase_obj = t.get(phase)
@@ -351,7 +368,7 @@ def write_harmonia_markdown(
 
 
 # ---------------------------------------------------------------------------
-# Patch writer & index
+# Patch writer & index（Inventor/外部JSON）
 # ---------------------------------------------------------------------------
 def _write_single_patch(seq: int, suggestion: PatchSuggestion) -> Optional[Path]:
     """
@@ -489,6 +506,139 @@ def generate_patches_from_external() -> List[Tuple[Path, Dict[str, Any]]]:
 
 
 # ---------------------------------------------------------------------------
+# Git-diff → patch 出力（🆕 追加）
+# ---------------------------------------------------------------------------
+def _run(cmd: List[str], cwd: Optional[Path] = None, allow_fail: bool = False) -> str:
+    try:
+        res = subprocess.run(
+            cmd, cwd=str(cwd or ROOT), check=not allow_fail, capture_output=True, text=True
+        )
+        return res.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        if allow_fail:
+            return (e.stdout or "").strip()
+        raise
+
+
+def _git_short_sha(ref: str = "HEAD") -> str:
+    try:
+        return _run(["git", "rev-parse", "--short", ref])
+    except Exception:
+        return "HEAD"
+
+
+def _git_stat_summary_for_worktree() -> tuple[int, int, int]:
+    """
+    現在のワークツリー（staged + unstaged）の変更サマリを返す。
+    """
+    out = _run(["git", "diff", "--numstat"], allow_fail=True)
+    out2 = _run(["git", "diff", "--numstat", "--cached"], allow_fail=True)
+    lines = []
+    if out:
+        lines.extend(out.splitlines())
+    if out2:
+        lines.extend(out2.splitlines())
+    files, ins, dels = 0, 0, 0
+    for ln in lines:
+        m = re.match(r"(\d+|-)\t(\d+|-)\t(.+)", ln)
+        if not m:
+            continue
+        i = 0 if m.group(1) == "-" else int(m.group(1))
+        d = 0 if m.group(2) == "-" else int(m.group(2))
+        files += 1
+        ins += i
+        dels += d
+    return files, ins, dels
+
+
+def _current_state_id() -> str:
+    head = _git_short_sha("HEAD")
+    dirty = _run(["git", "status", "--porcelain"], allow_fail=True)
+    return f"{head}{'-dirty' if dirty else ''}"
+
+
+def save_patch_from_git_diff(
+    title: str,
+    *,
+    author: str = "Inventor Scriptus",
+    intent: str = "codex-change",
+    notes: str = "",
+    include_unstaged: bool = True,
+    include_staged: bool = True,
+) -> Dict[str, Any]:
+    """
+    現在のワークツリー差分（unstaged/staged）を結合し、.patch として保存して索引を更新。
+
+    Returns: {
+        "ok": bool,
+        "reason": None|str,
+        "patch_path": str|None,          # repo-root 相対
+        "files_changed": int,
+        "insertions": int,
+        "deletions": int,
+        "head_state": str,               # e.g. 'a1b2c3d-dirty'
+        "base_commit": str,              # short SHA
+        "meta": { ... }                  # 同上フィールドを含むメタ情報
+    }
+    """
+    parts: List[str] = []
+    if include_unstaged:
+        d1 = _run(["git", "diff", "--patch"], allow_fail=True)
+        if d1:
+            parts.append(d1)
+    if include_staged:
+        d2 = _run(["git", "diff", "--patch", "--cached"], allow_fail=True)
+        if d2:
+            parts.append(d2)
+
+    if not parts:
+        return {"ok": False, "reason": "no-changes", "patch_path": None, "files_changed": 0,
+                "insertions": 0, "deletions": 0, "head_state": _current_state_id(),
+                "base_commit": _git_short_sha("HEAD"), "meta": {}}
+
+    unified = "\n".join(parts).strip()
+    if not unified.endswith("\n"):
+        unified += "\n"
+
+    seq = _next_seq_num()
+    ts = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    short = _git_short_sha("HEAD")
+    fname = f"{seq:04d}_{_slugify(title)}_{ts}.patch"
+    out_path = PATCHES_DIR / fname
+    out_path.write_text(unified, encoding="utf-8")
+
+    files, ins, dels = _git_stat_summary_for_worktree()
+    meta = {
+        "title": title,
+        "author": author,
+        "intent": intent,
+        "notes": notes,
+        "files_changed": files,
+        "insertions": ins,
+        "deletions": dels,
+        "head_state": _current_state_id(),
+        "base_commit": short,
+        "patch_path": str(out_path.relative_to(ROOT)),
+        "created_at": _now_iso(),
+    }
+
+    # 索引を再生成
+    write_patches_index()
+
+    return {
+        "ok": True,
+        "reason": None,
+        "patch_path": meta["patch_path"],
+        "files_changed": files,
+        "insertions": ins,
+        "deletions": dels,
+        "head_state": meta["head_state"],
+        "base_commit": short,
+        "meta": meta,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
 def _build_inventor_from_json(py_data: Dict[str, Any]) -> InventorOutput:
@@ -510,7 +660,7 @@ def main() -> int:
     - 外部提案 inventor_suggestions.json があれば、それも .patch 生成
     - 失敗が無い場合も、空の提案と軽いコメントでファイルを出力（GUI 側で常に閲覧可能）
     - pytest summary を pytest_summary.md に保存
-    - 🆕 Harmonia を `NOCTRIA_HARMONIA_MODE` で切替（offline | api | auto）
+    - Harmonia を `NOCTRIA_HARMONIA_MODE` で切替（offline | api | auto）
     """
     # ---- mode resolution ----------------------------------------------------
     mode = (os.getenv("NOCTRIA_HARMONIA_MODE") or "offline").lower()  # default offline
