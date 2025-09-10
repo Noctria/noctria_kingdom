@@ -1,0 +1,41 @@
+name: Codex Quality Gate
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps (light)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest ruff mypy
+
+      - name: Ruff (lint)
+        run: |
+          ruff check .
+
+      - name: Mypy (lenient)
+        run: |
+          mypy --ignore-missing-imports --install-types --non-interactive .
+
+      - name: Pytest (light / inventor-only)
+        env:
+          PYTHONWARNINGS: "ignore::DeprecationWarning"
+        run: |
+          # 想定: 軽量テスト向け設定は pytest.ini 側で制御済み
+          pytest -q
