@@ -88,8 +88,9 @@ def test_fallback_size_reason_matches_implementation():
     を厳密一致で検証する。
     """
     decision = _get_latest_decision()
+    # データがないCI環境では軽量テストとしてSKIP
     if not isinstance(decision, dict) or not decision.get("reason"):
-        import pytest
         pytest.skip("no decision.reason available in CI (skipping lightweight test)")
+
     # 実装仕様に合わせて厳密一致
     assert decision["reason"] == "fallback:size", f"unexpected reason: {decision.get('reason')!r}"
