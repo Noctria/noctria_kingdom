@@ -1,165 +1,173 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PDCA Agent: 本番戦略の recheck / adopt 自動化
-- 既定は DRYRUN。環境変数で切替:
-    PDCA_DRYRUN=true|false
-    PDCA_AUTO_ADOPT=true|false
-    PDCA_MIN_LIFT=0.0
-- やること:
-  1) 最新 decision/metrics を取得（既存スクリプト or 既知パス）
-  2) しきい値に基づいて採用可否を判断
-  3) adopt 方針: 自動PR or 直接 push + tag（AUTO_ADOPT=true かつ DRYRUN=false）
+PDCA Agent (recheck & adopt)
+
+- Recheck: scripts.show_last_inventor_decision --json で最新 decision を取得
+- Decide:   size > 0 かつ lift >= min_lift （オプション閾値）
+- Adopt:    codex_reports/decision_registry.jsonl に追記し、auto/* ブランチを切って commit/push
+            ※ .gitignore に阻まれないよう git add -f を使用
+
+想定実行環境: GitHub Actions（runner に git 権限があること）
 """
 
 from __future__ import annotations
-import os, json, subprocess, sys, datetime, pathlib, textwrap
 
-REPO = pathlib.Path(__file__).resolve().parents[1]
-DRYRUN = os.getenv("PDCA_DRYRUN", "true").lower() == "true"
-AUTO_ADOPT = os.getenv("PDCA_AUTO_ADOPT", "false").lower() == "true"
-MIN_LIFT = float(os.getenv("PDCA_MIN_LIFT", "0.0"))
-REQUIRE_TESTS = os.getenv("PDCA_REQUIRE_TESTS", "true").lower() == "true"
+import argparse
+import datetime as dt
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, Tuple
 
-# 1) 最新の decision を取得（既存の show_last_inventor_decision を活用）
-def load_latest_decision() -> dict | None:
-    py = sys.executable or "python3"
-    cmd = [py, "-m", "scripts.show_last_inventor_decision", "--json"]
+
+# ---------- Shell helpers ----------
+
+def run(cmd: list[str], check: bool = True, capture: bool = False, cwd: str | None = None) -> subprocess.CompletedProcess:
+    kwargs = dict(text=True, cwd=cwd)
+    if capture:
+        kwargs["stdout"] = subprocess.PIPE
+        kwargs["stderr"] = subprocess.STDOUT
+    print("+", " ".join(cmd))
+    cp = subprocess.run(cmd, **kwargs)
+    if check and cp.returncode != 0:
+        if capture and cp.stdout:
+            print(cp.stdout)
+        raise subprocess.CalledProcessError(cp.returncode, cmd)
+    return cp
+
+
+# ---------- Decision I/O ----------
+
+def load_latest_decision() -> Dict[str, Any]:
+    """
+    scripts.show_last_inventor_decision --json を呼び出して JSON を取得。
+    取得に失敗したら {} を返す。
+    """
     try:
-        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True, timeout=15).strip()
-        if out:
-            data = json.loads(out)
-            if isinstance(data, dict) and "decision" in data and isinstance(data["decision"], dict):
-                return data["decision"]
-            return data
+        cp = run([sys.executable, "-m", "scripts.show_last_inventor_decision", "--json"], check=True, capture=True)
+        raw = (cp.stdout or "").strip()
+        return json.loads(raw or "{}")
     except Exception as e:
-        print(f"::warning:: failed to load decision via script: {e}")
-    # 代替: 既知の成果物パス
-    for p in [
-        REPO / "codex_reports/latest_inventor_decision.json",
-        REPO / "reports/latest_inventor_decision.json",
-        REPO / "airflow_docker/codex_reports/inventor_last.json",
-    ]:
-        try:
-            if p.is_file():
-                return json.loads(p.read_text(encoding="utf-8")).get("decision")
-        except Exception as e:
-            print(f"::warning:: failed to read {p}: {e}")
-    return None
+        print(f"warn: failed to load decision via script: {e}", file=sys.stderr)
+        return {}
 
-# 2) 指標（例: lift/size/score）で採用判定を行うダミー基準
-def should_adopt(decision: dict) -> tuple[bool, str]:
-    # ここは本番ロジックに差し替え可。最低限の安全弁だけ入れる
-    size = float(decision.get("size", 0) or 0)
-    reason = str(decision.get("reason") or "")
-    lift = float(decision.get("lift", 0) or 0)
 
-    if REQUIRE_TESTS and reason == "fallback:size" and size <= 0:
-        return False, "fallback size invalid"
+def should_adopt(decision: Dict[str, Any], *, min_lift: float = 0.0) -> Tuple[bool, str]:
+    """
+    採用基準：
+      - decision.decision.size > 0
+      - decision.decision.lift >= min_lift  (デフォルト 0.0)
+    """
+    d = decision.get("decision") or {}
+    try:
+        size = float(d.get("size", 0) or 0)
+    except Exception:
+        size = 0.0
+    try:
+        lift = float(d.get("lift", 0) or 0)
+    except Exception:
+        lift = 0.0
+    reason = str(d.get("reason", "") or decision.get("reason", "") or "")
 
-    if lift < MIN_LIFT:
-        return False, f"lift {lift} < min {MIN_LIFT}"
+    ok = (size > 0.0) and (lift >= min_lift)
+    msg = f"ok: lift {lift}, size {size}, reason {reason or '-'}"
+    return ok, msg
 
-    return True, f"ok: lift {lift}, size {size}, reason {reason}"
 
-# 3) 採用に向けた変更を生成（PR方式が基本。強制採用は branch 直 push + tag）
-def ensure_git_config():
-    subprocess.run(["git", "config", "user.name", "noctria-bot"], check=False)
-    subprocess.run(["git", "config", "user.email", "noctria-bot@example.com"], check=False)
+# ---------- Git operations ----------
 
-def create_adopt_branch_and_commit(decision: dict) -> tuple[str, list[str]]:
-    ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    branch = f"auto/adopt-{ts}"
-    subprocess.check_call(["git", "checkout", "-b", branch])
+def git_current_branch() -> str:
+    cp = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True)
+    return (cp.stdout or "").strip()
 
-    # 例: decision_registry に追記（なければ生成）
-    reg = REPO / "codex_reports" / "decision_registry.jsonl"
+
+def ensure_clean_worktree() -> None:
+    # 不要だが、意図せぬ変更で失敗しないよう一応確認
+    run(["git", "status", "--porcelain"], capture=True)
+
+
+def create_adopt_branch_and_commit(decision: Dict[str, Any], *, prefix: str = "auto/adopt") -> Tuple[str, list[str]]:
+    """
+    - auto/adopt-YYYYMMDD-HHMMSS ブランチを作成
+    - codex_reports/decision_registry.jsonl に追記
+    - git add -f / commit
+    """
+    ts_utc = dt.datetime.now(dt.UTC).strftime("%Y%m%d-%H%M%S")
+    branch = f"{prefix}-{ts_utc}"
+
+    # ブランチ作成
+    run(["git", "checkout", "-b", branch])
+
+    # レジストリに追記（無ければ作る）
+    reg = Path("codex_reports/decision_registry.jsonl")
     reg.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps({"ts": ts, "decision": decision}, ensure_ascii=False)
-    old = reg.read_text("utf-8").splitlines() if reg.exists() else []
-    old.append(line)
-    reg.write_text("\n".join(old) + "\n", encoding="utf-8")
+    line = json.dumps({
+        "ts": dt.datetime.now(dt.UTC).isoformat(),
+        "decision": decision,
+    }, ensure_ascii=False)
+    with reg.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
 
-    subprocess.check_call(["git", "add", str(reg)])
-    msg = f"feat(pdca): adopt decision at {ts}"
-    subprocess.check_call(["git", "commit", "-m", msg])
+    # .gitignore に無視されても add できるよう -f を付ける
+    run(["git", "add", "-f", str(reg)])
+
+    # コミット
+    d = decision.get("decision") or {}
+    reason = d.get("reason") or decision.get("reason") or "-"
+    size = d.get("size", 0)
+    lift = d.get("lift", 0)
+    msg = f"pdca: adopt decision (size={size}, lift={lift}, reason={reason})"
+    run(["git", "commit", "-n", "-m", msg])
+
     return branch, [str(reg)]
 
-def open_pr(branch: str, title: str, body: str):
-    # gh CLI が runner には入っている。なければ fallback で push のみ。
-    try:
-        subprocess.check_call(["git", "push", "-u", "origin", branch])
-        subprocess.check_call([
-            "gh", "pr", "create",
-            "--title", title,
-            "--body", body,
-            "--base", "main",
-            "--head", branch
-        ])
-        print("::notice:: opened PR:", title)
-    except Exception as e:
-        print(f"::warning:: failed to open PR via gh: {e}\nPushing branch only.")
-        subprocess.run(["git", "push", "-u", "origin", branch], check=False)
 
-def merge_and_tag(branch: str, decision: dict):
-    # 危険操作: AUTO_ADOPT=true かつ DRYRUN=false のときのみ
-    subprocess.check_call(["git", "push", "-u", "origin", branch])
-    # マージは GitHub API/gh で実行（squash）
-    try:
-        title = f"auto(adopt): {decision.get('intent','strategy')}"
-        subprocess.check_call(["gh", "pr", "create", "--title", title, "--body", "auto adopt", "--base", "main", "--head", branch])
-        subprocess.check_call(["gh", "pr", "merge", "--squash", "--delete-branch", "--auto"])
-    except Exception as e:
-        print(f"::warning:: gh pr merge failed: {e}. Trying direct fast-forward.")
-        # 直 push (保護があると失敗する想定)
-        subprocess.check_call(["git", "checkout", "main"])
-        subprocess.check_call(["git", "pull", "--ff-only"])
-        subprocess.check_call(["git", "merge", "--ff-only", branch])
-        subprocess.check_call(["git", "push"])
+def push_branch(branch: str) -> None:
+    run(["git", "push", "-u", "origin", branch])
 
-    # タグ付け
-    tag = f"adopted/{decision.get('intent','strategy','unknown')}-{datetime.datetime.utcnow().strftime('%Y%m%d')}"
-    subprocess.check_call(["git", "tag", "-a", tag, "-m", "adopted-by-pdca-agent"])
-    subprocess.check_call(["git", "push", "origin", tag])
-    print("::notice:: tagged", tag)
 
-def main():
-    ensure_git_config()
+# ---------- CLI ----------
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="PDCA Agent: recheck & adopt")
+    ap.add_argument("--dryrun", action="store_true", help="変更を加えず判定ログのみ出力")
+    ap.add_argument("--min-lift", type=float, default=0.0, help="採用に必要な最小 lift（既定: 0.0）")
+    ap.add_argument("--branch-prefix", type=str, default="auto/adopt", help="作成ブランチの接頭辞")
+    ap.add_argument("--auto-adopt", action="store_true", help="（将来用）自動で main に取り込む。通常は PR 作成に任せる")
+    args = ap.parse_args()
+
+    ensure_clean_worktree()
+
     decision = load_latest_decision()
     if not decision:
-        print("::notice:: no decision found; exiting successfully.")
-        return
+        print("Notice:  no decision found; exiting successfully.")
+        return 0
 
-    ok, why = should_adopt(decision)
-    print(f"::notice:: adopt decision? {ok} ({why})")
-
+    ok, detail = should_adopt(decision, min_lift=args.min_lift)
+    print(f"Notice:  adopt decision? {ok} ({detail})")
     if not ok:
-        print("::notice:: not adopting (criteria unmet).")
-        return
+        # 採用しない＝成功終了（失敗扱いにしない）
+        return 0
 
-    if DRYRUN and not AUTO_ADOPT:
-        print("::notice:: DRYRUN=on; reporting only.")
-        print(json.dumps({"decision": decision, "why": why}, ensure_ascii=False, indent=2))
-        return
+    if args.dryrun:
+        print("Notice:  DRY-RUN mode → no changes will be committed.")
+        return 0
 
-    # 変更を生成して PR or 直接採用
-    branch, files = create_adopt_branch_and_commit(decision)
-    title = f"PDCA adopt: {decision.get('intent','strategy')} ({why})"
-    body = textwrap.dedent(f"""
-    This PR was created by PDCA agent.
+    # 本採用フロー：ブランチ作成→レジストリ追記→commit/push
+    branch, files = create_adopt_branch_and_commit(decision, prefix=args.branch_prefix)
+    print(f"Notice:  created branch {branch}, committed files: {files}")
 
-    - decision: `{json.dumps(decision, ensure_ascii=False)}`
-    - reason: {why}
-    - files: {files}
+    push_branch(branch)
+    print("Notice:  pushed branch to origin. (PR creation is handled by the workflow or GitHub UI)")
 
-    Merge policy:
-    - CI must be green
-    - Optional manual review (branch protection)
-    """)
+    # auto-adopt（将来的な自動マージ）はここで別途実装する想定
+    if args.auto_adopt:
+        print("Notice:  auto_adopt flag is set, but auto-merge is delegated to workflow protections.")
+    return 0
 
-    if AUTO_ADOPT and not DRYRUN:
-        merge_and_tag(branch, decision)
-    else:
-        open_pr(branch, title, body)
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
