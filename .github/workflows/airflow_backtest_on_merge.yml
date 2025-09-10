@@ -1,0 +1,44 @@
+name: Airflow Backtest on Adopt PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-backtest:
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'adopt/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (merged commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requests
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Trigger Airflow Backtest DAG
+        env:
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}   # e.g. https://airflow.example.com
+          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}         # e.g. Bearer token or PAT for reverse proxy
+          DAG_ID: ${{ vars.AIRFLOW_BACKTEST_DAG_ID || 'noctria_backtest_dag' }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_MERGER: ${{ github.event.pull_request.merged_by.login }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          python scripts/trigger_airflow_backtest.py
