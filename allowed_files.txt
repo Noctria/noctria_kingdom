@@ -8,3 +8,4 @@ tests/test_harmonia_rerank.py
 .github/workflows/pdca-agent.yml
 scripts/pdca_agent.py
 codex_reports/decision_registry.jsonl
+scripts/show_last_inventor_decision.py
