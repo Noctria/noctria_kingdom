@@ -3,38 +3,57 @@ name: Airflow Backtest on Adopt PR Merge
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number (manual run)"
+        required: false
+        default: ""
+      branch:
+        description: "Source branch (manual run)"
+        required: false
+        default: ""
+      title:
+        description: "PR title (manual run)"
+        required: false
+        default: ""
+      sha:
+        description: "Commit SHA (manual run)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
   trigger-backtest:
+    # PR閉鎖イベントでは「マージ済み かつ adopt/ ブランチ」だけ実行
+    # 手動実行（workflow_dispatch）の場合は常に実行
     if: >
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'adopt/')
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'adopt/'))
+      || (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (merged commit)
+      - name: Checkout (merged commit or default branch)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
 
       - name: Trigger Airflow Backtest DAG (direct API)
         env:
-          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}   # e.g. https://airflow.example.com
-          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}         # Bearer token or PAT
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
           AIRFLOW_BACKTEST_DAG_ID: ${{ vars.AIRFLOW_BACKTEST_DAG_ID || 'noctria_backtest_dag' }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PR_MERGER: ${{ github.event.pull_request.merged_by.login }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+
+          # PRイベントからの値（なければ手動入力 or ダミー）
+          PR_TITLE:  ${{ github.event.pull_request.title        || inputs.title   || 'manual-trigger' }}
+          PR_NUMBER: ${{ github.event.pull_request.number       || inputs.pr_number || 'manual' }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref     || inputs.branch  || 'manual' }}
+          PR_MERGER: ${{ github.event.pull_request.merged_by.login || github.actor }}
+          REPO:      ${{ github.repository }}
+          SHA:       ${{ github.event.pull_request.merge_commit_sha || inputs.sha || github.sha }}
         run: |
           set -euo pipefail
 
@@ -69,8 +88,6 @@ jobs:
           BODY="${BODY/__MERGER__/$PR_MERGER}"
 
           echo "POST ${BASE}/api/v1/dags/${AIRFLOW_BACKTEST_DAG_ID}/dagRuns"
-          echo "Body: ${BODY}"
-
           http_code=$(
             curl -sS -o /tmp/airflow_resp.json -w '%{http_code}' \
               -X POST "${BASE}/api/v1/dags/${AIRFLOW_BACKTEST_DAG_ID}/dagRuns" \
