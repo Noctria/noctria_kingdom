@@ -1,30 +1,44 @@
+# .github/workflows/airflow_backtest_local.yml
 name: Airflow Backtest (Local Runner)
 
 on:
-  workflow_dispatch:   # 手動トリガー用。PR閉鎖時にしたいなら pull_request: closed に変えてもOK
+  workflow_dispatch: {}
 
 jobs:
   trigger-backtest:
-    runs-on: [self-hosted]   # ここでさっき登録した self-hosted runner を指定
+    runs-on: [self-hosted]
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Trigger Airflow DAG (local REST)
+      - name: Trigger Airflow DAG (local REST, with Basic auth)
         env:
-          DAG_ID: noctria_backtest_dag    # 疎通確認用に作ったDAG名
+          DAG_ID: noctria_backtest_dag
           REPO: ${{ github.repository }}
           SHA:  ${{ github.sha }}
+          AIRFLOW_BASE_URL: http://127.0.0.1:8080
+          # どちらか1つ用意してください（Settings → Secrets → Actions）
+          AIRFLOW_BASIC_B64: ${{ secrets.AIRFLOW_BASIC_B64 }}     # "admin:admin" を base64 したもの
+          AIRFLOW_BASIC_USER: ${{ secrets.AIRFLOW_BASIC_USER }}   # 例: admin
+          AIRFLOW_BASIC_PASS: ${{ secrets.AIRFLOW_BASIC_PASS }}   # 例: admin
         run: |
           set -euo pipefail
           RUN_ID="ci-${SHA:0:7}"
           BODY='{"dag_run_id":"'"$RUN_ID"'","conf":{"repo":"'"$REPO"'","sha":"'"$SHA"'"}}'
 
+          auth_args=()
+          if [ -n "${AIRFLOW_BASIC_B64:-}" ]; then
+            auth_args=(-H "Authorization: Basic ${AIRFLOW_BASIC_B64}")
+          elif [ -n "${AIRFLOW_BASIC_USER:-}" ] && [ -n "${AIRFLOW_BASIC_PASS:-}" ]; then
+            auth_args=(-u "${AIRFLOW_BASIC_USER}:${AIRFLOW_BASIC_PASS}")
+          fi
+
+          echo "POST ${AIRFLOW_BASE_URL}/api/v1/dags/${DAG_ID}/dagRuns"
           code=$(curl -sS -o /tmp/airflow_resp.json -w '%{http_code}' \
-            -X POST "http://127.0.0.1:8080/api/v1/dags/${DAG_ID}/dagRuns" \
+            -X POST "${AIRFLOW_BASE_URL%/}/api/v1/dags/${DAG_ID}/dagRuns" \
             -H "Content-Type: application/json" \
+            "${auth_args[@]}" \
             --data "${BODY}")
 
           echo "HTTP ${code}"
           cat /tmp/airflow_resp.json || true
-          [ "${code#2}" != "${code}" ]  # 2xx 以外なら失敗
+          [ "${code#2}" != "${code}" ]
