@@ -1,0 +1,9 @@
+jobs:
+  trigger-backtest:
+    runs-on: [self-hosted]   # まずは既定ラベルだけでOK
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ping runner
+        run: |
+          echo "Hello from $(hostname)"
+          python -V || true
