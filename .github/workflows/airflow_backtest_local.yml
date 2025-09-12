@@ -1,9 +1,30 @@
+name: Airflow Backtest (Local Runner)
+
+on:
+  workflow_dispatch:   # 手動トリガー用。PR閉鎖時にしたいなら pull_request: closed に変えてもOK
+
 jobs:
   trigger-backtest:
-    runs-on: [self-hosted]   # まずは既定ラベルだけでOK
+    runs-on: [self-hosted]   # ここでさっき登録した self-hosted runner を指定
     steps:
-      - uses: actions/checkout@v4
-      - name: Ping runner
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Trigger Airflow DAG (local REST)
+        env:
+          DAG_ID: noctria_backtest_dag    # 疎通確認用に作ったDAG名
+          REPO: ${{ github.repository }}
+          SHA:  ${{ github.sha }}
         run: |
-          echo "Hello from $(hostname)"
-          python -V || true
+          set -euo pipefail
+          RUN_ID="ci-${SHA:0:7}"
+          BODY='{"dag_run_id":"'"$RUN_ID"'","conf":{"repo":"'"$REPO"'","sha":"'"$SHA"'"}}'
+
+          code=$(curl -sS -o /tmp/airflow_resp.json -w '%{http_code}' \
+            -X POST "http://127.0.0.1:8080/api/v1/dags/${DAG_ID}/dagRuns" \
+            -H "Content-Type: application/json" \
+            --data "${BODY}")
+
+          echo "HTTP ${code}"
+          cat /tmp/airflow_resp.json || true
+          [ "${code#2}" != "${code}" ]  # 2xx 以外なら失敗
