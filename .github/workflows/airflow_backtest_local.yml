@@ -1,16 +1,21 @@
+---
 name: Airflow Backtest (Local)
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       strategy_glob:
-        description: "実行対象戦略のグロブ（例: src/strategies/veritas_generated/**.py）"
+        description: >
+          実行対象戦略のグロブ
+          （例: src/strategies/veritas_generated/**.py）
         required: false
         default: "src/strategies/veritas_generated/**.py"
       extra_args:
         description: "追加引数（任意）"
         required: false
         default: ""
+  schedule:
+    - cron: "0 * * * *"  # 毎時00分（UTC）
 
 permissions:
   contents: read
@@ -21,7 +26,7 @@ concurrency:
 
 jobs:
   backtest:
-    # self-hosted runner があるならこちらに変更: runs-on: self-hosted
+    # self-hosted で回す場合は下行を self-hosted に変更
     runs-on: ubuntu-latest
 
     steps:
@@ -40,24 +45,21 @@ jobs:
 
       - name: Install minimal deps
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          # Airflow は重いので、ここではバックテストで必要な軽依存のみ（必要に応じて調整）
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
       - name: Run local backtest (script)
         shell: bash
         run: |
           set -euo pipefail
-          # 例）あなたのリポにある軽量バックテストスクリプトに合わせてコマンドを調整してください
-          # 参考になりそうな既存ファイル:
-          #   airflow_docker/scripts/veritas_local_test.py
-          #   src/scripts/evaluate_single_strategy.py など
           if [ -f "airflow_docker/scripts/veritas_local_test.py" ]; then
             python3 airflow_docker/scripts/veritas_local_test.py \
               --pattern "${{ github.event.inputs.strategy_glob }}" \
               ${{ github.event.inputs.extra_args }}
           else
-            echo "No local backtest script found; running a dry-run placeholder."
             python - <<'PY'
 print("Dry run: backtest step placeholder OK")
 PY
@@ -66,16 +68,17 @@ PY
       - name: Collect results
         if: always()
         run: |
+          set -euo pipefail
           mkdir -p handoff_out
-          # 代表的な成果物を拾う（存在するものだけ）
+          # 存在する成果物だけを収集
           for p in \
-            airflow_docker/logs/veritas_generate.log \
-            airflow_docker/logs/veritas_eval_result.json \
-            logs/veritas_evaluate.log \
-            logs/veritas_eval_result.json \
-            data/stats/*.json \
-            handoff/handoff_*.md \
-            handoff/handoff_*.json
+            "airflow_docker/logs/veritas_generate.log" \
+            "airflow_docker/logs/veritas_eval_result.json" \
+            "logs/veritas_evaluate.log" \
+            "logs/veritas_eval_result.json" \
+            "data/stats/*.json" \
+            "handoff/handoff_*.md" \
+            "handoff/handoff_*.json"
           do
             if ls $p >/dev/null 2>&1; then
               cp -r $p handoff_out/ 2>/dev/null || true
