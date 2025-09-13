@@ -11,7 +11,6 @@ import subprocess
 import sys
 from typing import Any, Dict
 
-
 # ===== ユーティリティ =====
 def _mk_outdir(run_id: str) -> str:
     outdir = f"/opt/airflow/backtests/{run_id}"
@@ -27,18 +26,15 @@ def _write_json(path: str, obj: Dict[str, Any]) -> None:
 def _load_conf(context) -> Dict[str, Any]:
     """dag_run.conf を吸収し、デフォルトを埋める"""
     conf = dict(context.get("dag_run").conf or {})
-    # 実行対象戦略（グロブ）
     conf.setdefault("strategy_glob", "src/strategies/veritas_generated/**.py")
-    # 追加引数（文字列）
     conf.setdefault("extra_args", "")
     return conf
 
 
 def _heavy_env_ready() -> bool:
-    """重依存が使えるか軽く判定（torch が import できるだけでもOK）"""
+    """重依存が使えるか軽く判定"""
     try:
         import importlib
-
         importlib.import_module("torch")  # noqa: F401
         return True
     except Exception:
@@ -47,24 +43,16 @@ def _heavy_env_ready() -> bool:
 
 # ===== 実バックテスト or ダミー =====
 def backtest_entry(**context):
-    """
-    可能なら実バックテストを実行。
-    - airflow_docker/scripts/veritas_local_test.py が存在
-    - torch が import 可能
-    いずれか満たさない場合はダミーにフォールバック。
-    すべての成果物は /opt/airflow/backtests/<run_id>/ に集約。
-    """
     run_id = context["run_id"]
     conf = _load_conf(context)
     outdir = _mk_outdir(run_id)
 
-    # conf を保存（トレース用）
+    # conf を保存
     _write_json(os.path.join(outdir, "conf.json"), conf)
 
     script_path = "/opt/airflow/airflow_docker/scripts/veritas_local_test.py"
-    script_repo_path = "airflow_docker/scripts/veritas_local_test.py"  # 開発時の相対パスも試す
+    script_repo_path = "airflow_docker/scripts/veritas_local_test.py"
 
-    # 実スクリプトのパスを解決
     candidate_paths = [script_path, os.path.abspath(script_repo_path)]
     real_script = next((p for p in candidate_paths if os.path.exists(p)), None)
 
@@ -80,13 +68,7 @@ def backtest_entry(**context):
 
     try:
         if will_run_real:
-            # 実バックテスト: veritas_local_test.py を呼ぶ
-            cmd = [
-                sys.executable,
-                real_script,
-            ]
-            # veritas_local_test.py 側で --pattern/追加引数を扱っていない場合もあるので、
-            # ここでは環境変数で渡す（将来引数対応したら cmd に追加してOK）
+            cmd = [sys.executable, real_script]
             env = os.environ.copy()
             env["NOCTRIA_STRATEGY_GLOB"] = str(conf.get("strategy_glob", ""))
             env["NOCTRIA_EXTRA_ARGS"] = str(conf.get("extra_args", ""))
@@ -105,7 +87,6 @@ def backtest_entry(**context):
             meta["returncode"] = proc.returncode
             meta["stdout_path"] = log_path
 
-            # 成功扱い（スクリプト内部で ImportError スキップ exit(0) の想定）
             if proc.returncode == 0:
                 result = {
                     "ok": True,
@@ -116,7 +97,6 @@ def backtest_entry(**context):
                 }
                 _write_json(os.path.join(outdir, "result.json"), result)
             else:
-                # 実行が失敗したらダミーにフォールバックせずエラーとして返す
                 result = {
                     "ok": False,
                     "msg": "Real backtest failed (see stdout.txt)",
@@ -125,9 +105,7 @@ def backtest_entry(**context):
                     "stdout_path": log_path,
                 }
                 _write_json(os.path.join(outdir, "result.json"), result)
-                # Airflow task は失敗にする
                 raise RuntimeError("Real backtest failed")
-
         else:
             # ダミー
             result = {
@@ -138,7 +116,6 @@ def backtest_entry(**context):
             }
             _write_json(os.path.join(outdir, "result.json"), result)
 
-        # XCom に主要パスを返す
         return {
             "result_path": f"{outdir}/result.json",
             "outdir": outdir,
@@ -146,10 +123,47 @@ def backtest_entry(**context):
         }
 
     except Exception as e:
-        # 失敗時もメタを書き出しておく
         meta["error"] = str(e)
         _write_json(os.path.join(outdir, "meta.json"), meta)
         raise
+
+
+# ===== HTML レポート生成 =====
+def render_report(**context):
+    """result.json を読み取り、report.html を生成"""
+    run_id = context["run_id"]
+    outdir = _mk_outdir(run_id)
+    result_path = os.path.join(outdir, "result.json")
+    if not os.path.exists(result_path):
+        raise FileNotFoundError(f"result.json not found: {result_path}")
+
+    with open(result_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # シンプルなHTML
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Backtest Report - {run_id}</title>
+  <style>
+    body {{ font-family: monospace; background: #111; color: #eee; padding: 1rem; }}
+    h1 {{ color: #6cf; }}
+    pre {{ background: #222; padding: 1rem; border-radius: 8px; }}
+  </style>
+</head>
+<body>
+  <h1>Backtest Report: {run_id}</h1>
+  <h2>Result JSON</h2>
+  <pre>{json.dumps(data, ensure_ascii=False, indent=2)}</pre>
+</body>
+</html>"""
+
+    out_path = os.path.join(outdir, "report.html")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    return {"report_path": out_path}
 
 
 # ===== DAG 定義 =====
@@ -162,7 +176,7 @@ with DAG(
     dag_id="noctria_backtest_dag",
     default_args=default_args,
     start_date=datetime(2025, 1, 1),
-    schedule_interval=None,  # API専用
+    schedule_interval=None,
     catchup=False,
     dagrun_timeout=timedelta(minutes=10),
     tags=["noctria", "backtest"],
@@ -170,5 +184,13 @@ with DAG(
     run = PythonOperator(
         task_id="run_backtest",
         python_callable=backtest_entry,
-        provide_context=True,  # Airflow 2.x 互換。3.x では context は自動渡し
+        provide_context=True,
     )
+
+    render = PythonOperator(
+        task_id="render_report",
+        python_callable=render_report,
+        provide_context=True,
+    )
+
+    run >> render
