@@ -1,0 +1,52 @@
+<!-- noctria_gui/templates/backtest_detail.html -->
+{% extends "base_hud.html" %}
+
+{% block title %}🔍 Backtest Detail - {{ detail.dag_run_id }}{% endblock %}
+{% block header_icon %}<i class="fas fa-vial"></i>{% endblock %}
+{% block header_title %}BACKTEST DETAIL{% endblock %}
+{% block header_nav_href %}/backtests/{% endblock %}
+{% block header_nav_text %}一覧に戻る{% endblock %}
+
+{% block content %}
+<section class="hud-panel" style="margin-bottom: 1rem;">
+  <h2 class="panel-title text-normal">
+    <i class="fas fa-info-circle"></i> 実行情報
+  </h2>
+  <div class="text-light">
+    <p><b>Run ID:</b> {{ detail.dag_run_id }}</p>
+    <p><b>State:</b> 
+      {% if detail.state == "success" %}
+        <span style="color:limegreen;">{{ detail.state }}</span>
+      {% elif detail.state == "failed" %}
+        <span style="color:red;">{{ detail.state }}</span>
+      {% else %}
+        {{ detail.state }}
+      {% endif %}
+    </p>
+    <p><b>Start:</b> {{ detail.start_date or "-" }}</p>
+    <p><b>End:</b> {{ detail.end_date or "-" }}</p>
+    <p><b>Conf:</b></p>
+    <pre style="background:rgba(0,0,0,0.3); padding:.5rem; border-radius:6px;">{{ detail.conf | tojson(indent=2) }}</pre>
+  </div>
+</section>
+
+<section class="hud-panel">
+  <h2 class="panel-title text-normal">
+    <i class="fas fa-file-alt"></i> 関連リンク
+  </h2>
+  <ul class="text-light">
+    <li><a class="hud-link" href="{{ detail.logs_url }}" target="_blank">
+      <i class="fas fa-external-link-alt"></i> Airflow Logs / Grid View
+    </a></li>
+    <li><a class="hud-link" href="/api/backtests/{{ detail.dag_run_id }}/json" target="_blank">
+      <i class="fas fa-code"></i> result.json (API)
+    </a></li>
+    <li><a class="hud-link" href="/api/backtests/{{ detail.dag_run_id }}/conf" target="_blank">
+      <i class="fas fa-cog"></i> conf.json (API)
+    </a></li>
+    <li><a class="hud-link" href="/backtests/{{ detail.dag_run_id }}/report" target="_blank">
+      <i class="fas fa-file-alt"></i> report.html (if available)
+    </a></li>
+  </ul>
+</section>
+{% endblock %}
