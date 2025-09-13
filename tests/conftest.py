@@ -151,3 +151,27 @@ def capture_alerts(monkeypatch, capsys):
         yield cap
     finally:
         cap._detach()
+
+
+# --- Marker-based default skipping (heavy/gpu/external) ---------------------
+# 目的:
+# - デフォルト実行では heavy/gpu/external を明示的に skip 表示にする
+# - ユーザが -m を指定した場合はその指定を尊重（本フックは無効）
+#
+# 連携:
+# - pytest.ini の addopts で `-m "not heavy and not gpu and not external"` を既定設定
+# - 重テストには @pytest.mark.heavy / gpu / external を付与
+def pytest_collection_modifyitems(config, items):
+    selected_expr = config.getoption("-m")
+    # デフォルト（= -m 指定なし or 既定の式）時だけ skip を付与
+    if not selected_expr or selected_expr.strip() == 'not heavy and not gpu and not external':
+        skip_heavy = pytest.mark.skip(reason="excluded by default: marker=heavy")
+        skip_gpu = pytest.mark.skip(reason="excluded by default: marker=gpu")
+        skip_external = pytest.mark.skip(reason="excluded by default: marker=external")
+        for item in items:
+            if "heavy" in item.keywords:
+                item.add_marker(skip_heavy)
+            if "gpu" in item.keywords:
+                item.add_marker(skip_gpu)
+            if "external" in item.keywords:
+                item.add_marker(skip_external)
