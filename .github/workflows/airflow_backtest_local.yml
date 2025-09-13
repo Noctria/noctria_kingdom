@@ -1,7 +1,7 @@
 ---
 name: Airflow Backtest (Local)
 
-"on":
+on:
   workflow_dispatch:
     inputs:
       strategy_glob:
@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   backtest:
-    runs-on: ubuntu-latest   # self-hosted ならここを変更
+    runs-on: ubuntu-latest  # self-hosted ならここを変更
 
     steps:
       - name: Checkout
@@ -60,6 +60,21 @@ jobs:
           else
             echo "Dry run: backtest step placeholder OK"
           fi
+
+      # Secrets が設定されている時だけ Airflow DAG を起動
+      - name: Trigger Airflow DAG (if secrets provided)
+        if: ${{ secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '' }}
+        env:
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
+          NOCTRIA_STRATEGY_GLOB: ${{ github.event.inputs.strategy_glob }}
+          NOCTRIA_EXTRA_ARGS: ${{ github.event.inputs.extra_args }}
+        run: |
+          set -euo pipefail
+          echo "Triggering Airflow DAG with:"
+          echo "  strategy_glob=$NOCTRIA_STRATEGY_GLOB"
+          echo "  extra_args=$NOCTRIA_EXTRA_ARGS"
+          python3 scripts/trigger_backtest_dag.py
 
       - name: Collect results
         if: always()
