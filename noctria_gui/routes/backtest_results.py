@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 
 try:
     import requests  # Airflow REST 呼び出し用
@@ -152,3 +152,12 @@ async def list_backtests(request: Request):
     if render:
         return HTMLResponse(render(request, "backtests/index.html", runs=runs))
     return HTMLResponse(f"<pre>{json.dumps(runs, ensure_ascii=False, indent=2)}</pre>")
+
+
+@router.get("/{run_id}")
+async def backtests_run_redirect(run_id: str):
+    """
+    /backtests/<run_id> に直接アクセスされた場合は
+    /backtests/<run_id>/report にリダイレクトする
+    """
+    return RedirectResponse(url=f"/backtests/{run_id}/report")
