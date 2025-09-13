@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   backtest:
-    runs-on: ubuntu-latest   # self-hosted にしたい場合はここを変更
+    # self-hosted で回す場合はここを self-hosted に変更
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -58,7 +59,7 @@ jobs:
               --pattern "${{ github.event.inputs.strategy_glob }}" \
               ${{ github.event.inputs.extra_args }}
           else
-            python - <<'PY'
+            cat <<'PY' | python3
 print("Dry run: backtest step placeholder OK")
 PY
           fi
