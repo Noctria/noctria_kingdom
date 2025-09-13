@@ -1,0 +1,39 @@
+{% extends "base_hud.html" %}
+{% block title %}Backtests — Noctria{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <h2 class="panel-title text-normal"><i class="fas fa-vial"></i> Backtest Runs</h2>
+  <p class="text-light" style="margin:.25rem 0 1rem 0;">
+    探索ディレクトリ: 
+    {% for b in base_dirs %}
+      <code>{{ b }}</code>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  </p>
+
+  {% if runs|length == 0 %}
+    <p class="text-light">結果が見つかりませんでした。Airflow DAG を実行し、/opt/airflow/backtests またはローカルにコピーしてください。</p>
+  {% else %}
+  <table class="hud-table" style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left;">run_id</th>
+        <th style="text-align:left;">mode</th>
+        <th style="text-align:left;">dir</th>
+        <th style="text-align:left;">open</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+      <tr>
+        <td><a href="/backtests/{{ r.run_id }}">{{ r.run_id }}</a></td>
+        <td>{{ r.mode }}</td>
+        <td class="text-light"><code>{{ r.dir }}</code></td>
+        <td><a class="hud-link" href="/backtests/{{ r.run_id }}"><i class="fas fa-external-link-alt"></i></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}
