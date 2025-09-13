@@ -11,7 +11,7 @@ Env (any of the following auth styles work):
 # Bearer token auth (if available; takes priority over Basic)
   AIRFLOW_TOKEN          e.g. eyJhbGciOi...
 
-# Basic auth (OSS Airflowで一般的)
+# Basic auth (typical on OSS Airflow with basic_auth backend)
   AIRFLOW_USER           e.g. admin
   AIRFLOW_PASSWORD       e.g. admin
 
@@ -19,7 +19,7 @@ Env (any of the following auth styles work):
   NOCTRIA_STRATEGY_GLOB  default: src/strategies/veritas_generated/**.py
   NOCTRIA_EXTRA_ARGS     default: ""
 
-If REST fails (or AIRFLOW_BASE_URL が未設定)、`airflow dags trigger` をCLIで試みます。
+If REST fails (or AIRFLOW_BASE_URL is not set), try `airflow dags trigger` via CLI.
 """
 from __future__ import annotations
 
@@ -28,11 +28,33 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
-from typing import Optional
+import time
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+from urllib import request, error
 
 DAG_ID = "noctria_backtest_dag"
-DEFAULT_TIMEOUT = 30  # seconds
+DEFAULT_TIMEOUT = 20  # seconds
+BACKOFF_DELAYS = [0, 1, 2, 4]  # seconds
+
+
+def _auth_header(token: Optional[str], user: Optional[str], password: Optional[str]) -> Optional[str]:
+    """Return Authorization header value (Bearer > Basic) or None."""
+    if token:
+        return f"Bearer {token}"
+    if user and password:
+        b = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+        return f"Basic {b}"
+    return None
+
+
+def _post_json(url: str, payload: Dict[str, Any], auth_header: Optional[str], timeout: float) -> str:
+    req = request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/json")
+    if auth_header:
+        req.add_header("Authorization", auth_header)
+    with request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace")
 
 
 def trigger_via_rest(
@@ -42,50 +64,46 @@ def trigger_via_rest(
     user: Optional[str] = None,
     password: Optional[str] = None,
     timeout: int = DEFAULT_TIMEOUT,
-) -> None:
-    import urllib.request
-    import urllib.error
-
+) -> str:
+    """
+    Returns raw response body (JSON string). Raises on failure.
+    """
     url = f"{base_url.rstrip('/')}/api/v1/dags/{DAG_ID}/dagRuns"
-    payload = json.dumps(
-        {"dag_run_id": f"manual__{datetime.utcnow().isoformat()}", "conf": conf},
-        ensure_ascii=False,
-    ).encode("utf-8")
+    dag_run_id = f"manual__{datetime.now(timezone.utc).isoformat(timespec='seconds')}"
+    payload = {"dag_run_id": dag_run_id, "conf": conf}
+    auth_header = _auth_header(token, user, password)
 
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Content-Type", "application/json")
-
-    # Auth header (Bearer > Basic > none)
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
-    elif user and password:
-        b = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
-        req.add_header("Authorization", f"Basic {b}")
-
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-            print(f"[REST] status={resp.status}")
+    print(f"[INFO] Trying REST API (base_url={base_url}, auth={'Bearer' if token else ('Basic' if user and password else 'none')})")
+    last_exc: Optional[Exception] = None
+    for i, delay in enumerate(BACKOFF_DELAYS):
+        if delay:
+            time.sleep(delay)
+        try:
+            body = _post_json(url, payload, auth_header, timeout=timeout)
+            print("[REST] status=200")
             print(body)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        print(f"[REST] HTTPError {e.code}: {body}", file=sys.stderr)
-        if e.code == 401:
-            hint = (
-                "Auth failed (401). If you're on OSS Airflow, enable BasicAuth in airflow.cfg:\n"
-                "  api.auth_backend = airflow.api.auth.backend.basic_auth\n"
-                "and supply AIRFLOW_USER / AIRFLOW_PASSWORD.\n"
-                "Alternatively provide AIRFLOW_TOKEN if your deployment supports it."
-            )
-            print(hint, file=sys.stderr)
-        raise
-    except Exception as e:
-        print(f"[REST] error: {e}", file=sys.stderr)
-        raise
+            return body
+        except error.HTTPError as e:
+            msg = e.read().decode("utf-8", "ignore")
+            print(f"[REST] HTTPError {e.code}: {msg}", file=sys.stderr)
+            if e.code == 401:
+                print(
+                    "HINT: For OSS Airflow enable BasicAuth:\n"
+                    "  api.auth_backend = airflow.api.auth.backend.basic_auth\n"
+                    "and provide AIRFLOW_USER / AIRFLOW_PASSWORD, or set AIRFLOW_TOKEN if supported.",
+                    file=sys.stderr,
+                )
+            last_exc = e
+        except Exception as e:
+            print(f"[REST] error: {e}", file=sys.stderr)
+            last_exc = e
+    raise RuntimeError("Failed to trigger DAG via REST after retries") from last_exc
 
 
 def trigger_via_cli(conf: dict) -> None:
-    # Airflow コンテナ内 or PATHに `airflow` がある想定
+    """
+    Fallback to Airflow CLI in the current host/container.
+    """
     cmd = [
         "airflow",
         "dags",
@@ -99,28 +117,26 @@ def trigger_via_cli(conf: dict) -> None:
 
 
 def main() -> int:
-    strategy_glob = os.getenv(
-        "NOCTRIA_STRATEGY_GLOB", "src/strategies/veritas_generated/**.py"
-    )
+    strategy_glob = os.getenv("NOCTRIA_STRATEGY_GLOB", "src/strategies/veritas_generated/**.py")
     extra_args = os.getenv("NOCTRIA_EXTRA_ARGS", "")
-    conf = {
-        "strategy_glob": strategy_glob,
-        "extra_args": extra_args,
-    }
+    conf = {"strategy_glob": strategy_glob, "extra_args": extra_args}
 
     base_url = os.getenv("AIRFLOW_BASE_URL")
     token = os.getenv("AIRFLOW_TOKEN")
     user = os.getenv("AIRFLOW_USER")
     password = os.getenv("AIRFLOW_PASSWORD")
 
-    # Prefer REST if base_url is provided (auth: Bearer > Basic > none)
     if base_url:
         try:
-            print(
-                "[INFO] Trying REST API "
-                f"(base_url={base_url}, auth={'Bearer' if token else ('Basic' if user and password else 'none')})"
-            )
-            trigger_via_rest(base_url, conf, token=token, user=user, password=password)
+            body = trigger_via_rest(base_url, conf, token=token, user=user, password=password)
+            # best-effort: print DAG_RUN_ID=... (helps shell capture)
+            try:
+                data = json.loads(body)
+                dag_run_id = data.get("dag_run_id") or data.get("dagRunId")
+                if dag_run_id:
+                    print(f"DAG_RUN_ID={dag_run_id}")
+            except Exception:
+                pass
             return 0
         except Exception:
             print("[WARN] REST failed. Falling back to CLI...", file=sys.stderr)
