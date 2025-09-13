@@ -1,0 +1,82 @@
+name: Handoff Rollup
+
+on:
+  workflow_dispatch:
+    inputs:
+      pinned_issue_number:
+        description: "コメント先のピン留めIssue番号"
+        required: true
+        default: "1"
+      lookback_hours:
+        description: "直近何時間の更新を集計するか"
+        required: true
+        default: "1"
+  schedule:
+    - cron: "0 * * * *"  # 毎時00分（UTC）
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: handoff-rollup
+  cancel-in-progress: true
+
+env:
+  PINNED_ISSUE_NUMBER: ${{ github.event.inputs.pinned_issue_number || '1' }}
+  LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '1' }}
+  TZ: "Asia/Tokyo"
+
+jobs:
+  rollup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post rollup comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = parseInt(process.env.PINNED_ISSUE_NUMBER || "1", 10);
+            let hours = parseInt(process.env.LOOKBACK_HOURS || "1", 10);
+            if (isNaN(hours) || hours < 1) hours = 1;
+
+            const sinceISO = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+            const closed = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 100
+            });
+            const merged = closed.filter(pr => pr.merged_at && pr.merged_at >= sinceISO).slice(0, 20);
+
+            const openPRs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', sort: 'updated', direction: 'desc', per_page: 20
+            });
+            const openIssuesAll = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', sort: 'updated', direction: 'desc', per_page: 40
+            });
+            const openIssues = openIssuesAll.filter(i => !i.pull_request).slice(0, 20);
+
+            const nowJST = new Date().toLocaleString('ja-JP', { timeZone: process.env.TZ });
+
+            const b = [];
+            b.push(`## 📝 引き継ぎ（${nowJST}）`);
+            b.push(`_直近 **${hours}h** の更新を集計_`);
+            b.push('');
+            b.push('### ✅ 最近マージ');
+            if (merged.length === 0) b.push('- なし');
+            merged.forEach(pr => b.push(`- #${pr.number} ${pr.title} (@${pr.user.login})`));
+            b.push('');
+            b.push('### 🔧 オープンPR（最新20件）');
+            if (openPRs.length === 0) b.push('- なし');
+            openPRs.forEach(pr => b.push(`- #${pr.number} ${pr.title} (@${pr.user.login})`));
+            b.push('');
+            b.push('### 📌 オープンIssue（最新20件）');
+            if (openIssues.length === 0) b.push('- なし');
+            openIssues.forEach(i => {
+              const d = new Date(i.updated_at).toLocaleString('ja-JP', { timeZone: process.env.TZ });
+              b.push(`- #${i.number} ${i.title}（更新: ${d}）`);
+            });
+            b.push('');
+            b.push('> 自動投稿: GitHub Actions（手動/毎時）');
+
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: b.join('\n') });
