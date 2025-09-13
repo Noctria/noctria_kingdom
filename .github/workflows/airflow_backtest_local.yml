@@ -1,44 +1,142 @@
-# .github/workflows/airflow_backtest_local.yml
-name: Airflow Backtest (Local Runner)
+name: Backtest (Airflow local)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      strategies_glob:
+        description: "Glob for strategies"
+        required: true
+        default: "src/strategies/veritas_generated/*.py"
+      start_date:
+        description: "Backtest start (YYYY-MM-DD)"
+        required: true
+        default: "2023-01-01"
+      end_date:
+        description: "Backtest end (YYYY-MM-DD)"
+        required: true
+        default: "2023-12-31"
+      out_dir:
+        description: "Artifact root dir (host-visible)"
+        required: true
+        default: "artifacts/backtest"
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
-  trigger-backtest:
-    runs-on: [self-hosted]
-    steps:
-      - uses: actions/checkout@v4
+  run:
+    # フォークPRで self-hosted を動かさないガード
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted]  # ← あなたのラベルに合わせて（例: self-hosted, linux, x64, airflow）
 
-      - name: Trigger Airflow DAG (local REST, with Basic auth)
+    env:
+      AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}   # 例: http://localhost:8080
+      AIRFLOW_USERNAME: ${{ secrets.AIRFLOW_USERNAME }}
+      AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger DAG run (noctria_backtest_dag)
+        id: trigger
         env:
-          DAG_ID: noctria_backtest_dag
-          REPO: ${{ github.repository }}
-          SHA:  ${{ github.sha }}
-          AIRFLOW_BASE_URL: http://127.0.0.1:8080
-          # どちらか1つ用意してください（Settings → Secrets → Actions）
-          AIRFLOW_BASIC_B64: ${{ secrets.AIRFLOW_BASIC_B64 }}     # "admin:admin" を base64 したもの
-          AIRFLOW_BASIC_USER: ${{ secrets.AIRFLOW_BASIC_USER }}   # 例: admin
-          AIRFLOW_BASIC_PASS: ${{ secrets.AIRFLOW_BASIC_PASS }}   # 例: admin
+          STRAT_GLOB: ${{ github.event.inputs.strategies_glob }}
+          START_DATE: ${{ github.event.inputs.start_date }}
+          END_DATE: ${{ github.event.inputs.end_date }}
+          OUT_DIR: ${{ github.event.inputs.out_dir }}
         run: |
           set -euo pipefail
-          RUN_ID="ci-${SHA:0:7}"
-          BODY='{"dag_run_id":"'"$RUN_ID"'","conf":{"repo":"'"$REPO"'","sha":"'"$SHA"'"}}'
+          echo "POST to Airflow DAG..."
+          CONF_JSON=$(cat <<'JSON'
+          {
+            "conf": {
+              "strategies_glob": "__GLOB__",
+              "start_date": "__START__",
+              "end_date": "__END__",
+              "out_dir": "__OUT__"
+            }
+          }
+          JSON
+          )
+          CONF_JSON="${CONF_JSON/__GLOB__/$STRAT_GLOB}"
+          CONF_JSON="${CONF_JSON/__START__/$START_DATE}"
+          CONF_JSON="${CONF_JSON/__END__/$END_DATE}"
+          CONF_JSON="${CONF_JSON/__OUT__/$OUT_DIR}"
 
-          auth_args=()
-          if [ -n "${AIRFLOW_BASIC_B64:-}" ]; then
-            auth_args=(-H "Authorization: Basic ${AIRFLOW_BASIC_B64}")
-          elif [ -n "${AIRFLOW_BASIC_USER:-}" ] && [ -n "${AIRFLOW_BASIC_PASS:-}" ]; then
-            auth_args=(-u "${AIRFLOW_BASIC_USER}:${AIRFLOW_BASIC_PASS}")
-          fi
-
-          echo "POST ${AIRFLOW_BASE_URL}/api/v1/dags/${DAG_ID}/dagRuns"
-          code=$(curl -sS -o /tmp/airflow_resp.json -w '%{http_code}' \
-            -X POST "${AIRFLOW_BASE_URL%/}/api/v1/dags/${DAG_ID}/dagRuns" \
+          RESP=$(curl -sS -u "$AIRFLOW_USERNAME:$AIRFLOW_PASSWORD" \
             -H "Content-Type: application/json" \
-            "${auth_args[@]}" \
-            --data "${BODY}")
+            -X POST "$AIRFLOW_BASE_URL/api/v1/dags/noctria_backtest_dag/dagRuns" \
+            -d "$CONF_JSON")
 
-          echo "HTTP ${code}"
-          cat /tmp/airflow_resp.json || true
-          [ "${code#2}" != "${code}" ]
+          echo "$RESP" > resp.json
+          echo "Airflow response saved to resp.json"
+
+          RUN_ID=$(python3 - <<'PY'
+import json,sys
+d=json.load(open('resp.json'))
+print(d.get('dag_run_id') or d.get('dag_run_id') or "")
+PY
+)
+          if [ -z "$RUN_ID" ]; then
+            echo "Failed to parse dag_run_id"
+            cat resp.json
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for completion
+        id: wait
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ steps.trigger.outputs.run_id }}"
+          echo "Waiting DAG run: $RUN_ID"
+          for i in $(seq 1 180); do
+            RESP=$(curl -sS -u "$AIRFLOW_USERNAME:$AIRFLOW_PASSWORD" \
+              "$AIRFLOW_BASE_URL/api/v1/dags/noctria_backtest_dag/dagRuns/$RUN_ID")
+            echo "$RESP" > state.json
+            STATE=$(python3 - <<'PY'
+import json; print(json.load(open('state.json')).get('state',""))
+PY
+)
+            echo "[$i] state=$STATE"
+            if [ "$STATE" = "success" ]; then break; fi
+            if [ "$STATE" = "failed" ]; then echo "DAG failed"; cat state.json; exit 1; fi
+            sleep 5
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-${{ steps.trigger.outputs.run_id }}
+          path: |
+            ${{ github.event.inputs.out_dir }}/${{ steps.trigger.outputs.run_id }}/**/*
+          if-no-files-found: warn
+          retention-days: 10
+
+      - name: Post PR comment summary (if PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          OUT_DIR: ${{ github.event.inputs.out_dir }}
+        with:
+          script: |
+            const runId = "${{ steps.trigger.outputs.run_id }}";
+            const fs = require('fs');
+            const path = require('path');
+            const summary = path.join(process.env.GITHUB_WORKSPACE, process.env.OUT_DIR, runId, "summary.json");
+            let body = `### Backtest Result — \`${runId}\`\n\n`;
+            try {
+              const j = JSON.parse(fs.readFileSync(summary, 'utf-8'));
+              const ok = (j.results && j.results.ok) ? j.results.ok.length : 0;
+              const fail = (j.results && j.results.fail) ? j.results.fail.length : 0;
+              body += `- ✅ OK: **${ok}**  /  ❌ FAIL: **${fail}**\n`;
+            } catch (e) {
+              body += "_summary.json not found; see workflow artifacts._\n";
+            }
+            body += `\n_Artifacts_: **backtest-${runId}**`;
+            github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number, body
+            });
