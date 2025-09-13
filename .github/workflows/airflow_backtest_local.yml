@@ -15,7 +15,7 @@ name: Airflow Backtest (Local)
         required: false
         default: ""
   schedule:
-    - cron: "0 * * * *"  # 毎時00分（UTC）
+    - cron: "0 * * * *"  # 毎時（UTC）
 
 permissions:
   contents: read
