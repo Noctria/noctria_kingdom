@@ -1,0 +1,52 @@
+{% extends "base_hud.html" %}
+{% block title %}Backtest {{ run_id }} — Noctria{% endblock %}
+
+{% block content %}
+<section class="hud-panel">
+  <h2 class="panel-title text-normal"><i class="fas fa-file-alt"></i> Backtest: {{ run_id }}</h2>
+  <p class="text-light">dir: <code>{{ run_dir }}</code></p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:1rem;">
+    <div class="hud-card">
+      <h3 class="text-normal">Summary (result.json)</h3>
+      {% if files["result.json"] %}
+        <pre style="max-height:320px; overflow:auto;">{{ result | tojson(indent=2) }}</pre>
+        <p><a class="hud-link" href="/backtests/{{ run_id }}/file/result.json">Download</a></p>
+      {% else %}
+        <p class="text-light">result.json は見つかりませんでした。</p>
+      {% endif %}
+    </div>
+
+    <div class="hud-card">
+      <h3 class="text-normal">Conf (conf.json)</h3>
+      {% if files["conf.json"] %}
+        <pre style="max-height:320px; overflow:auto;">{{ conf | tojson(indent=2) }}</pre>
+        <p><a class="hud-link" href="/backtests/{{ run_id }}/file/conf.json">Download</a></p>
+      {% else %}
+        <p class="text-light">conf.json は見つかりませんでした。</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hud-card" style="margin-top:1rem;">
+    <h3 class="text-normal">Artifacts</h3>
+    <ul>
+      <li>report.html:
+        {% if files["report.html"] %}
+          <a class="hud-link" href="/backtests/{{ run_id }}/file/report.html" target="_blank">Open</a>
+        {% else %}<span class="text-light">—</span>{% endif %}
+      </li>
+      <li>result.csv:
+        {% if files["result.csv"] %}
+          <a class="hud-link" href="/backtests/{{ run_id }}/file/result.csv">Download</a>
+        {% else %}<span class="text-light">—</span>{% endif %}
+      </li>
+      <li>stdout.txt:
+        {% if files["stdout.txt"] %}
+          <a class="hud-link" href="/backtests/{{ run_id }}/file/stdout.txt" target="_blank">Open</a>
+        {% else %}<span class="text-light">—</span>{% endif %}
+      </li>
+    </ul>
+  </div>
+</section>
+{% endblock %}
