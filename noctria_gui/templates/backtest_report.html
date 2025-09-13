@@ -17,7 +17,16 @@
     <a class="btn btn--ghost" href="/backtests/{{ run_id }}/report">Permalink</a>
     <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/json">result.json</a>
     <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/conf">conf.json</a>
-    <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/artifact/result.csv">result.csv</a>
+
+    {% if artifacts and artifacts.result_csv %}
+      <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/artifact/result.csv">result.csv</a>
+    {% else %}
+      <span class="btn btn--ghost" style="opacity:.5; pointer-events:none;">result.csv（未生成）</span>
+    {% endif %}
+
+    {% if artifacts and artifacts.stdout_txt %}
+      <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/artifact/stdout.txt">stdout.txt</a>
+    {% endif %}
   </div>
 </div>
 
