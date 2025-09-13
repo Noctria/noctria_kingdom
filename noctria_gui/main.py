@@ -315,6 +315,18 @@ _safe_include("noctria_gui.routes.decision_registry")
 # Airflow関連
 _safe_include("noctria_gui.routes.airflow_runs")
 
+# 🆕 バックテスト成果物ビュー（FastAPI or Flask どちらでも取り込み）
+#    - FastAPI 版: `router`
+#    - Flask 版  : `backtest_bp`（Starlette の ASGI 互換ラッパは不要。_safe_include が失敗したら警告）
+included_backtests = (
+    _safe_include("noctria_gui.routes.backtest_results", "router", tags=["backtests"])
+    or _safe_include("noctria_gui.routes.backtest_results", "backtest_bp")
+)
+if included_backtests:
+    logger.info("Included backtest_results routes")
+else:
+    logger.warning("Backtest_results routes not mounted (router/backtest_bp not found)")
+
 # Git関連
 _safe_include("noctria_gui.routes.git_tags")
 
