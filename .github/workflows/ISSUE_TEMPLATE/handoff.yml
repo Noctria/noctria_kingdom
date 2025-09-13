@@ -1,0 +1,38 @@
+name: 📝 Handoff（引き継ぎ）
+description: スレをまたいでも誰でも読める、最新の引き継ぎノート
+title: "Handoff: YYYY-MM-DD"
+labels: ["handoff"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要サマリ
+      description: 1〜3行で状況を要約
+      placeholder: "例) self-hosted runner 登録完了／DAGはダミー疎通のみ"
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: ✅ 完了したこと
+      placeholder: "- Actions Runner 登録\n- airflow_backtest_local.yml 成功"
+  - type: textarea
+    id: wip
+    attributes:
+      label: 🔄 進行中 / 未着手
+      placeholder: "- DAG に本物のバックテスト処理を注入（noctria_backtest_dag.py）"
+  - type: textarea
+    id: next
+    attributes:
+      label: 🚩 次アクション（優先順）
+      placeholder: "- strategies/veritas_generated/ を指定可能に\n- 結果を artifact/PRコメントで返却"
+  - type: textarea
+    id: risks
+    attributes:
+      label: ⚠️ リスク / ブロッカー
+      placeholder: "- GPU環境待ち / 外部API制限 など"
+  - type: textarea
+    id: links
+    attributes:
+      label: 🔗 リンク類
+      placeholder: "- 対応PR: #1234\n- 関連プロジェクト: Noctria – Master"
