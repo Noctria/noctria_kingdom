@@ -12,6 +12,31 @@ for p in map(str, {ROOT, SRC}):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+# --- sanitize sys.path: remove other runner clones --------------------------
+# actions-runner の別クローンが sys.path に混入していると
+# 「import file mismatch」が発生するため、現在の作業ツリー以外を除外する。
+OTHER_CLONE_HINTS = (
+    "actions-runner/_work/noctria_kingdom/noctria_kingdom",
+)
+for entry in list(sys.path):
+    try:
+        resolved = str(Path(entry).resolve())
+    except Exception:
+        continue
+    # 現在の作業ツリー配下は保持
+    if resolved.startswith(str(ROOT.resolve())):
+        continue
+    # ランナー配下の別クローンは除外
+    if any(h in resolved for h in OTHER_CLONE_HINTS):
+        sys.path.remove(entry)
+
+# 現在の作業ツリーを最優先に（SRC を前に）
+for q in map(str, {ROOT, SRC}):
+    if q in sys.path:
+        sys.path.remove(q)
+for q in map(str, [SRC, ROOT]):
+    sys.path.insert(0, q)
+
 # --- Fixtures ---------------------------------------------------------------
 import logging
 import typing as t
@@ -115,8 +140,10 @@ def capture_alerts(monkeypatch, capsys):
 
         # 便利API
         def contains(self, substr: str) -> bool:
-            return any((substr in ln) if isinstance(ln, str) else (substr in _json.dumps(ln, ensure_ascii=False))
-                       for ln in self.flush())
+            return any(
+                (substr in ln) if isinstance(ln, str) else (substr in _json.dumps(ln, ensure_ascii=False))
+                for ln in self.flush()
+            )
 
         # list風
         def __len__(self):
@@ -146,7 +173,7 @@ def capture_alerts(monkeypatch, capsys):
             return False
 
     cap = Capture()
-    cap._attach()   # with を使わないスタイルでも有効化
+    cap._attach()  # with を使わないスタイルでも有効化
     try:
         yield cap
     finally:
@@ -163,7 +190,6 @@ def capture_alerts(monkeypatch, capsys):
 # - 重テストには @pytest.mark.heavy / gpu / external を付与
 def pytest_collection_modifyitems(config, items):
     selected_expr = config.getoption("-m")
-    # デフォルト（= -m 指定なし or 既定の式）時だけ skip を付与
     if not selected_expr or selected_expr.strip() == 'not heavy and not gpu and not external':
         skip_heavy = pytest.mark.skip(reason="excluded by default: marker=heavy")
         skip_gpu = pytest.mark.skip(reason="excluded by default: marker=gpu")
