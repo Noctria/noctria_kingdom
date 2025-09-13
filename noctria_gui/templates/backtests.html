@@ -8,34 +8,50 @@
 {% block header_nav_text %}DASHBOARD{% endblock %}
 
 {% block content %}
-<div class="hud-panel">
-  <h2 class="hud-heading">Recent Backtests</h2>
-  <p>成果物は Airflow の scheduler コンテナからコピーされ、下記リンクから参照できます。</p>
+<section class="hud-panel">
+  <h2 class="panel-title text-normal"><i class="fas fa-list"></i> Recent Backtests</h2>
+  <p class="text-light">成果物は Airflow scheduler コンテナから取得され、下記リンクから参照できます。</p>
 
   {% if runs %}
-  <table class="hud-table">
+  <table class="hud-table" style="width:100%; border-collapse:collapse;">
     <thead>
       <tr>
-        <th>Run ID</th>
-        <th>Started</th>
-        <th>Report</th>
-        <th>JSON</th>
-        <th>CSV</th>
+        <th class="text-light" style="text-align:left; padding:.5rem;">Run ID</th>
+        <th class="text-light" style="text-align:left; padding:.5rem;">Started</th>
+        <th class="text-light" style="text-align:left; padding:.5rem;">State</th>
+        <th class="text-light" style="text-align:left; padding:.5rem;">Report</th>
+        <th class="text-light" style="text-align:left; padding:.5rem;">JSON</th>
+        <th class="text-light" style="text-align:left; padding:.5rem;">CSV</th>
       </tr>
     </thead>
     <tbody>
       {% for run in runs %}
       <tr>
-        <td><code>{{ run.run_id }}</code></td>
-        <td>{{ run.started or "-" }}</td>
-        <td>
-          <a href="/backtests/{{ run.run_id }}/report" target="_blank">HTML</a>
+        <td style="padding:.5rem;"><code>{{ run.run_id }}</code></td>
+        <td style="padding:.5rem;">{{ run.started or "-" }}</td>
+        <td style="padding:.5rem;">
+          {% if run.state == "success" %}
+            <span style="color:limegreen;">success</span>
+          {% elif run.state == "failed" %}
+            <span style="color:red;">failed</span>
+          {% else %}
+            {{ run.state or "-" }}
+          {% endif %}
         </td>
-        <td>
-          <a href="/api/backtests/{{ run.run_id }}/json" target="_blank">result.json</a>
+        <td style="padding:.5rem;">
+          <a class="hud-link" href="/backtests/{{ run.run_id }}/report" target="_blank">
+            <i class="fas fa-file-alt"></i> HTML
+          </a>
         </td>
-        <td>
-          <a href="/api/backtests/{{ run.run_id }}/artifact/result.csv" target="_blank">result.csv</a>
+        <td style="padding:.5rem;">
+          <a class="hud-link" href="/api/backtests/{{ run.run_id }}/json" target="_blank">
+            <i class="fas fa-code"></i> result.json
+          </a>
+        </td>
+        <td style="padding:.5rem;">
+          <a class="hud-link" href="/api/backtests/{{ run.run_id }}/artifact/result.csv" target="_blank">
+            <i class="fas fa-table"></i> result.csv
+          </a>
         </td>
       </tr>
       {% endfor %}
@@ -44,5 +60,5 @@
   {% else %}
   <p class="hud-muted">まだ成果物はありません。</p>
   {% endif %}
-</div>
+</section>
 {% endblock %}
