@@ -23,7 +23,7 @@ x-airflow-common: &airflow-common
     - NOCTRIA_OBS_PG_DSN=
     # DB に書く場合は上の2行を調整し、下の DSN を有効化（Compose の ${...} 展開を利用）
     # - NOCTRIA_OBS_MODE=
-    - NOCTRIA_OBS_PG_DSN=postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
+    # - NOCTRIA_OBS_PG_DSN=postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
 
     # ---- API 認証バックエンド（Basic + session を明示）----
     - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
@@ -46,7 +46,8 @@ x-airflow-common: &airflow-common
     - ./plugins:/opt/airflow/plugins
     - ../src:/opt/airflow/src
     - ../data:/opt/airflow/data
-    - ../scripts:/opt/airflow/scripts            # ★ ルート直下 scripts をマウント
+    - ../scripts:/opt/airflow/scripts            # ルート直下 scripts をマウント
+    - ./backtests:/opt/airflow/backtests         # ★ 追加：結果の共有（web/scheduler 両方）
     - airflow-logs:/opt/airflow/logs             # logs を永続化
   depends_on:
     postgres:
