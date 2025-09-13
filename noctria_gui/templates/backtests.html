@@ -1,0 +1,48 @@
+<!-- noctria_gui/templates/backtests.html -->
+{% extends "base_hud.html" %}
+
+{% block title %}🧪 Backtest Results - Noctria Kingdom{% endblock %}
+{% block header_icon %}<i class="fas fa-flask"></i>{% endblock %}
+{% block header_title %}BACKTEST RESULTS{% endblock %}
+{% block header_nav_href %}/dashboard{% endblock %}
+{% block header_nav_text %}DASHBOARD{% endblock %}
+
+{% block content %}
+<div class="hud-panel">
+  <h2 class="hud-heading">Recent Backtests</h2>
+  <p>成果物は Airflow の scheduler コンテナからコピーされ、下記リンクから参照できます。</p>
+
+  {% if runs %}
+  <table class="hud-table">
+    <thead>
+      <tr>
+        <th>Run ID</th>
+        <th>Started</th>
+        <th>Report</th>
+        <th>JSON</th>
+        <th>CSV</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><code>{{ run.run_id }}</code></td>
+        <td>{{ run.started or "-" }}</td>
+        <td>
+          <a href="/backtests/{{ run.run_id }}/report" target="_blank">HTML</a>
+        </td>
+        <td>
+          <a href="/api/backtests/{{ run.run_id }}/json" target="_blank">result.json</a>
+        </td>
+        <td>
+          <a href="/api/backtests/{{ run.run_id }}/artifact/result.csv" target="_blank">result.csv</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hud-muted">まだ成果物はありません。</p>
+  {% endif %}
+</div>
+{% endblock %}
