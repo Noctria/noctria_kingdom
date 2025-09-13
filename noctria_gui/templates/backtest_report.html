@@ -1,0 +1,58 @@
+<!-- noctria_gui/templates/backtest_report.html -->
+{% extends "base_hud.html" %}
+
+{% block title %}🧪 Backtest Report - {{ run_id }}{% endblock %}
+{% block header_icon %}<i class="fas fa-vial"></i>{% endblock %}
+{% block header_title %}BACKTEST REPORT{% endblock %}
+{% block header_nav_href %}/backtests{% endblock %}
+{% block header_nav_text %}BACKTESTS{% endblock %}
+
+{% block content %}
+<div class="hud-panel" style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+  <div>
+    <h2 class="hud-heading" style="margin:0;">Run ID</h2>
+    <code style="font-size:.95rem;">{{ run_id }}</code>
+  </div>
+  <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+    <a class="btn btn--ghost" href="/backtests/{{ run_id }}/report">Permalink</a>
+    <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/json">result.json</a>
+    <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/conf">conf.json</a>
+    <a class="btn btn--ghost" target="_blank" href="/backtests/api/{{ run_id }}/artifact/result.csv">result.csv</a>
+  </div>
+</div>
+
+<div class="hud-panel">
+  <h3 class="hud-subheading"><i class="fas fa-clipboard-check"></i> Result</h3>
+  {% if result %}
+    <div class="hud-kv">
+      <div class="hud-kv__row"><span class="hud-kv__key">ok</span><span class="hud-kv__val">{{ result.ok }}</span></div>
+      <div class="hud-kv__row"><span class="hud-kv__key">mode</span><span class="hud-kv__val"><code>{{ result.mode }}</code></span></div>
+      {% if result.msg %}
+      <div class="hud-kv__row"><span class="hud-kv__key">message</span><span class="hud-kv__val">{{ result.msg }}</span></div>
+      {% endif %}
+    </div>
+    <details style="margin-top:.75rem;">
+      <summary class="text-light">Raw JSON</summary>
+      <pre class="hud-pre" style="margin-top:.5rem;">{{ result | tojson(indent=2) }}</pre>
+    </details>
+  {% else %}
+    <p class="hud-warning">result.json が見つかりませんでした。</p>
+  {% endif %}
+</div>
+
+<div class="hud-panel">
+  <h3 class="hud-subheading"><i class="fas fa-cog"></i> Configuration</h3>
+  {% if conf %}
+    <div class="hud-kv">
+      <div class="hud-kv__row"><span class="hud-kv__key">strategy_glob</span><span class="hud-kv__val"><code>{{ conf.strategy_glob }}</code></span></div>
+      <div class="hud-kv__row"><span class="hud-kv__key">extra_args</span><span class="hud-kv__val"><code>{{ conf.extra_args }}</code></span></div>
+    </div>
+    <details style="margin-top:.75rem;">
+      <summary class="text-light">Raw JSON</summary>
+      <pre class="hud-pre" style="margin-top:.5rem;">{{ conf | tojson(indent=2) }}</pre>
+    </details>
+  {% else %}
+    <p class="hud-muted">conf.json は見つかりませんでした（任意）。</p>
+  {% endif %}
+</div>
+{% endblock %}
