@@ -26,8 +26,7 @@ concurrency:
 
 jobs:
   backtest:
-    # self-hosted で回す場合は下行を self-hosted に変更
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # self-hosted にしたい場合はここを変更
 
     steps:
       - name: Checkout
@@ -52,7 +51,6 @@ jobs:
           fi
 
       - name: Run local backtest (script)
-        shell: bash
         run: |
           set -euo pipefail
           if [ -f "airflow_docker/scripts/veritas_local_test.py" ]; then
