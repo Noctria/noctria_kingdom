@@ -183,3 +183,15 @@ def backtests_latest_redirect() -> Response:
     if fetched.ok and fetched.content:
         return redirect(f"/backtests/{run_id}/report", code=302)
     return redirect(f"/api/backtests/{run_id}/json", code=302)
+
+
+@router.get("/backtests", response_class=HTMLResponse)
+async def list_backtests(request: Request):
+    # 直近の run_id を Airflow REST から取得してもいいし
+    # ローカル backtests_* ディレクトリを走査してもよい
+    runs = [
+        {"run_id": "manual__2025-09-13T08:37:43.557371", "started": "2025-09-13 08:37"},
+        # 実際は os.listdir で生成
+    ]
+    return templates.TemplateResponse("backtests.html", {"request": request, "runs": runs})
+
