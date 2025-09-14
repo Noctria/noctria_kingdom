@@ -1,7 +1,4 @@
 # Repo X-Ray
-
-Root: `/mnt/d/noctria_kingdom`
-
 ## Workflows
 
 - `.github/workflows/ISSUE_TEMPLATE/handoff.yml` — **📝 Handoff（引き継ぎ）** ((see file))
