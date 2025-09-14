@@ -257,3 +257,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+# adopt auto pr test
+# adopt auto pr test
