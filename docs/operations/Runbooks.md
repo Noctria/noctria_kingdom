@@ -315,6 +315,11 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
   - インシデントに **DB 認証失敗** / **ENV 展開不備** / **CRLF** を追加
 - **2025-08-12**: v1.0 初版
 
+## 17. 引継ぎレポート作成コマンド
+- $ pytest -v  
+- $ python3 scripts/generate_handoff.py
+
+
 <!-- AUTOGEN:CHANGELOG START -->
 
 ### 🛠 Updates since: `2025-08-13 17:50 UTC`
