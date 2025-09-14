@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Tuple, Iterable, Sequence
+from typing import List, Dict, Any, Optional, Tuple, Iterable
 import textwrap
 import logging
 import os
