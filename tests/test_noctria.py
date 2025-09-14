@@ -1,5 +1,4 @@
 import unittest
-import numpy as np
 from core.Noctria import Noctria
 from data.data_loader import MarketDataFetcher
 
