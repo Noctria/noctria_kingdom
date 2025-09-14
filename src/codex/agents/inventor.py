@@ -1,11 +1,13 @@
 # src/codex/agents/inventor.py
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Optional
+import datetime as dt
+import json
 import re
 import textwrap
-import datetime as dt
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # =========================
 # 既存: システムプロンプト
@@ -33,6 +35,7 @@ class PatchSuggestion:
     function: str
     pseudo_diff: str
     rationale: str
+
 
 @dataclass
 class InventorOutput:
@@ -85,6 +88,7 @@ class InventorOutput:
         lines.append("1. 最小差分で修正 → 2. `pytest -q -k <nodeid>` → 3. 全体再実行")
         return "\n".join(lines)
 
+
 # =====================================
 # 新規: ヒューリスティック & 互換クラス
 # =====================================
@@ -95,13 +99,67 @@ class _FailureCase:
     duration: Optional[float]
     traceback: str
 
+
 class InventorScriptus:
     """
     - Lv1 ヒューリスティック提案器
     - 互換API:
         * propose_fixes_structured(pytest_result) -> InventorOutput  （既存の構造化呼び出し向け）
         * propose_fixes(failures, context) -> str                      （mini_loop の Markdown 出力向け）
+    - 追加API（ruff連携・最小実装）:
+        * load_ruff_report(report_path) -> None
+        * summarize_ruff() -> str
+        * next_action_from_ruff() -> str
     """
+
+    # ====== ruff runner 連携（追加） ======
+    def __init__(self) -> None:
+        # ruff レポートを読み込んだ結果を保持（任意）
+        self._ruff_report: Dict[str, Any] = {}
+
+    def load_ruff_report(self, report_path: str | Path) -> None:
+        """
+        ruff_runner.py が保存した JSON レポートを読み込む。
+        期待フォーマット（簡約）:
+        {
+          "fix_mode": bool,
+          "returncode": int,
+          "patch_path": "codex_reports/patches/xxxx.patch" | null,
+          "result": {"highlights": ["...","..."], ...}
+        }
+        """
+        p = Path(report_path)
+        if not p.exists():
+            raise FileNotFoundError(f"Ruff report not found: {p}")
+        self._ruff_report = json.loads(p.read_text(encoding="utf-8"))
+
+    def summarize_ruff(self) -> str:
+        """Ruff 実行結果の短い要約を返す。"""
+        if not self._ruff_report:
+            return "No ruff report loaded."
+        res = self._ruff_report.get("result", {}) or {}
+        highlights = "\n".join(res.get("highlights", []))
+        return (
+            "Inventor Summary (Ruff):\n"
+            f"- Fix mode: {self._ruff_report.get('fix_mode')}\n"
+            f"- Return code: {self._ruff_report.get('returncode')}\n"
+            f"- Patch: {self._ruff_report.get('patch_path')}\n"
+            f"--- Highlights ---\n{highlights}"
+        )
+
+    def next_action_from_ruff(self) -> str:
+        """
+        Ruff の returncode / patch 有無から単純な次アクションを提案。
+        """
+        if not self._ruff_report:
+            return "No ruff report loaded."
+        rc = self._ruff_report.get("returncode")
+        if rc == 0:
+            return "✅ Ruff: No issues detected. No action needed."
+        patch = self._ruff_report.get("patch_path")
+        if self._ruff_report.get("fix_mode") and patch:
+            return f"📝 Ruff patch generated: {patch}（commit → PR を推奨）"
+        return "⚠️ Ruff: Issues remain. `--fix` か手修正を検討してください。"
 
     # ====== 低レベル: パターン検出 ======
     def _detect_patterns(self, tb: str) -> List[str]:
@@ -136,12 +194,14 @@ class InventorScriptus:
         return PatchSuggestion(
             file=f"{frm}",
             function=f"(export {sym})",
-            pseudo_diff=textwrap.dedent(f"""\
+            pseudo_diff=textwrap.dedent(
+                f"""\
                 --- a/{frm}
                 +++ b/{frm}
                 @@
                 + # {sym} を __all__ に追加、もしくは実装ファイルから再エクスポート
-            """),
+                """
+            ),
             rationale="シンボル未公開/循環参照/破壊的変更のいずれか。最小差分で公開または呼び出し側を最新APIに合わせる。",
         )
 
@@ -152,12 +212,14 @@ class InventorScriptus:
         return PatchSuggestion(
             file=f"(class {obj})",
             function=f"(ensure {attr})",
-            pseudo_diff=textwrap.dedent(f"""\
+            pseudo_diff=textwrap.dedent(
+                f"""\
                 @@ class {obj}:
                 -    # missing: {attr}
                 +    def __init__(...):
                 +        self.{attr} = ...
-            """),
+                """
+            ),
             rationale="属性未設定/IF不一致。`__init__` での代入漏れや名称乖離を最小差分で補正。",
         )
 
@@ -192,7 +254,8 @@ class InventorScriptus:
             return PatchSuggestion(
                 file="src/plan_data/strategy_adapter.py",
                 function="_bundle_to_dict_and_order",
-                pseudo_diff=textwrap.dedent("""\
+                pseudo_diff=textwrap.dedent(
+                    """\
                     --- a/src/plan_data/strategy_adapter.py
                     +++ b/src/plan_data/strategy_adapter.py
                     @@
@@ -205,7 +268,8 @@ class InventorScriptus:
                              key = f"ctx_{k}" if k not in base else k
                              if key not in base:
                                  base[key] = v
-                """),
+                    """
+                ),
                 rationale="FeatureContext が pydantic モデルでも安全に動くよう .dict() に対応（最小差分）。",
             )
         if "QUALITY" in tb and "emit_alert" in tb:
@@ -343,8 +407,12 @@ class InventorScriptus:
                 f"**修正方針（候補）**\n\n"
                 f"- 対象: `{ps.file}` / `{ps.function}`\n"
                 f"- 根拠: {ps.rationale}\n\n"
-                + ("<details><summary>Pseudo Diff</summary>\n\n```diff\n"
-                   f"{ps.pseudo_diff.strip()}\n```\n</details>\n\n" if ps.pseudo_diff.strip() else "")
+                + (
+                    "<details><summary>Pseudo Diff</summary>\n\n```diff\n"
+                    f"{ps.pseudo_diff.strip()}\n```\n</details>\n\n"
+                    if ps.pseudo_diff.strip()
+                    else ""
+                )
                 + "<details><summary>Traceback (tail)</summary>\n\n```text\n"
                 f"{tb_tail}\n```\n</details>\n"
             )
@@ -358,6 +426,7 @@ class InventorScriptus:
             "3. 全体を `python -m codex.mini_loop` または CI で再検証\n"
         )
         return header + "\n".join(blocks) + tail
+
 
 # ======================================================
 # 既存互換: モジュールレベル関数（壊さないために残す）
