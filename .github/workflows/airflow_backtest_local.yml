@@ -1,4 +1,3 @@
----
 name: Airflow Backtest (Local)
 
 on:
@@ -27,6 +26,9 @@ concurrency:
 jobs:
   backtest:
     runs-on: ubuntu-latest  # self-hosted ならここを変更
+    env:
+      AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
+      AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
 
     steps:
       - name: Checkout
@@ -63,10 +65,8 @@ jobs:
 
       # Secrets が設定されている時だけ Airflow DAG を起動
       - name: Trigger Airflow DAG (if secrets provided)
-        if: ${{ secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '' }}
+        if: ${{ env.AIRFLOW_BASE_URL != '' && env.AIRFLOW_TOKEN != '' }}
         env:
-          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
-          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
           NOCTRIA_STRATEGY_GLOB: ${{ github.event.inputs.strategy_glob }}
           NOCTRIA_EXTRA_ARGS: ${{ github.event.inputs.extra_args }}
         run: |

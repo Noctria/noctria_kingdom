@@ -57,3 +57,4 @@ tests/**/*.py text diff=python
 # 🧪 Markdown & ドキュメント
 # ==========================
 *.md text
+* text=auto eol=lf
