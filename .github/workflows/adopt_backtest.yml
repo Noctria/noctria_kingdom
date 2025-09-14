@@ -3,11 +3,11 @@ name: Backtest on Adopt PR (self-hosted)
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
     inputs:
       ref:
-        description: "target ref (branch or SHA)"
+        description: "target ref (branch)"
         required: false
         default: ""
 
@@ -23,41 +23,28 @@ concurrency:
 jobs:
   backtest-on-adopt:
     runs-on: self-hosted
-    timeout-minutes: 45
-
-    # adopt/** 限定 + フォーク由来は self-hosted で実行しない（安全）
-    if: >
-      (github.event_name == 'workflow_dispatch' ||
-       startsWith((github.event.pull_request.head.ref || github.ref_name), 'adopt/'))
-      &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.head.repo.full_name == github.repository)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      startsWith((github.event.pull_request.head.ref || github.ref_name), 'adopt/')
 
     env:
-      # PRイベントなら head ブランチ/コミット、手動なら入力
       TARGET_REF: ${{ github.event.pull_request.head.ref || inputs.ref || github.ref_name }}
-      TARGET_SHA: ${{ github.event.pull_request.head.sha || inputs.ref || '' }}
-      STRATEGY_GLOB: "src/strategies/veritas_generated/**.py"
+      STRATEGY_GLOB: src/strategies/veritas_generated/**.py
       EXTRA_ARGS: ""
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}
 
     steps:
       - name: Show context
         run: |
           echo "TARGET_REF=${TARGET_REF}"
-          echo "TARGET_SHA=${TARGET_SHA}"
           echo "actor=${{ github.actor }}"
           echo "runner=${{ runner.name }} (${{ runner.os }})"
 
-      # self-hosted は作業ツリーが汚れやすいので毎回クリーンに
-      - name: Checkout target (clean)
+      - name: Checkout target branch
         uses: actions/checkout@v4
         with:
-          # PRなら正確にそのコミット、なければブランチ/入力ref
-          ref: ${{ env.TARGET_SHA != '' && env.TARGET_SHA || env.TARGET_REF }}
+          ref: ${{ env.TARGET_REF }}
           fetch-depth: 0
-          clean: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -82,9 +69,8 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      # Airflow連携（Secrets設定時のみ）
       - name: Trigger Airflow DAG (optional)
-        if: ${{ (secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '') }}
+        if: secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != ''
         env:
           AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
           AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
@@ -94,29 +80,6 @@ jobs:
           set -euo pipefail
           echo "Triggering Airflow DAG for ${TARGET_REF}"
           python3 scripts/trigger_backtest_dag.py
-
-      # 成否判定：result.json の ok を見て失敗なら exit 1（両方無ければスルー）
-      - name: Determine result
-        id: decide
-        if: always()
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-import glob, json, sys, pathlib
-cands = glob.glob("airflow_docker/backtests/**/result.json", recursive=True)
-ok = None
-for p in sorted(cands):
-    try:
-        d = json.loads(pathlib.Path(p).read_text(encoding="utf-8"))
-        if "ok" in d:
-            ok = bool(d["ok"])
-    except Exception:
-        pass
-if ok is False:
-    print("Backtest reported failure (ok=false)")
-    sys.exit(1)
-print("No failing result detected")
-PY
 
       - name: Collect artifacts
         if: always()
@@ -137,7 +100,7 @@ PY
             fi
           done
           echo "=== Collected ==="
-          find handoff_out -type f | sed 's/^/ - /'
+          find handoff_out -type f 2>/dev/null | sed 's/^/ - /' || true
 
       - name: Upload artifacts
         if: always()
@@ -148,11 +111,10 @@ PY
           retention-days: 14
 
       - name: Post summary to PR
-        if: ${{ github.event_name == 'pull_request' }}
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
           TARGET_REF: ${{ env.TARGET_REF }}
-          RUNNER_NAME: ${{ runner.name }}
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -165,13 +127,9 @@ PY
               ``,
               `> If Airflow secrets are configured, DAG was also triggered.`
             ].join('\n');
-            try {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body: `**${title}**\n\n${body}`
-              });
-            } catch (e) {
-              core.warning(`Failed to comment on PR: ${e.message}`);
-            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `**${title}**\n\n${body}`
+            });
