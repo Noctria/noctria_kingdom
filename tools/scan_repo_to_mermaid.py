@@ -21,11 +21,10 @@ Repository scanner → Mermaid (.mmd) generator
 """
 
 from __future__ import annotations
+
 import argparse
 import ast
 import fnmatch
-import io
-import os
 import re
 import sys
 from pathlib import Path
@@ -40,14 +39,14 @@ TEXT_LIKE_EXT = {
     ".dockerfile", ".dockerignore",
     ".sh", ".bash", ".zsh",
     ".sql",
-    ".cfg", ".properties",
+    ".properties",
     ".rst",
     ".jinja", ".j2",
     ".xml",
     ".gitignore", ".gitattributes",
     ".tf", ".tfvars",
     ".service",
-    ".log",  # ログも読みたいなら
+    ".log",
 }
 BINARY_LIKE_EXT = {
     ".zip", ".gz", ".bz2", ".xz", ".7z",
@@ -88,6 +87,7 @@ ROLE_STYLES = {
     "external": "ext",
 }
 
+
 def guess_role(path: Path, content: str) -> str:
     p = path
     name = p.name.lower()
@@ -112,11 +112,12 @@ def guess_role(path: Path, content: str) -> str:
         return "shell"
     if suffix in {".md", ".mmd", ".rst"}:
         return "docs"
-    if name in {".env", } or suffix in {".env"}:
+    if name in {".env"} or suffix in {".env"}:
         return "env"
     if suffix in {".ini", ".cfg", ".conf", ".toml", ".json"}:
         return "config"
     return "other"
+
 
 # --------- Python import 解析（AST） ---------
 
@@ -124,12 +125,12 @@ class PyImports(ast.NodeVisitor):
     def __init__(self):
         self.imports: Set[str] = set()
 
-    def visit_Import(self, node: ast.Import) -> None:
+    def visit_Import(self, node: ast.Import) -> None:  # type: ignore[override]
         for alias in node.names:
             if alias.name:
                 self.imports.add(alias.name)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # type: ignore[override]
         # node.module may be None (relative import like from . import x)
         mod = node.module or ""
         level = getattr(node, "level", 0) or 0
@@ -141,6 +142,7 @@ class PyImports(ast.NodeVisitor):
         else:
             if mod:
                 self.imports.add(mod)
+
 
 def build_python_module_index(root: Path) -> Dict[str, Path]:
     """
@@ -156,6 +158,7 @@ def build_python_module_index(root: Path) -> Dict[str, Path]:
         mod = ".".join(rel.with_suffix("").parts)
         idx[mod] = p
     return idx
+
 
 def resolve_relative_module(current_mod: str, rel: str) -> Optional[str]:
     """
@@ -176,19 +179,21 @@ def resolve_relative_module(current_mod: str, rel: str) -> Optional[str]:
         return None
     return ".".join(base)
 
+
 # --------- 依存関係抽出 ---------
 
 EDGE = Tuple[str, str]  # (src_id, dst_id)
+
 
 def sanitize_id(s: str) -> str:
     # MermaidのノードID用に安全化
     return re.sub(r"[^A-Za-z0-9_]", "_", s)
 
+
 def read_text_full(p: Path) -> str:
     # テキストとして全読込み（バイナリは除外）
     try:
-        with p.open("rb") as f:
-            raw = f.read()
+        raw = p.read_bytes()
         # 可能性: utf-8 / cp932 / latin-1 の順にトライ
         for enc in ("utf-8", "cp932", "latin-1"):
             try:
@@ -199,12 +204,14 @@ def read_text_full(p: Path) -> str:
     except Exception:
         return ""
 
+
 def should_exclude(path: Path, excludes: List[str], root: Path) -> bool:
     rel = str(path.relative_to(root))
     for pat in excludes:
         if fnmatch.fnmatch(rel, pat):
             return True
     return False
+
 
 def parse_dockerfile_refs(content: str) -> Set[str]:
     refs: Set[str] = set()
@@ -224,6 +231,7 @@ def parse_dockerfile_refs(content: str) -> Set[str]:
                 for s in srcs.split():
                     refs.add(s)
     return refs
+
 
 def parse_compose_refs(content: str) -> Set[str]:
     refs: Set[str] = set()
@@ -252,6 +260,7 @@ def parse_compose_refs(content: str) -> Set[str]:
             refs.add(ctx)
     return refs
 
+
 def parse_requirements(content: str) -> Set[str]:
     pkgs: Set[str] = set()
     for line in content.splitlines():
@@ -264,11 +273,12 @@ def parse_requirements(content: str) -> Set[str]:
             pkgs.add(name)
     return pkgs
 
+
 # --------- スキャン本体 ---------
 
-def scan_repo(root: Path, excludes: List[str], follow_symlinks: bool) -> Tuple[
-    Dict[str, Dict], List[EDGE], Dict[str, Set[str]]
-]:
+def scan_repo(
+    root: Path, excludes: List[str], follow_symlinks: bool
+) -> Tuple[Dict[str, Dict], List[EDGE], Dict[str, Set[str]]]:
     """
     Returns:
       nodes: id -> {path, label, role}
@@ -292,12 +302,16 @@ def scan_repo(root: Path, excludes: List[str], follow_symlinks: bool) -> Tuple[
             if should_exclude(p, excludes, root):
                 continue
             node_id = sanitize_id(str(p.relative_to(root)) + "/")
-            nodes.setdefault(node_id, {
-                "path": str(p.relative_to(root)) + "/",
-                "label": f"{p.name}/",
-                "role": "dir",
-            })
-            top = p.relative_to(root).parts[0] if p != root and len(p.relative_to(root).parts) > 0 else ""
+            nodes.setdefault(
+                node_id,
+                {
+                    "path": str(p.relative_to(root)) + "/",
+                    "label": f"{p.name}/",
+                    "role": "dir",
+                },
+            )
+            rel_parts = p.relative_to(root).parts
+            top = rel_parts[0] if p != root and len(rel_parts) > 0 else ""
             if top:
                 clusters.setdefault(top, set()).add(node_id)
             continue
@@ -327,9 +341,11 @@ def scan_repo(root: Path, excludes: List[str], follow_symlinks: bool) -> Tuple[
         # 依存解析
         if role in {"python", "airflow_dag"}:
             # Python import解析
-            imports = set()
+            imports: Set[str] = set()
             try:
-                imports = PyImports().visit(ast.parse(content)) or set()  # type: ignore
+                visitor = PyImports()
+                visitor.visit(ast.parse(content))
+                imports = visitor.imports
             except Exception:
                 # AST失敗時は簡易正規表現フォールバック
                 for m in re.finditer(r"^\s*import\s+([A-Za-z0-9_\.]+)", content, re.MULTILINE):
@@ -364,9 +380,10 @@ def scan_repo(root: Path, excludes: List[str], follow_symlinks: bool) -> Tuple[
                     edges.append((node_id, dst_id))
                 else:
                     # 外部依存としてノード化
-                    ext_id = sanitize_id(f"ext::{mod.split('.')[0]}")
+                    head = mod.split(".")[0]
+                    ext_id = sanitize_id(f"ext::{head}")
                     if ext_id not in nodes:
-                        nodes[ext_id] = {"path": mod.split('.')[0], "label": mod.split('.')[0], "role": "external"}
+                        nodes[ext_id] = {"path": head, "label": head, "role": "external"}
                     edges.append((node_id, ext_id))
 
         elif role == "dockerfile":
@@ -400,7 +417,11 @@ def scan_repo(root: Path, excludes: List[str], follow_symlinks: bool) -> Tuple[
                         if ref_path.is_dir():
                             nodes[dst_id] = {"path": str(rel_ref) + "/", "label": rel_ref.name + "/", "role": "dir"}
                         else:
-                            nodes[dst_id] = {"path": str(rel_ref), "label": rel_ref.name, "role": guess_role(ref_path, read_text_full(ref_path))}
+                            nodes[dst_id] = {
+                                "path": str(rel_ref),
+                                "label": rel_ref.name,
+                                "role": guess_role(ref_path, read_text_full(ref_path)),
+                            }
                     edges.append((node_id, dst_id))
                 else:
                     # 外部/未解決参照
@@ -418,11 +439,11 @@ def scan_repo(root: Path, excludes: List[str], follow_symlinks: bool) -> Tuple[
                 edges.append((node_id, ext_id))
 
         else:
-            # そのほかのファイルからの参照はここでは扱わないが、
-            # 必要なら "source filename" や "python script.py" なども拾える
+            # そのほかのファイルからの参照はここでは扱わない
             pass
 
     return nodes, edges, clusters
+
 
 # --------- Mermaid 生成 ---------
 
@@ -445,9 +466,7 @@ def render_mermaid(nodes: Dict[str, Dict], edges: List[EDGE], clusters: Dict[str
     out.append('  classDef other fill:#FAFAFA,stroke:#9E9E9E,stroke-width:1px;')
 
     # サブグラフ（トップレベルディレクトリ）
-    # ルート直下にないノード（extなど）はサブグラフ外に出す
     printed: Set[str] = set()
-
     for top, node_ids in clusters.items():
         if top == "" or top.startswith("."):
             continue
@@ -456,7 +475,6 @@ def render_mermaid(nodes: Dict[str, Dict], edges: List[EDGE], clusters: Dict[str
             n = nodes[nid]
             label = n["label"]
             role = n["role"]
-            # Mermaid ノード: id["label"]:::class
             out.append(f'    {nid}["{label}"]:::{ROLE_STYLES.get(role, "other")}')
             printed.add(nid)
         out.append("  end")
@@ -477,7 +495,7 @@ def render_mermaid(nodes: Dict[str, Dict], edges: List[EDGE], clusters: Dict[str
 
     # ちょいLegend
     out.append("  %% Legend")
-    out.append('  subgraph _Legend')
+    out.append("  subgraph _Legend")
     for role, cls in ROLE_STYLES.items():
         if role in {"dir"}:
             continue
@@ -486,6 +504,7 @@ def render_mermaid(nodes: Dict[str, Dict], edges: List[EDGE], clusters: Dict[str
     out.append("  end")
 
     return "\n".join(out)
+
 
 # --------- CLI ---------
 
@@ -513,6 +532,7 @@ def main():
         print(f"[OK] Mermaid written to: {args.output} (nodes={len(nodes)}, edges={len(edges)})")
     else:
         print(mmd)
+
 
 if __name__ == "__main__":
     main()
