@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "msg": "Dummy backtest succeeded (heavy env not available)",
+  "conf": {
+    "strategy_glob": "src/strategies/veritas_generated/**.py",
+    "extra_args": ""
+  },
+  "mode": "dummy"
+}
