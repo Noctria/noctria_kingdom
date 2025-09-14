@@ -1,0 +1,12 @@
+# .ruff.toml
+target-version = "py312"
+line-length = 120
+
+[lint]
+# まずは基本だけ（E/F）。長い行(E501)などは最初は見ない
+select = ["E", "F"]
+ignore = ["E501"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
