@@ -16,14 +16,13 @@ permissions:
   pull-requests: write
   issues: write
 
-# github.ref_name にスラッシュが含まれる場合に備えて置換
 concurrency:
-  group: backtest-adopt-${{ github.event.pull_request.number || replace(github.ref_name, '/', '-') }}
+  # replace() を使わず、素の ref を使う（ここは / を含んでも問題なし）
+  group: backtest-adopt-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   backtest-on-adopt:
-    # 自前ランナーで動かす
     runs-on: self-hosted
 
     # adopt/** のPRだけ対象（手動実行は常に可）
@@ -32,7 +31,7 @@ jobs:
       startsWith( (github.event.pull_request.head.ref || github.ref_name), 'adopt/')
 
     env:
-      # PRイベントなら adopt ブランチ名、手動なら入力、なければ ref_name
+      # PRなら adopt ブランチ名、手動なら入力
       TARGET_REF: ${{ github.event.pull_request.head.ref || inputs.ref || github.ref_name }}
       STRATEGY_GLOB: "src/strategies/veritas_generated/**.py"
       EXTRA_ARGS: ""
@@ -43,7 +42,7 @@ jobs:
         run: |
           echo "TARGET_REF=${TARGET_REF}"
           echo "actor=${{ github.actor }}"
-          echo "runner=${{ runner.name }} (${{ runner.os }})"
+          echo "runner=${RUNNER_NAME} (${RUNNER_OS})"
 
       - name: Checkout target branch
         uses: actions/checkout@v4
@@ -74,19 +73,31 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      # Airflow連携（Secrets設定時のみ）
-      - name: Trigger Airflow DAG (optional)
-        if: ${{ (secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '') }}
+      # === Airflow 連携（Secrets設定時のみ）===
+      - name: Export Airflow secrets to env
+        # ここで secrets を env に映す（この step 自体は常にOK）
         env:
-          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
-          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
+          AIRFLOW_BASE_URL_SEC: ${{ secrets.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN_SEC: ${{ secrets.AIRFLOW_TOKEN }}
+        run: |
+          # 空の場合は空文字を書き込む（未設定でも if 評価が安定するように）
+          echo "AIRFLOW_BASE_URL=${AIRFLOW_BASE_URL_SEC}" >> "$GITHUB_ENV"
+          echo "AIRFLOW_TOKEN=${AIRFLOW_TOKEN_SEC}" >> "$GITHUB_ENV"
+
+      - name: Trigger Airflow DAG (optional)
+        # secrets 直接参照ではなく、直前で書いた env で判定する
+        if: ${{ env.AIRFLOW_BASE_URL != '' && env.AIRFLOW_TOKEN != '' }}
+        env:
+          AIRFLOW_BASE_URL: ${{ env.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN: ${{ env.AIRFLOW_TOKEN }}
           NOCTRIA_STRATEGY_GLOB: ${{ env.STRATEGY_GLOB }}
           NOCTRIA_EXTRA_ARGS: ${{ env.EXTRA_ARGS }}
         run: |
           set -euo pipefail
-          echo "Triggering Airflow DAG for ${TARGET_REF}"
+          echo "Triggering Airflow DAG for ${TARGET_REF} via ${AIRFLOW_BASE_URL}"
           python3 scripts/trigger_backtest_dag.py
 
+      # === 収集＆アップロード ===
       - name: Collect artifacts
         if: always()
         run: |
@@ -108,17 +119,20 @@ jobs:
           echo "=== Collected ==="
           find handoff_out -type f | sed 's/^/ - /'
 
-      # Artifact 名に / が入らないようサニタイズ（例: adopt/hook-check -> adopt-hook-check）
-      - name: Sanitize ref for artifact names
+      - name: Make safe artifact name
+        id: safe
+        # アーティファクト名で / が禁止なのでここで置換しておく
         run: |
-          SAFE="${TARGET_REF//\//-}"
-          echo "TARGET_REF_SAFE=$SAFE" >> "$GITHUB_ENV"
+          SAFE_REF="${GITHUB_REF_NAME//\//-}"
+          echo "SAFE_REF=$SAFE_REF" | tee -a "$GITHUB_ENV"
+          echo "safe=$SAFE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backtest-${{ github.run_id }}-${{ env.TARGET_REF_SAFE }}
+          # 例: backtest-17709626741-adopt-hook-check
+          name: backtest-${{ github.run_id }}-${{ steps.safe.outputs.safe }}
           path: handoff_out
           retention-days: 14
 
@@ -127,7 +141,6 @@ jobs:
         uses: actions/github-script@v7
         env:
           TARGET_REF: ${{ env.TARGET_REF }}
-          RUNNER_NAME: ${{ runner.name }}
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
