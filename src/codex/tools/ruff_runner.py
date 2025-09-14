@@ -21,7 +21,7 @@ if not LOGGER.handlers:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 REPORTS_DIR = ROOT / "src" / "codex_reports"
 PATCH_DIR = REPORTS_DIR / "patches"
 RUFF_JSON_DIR = REPORTS_DIR / "ruff"
