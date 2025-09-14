@@ -1,0 +1,105 @@
+name: Airflow Backtest (Local)
+
+on:
+  workflow_dispatch:
+    inputs:
+      strategy_glob:
+        description: >
+          実行対象戦略のグロブ
+          （例: src/strategies/veritas_generated/**.py）
+        required: false
+        default: "src/strategies/veritas_generated/**.py"
+      extra_args:
+        description: "追加引数（任意）"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 * * * *"  # 毎時（UTC）
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airflow-backtest
+  cancel-in-progress: true
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest  # self-hosted ならここを変更
+    env:
+      AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
+      AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Show context
+        run: |
+          echo "strategy_glob=${{ github.event.inputs.strategy_glob }}"
+          echo "extra_args=${{ github.event.inputs.extra_args }}"
+
+      - name: Install minimal deps
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Run local backtest (script)
+        run: |
+          set -euo pipefail
+          if [ -f "airflow_docker/scripts/veritas_local_test.py" ]; then
+            python3 airflow_docker/scripts/veritas_local_test.py \
+              --pattern "${{ github.event.inputs.strategy_glob }}" \
+              ${{ github.event.inputs.extra_args }}
+          else
+            echo "Dry run: backtest step placeholder OK"
+          fi
+
+      # Secrets が設定されている時だけ Airflow DAG を起動
+      - name: Trigger Airflow DAG (if secrets provided)
+        if: ${{ env.AIRFLOW_BASE_URL != '' && env.AIRFLOW_TOKEN != '' }}
+        env:
+          NOCTRIA_STRATEGY_GLOB: ${{ github.event.inputs.strategy_glob }}
+          NOCTRIA_EXTRA_ARGS: ${{ github.event.inputs.extra_args }}
+        run: |
+          set -euo pipefail
+          echo "Triggering Airflow DAG with:"
+          echo "  strategy_glob=$NOCTRIA_STRATEGY_GLOB"
+          echo "  extra_args=$NOCTRIA_EXTRA_ARGS"
+          python3 scripts/trigger_backtest_dag.py
+
+      - name: Collect results
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p handoff_out
+          for p in \
+            "airflow_docker/logs/veritas_generate.log" \
+            "airflow_docker/logs/veritas_eval_result.json" \
+            "logs/veritas_evaluate.log" \
+            "logs/veritas_eval_result.json" \
+            "data/stats/*.json" \
+            "handoff/handoff_*.md" \
+            "handoff/handoff_*.json"
+          do
+            if ls $p >/dev/null 2>&1; then
+              cp -r $p handoff_out/ 2>/dev/null || true
+            fi
+          done
+          ls -al handoff_out || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airflow-backtest-${{ github.run_id }}
+          path: handoff_out
+          retention-days: 14
