@@ -16,23 +16,19 @@ permissions:
   pull-requests: write
   issues: write
 
-# github.ref_name にスラッシュが含まれる場合に備えて置換
 concurrency:
-  group: backtest-adopt-${{ github.event.pull_request.number || replace(github.ref_name, '/', '-') }}
+  group: backtest-adopt-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   backtest-on-adopt:
-    # 自前ランナーで動かす
     runs-on: self-hosted
 
-    # adopt/** のPRだけ対象（手動実行は常に可）
     if: >
       github.event_name == 'workflow_dispatch' ||
       startsWith( (github.event.pull_request.head.ref || github.ref_name), 'adopt/')
 
     env:
-      # PRイベントなら adopt ブランチ名、手動なら入力、なければ ref_name
       TARGET_REF: ${{ github.event.pull_request.head.ref || inputs.ref || github.ref_name }}
       STRATEGY_GLOB: "src/strategies/veritas_generated/**.py"
       EXTRA_ARGS: ""
@@ -62,6 +58,14 @@ jobs:
           python -m pip install -U pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - name: Compute safe ref / artifact name
+        id: saferef
+        run: |
+          set -euo pipefail
+          SAFE_REF="${TARGET_REF//\//-}"
+          echo "SAFE_REF=$SAFE_REF" | tee -a "$GITHUB_ENV"
+          echo "ARTIFACT=backtest-${{ github.run_id }}-$SAFE_REF" | tee -a "$GITHUB_ENV"
+
       - name: Run local backtest (fast path on runner)
         id: local_backtest
         continue-on-error: true
@@ -74,9 +78,7 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      # Airflow連携（Secrets設定時のみ）
       - name: Trigger Airflow DAG (optional)
-        if: ${{ (secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '') }}
         env:
           AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
           AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
@@ -84,8 +86,12 @@ jobs:
           NOCTRIA_EXTRA_ARGS: ${{ env.EXTRA_ARGS }}
         run: |
           set -euo pipefail
-          echo "Triggering Airflow DAG for ${TARGET_REF}"
-          python3 scripts/trigger_backtest_dag.py
+          if [ -n "${AIRFLOW_BASE_URL:-}" ] && [ -n "${AIRFLOW_TOKEN:-}" ]; then
+            echo "Triggering Airflow DAG for ${TARGET_REF}"
+            python3 scripts/trigger_backtest_dag.py
+          else
+            echo "AIRFLOW_* secrets not set; skipping Airflow trigger."
+          fi
 
       - name: Collect artifacts
         if: always()
@@ -108,17 +114,11 @@ jobs:
           echo "=== Collected ==="
           find handoff_out -type f | sed 's/^/ - /'
 
-      # Artifact 名に / が入らないようサニタイズ（例: adopt/hook-check -> adopt-hook-check）
-      - name: Sanitize ref for artifact names
-        run: |
-          SAFE="${TARGET_REF//\//-}"
-          echo "TARGET_REF_SAFE=$SAFE" >> "$GITHUB_ENV"
-
-      - name: Upload artifacts
+      - name: Upload artifacts (sanitized name)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backtest-${{ github.run_id }}-${{ env.TARGET_REF_SAFE }}
+          name: ${{ env.ARTIFACT }}
           path: handoff_out
           retention-days: 14
 
@@ -127,7 +127,6 @@ jobs:
         uses: actions/github-script@v7
         env:
           TARGET_REF: ${{ env.TARGET_REF }}
-          RUNNER_NAME: ${{ runner.name }}
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
