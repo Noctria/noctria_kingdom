@@ -16,8 +16,8 @@ permissions:
   pull-requests: write
   issues: write
 
+# NOTE: slashes を含んでも concurrency group は問題なし。/ を消したい場合は後段のシェルで SAFE_REF を作る
 concurrency:
-  # replace() を使わず、素の ref を使う（ここは / を含んでも問題なし）
   group: backtest-adopt-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
@@ -25,13 +25,12 @@ jobs:
   backtest-on-adopt:
     runs-on: self-hosted
 
-    # adopt/** のPRだけ対象（手動実行は常に可）
+    # adopt/** の PR だけ対象（手動は常に可）
     if: >
       github.event_name == 'workflow_dispatch' ||
       startsWith( (github.event.pull_request.head.ref || github.ref_name), 'adopt/')
 
     env:
-      # PRなら adopt ブランチ名、手動なら入力
       TARGET_REF: ${{ github.event.pull_request.head.ref || inputs.ref || github.ref_name }}
       STRATEGY_GLOB: "src/strategies/veritas_generated/**.py"
       EXTRA_ARGS: ""
@@ -42,7 +41,7 @@ jobs:
         run: |
           echo "TARGET_REF=${TARGET_REF}"
           echo "actor=${{ github.actor }}"
-          echo "runner=${RUNNER_NAME} (${RUNNER_OS})"
+          echo "runner=${{ runner.name }} (${{ runner.os }})"
 
       - name: Checkout target branch
         uses: actions/checkout@v4
@@ -61,6 +60,14 @@ jobs:
           python -m pip install -U pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - name: Compute safe ref / artifact name
+        id: saferef
+        run: |
+          set -euo pipefail
+          SAFE_REF="${TARGET_REF//\//-}"           # adopt/xxx → adopt-xxx
+          echo "SAFE_REF=$SAFE_REF"        | tee -a "$GITHUB_ENV"
+          echo "ARTIFACT=backtest-${{ github.run_id }}-$SAFE_REF" | tee -a "$GITHUB_ENV"
+
       - name: Run local backtest (fast path on runner)
         id: local_backtest
         continue-on-error: true
@@ -73,31 +80,22 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      # === Airflow 連携（Secrets設定時のみ）===
-      - name: Export Airflow secrets to env
-        # ここで secrets を env に映す（この step 自体は常にOK）
-        env:
-          AIRFLOW_BASE_URL_SEC: ${{ secrets.AIRFLOW_BASE_URL }}
-          AIRFLOW_TOKEN_SEC: ${{ secrets.AIRFLOW_TOKEN }}
-        run: |
-          # 空の場合は空文字を書き込む（未設定でも if 評価が安定するように）
-          echo "AIRFLOW_BASE_URL=${AIRFLOW_BASE_URL_SEC}" >> "$GITHUB_ENV"
-          echo "AIRFLOW_TOKEN=${AIRFLOW_TOKEN_SEC}" >> "$GITHUB_ENV"
-
+      # Airflow 連携は Secrets があるときだけ実行（式ではなくシェルで判定）
       - name: Trigger Airflow DAG (optional)
-        # secrets 直接参照ではなく、直前で書いた env で判定する
-        if: ${{ env.AIRFLOW_BASE_URL != '' && env.AIRFLOW_TOKEN != '' }}
         env:
-          AIRFLOW_BASE_URL: ${{ env.AIRFLOW_BASE_URL }}
-          AIRFLOW_TOKEN: ${{ env.AIRFLOW_TOKEN }}
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
           NOCTRIA_STRATEGY_GLOB: ${{ env.STRATEGY_GLOB }}
           NOCTRIA_EXTRA_ARGS: ${{ env.EXTRA_ARGS }}
         run: |
           set -euo pipefail
-          echo "Triggering Airflow DAG for ${TARGET_REF} via ${AIRFLOW_BASE_URL}"
-          python3 scripts/trigger_backtest_dag.py
+          if [ -n "${AIRFLOW_BASE_URL:-}" ] && [ -n "${AIRFLOW_TOKEN:-}" ]; then
+            echo "Triggering Airflow DAG for ${TARGET_REF}"
+            python3 scripts/trigger_backtest_dag.py
+          else
+            echo "AIRFLOW_* secrets not set; skipping Airflow trigger."
+          fi
 
-      # === 収集＆アップロード ===
       - name: Collect artifacts
         if: always()
         run: |
@@ -119,20 +117,11 @@ jobs:
           echo "=== Collected ==="
           find handoff_out -type f | sed 's/^/ - /'
 
-      - name: Make safe artifact name
-        id: safe
-        # アーティファクト名で / が禁止なのでここで置換しておく
-        run: |
-          SAFE_REF="${GITHUB_REF_NAME//\//-}"
-          echo "SAFE_REF=$SAFE_REF" | tee -a "$GITHUB_ENV"
-          echo "safe=$SAFE_REF" >> "$GITHUB_OUTPUT"
-
-      - name: Upload artifacts
+      - name: Upload artifacts (sanitized name)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          # 例: backtest-17709626741-adopt-hook-check
-          name: backtest-${{ github.run_id }}-${{ steps.safe.outputs.safe }}
+          name: ${{ env.ARTIFACT }}     # ← / を含まない安全な名前
           path: handoff_out
           retention-days: 14
 
