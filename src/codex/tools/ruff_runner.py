@@ -1,181 +1,130 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-ruff_runner.py
-- Ruff を指定ターゲットに対して実行
-- --fix 指定時は自動修正を実施し、差分をパッチとして保存
-- 実行結果の要約を JSON に保存（次段の Inventor/Harmonia で参照しやすく）
-
-使い方:
-  python ruff_runner.py tests/unit_tests.py tools/*.py
-  python ruff_runner.py --fix tools/scan_repo_to_mermaid.py
-
-推奨: venv_codex を有効化したシェルで実行（ruff が PATH にあること）
-"""
-
+# src/codex/tools/ruff_runner.py
 from __future__ import annotations
 
 import argparse
 import json
-import os
-import shlex
+import logging
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]  # プロジェクト直下を想定（/src の1つ上）
-REPORT_DIR = REPO_ROOT / "src" / "codex_reports" / "ruff"
-PATCH_DIR = REPO_ROOT / "src" / "codex_reports" / "patches"
-
-
-def run(cmd: List[str], cwd: Path | None = None) -> Tuple[int, str]:
-    """サブプロセスを走らせ、returncode と stdout+stderr を返す。"""
-    proc = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
+# =============================================================================
+# 設定
+# =============================================================================
+LOGGER = logging.getLogger("ruff_runner")
+if not LOGGER.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    return proc.returncode, proc.stdout
+
+ROOT = Path(__file__).resolve().parents[2]
+REPORTS_DIR = ROOT / "src" / "codex_reports"
+PATCH_DIR = REPORTS_DIR / "patches"
+RUFF_JSON_DIR = REPORTS_DIR / "ruff"
+
+for d in [REPORTS_DIR, PATCH_DIR, RUFF_JSON_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
 
 
-def ensure_dirs() -> None:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    PATCH_DIR.mkdir(parents=True, exist_ok=True)
+# =============================================================================
+# ユーティリティ
+# =============================================================================
+def run_cmd(args: List[str]) -> subprocess.CompletedProcess:
+    LOGGER.info("Running: %s", " ".join(args))
+    return subprocess.run(args, capture_output=True, text=True)
 
 
-def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Run ruff with optional --fix and export a patch.")
-    ap.add_argument(
-        "targets",
-        nargs="*",
-        help="Files or directories to lint. If omitted, ruff will run on the repo root.",
-    )
-    ap.add_argument(
-        "--fix",
-        action="store_true",
-        help="Run `ruff check --fix` to apply autofixes, then export a patch if changes exist.",
-    )
-    ap.add_argument(
-        "--output-json",
-        default=str(REPORT_DIR / "last_run.json"),
-        help="Path to write a JSON summary (default: src/codex_reports/ruff/last_run.json).",
-    )
-    ap.add_argument(
-        "--extra-args",
-        default="",
-        help="Extra args to pass to ruff (e.g. '--unsafe-fixes').",
-    )
-    return ap.parse_args()
+def save_patch(diff_text: str, prefix: str = "ruff_autofix") -> Path:
+    """生成されたパッチを保存して返す"""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    path = PATCH_DIR / f"{prefix}_{ts}.patch"
+    path.write_text(diff_text, encoding="utf-8")
+    LOGGER.info("Saved patch: %s", path)
+    return path
 
 
-def build_ruff_cmd(fix: bool, targets: List[str], extra_args: str) -> List[str]:
+def save_json(data: Dict[str, Any], filename: str) -> Path:
+    path = RUFF_JSON_DIR / filename
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    LOGGER.info("Saved JSON: %s", path)
+    return path
+
+
+# =============================================================================
+# 実行ロジック
+# =============================================================================
+def run_ruff(
+    targets: List[str],
+    fix: bool = False,
+    extra_args: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    ruff を実行して結果を dict で返す
+    """
     cmd = ["ruff", "check"]
     if fix:
         cmd.append("--fix")
-
     if extra_args:
-        cmd += shlex.split(extra_args)
+        cmd.extend(extra_args.split())
 
-    # ターゲットがなければカレント（repo root）に対して実行
-    if targets:
-        cmd += targets
-    else:
-        cmd.append(".")
+    cmd.extend(targets)
 
-    return cmd
+    proc = run_cmd(cmd)
 
-
-def export_patch_if_changed(targets: List[str]) -> str | None:
-    """
-    変更があれば git diff --patch を生成。
-    - 対象ファイルに絞りたいが、手軽さ優先でリポジトリ全体の差分を取得。
-    - 将来: targets が明示された場合はパスで -- を付けて範囲を絞る最適化も可。
-    """
-    # 何か変更があるか？
-    rc, _ = run(["git", "diff", "--quiet"])
-    if rc == 0:
-        return None  # 差分なし
-
-    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    patch_path = PATCH_DIR / f"ruff_autofix_{ts}.patch"
-
-    # パッチ出力
-    run(["git", "diff", "--patch", "--no-ext-diff", "-U3", "-a", "-M", "-C", "-B", "-R"])  # warm-up
-    rc, patch = run(["git", "diff", "--patch", "--no-ext-diff", "-U3"])
-    if rc not in (0, 1):  # git diff は差分があっても 0/1 を返し得る
-        return None
-
-    patch_path.write_text(patch, encoding="utf-8")
-    return str(patch_path)
-
-
-def summarize_ruff_output(output: str) -> Dict[str, Any]:
-    """
-    超簡易サマリ:
-    - 全出力テキスト
-    - issue 件数っぽい行の抽出（ruff は最後に 'Found X errors (Y fixed)' のようなまとめを出す）
-    """
-    summary_lines: List[str] = []
-    for line in output.splitlines():
-        if "error" in line.lower() or "warning" in line.lower():
-            summary_lines.append(line.strip())
-        if line.strip().startswith("Found "):  # Ruff のまとめ行
-            summary_lines.append(line.strip())
-
-    return {
-        "raw": output,
-        "highlights": summary_lines[-10:],  # 末尾側の重要そうな行を最大10行
+    result: Dict[str, Any] = {
+        "command": cmd,
+        "returncode": proc.returncode,
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
     }
 
+    return result
 
-def main() -> int:
-    args = parse_args()
-    ensure_dirs()
 
-    ruff_cmd = build_ruff_cmd(args.fix, args.targets, args.extra_args)
-    rc, out = run(ruff_cmd)
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description="Run ruff with unified output")
+    parser.add_argument("targets", nargs="*", help="Target files or directories")
+    parser.add_argument("--fix", action="store_true", help="Apply fixes")
+    parser.add_argument(
+        "--output-json", type=str, default="last_run.json", help="JSON出力先"
+    )
+    parser.add_argument(
+        "--extra-args", type=str, help="Extra args to pass to ruff (string)"
+    )
+    args = parser.parse_args(argv)
 
-    # 要約を準備
-    summary = {
-        "cmd": ruff_cmd,
-        "returncode": rc,
-        "fix_mode": args.fix,
-        "cwd": str(REPO_ROOT),
-        "timestamp_utc": datetime.utcnow().isoformat() + "Z",
-        "result": summarize_ruff_output(out),
-        "patch_path": None,
-    }
+    if not args.targets:
+        LOGGER.error("No targets specified")
+        return 1
 
-    # --fix の場合は差分をパッチ出力
-    if args.fix:
-        patch_path = export_patch_if_changed(args.targets)
-        if patch_path:
-            summary["patch_path"] = patch_path
+    result = run_ruff(args.targets, fix=args.fix, extra_args=args.extra_args)
 
     # JSON 保存
-    out_json = Path(args.output_json)
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_json(result, args.output_json)
 
-    # 画面にも軽く出す
+    # stdout/stderr を画面にも出力
     print("==== Ruff Runner ====")
-    print("$", " ".join(shlex.quote(c) for c in ruff_cmd))
-    print("--- returncode:", rc)
-    if summary["patch_path"]:
-        print("patch:", summary["patch_path"])
-    print("--- highlights ---")
-    for line in summary["result"]["highlights"]:
-        print(line)
-    print(f"JSON: {out_json}")
+    print(f"$ {' '.join(result['command'])}")
+    print(f"--- returncode: {result['returncode']}")
+    if result["stdout"]:
+        print("--- stdout ---")
+        print(result["stdout"])
+    if result["stderr"]:
+        print("--- stderr ---")
+        print(result["stderr"])
+    print(f"JSON: {RUFF_JSON_DIR / args.output_json}")
 
-    # そのまま Ruff の終了コードを返す（CI 連携しやすい）
-    return rc
+    # diff があればパッチ保存
+    if args.fix and result["stdout"]:
+        patch = save_patch(result["stdout"])
+        print(f"patch: {patch}")
+
+    return result["returncode"]
 
 
 if __name__ == "__main__":
