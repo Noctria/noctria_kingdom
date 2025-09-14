@@ -1,4 +1,4 @@
-# codex/agents/inventor.py
+# src/codex/agents/inventor.py
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -25,7 +25,7 @@ INVENTOR_SYSTEM_PROMPT = """\
 """
 
 # =========================
-# 既存: データモデル
+# 既存: データモデル (+最小強化)
 # =========================
 @dataclass
 class PatchSuggestion:
@@ -41,17 +41,23 @@ class InventorOutput:
     patch_suggestions: List[PatchSuggestion]
     followup_tests: List[str]
 
+    # ★ 最小強化: 生成時刻とトレースID（観測性）
+    generated_at: str
+    trace_id: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
-        d = asdict(self)
-        # dataclassのリストを素の辞書へ
-        d["patch_suggestions"] = [asdict(p) for p in self.patch_suggestions]
-        return d
+        # asdict で十分（PatchSuggestion も展開される）
+        return asdict(self)
 
     def to_markdown(self) -> str:
         lines: List[str] = []
         lines.append("# 🛠️ Inventor Scriptus — 修正案（Lv1）")
-        jst = dt.timezone(dt.timedelta(hours=9))
-        lines.append(f"\n- Generated: `{dt.datetime.now(tz=jst).isoformat(timespec='seconds')}`\n")
+
+        # 既定は JST
+        lines.append(f"\n- Generated: `{self.generated_at}`\n")
+        if self.trace_id:
+            lines.append(f"- Trace ID: `{self.trace_id}`\n")
+
         if self.summary:
             lines.append(f"**Summary**: {self.summary}\n")
         if self.root_causes:
@@ -211,12 +217,13 @@ class InventorScriptus:
             )
         return None
 
-    # ====== 構造化出力（既存互換） ======
+    # ====== 構造化出力（既存互換 + 最小強化） ======
     def propose_fixes_structured(self, pytest_result: Dict[str, Any]) -> InventorOutput:
         """
         pytest_result 例（柔軟に対応）:
           {
             "failures": [{"nodeid": "...", "traceback": "...", "message": "..."}],
+            "trace_id": "...",  # 任意
             ...
           }
         """
@@ -251,22 +258,35 @@ class InventorScriptus:
             else:
                 suggestions.append(self._generic_suggestion(tb))
 
+        # 生成時刻（JST）
+        jst = dt.timezone(dt.timedelta(hours=9))
+        generated_at = dt.datetime.now(tz=jst).isoformat(timespec="seconds")
+        trace_id = pytest_result.get("trace_id")
+
         if not failures_in:
+            # 失敗なしでも観測情報は付けて返す
             return InventorOutput(
                 summary="失敗なし。修正提案は不要です。",
                 root_causes=[],
                 patch_suggestions=[],
                 followup_tests=[],
+                generated_at=generated_at,
+                trace_id=trace_id,
             )
+
+        # ★ 最小強化: followup_tests を必ず最低1件は入れる
+        followups: List[str] = [
+            "pytest -q -k <failing-nodeid>",
+            "pytest -q tests/test_quality_gate_alerts.py tests/test_noctus_gate_block.py",
+        ]
 
         return InventorOutput(
             summary="失敗テストに対する最小修正案の下書き",
             root_causes=root_causes,
             patch_suggestions=suggestions if suggestions else [self._generic_suggestion("")],
-            followup_tests=[
-                "pytest -q tests/test_quality_gate_alerts.py tests/test_noctus_gate_block.py",
-                "pytest -q -k <failing-nodeid>",
-            ],
+            followup_tests=followups,  # ← 空にならない
+            generated_at=generated_at,
+            trace_id=trace_id,
         )
 
     # ====== Markdown 出力（mini_loop 用の互換API） ======
@@ -292,6 +312,9 @@ class InventorScriptus:
             f"failed={context.get('pytest_summary',{}).get('failed',0)}, "
             f"errors={context.get('pytest_summary',{}).get('errors',0)}\n"
         )
+        if context.get("trace_id"):
+            header += f"- Trace ID: `{context.get('trace_id')}`\n"
+
         if not fs:
             return header + "\n✅ 失敗はありません。提案は不要です。\n"
 
