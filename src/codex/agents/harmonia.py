@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Tuple, Iterable
+from typing import List, Dict, Any, Optional, Tuple, Iterable, Sequence
 import textwrap
 import logging
+import os
+import json
+import math
 
 from .inventor import InventorOutput, PatchSuggestion
 
@@ -30,15 +33,60 @@ HARMONIA_SYSTEM_PROMPT = """\
 - "comments": 箇条書き
 """
 
+# =============================================================================
+# モード・重み設定
+# =============================================================================
+def _env_mode() -> str:
+    """
+    NOCTRIA_HARMONIA_MODE = "offline" | "api" | "auto"  (default: offline)
+    - offline: 既存の構造化ローカル審査のみ
+    - api    : LLM APIでの要約/補足コメント（失敗時は自動でofflineへフォールバック）
+    - auto   : apiを試して失敗ならoffline
+    """
+    mode = os.getenv("NOCTRIA_HARMONIA_MODE", "offline").strip().lower()
+    return mode if mode in {"offline", "api", "auto"} else "offline"
+
+
+_DEFAULT_WEIGHTS = {
+    # “weighted” リランク時の係数（大きいほど寄与）
+    "quality": 1.00,      # 提案品質: 高いほど良い (+)
+    "risk_adj": 0.90,     # リスク調整リターン: 高いほど良い (+)
+    "risk": 0.60,         # リスク: 低いほど良い  (-)
+    "size": 0.25,         # 取引サイズ: 過大は減点 (-, 非線形)
+}
+
+def _load_weights() -> Dict[str, float]:
+    raw = os.getenv("HARMONIA_WEIGHTS", "").strip()
+    if not raw:
+        return dict(_DEFAULT_WEIGHTS)
+    try:
+        data = json.loads(raw)
+        w = dict(_DEFAULT_WEIGHTS)
+        for k, v in (data or {}).items():
+            if isinstance(v, (int, float)) and k in w:
+                w[k] = float(v)
+        return w
+    except Exception:
+        LOGGER.warning("HARMONIA_WEIGHTS のJSON解釈に失敗。デフォルトを使用します。")
+        return dict(_DEFAULT_WEIGHTS)
+
+
+# =============================================================================
+# 型
+# =============================================================================
 @dataclass
 class ReviewResult:
     verdict: str  # "APPROVE" | "REVISE"
     comments: List[str]
 
+
+# =============================================================================
+# 本体
+# =============================================================================
 class HarmoniaOrdinis:
     """
-    Harmonia レビュー実装（Lv1）
-      - review_structured(): InventorOutput を受けて構造化レビュー
+    Harmonia レビュー実装（Lv1ベース → 強化）
+      - review_structured(): InventorOutput を受けて構造化レビュー（オフラインの基盤）
       - review_markdown(): 失敗配列 + InventorのMarkdown を受けて Markdown レビューを生成（mini_loop 用）
       - to_markdown(): ReviewResult を Markdown へ
     """
@@ -77,7 +125,7 @@ class HarmoniaOrdinis:
         comments: List[str] = []
         verdict = "APPROVE"
 
-        if not inventor_out.patch_suggestions:
+        if not getattr(inventor_out, "patch_suggestions", None):
             comments.append("パッチ案が空。最低1件は具体差分を提示してください。")
             return ReviewResult(verdict="REVISE", comments=comments)
 
@@ -108,7 +156,7 @@ class HarmoniaOrdinis:
             comments.extend(self._check_project_specific(ps))
 
         # 追試の有無（再現性）
-        if not inventor_out.followup_tests:
+        if not getattr(inventor_out, "followup_tests", None):
             comments.append("追試案が未提示。`pytest -q -k <nodeid>` などの再現/再実行手順を明記してください。")
             verdict = "REVISE"
 
@@ -177,22 +225,98 @@ class HarmoniaOrdinis:
             lines.append("")
         return "\n".join(lines)
 
-# =========================================
+
+# =============================================================================
 # 既存互換 API（壊さないために残す・強化版）
-# =========================================
+# - review(): オフライン審査に加え、モードが api/auto の場合はLLMで補足コメントを付与（失敗時はoffline）。
+# =============================================================================
+def _api_review(inventor_out: InventorOutput) -> Optional[ReviewResult]:
+    """
+    軽量APIレビュー。無ければ None（呼び出し側でofflineを使う）。
+    verdict は "APPROVE"/"REVISE" に丸める。
+    """
+    try:
+        import openai  # type: ignore
+    except Exception:
+        LOGGER.warning("openai 未導入のため APIレビューはスキップします。")
+        return None
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")
+    if not api_key:
+        LOGGER.warning("OPENAI_API_KEY が未設定のため APIレビューはスキップします。")
+        return None
+
+    # openai-python のレガシー互換（v1/v4で書き分け不要の最低限）
+    try:
+        # 対象の要約（サイズ抑制）
+        payload = {
+            "patch_count": len(getattr(inventor_out, "patch_suggestions", []) or []),
+            "followup_tests": bool(getattr(inventor_out, "followup_tests", None)),
+            "files": [getattr(ps, "file", "") for ps in (getattr(inventor_out, "patch_suggestions", []) or [])][:10],
+        }
+        # v1スタイル（chat.completions）
+        resp = openai.chat.completions.create(  # type: ignore[attr-defined]
+            model=model,
+            messages=[
+                {"role": "system", "content": HARMONIA_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+            temperature=0.2,
+            max_tokens=400,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        LOGGER.exception("APIレビューに失敗: %s", e)
+        return None
+
+    lower = text.lower()
+    if "approve" in lower:
+        verdict = "APPROVE"
+    else:
+        # "reject" 相当は運用上 REVISE に丸める
+        verdict = "REVISE"
+
+    # 最初の20行程度をコメントへ
+    comments = [c for c in text.split("\n") if c.strip()][:20]
+    return ReviewResult(verdict=verdict, comments=comments)
+
+
 def review(inventor_out: InventorOutput) -> ReviewResult:
     """
     既存互換の関数。内部で HarmoniaOrdinis を用いて審査を行う。
-    - 既存ロジック（file 未特定・pydantic 注意）を包含しつつ、追加の最小差分/後方互換/追試チェックを実施。
+    - mode=offline: 構造化ローカル審査のみ
+    - mode=api/auto: 可能ならAPIコメントを付与（失敗時はofflineへフォールバック）
     """
     harmonia = HarmoniaOrdinis()
-    return harmonia.review_structured(inventor_out)
+    base = harmonia.review_structured(inventor_out)
+
+    mode = _env_mode()
+    if mode == "offline":
+        return base
+
+    api_res = _api_review(inventor_out)
+    if api_res is None:
+        # auto/api でもAPI失敗時はoffline結果
+        return base
+
+    # マージ：厳しめに判定（どちらかがREVISEならREVISE）
+    verdict = "REVISE" if (base.verdict != "APPROVE" or api_res.verdict != "APPROVE") else "APPROVE"
+    comments = []
+    comments.extend(base.comments)
+    # 同じ内容をだぶつかせない程度に付与
+    for c in api_res.comments:
+        if c not in comments:
+            comments.append(c)
+        if len(comments) >= 40:
+            break
+    return ReviewResult(verdict=verdict, comments=comments)
 
 
 # =============================================================================
-# Harmonia リランク（Lv0: 安全な最小実装）
-#   - run_inventor_and_decide から optional import で呼ばれる想定
-#   - ここでは "context" 情報をログに出す観測性を強化
+# Harmonia リランク
+#   - 従来の「risk_scoreベースの簡易調整」をデフォルト（後方互換）
+#   - HARMONIA_RERANK=weighted で “重み付きスコア” に切替可能
 # =============================================================================
 def _safe_get(obj: Any, key: str, default: Any = None) -> Any:
     if hasattr(obj, key):
@@ -221,78 +345,164 @@ def _intent_for_bonus(obj: Any) -> str:
     return "FLAT"
 
 
+def _get_num(x: Any, default: float = 0.0) -> float:
+    try:
+        if x is None:
+            return default
+        if isinstance(x, (int, float)):
+            return float(x)
+        if isinstance(x, str) and x.strip() != "":
+            return float(x)
+        return default
+    except Exception:
+        return default
+
+
+def _peek(proposal: Any, *names: str, default: float = 0.0) -> float:
+    """dictでもobjでもOKな数値取得"""
+    for n in names:
+        if isinstance(proposal, dict) and n in proposal:
+            return _get_num(proposal.get(n), default)
+        if hasattr(proposal, n):
+            return _get_num(getattr(proposal, n), default)
+    return default
+
+
+def _score_weighted(p: Any, w: Dict[str, float]) -> float:
+    """
+    “weighted” スコア:
+      S = + w_q * quality
+          + w_ra * risk_adjusted
+          - w_r * risk_score
+          - w_s * size_penalty   (size ペナルティは log1p)
+    属性が無い場合は0として扱う（堅牢性優先）。
+    """
+    q = _peek(p, "quality", "score_quality", default=0.0)
+    ra = _peek(p, "risk_adjusted", "risk_adj", default=0.0)
+    r = _peek(p, "risk_score", "risk", default=0.0)  # 小さいほど良い
+    sz = _peek(p, "qty_raw", "size", default=0.0)
+
+    size_penalty = math.log1p(max(0.0, sz))
+    s = (w["quality"] * q) + (w["risk_adj"] * ra) - (w["risk"] * r) - (w["size"] * size_penalty)
+    return float(s)
+
+
 def rerank_candidates(
     candidates: List[Any] | Iterable[Any],
     context: Optional[Dict[str, Any]] = None,
     quality: Optional[Dict[str, Any]] = None,
 ) -> List[Any]:
     """
-    候補の簡易リランク関数（pydantic model / dict 両対応）。
-    - 基本スコア: candidate.risk_score（無ければ 0.5）
-    - 減点     : quality.missing_ratio（大きいほど減点）、context/quality の data_lag_min（>5 で軽い減点）
-    - ボーナス : intent == 'LONG'（BUY等の同義含む）に +0.01
-    - 観測性   : symbol/timeframe/trace_id とトップの intent を INFO ログ出力
+    候補のリランク（pydantic model / dict 両対応）。
+    デフォルト（後方互換）: risk_score をベースに、欠損/ラグの減点・LONGボーナスを加えた簡易調整。
+    環境変数 HARMONIA_RERANK=weighted で “重み付き” 評価へ切替可能。
     戻り値はスコア降順の **新しいリスト**（元リストは破壊しない）。
     """
+    mode = os.getenv("HARMONIA_RERANK", "simple").strip().lower()
     ctx = context or {}
     q = quality or {}
 
-    # --- ペナルティ係数の算出 ---
-    try:
-        missing = float(_safe_get(q, "missing_ratio", 0.0) or 0.0)
-    except Exception:
-        missing = 0.0
-    try:
-        lag = float(_safe_get(ctx, "data_lag_min", _safe_get(q, "data_lag_min", 0.0)) or 0.0)
-    except Exception:
-        lag = 0.0
-
-    # --- スコアリング ---
-    scored: List[Tuple[float, Any]] = []
-    for c in list(candidates or []):
-        base = _safe_get(c, "risk_score", 0.5)
+    # ==========================
+    # simple（従来ロジック）
+    # ==========================
+    if mode != "weighted":
+        # --- ペナルティ係数の算出 ---
         try:
-            base = float(base if base is not None else 0.5)
+            missing = float(_safe_get(q, "missing_ratio", 0.0) or 0.0)
         except Exception:
-            base = 0.5
-
-        intent_std = _intent_for_bonus(c)
-        side_bonus = 0.01 if intent_std == "LONG" else 0.0
-        # 欠損が多いほど、ラグが大きいほど減点（0.8〜1.0 の係数イメージ）
-        penalty = max(0.0, 1.0 - missing * 2.0) * (1.0 if lag <= 5.0 else 0.8)
-        adj = base * penalty + side_bonus
-
-        # 可能なら派生スコアを書き戻し（失敗しても無視）
+            missing = 0.0
         try:
-            setattr(c, "risk_score", base)
-            setattr(c, "risk_adjusted", adj)
+            lag = float(_safe_get(ctx, "data_lag_min", _safe_get(q, "data_lag_min", 0.0)) or 0.0)
         except Exception:
-            if isinstance(c, dict):
-                c["risk_score"] = base
-                c["risk_adjusted"] = adj
+            lag = 0.0
 
-        scored.append((adj, c))
+        scored: List[Tuple[float, Any]] = []
+        base_list = list(candidates or [])
+        for c in base_list:
+            base = _safe_get(c, "risk_score", 0.5)
+            try:
+                base = float(base if base is not None else 0.5)
+            except Exception:
+                base = 0.5
 
-    scored.sort(key=lambda t: t[0], reverse=True)
-    ranked = [c for _, c in scored]
+            intent_std = _intent_for_bonus(c)
+            side_bonus = 0.01 if intent_std == "LONG" else 0.0
+            # 欠損が多いほど、ラグが大きいほど減点（0.8〜1.0 の係数イメージ）
+            penalty = max(0.0, 1.0 - missing * 2.0) * (1.0 if lag <= 5.0 else 0.8)
+            adj = base * penalty + side_bonus
 
-    # --- 観測ログ（Airflow ロガー）---
+            # 可能なら派生スコアを書き戻し（失敗しても無視）
+            try:
+                setattr(c, "risk_score", base)
+                setattr(c, "risk_adjusted", adj)
+            except Exception:
+                if isinstance(c, dict):
+                    c["risk_score"] = base
+                    c["risk_adjusted"] = adj
+
+            scored.append((adj, c))
+
+        scored.sort(key=lambda t: t[0], reverse=True)
+        ranked = [c for _, c in scored]
+
+        # 観測ログ
+        try:
+            top_intent = _safe_get(ranked[0], "intent", None) if ranked else None
+            std_top = _intent_for_bonus(ranked[0]) if ranked else None
+            LOGGER.info(
+                "[Harmonia] reranked(simple) %s -> %s top=%s(std=%s) symbol=%s tf=%s trace=%s",
+                len(base_list), len(ranked), top_intent, std_top,
+                ctx.get("symbol"), ctx.get("timeframe"), ctx.get("trace_id"),
+            )
+        except Exception:
+            pass
+
+        return ranked
+
+    # ==========================
+    # weighted（新ロジック）
+    # ==========================
+    w = _load_weights()
+    scored_w: List[Tuple[float, Any]] = []
+    base_list = list(candidates or [])
+    for p in base_list:
+        s = _score_weighted(p, w)
+        # マーク（後段のデバッグ用）
+        try:
+            if isinstance(p, dict):
+                p["__harmonia_score"] = s
+            else:
+                setattr(p, "__harmonia_score", s)
+        except Exception:
+            pass
+        scored_w.append((s, p))
+
+    def _tie_key(item: Tuple[float, Any]) -> Tuple[float, str, str]:
+        s, p = item
+        sym = ""
+        trace = ""
+        for n in ("symbol", "sym"):
+            if isinstance(p, dict) and n in p:
+                sym = str(p[n]); break
+            if hasattr(p, n):
+                sym = str(getattr(p, n)); break
+        for n in ("trace", "id", "name"):
+            if isinstance(p, dict) and n in p:
+                trace = str(p[n]); break
+            if hasattr(p, n):
+                trace = str(getattr(p, n)); break
+        return (s, sym, trace)
+
+    ranked_w = [p for _, p in sorted(scored_w, key=_tie_key, reverse=True)]
     try:
-        top_intent = _safe_get(ranked[0], "intent", None) if ranked else None
-        # BUY/SELL を LONG/SHORT へマッピングして統一表示
-        std_top = _intent_for_bonus(ranked[0]) if ranked else None
-        LOGGER.info(
-            "[Harmonia] reranked %s -> %s top=%s(std=%s) symbol=%s tf=%s trace=%s",
-            len(list(candidates or [])),
-            len(ranked),
-            top_intent,
-            std_top,
-            ctx.get("symbol"),
-            ctx.get("timeframe"),
-            ctx.get("trace_id"),
-        )
+        top3 = []
+        for i, p in enumerate(ranked_w[:3], 1):
+            s = getattr(p, "__harmonia_score", None)
+            if s is None and isinstance(p, dict):
+                s = p.get("__harmonia_score")
+            top3.append(f"#{i} score={s}")
+        LOGGER.info("[Harmonia] reranked(weighted) %d -> %d top=%s", len(base_list), len(ranked_w), ", ".join(top3))
     except Exception:
-        # ログで失敗しても本処理は継続
         pass
 
-    return ranked
+    return ranked_w
