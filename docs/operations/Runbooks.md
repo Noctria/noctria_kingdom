@@ -316,9 +316,19 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
 - **2025-08-12**: v1.0 初版
 
 ## 17. 引継ぎレポート作成コマンド
-- $ pytest -v  
-- $ python3 scripts/generate_handoff.py
+- venv_codexで使用。#source venv_codex/bin/activate
+- $ pytest -v
+- 
+・次アクションの自動判定を入れる場合
+- python3 scripts/generate_handoff.py --auto-complete-next
 
+・Airflow の直近 Run 一覧も付ける（コンテナ名は環境に合わせて）
+- python3 scripts/generate_handoff.py --include-airflow --airflow-container noctria_airflow_scheduler --max-runs 8
+
+・外部ファイルから “次アクション” を読みつつ、自動判定も併用
+
+- $ python3 scripts/generate_handoff.py
+- python3 scripts/generate_handoff.py --next-from docs/next_actions.md --auto-complete-next
 
 <!-- AUTOGEN:CHANGELOG START -->
 
