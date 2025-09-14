@@ -317,8 +317,16 @@ curl -sS http://127.0.0.1:${NOCTRIA_GUI_PORT:-8001}/healthz
 
 ## 18. 引継ぎレポート作成コマンド
 - venv_codexで使用。#source venv_codex/bin/activate
-- $ pytest -v
-- 
+
+# デフォルト（軽量テストのみ）
+pytest -v
+
+# heavy/gpu/external も含めたい場合
+pytest -m "heavy" -v
+pytest -m "gpu" -v
+pytest -m "external" -v
+pytest -m "heavy or gpu" -v   # 組み合わせもOK
+
 ・次アクションの自動判定を入れる場合
 - python3 scripts/generate_handoff.py --auto-complete-next
 
