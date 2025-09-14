@@ -1,0 +1,47 @@
+# .github/workflows/ruff.yml
+name: Ruff Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ruff:
+    name: Run Ruff checks
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python (system)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Ruff via wrapper
+        run: |
+          echo "==> Activating venv_codex"
+          if [ -f "venv_codex/bin/activate" ]; then
+            source venv_codex/bin/activate
+          else
+            echo "❌ venv_codex not found"
+            exit 1
+          fi
+
+          echo "==> Running ruff_runner.py"
+          python -m src.codex.tools.ruff_runner --fix tests/unit_tests.py tools/advanced_import_map.py tools/fix_quarantine.py
+
+      - name: Upload Ruff JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-report
+          path: src/codex_reports/ruff/last_run.json
+
+      - name: Upload Ruff Patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-patch
+          path: src/codex_reports/patches/ruff_autofix_*.patch

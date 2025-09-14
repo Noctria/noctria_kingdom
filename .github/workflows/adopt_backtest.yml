@@ -1,8 +1,3 @@
-# 1) PRのブランチへ移動
-git switch adopt/inventor-harmonia-smoke
-
-# 2) adopt_backtest.yml を安全な内容で上書き（置換）
-cat > .github/workflows/adopt_backtest.yml <<'YAML'
 name: Backtest on Adopt PR (self-hosted)
 
 on:
@@ -83,7 +78,8 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      - name: Trigger Airflow DAG (optional)
+      - name: Trigger Airflow DAG (if secrets provided)
+        if: ${{ secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '' }}
         env:
           AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
           AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
@@ -91,12 +87,8 @@ jobs:
           NOCTRIA_EXTRA_ARGS: ${{ env.EXTRA_ARGS }}
         run: |
           set -euo pipefail
-          if [ -n "${AIRFLOW_BASE_URL:-}" ] && [ -n "${AIRFLOW_TOKEN:-}" ]; then
-            echo "Triggering Airflow DAG for ${TARGET_REF}"
-            python3 scripts/trigger_backtest_dag.py
-          else
-            echo "AIRFLOW_* secrets not set; skipping Airflow trigger."
-          fi
+          echo "Triggering Airflow DAG for ${TARGET_REF}"
+          python3 scripts/trigger_backtest_dag.py
 
       - name: Collect artifacts
         if: always()
@@ -150,9 +142,3 @@ jobs:
               issue_number: context.payload.pull_request.number,
               body: `**${title}**\n\n${body}`
             });
-YAML
-
-# 3) コミット & プッシュ（adopt/* ブランチなのでフック緩和も効く）
-git add .github/workflows/adopt_backtest.yml
-git commit -m "fix: adopt_backtest.yml (no replace(); safe artifact name; secrets-guarded)"
-git push -u origin HEAD
