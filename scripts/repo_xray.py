@@ -7,8 +7,9 @@ from typing import Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 走査対象ディレクトリ（重複防止のため親ディレクトリを外す）
 WF_DIRS = [ROOT / ".github" / "workflows"]
-AIRFLOW_DIRS = [ROOT / "airflow_docker", ROOT / "dags", ROOT / "airflow_docker" / "dags"]
+AIRFLOW_DIRS = [ROOT / "airflow_docker" / "dags", ROOT / "dags"]
 CODE_DIRS = [ROOT / "src", ROOT / "experts", ROOT / "autogen_scripts", ROOT / "tools", ROOT / "scripts"]
 
 PATTERNS = {
@@ -19,7 +20,6 @@ PATTERNS = {
     "airflow":   re.compile(r"\bairflow\b|DAG\s*\(", re.I),
 }
 
-# --- helpers ---
 def read_text_safe(p: Path, limit_bytes: int = 200_000) -> str:
     try:
         b = p.read_bytes()
@@ -30,51 +30,57 @@ def read_text_safe(p: Path, limit_bytes: int = 200_000) -> str:
         return ""
 
 def list_files(dirs: List[Path], exts: Tuple[str,...] = (".py", ".yml", ".yaml", ".md")) -> List[Path]:
+    """重複パスを絶対パスで排除しつつ収集"""
+    seen = set()
     out: List[Path] = []
     for d in dirs:
-        if not d.exists(): 
+        if not d.exists():
             continue
         for p in d.rglob("*"):
-            if p.is_file() and (p.suffix in exts or (p.suffix == "" and p.name.endswith(".yml"))):
-                # skip large irrelevant dirs quickly
-                if any(part in {"logs","data",".venv","node_modules"} for part in p.parts):
-                    continue
-                out.append(p)
+            if not p.is_file():
+                continue
+            if not (p.suffix in exts or p.name.endswith(".yml")):
+                continue
+            if any(part in {"logs", "data", ".venv", "node_modules"} for part in p.parts):
+                continue
+            rp = p.resolve()
+            if rp in seen:
+                continue
+            seen.add(rp)
+            out.append(rp)
     return out
 
 def parse_workflow_meta(yml_text: str) -> Dict[str, str]:
-    # very light regex parse (no PyYAML)
+    # very light parse（PyYAML不使用）
     name = ""
-    on_line = ""
+    has_on = False
     for line in yml_text.splitlines():
         if not name:
             m = re.match(r"^\s*name:\s*(.+?)\s*$", line)
-            if m: name = m.group(1).strip()
-        if re.match(r"^\s*on:\s*", line):
-            on_line = "on:"
-        if name and on_line:
+            if m:
+                name = m.group(1).strip()
+        if re.match(r"^\s*on\s*:", line):
+            has_on = True
+        if name and has_on:
             break
-    return {"name": name or "(no name)", "trigger": on_line or "(see file)"}
+    return {"name": name or "(no name)", "valid": has_on}
 
 def parse_airflow_dag_ids(py_text: str) -> List[str]:
     ids = set()
-    # dag_id="xxx"
     for m in re.finditer(r"dag_id\s*=\s*['\"]([^'\"]+)['\"]", py_text):
         ids.add(m.group(1))
-    # with DAG("xxx", ...) OR with DAG(dag_id="xxx", ...)
     for m in re.finditer(r"with\s+DAG\s*\(\s*(['\"])([^'\"]+)\1", py_text):
         ids.add(m.group(2))
     return sorted(ids)
 
-def grep_patterns(py_text: str) -> List[str]:
+def grep_patterns(txt: str) -> List[str]:
     hits = []
     for key, rx in PATTERNS.items():
-        if rx.search(py_text):
+        if rx.search(txt):
             hits.append(key)
     return hits
 
-def top_dirs() -> List[Tuple[int,str]]:
-    # count files per dir (tracked by git)
+def git_top_dirs() -> List[Tuple[int,str]]:
     try:
         import subprocess
         res = subprocess.run(
@@ -82,10 +88,7 @@ def top_dirs() -> List[Tuple[int,str]]:
         )
         counts: Dict[str,int] = {}
         for line in res.stdout.splitlines():
-            if "/" in line:
-                d = line.rsplit("/",1)[0]
-            else:
-                d = "."
+            d = line.rsplit("/",1)[0] if "/" in line else "."
             counts[d] = counts.get(d,0)+1
         ranked = sorted(((c,d) for d,c in counts.items()), reverse=True)
         return ranked[:20]
@@ -102,19 +105,21 @@ def main():
     out_base = Path(args.out)
     out_base.parent.mkdir(parents=True, exist_ok=True)
 
-    # Workflows
+    # Workflows（on: が無い yml は除外）
     wf_files = list_files(WF_DIRS, exts=(".yml",".yaml"))
     workflows = []
     for p in wf_files:
         t = read_text_safe(p)
         meta = parse_workflow_meta(t)
+        if not meta["valid"]:
+            continue
         workflows.append({
             "path": str(p.relative_to(root)),
             "name": meta["name"],
-            "trigger_hint": meta["trigger"],
+            "trigger_hint": "on:"
         })
 
-    # Airflow DAGs
+    # Airflow DAGs（重複排除済のファイル集合から抽出）
     dag_py = list_files(AIRFLOW_DIRS, exts=(".py",))
     dags = []
     for p in dag_py:
@@ -126,23 +131,23 @@ def main():
                 "dag_ids": ids
             })
 
-    # Code hits by pattern
+    # Pattern hits
     code_files = list_files(CODE_DIRS, exts=(".py",".md",".yml",".yaml"))
     buckets: Dict[str, List[str]] = {k: [] for k in PATTERNS.keys()}
     for p in code_files:
         t = read_text_safe(p)
-        hits = grep_patterns(t)
-        for h in hits:
+        for h in grep_patterns(t):
             buckets[h].append(str(p.relative_to(root)))
+    buckets = {k: sorted(set(v)) for k,v in buckets.items()}
 
     # Top dirs
-    dir_ranking = [{"count": c, "dir": d} for c,d in top_dirs()]
+    dir_ranking = [{"count": c, "dir": d} for c,d in git_top_dirs()]
 
     result = {
         "root": str(root),
         "workflows": sorted(workflows, key=lambda x: x["path"]),
         "airflow_dags": sorted(dags, key=lambda x: x["path"]),
-        "pattern_hits": {k: sorted(set(v)) for k,v in buckets.items()},
+        "pattern_hits": buckets,
         "dir_ranking": dir_ranking,
     }
 
