@@ -1,3 +1,8 @@
+# 1) PRのブランチへ移動
+git switch adopt/inventor-harmonia-smoke
+
+# 2) adopt_backtest.yml を安全な内容で上書き（置換）
+cat > .github/workflows/adopt_backtest.yml <<'YAML'
 name: Backtest on Adopt PR (self-hosted)
 
 on:
@@ -16,7 +21,6 @@ permissions:
   pull-requests: write
   issues: write
 
-# NOTE: slashes を含んでも concurrency group は問題なし。/ を消したい場合は後段のシェルで SAFE_REF を作る
 concurrency:
   group: backtest-adopt-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
@@ -25,7 +29,6 @@ jobs:
   backtest-on-adopt:
     runs-on: self-hosted
 
-    # adopt/** の PR だけ対象（手動は常に可）
     if: >
       github.event_name == 'workflow_dispatch' ||
       startsWith( (github.event.pull_request.head.ref || github.ref_name), 'adopt/')
@@ -64,8 +67,8 @@ jobs:
         id: saferef
         run: |
           set -euo pipefail
-          SAFE_REF="${TARGET_REF//\//-}"           # adopt/xxx → adopt-xxx
-          echo "SAFE_REF=$SAFE_REF"        | tee -a "$GITHUB_ENV"
+          SAFE_REF="${TARGET_REF//\//-}"
+          echo "SAFE_REF=$SAFE_REF" | tee -a "$GITHUB_ENV"
           echo "ARTIFACT=backtest-${{ github.run_id }}-$SAFE_REF" | tee -a "$GITHUB_ENV"
 
       - name: Run local backtest (fast path on runner)
@@ -80,7 +83,6 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      # Airflow 連携は Secrets があるときだけ実行（式ではなくシェルで判定）
       - name: Trigger Airflow DAG (optional)
         env:
           AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
@@ -121,7 +123,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT }}     # ← / を含まない安全な名前
+          name: ${{ env.ARTIFACT }}
           path: handoff_out
           retention-days: 14
 
@@ -148,3 +150,9 @@ jobs:
               issue_number: context.payload.pull_request.number,
               body: `**${title}**\n\n${body}`
             });
+YAML
+
+# 3) コミット & プッシュ（adopt/* ブランチなのでフック緩和も効く）
+git add .github/workflows/adopt_backtest.yml
+git commit -m "fix: adopt_backtest.yml (no replace(); safe artifact name; secrets-guarded)"
+git push -u origin HEAD
