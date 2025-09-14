@@ -1,0 +1,294 @@
+# Repo X-Ray
+
+Root: `/mnt/d/noctria_kingdom`
+
+## Workflows
+
+- `.github/workflows/ISSUE_TEMPLATE/handoff.yml` — **📝 Handoff（引き継ぎ）** ((see file))
+- `.github/workflows/adopt_auto_pr.yml` — **Adopt Auto PR** (on:)
+- `.github/workflows/adopt_backtest.yml` — **Backtest on Adopt PR (self-hosted)** (on:)
+- `.github/workflows/airflow_backtest_local.yml` — **Airflow Backtest (Local)** (on:)
+- `.github/workflows/airflow_backtest_on_merge.yml` — **Airflow Backtest on Adopt PR Merge** (on:)
+- `.github/workflows/codex_quality.yml` — **Codex Quality Gate** (on:)
+- `.github/workflows/docker-pytest.yml` — **Docker Pytest Workflow** (on:)
+- `.github/workflows/handoff_rollup.yml` — **Handoff Rollup** (on:)
+- `.github/workflows/inventor-pr-guard.yml` — **Inventor Decision Guard (PR only)** (on:)
+- `.github/workflows/merge_guard_labeler.yml` — **Merge Guard (labels)** (on:)
+- `.github/workflows/noctria_policy_check.yml` — **noctria_policy_check** (on:)
+- `.github/workflows/pdca-agent.yml` — **PDCA Agent (recheck & adopt)** (on:)
+- `.github/workflows/pr-inventor-guard.yml` — **PR — Inventor Guard (light tests)** (on:)
+- `.github/workflows/pytest.yml` — **🔍 Run Pytest for Noctria Kingdom** (on:)
+- `.github/workflows/veritas_ci.yml` — **🧪 Veritas Official Strategy CI** (on:)
+
+## Airflow DAGs
+
+- `airflow_docker/dags/inventor_pipeline_dag.py` — dag_id: `inventor_pipeline`
+- `airflow_docker/dags/inventor_pipeline_dag.py` — dag_id: `inventor_pipeline`
+- `airflow_docker/dags/levia_strategy_dag.py` — dag_id: `levia_strategy_dag`
+- `airflow_docker/dags/levia_strategy_dag.py` — dag_id: `levia_strategy_dag`
+- `airflow_docker/dags/metaai_apply_dag.py` — dag_id: `metaai_apply_dag`
+- `airflow_docker/dags/metaai_apply_dag.py` — dag_id: `metaai_apply_dag`
+- `airflow_docker/dags/noctria_backtest_dag.py` — dag_id: `noctria_backtest_dag`
+- `airflow_docker/dags/noctria_backtest_dag.py` — dag_id: `noctria_backtest_dag`
+- `airflow_docker/dags/noctria_kingdom_dag.py` — dag_id: `noctria_kingdom_royal_council_dag`
+- `airflow_docker/dags/noctria_kingdom_dag.py` — dag_id: `noctria_kingdom_royal_council_dag`
+- `airflow_docker/dags/noctria_kingdom_pdca_dag.py` — dag_id: `noctria_kingdom_pdca_dag`
+- `airflow_docker/dags/noctria_kingdom_pdca_dag.py` — dag_id: `noctria_kingdom_pdca_dag`
+- `airflow_docker/dags/noctus_strategy_dag.py` — dag_id: `noctus_strategy_dag`
+- `airflow_docker/dags/noctus_strategy_dag.py` — dag_id: `noctus_strategy_dag`
+- `airflow_docker/dags/pdca_plan_summary_dag.py` — dag_id: `pdca_plan_summary_dag`
+- `airflow_docker/dags/pdca_plan_summary_dag.py` — dag_id: `pdca_plan_summary_dag`
+- `airflow_docker/dags/prometheus_strategy_dag.py` — dag_id: `prometheus_strategy_dag`
+- `airflow_docker/dags/prometheus_strategy_dag.py` — dag_id: `prometheus_strategy_dag`
+- `airflow_docker/dags/simulate_strategy_dag.py` — dag_id: `simulate_strategy_dag`
+- `airflow_docker/dags/simulate_strategy_dag.py` — dag_id: `simulate_strategy_dag`
+- `airflow_docker/dags/structure_check_dag.py` — dag_id: `structure_check_dag`
+- `airflow_docker/dags/structure_check_dag.py` — dag_id: `structure_check_dag`
+- `airflow_docker/dags/train_prometheus_obs8_dag.py` — dag_id: `train_prometheus_obs8`
+- `airflow_docker/dags/train_prometheus_obs8_dag.py` — dag_id: `train_prometheus_obs8`
+- `airflow_docker/dags/verify_path_config_dag.py` — dag_id: `verify_path_config_dag`
+- `airflow_docker/dags/verify_path_config_dag.py` — dag_id: `verify_path_config_dag`
+- `airflow_docker/dags/veritas_act_record_dag.py` — dag_id: `veritas_act_record_dag`
+- `airflow_docker/dags/veritas_act_record_dag.py` — dag_id: `veritas_act_record_dag`
+- `airflow_docker/dags/veritas_eval_dag.py` — dag_id: `veritas_evaluation_pipeline`
+- `airflow_docker/dags/veritas_eval_dag.py` — dag_id: `veritas_evaluation_pipeline`
+- `airflow_docker/dags/veritas_eval_single_dag.py` — dag_id: `veritas_eval_single_dag`
+- `airflow_docker/dags/veritas_eval_single_dag.py` — dag_id: `veritas_eval_single_dag`
+- `airflow_docker/dags/veritas_generate_dag.py` — dag_id: `veritas_generate_dag`
+- `airflow_docker/dags/veritas_generate_dag.py` — dag_id: `veritas_generate_dag`
+- `airflow_docker/dags/veritas_pdca_dag.py` — dag_id: `veritas_pdca_loop_v2`
+- `airflow_docker/dags/veritas_pdca_dag.py` — dag_id: `veritas_pdca_loop_v2`
+- `airflow_docker/dags/veritas_push_dag.py` — dag_id: `veritas_push_dag`
+- `airflow_docker/dags/veritas_push_dag.py` — dag_id: `veritas_push_dag`
+- `airflow_docker/dags/veritas_recheck_dag.py` — dag_id: `veritas_recheck_dag`
+- `airflow_docker/dags/veritas_recheck_dag.py` — dag_id: `veritas_recheck_dag`
+- `airflow_docker/dags/veritas_refactor_dag.py` — dag_id: `veritas_refactor_dag`
+- `airflow_docker/dags/veritas_refactor_dag.py` — dag_id: `veritas_refactor_dag`
+- `airflow_docker/dags/veritas_replay_dag.py` — dag_id: `veritas_replay_dag`
+- `airflow_docker/dags/veritas_replay_dag.py` — dag_id: `veritas_replay_dag`
+- `airflow_docker/dags/veritas_to_order_dag.py` — dag_id: `veritas_to_order_pipeline`
+- `airflow_docker/dags/veritas_to_order_dag.py` — dag_id: `veritas_to_order_pipeline`
+
+## Pattern Hits
+
+### inventor
+- `scripts/codex_progress_check.py`
+- `scripts/pdca_agent.py`
+- `scripts/repo_xray.py`
+- `scripts/show_last_inventor_decision.py`
+- `src/codex/agents/harmonia.py`
+- `src/codex/agents/inventor.py`
+- `src/codex/mini_loop.py`
+- `src/codex/run_codex_cycle.py`
+- `src/codex/tools/collect_failures.py`
+- `src/codex/tools/json_parse.py`
+- `src/codex/tools/patch_gen.py`
+- `src/codex/tools/review_pipeline.py`
+- `src/codex_reports/inventor_suggestions.md`
+- `src/plan_data/adapter_to_decision.py`
+- `src/plan_data/inventor.py`
+- `src/plan_data/run_inventor.py`
+
+### harmonia
+- `scripts/repo_xray.py`
+- `src/codex/agents/harmonia.py`
+- `src/codex/mini_loop.py`
+- `src/codex/run_codex_cycle.py`
+- `src/codex/tools/collect_failures.py`
+- `src/codex/tools/review_pipeline.py`
+- `src/codex_reports/harmonia_review.md`
+- `src/plan_data/inventor.py`
+- `src/plan_data/run_inventor.py`
+
+### pdca
+- `scripts/codex_progress_check.py`
+- `scripts/noctria_dead_code_detector.py`
+- `scripts/pdca_agent.py`
+- `scripts/repo_xray.py`
+- `scripts/show_last_inventor_decision.py`
+- `src/core/act_service.py`
+- `src/core/decision_hooks.py`
+- `src/core/decision_registry.py`
+- `src/core/king_noctria.py`
+- `src/core/path_config.py`
+- `src/core/strategy_evaluator.py`
+- `src/decision/decision_engine.py`
+- `src/decision/quality_gate.py`
+- `src/e2e/decision_minidemo.py`
+- `src/execution/execution_manager.py`
+- `src/execution/simulate_official_strategy.py`
+- `src/noctria_ai/noctria.py`
+- `src/plan_data/adapter_to_decision.py`
+- `src/plan_data/adapter_to_decision_cli.py`
+- `src/plan_data/contracts.py`
+- `src/plan_data/inventor.py`
+- `src/plan_data/observability.py`
+- `src/plan_data/pdca_summary_service.py`
+- `src/plan_data/plan_to_all_minidemo.py`
+- `src/plan_data/plan_to_aurus_demo.py`
+- `src/plan_data/plan_to_hermes_demo.py`
+- `src/plan_data/plan_to_levia_demo.py`
+- `src/plan_data/plan_to_noctus_demo.py`
+- `src/plan_data/plan_to_prometheus_demo.py`
+- `src/plan_data/plan_to_veritas_demo.py`
+- `src/plan_data/profile_loader.py`
+- `src/plan_data/run_inventor.py`
+- `src/plan_data/run_with_profile.py`
+- `src/plan_data/statistics.py`
+- `src/scripts/apply_best_params_to_metaai.py`
+- `src/scripts/generate_dummy_logs.py`
+- `src/strategies/aurus_singularis.py`
+- `src/strategies/auto_adjustment.py`
+- `src/strategies/hermes_cognitor.py`
+- `src/strategies/levia_tempest.py`
+- `src/strategies/noctus_sentinella.py`
+- `src/strategies/prometheus_oracle.py`
+- `src/veritas/veritas_machina.py`
+
+### veritas
+- `autogen_scripts/openai_noctria_dev.py`
+- `scripts/backtest_runner.py`
+- `scripts/check_imports.py`
+- `scripts/generate_handoff.py`
+- `scripts/repo_xray.py`
+- `scripts/trigger_backtest_dag.py`
+- `src/codex/agents/harmonia.py`
+- `src/codex/agents/inventor.py`
+- `src/core/act_service.py`
+- `src/core/config.yaml`
+- `src/core/decision_registry.py`
+- `src/core/git_utils.py`
+- `src/core/king_noctria.py`
+- `src/core/meta_ai.py`
+- `src/core/path_config.py`
+- `src/core/pdca_log_parser.py`
+- `src/core/strategy_evaluator.py`
+- `src/core/strategy_optimizer_adjusted.py`
+- `src/core/task_scheduler.py`
+- `src/core/veritas_trigger_api.py`
+- `src/decision/decision_engine.py`
+- `src/execution/generate_order_json.py`
+- `src/execution/simulate_official_strategy.py`
+- `src/hermes/strategy_generator.py`
+- `src/noctria_ai/noctria.py`
+- `src/plan_data/adapter_to_decision.py`
+- `src/plan_data/adapter_to_decision_cli.py`
+- `src/plan_data/ai_adapter.py`
+- `src/plan_data/anomaly_detector.py`
+- `src/plan_data/contracts.py`
+- `src/plan_data/feature_spec.py`
+- `src/plan_data/inventor.py`
+- `src/plan_data/kpi_minidemo.py`
+- `src/plan_data/observability.py`
+- `src/plan_data/pdca_summary_service.py`
+- `src/plan_data/plan_to_all_minidemo.py`
+- `src/plan_data/plan_to_hermes_demo.py`
+- `src/plan_data/plan_to_veritas_demo.py`
+- `src/plan_data/run_with_profile.py`
+- `src/plan_data/strategy_adapter.py`
+- `src/plan_data/test_plan_analyzer.py`
+- `src/scripts/evaluate_single_strategy.py`
+- `src/scripts/generate_dummy_logs.py`
+- `src/scripts/github_push_adopted_strategies.py`
+- `src/scripts/log_pdca_result.py`
+- `src/scripts/meta_ai_tensorboard_train.py`
+- `src/scripts/push_generated_strategy.py`
+- `src/scripts/push_generated_strategy_to_github_dag.py`
+- `src/scripts/recheck_runner.py`
+- `src/scripts/tag_adoption_log.py`
+- `src/strategies/aurus_singularis.py`
+- `src/strategies/auto_adjustment.py`
+- `src/strategies/hermes_cognitor.py`
+- `src/strategies/prometheus_oracle.py`
+- `src/strategies/reinforcement/exploration_strategy.py`
+- `src/strategies/strategy_runner.py`
+- `src/strategies/veritas_generated/Aurus_Singularis.py`
+- `src/tools/apply_path_fixes.py`
+- `src/tools/dependency_analyzer.py`
+- `src/tools/diagnose_dependencies.py`
+- `src/tools/export_all_logs.py`
+- `src/tools/fix_logger_usage.py`
+- `src/tools/fix_path_violations.py`
+- `src/tools/generate_github_template_summary.py`
+- `src/tools/generate_readme_summary.py`
+- `src/tools/generate_refactor_plan.py`
+- `src/tools/hardcoded_path_replacer.py`
+- `src/tools/push_official_strategy_to_github.py`
+- `src/tools/refactor_manager.py`
+- `src/tools/scan_refactor_plan.py`
+- `src/tools/strategy_classifier.py`
+- `src/tools/structure_refactor.py`
+- `src/tools/tag_summary_generator.py`
+- `src/tools/verify_path_config_usage.py`
+- `src/training/train_prometheus.py`
+- `src/veritas/evaluate_veritas.py`
+- `src/veritas/generate_strategy_file.py`
+- `src/veritas/promote_accepted_strategies.py`
+- `src/veritas/record_act_log.py`
+- `src/veritas/strategy_generator.py`
+- `src/veritas/veritas_airflow_executor.py`
+- `src/veritas/veritas_generate_strategy.py`
+- `src/veritas/veritas_machina.py`
+- `tools/generate_import_map.py`
+
+### airflow
+- `autogen_scripts/utils/cycle_logger.py`
+- `scripts/generate_handoff.py`
+- `scripts/noctria_dead_code_detector.py`
+- `scripts/repo_xray.py`
+- `scripts/show_last_inventor_decision.py`
+- `scripts/trigger_backtest_dag.py`
+- `src/codex/agents/harmonia.py`
+- `src/codex/agents/inventor.py`
+- `src/core/airflow_client.py`
+- `src/core/dag_trigger.py`
+- `src/core/db_logging.py`
+- `src/core/decision_hooks.py`
+- `src/core/env_config.py`
+- `src/core/king_noctria.py`
+- `src/core/path_config.py`
+- `src/core/strategy_evaluator.py`
+- `src/core/utils.py`
+- `src/core/veritas_trigger_api.py`
+- `src/execution/simulate_official_strategy.py`
+- `src/hermes/strategy_generator.py`
+- `src/plan_data/quality_gate.py`
+- `src/plan_data/run_inventor.py`
+- `src/scripts/apply_best_params_to_kingdom.py`
+- `src/scripts/apply_best_params_to_metaai.py`
+- `src/scripts/generate_path_mapping.py`
+- `src/scripts/log_pdca_result.py`
+- `src/scripts/optimize_params_with_optuna.py`
+- `src/scripts/push_generated_strategy_to_github_dag.py`
+- `src/tools/apply_path_fixes.py`
+- `src/tools/fix_import_paths.py`
+- `src/tools/scan_and_fix_paths.py`
+- `src/tools/verify_imports.py`
+- `src/utils/model_io.py`
+- `src/veritas/strategy_generator.py`
+- `src/veritas/veritas_airflow_executor.py`
+- `tools/collect_autogen_devcycle_pg.py`
+- `tools/scan_repo_to_mermaid.py`
+
+## Top Directories (tracked by git)
+
+-   60  `generated_code`
+-   59  `.`
+-   57  `noctria_gui/routes`
+-   54  `_graveyard/2025-09-06/noctria_gui/routes`
+-   51  `noctria_gui/templates`
+-   34  `src/plan_data`
+-   32  `src/tools`
+-   30  `src/core`
+-   30  `_graveyard/2025-09-06/src/tools`
+-   29  `tests`
+-   28  `scripts`
+-   28  `airflow_docker/dags`
+-   25  `_graveyard/2025-09-06/airflow_docker/dags`
+-   19  `_graveyard/2025-09-06/noctria_gui/templates`
+-   18  `_graveyard/2025-09-06/src/plan_data`
+-   17  `data`
+-   17  `airflow_docker/scripts`
+-   16  `src/scripts`
+-   15  `src/execution`
+-   14  `docs/architecture/diagrams`
