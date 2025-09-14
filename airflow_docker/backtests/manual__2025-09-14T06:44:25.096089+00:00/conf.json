@@ -1,0 +1,4 @@
+{
+  "strategy_glob": "src/strategies/veritas_generated/**.py",
+  "extra_args": ""
+}
