@@ -1,9 +1,10 @@
+# .github/workflows/adopt_backtest.yml
 name: Backtest on Adopt PR (self-hosted)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       ref:
@@ -23,13 +24,15 @@ concurrency:
 jobs:
   backtest-on-adopt:
     runs-on: self-hosted
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      startsWith((github.event.pull_request.head.ref || github.ref_name), 'adopt/')
+
+    # adopt/** のPRだけ対象（手動実行は常に可）
+    if: >
+      ${{ github.event_name == 'workflow_dispatch' ||
+          startsWith((github.event.pull_request.head.ref || github.ref_name), 'adopt/') }}
 
     env:
       TARGET_REF: ${{ github.event.pull_request.head.ref || inputs.ref || github.ref_name }}
-      STRATEGY_GLOB: src/strategies/veritas_generated/**.py
+      STRATEGY_GLOB: "src/strategies/veritas_generated/**.py"
       EXTRA_ARGS: ""
       PYTHONUNBUFFERED: "1"
 
@@ -69,13 +72,26 @@ jobs:
             echo "No local test script; skipping."
           fi
 
-      - name: Trigger Airflow DAG (optional)
-        if: secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != ''
+      # ← まず Secrets の存在を判定（ここで secrets を env として受け取る）
+      - name: Check Airflow secrets
+        id: chk_airflow
         env:
           AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
-          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
+          AIRFLOW_TOKEN:    ${{ secrets.AIRFLOW_TOKEN }}
+        run: |
+          if [ -n "$AIRFLOW_BASE_URL" ] && [ -n "$AIRFLOW_TOKEN" ]; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger Airflow DAG (optional)
+        if: ${{ steps.chk_airflow.outputs.has == 'true' }}
+        env:
+          AIRFLOW_BASE_URL:      ${{ secrets.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN:         ${{ secrets.AIRFLOW_TOKEN }}
           NOCTRIA_STRATEGY_GLOB: ${{ env.STRATEGY_GLOB }}
-          NOCTRIA_EXTRA_ARGS: ${{ env.EXTRA_ARGS }}
+          NOCTRIA_EXTRA_ARGS:    ${{ env.EXTRA_ARGS }}
         run: |
           set -euo pipefail
           echo "Triggering Airflow DAG for ${TARGET_REF}"
@@ -100,7 +116,7 @@ jobs:
             fi
           done
           echo "=== Collected ==="
-          find handoff_out -type f 2>/dev/null | sed 's/^/ - /' || true
+          find handoff_out -type f | sed 's/^/ - /'
 
       - name: Upload artifacts
         if: always()
@@ -111,7 +127,7 @@ jobs:
           retention-days: 14
 
       - name: Post summary to PR
-        if: github.event_name == 'pull_request'
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@v7
         env:
           TARGET_REF: ${{ env.TARGET_REF }}
