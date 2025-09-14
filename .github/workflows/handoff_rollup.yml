@@ -1,29 +1,32 @@
+# .github/workflows/handoff_rollup.yml
+# Generate a small "handoff" note, upload it as an artifact,
+# and (safely) comment to the PR when permissions allow.
+
 name: Handoff Rollup
 
 on:
-  # adopt/* → main の通常フローで動かしたい想定
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [main]
-  push:
-    branches:
-      - adopt/**
-  # 手動実行も可能
   workflow_dispatch:
     inputs:
       lookback_hours:
-        description: "push など PR 以外のイベントで集計する時間幅（h）"
+        description: "How many hours to look back for the handoff note"
         required: false
         default: "1"
+  pull_request:
+    branches: [ main ]
+  push:
+    branches:
+      - adopt/**
+      - main
+  schedule:
+    - cron: "0 * * * *"  # hourly (UTC)
 
-# 403 を回避するために明示的に付与
 permissions:
   contents: read
-  issues: write          # PR コメント API は issues 権限
-  pull-requests: write   # 念のため（将来的にラベル付与等にも対応しやすい）
+  pull-requests: write
+  issues: write
 
 concurrency:
-  group: handoff-rollup-${{ github.ref || github.run_id }}
+  group: handoff-rollup
   cancel-in-progress: true
 
 jobs:
@@ -31,125 +34,88 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (full history)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Decide commit range
-        id: range
+      - name: Resolve inputs / defaults
+        id: cfg
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            base="${{ github.event.pull_request.base.sha }}"
-            head="${{ github.event.pull_request.head.sha }}"
-            echo "range=${base}..${head}" >> "$GITHUB_OUTPUT"
-            echo "since=" >> "$GITHUB_OUTPUT"
-          else
-            # push / manual など
-            hours="${{ inputs.lookback_hours || '1' }}"
-            echo "range=" >> "$GITHUB_OUTPUT"
-            echo "since=--since='${hours} hours ago'" >> "$GITHUB_OUTPUT"
-          fi
+          # normalize lookback_hours (string -> int-ish)
+          LB="${{ github.event.inputs.lookback_hours || '1' }}"
+          [[ -z "$LB" ]] && LB="1"
+          echo "lookback_hours=$LB" >> "$GITHUB_OUTPUT"
 
-      - name: Build handoff markdown
-        id: mk
+      - name: Prepare handoff file (safe filename; relative path)
+        id: handoff_file
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p handoff
-          ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          out="handoff/handoff_${ts}.md"
+          # Safe timestamp without colon (e.g., 2025-09-14T180633Z)
+          NOW_SAFE="$(date -u +'%Y-%m-%dT%H%M%SZ')"
+          DIR="handoff_out"
+          FILE="handoff_${NOW_SAFE}.md"
+          mkdir -p "$DIR"
 
-          if [[ -n "${{ steps.range.outputs.range }}" ]]; then
-            gitlog_cmd=(git log --no-merges --pretty=format:'- %h %ad %an — %s' --date=short ${{ steps.range.outputs.range }})
-          else
-            gitlog_cmd=(git log --no-merges --pretty=format:'- %h %ad %an — %s' --date=short ${{ steps.range.outputs.since }})
-          fi
-
-          commits="$("${gitlog_cmd[@]}" || true)"
           {
-            echo "# 📝 Handoff Rollup"
-            echo ""
-            echo "- Generated (UTC): \`$ts\`"
-            echo "- Repo: \`${{ github.repository }}\`"
-            if [[ -n "${{ steps.range.outputs.range }}" ]]; then
-              echo "- Range: \`${{ steps.range.outputs.range }}\`"
-            fi
-            echo ""
-            if [[ -n "$commits" ]]; then
-              echo "## ✅ Recent Commits"
-              echo "$commits"
-            else
-              echo "## ✅ Recent Commits"
-              echo "- （該当なし）"
-            fi
-            echo ""
-            echo "## 🚩 Next Actions (template)"
+            echo "# 📝 引き継ぎレポート (${NOW_SAFE})"
+            echo "_直近 **${{ steps.cfg.outputs.lookback_hours }}h** の更新を集計_"
+            echo
+            echo "## ✅ 最近のコミット（サンプル）"
+            # 直近コミット（最大10件・省略表示）
+            git log --since="${{ steps.cfg.outputs.lookback_hours }} hours ago" --pretty='- %h %s (%an)' -n 10 || true
+            echo
+            echo "## 🚩 次アクション（サンプル）"
             echo "- [ ] DAG 本処理の組み込み"
             echo "- [ ] 戦略指定パラメータの対応"
             echo "- [ ] 結果の artifact / PR コメント出力"
-          } > "$out"
+            echo
+            echo "<!--HANDOFF_META"
+            echo "{\"generated_at\":\"${NOW_SAFE}\",\"lookback_hours\":${{ steps.cfg.outputs.lookback_hours }}}"
+            echo "HANDOFF_META-->"
+          } > "${DIR}/${FILE}"
 
-          # 出力パスと有無を出力
-          if [[ -s "$out" ]]; then
-            echo "path=$out" >> "$GITHUB_OUTPUT"
-            # コミットが1件も無い場合でもファイルは生成されるので、本文に依存して判定
-            if grep -qE '^- [0-9a-f]{7,} ' "$out"; then
-              echo "has_content=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "has_content=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "path=" >> "$GITHUB_OUTPUT"
-            echo "has_content=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "HANDOFF_DIR=${DIR}"  >> "$GITHUB_ENV"
+          echo "HANDOFF_FILE=${FILE}" >> "$GITHUB_ENV"
 
-      - name: Upload artifact
-        if: always() && steps.mk.outputs.path != ''
+      - name: Upload handoff artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: handoff-${{ github.run_id }}
-          path: ${{ steps.mk.outputs.path }}
+          path: ${{ env.HANDOFF_DIR }}/
           retention-days: 14
 
-      # PR のときだけ & fork ではないときだけ安全にコメント
-      - name: Post handoff comment on PR (safe)
-        if: >
-          ${{
-            github.event_name == 'pull_request' &&
-            !github.event.pull_request.head.repo.fork &&
-            steps.mk.outputs.path != ''
-          }}
+      # Safely comment to PR only when:
+      # - This workflow is running on a PR event
+      # - The PR is NOT from a fork (GITHUB_TOKEN has write on same-repo PR)
+      - name: Comment to PR (when allowed)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
         uses: actions/github-script@v7
         env:
-          HANDOFF_PATH: ${{ steps.mk.outputs.path }}
-          HAS_CONTENT: ${{ steps.mk.outputs.has_content }}
+          HANDOFF_DIR: ${{ env.HANDOFF_DIR }}
+          HANDOFF_FILE: ${{ env.HANDOFF_FILE }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const pr = context.payload.pull_request?.number;
-            if (!pr) {
-              core.info('No PR number in context. Skip commenting.');
-              return;
-            }
+            const path = require('path');
+            const filePath = path.join(process.env.HANDOFF_DIR, process.env.HANDOFF_FILE);
             let body = '';
             try {
-              body = fs.readFileSync(process.env.HANDOFF_PATH, 'utf8');
+              body = fs.readFileSync(filePath, 'utf8');
             } catch (e) {
-              core.warning(`Failed to read handoff file: ${e}`);
-              return;
+              body = '# 📝 引き継ぎレポート\nファイルの読込に失敗しましたが、artifact に同梱されています。';
             }
-            // 空っぽならスパム化を避けてスキップ
-            if ((process.env.HAS_CONTENT || '').toLowerCase() !== 'true') {
-              core.info('No new commits detected; skip PR comment.');
-              return;
+
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+              core.info('Posted handoff note to PR.');
+            } catch (err) {
+              core.warning(`Skip PR comment (likely permissions). ${err}`);
             }
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr,
-              body
-            });
