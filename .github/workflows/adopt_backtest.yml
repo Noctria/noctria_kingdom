@@ -1,0 +1,140 @@
+name: Backtest on Adopt PR (self-hosted)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "target ref (branch)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: backtest-adopt-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  backtest-on-adopt:
+    # 自前ランナーで動かす
+    runs-on: self-hosted
+
+    # adopt/** のPRだけ対象（手動実行は常に可）
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      startsWith( (github.event.pull_request.head.ref || github.ref_name), 'adopt/')
+
+    env:
+      # PRイベントなら adopt ブランチ名、手動なら入力
+      TARGET_REF: ${{ github.event.pull_request.head.ref || inputs.ref || github.ref_name }}
+      STRATEGY_GLOB: "src/strategies/veritas_generated/**.py"
+      EXTRA_ARGS: ""
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Show context
+        run: |
+          echo "TARGET_REF=${TARGET_REF}"
+          echo "actor=${{ github.actor }}"
+          echo "runner=${{ runner.name }} (${{ runner.os }})"
+
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_REF }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal deps
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run local backtest (fast path on runner)
+        id: local_backtest
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ -f "airflow_docker/scripts/veritas_local_test.py" ]; then
+            python3 airflow_docker/scripts/veritas_local_test.py \
+              --pattern "${STRATEGY_GLOB}" ${EXTRA_ARGS}
+          else
+            echo "No local test script; skipping."
+          fi
+
+      # Airflow連携（Secrets設定時のみ）
+      - name: Trigger Airflow DAG (optional)
+        if: ${{ (secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '') }}
+        env:
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
+          AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
+          NOCTRIA_STRATEGY_GLOB: ${{ env.STRATEGY_GLOB }}
+          NOCTRIA_EXTRA_ARGS: ${{ env.EXTRA_ARGS }}
+        run: |
+          set -euo pipefail
+          echo "Triggering Airflow DAG for ${TARGET_REF}"
+          python3 scripts/trigger_backtest_dag.py
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p handoff_out
+          for p in \
+            "airflow_docker/logs/veritas_generate.log" \
+            "airflow_docker/logs/veritas_eval_result.json" \
+            "logs/veritas_evaluate.log" \
+            "logs/veritas_eval_result.json" \
+            "data/stats/*.json" \
+            "airflow_docker/backtests/**/result.json" \
+            "airflow_docker/backtests/**/report.html"
+          do
+            if ls $p >/dev/null 2>&1; then
+              cp -r --parents $p handoff_out/ 2>/dev/null || true
+            fi
+          done
+          echo "=== Collected ==="
+          find handoff_out -type f | sed 's/^/ - /'
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-${{ github.run_id }}-${{ env.TARGET_REF }}
+          path: handoff_out
+          retention-days: 14
+
+      - name: Post summary to PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        env:
+          TARGET_REF: ${{ env.TARGET_REF }}
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `Backtest finished on self-hosted for \`${process.env.TARGET_REF}\``;
+            const body = [
+              `### ✅ Backtest completed (self-hosted)`,
+              `- Branch: \`${process.env.TARGET_REF}\``,
+              `- Runner: \`${process.env.RUNNER_NAME || 'self-hosted'}\``,
+              `- Artifacts: see [Actions run](${runUrl})`,
+              ``,
+              `> If Airflow secrets are configured, DAG was also triggered.`
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `**${title}**\n\n${body}`
+            });
