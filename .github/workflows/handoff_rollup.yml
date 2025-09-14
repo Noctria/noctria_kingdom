@@ -1,82 +1,155 @@
 name: Handoff Rollup
 
 on:
+  # adopt/* → main の通常フローで動かしたい想定
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  push:
+    branches:
+      - adopt/**
+  # 手動実行も可能
   workflow_dispatch:
     inputs:
-      pinned_issue_number:
-        description: "コメント先のピン留めIssue番号"
-        required: true
-        default: "1"
       lookback_hours:
-        description: "直近何時間の更新を集計するか"
-        required: true
-        default: "1"
-      next_from:
-        description: "次アクション読込ファイルパス（任意）"
+        description: "push など PR 以外のイベントで集計する時間幅（h）"
         required: false
-        default: ""
-  schedule:
-    - cron: "0 * * * *"  # 毎時00分（UTC）
+        default: "1"
 
+# 403 を回避するために明示的に付与
 permissions:
   contents: read
-  pull-requests: read
-  issues: write
+  issues: write          # PR コメント API は issues 権限
+  pull-requests: write   # 念のため（将来的にラベル付与等にも対応しやすい）
 
 concurrency:
-  group: handoff-rollup
+  group: handoff-rollup-${{ github.ref || github.run_id }}
   cancel-in-progress: true
-
-env:
-  PINNED_ISSUE_NUMBER: ${{ github.event.inputs.pinned_issue_number || '1' }}
-  LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '1' }}
-  NEXT_FROM: ${{ github.event.inputs.next_from || '' }}
 
 jobs:
   rollup:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
         with:
-          python-version: "3.12"
+          fetch-depth: 0
 
-      - name: Generate handoff (markdown + json)
+      - name: Decide commit range
+        id: range
+        shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/generate_handoff.py --lookback-hours "${LOOKBACK_HOURS}" ${NEXT_FROM:+--next-from "${NEXT_FROM}"}
-          ls -al handoff/
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            echo "range=${base}..${head}" >> "$GITHUB_OUTPUT"
+            echo "since=" >> "$GITHUB_OUTPUT"
+          else
+            # push / manual など
+            hours="${{ inputs.lookback_hours || '1' }}"
+            echo "range=" >> "$GITHUB_OUTPUT"
+            echo "since=--since='${hours} hours ago'" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Upload artifacts
+      - name: Build handoff markdown
+        id: mk
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p handoff
+          ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          out="handoff/handoff_${ts}.md"
+
+          if [[ -n "${{ steps.range.outputs.range }}" ]]; then
+            gitlog_cmd=(git log --no-merges --pretty=format:'- %h %ad %an — %s' --date=short ${{ steps.range.outputs.range }})
+          else
+            gitlog_cmd=(git log --no-merges --pretty=format:'- %h %ad %an — %s' --date=short ${{ steps.range.outputs.since }})
+          fi
+
+          commits="$("${gitlog_cmd[@]}" || true)"
+          {
+            echo "# 📝 Handoff Rollup"
+            echo ""
+            echo "- Generated (UTC): \`$ts\`"
+            echo "- Repo: \`${{ github.repository }}\`"
+            if [[ -n "${{ steps.range.outputs.range }}" ]]; then
+              echo "- Range: \`${{ steps.range.outputs.range }}\`"
+            fi
+            echo ""
+            if [[ -n "$commits" ]]; then
+              echo "## ✅ Recent Commits"
+              echo "$commits"
+            else
+              echo "## ✅ Recent Commits"
+              echo "- （該当なし）"
+            fi
+            echo ""
+            echo "## 🚩 Next Actions (template)"
+            echo "- [ ] DAG 本処理の組み込み"
+            echo "- [ ] 戦略指定パラメータの対応"
+            echo "- [ ] 結果の artifact / PR コメント出力"
+          } > "$out"
+
+          # 出力パスと有無を出力
+          if [[ -s "$out" ]]; then
+            echo "path=$out" >> "$GITHUB_OUTPUT"
+            # コミットが1件も無い場合でもファイルは生成されるので、本文に依存して判定
+            if grep -qE '^- [0-9a-f]{7,} ' "$out"; then
+              echo "has_content=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_content=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "has_content=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload artifact
+        if: always() && steps.mk.outputs.path != ''
         uses: actions/upload-artifact@v4
         with:
           name: handoff-${{ github.run_id }}
-          path: |
-            handoff/handoff_*.md
-            handoff/handoff_*.json
+          path: ${{ steps.mk.outputs.path }}
           retention-days: 14
 
-      - name: Post to pinned issue
+      # PR のときだけ & fork ではないときだけ安全にコメント
+      - name: Post handoff comment on PR (safe)
+        if: >
+          ${{
+            github.event_name == 'pull_request' &&
+            !github.event.pull_request.head.repo.fork &&
+            steps.mk.outputs.path != ''
+          }}
         uses: actions/github-script@v7
+        env:
+          HANDOFF_PATH: ${{ steps.mk.outputs.path }}
+          HAS_CONTENT: ${{ steps.mk.outputs.has_content }}
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const path = require('path');
-            const dir = path.join(process.env.GITHUB_WORKSPACE, "handoff");
-            // 最新ファイル（更新時刻最大の .md）を選ぶ
-            const mds = fs.readdirSync(dir).filter(f => f.endsWith(".md"))
-              .map(f => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
-              .sort((a,b) => b.t - a.t);
-            if (mds.length === 0) {
-              core.setFailed("handoff/*.md not found");
+            const pr = context.payload.pull_request?.number;
+            if (!pr) {
+              core.info('No PR number in context. Skip commenting.');
+              return;
             }
-            const latest = path.join(dir, mds[0].f);
-            const body = fs.readFileSync(latest, 'utf-8');
-
+            let body = '';
+            try {
+              body = fs.readFileSync(process.env.HANDOFF_PATH, 'utf8');
+            } catch (e) {
+              core.warning(`Failed to read handoff file: ${e}`);
+              return;
+            }
+            // 空っぽならスパム化を避けてスキップ
+            if ((process.env.HAS_CONTENT || '').toLowerCase() !== 'true') {
+              core.info('No new commits detected; skip PR comment.');
+              return;
+            }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: parseInt(process.env.PINNED_ISSUE_NUMBER || "1", 10),
+              issue_number: pr,
               body
             });
