@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
-import io
 import re
 import sys
 from pathlib import Path
