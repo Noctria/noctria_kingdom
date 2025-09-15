@@ -134,6 +134,11 @@ def db_connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL;")
+    # ★ ここで必ずスキーマ作成（idempotent）
+    try:
+        db_init(conn)
+    except Exception as e:
+        log(f"[warn] db_init on connect failed: {e}")
     return conn
 
 
@@ -637,7 +642,7 @@ def main() -> int:
     # 6) Royal Scribe — SQLite 保存
     try:
         conn = db_connect()
-        db_init(conn)
+        # db_init(conn)  # ← db_connect内で呼んでいるので二重でも安全だが省略可
         db_insert_tests(conn, trace_id, pyres.get("cases", []) or [])
         db_insert_lint_summary(conn, trace_id, ruff_meta.get("counts", {}) or {})
         db_insert_run(
