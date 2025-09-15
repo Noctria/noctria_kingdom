@@ -9,11 +9,10 @@ run_pdca_agents.py — PDCA Orchestrator (all-in-one, reports-only commit, DB lo
   2) ruff 実行 (JSON/統計保存) → サマリ抽出
   3) Inventor → Harmonia の提案/レビュー (モジュールがあれば)
   4) Veritas / Hermes 連携 (モジュールがあれば)
-  5) Royal Scribe: SQLite へ
-       - PDCA ラン基本情報
-       - エージェント会話/進捗ログ
-       - テスト/リンタ結果
-     を保存（スキーマ自動作成）
+  5) Royal Scribe: SQLite に加えて Chronicle(Postgres/JSONL) にも記録
+       - PDCA ラン基本情報（SQLite）
+       - エージェント会話/進捗ログ（SQLite + Chronicle）
+       - テスト/リンタ結果（SQLite + Chronicle）
   6) レポート成果物のみを git add -f（--no-verify で静かに commit）
   7) All green（テスト失敗なし & ruff returncode==0）かつ環境変数で許可のとき
      → dev ブランチへ自動 add/commit/push（オプション）
@@ -45,6 +44,19 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+# ---- Chronicle/Royal Scribe 連携（Postgres or JSONL） ------------------------
+# 失敗しても本体フローを止めないように広範囲 try/except で包む
+try:
+    from scripts._scribe import (
+        log_test_results as scribe_log_tests,
+        log_lint_results as scribe_log_lint,
+        log_pdca_stage as scribe_log_stage,
+        log_ai_message as scribe_log_ai,
+    )
+    SCRIBE_AVAILABLE = True
+except Exception:
+    SCRIBE_AVAILABLE = False
 
 # ------------------------------------------------------------
 # パス/定数
@@ -80,9 +92,6 @@ REPORT_ADD_PATTERNS: List[str] = [
     "src/codex_reports/",
     "noctria_gui/static/codex_reports/",
     "src/codex_reports/patches/*.patch",
-    # 必要なら設定系も入れられる:
-    # ".ruff.toml",
-    # "allowed_files.txt",
 ]
 
 
@@ -380,7 +389,9 @@ def generate_inventor_and_harmonia(pyres: Dict[str, Any], ruff_meta: Dict[str, A
 
     # Ruffサマリ添付
     if ruff_meta:
-        hi = "\n".join([f"{cnt:4d} {code}" for code, cnt in sorted(ruff_meta.get("counts", {}).items(), key=lambda t: t[1], reverse=True)[:5]])
+        hi = "\n".join(
+            [f"{cnt:4d} {code}" for code, cnt in sorted(ruff_meta.get("counts", {}).items(), key=lambda t: t[1], reverse=True)[:5]]
+        )
         inventor_md += "\n\n---\n### Ruff summary (top)\n```\n" + hi + "\n```"
 
     INVENTOR_MD.write_text(inventor_md, encoding="utf-8")
@@ -405,48 +416,88 @@ def generate_inventor_and_harmonia(pyres: Dict[str, Any], ruff_meta: Dict[str, A
 
     HARMONIA_MD.write_text(harmonia_md, encoding="utf-8")
 
-    # Royal Scribe 保存 & GPT 要約
+    # Royal Scribe 保存（SQLite + Chronicle）
     try:
         conn = db_connect()
         db_insert_agent_log(conn, trace_id, "inventor", "Inventor Suggestions", inventor_md)
         db_insert_agent_log(conn, trace_id, "harmonia", "Harmonia Review", harmonia_md)
-        # GPT 要約（任意）
-        if OPENAI_KEY:
+        conn.close()
+    except Exception as e:
+        log(f"[warn] DB log for inventor/harmonia failed: {e}")
+
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_ai(name="Inventor", role="inventor", content=inventor_md, trace_id=trace_id, topic="AI Council")
+            scribe_log_ai(name="Harmonia", role="harmonia", content=harmonia_md, trace_id=trace_id, topic="AI Council")
+        except Exception as e:
+            log(f"[warn] scribe inventor/harmonia: {e}")
+
+    # GPT 要約（任意） → SQLite のみ（必要なら scribe にも）
+    if OPENAI_KEY:
+        try:
             for role, title, body in [
                 ("inventor", "Inventor Summary", inventor_md),
                 ("harmonia", "Harmonia Summary", harmonia_md),
             ]:
                 summ = gpt_summarize(title, body)
                 if summ:
+                    conn = db_connect()
                     db_insert_agent_log(conn, trace_id, f"gpt-{role}", f"GPT Summary: {title}", summ)
-        conn.close()
-    except Exception as e:
-        log(f"[warn] DB log for inventor/harmonia failed: {e}")
+                    conn.close()
+                    if SCRIBE_AVAILABLE:
+                        try:
+                            scribe_log_ai(name=f"GPT-{role}", role="gpt", content=summ, trace_id=trace_id, topic="AI Council")
+                        except Exception as e:
+                            log(f"[warn] scribe gpt summary: {e}")
+        except Exception as e:
+            log(f"[warn] GPT summarize inventor/harmonia: {e}")
 
 
 def maybe_run_veritas(trace_id: str) -> None:
     """
     Veritas/strategy_generator 等が存在すれば軽く呼ぶ（重い実行は避ける）。
     """
+    body = ""
     try:
         from src.veritas.strategy_generator import StrategyGenerator  # type: ignore
         gen = StrategyGenerator()
-        txt = gen.preview() if hasattr(gen, "preview") else "Veritas: preview() not available"
-        db_insert_agent_log(db_connect(), trace_id, "veritas", "Veritas Preview", str(txt))
+        body = gen.preview() if hasattr(gen, "preview") else "Veritas: preview() not available"
     except Exception as e:
-        log(f"[info] Veritas skipped: {e}")
+        body = f"Veritas skipped: {e}"
+
+    try:
+        db_insert_agent_log(db_connect(), trace_id, "veritas", "Veritas Preview", str(body))
+    except Exception:
+        pass
+
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_ai(name="Veritas", role="veritas", content=str(body), trace_id=trace_id, topic="AI Council")
+        except Exception as e:
+            log(f"[warn] scribe veritas: {e}")
 
 
 def maybe_run_hermes(trace_id: str) -> None:
     """
     Hermes（計画系）にフック。存在すればダイジェスト実行。
     """
+    body = ""
     try:
         from src.plan_data.run_pdca_plan_workflow import run_plan  # type: ignore
-        out = run_plan(dry_run=True) if callable(run_plan) else "Hermes: run_plan not callable"
-        db_insert_agent_log(db_connect(), trace_id, "hermes", "Hermes Plan Digest", str(out))
+        body = run_plan(dry_run=True) if callable(run_plan) else "Hermes: run_plan not callable"
     except Exception as e:
-        log(f"[info] Hermes skipped: {e}")
+        body = f"Hermes skipped: {e}"
+
+    try:
+        db_insert_agent_log(db_connect(), trace_id, "hermes", "Hermes Plan Digest", str(body))
+    except Exception:
+        pass
+
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_ai(name="Hermes", role="hermes", content=str(body), trace_id=trace_id, topic="AI Council")
+        except Exception as e:
+            log(f"[warn] scribe hermes: {e}")
 
 
 # ------------------------------------------------------------
@@ -522,9 +573,20 @@ def main() -> int:
 
     # 1) Test
     pyres = run_pytest(JUNIT_XML)
+    # Chronicle へも保存
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_tests(pyres, trace_id=trace_id, topic="PDCA agents")
+        except Exception as e:
+            log(f"[warn] scribe pytest: {e}")
 
     # 2) Lint
     ruff_meta = run_ruff()
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_lint(ruff_meta, trace_id=trace_id, topic="PDCA agents")
+        except Exception as e:
+            log(f"[warn] scribe ruff: {e}")
 
     # 3) Agents
     try:
@@ -552,7 +614,27 @@ def main() -> int:
     ).strip() + "\n"
     LATEST_CYCLE_MD.write_text(summary_md, encoding="utf-8")
 
-    # 6) Royal Scribe — DB 保存
+    # Chronicle（全体サマリ）
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_stage(
+                stage="summary",
+                payload={
+                    "trace_id": trace_id,
+                    "pytest": {k: pyres.get(k) for k in ("total", "failures", "errors", "skipped", "returncode")},
+                    "ruff": ruff_meta,
+                    "green": bool(green),
+                    "started": started,
+                    "finished": ts_jst(),
+                },
+                trace_id=trace_id,
+                topic="PDCA agents",
+                tags=["summary"],
+            )
+        except Exception as e:
+            log(f"[warn] scribe summary: {e}")
+
+    # 6) Royal Scribe — SQLite 保存
     try:
         conn = db_connect()
         db_init(conn)
@@ -577,6 +659,11 @@ def main() -> int:
             summ = gpt_summarize("PDCA Summary", summary_md)
             if summ:
                 db_insert_agent_log(conn, trace_id, "gpt", "GPT Summary: PDCA", summ)
+                if SCRIBE_AVAILABLE:
+                    try:
+                        scribe_log_ai(name="GPT", role="gpt", content=summ, trace_id=trace_id, topic="AI Council")
+                    except Exception as e:
+                        log(f"[warn] scribe gpt PDCA: {e}")
         conn.close()
     except Exception as e:
         log(f"[warn] DB write failed: {e}")
