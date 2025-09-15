@@ -1,3 +1,4 @@
+# ruff: noqa: F403, F405
 from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8

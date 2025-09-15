@@ -1,9 +1,8 @@
+# ruff: noqa: F403, F405
 from core.path_config import *
 # tests/run_ai_trading_loop.py
 
 import time
-import sys
-import os
 import numpy as np
 
 # ✅ プロジェクトルートをパスに追加

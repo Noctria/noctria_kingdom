@@ -1,6 +1,5 @@
+# ruff: noqa: F403, F405
 from core.path_config import *
-import sys
-import os
 
 from order_execution import OrderExecution  # execution/order_execution.py
 

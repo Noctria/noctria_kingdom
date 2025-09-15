@@ -2,7 +2,6 @@
 # coding: utf-8
 
 import numpy as np
-import pandas as pd
 from core.meta_ai import MetaAI
 from strategies.Aurus_Singularis import AurusSingularis
 from strategies.Levia_Tempest import LeviaTempest
@@ -25,10 +24,10 @@ def main():
 
     # 例: 実際のヒストリカルデータファイルから観測データ生成（省略可）
     # ここではランダム観測データを利用
-    observation = np.random.rand(12)
+    _observation = np.random.rand(12)
 
     # 環境の初期化
-    obs = meta_ai.reset()
+    _obs = meta_ai.reset()
 
     # 例: 50,000ステップの長期学習
     total_timesteps = 50000
