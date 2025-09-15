@@ -1,7 +1,6 @@
 # src/plan_data/adapter_to_decision.py
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import Any, Dict, Optional
 
 import pandas as pd

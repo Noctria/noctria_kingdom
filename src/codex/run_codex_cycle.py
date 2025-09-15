@@ -10,7 +10,7 @@ import importlib.util
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 # ===== パス/レポート =====
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

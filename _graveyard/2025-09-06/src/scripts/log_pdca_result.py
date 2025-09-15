@@ -10,7 +10,6 @@
 
 import json
 from datetime import datetime
-from pathlib import Path
 from src.core.path_config import PDCA_LOG_DIR
 
 PDCA_HISTORY_PATH = PDCA_LOG_DIR / "pdca_history.json"

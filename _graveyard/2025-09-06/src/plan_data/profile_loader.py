@@ -1,8 +1,7 @@
 # src/plan_data/profile_loader.py
 from __future__ import annotations
 
-from typing import Optional, Mapping, Any
-import os
+from typing import Mapping, Any
 import pathlib
 import yaml
 

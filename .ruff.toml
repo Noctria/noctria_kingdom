@@ -1,12 +1,27 @@
-# .ruff.toml
-target-version = "py312"
-line-length = 120
+# .ruff.toml (Ruff 0.13系向け)
+# まずは範囲を絞って「いま直すべき場所だけ」を監視する
+target-version = "py311"
+
+# 監視対象外を明確化（生成物・墓場・ログ・重依存など）
+exclude = [
+  ".git", ".venv", "venv", "__pycache__", "build", "dist",
+  "_graveyard", "logs", "airflow_docker/logs", "actions-runner",
+  "data/models", "noctria_gui/static", "src/codex_reports",  # レポート出力系はlint対象外
+]
 
 [lint]
-# まずは基本だけ（E/F）。長い行(E501)などは最初は見ない
-select = ["E", "F"]
-ignore = ["E501"]
+# 最初は“Pythonとしての致命系 + 使い回しやすい軽い規律”に限定
+select = ["E", "F", "W"]
+ignore = [
+  "E402",  # import の位置は後回し
+  "E701", "E702",  # 1行に複数文も段階的に直す
+]
+
+# まずは tests/ のみ一部緩める例（必要なら）
+per-file-ignores = { "tests/conftest.py" = ["E402"] }
 
 [format]
-quote-style = "double"
-indent-style = "space"
+# 後で整形を有効化したいとき用の雛形（今は実質デフォルト）
+# quote-style = "double"
+# indent-style = "space"
+# line-ending = "auto"

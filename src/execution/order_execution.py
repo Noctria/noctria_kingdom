@@ -121,7 +121,7 @@ class OrderExecution:
                 r = requests.get(self.get_balance_api_url, timeout=self.timeout_sec)
                 r.raise_for_status()
                 return float(r.json().get("balance", 0))
-            except Exception as e:
+            except Exception:
                 return None
 
         # ダミー

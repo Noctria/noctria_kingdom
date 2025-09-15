@@ -7,7 +7,6 @@
 - 固定テンプレートだが、将来的にはLLMがコード自体を生成する想定。
 """
 
-import os
 import re
 import sys
 import logging
@@ -128,7 +127,7 @@ def generate_strategy_file(strategy_name: str) -> str:
 
         logging.info(f"✅ 新たな戦略の羊皮紙を生成しました: {filepath}")
         return str(filepath)
-    except Exception as e:
+    except Exception:
         logging.error("❌ 戦略ファイルの生成中にエラーが発生しました", exc_info=True)
         raise
 

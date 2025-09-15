@@ -7,7 +7,6 @@
 - まだPushされていない（pushed=False）戦略をGitHubにPushする。
 """
 
-import os
 import json
 import logging
 import subprocess
@@ -16,7 +15,7 @@ from pathlib import Path
 
 # --- 王国の基盤モジュールをインポート ---
 # ✅ 修正: path_configから正しい変数名をインポート
-from src.core.path_config import PROJECT_ROOT, STRATEGIES_DIR, ACT_LOG_DIR, VERITAS_EVAL_LOG
+from src.core.path_config import PROJECT_ROOT, STRATEGIES_DIR, VERITAS_EVAL_LOG
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')

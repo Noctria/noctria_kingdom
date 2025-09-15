@@ -1,5 +1,4 @@
 import subprocess
-import os
 
 def get_unmerged_files():
     result = subprocess.run(['git', 'status', '--porcelain'], stdout=subprocess.PIPE)

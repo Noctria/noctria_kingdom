@@ -11,7 +11,6 @@ from plan_data import observability  # type: ignore
 # 型チェック時のみ参照（実行時は遅延 import で循環を回避）
 if TYPE_CHECKING:
     from plan_data import quality_gate as quality_gate_mod  # type: ignore
-    from plan_data import noctus_gate as noctus_gate_mod  # type: ignore
 
 DictLike = Dict[str, Any]
 

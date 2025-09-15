@@ -78,7 +78,7 @@ def simulate_strategy_adjusted(strategy_path: str, market_data: pd.DataFrame) ->
             "error_message": None
         }
 
-    except Exception as e:
+    except Exception:
         return {
             "status": "error",
             "error_message": traceback.format_exc()

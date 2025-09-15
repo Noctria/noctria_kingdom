@@ -39,7 +39,7 @@ def generate_cleanup_commands():
         elif t == "duplicate_directory_case":
             # 名前が異なるだけで内容が重複していそうなディレクトリ
             paths = issue["paths"]
-            cmds.append(f"# ⚠️ 大文字小文字の混在 → 手動で統一検討\n")
+            cmds.append("# ⚠️ 大文字小文字の混在 → 手動で統一検討\n")
             for p in paths:
                 cmds.append(f"# ls '{p}'\n")
 

@@ -1,6 +1,5 @@
 # tools/save_tree_snapshot.py
 
-import os
 import subprocess
 from pathlib import Path
 

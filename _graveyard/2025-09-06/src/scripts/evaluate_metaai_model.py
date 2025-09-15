@@ -2,7 +2,6 @@
 # coding: utf-8
 
 import os
-from pathlib import Path
 from stable_baselines3 import PPO
 from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 from core.path_config import MODELS_DIR, DATA_DIR, LOGS_DIR

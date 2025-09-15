@@ -9,7 +9,6 @@
 """
 
 import subprocess
-import shutil
 from datetime import datetime
 import json
 from pathlib import Path

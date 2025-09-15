@@ -9,7 +9,6 @@
 
 import shutil
 import json
-from pathlib import Path
 from src.core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR
 
 # ========================================

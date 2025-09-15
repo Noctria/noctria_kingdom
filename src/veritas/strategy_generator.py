@@ -12,7 +12,6 @@ import os
 import torch
 import psycopg2
 from datetime import datetime
-from typing import Optional
 
 from core.path_config import VERITAS_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
 from core.logger import setup_logger

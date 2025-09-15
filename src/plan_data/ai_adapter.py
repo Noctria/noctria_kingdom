@@ -1,5 +1,5 @@
 import concurrent.futures as cf
-from typing import Callable, Dict
+from typing import Callable
 from .contracts import FeatureBundle, StrategyProposal
 
 def propose_with_timeout(fn: Callable[[FeatureBundle], StrategyProposal],

@@ -1,7 +1,6 @@
 # src/plan_data/plan_to_levia_demo.py
 
 import pandas as pd
-from datetime import datetime, timedelta
 
 from plan_data.collector import PlanDataCollector
 from plan_data.features import FeatureEngineer

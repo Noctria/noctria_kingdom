@@ -146,7 +146,7 @@ class GitHelper:
         """
         # 注釈の有無
         tagger = _run(
-            ["git", "for-each-ref", f"--format=%(taggername)", f"refs/tags/{tag}"],
+            ["git", "for-each-ref", "--format=%(taggername)", f"refs/tags/{tag}"],
             cwd=self.repo_dir,
             check=False,
         ).strip()

@@ -5,14 +5,10 @@ Plan層（collector→features→statistics）からPrometheus Oracleへの連�
 - 市場特徴量DFから未来予測を生成し、可視化・指標を出力
 """
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
 
 from src.core.path_config import DATA_DIR
 from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
 from src.plan_data.features import FeatureEngineer
-from src.plan_data.statistics import PlanStatistics
 
 from src.strategies.prometheus_oracle import PrometheusOracle
 

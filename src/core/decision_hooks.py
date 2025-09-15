@@ -22,13 +22,13 @@ from typing import Any, Dict, Optional
 
 try:
     from src.core.decision_registry import create_decision, append_event
-except Exception as e:  # pragma: no cover
+except Exception:  # pragma: no cover
     create_decision = None  # type: ignore
     append_event = None  # type: ignore
 
 try:
     from src.core.airflow_client import make_airflow_client
-except Exception as e:  # pragma: no cover
+except Exception:  # pragma: no cover
     make_airflow_client = None  # type: ignore
 
 

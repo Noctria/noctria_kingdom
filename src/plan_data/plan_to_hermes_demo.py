@@ -1,7 +1,6 @@
 # src/plan_data/plan_to_hermes_demo.py
 
 import json
-from pathlib import Path
 
 from src.core.path_config import DATA_DIR
 from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
