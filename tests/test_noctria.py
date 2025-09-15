@@ -6,12 +6,12 @@ import unittest
 def _resolve_market_fetcher():
     try:
         # New path (preferred)
-        from core.data.market_data_fetcher import MarketDataFetcher as _F  # noqa: WPS433
+        from core.data.market_data_fetcher import MarketDataFetcher as _F
         return _F
     except Exception:
         try:
             # Legacy path (if exists)
-            from data.data_loader import MarketDataFetcher as _F  # noqa: WPS433
+            from data.data_loader import MarketDataFetcher as _F
             return _F
         except Exception:
             return None
