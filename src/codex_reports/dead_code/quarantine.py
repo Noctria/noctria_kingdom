@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-import csv, os, sys, subprocess, shlex
-GRAVEYARD = sys.argv[1] if len(sys.argv)>1 else f"_graveyard"
+import csv
+import os
+import sys
+import subprocess
+import shlex
+GRAVEYARD = sys.argv[1] if len(sys.argv)>1 else "_graveyard"
 CSV_PATH = "codex_reports/dead_code/report.csv"
 
 def run(cmd): return subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
