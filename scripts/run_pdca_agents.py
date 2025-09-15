@@ -1,196 +1,434 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+run_pdca_agents.py
+------------------
+PDCA 自動実行のオーケストレーター（ローカル用）。
+
+流れ:
+  1) pytest を JUnit XML 付きで実行
+  2) ruff を JSON 出力で実行
+  3) Inventor (提案) → Harmonia (レビュー) を生成
+  4) git: ブランチ作成/切替 → allowed_files.txt にマッチする変更だけ add/commit
+  5) 必要なら push (NOCTRIA_PDCA_GIT_PUSH=1)
+
+環境:
+  - .env は外側で読み込んでおく想定（例: `set -a && source .env && set +a`）
+  - PYTHONPATH はリポジトリ直下を指すこと（例: `export PYTHONPATH="$PWD"`）
+"""
+
 from __future__ import annotations
 
-import os, sys, json, shlex, subprocess
-from datetime import datetime, timezone, timedelta
+import argparse
+import json
+import os
+import shlex
+import subprocess
+import sys
+import textwrap
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+import datetime as dt
+import xml.etree.ElementTree as ET
 
+# ---------------------------------------------------------------------
+# 定数 / パス
+# ---------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
-os.chdir(ROOT)
+REPORT_DIR = ROOT / "src" / "codex_reports"
+RUFF_DIR = REPORT_DIR / "ruff"
+JUNIT_XML = REPORT_DIR / "pytest_last.xml"
+INVENTOR_MD = REPORT_DIR / "inventor_suggestions.md"
+HARMONIA_MD = REPORT_DIR / "harmonia_review.md"
+RUFF_JSON = RUFF_DIR / "ruff.json"
 
-JST = timezone(timedelta(hours=9))
-TRACE_ID = datetime.now(JST).strftime("pdca_%Y%m%d_%H%M%S")
+DEFAULT_BRANCH = os.getenv("NOCTRIA_PDCA_BRANCH", "dev/pdca-tested")
+WANT_PUSH = (os.getenv("NOCTRIA_PDCA_GIT_PUSH", "0").strip().lower() in {"1", "true", "yes", "on"})
+PYTEST_ARGS_ENV = os.getenv("NOCTRIA_PYTEST_ARGS", "")  # 追加引数を渡したいときに使用
 
-# --- optional: load .env if present (for local runs)
-try:
-    from dotenv import load_dotenv  # type: ignore
-    load_dotenv(ROOT / ".env")
-except Exception:
-    pass
+# Harmonia を API 呼び出し無しのオフライン判定へ（安全のため既定で offline）
+os.environ.setdefault("NOCTRIA_HARMONIA_MODE", "offline")
 
 
-# === DB utils（存在しなくても動くフェイルソフト） ===
-try:
-    from scripts._pdca_db import (
-        start_run, finish_run, log_message, save_artifact, save_tests, save_lint, log_commit
+# ---------------------------------------------------------------------
+# ユーティリティ
+# ---------------------------------------------------------------------
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def run(cmd: List[str] | str, cwd: Optional[Path] = None) -> Tuple[int, str, str]:
+    """サブプロセス実行。stdout/stderr を返す。"""
+    shell = isinstance(cmd, str)
+    display = cmd if shell else " ".join(shlex.quote(c) for c in cmd)  # type: ignore
+    log(f"[run] {display}")
+    proc = subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        text=True,
+        capture_output=True,
+        shell=shell,
     )
-except Exception:
-    def start_run(*a, **k): pass
-    def finish_run(*a, **k): pass
-    def log_message(*a, **k): pass
-    def save_artifact(*a, **k): pass
-    def save_tests(*a, **k): pass
-    def save_lint(*a, **k): pass
-    def log_commit(*a, **k): pass
+    if proc.stdout:
+        sys.stdout.write(proc.stdout)
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+    return proc.returncode, proc.stdout, proc.stderr
 
-# === Scribe（史官） ===
-try:
-    from scripts._scribe import log_chronicle
-except Exception:
-    def log_chronicle(*a, **k): pass
 
-# === Inventor / Harmonia ===
-from src.codex.agents.inventor import InventorScriptus, InventorOutput
-from src.codex.agents import harmonia as H
+def ensure_dirs() -> None:
+    RUFF_DIR.mkdir(parents=True, exist_ok=True)
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-# --- helpers ---
-def run(cmd: str, allow_fail: bool = False, cwd: Path | None = None) -> Tuple[int, str, str]:
-    print(f"[run] {cmd}")
-    p = subprocess.run(cmd, shell=True, cwd=str(cwd or ROOT), text=True, capture_output=True)
-    if p.stdout: print(p.stdout, end="")
-    if p.stderr: print(p.stderr, end="", file=sys.stderr)
-    if p.returncode != 0 and not allow_fail:
-        raise SystemExit(p.returncode)
-    return p.returncode, p.stdout, p.stderr
 
-def parse_junit(junit_path: Path) -> dict:
-    try:
-        import xml.etree.ElementTree as ET
-        root = ET.parse(junit_path).getroot()
-        total = failed = errors = skipped = 0
-        for suite in root.findall("testsuite"):
-            total += int(suite.attrib.get("tests", 0))
-            failed += int(suite.attrib.get("failures", 0))
-            errors += int(suite.attrib.get("errors", 0))
-            skipped += int(suite.attrib.get("skipped", 0))
-        passed = max(0, total - failed - errors - skipped)
-        return {"total": total, "passed": passed, "failed": failed, "errors": errors, "skipped": skipped}
-    except Exception:
-        return {"total": None, "passed": None, "failed": None, "errors": None, "skipped": None}
+def ts_jst() -> str:
+    jst = dt.timezone(dt.timedelta(hours=9))
+    return dt.datetime.now(tz=jst).isoformat(timespec="seconds")
 
-def git_commit_push(stage_files: List[str], branch: str, message: str) -> Tuple[bool, str | None]:
-    def _r(args: List[str]) -> Tuple[int, str, str]:
-        return run(" ".join(shlex.quote(a) for a in args), allow_fail=True)
 
-    _r(["git","switch",branch])
-    _r(["git","switch","-c",branch])  # branchが無ければ作る
+# ---------------------------------------------------------------------
+# Pytest 実行 & 失敗抽出
+# ---------------------------------------------------------------------
+@dataclass
+class FailureCase:
+    nodeid: str
+    message: str
+    traceback: str
+    duration: Optional[float] = None
 
-    if stage_files:
-        _r(["git","add", *stage_files])
 
-    rc, out, _ = _r(["git","commit","-m", message])
-    if rc != 0:
-        return (False, None)
+def run_pytest(junit_xml: Path = JUNIT_XML) -> Dict[str, Any]:
+    """pytest を実行し、JUnit XML を保存してサマリを返す。"""
+    args = ["-q", "--maxfail=1", "--disable-warnings", "-rA", f"--junitxml={junit_xml}"]
+    if PYTEST_ARGS_ENV.strip():
+        # 例: "tests -k not slow --durations=10"
+        extra = shlex.split(PYTEST_ARGS_ENV)
+        args = extra + [*args]
 
-    rc2, out2, _ = _r(["git","rev-parse","HEAD"])
-    sha = (out2 or "").strip() if rc2 == 0 else None
+    rc, _, _ = run(["pytest", *args])
+    # rc をそのまま返すと PDCA が止まるので、以降の解析に任せる
+    summary = parse_junit(junit_xml)
+    summary["returncode"] = rc
+    return summary
 
-    _r(["git","push","-u","origin",branch])
-    return (True, sha)
 
-def main() -> int:
-    # === Start ===
-    start_run(TRACE_ID, notes="nightly PDCA run")
-    log_message(TRACE_ID, "orchestrator", "system", "PDCA run started", {"trace_id": TRACE_ID})
-    log_chronicle(
-        title="PDCA 開始",
-        category="note",
-        content_md=f"Trace `{TRACE_ID}` で夜間PDCAを開始（Veritas→Inventor→Harmonia→Hermes）。",
-        trace_id=TRACE_ID, topic="PDCA nightly", tags=["pdca","nightly"]
-    )
-
-    reports_dir = ROOT / "src" / "codex_reports"
-    (reports_dir / "ruff").mkdir(parents=True, exist_ok=True)
-
-    # === 1) Lint & Test を機械可読に ===
-    junit = reports_dir / "pytest_last.xml"
-    ruff_json = reports_dir / "ruff" / "ruff.json"
-
-    run(f"pytest -q --maxfail=1 --disable-warnings -rA --junitxml={junit}", allow_fail=True)
-    run(f"ruff check . --output-format=json > {ruff_json}", allow_fail=True)
-
-    test_sum = parse_junit(junit) if junit.exists() else {"failed": None, "errors": None}
-    save_tests(TRACE_ID, test_sum, str(junit) if junit.exists() else None)
-
-    try:
-        lint_raw = json.loads(ruff_json.read_text(encoding="utf-8")) if ruff_json.exists() else []
-        lint_errs = len(lint_raw) if isinstance(lint_raw, list) else 0
-    except Exception:
-        lint_raw, lint_errs = [], None
-    save_lint(TRACE_ID, {"errors": lint_errs, "warnings": 0}, str(ruff_json) if ruff_json.exists() else None)
-
-    log_chronicle(
-        title="テスト/リンタ結果",
-        category="kpi",
-        content_md=f"pytest: total={test_sum.get('total')}, passed={test_sum.get('passed')}, failed={test_sum.get('failed')}, errors={test_sum.get('errors')} / ruff errors={lint_errs}",
-        trace_id=TRACE_ID, topic="PDCA nightly"
-    )
-
-    # === 2) Inventor 提案 → Harmonia レビュー ===
-    inv_agent = InventorScriptus()
-
-    # pytestの失敗詳細が必要なら、将来は --json-report などの統合に切替可
-    pytest_result = {
-        "failures": [],    # 失敗が無ければ空（Inventorは「修正不要」の体裁で出力）
-        "trace_id": TRACE_ID
+def parse_junit(path: Path) -> Dict[str, Any]:
+    """JUnit XML から失敗ケースを抽出。無ければ all green として扱う。"""
+    out: Dict[str, Any] = {
+        "total": 0,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "cases": [],  # FailureCase の dict
     }
-    inventor_out: InventorOutput = inv_agent.propose_fixes_structured(pytest_result)
-    inv_md = inventor_out.to_markdown()
-    (reports_dir / "inventor_suggestions.md").write_text(inv_md, encoding="utf-8")
-    save_artifact(TRACE_ID, "report", str(reports_dir / "inventor_suggestions.md"), inventor_out.to_dict())
-    log_message(TRACE_ID, "inventor", "assistant", "inventor_suggestions", {"patches": len(inventor_out.patch_suggestions)})
+    if not path.exists():
+        return out
 
-    harmonia = H.HarmoniaOrdinis()
-    review_res = harmonia.review_structured(inventor_out)
-    harm_md = harmonia.to_markdown(review_res)
-    (reports_dir / "harmonia_review.md").write_text(harm_md, encoding="utf-8")
-    save_artifact(TRACE_ID, "report", str(reports_dir / "harmonia_review.md"), {"verdict": review_res.verdict, "comments": review_res.comments})
-    log_message(TRACE_ID, "harmonia", "assistant", "review", {"verdict": review_res.verdict, "n_comments": len(review_res.comments)})
+    try:
+        root = ET.parse(path).getroot()
+    except Exception:
+        return out
 
-    log_chronicle(
-        title="修正提案とレビュー",
-        category="decision",
-        content_md=f"- Inventor: {inventor_out.summary}\n- Harmonia: verdict **{review_res.verdict}**（{len(review_res.comments)} comments）",
-        trace_id=TRACE_ID, topic="PDCA nightly",
-        refs={"inventor_report":"src/codex_reports/inventor_suggestions.md","harmonia_report":"src/codex_reports/harmonia_review.md"}
-    )
+    tests = 0
+    failures = 0
+    errors = 0
+    skipped = 0
+    cases: List[Dict[str, Any]] = []
 
-    # === 3) 緑なら dev ブランチへ push ===
-    DEV_BRANCH = os.getenv("NOCTRIA_DEV_BRANCH", "dev/pdca-tested")
-    ALLOW_GLOBS = [g.strip() for g in os.getenv("NOCTRIA_DEV_ALLOW_GLOBS", "src/**/*.py,tests/**/*.py").split(",")]
-
-    rc, out, _ = run("git status --porcelain", allow_fail=True)
-    changed: List[str] = []
-    if out:
-        for line in out.splitlines():
-            if not line.strip():
-                continue
-            path = line[3:].strip()
-            p = Path(path)
-            if any(p.match(g) for g in ALLOW_GLOBS):
-                changed.append(path)
-
-    ok_tests = (test_sum.get("failed") in (0, None)) and (test_sum.get("errors") in (0, None))
-    ok_lint = (lint_errs == 0) or (lint_errs is None)  # ルールは好みに合わせて厳格化可
-
-    if changed and ok_tests:
-        success, sha = git_commit_push(changed, DEV_BRANCH, f"pdca: tested {TRACE_ID}")
-        log_commit(TRACE_ID, DEV_BRANCH, sha, changed, "pdca: tested")
-        msg = f"devブランチ `{DEV_BRANCH}` へ push。commit={sha}, files={len(changed)}"
-        log_message(TRACE_ID, "orchestrator", "assistant", "git_push", {"branch": DEV_BRANCH, "commit": sha, "files": changed})
-        log_chronicle(title="自動コミット/プッシュ", category="pr", content_md=msg, trace_id=TRACE_ID, topic="PDCA nightly", refs={"branch":DEV_BRANCH,"commit":sha,"files":changed})
+    # <testsuite> or <testsuites>
+    suites = []
+    if root.tag == "testsuite":
+        suites = [root]
     else:
-        reason = "no changes" if not changed else "tests not green"
-        log_message(TRACE_ID, "orchestrator", "assistant", "git_skip", {"reason": reason, "ok_tests": ok_tests, "lint_errs": lint_errs})
-        log_chronicle(title="自動コミットをスキップ", category="note", content_md=f"理由: {reason}. ok_tests={ok_tests}, lint_errs={lint_errs}", trace_id=TRACE_ID, topic="PDCA nightly")
+        suites = root.findall("testsuite")
 
-    # === End ===
-    finish_run(TRACE_ID, status="SUCCESS")
-    log_chronicle(title="PDCA 完了", category="note", content_md="今回の夜間ループを完了。", trace_id=TRACE_ID, topic="PDCA nightly")
-    print("[done] PDCA agents finished.")
+    for suite in suites:
+        try:
+            tests += int(suite.attrib.get("tests", "0"))
+            failures += int(suite.attrib.get("failures", "0"))
+            errors += int(suite.attrib.get("errors", "0"))
+            skipped += int(suite.attrib.get("skipped", "0"))
+        except Exception:
+            pass
+
+        for tc in suite.findall("testcase"):
+            name = tc.attrib.get("name", "")
+            classname = tc.attrib.get("classname", "")
+            nodeid = f"{classname}::{name}" if classname else name
+            duration = None
+            try:
+                duration = float(tc.attrib.get("time", "0") or 0.0)
+            except Exception:
+                duration = None
+
+            # failure / error ノードを抽出
+            tb_text = ""
+            msg = ""
+            f_node = tc.find("failure")
+            e_node = tc.find("error")
+            if f_node is not None:
+                tb_text = (f_node.text or "").strip()
+                msg = f_node.attrib.get("message", "") or "failure"
+            elif e_node is not None:
+                tb_text = (e_node.text or "").strip()
+                msg = e_node.attrib.get("message", "") or "error"
+            else:
+                continue  # pass/skip はここではスキップ
+
+            cases.append(
+                {
+                    "nodeid": nodeid,
+                    "message": msg,
+                    "traceback": tb_text,
+                    "duration": duration,
+                }
+            )
+
+    out.update(
+        {
+            "total": tests,
+            "failures": failures,
+            "errors": errors,
+            "skipped": skipped,
+            "cases": cases,
+        }
+    )
+    return out
+
+
+# ---------------------------------------------------------------------
+# Ruff 実行
+# ---------------------------------------------------------------------
+def run_ruff(out_path: Path = RUFF_JSON) -> Dict[str, Any]:
+    """ruff を JSON で出力。返り値は軽いメタ情報。"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    rc, stdout, _ = run(["ruff", "check", ".", "--output-format=json"])
+    # そのまま保存（stdout が JSON）
+    try:
+        out_path.write_text(stdout, encoding="utf-8")
+    except Exception as e:
+        log(f"[warn] failed to write ruff json: {e}")
+
+    highlights: List[str] = []
+    try:
+        rows = json.loads(stdout or "[]")
+        # ざっくり上位ルールを 5 件抽出
+        counts: Dict[str, int] = {}
+        for r in rows:
+            code = r.get("code")
+            if code:
+                counts[code] = counts.get(code, 0) + 1
+        for code, cnt in sorted(counts.items(), key=lambda t: t[1], reverse=True)[:5]:
+            highlights.append(f"{cnt:4d}  {code}")
+    except Exception:
+        pass
+
+    return {
+        "returncode": rc,
+        "highlights": highlights,
+        "json_path": str(out_path),
+    }
+
+
+# ---------------------------------------------------------------------
+# Inventor / Harmonia 生成
+# ---------------------------------------------------------------------
+def write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def generate_inventor_and_harmonia(pytest_summary: Dict[str, Any], ruff_meta: Dict[str, Any]) -> None:
+    """
+    pytest の結果から Inventor 提案を作り、Harmonia がレビュー。
+    それぞれ Markdown を codex_reports に保存。
+    """
+    from src.codex.agents.inventor import InventorScriptus
+    from src.codex.agents.harmonia import HarmoniaOrdinis
+
+    trace_id = f"pdca_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    ctx = {
+        "trace_id": trace_id,
+        "generated_at": ts_jst(),
+        "pytest_summary": {
+            "total": pytest_summary.get("total", 0),
+            "failed": pytest_summary.get("failures", 0),
+            "errors": pytest_summary.get("errors", 0),
+            "skipped": pytest_summary.get("skipped", 0),
+        },
+    }
+
+    inv = InventorScriptus()
+    # Ruff 結果（任意表示）
+    if ruff_meta and ruff_meta.get("json_path"):
+        try:
+            # ここでは JSON を直接は読まないが、要約を表示
+            hi = "\n".join(ruff_meta.get("highlights", []) or [])
+            ruff_summary = textwrap.dedent(
+                f"""
+                ### Ruff summary
+                - Return code: {ruff_meta.get('returncode')}
+                - JSON: `{ruff_meta.get('json_path')}`
+                ```
+                {hi}
+                ```
+                """
+            ).strip()
+        except Exception:
+            ruff_summary = "Ruff summary unavailable."
+    else:
+        ruff_summary = "Ruff not executed."
+
+    # 失敗の有無で分岐（構造化 / markdown どちらでも良い）
+    failures = pytest_summary.get("cases", []) or []
+    inventor_md: str
+    if not failures:
+        inventor_md = (
+            "# 🛠️ Inventor Scriptus — 修正案（Lv1）\n\n"
+            f"- Generated: `{ctx['generated_at']}`\n"
+            f"- Trace ID: `{trace_id}`\n"
+            f"- Pytest: total={ctx['pytest_summary']['total']}, failed=0, errors=0\n\n"
+            "✅ 失敗はありません。提案は不要です。\n\n"
+            + ruff_summary
+        )
+    else:
+        inventor_md = inv.propose_fixes(failures=failures, context=ctx)
+        inventor_md += "\n\n" + ruff_summary
+
+    write_text(INVENTOR_MD, inventor_md)
+
+    # Harmonia レビュー
+    harmonia = HarmoniaOrdinis()
+    harmonia_md = harmonia.review_markdown(
+        failures=failures,
+        inventor_suggestions=inventor_md,
+        principles=[
+            "最小差分・後方互換を優先",
+            "observability（重要経路にログ/メトリクス）",
+            "再現手順を必ず明記",
+        ],
+    )
+    write_text(HARMONIA_MD, harmonia_md)
+
+
+# ---------------------------------------------------------------------
+# Git 操作（allowed_files.txt フィルタ付き）
+# ---------------------------------------------------------------------
+def git_current_branch() -> str:
+    rc, out, _ = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    return out.strip() if rc == 0 else ""
+
+
+def git_switch_create(branch: str) -> None:
+    cur = git_current_branch()
+    if cur == branch:
+        log(f"[git] already on '{branch}'")
+        return
+    rc, _, _ = run(["git", "switch", branch])
+    if rc != 0:
+        run(["git", "switch", "-c", branch])
+
+
+def git_status_changed() -> List[str]:
+    rc, out, _ = run(["git", "status", "--porcelain"])
+    if rc != 0:
+        return []
+    changed: List[str] = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        # format: XY <path>
+        changed.append(line[3:].strip())
+    return changed
+
+
+def read_allowed_prefixes(path: Path = ROOT / "allowed_files.txt") -> List[str]:
+    pref: List[str] = []
+    if not path.exists():
+        return pref
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if s.startswith("./"):
+            s = s[2:]
+        pref.append(s)
+    return pref
+
+
+def filter_allowed(paths: Iterable[str], prefixes: List[str]) -> List[str]:
+    out: List[str] = []
+    for p in paths:
+        r = p.lstrip("./")
+        if any(r.startswith(px) for px in prefixes):
+            out.append(p)
+    return out
+
+
+def git_commit_allowed(branch: str, msg: str) -> bool:
+    git_switch_create(branch)
+
+    changed = git_status_changed()
+    if not changed:
+        log("[git] no changes detected.")
+        return False
+
+    allowed_prefixes = read_allowed_prefixes()
+    if not allowed_prefixes:
+        log("✋ BLOCK: allowed_files.txt が空または未設置のため、自動コミットをスキップします。")
+        return False
+
+    allowed_only = filter_allowed(changed, allowed_prefixes)
+    if not allowed_only:
+        log("ℹ️ allowed_files に一致する変更がありません。コミットしません。")
+        return False
+
+    run(["git", "add", *allowed_only])
+    rc, out, err = run(["git", "commit", "-m", msg])
+    if rc != 0:
+        sys.stderr.write(err)
+        log("✋ BLOCK: コミットに失敗しました。")
+        return False
+
+    if WANT_PUSH:
+        run(["git", "push", "-u", "origin", branch])
+    return True
+
+
+# ---------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------
+def main() -> int:
+    os.chdir(ROOT)
+    ensure_dirs()
+
+    parser = argparse.ArgumentParser(description="Run PDCA agents locally.")
+    parser.add_argument("--branch", default=DEFAULT_BRANCH, help="commit/push に使うブランチ名")
+    args = parser.parse_args()
+
+    # 1) pytest
+    pyres = run_pytest(JUNIT_XML)
+
+    # 2) ruff
+    ruff_meta = run_ruff(RUFF_JSON)
+
+    # 3) Inventor & Harmonia
+    try:
+        generate_inventor_and_harmonia(pyres, ruff_meta)
+    except Exception as e:
+        log(f"[warn] failed to render Inventor/Harmonia: {e}")
+
+    # 4) commit (allowed のみ)
+    commit_msg = f"pdca: tested {dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    committed = git_commit_allowed(args.branch, commit_msg)
+    if committed:
+        log("[done] PDCA agents committed changes.")
+    else:
+        log("[done] PDCA agents finished (no commit).")
+
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
