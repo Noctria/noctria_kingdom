@@ -1,3 +1,4 @@
+from plan_data.adapter_to_decision import run_strategy_and_decide
 # tests/test_noctus_gate_block.py
 import pandas as pd
 import importlib.util
@@ -14,7 +15,6 @@ spec.loader.exec_module(sa)
 FeatureBundle = sa.FeatureBundle  # dataclass版
 StrategyProposal = sa.StrategyProposal
 
-from plan_data.adapter_to_decision import run_strategy_and_decide
 
 
 class RiskyStrategy:
