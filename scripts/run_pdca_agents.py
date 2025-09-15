@@ -13,6 +13,14 @@ os.chdir(ROOT)
 JST = timezone(timedelta(hours=9))
 TRACE_ID = datetime.now(JST).strftime("pdca_%Y%m%d_%H%M%S")
 
+# --- optional: load .env if present (for local runs)
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv(ROOT / ".env")
+except Exception:
+    pass
+
+
 # === DB utils（存在しなくても動くフェイルソフト） ===
 try:
     from scripts._pdca_db import (
