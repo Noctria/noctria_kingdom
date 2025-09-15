@@ -2,7 +2,21 @@ import os
 import sys
 import pytest
 import unittest
-from data.data_loader import MarketDataFetcher
+# --- Dynamic resolve for MarketDataFetcher (new/legacy path). No E402 at top-level.
+def _resolve_market_fetcher():
+    try:
+        # New path (preferred)
+        from core.data.market_data_fetcher import MarketDataFetcher as _F  # noqa: WPS433
+        return _F
+    except Exception:
+        try:
+            # Legacy path (if exists)
+            from data.data_loader import MarketDataFetcher as _F  # noqa: WPS433
+            return _F
+        except Exception:
+            return None
+
+MarketDataFetcher = _resolve_market_fetcher()
 
 
 sys.path.insert(0, os.path.abspath("src"))
