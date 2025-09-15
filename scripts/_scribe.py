@@ -3,7 +3,11 @@ from __future__ import annotations
 import os, json
 import psycopg2
 
-DSN = os.getenv("NOCTRIA_DB_DSN")
++DSN = (
++    os.getenv("NOCTRIA_DB_DSN")
++    or os.getenv("NOCTRIA_OBS_PG_DSN")
++    or os.getenv("DATABASE_URL")
++)
 
 def _conn():
     if not DSN: return None
