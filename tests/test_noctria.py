@@ -1,6 +1,9 @@
 import os
 import sys
 import pytest
+import unittest
+from data.data_loader import MarketDataFetcher
+
 
 sys.path.insert(0, os.path.abspath("src"))
 try:
@@ -12,8 +15,6 @@ except Exception:
         pytest.skip("Noctria class not available in src/core", allow_module_level=True)
 Noctria = _Noctria
 
-import unittest
-from data.data_loader import MarketDataFetcher
 
 
 class TestNoctria(unittest.TestCase):
