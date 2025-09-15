@@ -61,3 +61,9 @@ logs/
 *.jsonl
 !codex_reports/decision_registry.jsonl
 *.bak
+
+# Codex report noise
+src/codex_reports/*.log
+src/codex_reports/pytest_last.xml
+src/codex_reports/ruff/
+noctria_gui/static/codex_reports/*.log
