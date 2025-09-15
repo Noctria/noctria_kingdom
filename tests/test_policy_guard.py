@@ -4,7 +4,7 @@ os.environ["NOCTRIA_POLICY_FILE"] = "docs/codex/codex_noctria_policy.yaml"
 from agents.guardrails.policy_guard import enforce, GuardrailError, load_policy
 
 def test_inventor_can_propose_patch_basic():
-load_policy()
+    load_policy()
     ctx = {
         "changed_files": 2,
         "patch_lines": 120,
