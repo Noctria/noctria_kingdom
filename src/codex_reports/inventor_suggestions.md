@@ -1,8 +1,8 @@
 # 🛠️ Inventor Scriptus — 修正案（Lv1）
 
-- Generated: `2025-09-20T07:37:04+09:00`
+- Generated: `2025-09-20T07:41:59+09:00`
 - Pytest: total=6, failed=0, errors=0
-- Trace ID: `pdca_20250920_073407`
+- Trace ID: `pdca_20250920_073903`
 
 ✅ 失敗はありません。提案は不要です。
 
@@ -10,9 +10,9 @@
 ---
 ### Ruff summary (top)
 ```
-  51 E402
-  35 E701
-  19 F841
+  29 E701
   16 invalid-syntax
-  10 F821
+   6 F821
+   2 F404
+   1 F841
 ```
