@@ -6,3 +6,4 @@ allowed_files.txt
 
 scripts/run_pdca_agents.py
 src/strategies/hermes_cognitor.py
+.github/workflows/airflow_backtest_local.yml
