@@ -5,10 +5,16 @@ from __future__ import annotations
 import os, sys, json, shlex, subprocess
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Dict, Any
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
 os.chdir(ROOT)
+
+# sys.path に src を追加して import エラーを防ぐ
+for p in (ROOT, SRC):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 JST = timezone(timedelta(hours=9))
 TRACE_ID = datetime.now(JST).strftime("pdca_%Y%m%d_%H%M%S")
@@ -16,10 +22,11 @@ TRACE_ID = datetime.now(JST).strftime("pdca_%Y%m%d_%H%M%S")
 # --- optional: load .env if present (for local runs)
 try:
     from dotenv import load_dotenv  # type: ignore
-    load_dotenv(ROOT / ".env")
-except Exception:
-    pass
-
+    env_path = ROOT / ".env"
+    load_dotenv(env_path, override=True)
+    print(f"[env] Loaded {env_path}")
+except Exception as e:
+    print(f"[env] dotenv not loaded: {e}")
 
 # === DB utils（存在しなくても動くフェイルソフト） ===
 try:
@@ -41,11 +48,12 @@ try:
 except Exception:
     def log_chronicle(*a, **k): pass
 
-# === Inventor / Harmonia ===
+# === Agents ===
 from src.codex.agents.inventor import InventorScriptus, InventorOutput
 from src.codex.agents import harmonia as H
+from src.strategies.hermes_cognitor import HermesCognitorStrategy
 
-# --- helpers ---
+# --- helpers -----------------------------------------------------------------
 def run(cmd: str, allow_fail: bool = False, cwd: Path | None = None) -> Tuple[int, str, str]:
     print(f"[run] {cmd}")
     p = subprocess.run(cmd, shell=True, cwd=str(cwd or ROOT), text=True, capture_output=True)
@@ -54,6 +62,7 @@ def run(cmd: str, allow_fail: bool = False, cwd: Path | None = None) -> Tuple[in
     if p.returncode != 0 and not allow_fail:
         raise SystemExit(p.returncode)
     return p.returncode, p.stdout, p.stderr
+
 
 def parse_junit(junit_path: Path) -> dict:
     try:
@@ -70,26 +79,37 @@ def parse_junit(junit_path: Path) -> dict:
     except Exception:
         return {"total": None, "passed": None, "failed": None, "errors": None, "skipped": None}
 
+
 def git_commit_push(stage_files: List[str], branch: str, message: str) -> Tuple[bool, str | None]:
     def _r(args: List[str]) -> Tuple[int, str, str]:
         return run(" ".join(shlex.quote(a) for a in args), allow_fail=True)
 
-    _r(["git","switch",branch])
-    _r(["git","switch","-c",branch])  # branchが無ければ作る
+    _r(["git", "switch", branch])
+    _r(["git", "switch", "-c", branch])  # 既存なら失敗してもOK
 
     if stage_files:
-        _r(["git","add", *stage_files])
-
-    rc, out, _ = _r(["git","commit","-m", message])
-    if rc != 0:
+        _r(["git", "add", *stage_files])
+    else:
         return (False, None)
 
-    rc2, out2, _ = _r(["git","rev-parse","HEAD"])
-    sha = (out2 or "").strip() if rc2 == 0 else None
+    # ワークツリーの他変更は退避し、ステージ済みのみ commit
+    _r(["git", "stash", "-u", "--keep-index"])
 
-    _r(["git","push","-u","origin",branch])
-    return (True, sha)
+    try:
+        rc, out, _ = _r(["git", "commit", "-m", message])
+        if rc != 0:
+            return (False, None)
 
+        rc2, out2, _ = _r(["git", "rev-parse", "HEAD"])
+        sha = (out2 or "").strip() if rc2 == 0 else None
+
+        _r(["git", "push", "-u", "origin", branch])
+        return (True, sha)
+    finally:
+        _r(["git", "stash", "pop"])
+
+
+# --- main --------------------------------------------------------------------
 def main() -> int:
     # === Start ===
     start_run(TRACE_ID, notes="nightly PDCA run")
@@ -104,7 +124,7 @@ def main() -> int:
     reports_dir = ROOT / "src" / "codex_reports"
     (reports_dir / "ruff").mkdir(parents=True, exist_ok=True)
 
-    # === 1) Lint & Test を機械可読に ===
+    # === 1) Lint & Test ===
     junit = reports_dir / "pytest_last.xml"
     ruff_json = reports_dir / "ruff" / "ruff.json"
 
@@ -124,42 +144,87 @@ def main() -> int:
     log_chronicle(
         title="テスト/リンタ結果",
         category="kpi",
-        content_md=f"pytest: total={test_sum.get('total')}, passed={test_sum.get('passed')}, failed={test_sum.get('failed')}, errors={test_sum.get('errors')} / ruff errors={lint_errs}",
+        content_md=(
+            f"- pytest: total={test_sum.get('total')}, passed={test_sum.get('passed')}, "
+            f"failed={test_sum.get('failed')}, errors={test_sum.get('errors')}\n"
+            f"- ruff errors={lint_errs}"
+        ),
         trace_id=TRACE_ID, topic="PDCA nightly"
     )
 
-    # === 2) Inventor 提案 → Harmonia レビュー ===
+    # === 2) Inventor 提案 → Harmonia レビュー（API/オフライン自動切替） ===
     inv_agent = InventorScriptus()
-
-    # pytestの失敗詳細が必要なら、将来は --json-report などの統合に切替可
-    pytest_result = {
-        "failures": [],    # 失敗が無ければ空（Inventorは「修正不要」の体裁で出力）
-        "trace_id": TRACE_ID
-    }
+    pytest_result = {"failures": [], "trace_id": TRACE_ID}
     inventor_out: InventorOutput = inv_agent.propose_fixes_structured(pytest_result)
+
     inv_md = inventor_out.to_markdown()
     (reports_dir / "inventor_suggestions.md").write_text(inv_md, encoding="utf-8")
     save_artifact(TRACE_ID, "report", str(reports_dir / "inventor_suggestions.md"), inventor_out.to_dict())
-    log_message(TRACE_ID, "inventor", "assistant", "inventor_suggestions", {"patches": len(inventor_out.patch_suggestions)})
+    log_message(TRACE_ID, "inventor", "assistant", "inventor_suggestions",
+                {"patches": len(inventor_out.patch_suggestions)})
 
-    harmonia = H.HarmoniaOrdinis()
-    review_res = harmonia.review_structured(inventor_out)
-    harm_md = harmonia.to_markdown(review_res)
+    # 🔑 Harmonia（統合API）：環境で offline/api を自動選択
+    review_res = H.review(inventor_out)  # ← ここが統合ポイント
+    harm_md = H.HarmoniaOrdinis().to_markdown(review_res)
     (reports_dir / "harmonia_review.md").write_text(harm_md, encoding="utf-8")
-    save_artifact(TRACE_ID, "report", str(reports_dir / "harmonia_review.md"), {"verdict": review_res.verdict, "comments": review_res.comments})
-    log_message(TRACE_ID, "harmonia", "assistant", "review", {"verdict": review_res.verdict, "n_comments": len(review_res.comments)})
+    save_artifact(TRACE_ID, "report", str(reports_dir / "harmonia_review.md"),
+                  {"verdict": review_res.verdict, "comments": review_res.comments})
+    log_message(TRACE_ID, "harmonia", "assistant", "review",
+                {"verdict": review_res.verdict, "n_comments": len(review_res.comments)})
 
     log_chronicle(
         title="修正提案とレビュー",
         category="decision",
         content_md=f"- Inventor: {inventor_out.summary}\n- Harmonia: verdict **{review_res.verdict}**（{len(review_res.comments)} comments）",
         trace_id=TRACE_ID, topic="PDCA nightly",
-        refs={"inventor_report":"src/codex_reports/inventor_suggestions.md","harmonia_report":"src/codex_reports/harmonia_review.md"}
+        refs={"inventor_report": "src/codex_reports/inventor_suggestions.md",
+              "harmonia_report": "src/codex_reports/harmonia_review.md"}
     )
 
-    # === 3) 緑なら dev ブランチへ push ===
+    # === 2.5) Hermes 説明生成（API/ローカル自動切替） =======================
+    try:
+        hermes = HermesCognitorStrategy()
+        # Harmoniaの結果を軽く特徴量化して渡す（必要に応じて拡張OK）
+        features: Dict[str, Any] = {
+            "harmonia_verdict": review_res.verdict,
+            "harmonia_comments": len(review_res.comments),
+        }
+        # 代表ラベル（例）：verdict とコメント数の粗い離散化
+        labels: List[str] = [
+            f"verdict_{review_res.verdict.lower()}",
+            "comments_many" if len(review_res.comments) >= 5 else "comments_few",
+        ]
+        reason = "Harmonia の審査結果に基づく要約レポートを作成してください。"
+
+        hermes_out = hermes.propose(
+            {"features": features, "labels": labels, "reason": reason},
+            decision_id=TRACE_ID,
+            caller="pdca_orchestrator",
+        )
+        hermes_md = HermesCognitorStrategy.to_markdown(
+            hermes_out["explanation"],
+            meta={"llm_model": hermes_out.get("llm_model"),
+                  "decision_id": TRACE_ID, "caller": "pdca_orchestrator"},
+        )
+        (reports_dir / "hermes_explanation.md").write_text(hermes_md, encoding="utf-8")
+        save_artifact(TRACE_ID, "report", str(reports_dir / "hermes_explanation.md"), hermes_out)
+        log_message(TRACE_ID, "hermes", "assistant", "explanation", {"used_api": os.getenv("HERMES_USE_OPENAI") == "1"})
+        log_chronicle(
+            title="Hermes 説明生成",
+            category="analysis",
+            content_md="Hermes explanation generated: レポートを保存しました。",
+            trace_id=TRACE_ID, topic="PDCA nightly",
+            refs={"hermes_report": "src/codex_reports/hermes_explanation.md"}
+        )
+    except Exception as e:
+        log_message(TRACE_ID, "hermes", "assistant", "skip", {"error": repr(e)})
+
+    # === 3) 緑なら dev ブランチへ push（レポートのみ） =======================
     DEV_BRANCH = os.getenv("NOCTRIA_DEV_BRANCH", "dev/pdca-tested")
-    ALLOW_GLOBS = [g.strip() for g in os.getenv("NOCTRIA_DEV_ALLOW_GLOBS", "src/**/*.py,tests/**/*.py").split(",")]
+    ALLOW_GLOBS = [g.strip() for g in os.getenv(
+        "NOCTRIA_DEV_ALLOW_GLOBS",
+        "src/codex_reports/**,pdca_reports/**"
+    ).split(",") if g.strip()]
 
     rc, out, _ = run("git status --porcelain", allow_fail=True)
     changed: List[str] = []
@@ -173,24 +238,32 @@ def main() -> int:
                 changed.append(path)
 
     ok_tests = (test_sum.get("failed") in (0, None)) and (test_sum.get("errors") in (0, None))
-    ok_lint = (lint_errs == 0) or (lint_errs is None)  # ルールは好みに合わせて厳格化可
+    ok_lint = (lint_errs == 0) or (lint_errs is None)
 
     if changed and ok_tests:
-        success, sha = git_commit_push(changed, DEV_BRANCH, f"pdca: tested {TRACE_ID}")
-        log_commit(TRACE_ID, DEV_BRANCH, sha, changed, "pdca: tested")
-        msg = f"devブランチ `{DEV_BRANCH}` へ push。commit={sha}, files={len(changed)}"
-        log_message(TRACE_ID, "orchestrator", "assistant", "git_push", {"branch": DEV_BRANCH, "commit": sha, "files": changed})
-        log_chronicle(title="自動コミット/プッシュ", category="pr", content_md=msg, trace_id=TRACE_ID, topic="PDCA nightly", refs={"branch":DEV_BRANCH,"commit":sha,"files":changed})
+        success, sha = git_commit_push(changed, DEV_BRANCH, f"pdca: report artifacts ({TRACE_ID})")
+        log_commit(TRACE_ID, DEV_BRANCH, sha, changed, "pdca: reports")
+        msg = f"devブランチ `{DEV_BRANCH}` へ report push。commit={sha}, files={len(changed)}"
+        log_message(TRACE_ID, "orchestrator", "assistant", "git_push",
+                    {"branch": DEV_BRANCH, "commit": sha, "files": changed})
+        log_chronicle(title="レポートをコミット/プッシュ", category="pr", content_md=msg,
+                       trace_id=TRACE_ID, topic="PDCA nightly",
+                       refs={"branch": DEV_BRANCH, "commit": sha, "files": changed})
     else:
         reason = "no changes" if not changed else "tests not green"
-        log_message(TRACE_ID, "orchestrator", "assistant", "git_skip", {"reason": reason, "ok_tests": ok_tests, "lint_errs": lint_errs})
-        log_chronicle(title="自動コミットをスキップ", category="note", content_md=f"理由: {reason}. ok_tests={ok_tests}, lint_errs={lint_errs}", trace_id=TRACE_ID, topic="PDCA nightly")
+        log_message(TRACE_ID, "orchestrator", "assistant", "git_skip",
+                    {"reason": reason, "ok_tests": ok_tests, "lint_errs": lint_errs})
+        log_chronicle(title="自動コミットをスキップ", category="note",
+                       content_md=f"理由: {reason}. ok_tests={ok_tests}, lint_errs={lint_errs}",
+                       trace_id=TRACE_ID, topic="PDCA nightly")
 
     # === End ===
     finish_run(TRACE_ID, status="SUCCESS")
-    log_chronicle(title="PDCA 完了", category="note", content_md="今回の夜間ループを完了。", trace_id=TRACE_ID, topic="PDCA nightly")
+    log_chronicle(title="PDCA 完了", category="note",
+                  content_md="今回の夜間ループを完了。", trace_id=TRACE_ID, topic="PDCA nightly")
     print("[done] PDCA agents finished.")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
