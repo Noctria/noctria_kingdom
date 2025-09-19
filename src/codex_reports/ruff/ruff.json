@@ -473,23 +473,6 @@
   },
   {
     "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 16,
-      "row": 133
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/core/meta_ai.py",
-    "fix": null,
-    "location": {
-      "column": 12,
-      "row": 133
-    },
-    "message": "Undefined name `Path`",
-    "noqa_row": 133,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
     "code": "F841",
     "end_location": {
       "column": 16,
@@ -573,54 +556,36 @@
   },
   {
     "cell": null,
-    "code": "F821",
+    "code": "I001",
     "end_location": {
-      "column": 40,
-      "row": 73
+      "column": 30,
+      "row": 12
     },
     "filename": "/mnt/d/noctria_kingdom/src/execution/simulate_official_strategy.py",
-    "fix": null,
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "import importlib.util\nimport json\nimport os\nfrom datetime import datetime\nfrom pathlib import Path\n\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\n",
+          "end_location": {
+            "column": 1,
+            "row": 14
+          },
+          "location": {
+            "column": 1,
+            "row": 3
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
     "location": {
-      "column": 25,
-      "row": 73
+      "column": 1,
+      "row": 3
     },
-    "message": "Undefined name `initial_capital`",
-    "noqa_row": 73,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 17,
-      "row": 174
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/execution/simulate_official_strategy.py",
-    "fix": null,
-    "location": {
-      "column": 13,
-      "row": 174
-    },
-    "message": "Undefined name `json`",
-    "noqa_row": 174,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 63,
-      "row": 210
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/execution/simulate_official_strategy.py",
-    "fix": null,
-    "location": {
-      "column": 55,
-      "row": 210
-    },
-    "message": "Undefined name `datetime`",
-    "noqa_row": 210,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 3,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
   },
   {
     "cell": null,

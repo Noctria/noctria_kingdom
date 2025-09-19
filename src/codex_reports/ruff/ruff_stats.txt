@@ -1,11 +1,12 @@
-19	F821	undefined-name
-16	    	invalid-syntax
-14	F841	unused-variable
- 4	F403	undefined-local-with-import-star
- 1	E722	bare-except
- 1	F404	late-future-import
- 1	F405	undefined-local-with-import-star-usage
- 1	F601	multi-value-repeated-key-literal
- 1	F811	redefined-while-unused
-Found 58 errors.
-No fixes available (15 hidden fixes can be enabled with the `--unsafe-fixes` option).
+16	    	[ ] invalid-syntax
+15	F821	[ ] undefined-name
+14	F841	[ ] unused-variable
+ 4	F403	[ ] undefined-local-with-import-star
+ 1	E722	[ ] bare-except
+ 1	F404	[ ] late-future-import
+ 1	F405	[ ] undefined-local-with-import-star-usage
+ 1	F601	[ ] multi-value-repeated-key-literal
+ 1	F811	[ ] redefined-while-unused
+ 1	I001	[*] unsorted-imports
+Found 55 errors.
+[*] 1 fixable with the `--fix` option (15 hidden fixes can be enabled with the `--unsafe-fixes` option).
