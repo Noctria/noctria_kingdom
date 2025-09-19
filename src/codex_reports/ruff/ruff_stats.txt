@@ -1,8 +1,6 @@
 29	E701	multiple-statements-on-one-line-colon
-16	    	invalid-syntax
- 6	F821	undefined-name
- 2	F404	late-future-import
- 1	E702	multiple-statements-on-one-line-semicolon
+19	    	invalid-syntax
+ 3	F821	undefined-name
  1	F841	unused-variable
-Found 55 errors.
+Found 52 errors.
 No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
