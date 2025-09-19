@@ -4,4 +4,3 @@ noctria_gui/static/codex_reports/
 allowed_files.txt
 .ruff.toml
 
-.gitignore
