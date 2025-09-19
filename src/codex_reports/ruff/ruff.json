@@ -154,6 +154,138 @@
   },
   {
     "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 26,
+      "row": 1
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/chat_api.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "from flask import jsonify\n\n",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 1,
+      "row": 1
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 1,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+  },
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": {
+      "column": 26,
+      "row": 1
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/chat_api.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": "Remove unused import: `flask.jsonify`"
+    },
+    "location": {
+      "column": 19,
+      "row": 1
+    },
+    "message": "`flask.jsonify` imported but unused",
+    "noqa_row": 1,
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 26,
+      "row": 16
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/chat_api.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "import asyncio\nimport os\nfrom typing import Any\n\nfrom fastapi import APIRouter, Depends, Request\nfrom fastapi.responses import JSONResponse\nfrom openai import OpenAI\n\n",
+          "end_location": {
+            "column": 1,
+            "row": 18
+          },
+          "location": {
+            "column": 1,
+            "row": 10
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 1,
+      "row": 10
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 10,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+  },
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": {
+      "column": 23,
+      "row": 10
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/chat_api.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 11
+          },
+          "location": {
+            "column": 1,
+            "row": 10
+          }
+        }
+      ],
+      "message": "Remove unused import: `typing.Any`"
+    },
+    "location": {
+      "column": 20,
+      "row": 10
+    },
+    "message": "`typing.Any` imported but unused",
+    "noqa_row": 10,
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
     "code": "E402",
     "end_location": {
       "column": 2,
@@ -473,6 +605,209 @@
     "message": "`.statistics_dashboard.router` imported but unused; consider removing, adding to `__all__`, or using a redundant alias",
     "noqa_row": 6,
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 15,
+      "row": 1
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "import logging\n\n",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 1,
+      "row": 1
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 1,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 11,
+      "row": 4
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 4
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 4,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 10,
+      "row": 5
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 5
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 5,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 12,
+      "row": 6
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 6
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 6,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 10,
+      "row": 7
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 7
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 7,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 30,
+      "row": 8
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 8
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 8,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 25,
+      "row": 9
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 9
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 9,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 54,
+      "row": 11
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 11
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 11,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 62,
+      "row": 12
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 12
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 12,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 47,
+      "row": 13
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 13
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 13,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 72,
+      "row": 14
+    },
+    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics_detail.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 14
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 14,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
   },
   {
     "cell": null,
