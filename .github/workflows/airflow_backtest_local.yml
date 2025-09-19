@@ -1,4 +1,3 @@
----
 name: Airflow Backtest (Local)
 
 on:
@@ -95,6 +94,23 @@ jobs:
             fi
           done
           ls -al handoff_out || true
+
+      # ←★ artifact アップロード前に ":" を含むファイル名を安全な文字に置換
+      - name: Sanitize artifact filenames (colon -> _)
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -d handoff_out ]; then
+            while IFS= read -r -d '' f; do
+              new="${f//:/_}"
+              if [ "$f" != "$new" ]; then
+                mkdir -p "$(dirname "$new")"
+                mv "$f" "$new"
+              fi
+            done < <(find handoff_out -type f -name '*:*' -print0)
+          fi
+          echo "Sanitized:"
+          find handoff_out -type f -print || true
 
       - name: Upload artifacts
         if: always()

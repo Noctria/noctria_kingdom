@@ -11,3 +11,4 @@ codex_reports/decision_registry.jsonl
 scripts/show_last_inventor_decision.py
 codex_reports/inventor_last.json
 .ruff.toml
+.github/workflows/airflow_backtest_local.yml
