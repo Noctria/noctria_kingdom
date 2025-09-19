@@ -62,7 +62,7 @@ jobs:
 
       # Secrets が設定されている時だけ Airflow DAG を起動
       - name: Trigger Airflow DAG (if secrets provided)
-        if: ${{ secrets.AIRFLOW_BASE_URL && secrets.AIRFLOW_TOKEN }}
+        if: ${{ secrets.AIRFLOW_BASE_URL != '' && secrets.AIRFLOW_TOKEN != '' }}
         env:
           AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}
           AIRFLOW_TOKEN: ${{ secrets.AIRFLOW_TOKEN }}
@@ -95,13 +95,12 @@ jobs:
           done
           ls -al handoff_out || true
 
-      # ←★ 重要：artifact アップロード前に ":" を含むファイル名を安全な文字に置換
+      # ←★ artifact アップロード前に ":" を含むファイル名を安全な文字に置換
       - name: Sanitize artifact filenames (colon -> _)
         if: always()
         run: |
           set -euo pipefail
           if [ -d handoff_out ]; then
-            # find で ':' を含むファイルを検出し、安全な名前にリネーム
             while IFS= read -r -d '' f; do
               new="${f//:/_}"
               if [ "$f" != "$new" ]; then
