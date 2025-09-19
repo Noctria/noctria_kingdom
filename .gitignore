@@ -67,3 +67,10 @@ src/codex_reports/*.log
 src/codex_reports/pytest_last.xml
 src/codex_reports/ruff/
 noctria_gui/static/codex_reports/*.log
+# Local GitHub runner artifacts
+actions-runner/
+# Local model artifacts
+data/models/*.zip
+# Environment files
+.env
+.env.*
