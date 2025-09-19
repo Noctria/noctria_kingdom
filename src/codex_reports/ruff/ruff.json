@@ -33517,7 +33517,7 @@
     "code": "F541",
     "end_location": {
       "column": 32,
-      "row": 534
+      "row": 548
     },
     "filename": "/mnt/d/noctria_kingdom/scripts/run_pdca_agents.py",
     "fix": {
@@ -33527,11 +33527,11 @@
           "content": "\"# Fintokei ルール査定レポート\"",
           "end_location": {
             "column": 32,
-            "row": 534
+            "row": 548
           },
           "location": {
             "column": 9,
-            "row": 534
+            "row": 548
           }
         }
       ],
@@ -33539,10 +33539,10 @@
     },
     "location": {
       "column": 9,
-      "row": 534
+      "row": 548
     },
     "message": "f-string without any placeholders",
-    "noqa_row": 534,
+    "noqa_row": 548,
     "url": "https://docs.astral.sh/ruff/rules/f-string-missing-placeholders"
   },
   {
@@ -33713,6 +33713,105 @@
     "message": "Local variable `pytest_args` is assigned to but never used",
     "noqa_row": 75,
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  },
+  {
+    "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 55,
+      "row": 38
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/core/king_noctria.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "import json\nimport logging\nimport os\nimport uuid\nfrom datetime import datetime\nfrom typing import Any, Dict, Optional\n\nimport numpy as np\nimport pandas as pd\nimport requests\n\n# 既存のパス規約に合わせる（本プロジェクトでは core.* は import 可能）\nfrom core.path_config import AIRFLOW_API_BASE\nfrom src.execution.order_execution import OrderExecution\nfrom src.strategies.aurus_singularis import AurusSingularis\nfrom src.strategies.hermes_cognitor import HermesCognitorStrategy\nfrom src.strategies.levia_tempest import LeviaTempest\nfrom src.strategies.noctus_sentinella import NoctusSentinella\nfrom src.strategies.prometheus_oracle import PrometheusOracle\nfrom src.veritas.veritas_machina import VeritasMachina\n\n",
+          "end_location": {
+            "column": 1,
+            "row": 40
+          },
+          "location": {
+            "column": 1,
+            "row": 18
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 1,
+      "row": 18
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 18,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+  },
+  {
+    "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 45,
+      "row": 44
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/core/king_noctria.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "    from src.core.fintokei_rules import Plan  # Gate へ渡す Plan 定義\n    from src.do_layer.levia_gate import evaluate_plan_for_levia  # Gate 関数\n",
+          "end_location": {
+            "column": 1,
+            "row": 45
+          },
+          "location": {
+            "column": 1,
+            "row": 43
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 5,
+      "row": 43
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 43,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+  },
+  {
+    "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 41,
+      "row": 48
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/core/king_noctria.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "    from core.fintokei_rules import Plan  # type: ignore\n    from do_layer.levia_gate import evaluate_plan_for_levia  # type: ignore\n",
+          "end_location": {
+            "column": 1,
+            "row": 49
+          },
+          "location": {
+            "column": 1,
+            "row": 47
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 5,
+      "row": 47
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 47,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
   },
   {
     "cell": null,
@@ -34500,6 +34599,39 @@
     "message": "`from core.path_config import *` used; unable to detect undefined names",
     "noqa_row": 15,
     "url": "https://docs.astral.sh/ruff/rules/undefined-local-with-import-star"
+  },
+  {
+    "cell": null,
+    "code": "I001",
+    "end_location": {
+      "column": 60,
+      "row": 9
+    },
+    "filename": "/mnt/d/noctria_kingdom/tests/test_levia_gate.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "import math\nimport os\n\nfrom src.core.fintokei_rules import Plan\nfrom src.do_layer.levia_gate import evaluate_plan_for_levia\n\nfrom src.strategies.levia_tempest import LeviaTempest\n\n\n",
+          "end_location": {
+            "column": 1,
+            "row": 11
+          },
+          "location": {
+            "column": 1,
+            "row": 4
+          }
+        }
+      ],
+      "message": "Organize imports"
+    },
+    "location": {
+      "column": 1,
+      "row": 4
+    },
+    "message": "Import block is un-sorted or un-formatted",
+    "noqa_row": 4,
+    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
   },
   {
     "cell": null,

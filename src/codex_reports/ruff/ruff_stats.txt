@@ -1,4 +1,4 @@
-85	I001	[*] unsorted-imports
+89	I001	[*] unsorted-imports
 32	F401	[*] unused-import
 19	F821	[ ] undefined-name
 16	F841	[*] unused-variable
@@ -9,5 +9,5 @@
  1	F405	[ ] undefined-local-with-import-star-usage
  1	F601	[ ] multi-value-repeated-key-literal
  1	F811	[ ] redefined-while-unused
-Found 169 errors.
-[*] 119 fixable with the `--fix` option (15 hidden fixes can be enabled with the `--unsafe-fixes` option).
+Found 173 errors.
+[*] 123 fixable with the `--fix` option (15 hidden fixes can be enabled with the `--unsafe-fixes` option).
