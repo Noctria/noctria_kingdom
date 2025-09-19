@@ -4,3 +4,6 @@ noctria_gui/static/codex_reports/
 allowed_files.txt
 .ruff.toml
 
+scripts/run_pdca_agents.py
+src/strategies/hermes_cognitor.py
+.github/workflows/airflow_backtest_local.yml
