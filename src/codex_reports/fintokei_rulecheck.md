@@ -1,6 +1,6 @@
 # Fintokei ルール査定レポート
-- Trace ID: `pdca_20250920_070835`
-- Evaluated: 2025-09-20T07:11:35+09:00
+- Trace ID: `pdca_20250920_073001`
+- Evaluated: 2025-09-20T07:32:59+09:00
 - Result: OK ✅
 
 ## Plan
