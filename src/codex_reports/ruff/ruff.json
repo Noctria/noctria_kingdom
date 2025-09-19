@@ -972,16 +972,16 @@
     "code": "E701",
     "end_location": {
       "column": 14,
-      "row": 562
+      "row": 566
     },
     "filename": "/mnt/d/noctria_kingdom/scripts/run_pdca_agents.py",
     "fix": null,
     "location": {
       "column": 13,
-      "row": 562
+      "row": 566
     },
     "message": "Multiple statements on one line (colon)",
-    "noqa_row": 562,
+    "noqa_row": 566,
     "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
   },
   {
@@ -989,16 +989,16 @@
     "code": "E701",
     "end_location": {
       "column": 14,
-      "row": 565
+      "row": 569
     },
     "filename": "/mnt/d/noctria_kingdom/scripts/run_pdca_agents.py",
     "fix": null,
     "location": {
       "column": 13,
-      "row": 565
+      "row": 569
     },
     "message": "Multiple statements on one line (colon)",
-    "noqa_row": 565,
+    "noqa_row": 569,
     "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
   },
   {
@@ -1006,16 +1006,16 @@
     "code": "E701",
     "end_location": {
       "column": 18,
-      "row": 569
+      "row": 573
     },
     "filename": "/mnt/d/noctria_kingdom/scripts/run_pdca_agents.py",
     "fix": null,
     "location": {
       "column": 17,
-      "row": 569
+      "row": 573
     },
     "message": "Multiple statements on one line (colon)",
-    "noqa_row": 569,
+    "noqa_row": 573,
     "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
   },
   {
