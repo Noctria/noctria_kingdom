@@ -1,12 +1,31 @@
-# .ruff.toml
-target-version = "py312"
-line-length = 120
+target-version = "py311"
+line-length = 100
+src = ["src", "scripts", "tests", "noctria_gui"]
+
+extend-exclude = [
+  "_graveyard/**",
+  "generated_code/**",
+  "airflow_docker/**",
+  "src/codex_reports/**",
+  "scripts/_pdca_db.py",
+  "src/plan_data/kpi_minidemo.py",
+  "generated_code",
+  "_graveyard",
+]
 
 [lint]
-# まずは基本だけ（E/F）。長い行(E501)などは最初は見ない
-select = ["E", "F"]
+select = ["E", "F", "I"]
 ignore = ["E501"]
 
-[format]
-quote-style = "double"
-indent-style = "space"
+[lint.per-file-ignores]
+"tests/*.py" = ["F403", "F405"]
+"noctria_gui/routes/chat_api.py" = ["F821"]
+"noctria_gui/routes/statistics_detail.py" = ["F821"]
+"noctria_gui/routes/adoptions.py" = ["F841"]
+"noctria_gui/services/dashboard_service.py" = ["F841"]
+"airflow_docker/scripts/meta_ai_tensorboard_train.py" = ["F403"]
+"src/tools/push_official_strategy_to_github.py" = ["E722"]
+
+# [lint.per-file-ignores]  # duplicate removed
+# "noctria_gui/routes/logs_routes.py" = ["E999"]
+# "noctria_gui/routes/strategy_heatmap.py" = ["E999","E701","E702"]

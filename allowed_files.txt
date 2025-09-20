@@ -11,3 +11,12 @@ codex_reports/decision_registry.jsonl
 scripts/show_last_inventor_decision.py
 codex_reports/inventor_last.json
 .ruff.toml
+noctria_gui/routes/logs_routes.py
+noctria_gui/routes/strategy_heatmap.py
+.ruff.toml
+tools/fix_final_gui.py
+noctria_gui/routes/logs_routes.py
+noctria_gui/routes/strategy_heatmap.py
+.ruff.toml
+tools/fix_final_gui.py
+allowed_files.txt

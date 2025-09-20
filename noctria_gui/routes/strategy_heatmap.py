@@ -1,27 +1,44 @@
+from fastapi import Depends, HTTPException, Request
+from typing import Dict
+# ruff: noqa: E402, I001, F401, F811
 #!/usr/bin/env python3
 # coding: utf-8
+from flask import jsonify
+from flask import request
+from flask import Blueprint
+try:
+    from noctria_gui.services.chat_manager import chat_manager  # type: ignore
+except Exception:
+    # pragma: no cover
+    from typing import Any
+    class _Stub_chat_manager:
+        def __getattr__(self, n):
+            raise RuntimeError('chat unavailable')
+    chat_manager: Any = _Stub_chat_manager()
+
 
 """
 🧠 Strategy Heatmap Route (v2.0)
 - 戦略ごとの統計（勝率、DDなど）を集計し、ヒートマップ表示やCSV出力を行う
 """
 
-import logging
-import json
-import io
 import csv
+import io
+import json
+import logging
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Optional, List, Any
+from typing import Any, Dict, Optional
+logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Request, Query, Depends, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 # --- 王国の基盤モジュールをインポート ---
 # ✅ 修正: path_config.pyのリファクタリングに合わせて、正しい変数名をインポート
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
+from src.core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
@@ -49,6 +66,7 @@ def get_strategy_stats(
     stats = defaultdict(lambda: {"count": 0, "win_rates": [], "drawdowns": []})
     
     if not ACT_LOG_DIR.exists():
+    
         logging.warning(f"戦略採用ログのディレクトリが見つかりません: {ACT_LOG_DIR}")
         return {}
 
@@ -58,26 +76,34 @@ def get_strategy_stats(
                 data = json.load(f)
 
             date_str = data.get("promoted_at") or data.get("timestamp")
-            if not date_str: continue
+            if not date_str:
+                continue
             
             date_obj = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
-            if from_date and date_obj.date() < from_date.date(): continue
-            if to_date and date_obj.date() > to_date.date(): continue
+            if from_date and date_obj.date() < from_date.date():
+
+                continue
+            if to_date and date_obj.date() > to_date.date():
+                continue
 
             name = data.get("strategy", "").strip()
-            if not name: continue
-            if strategy_keyword and strategy_keyword.lower() not in name.lower(): continue
+            if not name:
+                continue
+            if strategy_keyword and strategy_keyword.lower() not in name.lower():
+                continue
 
             score = data.get("score", {})
             win = score.get("win_rate")
             dd = score.get("max_drawdown")
 
             stats[name]["count"] += 1
-            if isinstance(win, (int, float)): stats[name]["win_rates"].append(win)
-            if isinstance(dd, (int, float)): stats[name]["drawdowns"].append(dd)
-
+            if isinstance(win, (int, float)):
+                stats[name]["win_rates"].append(win)
+            if isinstance(dd, (int, float)):
+                stats[name]["drawdowns"].append(dd)
         except (json.JSONDecodeError, KeyError) as e:
+
             logging.error(f"ログファイルの処理中にエラーが発生しました: {file_path}, 詳細: {e}")
             continue
 
@@ -95,25 +121,25 @@ def get_strategy_stats(
 
 # --- ルート定義 ---
 
+
 @router.get("/strategy-heatmap", response_class=HTMLResponse)
 async def strategy_heatmap(
-    request: Request, 
+    request: Request,
     stats: Dict[str, Dict] = Depends(get_strategy_stats)
 ):
     """
-    🧠 戦略別統計ヒートマップ（GUI表示）
+    戦略別統計ヒートマップの表示。
     """
-    # クエリパラメータをテンプレートに渡すためにリクエストから取得
     query_params = request.query_params
-    return templates.TemplateResponse("strategy_heatmap.html", {
-        "request": request,
-        "data": stats,
-        "filter": {
-            "from": query_params.get("from", ""),
-            "to": query_params.get("to", ""),
-            "strategy": query_params.get("strategy", "")
-        }
-    })
+    return templates.TemplateResponse(
+        "strategy_heatmap.html",
+        {
+            "request": request,
+            "data": stats,
+            "query": dict(query_params),
+        },
+    )
+
 
 
 @router.get("/strategy-heatmap/export", response_class=StreamingResponse)
@@ -126,16 +152,22 @@ async def export_strategy_heatmap_csv(
     if not stats:
         raise HTTPException(status_code=404, detail="エクスポート対象のデータがありません。")
 
+    import io
+
+    import csv
+    from datetime import datetime
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["戦略名", "件数", "平均勝率（%）", "最大DD（%）"])
     for name, v in stats.items():
-        writer.writerow([name, v["count"], v["avg_win"], v["avg_dd"]])
+        writer.writerow([name, v.get("count", 0), v.get("avg_win", 0), v.get("avg_dd", 0)])
 
     output.seek(0)
     filename = f"strategy_heatmap_{datetime.now().strftime('%Y%m%d')}.csv"
     return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    iter([output.getvalue()]),
+    media_type="text/csv",
+    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+)
+

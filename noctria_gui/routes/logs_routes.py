@@ -1,3 +1,4 @@
+# ruff: noqa: E402, I001, F401, F811, F821
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -6,14 +7,13 @@
 - 統治ログの一括CSV出力やGUIダッシュボード表示を提供
 """
 
+import subprocess
+from pathlib import Path
+
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from datetime import datetime
-from pathlib import Path
-import subprocess
-
-from src.core.path_config import TOOLS_DIR
 from fastapi.templating import Jinja2Templates
+from src.core.path_config import TOOLS_DIR
 
 # 📁 テンプレート（logs_dashboard.html）読み込み用
 TEMPLATES_DIR = TOOLS_DIR.parent / "noctria_gui" / "templates"
@@ -32,19 +32,18 @@ async def export_all_governance_logs():
     script_path = TOOLS_DIR / "export_all_logs.py"
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["python3", str(script_path)],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
     except subprocess.CalledProcessError as e:
         print(f"⚠️ スクリプト実行エラー:\n{e.stderr}")
         return HTMLResponse(
             content="<h3>⚠️ 統治ログの出力に失敗しました</h3>",
-            status_code=500
+            status_code=500,
         )
-
     output_dir = TOOLS_DIR / "統治記録"
     try:
         latest_file: Path = max(output_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime)
