@@ -1,17 +1,12 @@
-289	I001	[*] unsorted-imports
-150	F401	[ ] unused-import
- 72	E402	[ ] module-import-not-at-top-of-file
- 26	F841	[*] unused-variable
- 23	E701	[ ] multiple-statements-on-one-line-colon
- 21	F821	[ ] undefined-name
-  9	F541	[*] f-string-missing-placeholders
-  8	F811	[ ] redefined-while-unused
-  5	    	[ ] invalid-syntax
-  4	E401	[*] multiple-imports-on-one-line
-  3	E741	[ ] ambiguous-variable-name
-  2	F404	[ ] late-future-import
-  1	E702	[ ] multiple-statements-on-one-line-semicolon
-  1	F403	[ ] undefined-local-with-import-star
-  1	F601	[ ] multi-value-repeated-key-literal
-Found 615 errors.
-[*] 466 fixable with the `--fix` option (19 hidden fixes can be enabled with the `--unsafe-fixes` option).
+70	E402	[ ] module-import-not-at-top-of-file
+21	F821	[ ] undefined-name
+18	F841	[ ] unused-variable
+ 3	E741	[ ] ambiguous-variable-name
+ 2	F404	[ ] late-future-import
+ 2	I001	[*] unsorted-imports
+ 1	F401	[ ] unused-import
+ 1	F403	[ ] undefined-local-with-import-star
+ 1	F601	[ ] multi-value-repeated-key-literal
+ 1	F811	[ ] redefined-while-unused
+Found 120 errors.
+[*] 2 fixable with the `--fix` option (19 hidden fixes can be enabled with the `--unsafe-fixes` option).
