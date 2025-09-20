@@ -1,8 +1,7 @@
 65	E402	module-import-not-at-top-of-file
-17	    	invalid-syntax
  7	F841	unused-variable
  6	F821	undefined-name
  3	E741	ambiguous-variable-name
  1	F404	late-future-import
-Found 99 errors.
+Found 82 errors.
 No fixes available (7 hidden fixes can be enabled with the `--unsafe-fixes` option).
