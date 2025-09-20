@@ -2,18 +2,57 @@
 =================================== FAILURES ===================================
 ________________ test_quality_gate_emits_alert_on_missing_ratio ________________
 
-capture_alerts = <conftest.capture_alerts.<locals>.Capture object at 0x71c760214350>
+capture_alerts = <conftest.capture_alerts.<locals>.Capture object at 0x7e5909638170>
 
     def test_quality_gate_emits_alert_on_missing_ratio(capture_alerts):
         fb = _fb("USDJPY", "1h", lag=0, miss=0.12, trace="test-trace-quality-001")
         res = evaluate_quality(fb, conn_str=None)
     
         assert res.action in ("SCALE", "FLAT")
->       assert not res.ok
-E       AssertionError: assert not True
-E        +  where True = _QR(action='FLAT', ok=True, passed=True, reason='quality_ok', details={'missing_ratio': 0.12, 'data_lag_min': 0.0, 'thresholds': {'missing_max': 0.2, 'lag_max_min': 10.0}}).ok
+        assert not res.ok
+>       assert res.missing_ratio >= 0.12
+               ^^^^^^^^^^^^^^^^^
 
-tests/test_quality_gate_alerts.py:23: AssertionError
+tests/test_quality_gate_alerts.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = _QR(action='SCALE', ok=False, passed=False, reason='quality_threshold_not_met: missing_ratio 0.120>0.100', details={'missing_ratio': 0.12, 'data_lag_min': 0.0, 'thresholds': {'missing_max': 0.1, 'lag_max_min': 10.0}})
+item = 'missing_ratio'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra:
+                try:
+                    return pydantic_extra[item]
+                except KeyError as exc:
+                    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: '_QR' object has no attribute 'missing_ratio'
+
+venv_codex/lib/python3.12/site-packages/pydantic/main.py:991: AttributeError
 ==================================== PASSES ====================================
 ______________________________ test_floor_mod_cpu ______________________________
 ----------------------------- Captured stdout call -----------------------------
@@ -61,5 +100,5 @@ PASSED tests/test_policy_guard.py::test_harmonia_alignment_required
 PASSED tests/test_policy_guard.py::test_harmonia_alignment_ok
 FAILED tests/test_quality_gate_alerts.py::test_quality_gate_emits_alert_on_missing_ratio
 !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
-1 failed, 36 passed, 2 warnings in 50.72s
+1 failed, 36 passed, 2 warnings in 52.83s
 
