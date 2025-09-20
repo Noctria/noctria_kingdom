@@ -2,20 +2,21 @@
 =================================== FAILURES ===================================
 ________________ test_quality_gate_emits_alert_on_missing_ratio ________________
 
-capture_alerts = <conftest.capture_alerts.<locals>.Capture object at 0x78ee62c4c3e0>
+capture_alerts = <conftest.capture_alerts.<locals>.Capture object at 0x7d53a39387d0>
 
     def test_quality_gate_emits_alert_on_missing_ratio(capture_alerts):
         fb = _fb("USDJPY", "1h", lag=0, miss=0.12, trace="test-trace-quality-001")
         res = evaluate_quality(fb, conn_str=None)
     
->       assert res.action in ("SCALE", "FLAT")
-               ^^^^^^^^^^
+        assert res.action in ("SCALE", "FLAT")
+>       assert not res.ok
+                   ^^^^^^
 
-tests/test_quality_gate_alerts.py:22: 
+tests/test_quality_gate_alerts.py:23: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = _QR(passed=True, reason='quality_ok', details={'missing_ratio': 0.0, 'data_lag_min': 0.0, 'thresholds': {'missing_max': 0.2, 'lag_max_min': 10.0}})
-item = 'action'
+self = _QR(action='FLAT', passed=True, reason='quality_ok', details={'missing_ratio': 0.0, 'data_lag_min': 0.0, 'thresholds': {'missing_max': 0.2, 'lag_max_min': 10.0}})
+item = 'ok'
 
     def __getattr__(self, item: str) -> Any:
         private_attributes = object.__getattribute__(self, '__private_attributes__')
@@ -48,7 +49,7 @@ item = 'action'
                 else:
                     # this is the current error
 >                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
-E                   AttributeError: '_QR' object has no attribute 'action'
+E                   AttributeError: '_QR' object has no attribute 'ok'
 
 venv_codex/lib/python3.12/site-packages/pydantic/main.py:991: AttributeError
 ==================================== PASSES ====================================
@@ -98,5 +99,5 @@ PASSED tests/test_policy_guard.py::test_harmonia_alignment_required
 PASSED tests/test_policy_guard.py::test_harmonia_alignment_ok
 FAILED tests/test_quality_gate_alerts.py::test_quality_gate_emits_alert_on_missing_ratio
 !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
-1 failed, 36 passed, 2 warnings in 52.88s
+1 failed, 36 passed, 2 warnings in 51.36s
 
