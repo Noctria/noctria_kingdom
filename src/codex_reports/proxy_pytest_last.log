@@ -1,6 +1,67 @@
+............F
+=================================== FAILURES ===================================
+__________________ test_path_exists[OFFICIAL_STRATEGIES_DIR] ___________________
 
-ImportError while loading conftest '/mnt/d/noctria_kingdom/tests/conftest.py'.
-  File "/mnt/d/noctria_kingdom/tests/conftest.py", line 9
-    from __future__ import annotations
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-SyntaxError: from __future__ imports must occur at the beginning of the file
+name = 'OFFICIAL_STRATEGIES_DIR'
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "BASE_DIR",
+            "AIRFLOW_DIR",
+            "CORE_DIR",
+            "VERITAS_DIR",
+            "STRATEGIES_DIR",
+            "OFFICIAL_STRATEGIES_DIR",
+            "GENERATED_STRATEGIES_DIR",
+            "EXECUTION_DIR",
+            "DATA_DIR",
+            "RAW_DATA_DIR",
+            "PROCESSED_DATA_DIR",
+            "FUNDAMENTAL_DATA_DIR",
+            "MODELS_DIR",
+            "LATEST_MODELS_DIR",
+            "ARCHIVE_MODELS_DIR",
+            "LLM_SERVER_DIR",
+            "GUI_DIR",
+            "EXPERTS_DIR",
+            "TOOLS_DIR",
+            "TESTS_DIR",
+            "DOCS_DIR",
+            "AIRFLOW_LOG_DIR",
+            "VERITAS_EVAL_LOG",
+        ],
+    )
+    def test_path_exists(name):
+        """各パスがPathオブジェクトであることを検証"""
+        value = getattr(path_config, name, None)
+>       assert value is not None, f"{name} is not defined"
+E       AssertionError: OFFICIAL_STRATEGIES_DIR is not defined
+E       assert None is not None
+
+tests/test_path_config.py:39: AssertionError
+==================================== PASSES ====================================
+______________________________ test_floor_mod_cpu ______________________________
+----------------------------- Captured stdout call -----------------------------
+CPU FloorMod result: tf.Tensor([123456789         0], shape=(2,), dtype=int32)
+______________________________ test_floor_mod_gpu ______________________________
+----------------------------- Captured stdout call -----------------------------
+GPU FloorMod result: tf.Tensor([123456789         0], shape=(2,), dtype=int32)
+- generated xml file: /mnt/d/noctria_kingdom/src/codex_reports/pytest_last.xml -
+=========================== short test summary info ============================
+PASSED tests/test_decision_fallback_size.py::test_fallback_size_reason_matches_implementation
+PASSED tests/test_dummy.py::test_basic
+PASSED tests/test_floor_mod.py::test_floor_mod_cpu
+PASSED tests/test_floor_mod_gpu.py::test_floor_mod_gpu
+PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_sets_risk_adjusted_and_orders
+PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_penalizes_with_lag_and_missing_ratio
+PASSED tests/test_noctus_gate_block.py::test_noctus_gate_blocks_and_emits_alert
+PASSED tests/test_path_config.py::test_path_exists[BASE_DIR]
+PASSED tests/test_path_config.py::test_path_exists[AIRFLOW_DIR]
+PASSED tests/test_path_config.py::test_path_exists[CORE_DIR]
+PASSED tests/test_path_config.py::test_path_exists[VERITAS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[STRATEGIES_DIR]
+FAILED tests/test_path_config.py::test_path_exists[OFFICIAL_STRATEGIES_DIR]
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 12 passed, 2 warnings in 50.79s
+

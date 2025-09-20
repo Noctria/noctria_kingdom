@@ -1,9 +1,0 @@
-16	I001	[*] unsorted-imports
- 7	F841	[ ] unused-variable
- 4	F401	[*] unused-import
- 4	F404	[ ] late-future-import
- 3	E402	[ ] module-import-not-at-top-of-file
- 3	E741	[ ] ambiguous-variable-name
- 3	F821	[ ] undefined-name
-Found 40 errors.
-[*] 20 fixable with the `--fix` option (7 hidden fixes can be enabled with the `--unsafe-fixes` option).

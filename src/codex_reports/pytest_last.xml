@@ -1,1 +1,38 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="6" time="157.980" timestamp="2025-09-20T20:53:23.234898+09:00" hostname="DESKTOP-I6MJ9DG"><testcase classname="actions-runner._work.noctria_kingdom.noctria_kingdom.tests.test_decision_fallback_size" name="test_fallback_size_reason_matches_implementation" time="0.090" /><testcase classname="actions-runner._work.noctria_kingdom.noctria_kingdom.tests.test_harmonia_rerank" name="test_harmonia_rerank_sets_risk_adjusted_and_orders" time="0.001" /><testcase classname="actions-runner._work.noctria_kingdom.noctria_kingdom.tests.test_harmonia_rerank" name="test_harmonia_rerank_penalizes_with_lag_and_missing_ratio" time="0.000" /><testcase classname="tests.test_decision_fallback_size" name="test_fallback_size_reason_matches_implementation" time="0.124" /><testcase classname="tests.test_harmonia_rerank" name="test_harmonia_rerank_sets_risk_adjusted_and_orders" time="0.001" /><testcase classname="tests.test_harmonia_rerank" name="test_harmonia_rerank_penalizes_with_lag_and_missing_ratio" time="0.000" /></testsuite></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="13" time="50.771" timestamp="2025-09-20T22:38:07.774084+09:00" hostname="DESKTOP-I6MJ9DG"><testcase classname="tests.test_decision_fallback_size" name="test_fallback_size_reason_matches_implementation" time="0.089" /><testcase classname="tests.test_dummy" name="test_basic" time="0.000" /><testcase classname="tests.test_floor_mod" name="test_floor_mod_cpu" time="0.038" /><testcase classname="tests.test_floor_mod_gpu" name="test_floor_mod_gpu" time="0.001" /><testcase classname="tests.test_harmonia_rerank" name="test_harmonia_rerank_sets_risk_adjusted_and_orders" time="0.000" /><testcase classname="tests.test_harmonia_rerank" name="test_harmonia_rerank_penalizes_with_lag_and_missing_ratio" time="0.000" /><testcase classname="tests.test_noctus_gate_block" name="test_noctus_gate_blocks_and_emits_alert" time="0.219" /><testcase classname="tests.test_path_config" name="test_path_exists[BASE_DIR]" time="0.001" /><testcase classname="tests.test_path_config" name="test_path_exists[AIRFLOW_DIR]" time="0.000" /><testcase classname="tests.test_path_config" name="test_path_exists[CORE_DIR]" time="0.000" /><testcase classname="tests.test_path_config" name="test_path_exists[VERITAS_DIR]" time="0.000" /><testcase classname="tests.test_path_config" name="test_path_exists[STRATEGIES_DIR]" time="0.000" /><testcase classname="tests.test_path_config" name="test_path_exists[OFFICIAL_STRATEGIES_DIR]" time="0.001"><failure message="AssertionError: OFFICIAL_STRATEGIES_DIR is not defined&#10;assert None is not None">name = 'OFFICIAL_STRATEGIES_DIR'
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "BASE_DIR",
+            "AIRFLOW_DIR",
+            "CORE_DIR",
+            "VERITAS_DIR",
+            "STRATEGIES_DIR",
+            "OFFICIAL_STRATEGIES_DIR",
+            "GENERATED_STRATEGIES_DIR",
+            "EXECUTION_DIR",
+            "DATA_DIR",
+            "RAW_DATA_DIR",
+            "PROCESSED_DATA_DIR",
+            "FUNDAMENTAL_DATA_DIR",
+            "MODELS_DIR",
+            "LATEST_MODELS_DIR",
+            "ARCHIVE_MODELS_DIR",
+            "LLM_SERVER_DIR",
+            "GUI_DIR",
+            "EXPERTS_DIR",
+            "TOOLS_DIR",
+            "TESTS_DIR",
+            "DOCS_DIR",
+            "AIRFLOW_LOG_DIR",
+            "VERITAS_EVAL_LOG",
+        ],
+    )
+    def test_path_exists(name):
+        """各パスがPathオブジェクトであることを検証"""
+        value = getattr(path_config, name, None)
+&gt;       assert value is not None, f"{name} is not defined"
+E       AssertionError: OFFICIAL_STRATEGIES_DIR is not defined
+E       assert None is not None
+
+tests/test_path_config.py:39: AssertionError</failure></testcase></testsuite></testsuites>
