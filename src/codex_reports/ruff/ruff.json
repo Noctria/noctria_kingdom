@@ -50185,72 +50185,6 @@
   },
   {
     "cell": null,
-    "code": "I001",
-    "end_location": {
-      "column": 45,
-      "row": 44
-    },
-    "filename": "/mnt/d/noctria_kingdom/noctria_gui/main.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "from __future__ import annotations\n\nimport json\nimport logging\nimport os\nimport sys\nimport time\nimport traceback\nfrom collections import deque\nfrom importlib import import_module\nfrom pathlib import Path\nfrom typing import Any, Dict, Optional, Sequence\n\nfrom dotenv import load_dotenv\nfrom fastapi import FastAPI, Request\nfrom fastapi.responses import JSONResponse, RedirectResponse, Response\nfrom fastapi.staticfiles import StaticFiles\nfrom fastapi.templating import Jinja2Templates\nfrom markupsafe import Markup\nfrom starlette.middleware.sessions import SessionMiddleware\nfrom starlette.responses import FileResponse\n\nfrom noctria_gui.routes.statistics import router as statistics_router  # noqa: F401 (side-effects)\n\n",
-          "end_location": {
-            "column": 1,
-            "row": 46
-          },
-          "location": {
-            "column": 1,
-            "row": 23
-          }
-        }
-      ],
-      "message": "Organize imports"
-    },
-    "location": {
-      "column": 1,
-      "row": 23
-    },
-    "message": "Import block is un-sorted or un-formatted",
-    "noqa_row": 23,
-    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
-  },
-  {
-    "cell": null,
-    "code": "I001",
-    "end_location": {
-      "column": 6,
-      "row": 106
-    },
-    "filename": "/mnt/d/noctria_kingdom/noctria_gui/main.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "    from src.core.path_config import (  # type: ignore\n        NOCTRIA_GUI_STATIC_DIR as _STATIC_DIR,\n    )\n    from src.core.path_config import (\n        NOCTRIA_GUI_TEMPLATES_DIR as _TEMPLATES_DIR,\n    )\n",
-          "end_location": {
-            "column": 1,
-            "row": 107
-          },
-          "location": {
-            "column": 1,
-            "row": 103
-          }
-        }
-      ],
-      "message": "Organize imports"
-    },
-    "location": {
-      "column": 5,
-      "row": 103
-    },
-    "message": "Import block is un-sorted or un-formatted",
-    "noqa_row": 103,
-    "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
-  },
-  {
-    "cell": null,
     "code": "E402",
     "end_location": {
       "column": 69,
@@ -50350,23 +50284,6 @@
     "message": "Module level import not at top of file",
     "noqa_row": 16,
     "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
-  },
-  {
-    "cell": null,
-    "code": "F401",
-    "end_location": {
-      "column": 41,
-      "row": 6
-    },
-    "filename": "/mnt/d/noctria_kingdom/noctria_gui/routes/statistics/__init__.py",
-    "fix": null,
-    "location": {
-      "column": 35,
-      "row": 6
-    },
-    "message": "`.statistics_dashboard.router` imported but unused; consider removing, adding to `__all__`, or using a redundant alias",
-    "noqa_row": 6,
-    "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
     "cell": null,
@@ -54153,23 +54070,6 @@
   },
   {
     "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 16,
-      "row": 133
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/core/meta_ai.py",
-    "fix": null,
-    "location": {
-      "column": 12,
-      "row": 133
-    },
-    "message": "Undefined name `Path`",
-    "noqa_row": 133,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
     "code": "F841",
     "end_location": {
       "column": 16,
@@ -54200,90 +54100,6 @@
     "message": "Local variable `dd_diff` is assigned to but never used",
     "noqa_row": 98,
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 14,
-      "row": 24
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/core/task_scheduler.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 17,
-            "row": 24
-          },
-          "location": {
-            "column": 9,
-            "row": 24
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `state`"
-    },
-    "location": {
-      "column": 9,
-      "row": 24
-    },
-    "message": "Local variable `state` is assigned to but never used",
-    "noqa_row": 24,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 40,
-      "row": 73
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/execution/simulate_official_strategy.py",
-    "fix": null,
-    "location": {
-      "column": 25,
-      "row": 73
-    },
-    "message": "Undefined name `initial_capital`",
-    "noqa_row": 73,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 17,
-      "row": 174
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/execution/simulate_official_strategy.py",
-    "fix": null,
-    "location": {
-      "column": 13,
-      "row": 174
-    },
-    "message": "Undefined name `json`",
-    "noqa_row": 174,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 63,
-      "row": 210
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/execution/simulate_official_strategy.py",
-    "fix": null,
-    "location": {
-      "column": 55,
-      "row": 210
-    },
-    "message": "Undefined name `datetime`",
-    "noqa_row": 210,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
   },
   {
     "cell": null,
@@ -54355,43 +54171,299 @@
   },
   {
     "cell": null,
-    "code": "F841",
+    "code": "invalid-syntax",
     "end_location": {
-      "column": 13,
+      "column": 41,
       "row": 173
     },
     "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 21,
-            "row": 173
-          },
-          "location": {
-            "column": 5,
-            "row": 173
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `trace_id`"
-    },
+    "fix": null,
     "location": {
-      "column": 5,
+      "column": 40,
       "row": 173
     },
-    "message": "Local variable `trace_id` is assigned to but never used",
-    "noqa_row": 173,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+    "message": "Expected a newline after line continuation character",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 77,
+      "row": 173
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 41,
+      "row": 173
+    },
+    "message": "missing closing quote in string literal",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 17,
+      "row": 176
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 176
+    },
+    "message": "Expected ',', found name",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 16,
+      "row": 178
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 178
+    },
+    "message": "Expected ',', found name",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 11,
+      "row": 180
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 180
+    },
+    "message": "Expected ',', found name",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 15,
+      "row": 182
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 14,
+      "row": 182
+    },
+    "message": "Expected 'else', found ':'",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 9,
+      "row": 184
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 184
+    },
+    "message": "Expected ',', found 'else'",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 10,
+      "row": 184
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 9,
+      "row": 184
+    },
+    "message": "Expected ',', found ':'",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 40,
+      "row": 187
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 39,
+      "row": 187
+    },
+    "message": "Expected 'else', found ':'",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 38,
+      "row": 189
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 13,
+      "row": 188
+    },
+    "message": "Positional argument cannot follow keyword argument",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 39,
+      "row": 189
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 38,
+      "row": 189
+    },
+    "message": "Expected 'else', found ':'",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 39,
+      "row": 189
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 38,
+      "row": 189
+    },
+    "message": "Expected ',', found ':'",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 79,
+      "row": 190
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 13,
+      "row": 190
+    },
+    "message": "Positional argument cannot follow keyword argument",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 15,
+      "row": 191
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 9,
+      "row": 191
+    },
+    "message": "Expected ',', found name",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 66,
+      "row": 191
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 9,
+      "row": 191
+    },
+    "message": "Duplicate keyword argument \"reason\"",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 12,
+      "row": 193
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 193
+    },
+    "message": "Expected ',', found name",
+    "noqa_row": null,
+    "url": null
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 1,
+      "row": 201
+    },
+    "filename": "/mnt/d/noctria_kingdom/src/plan_data/quality_gate.py",
+    "fix": null,
+    "location": {
+      "column": 6,
+      "row": 200
+    },
+    "message": "Expected ')', found newline",
+    "noqa_row": null,
+    "url": null
   },
   {
     "cell": null,
     "code": "F841",
     "end_location": {
       "column": 7,
-      "row": 92
+      "row": 102
     },
     "filename": "/mnt/d/noctria_kingdom/src/scripts/optimize_params_with_optuna.py",
     "fix": {
@@ -54401,11 +54473,11 @@
           "content": "",
           "end_location": {
             "column": 10,
-            "row": 92
+            "row": 102
           },
           "location": {
             "column": 5,
-            "row": 92
+            "row": 102
           }
         }
       ],
@@ -54413,10 +54485,10 @@
     },
     "location": {
       "column": 5,
-      "row": 92
+      "row": 102
     },
     "message": "Local variable `np` is assigned to but never used",
-    "noqa_row": 92,
+    "noqa_row": 102,
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
@@ -54424,7 +54496,7 @@
     "code": "F841",
     "end_location": {
       "column": 15,
-      "row": 97
+      "row": 107
     },
     "filename": "/mnt/d/noctria_kingdom/src/scripts/optimize_params_with_optuna.py",
     "fix": {
@@ -54434,11 +54506,11 @@
           "content": "",
           "end_location": {
             "column": 18,
-            "row": 97
+            "row": 107
           },
           "location": {
             "column": 5,
-            "row": 97
+            "row": 107
           }
         }
       ],
@@ -54446,127 +54518,10 @@
     },
     "location": {
       "column": 5,
-      "row": 97
+      "row": 107
     },
     "message": "Local variable `optuna_mod` is assigned to but never used",
-    "noqa_row": 97,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 33,
-      "row": 106
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/scripts/optimize_params_with_optuna.py",
-    "fix": null,
-    "location": {
-      "column": 27,
-      "row": 106
-    },
-    "message": "Undefined name `optuna`",
-    "noqa_row": 106,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 21,
-      "row": 202
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/scripts/optimize_params_with_optuna.py",
-    "fix": null,
-    "location": {
-      "column": 15,
-      "row": 202
-    },
-    "message": "Undefined name `optuna`",
-    "noqa_row": 202,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 29,
-      "row": 211
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/scripts/optimize_params_with_optuna.py",
-    "fix": null,
-    "location": {
-      "column": 23,
-      "row": 211
-    },
-    "message": "Undefined name `optuna`",
-    "noqa_row": 211,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 15,
-      "row": 46
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/strategies/hermes_cognitor.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 18,
-            "row": 46
-          },
-          "location": {
-            "column": 9,
-            "row": 46
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `prompt`"
-    },
-    "location": {
-      "column": 9,
-      "row": 46
-    },
-    "message": "Local variable `prompt` is assigned to but never used",
-    "noqa_row": 46,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 19,
-      "row": 12
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/strategies/portfolio_optimizer.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 22,
-            "row": 12
-          },
-          "location": {
-            "column": 9,
-            "row": 12
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `cov_matrix`"
-    },
-    "location": {
-      "column": 9,
-      "row": 12
-    },
-    "message": "Local variable `cov_matrix` is assigned to but never used",
-    "noqa_row": 12,
+    "noqa_row": 107,
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
@@ -54605,23 +54560,6 @@
   },
   {
     "cell": null,
-    "code": "F821",
-    "end_location": {
-      "column": 7,
-      "row": 49
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/tools/dependency_analyzer.py",
-    "fix": null,
-    "location": {
-      "column": 5,
-      "row": 49
-    },
-    "message": "Undefined name `pr`",
-    "noqa_row": 49,
-    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
-  },
-  {
-    "cell": null,
     "code": "E741",
     "end_location": {
       "column": 61,
@@ -54636,39 +54574,6 @@
     "message": "Ambiguous variable name: `l`",
     "noqa_row": 45,
     "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 17,
-      "row": 35
-    },
-    "filename": "/mnt/d/noctria_kingdom/src/tools/generate_cleanup_script.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 20,
-            "row": 35
-          },
-          "location": {
-            "column": 13,
-            "row": 35
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `keep`"
-    },
-    "location": {
-      "column": 13,
-      "row": 35
-    },
-    "message": "Local variable `keep` is assigned to but never used",
-    "noqa_row": 35,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
     "cell": null,
@@ -54725,8 +54630,8 @@
     "cell": null,
     "code": "F841",
     "end_location": {
-      "column": 24,
-      "row": 24
+      "column": 16,
+      "row": 12
     },
     "filename": "/mnt/d/noctria_kingdom/src/veritas/generate/templates/strategy_template.py",
     "fix": {
@@ -54736,22 +54641,22 @@
           "content": "",
           "end_location": {
             "column": 1,
-            "row": 25
+            "row": 13
           },
           "location": {
             "column": 1,
-            "row": 24
+            "row": 12
           }
         }
       ],
       "message": "Remove assignment to unused variable `entry_price`"
     },
     "location": {
-      "column": 13,
-      "row": 24
+      "column": 5,
+      "row": 12
     },
     "message": "Local variable `entry_price` is assigned to but never used",
-    "noqa_row": 24,
+    "noqa_row": 12,
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
@@ -54908,105 +54813,6 @@
   },
   {
     "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 27,
-      "row": 38
-    },
-    "filename": "/mnt/d/noctria_kingdom/tests/backtesting/dqn_backtest.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 30,
-            "row": 38
-          },
-          "location": {
-            "column": 13,
-            "row": 38
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `actions_tensor`"
-    },
-    "location": {
-      "column": 13,
-      "row": 38
-    },
-    "message": "Local variable `actions_tensor` is assigned to but never used",
-    "noqa_row": 38,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 27,
-      "row": 39
-    },
-    "filename": "/mnt/d/noctria_kingdom/tests/backtesting/dqn_backtest.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 30,
-            "row": 39
-          },
-          "location": {
-            "column": 13,
-            "row": 39
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `rewards_tensor`"
-    },
-    "location": {
-      "column": 13,
-      "row": 39
-    },
-    "message": "Local variable `rewards_tensor` is assigned to but never used",
-    "noqa_row": 39,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 25,
-      "row": 40
-    },
-    "filename": "/mnt/d/noctria_kingdom/tests/backtesting/dqn_backtest.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 28,
-            "row": 40
-          },
-          "location": {
-            "column": 13,
-            "row": 40
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `dones_tensor`"
-    },
-    "location": {
-      "column": 13,
-      "row": 40
-    },
-    "message": "Local variable `dones_tensor` is assigned to but never used",
-    "noqa_row": 40,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
     "code": "E402",
     "end_location": {
       "column": 21,
@@ -55072,105 +54878,6 @@
     "message": "Module level import not at top of file",
     "noqa_row": 43,
     "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 16,
-      "row": 29
-    },
-    "filename": "/mnt/d/noctria_kingdom/tests/test_meta_ai_rl_longrun.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 19,
-            "row": 29
-          },
-          "location": {
-            "column": 5,
-            "row": 29
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `observation`"
-    },
-    "location": {
-      "column": 5,
-      "row": 29
-    },
-    "message": "Local variable `observation` is assigned to but never used",
-    "noqa_row": 29,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 8,
-      "row": 32
-    },
-    "filename": "/mnt/d/noctria_kingdom/tests/test_meta_ai_rl_longrun.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 11,
-            "row": 32
-          },
-          "location": {
-            "column": 5,
-            "row": 32
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `obs`"
-    },
-    "location": {
-      "column": 5,
-      "row": 32
-    },
-    "message": "Local variable `obs` is assigned to but never used",
-    "noqa_row": 32,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 25,
-      "row": 17
-    },
-    "filename": "/mnt/d/noctria_kingdom/tests/test_noctria.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 1,
-            "row": 30
-          },
-          "location": {
-            "column": 1,
-            "row": 17
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `mock_market_data`"
-    },
-    "location": {
-      "column": 9,
-      "row": 17
-    },
-    "message": "Local variable `mock_market_data` is assigned to but never used",
-    "noqa_row": 17,
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
     "cell": null,

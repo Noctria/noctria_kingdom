@@ -3,9 +3,9 @@ Inventor skipped: No module named 'src'
 ---
 ### Ruff summary (top)
 ```
-1390 invalid-syntax
- 337 I001
+1407 invalid-syntax
+ 335 I001
  265 E402
- 201 F401
+ 200 F401
  183 E701
 ```
