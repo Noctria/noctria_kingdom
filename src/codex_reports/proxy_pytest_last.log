@@ -1,11 +1,6 @@
-......                                                                   [100%]
-==================================== PASSES ====================================
-- generated xml file: /mnt/d/noctria_kingdom/src/codex_reports/pytest_last.xml -
-=========================== short test summary info ============================
-PASSED actions-runner/_work/noctria_kingdom/noctria_kingdom/tests/test_decision_fallback_size.py::test_fallback_size_reason_matches_implementation
-PASSED actions-runner/_work/noctria_kingdom/noctria_kingdom/tests/test_harmonia_rerank.py::test_harmonia_rerank_sets_risk_adjusted_and_orders
-PASSED actions-runner/_work/noctria_kingdom/noctria_kingdom/tests/test_harmonia_rerank.py::test_harmonia_rerank_penalizes_with_lag_and_missing_ratio
-PASSED tests/test_decision_fallback_size.py::test_fallback_size_reason_matches_implementation
-PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_sets_risk_adjusted_and_orders
-PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_penalizes_with_lag_and_missing_ratio
 
+ImportError while loading conftest '/mnt/d/noctria_kingdom/tests/conftest.py'.
+  File "/mnt/d/noctria_kingdom/tests/conftest.py", line 9
+    from __future__ import annotations
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: from __future__ imports must occur at the beginning of the file
