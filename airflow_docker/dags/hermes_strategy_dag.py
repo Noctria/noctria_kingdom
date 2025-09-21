@@ -5,9 +5,9 @@
 # ③ pdca_events への簡易ロギングを追加（失敗しても無視）
 # ④ 例外ログ整備
 
-from datetime import datetime, timedelta
 import importlib
 import logging
+from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator, get_current_context

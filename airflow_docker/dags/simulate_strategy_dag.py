@@ -1,8 +1,11 @@
 # /opt/airflow/dags/simulate_strategy_dag.py
 
 from datetime import datetime, timedelta
+
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
+
+from core.logger import setup_logger
 
 # ================================================
 # ★ 修正: 新しいimportルールを適用
@@ -10,7 +13,6 @@ from airflow.operators.python import PythonOperator
 # `PYTHONPATH`が設定されたため、sys.pathハックは不要。
 # 全てのモジュールは、srcを起点とした絶対パスでインポートする。
 from core.path_config import LOGS_DIR
-from core.logger import setup_logger
 
 # ★ 改善点: 外部スクリプトを実行するのではなく、関数として直接インポートする
 try:

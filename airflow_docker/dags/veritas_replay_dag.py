@@ -1,7 +1,9 @@
+from datetime import timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.utils.dates import days_ago
-from datetime import timedelta
+
 from core.path_config import EXECUTION_DIR
 
 default_args = {

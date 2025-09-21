@@ -23,10 +23,18 @@ Noctria Dead Code Detector — 不要化候補の自動抽出（CSV/MD/隔離コ
 """
 
 from __future__ import annotations
-import os, re, ast, csv, json, argparse, subprocess, time
-from pathlib import Path
+
+import argparse
+import ast
+import csv
+import json
+import os
+import re
+import subprocess
+import time
 from collections import defaultdict, deque
-from typing import Dict, List, Set, Tuple, Optional
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "codex_reports" / "dead_code"
@@ -408,7 +416,7 @@ def main():
         lines = []
         for r in items:
             lines.append(
-                f'|{r["categories"]}|{r["path"]}|{r["days_since_last_commit"]}|{r["in_degree"] or ""}|{r["reachable_from_canon"]}|{r["has_coverage"]}|{r["tests_ref"]}|{r["runtime_seen"]}|{r["reasons"]}|'
+                f"|{r['categories']}|{r['path']}|{r['days_since_last_commit']}|{r['in_degree'] or ''}|{r['reachable_from_canon']}|{r['has_coverage']}|{r['tests_ref']}|{r['runtime_seen']}|{r['reasons']}|"
             )
         return head + "\n".join(lines)
 

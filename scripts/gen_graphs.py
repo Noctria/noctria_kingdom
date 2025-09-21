@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-from pathlib import Path
-import json, os, re, shutil, subprocess, time, xml.etree.ElementTree as ET
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+import xml.etree.ElementTree as ET
 from collections import defaultdict, deque
+from pathlib import Path
 
 # ================== Paths ==================
 ROOT = Path(__file__).resolve().parents[1]
@@ -339,7 +346,7 @@ def build_svg_from_dot() -> bool:
         _run_dot(src_for_dot)
         print(
             f"+ built {SVG} from {dot_file.name} (hide={'on' if HIDE_GRAVEYARD else 'off'}, "
-            f"filter={used_backend}{layer_tag}{', viewport='+FORCE_VIEWPORT if FORCE_VIEWPORT else ''})"
+            f"filter={used_backend}{layer_tag}{', viewport=' + FORCE_VIEWPORT if FORCE_VIEWPORT else ''})"
         )
     except subprocess.CalledProcessError as e:
         print(f"! dot failed: {e}")

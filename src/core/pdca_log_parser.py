@@ -95,7 +95,7 @@ def load_and_aggregate_pdca_logs(
 
         avg_dd_before = sum(dd_before_vals) / len(group) if group else 0.0
         avg_dd_after = sum(dd_after_vals) / len(group) if group else 0.0
-        dd_diff = round(avg_dd_before - avg_dd_after, 2)
+        _dd_diff = round(avg_dd_before - avg_dd_after, 2)
 
         adopted = any(g["status"] == "adopted" for g in group)
 

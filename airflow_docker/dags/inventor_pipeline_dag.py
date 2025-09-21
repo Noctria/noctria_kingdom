@@ -1,8 +1,8 @@
 # airflow_docker/dags/inventor_pipeline_dag.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import uuid
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from airflow import DAG

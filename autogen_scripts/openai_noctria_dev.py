@@ -1,15 +1,16 @@
-import os
 import asyncio
-import subprocess
-import re
-from dotenv import load_dotenv
-from openai import OpenAI
 import datetime
-import sys
-from uuid import uuid4
 import json
 import logging
+import os
+import re
+import subprocess
+import sys
 from logging.handlers import RotatingFileHandler
+from uuid import uuid4
+
+from dotenv import load_dotenv
+from openai import OpenAI
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "utils")))
 from cycle_logger import insert_turn_history
@@ -201,8 +202,6 @@ def sanitize_filename(fname: str) -> str:
 
 
 def run_pytest_and_collect_detail(test_dir: str):
-    import shutil
-
     report_file = os.path.join(test_dir, "pytest_result.json")
     cmd = [
         "pytest",
@@ -260,7 +259,7 @@ async def call_openai(client, messages, retry=3, delay=2):
             log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
             print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
             if attempt + 1 == retry:
-                log_message(f"最終試行でAPI呼び出しに失敗しました。処理を中断します。")
+                log_message("最終試行でAPI呼び出しに失敗しました。処理を中断します。")
                 raise RuntimeError("OpenAI API呼び出しが最終試行で失敗しました。") from e
             await asyncio.sleep(delay)
 
@@ -392,7 +391,7 @@ async def multi_agent_loop(client, max_turns=10):
 
                 commit_message = f"{role} AI generated files - turn {turn+1}"
                 if not git_commit_and_push(OUTPUT_DIR, commit_message):
-                    print(f"警告: Git連携に失敗しました。手動でコミットを確認してください。")
+                    print("警告: Git連携に失敗しました。手動でコミットを確認してください。")
 
                 if role == "test":
                     passed, total, failed, details, log = await asyncio.to_thread(

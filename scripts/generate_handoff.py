@@ -13,14 +13,15 @@ scripts/generate_handoff.py
 """
 
 from __future__ import annotations
-from pathlib import Path
+
 import argparse
-import subprocess
 import datetime as dt
 import json
 import os
 import shlex
-from typing import List, Dict, Tuple, Optional
+import subprocess
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 HANDOFF_DIR = ROOT / "handoff"

@@ -1,11 +1,12 @@
-import os
-import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-import psycopg2
-
 #!/usr/bin/env python3
 from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import psycopg2
 
 """
 Royal Scribe（史官）

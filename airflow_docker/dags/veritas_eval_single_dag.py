@@ -1,13 +1,12 @@
 # airflow_docker/dags/veritas_eval_single_dag.py
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.python import get_current_context
-
-from datetime import datetime, timedelta
-import subprocess
 import json
+import subprocess
+from datetime import datetime, timedelta
 from pathlib import Path
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator, get_current_context
 
 # === DAG定義 ===
 

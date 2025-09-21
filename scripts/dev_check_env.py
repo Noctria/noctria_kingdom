@@ -1,5 +1,7 @@
+import os
+import textwrap
 from pathlib import Path
-import os, textwrap
+
 from dotenv import load_dotenv
 
 # プロジェクトルートにある .env を明示パス指定で読む（AssertionError回避）

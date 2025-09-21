@@ -7,12 +7,13 @@
 - GUI/RESTトリガー時、conf["reason"]（発令理由）も全タスクで記録・活用可
 """
 
+import logging
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from core.path_config import ORACLE_FORECAST_JSON
 
-import logging
+from core.path_config import ORACLE_FORECAST_JSON
 
 default_args = {
     "owner": "Prometheus",
@@ -47,7 +48,6 @@ def prometheus_forecast_task(**kwargs):
     reason = conf.get("reason", "理由未指定")
     try:
         from strategies.prometheus_oracle import PrometheusOracle
-        import pandas as pd
 
         logger = logging.getLogger("PrometheusForecast")
         logger.info(f"【未来予測発令理由】{reason}")

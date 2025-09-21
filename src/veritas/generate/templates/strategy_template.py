@@ -9,7 +9,7 @@ def simulate(data: pd.DataFrame) -> dict:
     """
     capital = 1_000_000  # 初期資本
     position = 0
-    entry_price = 0
+    _entry_price = 0
     wins = 0
     losses = 0
     capital_history = [capital]

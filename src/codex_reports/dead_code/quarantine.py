@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-import csv, os, sys, subprocess, shlex
+import csv
+import os
+import shlex
+import subprocess
+import sys
 
-GRAVEYARD = sys.argv[1] if len(sys.argv) > 1 else f"_graveyard"
+GRAVEYARD = sys.argv[1] if len(sys.argv) > 1 else "_graveyard"
 CSV_PATH = "codex_reports/dead_code/report.csv"
 
 

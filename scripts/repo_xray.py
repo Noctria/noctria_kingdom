@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # scripts/repo_xray.py
 from __future__ import annotations
-import argparse, json, re, sys
+
+import argparse
+import json
+import re
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -188,7 +192,7 @@ def main():
             for f in files[:200]:
                 md.append(f"- `{f}`")
             if len(files) > 200:
-                md.append(f"- ...and {len(files)-200} more")
+                md.append(f"- ...and {len(files) - 200} more")
         else:
             md.append("- (none)")
         md.append("")

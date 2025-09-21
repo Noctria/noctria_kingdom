@@ -14,9 +14,16 @@ Usage:
 """
 
 from __future__ import annotations
-from pathlib import Path
-import argparse, json, os, re, subprocess, sys, ast
+
+import argparse
+import ast
+import json
+import os
+import re
+import subprocess
+import sys
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 

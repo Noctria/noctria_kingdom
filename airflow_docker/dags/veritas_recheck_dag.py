@@ -21,13 +21,12 @@ from __future__ import annotations
 
 import csv
 import logging
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from airflow.decorators import dag, task, get_current_context
+from airflow.decorators import dag, get_current_context, task
 
 # -----------------------------------------------------------------------------
 # パス調整: <repo_root> と <repo_root>/src を import path に追加

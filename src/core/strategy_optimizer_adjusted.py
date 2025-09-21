@@ -1,5 +1,3 @@
-import traceback
-
 import numpy as np
 import pandas as pd
 
@@ -18,9 +16,7 @@ def load_market_data(csv_file="market_data.csv"):
         return None
 
 
-def simulate_strategy_adjusted(
-    prices, entry_threshold, exit_threshold, initial_capital=1000000
-):
+def simulate_strategy_adjusted(prices, entry_threshold, exit_threshold, initial_capital=1000000):
     risk_control = RiskControl(initial_capital)
     position = 0
     shares = 0
@@ -55,40 +51,40 @@ def simulate_strategy_adjusted(
     return risk_control.current_capital
 
 
-def simulate_strategy_adjusted(strategy_path: str, market_data: pd.DataFrame) -> dict:
-    try:
-        namespace = {}
-        with open(strategy_path, "r", encoding="utf-8") as f:
-            code = f.read()
-            exec(code, namespace)
-
-        if "strategy" not in namespace or not callable(namespace["strategy"]):
-            return {
-                "status": "error",
-                "error_message": "strategy関数が定義されていません",
-            }
-
-        result = namespace["strategy"](market_data)
-
-        if not isinstance(result, dict):
-            return {
-                "status": "error",
-                "error_message": "strategy関数の返り値がdict型ではありません",
-            }
-
-        return {
-            "status": "ok",
-            "final_capital": result.get("final_capital"),
-            "win_rate": result.get("win_rate"),
-            "max_drawdown": result.get("max_drawdown"),
-            "total_trades": result.get("total_trades"),
-            "error_message": None,
-        }
-
-    except Exception:
-        return {"status": "error", "error_message": traceback.format_exc()}
-
-
+# DUPLICATE_REMOVED: def simulate_strategy_adjusted(strategy_path: str, market_data: pd.DataFrame) -> dict:
+#     try:
+#         namespace = {}
+#         with open(strategy_path, "r", encoding="utf-8") as f:
+#             code = f.read()
+#             exec(code, namespace)
+#
+#         if "strategy" not in namespace or not callable(namespace["strategy"]):
+#             return {
+#                 "status": "error",
+#                 "error_message": "strategy関数が定義されていません",
+#             }
+#
+#         result = namespace["strategy"](market_data)
+#
+#         if not isinstance(result, dict):
+#             return {
+#                 "status": "error",
+#                 "error_message": "strategy関数の返り値がdict型ではありません",
+#             }
+#
+#         return {
+#             "status": "ok",
+#             "final_capital": result.get("final_capital"),
+#             "win_rate": result.get("win_rate"),
+#             "max_drawdown": result.get("max_drawdown"),
+#             "total_trades": result.get("total_trades"),
+#             "error_message": None,
+#         }
+#
+#     except Exception:
+#         return {"status": "error", "error_message": traceback.format_exc()}
+#
+#
 def optimize_parameters_adjusted(prices, initial_capital=1000000):
     best_profit = -np.inf
     best_params = None

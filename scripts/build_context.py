@@ -11,9 +11,14 @@ Usage:
 """
 
 from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from collections import defaultdict, deque
 from pathlib import Path
-import argparse, json, os, re, sys
-from collections import deque, defaultdict
 
 ROOT = Path(__file__).resolve().parents[1]
 GRDIR = ROOT / "codex_reports" / "graphs"

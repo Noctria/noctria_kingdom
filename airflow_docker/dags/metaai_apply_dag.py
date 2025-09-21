@@ -1,13 +1,12 @@
 # dags/metaai_apply_dag.py
 
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
+
 from airflow.decorators import dag, task
-from airflow.operators.python import get_current_context
 
-
-from core.path_config import LOGS_DIR
 from core.logger import setup_logger
+from core.path_config import LOGS_DIR
 from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
 
 dag_log_path = LOGS_DIR / "dags" / "metaai_apply_dag.log"

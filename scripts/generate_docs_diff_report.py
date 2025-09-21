@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse, datetime as dt, subprocess, sys
+import argparse
+import datetime as dt
+import subprocess
+import sys
 from pathlib import Path
 
 

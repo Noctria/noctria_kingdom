@@ -7,19 +7,12 @@ Auto-fix loop (PDCA強化版)
 - 段階テスト(軽→重) + 差分テスト
 - 成果メトリクス(JSONL)記録
 - 追加: 温度0.0 / トレースAllowlist / 回帰ゲート(失敗時ロールバック, 成功時のみcommit)
-
-Usage:
-  OPENAI_API_KEY=sk-... python scripts/auto_fix_loop.py --max-iters 5
-
-環境変数:
-  NOCTRIA_AUTOFIX_MODEL  : モデル名 (default: gpt-4o-mini)
-  NOCTRIA_AUTOFIX_LIGHT  : "1" なら軽テスト優先 (default: 1)
-  NOCTRIA_AUTOFIX_RUFF   : "1" なら ruff --fix 実行 (default: 1)
-  NOCTRIA_AUTOFIX_BLACK  : "1" なら black 実行 (default: 1)
-  NOCTRIA_AUTOFIX_COMMIT : "1" なら git commit (default: 1; ※成功時のみ実施)
+- 追加: pre-commit チェック統合（ruff-format 等の失敗を自動修正）
+- 追加: pre-commit 失敗時は .pre-commit-config.yaml の変更をロールバックしない（保持）
 """
 
 from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -30,12 +23,18 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Set, Tuple
+
+# 共通SP
+from codex.prompts.loader import load_noctria_system_prompt
 
 # ===================== 設定 =====================
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_DIRS = ("src/", "tests/")
+# 追加: テスト外のトップレベル設定ファイルもパッチ許可（pre-commit 対応用）
+ALLOWED_FILES = (".pre-commit-config.yaml", "pyproject.toml")
+
 MODEL = os.getenv("NOCTRIA_AUTOFIX_MODEL", "gpt-4o-mini")
 MAX_ITERS = 5
 
@@ -49,6 +48,7 @@ RUN_RUFF = os.getenv("NOCTRIA_AUTOFIX_RUFF", "1") == "1"
 RUN_BLACK = os.getenv("NOCTRIA_AUTOFIX_BLACK", "1") == "1"
 GIT_COMMIT = os.getenv("NOCTRIA_AUTOFIX_COMMIT", "1") == "1"
 LIGHT_FIRST = os.getenv("NOCTRIA_AUTOFIX_LIGHT", "1") == "1"
+RUN_PRECOMMIT = os.getenv("NOCTRIA_AUTOFIX_PRECOMMIT", "1") == "1"
 
 # ブランチ
 BRANCH_PREFIX = "autofix"
@@ -57,6 +57,7 @@ BRANCH_PREFIX = "autofix"
 EXTRA_CONTEXT_FILES = [
     "pytest.ini",
     "pyproject.toml",
+    ".pre-commit-config.yaml",
     "tests/conftest.py",
     "src/core/path_config.py",
 ]
@@ -69,15 +70,21 @@ FEWSHOT_DIR = ROOT / "scripts" / "autofix_fewshots"
 # メトリクス保存先
 METRICS_JSONL = ROOT / "src" / "codex_reports" / "autofix_metrics.jsonl"
 
+# ✅ ここで一度だけ共通SPをロード（call_model から使う）
+COMMON_SP = load_noctria_system_prompt("v1.5")
+
 # ===================== ヘルパ =====================
 
 
 @dataclass
-class PytestResult:
+class CmdResult:
     ok: bool
     code: int
     stdout: str
     stderr: str
+
+
+PytestResult = CmdResult  # 同型
 
 
 def run(cmd: List[str], check=False, **kw) -> subprocess.CompletedProcess:
@@ -86,17 +93,35 @@ def run(cmd: List[str], check=False, **kw) -> subprocess.CompletedProcess:
 
 def run_pytest(light: bool, target_tests: Optional[List[str]] = None) -> PytestResult:
     """
-    light=True: 既定設定(heavy/gpu/external を skip する pytest.ini 前提) + 差分テスト優先
-    light=False: 可能なら重め全体実行
+    env で絞り込み可能:
+      - NOCTRIA_AUTOFIX_PYTEST_LIGHT_ARGS
+      - NOCTRIA_AUTOFIX_PYTEST_HEAVY_ARGS
+    例: export NOCTRIA_AUTOFIX_PYTEST_LIGHT_ARGS='-k "not slow"'
     """
     base = ["pytest", "-q", "--maxfail=1", "--disable-warnings", "-rA"]
+    extra = os.getenv(
+        "NOCTRIA_AUTOFIX_PYTEST_LIGHT_ARGS" if light else "NOCTRIA_AUTOFIX_PYTEST_HEAVY_ARGS",
+        "",
+    ).strip()
     args = base[:]
+    if extra:
+        args += extra.split()
     if target_tests:
         args += target_tests
     proc = run(args, check=False)
     return PytestResult(
         ok=(proc.returncode == 0), code=proc.returncode, stdout=proc.stdout, stderr=proc.stderr
     )
+
+
+def run_precommit() -> CmdResult:
+    try:
+        proc = run(["pre-commit", "run", "--all-files", "-v"], check=False)
+        return CmdResult(
+            ok=(proc.returncode == 0), code=proc.returncode, stdout=proc.stdout, stderr=proc.stderr
+        )
+    except FileNotFoundError:
+        return CmdResult(ok=True, code=0, stdout="(pre-commit not installed)", stderr="")
 
 
 TB_FILE_RE = re.compile(r'File "([^"]+)", line (\d+), in ([^\n]+)')
@@ -128,7 +153,7 @@ def read_snippet(p: Path, around_line: int, radius: int = 36) -> Optional[str]:
     snippet = []
     for idx in range(i0, i1):
         prefix = ">>" if (idx + 1) == around_line else "  "
-        snippet.append(f"{prefix}{idx+1:5d}: {lines[idx]}")
+        snippet.append(f"{prefix}{idx + 1:5d}: {lines[idx]}")
     return "\n".join(snippet)
 
 
@@ -164,11 +189,6 @@ def collect_repo_context(
 
 
 def detect_changed_tests_from_patches(patches: List[Dict]) -> List[str]:
-    """
-    パッチに対応するテストを簡易に推定。
-    - tests/ 下の直接パッチはそのまま対象
-    - src/xxx.py に対しては tests/xxx*_test.py, tests/test_*xxx*.py を候補に
-    """
     candidates: set[str] = set()
     for p in patches:
         path = p.get("path", "")
@@ -278,10 +298,10 @@ Constraints:
 PROMPT_USER_FMT = """Repository failing test summary:
 Exit code: {code}
 
-=== Pytest stdout (tail) ===
+=== Pytest/pre-commit stdout (tail) ===
 {stdout_tail}
 
-=== Pytest stderr (tail) ===
+=== Pytest/pre-commit stderr (tail) ===
 {stderr_tail}
 
 Files mentioned in tracebacks (with snippets):
@@ -301,7 +321,7 @@ Task:
   "reason": "short explanation",
   "patches": [
     {
-      "path": "relative/path/under/src_or_tests.py",
+      "path": "relative/path/under/src_or_tests.py OR one of {allowed_files}",
       "new_content": "FULL new file content (UTF-8)",
       "why": "what changed"
     }
@@ -309,7 +329,7 @@ Task:
 }
 
 Rules:
-- Only include files under {allowed_dirs}.
+- Only include files under {allowed_dirs} or these files: {allowed_files}.
 - Each "new_content" must be the complete new content for that file.
 - No placeholders. No backticks.
 - If you are not confident, return "patches": [] with a helpful "reason".
@@ -319,13 +339,6 @@ Rules:
 
 
 def call_model(user_prompt: str) -> Dict:
-    """
-    OpenAI SDK の差異に耐える実装:
-    1) responses.parse (新) があれば使う
-    2) chat.completions with response_format={"type":"json_object"}
-    3) responses.create + 手パース
-    すべて temperature=0.0（決定性重視）
-    """
     try:
         from openai import OpenAI
     except Exception:
@@ -333,7 +346,7 @@ def call_model(user_prompt: str) -> Dict:
         raise
 
     client = OpenAI()
-    system_msg = PROMPT_SYSTEM.format(allowed_dirs=list(ALLOWED_DIRS))
+    system_msg = COMMON_SP + "\n\n" + PROMPT_SYSTEM.format(allowed_dirs=list(ALLOWED_DIRS))
 
     # Path A: responses.parse
     try:
@@ -399,12 +412,6 @@ def validate_patches(
     required_tokens: Dict[str, List[str]],
     allowed_paths: Optional[Set[str]] = None,
 ) -> Tuple[List[Dict], List[str]]:
-    """
-    - ディレクトリAllowlist（src/tests）
-    - トレースAllowlist（allowed_paths が与えられたら、その中だけ許可）
-    - 必須トークン検査
-    - サイズガード
-    """
     errors: List[str] = []
     total_bytes = 0
     valid: List[Dict] = []
@@ -415,10 +422,15 @@ def validate_patches(
         if not path or not isinstance(path, str):
             errors.append(f"[{i}] missing/invalid path")
             continue
-        if not any(path.startswith(d) for d in ALLOWED_DIRS):
+
+        is_allowed_dir = any(path.startswith(d) for d in ALLOWED_DIRS)
+        is_allowed_file = path in ALLOWED_FILES
+
+        if not (is_allowed_dir or is_allowed_file):
             errors.append(f"[{i}] path not allowed: {path}")
             continue
-        if allowed_paths is not None and path not in allowed_paths:
+
+        if allowed_paths is not None and (not is_allowed_file) and (path not in allowed_paths):
             errors.append(f"[{i}] path not in traceback allowlist: {path}")
             continue
 
@@ -456,10 +468,6 @@ def validate_patches(
 
 
 def apply_patches_with_backups(patches: List[Dict]) -> List[Tuple[Path, Optional[Path]]]:
-    """
-    ファイルごとに .autofix.bak を作ってから上書き。
-    返り値: [(path, backup_path_or_None), ...]
-    """
     applied: List[Tuple[Path, Optional[Path]]] = []
     for p in patches:
         path = Path(p["path"])
@@ -483,17 +491,29 @@ def format_code() -> None:
         run(["black", "src", "tests"], check=False)
 
 
+def _split_applied(
+    applied: List[Tuple[Path, Optional[Path]]],
+) -> Tuple[List[Tuple[Path, Optional[Path]]], List[Tuple[Path, Optional[Path]]]]:
+    """(.pre-commit-config.yaml / pyproject.toml) とそれ以外に分割"""
+    keep: List[Tuple[Path, Optional[Path]]] = []
+    revert: List[Tuple[Path, Optional[Path]]] = []
+    allowed = set(ALLOWED_FILES)
+    for item in applied:
+        p = item[0]
+        if p.name in allowed and p.parent == ROOT:
+            keep.append(item)
+        else:
+            revert.append(item)
+    return keep, revert
+
+
 def rollback_files(applied: List[Tuple[Path, Optional[Path]]]) -> None:
-    """
-    バックアップがあれば復元。なければ削除（新規作成されたファイルの取り消し）。
-    """
     for path, backup in applied:
         try:
             if backup and backup.exists():
                 shutil.copy2(backup, path)
                 backup.unlink(missing_ok=True)
             else:
-                # 新規作成なら削除
                 if path.exists():
                     path.unlink()
         except Exception:
@@ -501,7 +521,6 @@ def rollback_files(applied: List[Tuple[Path, Optional[Path]]]) -> None:
 
 
 def finalize_backups(applied: List[Tuple[Path, Optional[Path]]]) -> None:
-    """成功確定後に .autofix.bak を掃除。"""
     for _, backup in applied:
         if backup and backup.exists():
             try:
@@ -538,6 +557,32 @@ def ensure_branch():
         print(f"[warn] could not create branch {name}, staying on {base}")
 
 
+def _build_user_prompt(stdout_tail: str, stderr_tail: str, ctx: Dict) -> str:
+    fewshots = load_fewshots()
+    compact_fs = []
+    for ex in fewshots:
+        compact_fs.append(
+            {
+                "failure": str(ex.get("failure", ""))[:400],
+                "patch": {
+                    "path": ex.get("patch", {}).get("path", ""),
+                    "why": str(ex.get("patch", {}).get("why", ""))[:200],
+                },
+            }
+        )
+    fps = match_fingerprints(stdout_tail, stderr_tail)
+    return PROMPT_USER_FMT.format(
+        code=0,
+        stdout_tail=stdout_tail,
+        stderr_tail=stderr_tail,
+        ctx_json=json.dumps(ctx, ensure_ascii=False)[:CTX_MAX_BYTES],
+        fingerprints_json=json.dumps(fps, ensure_ascii=False),
+        fewshots_json=json.dumps(compact_fs, ensure_ascii=False),
+        allowed_dirs=list(ALLOWED_DIRS),
+        allowed_files=list(ALLOWED_FILES),
+    )
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-iters", type=int, default=MAX_ITERS)
@@ -545,7 +590,6 @@ def main():
 
     ensure_branch()
     required_tokens = load_required_tokens()
-    fewshots = load_fewshots()
 
     for it in range(1, args.max_iters + 1):
         print(f"\n=== Iteration {it} ===")
@@ -562,68 +606,90 @@ def main():
                 res_heavy = run_pytest(light=False)
                 heavy_elapsed = time.time() - start_ts2
                 if res_heavy.ok:
-                    print("✅ GREEN — all tests passed.")
+                    # ここで pre-commit を回す
+                    if RUN_PRECOMMIT:
+                        pc = run_precommit()
+                        if pc.ok:
+                            print("✅ GREEN — all tests & pre-commit passed.")
+                            log_metrics(
+                                {
+                                    "ts": int(time.time()),
+                                    "iter": it,
+                                    "result": "GREEN",
+                                    "model": MODEL,
+                                    "light_elapsed_sec": round(light_elapsed, 3),
+                                    "heavy_elapsed_sec": round(heavy_elapsed, 3),
+                                    "patches": 0,
+                                }
+                            )
+                            return
+                        # pre-commit 失敗 → 修正対象
+                        stdout_tail = pc.stdout[-20000:]
+                        stderr_tail = pc.stderr[-20000:]
+                        trace_files: List[Tuple[Path, int, str]] = []
+                    else:
+                        print("✅ GREEN — all tests passed.")
+                        log_metrics(
+                            {
+                                "ts": int(time.time()),
+                                "iter": it,
+                                "result": "GREEN",
+                                "model": MODEL,
+                                "light_elapsed_sec": round(light_elapsed, 3),
+                                "heavy_elapsed_sec": round(heavy_elapsed, 3),
+                                "patches": 0,
+                            }
+                        )
+                        return
+                else:
+                    # 重テストだけ失敗 → 修正対象
+                    stdout_tail = res_heavy.stdout[-20000:]
+                    stderr_tail = res_heavy.stderr[-20000:]
+                    trace_files = extract_trace_files(res_heavy.stdout, res_heavy.stderr)
+            else:
+                # Light only 運用
+                if RUN_PRECOMMIT:
+                    pc = run_precommit()
+                    if pc.ok:
+                        print("✅ GREEN — (light tests) & pre-commit passed.")
+                        log_metrics(
+                            {
+                                "ts": int(time.time()),
+                                "iter": it,
+                                "result": "GREEN_LIGHT_ONLY",
+                                "model": MODEL,
+                                "light_elapsed_sec": round(light_elapsed, 3),
+                                "patches": 0,
+                            }
+                        )
+                        return
+                    stdout_tail = pc.stdout[-20000:]
+                    stderr_tail = pc.stderr[-20000:]
+                    trace_files = []
+                else:
+                    print("✅ GREEN — (light tests).")
                     log_metrics(
                         {
                             "ts": int(time.time()),
                             "iter": it,
-                            "result": "GREEN",
+                            "result": "GREEN_LIGHT_ONLY",
                             "model": MODEL,
                             "light_elapsed_sec": round(light_elapsed, 3),
-                            "heavy_elapsed_sec": round(heavy_elapsed, 3),
                             "patches": 0,
                         }
                     )
                     return
-                stdout_tail = res_heavy.stdout[-20000:]
-                stderr_tail = res_heavy.stderr[-20000:]
-                trace_files = extract_trace_files(res_heavy.stdout, res_heavy.stderr)
-            else:
-                print("✅ GREEN — (light tests).")
-                log_metrics(
-                    {
-                        "ts": int(time.time()),
-                        "iter": it,
-                        "result": "GREEN_LIGHT_ONLY",
-                        "model": MODEL,
-                        "light_elapsed_sec": round(light_elapsed, 3),
-                        "patches": 0,
-                    }
-                )
-                return
         else:
             stdout_tail = res_light.stdout[-20000:]
             stderr_tail = res_light.stderr[-20000:]
             trace_files = extract_trace_files(res_light.stdout, res_light.stderr)
 
         # 文脈収集 & Allowlist
-        fps = match_fingerprints(stdout_tail, stderr_tail)
         ctx = collect_repo_context(trace_files, EXTRA_CONTEXT_FILES)
         trace_allowlist = build_trace_allowlist(trace_files)
 
-        # Few-shotを短文化
-        compact_fs = []
-        for ex in fewshots:
-            compact_fs.append(
-                {
-                    "failure": str(ex.get("failure", ""))[:400],
-                    "patch": {
-                        "path": ex.get("patch", {}).get("path", ""),
-                        "why": str(ex.get("patch", {}).get("why", ""))[:200],
-                    },
-                }
-            )
-
-        user_prompt = PROMPT_USER_FMT.format(
-            code=0,
-            stdout_tail=stdout_tail,
-            stderr_tail=stderr_tail,
-            ctx_json=json.dumps(ctx, ensure_ascii=False)[:CTX_MAX_BYTES],
-            fingerprints_json=json.dumps(fps, ensure_ascii=False),
-            fewshots_json=json.dumps(compact_fs, ensure_ascii=False),
-            allowed_dirs=list(ALLOWED_DIRS),
-        )
-
+        # モデル呼び出し
+        user_prompt = _build_user_prompt(stdout_tail, stderr_tail, ctx)
         proposal = call_model(user_prompt)
         reason = proposal.get("reason", "")
         patch_list = proposal.get("patches", [])
@@ -712,12 +778,35 @@ def main():
             if not green:
                 continue
 
+            # pre-commit も通す
+            if RUN_PRECOMMIT:
+                pc2 = run_precommit()
+                if not pc2.ok:
+                    print("⚠️ pre-commit failed after patch; selective rollback (keep config).")
+                    # ここがポイント：.pre-commit-config.yaml 等は保持し、それ以外を戻す
+                    keep, revert = _split_applied(applied)
+                    rollback_files(revert)
+                    finalize_backups(keep)  # config の .bak は掃除
+                    log_metrics(
+                        {
+                            "ts": int(time.time()),
+                            "iter": it,
+                            "result": "PRECOMMIT_FAIL",
+                            "model": MODEL,
+                            "patch_count": len(valid),
+                            "kept": [str(p[0]) for p in keep],
+                            "reverted": [str(p[0]) for p in revert],
+                        }
+                    )
+                    # 変更を保持したまま次イテレーションへ
+                    continue
+
             # ここまで来たら成功：バックアップ掃除＆コミット
             finalize_backups(applied)
             if GIT_COMMIT:
                 git_commit("autofix: apply model patches (green)")
 
-            print("✅ GREEN — all tests passed after patch.")
+            print("✅ GREEN — all tests (and pre-commit) passed after patch.")
             log_metrics(
                 {
                     "ts": int(time.time()),

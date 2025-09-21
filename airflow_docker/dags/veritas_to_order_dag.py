@@ -1,10 +1,11 @@
 import logging
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
+
 from airflow.decorators import dag, task
-from src.veritas.evaluate_veritas import main as evaluate_main
 from src.execution.generate_order_json import main as generate_order_main
+from src.veritas.evaluate_veritas import main as evaluate_main
 
 #!/usr/bin/env python3
 # coding: utf-8

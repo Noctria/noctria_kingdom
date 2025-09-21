@@ -1,13 +1,12 @@
+import logging
 import os
 import sys
-import json
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
-import logging
+from typing import Any, Dict, List
+
 from airflow.decorators import dag, task
 from airflow.operators.python import get_current_context
-from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR, ACT_LOG_DIR
+from src.core.path_config import STRATEGIES_VERITAS_GENERATED_DIR
 from src.core.strategy_evaluator import evaluate_strategy, log_evaluation_result
 
 #!/usr/bin/env python3

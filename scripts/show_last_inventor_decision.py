@@ -32,8 +32,8 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, Optional, Tuple, List
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 # ログ探索パスと抽出パターン
 LOG_GLOB = "/opt/airflow/logs/dag_id=inventor_pipeline/run_id=*/task_id=run_inventor_and_decide/*"

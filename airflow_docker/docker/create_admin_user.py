@@ -1,12 +1,7 @@
 # create_admin_user.py
 
-import os
-from airflow.models import DagBag
-from airflow.www.security import ApplessUser
-from airflow.utils.db import provide_session
-from airflow import settings
-
 from airflow.models import User
+from airflow.utils.db import provide_session
 from sqlalchemy.orm import Session
 
 # 管理者アカウントの初期値（必要に応じて環境変数にしてもよい）

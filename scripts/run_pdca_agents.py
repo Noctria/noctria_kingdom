@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -13,38 +15,39 @@ import textwrap
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
 from dotenv import load_dotenv
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+from codex.prompts.loader import load_noctria_system_prompt
 
 """
-run_pdca_agents.py — PDCA Orchestrator (all-in-one, reports-only commit, DB logging, optional GPT/agents)
+run_pdca_agents.py — PDCA Orchestrator (reports-only commit, DB logging, optional GPT/agents)
 
 機能:
   1) pytest 実行 (JUnit XML 保存) → JUnit 解析
-  2) ruff 実行 (JSON/統計保存) → サマリ抽出
+  2) ruff 実行 (JSON/統計保存) → サマリ抽出（環境変数で対象/除外/ignore など制御）
   3) Inventor → Harmonia の提案/レビュー (モジュールがあれば)
-  4) Veritas / Hermes 連携 (モジュールがあれば)
-  5) Royal Scribe: SQLite に加えて Chronicle(Postgres/JSONL) にも記録
-       - PDCA ラン基本情報（SQLite）
-       - エージェント会話/進捗ログ（SQLite + Chronicle）
-       - テスト/リンタ結果（SQLite + Chronicle）
+  4) Veritas / Hermes 連携 (モジュールがあれば; 無ければ安全にスキップ)
+  5) Royal Scribe: SQLite に保存（必要なら Chronicle にも）
   6) レポート成果物のみを git add -f（--no-verify で静かに commit）
-  7) All green（テスト失敗なし & ruff returncode==0）かつ環境変数で許可のとき
-     → dev ブランチへ自動 add/commit/push（オプション）
+  7) All green（テスト失敗なし & ruff returncode==0）かつ環境変数で許可のとき dev ブランチへ自動コミット
 
-環境変数:
-  NOCTRIA_PDCA_BRANCH=dev/pdca-tested     # レポート用ブランチ（既定）
-  NOCTRIA_PDCA_GIT_PUSH=0|1               # レポート用ブランチ commit 後 push
-  NOCTRIA_PYTEST_ARGS="tests -k 'not slow'"  # 追加 pytest 引数
-  NOCTRIA_HARMONIA_MODE=offline|online    # 既定 offline
+環境変数(主要):
+  NOCTRIA_PDCA_BRANCH=dev/pdca-tested
+  NOCTRIA_PDCA_GIT_PUSH=0|1
+  NOCTRIA_PYTEST_ARGS="tests -k 'not slow'"
   NOCTRIA_PDCA_DB=src/codex_reports/pdca_log.db
-  NOCTRIA_GPT_MODEL=gpt-4o-mini           # GPT 要約用モデル
-  OPENAI_API_KEY=...                      # あれば GPT 要約実行
-  NOCTRIA_GREEN_COMMIT=0|1                # green 時に dev 自動コミット許可
-  NOCTRIA_GREEN_BRANCH=dev                # 緑時コミット先（既定 dev）
+  NOCTRIA_GPT_MODEL=gpt-4o-mini
+  OPENAI_API_KEY=sk-xxxxx   # ← 秘密は .env にのみ保存、コード/履歴へは書かない
+  NOCTRIA_GREEN_COMMIT=0|1
+  NOCTRIA_GREEN_BRANCH=dev
+  # ruff 実行制御
+  NOCTRIA_RUFF_TARGETS="src tests noctria_gui"
+  NOCTRIA_RUFF_EXCLUDE="_graveyard|(^|/)_graveyard/"
+  NOCTRIA_RUFF_IGNORE=""
+  NOCTRIA_RUFF_FIX=0|1
+  NOCTRIA_RUFF_EXIT_ZERO=0|1
 """
 
 # ---- ロギング初期化 ----------------------------------------------------------
@@ -54,7 +57,7 @@ if not logging.getLogger().handlers:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-# ---- .env 読み込み（プロジェクトルート優先） --------------------------------
+# ---- .env 読み込み -----------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=ROOT / ".env")
 logging.info(
@@ -65,17 +68,20 @@ logging.info(
     os.getenv("NOCTRIA_GPT_MODEL") or os.getenv("OPENAI_MODEL"),
 )
 
-# ---- Chronicle/Royal Scribe 連携（Postgres or JSONL） ------------------------
-# 失敗しても本体フローを止めないように広範囲 try/except で包む
+# ---- Chronicle/Royal Scribe 連携（存在すれば使う） ----------------------------
 try:
     from scripts._scribe import (
-        log_test_results as scribe_log_tests,
-        log_lint_results as scribe_log_lint,
-        log_pdca_stage as scribe_log_stage,
         log_ai_message as scribe_log_ai,
     )
-except Exception as e:
-    pass
+    from scripts._scribe import (
+        log_lint_results as scribe_log_lint,
+    )
+    from scripts._scribe import (
+        log_pdca_stage as scribe_log_stage,
+    )
+    from scripts._scribe import (
+        log_test_results as scribe_log_tests,
+    )
 
     SCRIBE_AVAILABLE = True
 except Exception:
@@ -109,21 +115,12 @@ OPENAI_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 GREEN_COMMIT = os.getenv("NOCTRIA_GREEN_COMMIT", "0").strip().lower() in {"1", "true", "yes", "on"}
 GREEN_BRANCH = os.getenv("NOCTRIA_GREEN_BRANCH", "dev")
 
-# レポートだけを add するためのデフォルト・ホワイトリスト
+# レポートだけを add するためのホワイトリスト
 REPORT_ADD_PATTERNS: List[str] = [
     "src/codex_reports/",
     "noctria_gui/static/codex_reports/",
     "src/codex_reports/patches/*.patch",
 ]
-
-# ---- LLM フラグの起動ログ（.env 読込後に実行） -------------------------------
-logging.info(
-    "LLM flags: enabled=%s mode=%s base=%s model=%s",
-    os.getenv("NOCTRIA_LLM_ENABLED"),
-    os.getenv("NOCTRIA_HARMONIA_MODE"),
-    os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL"),
-    os.getenv("NOCTRIA_GPT_MODEL") or os.getenv("OPENAI_MODEL"),
-)
 
 
 # ------------------------------------------------------------
@@ -165,7 +162,6 @@ def db_connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL;")
-    # ★ ここで必ずスキーマ作成（idempotent）
     try:
         db_init(conn)
     except Exception as e:
@@ -191,7 +187,7 @@ def db_init(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS agent_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trace_id TEXT,
-            role TEXT,            -- inventor/harmonia/veritas/hermes/gpt
+            role TEXT,
             title TEXT,
             content TEXT,
             created_at TEXT
@@ -288,9 +284,7 @@ def run_pytest(junit_xml: Path = JUNIT_XML) -> Dict[str, Any]:
         args = shlex.split(PYTEST_ARGS_ENV) + args
     rc, out, err = run(["pytest", *args])
     # プロキシログ保存（GUI用に複写）
-    (REPORT_DIR / "proxy_pytest_last.log").write_text(
-        (out or "") + "\n" + (err or ""), encoding="utf-8"
-    )
+    PROXY_PYTEST_LOG.write_text((out or "") + "\n" + (err or ""), encoding="utf-8")
     GUI_PROXY_PYTEST_LOG.write_text((out or "") + "\n" + (err or ""), encoding="utf-8")
     summary = parse_junit(junit_xml)
     summary["returncode"] = rc
@@ -351,44 +345,81 @@ def parse_junit(path: Path) -> Dict[str, Any]:
 
 
 # ------------------------------------------------------------
-# Ruff
+# Ruff（環境変数で柔軟制御）
 # ------------------------------------------------------------
-def run_ruff_legacy() -> Dict[str, Any]:
+def run_ruff() -> Dict[str, Any]:
     RUFF_DIR.mkdir(parents=True, exist_ok=True)
-    rc, stdout, _ = run(["ruff", "check", ".", "--output-format=json"])
+
+    targets = shlex.split(os.getenv("NOCTRIA_RUFF_TARGETS", "src tests noctria_gui").strip() or "")
+    extend_exclude = os.getenv("NOCTRIA_RUFF_EXCLUDE", "").strip()
+    ignore_codes = os.getenv("NOCTRIA_RUFF_IGNORE", "").strip()
+    want_fix = os.getenv("NOCTRIA_RUFF_FIX", "0").strip().lower() in {"1", "true", "yes", "on"}
+    exit_zero = os.getenv("NOCTRIA_RUFF_EXIT_ZERO", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    # 1st pass: JSON
+    cmd = ["ruff", "check"] + (targets or ["."])
+    if extend_exclude:
+        cmd += ["--extend-exclude", extend_exclude]
+    if ignore_codes:
+        cmd += ["--ignore", ignore_codes]
+    if want_fix:
+        cmd += ["--fix"]
+    cmd += ["--force-exclude", "--output-format=json"]
+    if exit_zero:
+        cmd += ["--exit-zero"]
+
+    rc, stdout, _ = run(cmd, cwd=ROOT)
     try:
-        RUFF_JSON.write_text(stdout or "[]", encoding="utf-8")
+        RUFF_JSON.write_text(stdout if stdout is not None else "[]", encoding="utf-8")
+    except Exception as e:
+        log(f"[warn] write ruff json failed: {e}")
+    try:
         RUFF_LAST.write_text(json.dumps({"returncode": rc}), encoding="utf-8")
     except Exception as e:
-        log(f"[warn] write ruff files: {e}")
+        log(f"[warn] write ruff last_run failed: {e}")
 
-    # 人読み統計
-    rc2, out2, _ = run(
-        ["ruff", "check", "src", "tests", "noctria_gui", "--statistics", "--output-format=full"]
-    )
+    # 2nd pass: statistics
+    cmd2 = ["ruff", "check"] + (targets or ["."])
+    if extend_exclude:
+        cmd2 += ["--extend-exclude", extend_exclude]
+    if ignore_codes:
+        cmd2 += ["--ignore", ignore_codes]
+    cmd2 += ["--force-exclude", "--statistics", "--output-format=full"]
+    if exit_zero:
+        cmd2 += ["--exit-zero"]
+
+    try:
+        _, out2, _ = run(cmd2, cwd=ROOT)
+    except Exception as e:
+        out2 = ""
+        log(f"[warn] ruff statistics failed: {e}")
     try:
         RUFF_STATS.write_text(out2 or "", encoding="utf-8")
     except Exception:
         pass
 
+    # counts
     counts: Dict[str, int] = {}
     try:
         rows = json.loads(stdout or "[]")
         for r in rows:
-            code = r.get("code")
-            if code:
-                counts[code] = counts.get(code, 0) + 1
-    except Exception:
-        pass
-
+            c = r.get("code")
+            if c:
+                counts[c] = counts.get(c, 0) + 1
+    except Exception as e:
+        log(f"[warn] parse ruff json failed: {e}")
     return {"returncode": rc, "counts": counts}
 
 
 # ------------------------------------------------------------
-# GPT (任意) — 要約/レビュー補助
+# GPT（任意）
 # ------------------------------------------------------------
 def _log_llm_usage(resp) -> None:
-    """Best-effort logging of OpenAI-like usage fields."""
     try:
         u = getattr(resp, "usage", None)
         if u is not None:
@@ -396,8 +427,6 @@ def _log_llm_usage(resp) -> None:
             ct = getattr(u, "completion_tokens", None)
             tt = getattr(u, "total_tokens", None)
             logging.info("LLM usage prompt=%s completion=%s total=%s", pt, ct, tt)
-        else:
-            logging.info("LLM usage unavailable (provider?)")
     except Exception as _e:
         logging.exception("LLM usage logging failed: %s", _e)
 
@@ -406,22 +435,25 @@ def gpt_summarize(title: str, content: str) -> Optional[str]:
     if not OPENAI_KEY:
         return None
     try:
-        # OpenAI Python v1 スタイル（2024〜）
         from openai import OpenAI  # type: ignore
-    except Exception as e:
-        pass
 
         client = OpenAI(api_key=OPENAI_KEY)
+
+        # 共通 System Prompt v1.5 を先頭に付与 + 編集方針
+        common_sp = load_noctria_system_prompt("v1.5")
+        editor_sp = "You are a concise technical editor. Respond in Japanese."
+
         resp = client.chat.completions.create(
             model=GPT_MODEL,
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a concise technical editor. Respond in Japanese.",
-                },
+                {"role": "system", "content": common_sp},
+                {"role": "system", "content": editor_sp},
                 {
                     "role": "user",
-                    "content": f"次のドキュメントを100-200字で要約し、重要なアクションを箇条書きで最後に出力:\n\n# {title}\n{content}",
+                    "content": (
+                        f"次のドキュメントを100-200字で要約し、最後に重要アクションを箇条書きで3件以内で出力:\n\n"
+                        f"# {title}\n{content}"
+                    ),
                 },
             ],
             temperature=0.2,
@@ -445,8 +477,6 @@ def generate_inventor_and_harmonia(
     # Inventor
     try:
         from src.codex.agents.inventor import InventorScriptus  # type: ignore
-    except Exception as e:
-        pass
 
         inv = InventorScriptus()
         failures = pyres.get("cases", []) or []
@@ -481,8 +511,6 @@ def generate_inventor_and_harmonia(
     # Harmonia
     try:
         from src.codex.agents.harmonia import HarmoniaOrdinis  # type: ignore
-    except Exception as e:
-        pass
 
         harm = HarmoniaOrdinis()
         failures = pyres.get("cases", []) or []
@@ -500,7 +528,7 @@ def generate_inventor_and_harmonia(
 
     HARMONIA_MD.write_text(harmonia_md, encoding="utf-8")
 
-    # Royal Scribe 保存（SQLite + Chronicle）
+    # Royal Scribe 保存
     try:
         conn = db_connect()
         db_insert_agent_log(conn, trace_id, "inventor", "Inventor Suggestions", inventor_md)
@@ -528,389 +556,37 @@ def generate_inventor_and_harmonia(
         except Exception as e:
             log(f"[warn] scribe inventor/harmonia: {e}")
 
-    # GPT 要約（任意） → SQLite のみ（必要なら scribe にも）
+    # GPT 要約（任意）
     if OPENAI_KEY:
-        try:
-            for role, title, body in [
-                ("inventor", "Inventor Summary", inventor_md),
-                ("harmonia", "Harmonia Summary", harmonia_md),
-            ]:
+        for role, title, body in [
+            ("inventor", "Inventor Summary", inventor_md),
+            ("harmonia", "Harmonia Summary", harmonia_md),
+        ]:
+            try:
                 summ = gpt_summarize(title, body)
-                if summ:
-                    conn = db_connect()
-                    db_insert_agent_log(
-                        conn, trace_id, f"gpt-{role}", f"GPT Summary: {title}", summ
-                    )
-                    conn.close()
-                    if SCRIBE_AVAILABLE:
-                        try:
-                            scribe_log_ai(
-                                name=f"GPT-{role}",
-                                role="gpt",
-                                content=summ,
-                                trace_id=trace_id,
-                                topic="AI Council",
-                            )
-                        except Exception as e:
-                            log(f"[warn] scribe gpt summary: {e}")
-        except Exception as e:
-            log(f"[warn] GPT summarize inventor/harmonia: {e}")
-        except Exception as e:
-            pass
-
-
-def maybe_run_veritas(trace_id: str) -> None:
-    """
-    Veritas/strategy_generator 等が存在すれば軽く呼ぶ（重い実行は避ける）。
-    """
-    body = ""
-    try:
-        from src.veritas.strategy_generator import StrategyGenerator  # type: ignore
-    except Exception as e:
-        pass
-
-        gen = StrategyGenerator()
-        body = gen.preview() if hasattr(gen, "preview") else "Veritas: preview() not available"
-    except Exception as e:
-        body = f"Veritas skipped: {e}"
-
-    try:
-        db_insert_agent_log(db_connect(), trace_id, "veritas", "Veritas Preview", str(body))
-    except Exception:
-        pass
-
-    if SCRIBE_AVAILABLE:
-        try:
-            scribe_log_ai(
-                name="Veritas",
-                role="veritas",
-                content=str(body),
-                trace_id=trace_id,
-                topic="AI Council",
-            )
-        except Exception as e:
-            log(f"[warn] scribe veritas: {e}")
-
-
-def maybe_run_hermes(trace_id: str) -> None:
-    """
-    Hermes（計画系）にフック。存在すればダイジェスト実行。
-    """
-    body = ""
-    try:
-        from src.plan_data.run_pdca_plan_workflow import run_plan  # type: ignore
-    except Exception as e:
-        pass
-
-        body = run_plan(dry_run=True) if callable(run_plan) else "Hermes: run_plan not callable"
-    except Exception as e:
-        body = f"Hermes skipped: {e}"
-
-    try:
-        db_insert_agent_log(db_connect(), trace_id, "hermes", "Hermes Plan Digest", str(body))
-    except Exception:
-        pass
-
-    if SCRIBE_AVAILABLE:
-        try:
-            scribe_log_ai(
-                name="Hermes",
-                role="hermes",
-                content=str(body),
-                trace_id=trace_id,
-                topic="AI Council",
-            )
-        except Exception as e:
-            log(f"[warn] scribe hermes: {e}")
-
-
-# ------------------------------------------------------------
-# Git 操作
-# ------------------------------------------------------------
-def git_current_branch() -> str:
-    rc, out, _ = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    return out.strip() if rc == 0 else ""
-
-
-def git_switch_or_create(branch: str) -> None:
-    cur = git_current_branch()
-    if cur == branch:
-        log(f"[git] already on '{branch}'")
-        return
-    rc, _, _ = run(["git", "switch", branch])
-    if rc != 0:
-        run(["git", "switch", "-c", branch])
-
-
-def stage_reports_only(patterns: List[str]) -> None:
-    # ✋BLOCK 根治: レポートしか add しない。強制 add と --no-verify で静かに。
-    for pat in patterns:
-        run(["git", "add", "-f", "--", pat])
-
-
-def commit_staged(message: str, push: bool = False, branch: Optional[str] = None) -> bool:
-    rc, out, _ = run(["git", "diff", "--cached", "--name-only"])
-    staged = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-    if not staged:
-        log("[git] no staged files. skip commit.")
-        return False
-    rc, _, err = run(["git", "commit", "-m", message, "--no-verify"])
-    if rc != 0:
-        sys.stderr.write(err)
-        log("✋ BLOCK: commit failed.")
-        return False
-    if push and branch:
-        run(["git", "push", "-u", "origin", branch])
-    return True
-
-
-def green_commit_to_dev(message: str) -> None:
-    """
-    “緑”なら dev にコミット（許可時）。プロジェクトのフック事情により失敗する可能性はある。
-    """
-    try:
-        git_switch_or_create(GREEN_BRANCH)
-        rc, _, _ = run(["git", "add", "-A"])
-        rc, _, err = run(["git", "commit", "-m", message])
-        if rc != 0:
-            log(f"[warn] green commit skipped: {err.strip()}")
-            return
-        run(["git", "push", "-u", "origin", GREEN_BRANCH])
-        log("[green] committed to dev.")
-    except Exception as e:
-        log(f"[warn] green commit error: {e}")
-
-
-# ------------------------------------------------------------
-# Main
-# ------------------------------------------------------------
-def main() -> int:
-    os.chdir(ROOT)
-    ensure_dirs()
-
-    parser = argparse.ArgumentParser(description="Run PDCA agents locally.")
-    parser.add_argument("--branch", default=DEFAULT_BRANCH, help="reports commit branch")
-    args = parser.parse_args()
-
-    trace_id = f"pdca_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    started = ts_jst()
-
-    # 1) Test
-    pyres = run_pytest(JUNIT_XML)
-    # Chronicle へも保存
-    if SCRIBE_AVAILABLE:
-        try:
-            scribe_log_tests(pyres, trace_id=trace_id, topic="PDCA agents")
-        except Exception as e:
-            log(f"[warn] scribe pytest: {e}")
-
-    # 2) Lint
-    ruff_meta = run_ruff()
-    if SCRIBE_AVAILABLE:
-        try:
-            scribe_log_lint(ruff_meta, trace_id=trace_id, topic="PDCA agents")
-        except Exception as e:
-            log(f"[warn] scribe ruff: {e}")
-
-    # 3) Agents
-    try:
-        generate_inventor_and_harmonia(pyres, ruff_meta, trace_id)
-    except Exception as e:
-        log(f"[warn] inventor/harmonia: {e}")
-
-    # 4) Optional: Veritas/Hermes
-    maybe_run_veritas(trace_id)
-    maybe_run_hermes(trace_id)
-
-    # 5) Summary markdown
-    green = int(
-        pyres.get("failures", 0) == 0
-        and pyres.get("errors", 0) == 0
-        and ruff_meta.get("returncode", 1) == 0
-    )
-
-    # force green by env (temporary)
-    if os.getenv("NOCTRIA_FORCE_GREEN", "0").lower() in {"1", "true", "on"}:
-        green = 1
-    summary_md = (
-        textwrap.dedent(
-            f"""
-        # Latest PDCA Cycle Summary
-
-        - Trace ID: `{trace_id}`
-        - Started: {started}
-        - Finished: {ts_jst()}
-        - Pytest: total={pyres.get('total', 0)}, failures={pyres.get('failures', 0)}, errors={pyres.get('errors', 0)}, skipped={pyres.get('skipped', 0)}
-        - Ruff: returncode={ruff_meta.get('returncode', 1)} (0 がクリーン)
-        - GREEN: {bool(green)}
-        """
-        ).strip()
-        + "\n"
-    )
-    LATEST_CYCLE_MD.write_text(summary_md, encoding="utf-8")
-
-    # Chronicle（全体サマリ）
-    if SCRIBE_AVAILABLE:
-        try:
-            scribe_log_stage(
-                stage="summary",
-                payload={
-                    "trace_id": trace_id,
-                    "pytest": {
-                        k: pyres.get(k)
-                        for k in ("total", "failures", "errors", "skipped", "returncode")
-                    },
-                    "ruff": ruff_meta,
-                    "green": bool(green),
-                    "started": started,
-                    "finished": ts_jst(),
-                },
-                trace_id=trace_id,
-                topic="PDCA agents",
-                tags=["summary"],
-            )
-        except Exception as e:
-            log(f"[warn] scribe summary: {e}")
-
-    # 6) Royal Scribe — SQLite 保存
-    try:
-        conn = db_connect()
-        db_insert_tests(conn, trace_id, pyres.get("cases", []) or [])
-        db_insert_lint_summary(conn, trace_id, ruff_meta.get("counts", {}) or {})
-        db_insert_run(
-            conn,
-            {
-                "trace_id": trace_id,
-                "started_at": started,
-                "finished_at": ts_jst(),
-                "pytest_total": pyres.get("total", 0),
-                "pytest_failures": pyres.get("failures", 0),
-                "pytest_errors": pyres.get("errors", 0),
-                "pytest_skipped": pyres.get("skipped", 0),
-                "ruff_returncode": ruff_meta.get("returncode", 1),
-                "green": green,
-            },
-        )
-        # まとめの要約を GPT に（任意）
-        if OPENAI_KEY:
-            summ = gpt_summarize("PDCA Summary", summary_md)
-            if summ:
-                db_insert_agent_log(conn, trace_id, "gpt", "GPT Summary: PDCA", summ)
+                if not summ:
+                    continue
+                conn = db_connect()
+                db_insert_agent_log(conn, trace_id, f"gpt-{role}", f"GPT Summary: {title}", summ)
+                conn.close()
                 if SCRIBE_AVAILABLE:
                     try:
                         scribe_log_ai(
-                            name="GPT",
+                            name=f"GPT-{role}",
                             role="gpt",
                             content=summ,
                             trace_id=trace_id,
                             topic="AI Council",
                         )
-                    except Exception as e:
-                        log(f"[warn] scribe gpt PDCA: {e}")
-        conn.close()
-    except Exception as e:
-        log(f"[warn] DB write failed: {e}")
-
-    # 7) レポートのみ commit（✋BLOCK 静音）
-    try:
-        git_switch_or_create(args.branch)
-        stage_reports_only(REPORT_ADD_PATTERNS)
-        commit_msg = f"pdca: report artifacts ({trace_id})"
-        committed = commit_staged(commit_msg, push=WANT_PUSH, branch=args.branch)
-        if committed:
-            log("[done] reports committed.")
-        else:
-            log("[done] no report commit.")
-    except Exception as e:
-        log(f"[warn] report commit failed: {e}")
-
-    # 8) 緑なら dev に自動コミット（許可時）
-    if green and GREEN_COMMIT:
-        green_commit_to_dev(f"pdca: green ({trace_id})")
-
-    # 終了
-    if green:
-        log("[result] ✅ GREEN")
-    else:
-        log("[result] ⚠️ NOT GREEN")
-    return 0
-
-
-# --- injected: env-aware run_ruff() ---
-def run_ruff() -> Dict[str, Any]:
-    RUFF_DIR.mkdir(parents=True, exist_ok=True)
-
-    # env からフラグ
-    targets = shlex.split(os.getenv("NOCTRIA_RUFF_TARGETS", "src tests noctria_gui").strip() or "")
-    extend_exclude = os.getenv("NOCTRIA_RUFF_EXCLUDE", "").strip()
-    ignore_codes = os.getenv("NOCTRIA_RUFF_IGNORE", "").strip()
-    want_fix = os.getenv("NOCTRIA_RUFF_FIX", "0").strip().lower() in {"1", "true", "yes", "on"}
-    exit_zero = os.getenv("NOCTRIA_RUFF_EXIT_ZERO", "0").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-
-    # 1st pass: JSON
-    cmd = ["ruff", "check"] + (targets or ["."])
-    if extend_exclude:
-        cmd += ["--extend-exclude", extend_exclude]
-    if ignore_codes:
-        cmd += ["--ignore", ignore_codes]
-    if want_fix:
-        cmd += ["--fix"]
-    cmd += ["--force-exclude", "--output-format=json"]
-    if exit_zero:
-        cmd += ["--exit-zero"]
-
-    rc, stdout, _ = run(cmd, cwd=ROOT)
-    try:
-        RUFF_JSON.write_text(stdout if stdout is not None else "[]", encoding="utf-8")
-    except Exception as e:
-        log(f"[warn] write ruff json failed: {e}")
-    try:
-        RUFF_LAST.write_text(__import__("json").dumps({"returncode": rc}), encoding="utf-8")
-    except Exception as e:
-        log(f"[warn] write ruff last_run failed: {e}")
-
-    # 2nd pass: statistics
-    cmd2 = ["ruff", "check"] + (targets or ["."])
-    if extend_exclude:
-        cmd2 += ["--extend-exclude", extend_exclude]
-    if ignore_codes:
-        cmd2 += ["--ignore", ignore_codes]
-    cmd2 += ["--force-exclude", "--statistics", "--output-format=full"]
-    if exit_zero:
-        cmd2 += ["--exit-zero"]
-
-    try:
-        rc2, out2, _ = run(cmd2, cwd=ROOT)
-    except Exception as e:
-        rc2, out2 = 1, ""
-        log(f"[warn] ruff statistics failed: {e}")
-    try:
-        RUFF_STATS.write_text(out2 or "", encoding="utf-8")
-    except Exception:
-        pass
-
-    # counts
-    counts: Dict[str, int] = {}
-    try:
-        rows = __import__("json").loads(stdout or "[]")
-        for r in rows:
-            c = r.get("code")
-            if c:
-                counts[c] = counts.get(c, 0) + 1
-    except Exception as e:
-        log(f"[warn] parse ruff json failed: {e}")
-    return {"returncode": rc, "counts": counts}
+                    except Exception:
+                        pass
+            except Exception as e:
+                log(f"[warn] GPT summarize {role}: {e}")
 
 
 def maybe_run_veritas(trace_id: str) -> None:
     """
     Veritas/strategy_generator が無くても落とさない安全版。
-    失敗時は内容をログに残してスキップ。
     """
     body = ""
     try:
@@ -928,12 +604,9 @@ def maybe_run_veritas(trace_id: str) -> None:
             except Exception as e:
                 body = f"Veritas skipped: construct/preview failed: {type(e).__name__}: {e!r}"
 
-        try:
-            conn = db_connect()
-            db_insert_agent_log(conn, trace_id, "veritas", "Veritas Preview", str(body))
-            conn.close()
-        except Exception:
-            pass
+        conn = db_connect()
+        db_insert_agent_log(conn, trace_id, "veritas", "Veritas Preview", str(body))
+        conn.close()
 
         if SCRIBE_AVAILABLE:
             try:
@@ -976,12 +649,9 @@ def maybe_run_hermes(trace_id: str) -> None:
         elif not body:
             body = "Hermes: run_plan not available"
 
-        try:
-            conn = db_connect()
-            db_insert_agent_log(conn, trace_id, "hermes", "Hermes Plan Digest", str(body))
-            conn.close()
-        except Exception:
-            pass
+        conn = db_connect()
+        db_insert_agent_log(conn, trace_id, "hermes", "Hermes Plan Digest", str(body))
+        conn.close()
 
         if SCRIBE_AVAILABLE:
             try:
@@ -1005,136 +675,207 @@ def maybe_run_hermes(trace_id: str) -> None:
             pass
 
 
+# ------------------------------------------------------------
+# Git 操作
+# ------------------------------------------------------------
+def git_current_branch() -> str:
+    rc, out, _ = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    return out.strip() if rc == 0 else ""
+
+
+def git_switch_or_create(branch: str) -> None:
+    cur = git_current_branch()
+    if cur == branch:
+        log(f"[git] already on '{branch}'")
+        return
+    rc, _, _ = run(["git", "switch", branch])
+    if rc != 0:
+        run(["git", "switch", "-c", branch])
+
+
+def stage_reports_only(patterns: List[str]) -> None:
+    for pat in patterns:
+        run(["git", "add", "-f", "--", pat])
+
+
+def commit_staged(message: str, push: bool = False, branch: Optional[str] = None) -> bool:
+    rc, out, _ = run(["git", "diff", "--cached", "--name-only"])
+    staged = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
+    if not staged:
+        log("[git] no staged files. skip commit.")
+        return False
+    rc, _, err = run(["git", "commit", "-m", message, "--no-verify"])
+    if rc != 0:
+        sys.stderr.write(err)
+        log("✋ BLOCK: commit failed.")
+        return False
+    if push and branch:
+        run(["git", "push", "-u", "origin", branch])
+    return True
+
+
+def green_commit_to_dev(message: str) -> None:
+    try:
+        git_switch_or_create(GREEN_BRANCH)
+        rc, _, _ = run(["git", "add", "-A"])
+        rc, _, err = run(["git", "commit", "-m", message])
+        if rc != 0:
+            log(f"[warn] green commit skipped: {err.strip()}")
+            return
+        run(["git", "push", "-u", "origin", GREEN_BRANCH])
+        log("[green] committed to dev.")
+    except Exception as e:
+        log(f"[warn] green commit error: {e}")
+
+
+# ------------------------------------------------------------
+# Main
+# ------------------------------------------------------------
+def main() -> int:
+    os.chdir(ROOT)
+    ensure_dirs()
+
+    parser = argparse.ArgumentParser(description="Run PDCA agents locally.")
+    parser.add_argument("--branch", default=DEFAULT_BRANCH, help="reports commit branch")
+    args = parser.parse_args()
+
+    trace_id = f"pdca_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    started = ts_jst()
+
+    # 1) Test
+    pyres = run_pytest(JUNIT_XML)
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_tests(pyres, trace_id=trace_id, topic="PDCA agents")
+        except Exception as e:
+            log(f"[warn] scribe pytest: {e}")
+
+    # 2) Lint (ruff)
+    ruff_meta = run_ruff()
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_lint(ruff_meta, trace_id=trace_id, topic="PDCA agents")
+        except Exception as e:
+            log(f"[warn] scribe ruff: {e}")
+
+    # 3) Agents
+    try:
+        generate_inventor_and_harmonia(pyres, ruff_meta, trace_id)
+    except Exception as e:
+        log(f"[warn] inventor/harmonia: {e}")
+
+    # 4) Optional: Veritas/Hermes
+    maybe_run_veritas(trace_id)
+    maybe_run_hermes(trace_id)
+
+    # 5) Summary markdown
+    green = int(
+        pyres.get("failures", 0) == 0
+        and pyres.get("errors", 0) == 0
+        and ruff_meta.get("returncode", 1) == 0
+    )
+
+    # force green by env (temporary)
+    if os.getenv("NOCTRIA_FORCE_GREEN", "0").lower() in {"1", "true", "on"}:
+        green = 1
+
+    summary_md = (
+        textwrap.dedent(
+            f"""
+            # Latest PDCA Cycle Summary
+
+            - Trace ID: `{trace_id}`
+            - Started: {started}
+            - Finished: {ts_jst()}
+            - Pytest: total={pyres.get("total", 0)}, failures={pyres.get("failures", 0)}, errors={pyres.get("errors", 0)}, skipped={pyres.get("skipped", 0)}
+            - Ruff: returncode={ruff_meta.get("returncode", 1)} (0 がクリーン)
+            - GREEN: {bool(green)}
+            """
+        ).strip()
+        + "\n"
+    )
+    LATEST_CYCLE_MD.write_text(summary_md, encoding="utf-8")
+
+    if SCRIBE_AVAILABLE:
+        try:
+            scribe_log_stage(
+                stage="summary",
+                payload={
+                    "trace_id": trace_id,
+                    "pytest": {
+                        k: pyres.get(k)
+                        for k in ("total", "failures", "errors", "skipped", "returncode")
+                    },
+                    "ruff": ruff_meta,
+                    "green": bool(green),
+                    "started": started,
+                    "finished": ts_jst(),
+                },
+                trace_id=trace_id,
+                topic="PDCA agents",
+                tags=["summary"],
+            )
+        except Exception as e:
+            log(f"[warn] scribe summary: {e}")
+
+    # 6) Royal Scribe — SQLite 保存
+    try:
+        conn = db_connect()
+        db_insert_tests(conn, trace_id, pyres.get("cases", []) or [])
+        db_insert_lint_summary(conn, trace_id, ruff_meta.get("counts", {}) or {})
+        db_insert_run(
+            conn,
+            {
+                "trace_id": trace_id,
+                "started_at": started,
+                "finished_at": ts_jst(),
+                "pytest_total": pyres.get("total", 0),
+                "pytest_failures": pyres.get("failures", 0),
+                "pytest_errors": pyres.get("errors", 0),
+                "pytest_skipped": pyres.get("skipped", 0),
+                "ruff_returncode": ruff_meta.get("returncode", 1),
+                "green": green,
+            },
+        )
+        if OPENAI_KEY:
+            summ = gpt_summarize("PDCA Summary", summary_md)
+            if summ:
+                db_insert_agent_log(conn, trace_id, "gpt", "GPT Summary: PDCA", summ)
+                if SCRIBE_AVAILABLE:
+                    try:
+                        scribe_log_ai(
+                            name="GPT",
+                            role="gpt",
+                            content=summ,
+                            trace_id=trace_id,
+                            topic="AI Council",
+                        )
+                    except Exception as e:
+                        log(f"[warn] scribe gpt PDCA: {e}")
+        conn.close()
+    except Exception as e:
+        log(f"[warn] DB write failed: {e}")
+
+    # 7) レポートのみ commit
+    try:
+        git_switch_or_create(args.branch)
+        stage_reports_only(REPORT_ADD_PATTERNS)
+        commit_msg = f"pdca: report artifacts ({trace_id})"
+        committed = commit_staged(commit_msg, push=WANT_PUSH, branch=args.branch)
+        if committed:
+            log("[done] reports committed.")
+        else:
+            log("[done] no report commit.")
+    except Exception as e:
+        log(f"[warn] report commit failed: {e}")
+
+    # 8) 緑なら dev に自動コミット（許可時）
+    if green and GREEN_COMMIT:
+        green_commit_to_dev(f"pdca: green ({trace_id})")
+
+    log("[result] ✅ GREEN" if green else "[result] ⚠️ NOT GREEN")
+    return 0
+
+
 if __name__ == "__main__":
     sys.exit(main())
-
-
-# --- injected by fixer: env-aware run_ruff() ---
-def run_ruff_legacy() -> Dict[str, Any]:
-    pass
-
-
-RUFF_DIR.mkdir(parents=True, exist_ok=True)
-
-# --- env からフラグを取り込む（未設定なら本体だけを対象に） ---
-targets = shlex.split(os.getenv("NOCTRIA_RUFF_TARGETS", "src tests noctria_gui").strip() or "")
-extend_exclude = os.getenv("NOCTRIA_RUFF_EXCLUDE", "").strip()
-ignore_codes = os.getenv("NOCTRIA_RUFF_IGNORE", "").strip()
-want_fix = os.getenv("NOCTRIA_RUFF_FIX", "0").strip().lower() in {"1", "true", "yes", "on"}
-exit_zero = os.getenv("NOCTRIA_RUFF_EXIT_ZERO", "0").strip().lower() in {"1", "true", "yes", "on"}
-
-# JSON 出力（returncode 用）
-cmd = ["ruff", "check"]
-cmd += targets or ["."]
-if extend_exclude:
-    cmd += ["--extend-exclude", extend_exclude]
-if ignore_codes:
-    cmd += ["--ignore", ignore_codes]
-if want_fix:
-    cmd += ["--fix"]
-cmd += ["--force-exclude", "--output-format=json"]
-if exit_zero:
-    cmd += ["--exit-zero"]
-
-rc, stdout, _ = run(cmd, cwd=ROOT)
-try:
-    RUFF_JSON.write_text(stdout if stdout is not None else "[]", encoding="utf-8")
-    RUFF_LAST.write_text(json.dumps({"returncode": rc}), encoding="utf-8")
-except Exception as e:
-    log(f"[warn] write ruff files: {e}")
-
-# 人読み統計
-cmd2 = ["ruff", "check"]
-cmd2 += targets or ["."]
-if extend_exclude:
-    cmd2 += ["--extend-exclude", extend_exclude]
-if ignore_codes:
-    cmd2 += ["--ignore", ignore_codes]
-cmd2 += ["--force-exclude", "--statistics", "--output-format=full"]
-if exit_zero:
-    cmd2 += ["--exit-zero"]
-try:
-    rc2, out2, _ = run(cmd2, cwd=ROOT)
-except Exception as e:
-    rc2, out2 = 1, ""
-    log(f"[warn] ruff statistics failed: {e}")
-try:
-    RUFF_STATS.write_text(out2 or "", encoding="utf-8")
-except Exception:
-    pass
-
-
-# --- injected: env-aware run_ruff() ---
-def run_ruff() -> Dict[str, Any]:
-    RUFF_DIR.mkdir(parents=True, exist_ok=True)
-
-    # --- env からフラグを取り込む（未設定なら本体だけを対象に） ---
-    targets = shlex.split(os.getenv("NOCTRIA_RUFF_TARGETS", "src tests noctria_gui").strip() or "")
-    extend_exclude = os.getenv("NOCTRIA_RUFF_EXCLUDE", "").strip()
-    ignore_codes = os.getenv("NOCTRIA_RUFF_IGNORE", "").strip()
-    want_fix = os.getenv("NOCTRIA_RUFF_FIX", "0").strip().lower() in {"1", "true", "yes", "on"}
-    exit_zero = os.getenv("NOCTRIA_RUFF_EXIT_ZERO", "0").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-
-    # --- 1st pass: JSON 出力（returncode 用） ---
-    cmd = ["ruff", "check"]
-    cmd += targets or ["."]
-    if extend_exclude:
-        cmd += ["--extend-exclude", extend_exclude]
-    if ignore_codes:
-        cmd += ["--ignore", ignore_codes]
-    if want_fix:
-        cmd += ["--fix"]
-    cmd += ["--force-exclude", "--output-format=json"]
-    if exit_zero:
-        cmd += ["--exit-zero"]
-
-    rc, stdout, _ = run(cmd, cwd=ROOT)
-
-    # JSON と last_run の書き出しは個別 try で堅牢化
-    try:
-        RUFF_JSON.write_text(stdout if stdout is not None else "[]", encoding="utf-8")
-    except Exception as e:
-        log(f"[warn] write ruff json failed: {e}")
-    try:
-        RUFF_LAST.write_text(json.dumps({"returncode": rc}), encoding="utf-8")
-    except Exception as e:
-        log(f"[warn] write ruff last_run failed: {e}")
-
-    # --- 2nd pass: 人読み統計 ---
-    cmd2 = ["ruff", "check"]
-    cmd2 += targets or ["."]
-    if extend_exclude:
-        cmd2 += ["--extend-exclude", extend_exclude]
-    if ignore_codes:
-        cmd2 += ["--ignore", ignore_codes]
-    cmd2 += ["--force-exclude", "--statistics", "--output-format=full"]
-    if exit_zero:
-        cmd2 += ["--exit-zero"]
-
-    try:
-        rc2, out2, _ = run(cmd2, cwd=ROOT)
-    except Exception as e:
-        rc2, out2 = 1, ""
-        log(f"[warn] ruff statistics failed: {e}")
-    try:
-        RUFF_STATS.write_text(out2 or "", encoding="utf-8")
-    except Exception:
-        pass
-
-    # counts の集計
-    counts: Dict[str, int] = {}
-    try:
-        rows = json.loads(stdout or "[]")
-        for r in rows:
-            code = r.get("code")
-            if code:
-                counts[code] = counts.get(code, 0) + 1
-    except Exception as e:
-        log(f"[warn] parse ruff json failed: {e}")
-
-    return {"returncode": rc, "counts": counts}

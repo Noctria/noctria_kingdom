@@ -1,12 +1,11 @@
+import os
 from datetime import datetime, timedelta
+
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
-import os
-import logging
 
 from core.logger import setup_logger
 from core.path_config import LOGS_DIR
-
 from veritas.strategy_generator import (
     build_prompt,
     generate_strategy_code,

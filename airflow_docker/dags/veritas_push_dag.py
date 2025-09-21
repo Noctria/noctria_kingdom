@@ -1,8 +1,9 @@
+import logging
+from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from datetime import datetime, timedelta
-import logging
 
 logger = logging.getLogger("airflow.task")
 

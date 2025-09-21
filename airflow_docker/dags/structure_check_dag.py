@@ -1,12 +1,11 @@
-import sys
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 # ✅ PYTHONPATH を補完（Airflowコンテナ内では /opt/airflow がベース）
-
 # ✅ パス集中管理と Lint関数
-from core.path_config import _lint_path_config, VERITAS_EVAL_LOG
+from core.path_config import _lint_path_config
 
 # === DAG共通設定 ===
 default_args = {

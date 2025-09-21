@@ -8,12 +8,11 @@
 """
 
 from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from core.path_config import STRATEGIES_DIR
-
-import pandas as pd
-import numpy as np
 
 default_args = {
     "owner": "Noctria",

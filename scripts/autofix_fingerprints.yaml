@@ -25,3 +25,30 @@
   prefer_fix_in: "src"
   extra_files:
     - "src/decision/decision_engine.py"
+
+
+- id: ruff_format_graveyard
+  when_stdout_regex: "Failed to parse .*_graveyard/.* Expected one or more symbol names after import"
+  guide: |
+    pre-commit の ruff / ruff-format フックで _graveyard/ 配下を除外して下さい。
+    例:
+      - repo: https://github.com/astral-sh/ruff-pre-commit
+        rev: v0.6.5
+        hooks:
+          - id: ruff
+            args: [--fix, --force-exclude]
+            exclude: '(^|/)_graveyard/'
+          - id: ruff-format
+            args: [--force-exclude]
+            exclude: '(^|/)_graveyard/'
+  prefer_fix_in: ".pre-commit-config.yaml"
+  extra_files:
+    - ".pre-commit-config.yaml"
+
+- id: precommit_ruff_format
+  when_stdout_regex: "(?i)(pre-commit|ruff-format|ruff )"
+  guide: |
+    pre-commit の失敗。まず .pre-commit-config.yaml を直して下さい。
+    例: 古い産廃を除外
+      exclude: '(^|/)_graveyard/'
+  prefer_fix_in: ".pre-commit-config.yaml"

@@ -69,7 +69,7 @@ def generate_strategy_code(prompt: str) -> str:
     （本番用は推論結果→Python戦略コードへ動的変換が必要）
     """
     try:
-        model = load_ml_model()
+        _model = load_ml_model()
         # TODO: 入力ベクトル・推論ロジックを本番仕様で置き換え
         import random
 

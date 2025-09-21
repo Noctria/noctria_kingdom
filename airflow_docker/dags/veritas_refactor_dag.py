@@ -1,23 +1,15 @@
-from core.path_config import (
-    CORE_DIR,
-    DAGS_DIR,
-    DATA_DIR,
-    INSTITUTIONS_DIR,
-    LOGS_DIR,
-    VERITAS_MODELS_DIR,
-    PLUGINS_DIR,
-    SCRIPTS_DIR,
-    STRATEGIES_DIR,
-    TESTS_DIR,
-    TOOLS_DIR,
-    VERITAS_DIR,
-)
 import sys
+
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from airflow.utils.trigger_rule import TriggerRule
+
+from core.path_config import (
+    TESTS_DIR,
+    TOOLS_DIR,
+)
 
 # ✅ sys.path に BASE_DIR を追加（Airflowコンテナ対応）
 BASE_DIR = str(TOOLS_DIR.parent)

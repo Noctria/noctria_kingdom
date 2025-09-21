@@ -1,8 +1,8 @@
+import os
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-import sys
-import os
 
 from core.path_config import VERITAS_DIR
 

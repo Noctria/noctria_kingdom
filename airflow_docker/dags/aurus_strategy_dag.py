@@ -5,9 +5,9 @@
 # ③ pdca_events への簡易ロギングを追加（任意・安全に失敗無視）
 # ④ XComのキー名は既存踏襲
 
-from datetime import datetime, timedelta
 import importlib
 import logging
+from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator, get_current_context

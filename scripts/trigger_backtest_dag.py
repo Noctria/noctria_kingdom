@@ -31,8 +31,8 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from urllib import request, error
+from typing import Any, Dict, Optional
+from urllib import error, request
 
 DAG_ID = "noctria_backtest_dag"
 DEFAULT_TIMEOUT = 20  # seconds

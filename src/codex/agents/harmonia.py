@@ -10,6 +10,8 @@ import textwrap
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from codex.prompts.loader import load_noctria_system_prompt  # ★ 共通SPローダー
+
 from .inventor import InventorOutput, PatchSuggestion
 
 # =============================================================================
@@ -33,6 +35,10 @@ HARMONIA_SYSTEM_PROMPT = """\
 - "verdict": APPROVE / REVISE
 - "comments": 箇条書き
 """
+
+# ★ 共通System Prompt v1.5 を先頭に、Harmonia固有規範を後置
+COMMON_SP = load_noctria_system_prompt("v1.5")
+SYSTEM_PROMPT_HARMONIA = COMMON_SP + "\n\n" + HARMONIA_SYSTEM_PROMPT
 
 
 # =============================================================================
@@ -234,46 +240,72 @@ class HarmoniaOrdinis:
 
 
 # =============================================================================
-# 既存互換 API
+# 既存互換 API（LLMを使うレビュー：System=共通SP+Harmonia規範）
 # =============================================================================
 def _api_review(inventor_out: InventorOutput) -> Optional[ReviewResult]:
+    # OpenAIクライアントの取得（新API優先、旧APIにフォールバック）
+    client = None
     try:
-        import openai  # type: ignore
+        from openai import OpenAI  # type: ignore
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA"))
     except Exception:
-        LOGGER.warning("openai 未導入のため APIレビューはスキップします。")
-        return None
+        try:
+            import openai  # type: ignore
+
+            openai.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")
+            client = openai
+        except Exception:
+            LOGGER.warning("openai クライアントを初期化できないため APIレビューはスキップします。")
+            return None
 
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")
-    if not api_key:
+    if not (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")):
         LOGGER.warning("OPENAI_API_KEY が未設定のため APIレビューはスキップします。")
         return None
 
     try:
         payload = {
             "patch_count": len(getattr(inventor_out, "patch_suggestions", []) or []),
-            "followup_tests": bool(getattr(inventor_out, "followup_tests", None)),
+            "has_followup_tests": bool(getattr(inventor_out, "followup_tests", None)),
             "files": [
                 getattr(ps, "file", "")
                 for ps in (getattr(inventor_out, "patch_suggestions", []) or [])
-            ][:10],
+            ][:12],
+            "trace_id": inventor_out.trace_id,
         }
-        resp = openai.chat.completions.create(  # type: ignore
-            model=model,
-            messages=[
-                {"role": "system", "content": HARMONIA_SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ],
-            temperature=0.2,
-            max_tokens=400,
-        )
-        text = (resp.choices[0].message.content or "").strip()
+
+        # 新API経路
+        if hasattr(client, "chat") and hasattr(client.chat, "completions"):
+            resp = client.chat.completions.create(  # type: ignore
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT_HARMONIA},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                temperature=0.2,
+                max_tokens=400,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+        else:
+            # 旧API互換（念のため）
+            resp = client.ChatCompletion.create(  # type: ignore
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT_HARMONIA},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                temperature=0.2,
+                max_tokens=400,
+            )
+            text = (resp["choices"][0]["message"]["content"] or "").strip()
+
     except Exception as e:
         LOGGER.exception("APIレビューに失敗: %s", e)
         return None
 
     verdict = "APPROVE" if "approve" in text.lower() else "REVISE"
-    comments = [c for c in text.split("\n") if c.strip()][:20]
+    comments = [c for c in text.split("\n") if c.strip()][:40]
     return ReviewResult(verdict=verdict, comments=comments, trace_id=inventor_out.trace_id)
 
 

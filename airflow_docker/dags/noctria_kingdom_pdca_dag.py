@@ -11,10 +11,9 @@
 # ⑨ 各主要タスク終了時に log_event() でDBロギング
 # ⑩ royal_decision_task を拡張：昇格済みモデルパスをXCom/メタから解決し、NOCTRIA_MODEL_PATH として渡す
 
-from datetime import datetime, timedelta
-import logging
-import os
 import json
+import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -24,15 +23,17 @@ try:
     from airflow.operators.python import PythonOperator, get_current_context
 except Exception:
     # かなり古い環境向けフォールバック
-    from airflow.operators.python_operator import PythonOperator  # type: ignore
-    from airflow.operators.python_operator import get_current_context  # type: ignore
+    from airflow.operators.python_operator import (
+        PythonOperator,  # type: ignore
+        get_current_context,  # type: ignore
+    )
 
-from src.core.path_config import LOGS_DIR
-from src.core.logger import setup_logger
 from src.core.db_logging import log_event
-from src.scripts.optimize_params_with_optuna import optimize_main
-from src.scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
+from src.core.logger import setup_logger
+from src.core.path_config import LOGS_DIR
 from src.scripts.apply_best_params_to_kingdom import apply_best_params_to_kingdom
+from src.scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
+from src.scripts.optimize_params_with_optuna import optimize_main
 
 dag_log_path = LOGS_DIR / "dags" / "noctria_kingdom_pdca_dag.log"
 logger = setup_logger("NoctriaPDCA_DAG", dag_log_path)

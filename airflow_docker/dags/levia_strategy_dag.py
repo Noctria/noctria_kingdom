@@ -2,9 +2,9 @@
 # coding: utf-8
 
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from core.path_config import STRATEGIES_DIR
 
 default_args = {
     "owner": "Noctria",

@@ -30,7 +30,7 @@ for fname in os.listdir(FOLDER):
         new_imports = []
         for rule in IMPORT_RULES:
             if re.search(rule["pattern"], code) and all(
-                rule["import"] not in l for l in existing_import_lines
+                rule["import"] not in line for line in existing_import_lines
             ):
                 new_imports.append(rule["import"])
 

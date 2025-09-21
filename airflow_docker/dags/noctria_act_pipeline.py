@@ -1,20 +1,15 @@
+from __future__ import annotations
+
+import json
 import os
 import sys
 from datetime import datetime, timedelta
+from glob import glob
+from typing import Any, Dict, List
+
 from airflow.models import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-import os
-import json
-from glob import glob
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-import os
-import json
-import time
-from typing import Dict, Any
-from datetime import datetime
-from typing import Any, Dict
 
 # =========================
 # Noctria Act 層 自動化 一式
@@ -175,7 +170,6 @@ PDCA 再評価結果の集計と、採用候補の選定ロジック。
   2) 将来的にDB (obs_* テーブル) へ切替可能
 """
 
-from __future__ import annotations
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PDCA_DIR = os.path.join(PROJECT_ROOT, "..", "data", "pdca_logs", "veritas_orders")
@@ -337,7 +331,6 @@ def choose_best_candidate(
  - adopt報告用の結果を返却
 """
 
-from __future__ import annotations
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STRATEGIES_DIR = os.path.join(PROJECT_ROOT, "strategies", "veritas_generated")

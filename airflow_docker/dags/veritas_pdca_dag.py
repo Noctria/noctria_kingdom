@@ -1,12 +1,13 @@
 import logging
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
+
 from airflow.decorators import dag, task
 from airflow.utils.email import send_email
-from src.veritas.veritas_generate_strategy import main as generate_main
-from src.veritas.evaluate_veritas import main as evaluate_main
 from src.scripts.github_push_adopted_strategies import main as push_main
+from src.veritas.evaluate_veritas import main as evaluate_main
+from src.veritas.veritas_generate_strategy import main as generate_main
 
 #!/usr/bin/env python3
 # coding: utf-8
