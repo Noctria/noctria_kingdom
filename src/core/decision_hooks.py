@@ -21,14 +21,14 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 try:
-    from src.core.decision_registry import create_decision, append_event
-except Exception as e:  # pragma: no cover
+    from src.core.decision_registry import append_event, create_decision
+except Exception:  # pragma: no cover
     create_decision = None  # type: ignore
     append_event = None  # type: ignore
 
 try:
     from src.core.airflow_client import make_airflow_client
-except Exception as e:  # pragma: no cover
+except Exception:  # pragma: no cover
     make_airflow_client = None  # type: ignore
 
 
@@ -41,9 +41,13 @@ def create_decision_and_trigger_airflow(
     note: Optional[str] = None,
 ) -> Dict[str, Any]:
     if create_decision is None or append_event is None:
-        raise RuntimeError("Decision Registry が利用できません（src/core/decision_registry.py を確認）")
+        raise RuntimeError(
+            "Decision Registry が利用できません（src/core/decision_registry.py を確認）"
+        )
     if make_airflow_client is None:
-        raise RuntimeError("Airflow クライアントが利用できません（src/core/airflow_client.py を確認）")
+        raise RuntimeError(
+            "Airflow クライアントが利用できません（src/core/airflow_client.py を確認）"
+        )
 
     # 1) Decision を発行
     decision = create_decision(

@@ -36,10 +36,12 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
+
 def _reason_from_conf() -> str:
     ctx = get_current_context()
     dr = ctx.get("dag_run")
     return (dr.conf or {}).get("reason", "理由未指定") if dr else "理由未指定"
+
 
 def _safe_db_log(event_type: str, payload: dict):
     if _db_log_event is None:
@@ -53,6 +55,7 @@ def _safe_db_log(event_type: str, payload: dict):
         )
     except Exception as e:
         logger.debug(f"pdca_events log skipped: {e}")
+
 
 def trigger_task():
     reason = _reason_from_conf()
@@ -76,6 +79,7 @@ def trigger_task():
     # XCom: return_value で次タスクへ
     return {"features": mock_features, "labels": mock_labels, "reason": reason}
 
+
 def hermes_strategy_task():
     ctx = get_current_context()
     reason = _reason_from_conf()
@@ -93,13 +97,16 @@ def hermes_strategy_task():
         explanation = strategy.summarize_strategy(features, labels)
         result = {"explanation": explanation, "reason": reason}
 
-        _safe_db_log("HERMES_EXPLAINED", {"reason": reason, "explanation_head": str(explanation)[:240]})
+        _safe_db_log(
+            "HERMES_EXPLAINED", {"reason": reason, "explanation_head": str(explanation)[:240]}
+        )
         logger.info(f"🦉 Hermesの説明生成結果: {result}")
         return result
     except Exception as e:
         logger.error(f"❌ {STRATEGY_CLASS}実行中にエラー発生: {e}", exc_info=True)
         _safe_db_log("HERMES_ERROR", {"reason": reason, "error": str(e)})
         return None
+
 
 with DAG(
     dag_id=DAG_ID,
@@ -110,7 +117,6 @@ with DAG(
     catchup=False,
     tags=["noctria", "llm", "explanation"],
 ) as dag:
-
     t1 = PythonOperator(
         task_id="trigger_task",
         python_callable=trigger_task,

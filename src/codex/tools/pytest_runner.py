@@ -1,12 +1,11 @@
 # codex/tools/pytest_runner.py
 from __future__ import annotations
 
-import json
+import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
-import os
+from typing import Dict, List, Optional, Tuple
 
 
 def run_pytest(
@@ -27,7 +26,12 @@ def run_pytest(
     env = os.environ.copy()
     if json_report:
         # オートロードが無効でもプラグインを読み込む
-        cmd += ["-p", "pytest_jsonreport", "--json-report", f"--json-report-file={str(json_path)}"]
+        cmd += [
+            "-p",
+            "pytest_jsonreport",
+            "--json-report",
+            f"--json-report-file={str(json_path)}",
+        ]
         # それでも環境側で抑止される可能性に備え、環境変数を解除/上書き
         env.pop("PYTEST_DISABLE_PLUGIN_AUTOLOAD", None)
 

@@ -11,6 +11,7 @@ import subprocess
 import sys
 from typing import Any, Dict
 
+
 # ===== ユーティリティ =====
 def _mk_outdir(run_id: str) -> str:
     outdir = f"/opt/airflow/backtests/{run_id}"
@@ -35,6 +36,7 @@ def _heavy_env_ready() -> bool:
     """重依存が使えるか軽く判定"""
     try:
         import importlib
+
         importlib.import_module("torch")  # noqa: F401
         return True
     except Exception:

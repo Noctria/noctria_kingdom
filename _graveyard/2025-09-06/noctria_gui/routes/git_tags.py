@@ -28,9 +28,11 @@ except Exception:
 
 router = APIRouter(prefix="", tags=["Git"])
 
+
 def _render(request: Request, template: str, **ctx: Any) -> HTMLResponse:
     env = request.app.state.jinja_env
     return HTMLResponse(env.get_template(template).render(**ctx))
+
 
 def _find_related_decisions_by_tag(tag: str, max_scan: int = 1000) -> List[Dict[str, Any]]:
     """
@@ -53,6 +55,7 @@ def _find_related_decisions_by_tag(tag: str, max_scan: int = 1000) -> List[Dict[
     related.sort(key=lambda x: x.get("ts_utc") or "", reverse=True)
     return related
 
+
 @router.get("/tags", response_class=HTMLResponse)
 async def tags_index(
     request: Request,
@@ -60,7 +63,10 @@ async def tags_index(
     limit: int = Query(200, ge=1, le=500),
 ):
     if GitHelper is None:
-        return HTMLResponse("<h1>GitHelper 未配備</h1><p>src/core/git_utils.py を配置してください。</p>", status_code=501)
+        return HTMLResponse(
+            "<h1>GitHelper 未配備</h1><p>src/core/git_utils.py を配置してください。</p>",
+            status_code=501,
+        )
     gh = GitHelper()
     tags = gh.list_tags(pattern=pattern or None, limit=limit)
     return _render(
@@ -73,13 +79,17 @@ async def tags_index(
         tags=tags,
     )
 
+
 @router.get("/tags/{tag}", response_class=HTMLResponse)
 async def tag_detail(
     request: Request,
     tag: str,
 ):
     if GitHelper is None:
-        return HTMLResponse("<h1>GitHelper 未配備</h1><p>src/core/git_utils.py を配置してください。</p>", status_code=501)
+        return HTMLResponse(
+            "<h1>GitHelper 未配備</h1><p>src/core/git_utils.py を配置してください。</p>",
+            status_code=501,
+        )
     gh = GitHelper()
     try:
         info = gh.get_tag_detail(tag)

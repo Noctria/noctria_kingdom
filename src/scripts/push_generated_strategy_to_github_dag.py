@@ -9,6 +9,7 @@ Veritas戦略自動保存 + GitHub自動Pushスクリプト
 import os
 import subprocess
 from datetime import datetime
+
 from dotenv import load_dotenv
 
 # .env読み込み
@@ -18,10 +19,11 @@ GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "Noctria")
 GITHUB_REPO = os.getenv("GITHUB_REPO", "noctria_kingdom")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
+
 def save_and_push_strategy(code: str, strategy_name: str = None):
     """
     Veritasが生成したコードを .py に保存し、GitHubに自動Pushする。
-    
+
     Parameters:
         code (str): 生成された戦略コード（Python形式）
         strategy_name (str): 任意のファイル名（デフォルト: 日時付き）
@@ -43,7 +45,16 @@ def save_and_push_strategy(code: str, strategy_name: str = None):
 
     # ✅ Gitユーザー設定（省略可：一度設定済みなら不要）
     subprocess.run(["git", "config", "--global", "user.name", GITHUB_USERNAME], check=True)
-    subprocess.run(["git", "config", "--global", "user.email", f"{GITHUB_USERNAME}@users.noreply.github.com"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "--global",
+            "user.email",
+            f"{GITHUB_USERNAME}@users.noreply.github.com",
+        ],
+        check=True,
+    )
 
     # ✅ Git add → commit → push
     try:

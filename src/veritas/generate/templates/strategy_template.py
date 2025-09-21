@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np
+
 
 def simulate(data: pd.DataFrame) -> dict:
     """
@@ -15,14 +15,13 @@ def simulate(data: pd.DataFrame) -> dict:
     capital_history = [capital]
 
     for i in range(1, len(data)):
-        rsi = data.loc[i, 'RSI(14)']
-        spread = data.loc[i, 'spread']
-        price = data.loc[i, 'price']
+        rsi = data.loc[i, "RSI(14)"]
+        spread = data.loc[i, "spread"]
+        price = data.loc[i, "price"]
 
         if position == 0 and rsi > 50 and spread < 2:
             position = capital / price
-            entry_price = price
-
+            _entry_price = price  # unused
         elif position > 0 and (rsi < 50 or spread > 2):
             exit_price = price
             new_capital = position * exit_price
@@ -36,7 +35,7 @@ def simulate(data: pd.DataFrame) -> dict:
 
     # ポジションが残っていれば決済
     if position > 0:
-        capital = position * data.iloc[-1]['price']
+        capital = position * data.iloc[-1]["price"]
         capital_history.append(capital)
 
     # 指標計算
@@ -55,5 +54,5 @@ def simulate(data: pd.DataFrame) -> dict:
         "final_capital": round(capital),
         "win_rate": round(win_rate, 4),
         "max_drawdown": round(max_drawdown, 4),
-        "total_trades": total_trades
+        "total_trades": total_trades,
     }

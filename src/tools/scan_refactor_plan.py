@@ -1,10 +1,10 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-# tools/scan_refactor_plan.py
-
-import os
-import re
 import json
+
+# tools/scan_refactor_plan.py
+import os
 from pathlib import Path
+
+from core.path_config import LOGS_DIR
 
 # ✅ 共通パス定義（path_config.py から読み込み）
 try:
@@ -35,8 +35,18 @@ RESPONSIBILITY_MAP = {
 
 # ハードコードされていそうなパスのパターン
 SUSPECT_PATHS = [
-    "strategies/", "execution/", "data/", "models/", "airflow_docker/",
-    "veritas/", "llm_server/", "noctria_gui/", "experts/", "tools/", "tests/", "docs/"
+    "strategies/",
+    "execution/",
+    "data/",
+    "models/",
+    "airflow_docker/",
+    "veritas/",
+    "llm_server/",
+    "noctria_gui/",
+    "experts/",
+    "tools/",
+    "tests/",
+    "docs/",
 ]
 
 
@@ -66,20 +76,24 @@ def scan_file(path: Path) -> list:
     for i, line in enumerate(lines):
         for pattern in SUSPECT_PATHS:
             if pattern in line and "path_config" not in line:
-                actions.append({
-                    "file": str(path.relative_to(BASE_DIR)),
-                    "line": i + 1,
-                    "type": "hardcoded_path",
-                    "content": line.strip()
-                })
+                actions.append(
+                    {
+                        "file": str(path.relative_to(BASE_DIR)),
+                        "line": i + 1,
+                        "type": "hardcoded_path",
+                        "content": line.strip(),
+                    }
+                )
 
         if "def simulate" in line and "strategies/" not in str(path):
-            actions.append({
-                "file": str(path.relative_to(BASE_DIR)),
-                "line": i + 1,
-                "type": "simulate_function_out_of_place",
-                "content": line.strip()
-            })
+            actions.append(
+                {
+                    "file": str(path.relative_to(BASE_DIR)),
+                    "line": i + 1,
+                    "type": "simulate_function_out_of_place",
+                    "content": line.strip(),
+                }
+            )
 
     return actions
 

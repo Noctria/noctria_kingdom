@@ -7,10 +7,12 @@
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
+
 
 class LeviaTempest:
     def __init__(
@@ -24,7 +26,7 @@ class LeviaTempest:
         price_threshold: float = 0.0005,
         min_liquidity: float = 120,
         max_spread: float = 0.018,
-        max_volatility: float = 0.2
+        max_volatility: float = 0.2,
     ):
         self.feature_order = feature_order or STANDARD_FEATURE_ORDER
         self.price_col = price_col
@@ -48,7 +50,7 @@ class LeviaTempest:
         feature_dict: Dict[str, Any],
         decision_id: Optional[str] = None,
         caller: Optional[str] = "king_noctria",
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         liquidity = feature_dict.get(self.volume_col, 0.0)
         spread = feature_dict.get(self.spread_col, 0.0)
@@ -83,7 +85,7 @@ class LeviaTempest:
         feature_dict: Dict[str, Any],
         decision_id: Optional[str],
         caller: Optional[str],
-        reason: Optional[str]
+        reason: Optional[str],
     ) -> Dict[str, Any]:
         return {
             "name": "LeviaTempest",
@@ -94,5 +96,5 @@ class LeviaTempest:
             "priority": "very_high",
             "decision_id": decision_id,
             "caller": caller,
-            "reason": reason
+            "reason": reason,
         }

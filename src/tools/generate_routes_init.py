@@ -6,11 +6,11 @@
 - noctria_gui.routes.__init__.py を自動生成し、すべての router を登録する
 """
 
-import os
 from pathlib import Path
 
 ROUTES_DIR = Path(__file__).resolve().parent.parent / "noctria_gui" / "routes"
 INIT_FILE = ROUTES_DIR / "__init__.py"
+
 
 def find_router_modules():
     """
@@ -41,15 +41,15 @@ def generate_init_content(modules):
     lines.append("__path__ = __path__  # required for pkgutil\n")
 
     for name in modules:
-        lines.append(f"try:")
-        lines.append(f"    mod = importlib.import_module(f\".{{name}}\", package=__name__)")
-        lines.append(f"    if hasattr(mod, \"router\"):")
-        lines.append(f"        routers.append(mod.router)")
-        lines.append(f"        print(f\"[routes] ✅ router 読込成功: {name}\")")
-        lines.append(f"    else:")
-        lines.append(f"        print(f\"[routes] ⚠️ router 未定義: {name}\")")
-        lines.append(f"except Exception as e:")
-        lines.append(f"    print(f\"[routes] ❌ router 読込失敗: {name} - {{repr(e)}}\")\n")
+        lines.append("try:")
+        lines.append('    mod = importlib.import_module(f".{name}", package=__name__)')
+        lines.append('    if hasattr(mod, "router"):')
+        lines.append("        routers.append(mod.router)")
+        lines.append(f'        print(f"[routes] ✅ router 読込成功: {name}")')
+        lines.append("    else:")
+        lines.append(f'        print(f"[routes] ⚠️ router 未定義: {name}")')
+        lines.append("except Exception as e:")
+        lines.append(f'    print(f"[routes] ❌ router 読込失敗: {name} - {{repr(e)}}")\n')
 
     return "\n".join(lines)
 

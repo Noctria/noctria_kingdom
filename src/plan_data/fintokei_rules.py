@@ -51,7 +51,11 @@ class FintokeiRuleEnforcer:
             return RuleViolation(
                 code="MAX_RISK_EXCEEDED",
                 message=f"1取引リスク {risk_pct:.2f}% が上限 {self.cfg['max_risk_per_trade_pct']}% を超過",
-                details={"risk_pct": risk_pct, "risk_amt": risk_amt, "capital": capital},
+                details={
+                    "risk_pct": risk_pct,
+                    "risk_amt": risk_amt,
+                    "capital": capital,
+                },
                 severity="ERROR",
             )
         return None
@@ -67,7 +71,8 @@ class FintokeiRuleEnforcer:
             return None
         # 過去N件の平均ロット比で急増（例：3倍超）
         last_avg = max(
-            1e-9, sum(t.get("lot", 0) for t in recent_trades[-5:]) / min(5, len(recent_trades))
+            1e-9,
+            sum(t.get("lot", 0) for t in recent_trades[-5:]) / min(5, len(recent_trades)),
         )
         if lot > 3.0 * last_avg and lot >= 0.5:  # 0.5ロット以上で急増
             return RuleViolation(
@@ -93,7 +98,11 @@ class FintokeiRuleEnforcer:
             return RuleViolation(
                 code="ONE_TRADE_PROFIT_PUSH",
                 message=f"同日単一銘柄PnLが目標利益の大半を占有 ({top_sym}: {top_val:.0f} >= 70% of {target_profit:.0f})",
-                details={"symbol": top_sym, "pnl": top_val, "target_profit": target_profit},
+                details={
+                    "symbol": top_sym,
+                    "pnl": top_val,
+                    "target_profit": target_profit,
+                },
                 severity="WARN",
             )
         return None

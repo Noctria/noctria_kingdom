@@ -1,13 +1,14 @@
 import shutil
-from pathlib import Path
 import subprocess
 from datetime import datetime
+from pathlib import Path
 
 # 保存パス設定
 STRATEGY_DIR = Path("strategies/official/")
 SCRIPT_EVAL = Path("veritas/evaluate_veritas.py")
 SCRIPT_DO = Path("execution/generate_order_json.py")
 UPLOAD_LOG_DIR = Path("logs/uploads")
+
 
 async def process_uploaded_strategy(file) -> str:
     try:
@@ -27,11 +28,7 @@ async def process_uploaded_strategy(file) -> str:
         shutil.copy(dest_path, official_path)
 
         # === 評価スクリプト実行 ===
-        eval_proc = subprocess.run(
-            ["python", str(SCRIPT_EVAL)],
-            capture_output=True,
-            text=True
-        )
+        eval_proc = subprocess.run(["python", str(SCRIPT_EVAL)], capture_output=True, text=True)
 
         # === ログ保存 ===
         result_log = save_dir / "upload_result.txt"
@@ -39,11 +36,7 @@ async def process_uploaded_strategy(file) -> str:
 
         # === 採用があれば命令生成 ===
         if "採用基準を満たした戦略数: 0" not in eval_proc.stdout:
-            do_proc = subprocess.run(
-                ["python", str(SCRIPT_DO)],
-                capture_output=True,
-                text=True
-            )
+            do_proc = subprocess.run(["python", str(SCRIPT_DO)], capture_output=True, text=True)
             result_text += "\n\n" + do_proc.stdout
         else:
             result_text += "\n❌ 採用なし"

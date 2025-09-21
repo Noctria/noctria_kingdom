@@ -6,13 +6,13 @@
 - 昇格ログの読み込み、検索フィルタ、CSV出力、再処理支援、個別取得
 """
 
-import json
 import csv
+import json
 import re
 import unicodedata
-from typing import List, Dict, Optional, Tuple
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 from src.core.path_config import ACT_LOG_DIR, VERITAS_EVAL_LOG
 
@@ -23,7 +23,7 @@ def normalize_tag(tag: Optional[str]) -> str:
         return ""
     tag = tag.strip().lower()
     tag = unicodedata.normalize("NFKC", tag)  # 全角→半角
-    tag = re.sub(r"[^a-z0-9]+", "", tag)      # 記号除去
+    tag = re.sub(r"[^a-z0-9]+", "", tag)  # 記号除去
     return tag
 
 
@@ -63,13 +63,15 @@ def filter_act_logs(
     tag: Optional[str] = None,
     score_range: Optional[Tuple[float, float]] = None,
     date_range: Optional[Tuple[datetime, datetime]] = None,
-    pushed: Optional[bool] = None
+    pushed: Optional[bool] = None,
 ) -> List[Dict]:
     """🔍 昇格ログのフィルタ処理"""
     filtered = logs
 
     if strategy_name:
-        filtered = [log for log in filtered if strategy_name.lower() in log.get("strategy", "").lower()]
+        filtered = [
+            log for log in filtered if strategy_name.lower() in log.get("strategy", "").lower()
+        ]
 
     if tag:
         normalized = normalize_tag(tag)
@@ -78,14 +80,16 @@ def filter_act_logs(
     if score_range:
         min_score, max_score = score_range
         filtered = [
-            log for log in filtered
+            log
+            for log in filtered
             if isinstance(log.get("score"), (int, float)) and min_score <= log["score"] <= max_score
         ]
 
     if date_range:
         start, end = date_range
         filtered = [
-            log for log in filtered
+            log
+            for log in filtered
             if "promoted_at" in log and _within_date_range(log["promoted_at"], start, end)
         ]
 

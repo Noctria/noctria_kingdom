@@ -1,7 +1,7 @@
-from pathlib import Path
-import shutil
 import datetime
+import shutil
 import subprocess
+from pathlib import Path
 
 from src.core.path_config import STRATEGIES_DIR
 
@@ -42,13 +42,9 @@ def re_evaluate_strategy(filename: str) -> dict:
             ["python", "veritas/evaluate_veritas.py", "--strategy", str(strategy_path)],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,
         )
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        }
+        return {"success": result.returncode == 0, "stdout": result.stdout, "stderr": result.stderr}
     except Exception as e:
         return {"success": False, "message": str(e)}
 

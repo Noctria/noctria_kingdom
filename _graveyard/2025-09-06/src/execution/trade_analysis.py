@@ -1,9 +1,10 @@
-print("=== Trade Analysis Script Started ===")
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 import os
+
+print("=== Trade Analysis Script Started ===")
+
 
 print("[INFO] Checking logs directory for trade history CSVs...")
 
@@ -40,7 +41,7 @@ win_rate_df = pd.DataFrame(win_rates)
 
 # 週次勝率の折れ線グラフを保存
 plt.figure(figsize=(10, 5))
-plt.plot(win_rate_df["week"], win_rate_df["win_rate"], marker='o', label="Win Rate")
+plt.plot(win_rate_df["week"], win_rate_df["win_rate"], marker="o", label="Win Rate")
 plt.xticks(rotation=45)
 plt.xlabel("Week")
 plt.ylabel("Win Rate")

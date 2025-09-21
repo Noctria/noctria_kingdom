@@ -22,6 +22,7 @@ _THIS = Path(__file__).resolve()
 PROJECT_ROOT = _THIS.parents[2]
 try:
     from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # type: ignore
+
     _TPL_DIR = Path(str(NOCTRIA_GUI_TEMPLATES_DIR))
 except Exception:
     _TPL_DIR = PROJECT_ROOT / "noctria_gui" / "templates"
@@ -49,7 +50,12 @@ async def statistics_detail(
                 "ok": True,
                 "message": "statistics_detail.html not found (placeholder).",
                 "hint": "noctria_gui/templates/statistics_detail.html を配置してください。",
-                "params": {"mode": mode, "key": key, "trace_id": trace_id, "decision_id": decision_id},
+                "params": {
+                    "mode": mode,
+                    "key": key,
+                    "trace_id": trace_id,
+                    "decision_id": decision_id,
+                },
             }
         )
     ctx: Dict[str, Any] = {

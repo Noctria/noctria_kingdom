@@ -8,6 +8,7 @@ from core.strategy_optimizer_adjusted import simulate_strategy_adjusted
 from core.market_loader import load_market_data
 from core.path_config import STRATEGIES_DIR, LOGS_DIR, PROJECT_ROOT
 
+
 def evaluate_strategy(strategy_filename: str, market_csv: str = "market_data.csv") -> dict:
     """
     戦略ファイル（.py）を受け取り、評価と採用処理を実施。
@@ -34,7 +35,7 @@ def evaluate_strategy(strategy_filename: str, market_csv: str = "market_data.csv
         "win_rate": result.get("win_rate"),
         "max_drawdown": result.get("max_drawdown"),
         "total_trades": result.get("total_trades"),
-        "error_message": result.get("error_message")
+        "error_message": result.get("error_message"),
     }
 
     try:
@@ -46,8 +47,14 @@ def evaluate_strategy(strategy_filename: str, market_csv: str = "market_data.csv
             log_entry["status"] = "adopted"
 
             try:
-                subprocess.run(["git", "add", str(official_path)], cwd=str(PROJECT_ROOT), check=True)
-                subprocess.run(["git", "commit", "-m", f"✅ Adopt strategy: {strategy_filename}"], cwd=str(PROJECT_ROOT), check=True)
+                subprocess.run(
+                    ["git", "add", str(official_path)], cwd=str(PROJECT_ROOT), check=True
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", f"✅ Adopt strategy: {strategy_filename}"],
+                    cwd=str(PROJECT_ROOT),
+                    check=True,
+                )
                 subprocess.run(["git", "push"], cwd=str(PROJECT_ROOT), check=True)
                 print(f"🚀 GitHubへPush完了: {strategy_filename}")
                 log_entry["git_push"] = "success"
@@ -85,9 +92,12 @@ def evaluate_strategy(strategy_filename: str, market_csv: str = "market_data.csv
 
 if __name__ == "__main__":
     import sys
+
     filename = sys.argv[1] if len(sys.argv) > 1 else None
     if not filename:
-        print("📛 戦略ファイル名が必要です: python evaluate_generated_strategies.py strategy_xxx.py")
+        print(
+            "📛 戦略ファイル名が必要です: python evaluate_generated_strategies.py strategy_xxx.py"
+        )
         exit(1)
 
     result = evaluate_strategy(filename)

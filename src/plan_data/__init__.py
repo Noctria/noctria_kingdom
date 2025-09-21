@@ -64,8 +64,8 @@ def __dir__():
 # mypy/pyright には実体を見せる（実行時には遅延 import が使われる）
 if TYPE_CHECKING:
     from plan_data.trace import (  # noqa: F401
-        new_trace_id,
-        get_trace_id,
-        set_trace_id,
         bind_trace_id,
+        get_trace_id,
+        new_trace_id,
+        set_trace_id,
     )

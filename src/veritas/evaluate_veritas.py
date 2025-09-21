@@ -12,9 +12,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -24,8 +24,8 @@ import pandas as pd
 # `core.path_config` 経由でもインポートできるようにする。
 try:
     from src.core.path_config import (
-        STRATEGIES_VERITAS_GENERATED_DIR,
         DATA_DIR,
+        STRATEGIES_VERITAS_GENERATED_DIR,
         VERITAS_EVAL_LOG,
     )
 except Exception:
@@ -37,8 +37,8 @@ except Exception:
     try:
         # src なしでも core 直下で解決できるように
         from core.path_config import (
-            STRATEGIES_VERITAS_GENERATED_DIR,
             DATA_DIR,
+            STRATEGIES_VERITAS_GENERATED_DIR,
             VERITAS_EVAL_LOG,
         )
     except Exception as e:
@@ -48,12 +48,12 @@ except Exception:
         ) from e
 
 # ロガー設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 # --- 戦略採用基準（ML的な数値重視） ---
-WIN_RATE_THRESHOLD = 0.50      # 最低勝率50%
+WIN_RATE_THRESHOLD = 0.50  # 最低勝率50%
 MAX_DRAWDOWN_THRESHOLD = 0.30  # 最大ドローダウン30%
-MIN_TRADES_THRESHOLD = 10      # 最低取引回数
+MIN_TRADES_THRESHOLD = 10  # 最低取引回数
 
 TEST_DATA_PATH = DATA_DIR / "sample_test_data.csv"
 
@@ -76,10 +76,10 @@ def _load_strategy_module(strategy_path: Path) -> Optional[Any]:
 def _is_strategy_adopted(result: Dict[str, Any]) -> bool:
     """王国採用基準（ML/数値基準）判定"""
     return (
-        result.get("final_capital", 0) > 1_000_000 and
-        result.get("win_rate", 0.0) >= WIN_RATE_THRESHOLD and
-        result.get("max_drawdown", 1.0) <= MAX_DRAWDOWN_THRESHOLD and
-        result.get("total_trades", 0) >= MIN_TRADES_THRESHOLD
+        result.get("final_capital", 0) > 1_000_000
+        and result.get("win_rate", 0.0) >= WIN_RATE_THRESHOLD
+        and result.get("max_drawdown", 1.0) <= MAX_DRAWDOWN_THRESHOLD
+        and result.get("total_trades", 0) >= MIN_TRADES_THRESHOLD
     )
 
 
@@ -87,10 +87,18 @@ def _evaluate_single_strategy(strategy_path: Path, test_data: pd.DataFrame) -> D
     """単一戦略を評価し辞書で返却"""
     strategy_module = _load_strategy_module(strategy_path)
     if strategy_module is None:
-        return {"strategy": strategy_path.name, "error": "モジュール読み込み失敗", "passed": False}
+        return {
+            "strategy": strategy_path.name,
+            "error": "モジュール読み込み失敗",
+            "passed": False,
+        }
 
-    if not hasattr(strategy_module, 'simulate'):
-        return {"strategy": strategy_path.name, "error": "simulate関数が存在しません。", "passed": False}
+    if not hasattr(strategy_module, "simulate"):
+        return {
+            "strategy": strategy_path.name,
+            "error": "simulate関数が存在しません。",
+            "passed": False,
+        }
 
     try:
         result = strategy_module.simulate(test_data)

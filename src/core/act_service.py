@@ -19,17 +19,21 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # パス解決（path_config が無くても動く）
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = PROJECT_ROOT / "src"
 
 try:
+    from src.core.path_config import (
+        PDCA_LOG_DIR as _PDCA_DIR,
+    )
+    from src.core.path_config import (
+        STRATEGIES_DIR as _STR_DIR,
+    )
     from src.core.path_config import (  # type: ignore
         STRATEGIES_VERITAS_GENERATED_DIR as _GEN_DIR,
-        STRATEGIES_DIR as _STR_DIR,
-        PDCA_LOG_DIR as _PDCA_DIR,
     )
 except Exception:
     _GEN_DIR = SRC_DIR / "strategies" / "veritas_generated"
@@ -62,7 +66,12 @@ class ActResult:
 
 def _git_available(repo_dir: Path) -> bool:
     try:
-        subprocess.run(["git", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(
+            ["git", "--version"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         r = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
             cwd=repo_dir,
@@ -74,7 +83,9 @@ def _git_available(repo_dir: Path) -> bool:
         return False
 
 
-def _git_commit_and_tag(repo_dir: Path, rel_path: str, message: str, tag: Optional[str]) -> Tuple[bool, Optional[str], Dict[str, Any]]:
+def _git_commit_and_tag(
+    repo_dir: Path, rel_path: str, message: str, tag: Optional[str]
+) -> Tuple[bool, Optional[str], Dict[str, Any]]:
     committed = False
     try:
         subprocess.run(["git", "add", rel_path], cwd=repo_dir, check=True)
@@ -113,7 +124,11 @@ def _read_latest_eval_metrics(strategy: str) -> Dict[str, Any]:
     }
 
     try:
-        files = sorted(_PLOG_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+        files = sorted(
+            _PLOG_DIR.glob("rechecks_*.csv"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
     except Exception:
         files = []
 
@@ -136,14 +151,26 @@ def _read_latest_eval_metrics(strategy: str) -> Dict[str, Any]:
                         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                     except Exception:
                         dt = None
-                    if latest_ts is None or (dt and latest_ts and dt > latest_ts) or (dt and latest_ts is None):
+                    if (
+                        latest_ts is None
+                        or (dt and latest_ts and dt > latest_ts)
+                        or (dt and latest_ts is None)
+                    ):
                         latest_ts = dt
                         latest_row = row
                 if latest_row:
-                    metrics["win_rate"] = _safe_float(latest_row.get("winrate_new") or latest_row.get("win_rate"))
-                    metrics["max_drawdown"] = _safe_float(latest_row.get("maxdd_new") or latest_row.get("max_drawdown"))
-                    metrics["trades"] = _safe_float(latest_row.get("trades_new") or latest_row.get("trades"))
-                    metrics["last_evaluated_at"] = (latest_row.get("evaluated_at") or latest_row.get("timestamp") or None)
+                    metrics["win_rate"] = _safe_float(
+                        latest_row.get("winrate_new") or latest_row.get("win_rate")
+                    )
+                    metrics["max_drawdown"] = _safe_float(
+                        latest_row.get("maxdd_new") or latest_row.get("max_drawdown")
+                    )
+                    metrics["trades"] = _safe_float(
+                        latest_row.get("trades_new") or latest_row.get("trades")
+                    )
+                    metrics["last_evaluated_at"] = (
+                        latest_row.get("evaluated_at") or latest_row.get("timestamp") or None
+                    )
                     metrics["_source_file"] = fp.name
                     return metrics
         except Exception:
@@ -175,7 +202,12 @@ def adopt_strategy(
     dst = ADOPTED_DIR / f"{strategy}.py"
 
     # ---- ポリシー審査 -------------------------------------------------------
-    force_env = str(os.getenv("NOCTRIA_ACT_FORCE", "")).strip().lower() in ("1", "true", "yes", "on")
+    force_env = str(os.getenv("NOCTRIA_ACT_FORCE", "")).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
     force_final = bool(force or force_env)
 
     policy_ok: Optional[bool] = None
@@ -228,7 +260,9 @@ def adopt_strategy(
         )
 
     # ---- 実行（DRY-RUN） ---------------------------------------------------
-    commit_msg = f"adopt(strategy={strategy}) reason='{reason}' decision_id={decision_id or '-'} at {ts}"
+    commit_msg = (
+        f"adopt(strategy={strategy}) reason='{reason}' decision_id={decision_id or '-'} at {ts}"
+    )
     tag_name = f"adopted/{strategy}/{ts}"
 
     if dry_run:
@@ -306,7 +340,9 @@ def adopt_strategy(
                 "max_drawdown": met["max_drawdown"],
                 "trades": met["trades"],
                 "evaluated_at": met["last_evaluated_at"],
-                "policy_source": (policy_snapshot.get("source", {}) if isinstance(policy_snapshot, dict) else {}),
+                "policy_source": (
+                    policy_snapshot.get("source", {}) if isinstance(policy_snapshot, dict) else {}
+                ),
             }
         )
 

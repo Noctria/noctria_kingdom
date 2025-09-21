@@ -22,6 +22,7 @@ AIRFLOW_USERNAME = os.getenv("AIRFLOW_USERNAME", "airflow")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
 VERITAS_CONF_JSON = os.getenv("VERITAS_CONF_JSON", "{}")
 
+
 # ============================
 # 🚀 DAG起動処理
 # ============================
@@ -41,10 +42,7 @@ def trigger_veritas_master_dag():
 
     try:
         response = requests.post(
-            trigger_url,
-            auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
-            json=payload,
-            timeout=10
+            trigger_url, auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD), json=payload, timeout=10
         )
 
         if response.status_code in (200, 201):
@@ -56,6 +54,7 @@ def trigger_veritas_master_dag():
 
     except RequestException as e:
         print(f"🚨 通信エラー: {e}")
+
 
 # ============================
 # 🔧 実行ブロック

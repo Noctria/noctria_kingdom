@@ -49,19 +49,22 @@ from pathlib import Path
 from typing import List, Tuple
 
 BEGIN_TMPL = "<!-- AUTODOC:BEGIN mode=file_content path_globs={path} -->"
-END_TMPL   = "<!-- AUTODOC:END -->"
+END_TMPL = "<!-- AUTODOC:END -->"
 
 AUTODOC_BEGIN_RE = re.compile(r"<!--\s*AUTODOC:BEGIN\b", re.IGNORECASE)
-FRONT_MATTER_RE  = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+FRONT_MATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
-def find_front_matter_span(text: str) -> Tuple[int,int] | None:
+
+def find_front_matter_span(text: str) -> Tuple[int, int] | None:
     m = FRONT_MATTER_RE.match(text)
     if not m:
         return None
     return (0, m.end())
 
+
 def ensure_dir(p: Path):
     p.parent.mkdir(parents=True, exist_ok=True)
+
 
 def should_exclude(path: Path, exclude_globs: List[str], docs_root: Path) -> bool:
     rel = path.relative_to(docs_root).as_posix()
@@ -69,6 +72,7 @@ def should_exclude(path: Path, exclude_globs: List[str], docs_root: Path) -> boo
         if Path(docs_root / g).match(str(docs_root / rel)) or glob.fnmatch.fnmatch(rel, g):
             return True
     return False
+
 
 def matches_includes(path: Path, include_globs: List[str], docs_root: Path) -> bool:
     if not include_globs:
@@ -79,6 +83,7 @@ def matches_includes(path: Path, include_globs: List[str], docs_root: Path) -> b
             return True
     return False
 
+
 def process_file(
     md_path: Path,
     docs_root: Path,
@@ -88,7 +93,7 @@ def process_file(
     dry_run: bool,
     backup: bool,
     force: bool,
-) -> Tuple[bool,str]:
+) -> Tuple[bool, str]:
     text = md_path.read_text(encoding="utf-8")
 
     if AUTODOC_BEGIN_RE.search(text) and not force:
@@ -97,8 +102,8 @@ def process_file(
     # front matter 切り分け
     fm_span = find_front_matter_span(text) if keep_front_matter else None
     if fm_span:
-        fm = text[fm_span[0]:fm_span[1]]
-        body = text[fm_span[1]:]
+        fm = text[fm_span[0] : fm_span[1]]
+        body = text[fm_span[1] :]
     else:
         fm = ""
         body = text
@@ -128,10 +133,12 @@ def process_file(
         md_path.write_text(new_text, encoding="utf-8")
         return (True, f"Wrapped -> {rel_for_attr}")
 
+
 def quote_attr(val: str) -> str:
     if re.search(r'\s|;|=|"|\'', val):
-        return '"' + val.replace('"','\\"') + '"'
+        return '"' + val.replace('"', '\\"') + '"'
     return val
+
 
 def collect_targets(docs_root: Path, include_globs: List[str]) -> List[Path]:
     # 既定は docs_root 配下の *.md 全部
@@ -147,19 +154,45 @@ def collect_targets(docs_root: Path, include_globs: List[str]) -> List[Path]:
                 picked.add(pm.resolve())
     return sorted(picked)
 
+
 def main():
-    ap = argparse.ArgumentParser(description="Full-wrap Markdown files into AUTODOC (file_content) blocks.")
+    ap = argparse.ArgumentParser(
+        description="Full-wrap Markdown files into AUTODOC (file_content) blocks."
+    )
     ap.add_argument("--docs-root", type=Path, default=Path("docs"))
     ap.add_argument("--repo-root", type=Path, default=Path("."))
-    ap.add_argument("--partials-root", type=Path, default=Path("docs/_partials_full"),
-                    help="Where to write partials (repo-root relative).")
-    ap.add_argument("--include", action="append", default=[], help="Include glob(s) under docs-root (e.g. 'governance/**/*.md').")
-    ap.add_argument("--exclude", action="append", default=[], help="Exclude glob(s) under docs-root.")
-    ap.add_argument("--keep-front-matter", type=lambda x: str(x).lower() in ("1","true","yes","y","on"), default=True)
-    ap.add_argument("--force", type=lambda x: str(x).lower() in ("1","true","yes","y","on"), default=False,
-                    help="Wrap even if AUTODOC already exists.")
-    ap.add_argument("--dry-run", type=lambda x: str(x).lower() in ("1","true","yes","y","on"), default=True)
-    ap.add_argument("--backup", type=lambda x: str(x).lower() in ("1","true","yes","y","on"), default=True)
+    ap.add_argument(
+        "--partials-root",
+        type=Path,
+        default=Path("docs/_partials_full"),
+        help="Where to write partials (repo-root relative).",
+    )
+    ap.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        help="Include glob(s) under docs-root (e.g. 'governance/**/*.md').",
+    )
+    ap.add_argument(
+        "--exclude", action="append", default=[], help="Exclude glob(s) under docs-root."
+    )
+    ap.add_argument(
+        "--keep-front-matter",
+        type=lambda x: str(x).lower() in ("1", "true", "yes", "y", "on"),
+        default=True,
+    )
+    ap.add_argument(
+        "--force",
+        type=lambda x: str(x).lower() in ("1", "true", "yes", "y", "on"),
+        default=False,
+        help="Wrap even if AUTODOC already exists.",
+    )
+    ap.add_argument(
+        "--dry-run", type=lambda x: str(x).lower() in ("1", "true", "yes", "y", "on"), default=True
+    )
+    ap.add_argument(
+        "--backup", type=lambda x: str(x).lower() in ("1", "true", "yes", "y", "on"), default=True
+    )
     args = ap.parse_args()
 
     docs_root = args.docs_root.resolve()
@@ -201,6 +234,7 @@ def main():
     print(f"Summary: changed={changed}, scanned={scanned}")
     if args.dry_run:
         print("Note: dry-run mode; no files were written.")
+
 
 if __name__ == "__main__":
     main()

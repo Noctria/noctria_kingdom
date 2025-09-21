@@ -18,9 +18,7 @@ import sys
 
 
 GRAVEYARD = (
-    sys.argv[sys.argv.index("--graveyard") + 1]
-    if "--graveyard" in sys.argv
-    else "_graveyard"
+    sys.argv[sys.argv.index("--graveyard") + 1] if "--graveyard" in sys.argv else "_graveyard"
 )
 CSV_PATH = (
     sys.argv[sys.argv.index("--csv") + 1]
@@ -38,7 +36,7 @@ def run(cmd: str) -> subprocess.CompletedProcess[str]:
 
 def git_tracked(path: str) -> bool:
     """Git 管理下（tracked）にあるか判定。"""
-    r = run(f'git ls-files --error-unmatch -- {shlex.quote(path)}')
+    r = run(f"git ls-files --error-unmatch -- {shlex.quote(path)}")
     return r.returncode == 0
 
 
@@ -46,18 +44,18 @@ def git_mv(src: str, dst: str) -> None:
     """git mv を試み、失敗時は FS 移動 + stage にフォールバック。"""
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     if git_tracked(src):
-        r = run(f'git mv -f -- {shlex.quote(src)} {shlex.quote(dst)}')
+        r = run(f"git mv -f -- {shlex.quote(src)} {shlex.quote(dst)}")
         if r.returncode != 0:
             # mixed state 向けフォールバック
-            run(f'mv -f -- {shlex.quote(src)} {shlex.quote(dst)}')
-            run(f'git add -A -- {shlex.quote(dst)}')
-            run(f'git rm -f --cached -- {shlex.quote(src)}')
+            run(f"mv -f -- {shlex.quote(src)} {shlex.quote(dst)}")
+            run(f"git add -A -- {shlex.quote(dst)}")
+            run(f"git rm -f --cached -- {shlex.quote(src)}")
     else:
         # plain FS move + stage
         if os.path.exists(src):
-            run(f'mkdir -p {shlex.quote(os.path.dirname(dst))}')
-            run(f'mv -f -- {shlex.quote(src)} {shlex.quote(dst)}')
-            run(f'git add -A -- {shlex.quote(dst)}')
+            run(f"mkdir -p {shlex.quote(os.path.dirname(dst))}")
+            run(f"mv -f -- {shlex.quote(src)} {shlex.quote(dst)}")
+            run(f"git add -A -- {shlex.quote(dst)}")
 
 
 def relocate_flat_file(path: str) -> None:
@@ -67,9 +65,9 @@ def relocate_flat_file(path: str) -> None:
     dest = os.path.join(GRAVEYARD, path)
     if os.path.exists(flat) and not os.path.exists(dest):
         os.makedirs(os.path.dirname(dest), exist_ok=True)
-        run(f'mv -f -- {shlex.quote(flat)} {shlex.quote(dest)}')
-        run(f'git add -A -- {shlex.quote(dest)}')
-        print(f'[rearranged] {flat} -> {dest}')
+        run(f"mv -f -- {shlex.quote(flat)} {shlex.quote(dest)}")
+        run(f"git add -A -- {shlex.quote(dest)}")
+        print(f"[rearranged] {flat} -> {dest}")
 
 
 def move_if_needed(path: str) -> None:
@@ -82,7 +80,7 @@ def move_if_needed(path: str) -> None:
     if os.path.exists(path) or git_tracked(path):
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         git_mv(path, dest)
-        print(f'[moved] {path} -> {dest}')
+        print(f"[moved] {path} -> {dest}")
 
 
 def main() -> None:
@@ -90,7 +88,7 @@ def main() -> None:
     with open(CSV_PATH, newline="", encoding="utf-8") as f:
         rdr = csv.DictReader(f)
         for row in rdr:
-            categories = (row.get("categories") or "")
+            categories = row.get("categories") or ""
             path = (row.get("path") or "").strip().strip('"')
             # coverage / runtime_seen が 0 のみが対象
             cov = (row.get("has_coverage") or "0").strip()
@@ -107,7 +105,7 @@ def main() -> None:
             # 2) まだ残ってるソースを隔離
             move_if_needed(path)
 
-    print(f'[done] fix_quarantine completed for {GRAVEYARD}')
+    print(f"[done] fix_quarantine completed for {GRAVEYARD}")
 
 
 if __name__ == "__main__":

@@ -10,12 +10,15 @@
 
 import json
 from datetime import datetime
-from pathlib import Path
+
 from src.core.path_config import PDCA_LOG_DIR
 
 PDCA_HISTORY_PATH = PDCA_LOG_DIR / "pdca_history.json"
 
-def log_pdca_event(phase: str, status: str, detail: str = "", strategy_id: str = "", meta: dict = None):
+
+def log_pdca_event(
+    phase: str, status: str, detail: str = "", strategy_id: str = "", meta: dict = None
+):
     """
     PDCAサイクルのイベントをログに追記
 
@@ -32,7 +35,7 @@ def log_pdca_event(phase: str, status: str, detail: str = "", strategy_id: str =
         "status": status,
         "detail": detail,
         "strategy_id": strategy_id,
-        "meta": meta or {}
+        "meta": meta or {},
     }
 
     # 既存ログの読み込み
@@ -54,6 +57,12 @@ def log_pdca_event(phase: str, status: str, detail: str = "", strategy_id: str =
 
     print(f"PDCA履歴ログを追記: {event}")
 
+
 # --- CLIテスト例 ---
 if __name__ == "__main__":
-    log_pdca_event("replay", "success", detail="Airflowによる再送テスト", strategy_id="sample_strategy")
+    log_pdca_event(
+        "replay",
+        "success",
+        detail="Airflowによる再送テスト",
+        strategy_id="sample_strategy",
+    )

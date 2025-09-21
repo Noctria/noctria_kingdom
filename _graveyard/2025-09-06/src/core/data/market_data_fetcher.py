@@ -56,7 +56,10 @@ class MarketDataFetcher:
         # ---------- Alpha Vantage ブリッジ ----------
         if source == "alphavantage":
             # 既存の Alpha Vantage 実装をブリッジ（src.core.data_loader.MarketDataFetcher）
-            from src.core.data_loader import MarketDataFetcher as _AlphaV  # 互換レイヤ or 既存クラス
+            from src.core.data_loader import (
+                MarketDataFetcher as _AlphaV,
+            )  # 互換レイヤ or 既存クラス
+
             av = _AlphaV(api_key=self.alphavantage_api_key)
 
             # symbol 正規化： "USDJPY" / "USDJPY=X" / "USD/JPY" などから from/to を抽出

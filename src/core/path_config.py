@@ -14,10 +14,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 
 # =========================================================
 # 🏰 基本ディレクトリ判定（Docker or ローカル）＋ENV上書き
@@ -27,7 +27,11 @@ _env_root = os.getenv("NOCTRIA_PROJECT_ROOT")
 if _env_root:
     PROJECT_ROOT = Path(_env_root).resolve()
 else:
-    PROJECT_ROOT = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parents[2]
+    PROJECT_ROOT = (
+        Path("/opt/airflow").resolve()
+        if Path("/opt/airflow").exists()
+        else Path(__file__).resolve().parents[2]
+    )
 
 SRC_DIR = PROJECT_ROOT / "src"
 BASE_DIR = PROJECT_ROOT  # 歴史的互換（BASE_DIR = プロジェクトルート）
@@ -62,7 +66,9 @@ DO_DIR = DO_DIR_CANDIDATE if DO_DIR_CANDIDATE.exists() else EXECUTION_DIR_CANDID
 EXECUTION_DIR = DO_DIR  # 旧名互換
 
 # --- 専門領域・アダプタ等 ---
-EXPERTS_DIR = (PROJECT_ROOT / "experts") if (PROJECT_ROOT / "experts").exists() else (SRC_DIR / "experts")
+EXPERTS_DIR = (
+    (PROJECT_ROOT / "experts") if (PROJECT_ROOT / "experts").exists() else (SRC_DIR / "experts")
+)
 NOCTRIA_AI_DIR = SRC_DIR / "noctria_ai"
 TOOLS_DIR = SRC_DIR / "tools"
 
@@ -84,7 +90,11 @@ LOCAL_DATA_PATH = DATA_DIR / "local_data"
 FEATURES_PATH = PROCESSED_DATA_DIR / "features"
 MODEL_PATH = DATA_DIR / "models" / "latest_model.pkl"
 
-INSTITUTIONS_DIR = (AIRFLOW_DOCKER_DIR / "institutions") if (AIRFLOW_DOCKER_DIR / "institutions").exists() else PROJECT_ROOT / "institutions"
+INSTITUTIONS_DIR = (
+    (AIRFLOW_DOCKER_DIR / "institutions")
+    if (AIRFLOW_DOCKER_DIR / "institutions").exists()
+    else PROJECT_ROOT / "institutions"
+)
 
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
@@ -161,12 +171,15 @@ CATEGORY_MAP = {
     "legacy": "📜 旧版戦略",
 }
 
+
 # =========================================================
 # ✅ パス整合性・import パス整備ユーティリティ
 # =========================================================
 def _lint_path_config():
     """各 Path が存在するかの簡易チェック（GUI/CLI デバッグ用）"""
-    return {k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")}
+    return {
+        k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")
+    }
 
 
 def _str(p: Path) -> str:
@@ -225,7 +238,9 @@ def ensure_strategy_packages() -> None:
         init_file = d / "__init__.py"
         if not init_file.exists():
             try:
-                init_file.write_text("# package init (auto-created by path_config)\n", encoding="utf-8")
+                init_file.write_text(
+                    "# package init (auto-created by path_config)\n", encoding="utf-8"
+                )
             except Exception:
                 # 失敗しても致命ではない
                 pass
@@ -243,30 +258,61 @@ if os.getenv("NOCTRIA_AUTOINIT", "").lower() in {"1", "true", "yes"}:
 # =========================================================
 __all__ = [
     # ルート
-    "PROJECT_ROOT", "SRC_DIR", "BASE_DIR",
+    "PROJECT_ROOT",
+    "SRC_DIR",
+    "BASE_DIR",
     # Airflow
-    "AIRFLOW_DOCKER_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR", "AIRFLOW_API_BASE",
+    "AIRFLOW_DOCKER_DIR",
+    "DAGS_DIR",
+    "LOGS_DIR",
+    "PLUGINS_DIR",
+    "AIRFLOW_SCRIPTS_DIR",
+    "AIRFLOW_API_BASE",
     # コア/スクリプト/AI
-    "CORE_DIR", "SCRIPTS_DIR", "VERITAS_DIR", "STRATEGIES_DIR", "STRATEGIES_VERITAS_GENERATED_DIR",
+    "CORE_DIR",
+    "SCRIPTS_DIR",
+    "VERITAS_DIR",
+    "STRATEGIES_DIR",
+    "STRATEGIES_VERITAS_GENERATED_DIR",
     # 実行層（新旧互換）
-    "DO_DIR", "EXECUTION_DIR",
+    "DO_DIR",
+    "EXECUTION_DIR",
     # 周辺領域
-    "EXPERTS_DIR", "NOCTRIA_AI_DIR", "TOOLS_DIR",
+    "EXPERTS_DIR",
+    "NOCTRIA_AI_DIR",
+    "TOOLS_DIR",
     # モデル/AI
-    "VERITAS_MODELS_DIR", "HERMES_DIR", "HERMES_MODELS_DIR",
+    "VERITAS_MODELS_DIR",
+    "HERMES_DIR",
+    "HERMES_MODELS_DIR",
     # データ領域
-    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "STATS_DIR",
+    "DATA_DIR",
+    "RAW_DATA_DIR",
+    "PROCESSED_DATA_DIR",
+    "STATS_DIR",
     "INSTITUTIONS_DIR",
-    "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR", "ORACLE_FORECAST_JSON",
+    "PDCA_LOG_DIR",
+    "ACT_LOG_DIR",
+    "PUSH_LOG_DIR",
+    "ORACLE_FORECAST_JSON",
     # GUI/Docs/Tests/LLM
-    "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
-    "NOCTRIA_GUI_ROUTES_DIR", "NOCTRIA_GUI_SERVICES_DIR",
+    "NOCTRIA_GUI_DIR",
+    "NOCTRIA_GUI_TEMPLATES_DIR",
+    "NOCTRIA_GUI_STATIC_DIR",
+    "NOCTRIA_GUI_ROUTES_DIR",
+    "NOCTRIA_GUI_SERVICES_DIR",
     "GUI_TEMPLATES_DIR",  # <--- 修正: エイリアスを公開リストに追加
-    "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
+    "LLM_SERVER_DIR",
+    "DOCS_DIR",
+    "TESTS_DIR",
     # 主要ファイル
-    "VERITAS_EVAL_LOG", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
+    "VERITAS_EVAL_LOG",
+    "MARKET_DATA_CSV",
+    "VERITAS_ORDER_JSON",
     # スクリプト/Repo
-    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GITHUB_PUSH_SCRIPT",
+    "VERITAS_GENERATE_SCRIPT",
+    "VERITAS_EVALUATE_SCRIPT",
+    "GITHUB_PUSH_SCRIPT",
     "GITHUB_REPO_URL",
     # 分類
     "CATEGORY_MAP",
@@ -276,3 +322,16 @@ __all__ = [
     "with_import_path",
     "ensure_strategy_packages",
 ]
+
+# tests/test_path_config.py が参照する AIRFLOW_DIR を必ず用意する
+AIRFLOW_DIR = PROJECT_ROOT / "airflow_docker" / "dags"
+
+# ---- Auto-added safe fallbacks (only if missing) ----
+OFFICIAL_STRATEGIES_DIR = PROJECT_ROOT / "src/strategies/official"
+GENERATED_STRATEGIES_DIR = PROJECT_ROOT / "src/strategies/generated"
+FUNDAMENTAL_DATA_DIR = PROJECT_ROOT / "data/fundamental"
+MODELS_DIR = PROJECT_ROOT / "models"
+LATEST_MODELS_DIR = PROJECT_ROOT / "models/latest"
+ARCHIVE_MODELS_DIR = PROJECT_ROOT / "models/archive"
+GUI_DIR = PROJECT_ROOT / "noctria_gui"
+AIRFLOW_LOG_DIR = PROJECT_ROOT / "airflow_docker/logs"

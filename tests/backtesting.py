@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 class Backtesting:
     """過去データを用いて戦略のパフォーマンスを検証"""
@@ -15,12 +16,15 @@ class Backtesting:
         self.data["signal"] = np.where(self.data["SMA_50"] > self.data["SMA_200"], 1, -1)
         return self.data[["date", "price", "signal"]]
 
+
 # ✅ バックテスト適用テスト
 if __name__ == "__main__":
-    mock_data = pd.DataFrame({
-        "date": pd.date_range(start="2023-01-01", periods=300),
-        "price": np.random.uniform(1.2, 1.5, 300)
-    })
+    mock_data = pd.DataFrame(
+        {
+            "date": pd.date_range(start="2023-01-01", periods=300),
+            "price": np.random.uniform(1.2, 1.5, 300),
+        }
+    )
     backtester = Backtesting(mock_data)
     results = backtester.run_backtest()
 

@@ -8,18 +8,22 @@ from datetime import date
 router = APIRouter()
 
 # フロントが使うソートキーを固定して安全化
-SortKey = Literal["date", "tag", "evals", "adopted", "win_rate", "max_drawdown", "rechecks", "trades"]
+SortKey = Literal[
+    "date", "tag", "evals", "adopted", "win_rate", "max_drawdown", "rechecks", "trades"
+]
 SortDir = Literal["asc", "desc"]
+
 
 class DetailRow(BaseModel):
     date: str
     tag: str
     evals: int = 0
     adopted: int = 0
-    win_rate: Optional[float] = None      # 0.0-1.0（API内では比率、フロントで%化）
+    win_rate: Optional[float] = None  # 0.0-1.0（API内では比率、フロントで%化）
     max_drawdown: Optional[float] = None  # 0.0-1.0 の負方向
     rechecks: int = 0
     trades: int = 0
+
 
 class DetailsResponse(BaseModel):
     items: List[DetailRow]
@@ -29,9 +33,12 @@ class DetailsResponse(BaseModel):
     sort_key: SortKey
     sort_dir: SortDir
 
+
 def _parse_date(s: Optional[str]) -> Optional[date]:
-    if not s: return None
+    if not s:
+        return None
     return date.fromisoformat(s)
+
 
 def _build_filters(
     date_from: Optional[str],
@@ -47,16 +54,18 @@ def _build_filters(
         "date_from": _parse_date(date_from),
         "date_to": _parse_date(date_to),
         "tag": (tag or "").strip() or None,
-        "win_diff": win_diff,       # 例：ベンチとの差分(%)をAPIが受けるならここで変換
-        "dd_diff": dd_diff,         # 同上
+        "win_diff": win_diff,  # 例：ベンチとの差分(%)をAPIが受けるならここで変換
+        "dd_diff": dd_diff,  # 同上
         "min_trades": min_trades or 0,
     }
 
+
 def _allowed(sort_key: str) -> SortKey:
-    allowed = {"date","tag","evals","adopted","win_rate","max_drawdown","rechecks","trades"}
+    allowed = {"date", "tag", "evals", "adopted", "win_rate", "max_drawdown", "rechecks", "trades"}
     if sort_key not in allowed:
         return "date"  # 既定
     return sort_key  # type: ignore
+
 
 @router.get("/pdca/api/details", response_model=DetailsResponse)
 def get_details(
@@ -110,6 +119,7 @@ def get_details(
         # DEMO: ダミーデータ（実装時は↑のDBアクセスに置換）
         import random
         import datetime as dt
+
         rng = random.Random(42)
         DF = _parse_date(date_from) or dt.date.today().replace(day=1)
         DT = _parse_date(date_to) or dt.date.today()
@@ -117,14 +127,14 @@ def get_details(
         universe = []
         for i in range(max(1, days)):
             d = DF + dt.timedelta(days=i)
-            for tg in (["veritas","levia","sirius"] if not tag else [tag]):
+            for tg in ["veritas", "levia", "sirius"] if not tag else [tag]:
                 r = {
                     "date": d.isoformat(),
                     "tag": tg,
                     "evals": rng.randint(0, 30),
                     "adopted": rng.randint(0, 10),
-                    "win_rate": rng.random(),             # 0-1
-                    "max_drawdown": -rng.random()*0.2,    # 0 ～ -0.2
+                    "win_rate": rng.random(),  # 0-1
+                    "max_drawdown": -rng.random() * 0.2,  # 0 ～ -0.2
                     "rechecks": rng.randint(0, 5),
                     "trades": rng.randint(10, 120),
                 }
@@ -134,21 +144,24 @@ def get_details(
         total = len(universe)
         # ソート
         sk = _allowed(sort_key)
-        reverse = (sort_dir == "desc")
+        reverse = sort_dir == "desc"
+
         def _key(r):
             v = r.get(sk)
             # None 安定化（末尾送り）
             return (v is None, v)
+
         universe.sort(key=_key, reverse=reverse)
         # ページング
-        page = universe[offset: offset+limit]
+        page = universe[offset : offset + limit]
 
         return DetailsResponse(
             items=[DetailRow(**it) for it in page],
             total=total,
             limit=limit,
             offset=offset,
-            sort_key=sk, sort_dir=sort_dir
+            sort_key=sk,
+            sort_dir=sort_dir,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

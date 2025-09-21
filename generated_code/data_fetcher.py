@@ -2,6 +2,7 @@ import requests
 
 from path_config import DATA_API_ENDPOINT
 
+
 class DataFetcher:
     def __init__(self):
         self.api_endpoint = DATA_API_ENDPOINT
@@ -12,6 +13,7 @@ class DataFetcher:
             return response.json()
         else:
             raise Exception("データ取得失敗")
+
 
 def log_difference_and_reason(old_data, new_data, reason):
     pass

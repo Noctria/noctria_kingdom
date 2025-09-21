@@ -1,5 +1,6 @@
-import requests
 import base64
+
+import requests
 
 # === 🔧 設定 ===
 GITHUB_USER = "Noctria"
@@ -14,11 +15,12 @@ TARGET_DIRS = [
     "airflow_docker/core",
     "airflow_docker/data",
     "veritas",
-    "veritas_dev"
+    "veritas_dev",
 ]
 
 HEAD_LINES = 10
 OUTPUT_FILE = "NOCTRIA_REMOTE_TEMPLATE.md"
+
 
 # === 📦 GitHub API関数 ===
 def fetch_tree(user, repo, branch, token):
@@ -27,6 +29,7 @@ def fetch_tree(user, repo, branch, token):
     res = requests.get(url, headers=headers)
     res.raise_for_status()
     return res.json()["tree"]
+
 
 def fetch_file_content(user, repo, path, token):
     url = f"https://api.github.com/repos/{user}/{repo}/contents/{path}"
@@ -38,9 +41,10 @@ def fetch_file_content(user, repo, path, token):
         return base64.b64decode(data["content"]).decode("utf-8")
     return None
 
+
 # === 📝 Markdownテンプレート生成 ===
 def generate_summary():
-    md = f"# 📘 Noctria Kingdom GitHub構成テンプレート（API自動生成）\n"
+    md = "# 📘 Noctria Kingdom GitHub構成テンプレート（API自動生成）\n"
     md += f"対象リポジトリ: `{GITHUB_USER}/{REPO_NAME}` @ `{BRANCH}`\n\n"
 
     tree = fetch_tree(GITHUB_USER, REPO_NAME, BRANCH, GITHUB_TOKEN)
@@ -48,7 +52,11 @@ def generate_summary():
     for base in TARGET_DIRS:
         md += f"## 📁 `{base}/`\n"
         for obj in tree:
-            if obj["type"] == "blob" and obj["path"].startswith(base) and obj["path"].endswith(".py"):
+            if (
+                obj["type"] == "blob"
+                and obj["path"].startswith(base)
+                and obj["path"].endswith(".py")
+            ):
                 rel_path = obj["path"]
                 md += f"### 📄 `{rel_path}`\n```python\n"
                 try:
@@ -61,6 +69,7 @@ def generate_summary():
                 md += "\n```\n\n"
         md += "\n"
     return md
+
 
 # === 💾 メイン処理 ===
 if __name__ == "__main__":

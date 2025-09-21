@@ -1,5 +1,6 @@
 # strategies/self_play.py
 
+
 class NoctriaSelfPlayAI:
     """
     自己対戦学習用のAIクラス（スタブ）

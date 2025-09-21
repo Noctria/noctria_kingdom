@@ -21,6 +21,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter()
 
+
 # ================================
 # 📥 統治ログの一括CSVダウンロード
 # ================================
@@ -48,16 +49,9 @@ async def export_all_governance_logs():
     try:
         latest_file: Path = max(output_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime)
     except ValueError:
-        return HTMLResponse(
-            content="<h3>⚠️ 出力ファイルが存在しません</h3>",
-            status_code=404
-        )
+        return HTMLResponse(content="<h3>⚠️ 出力ファイルが存在しません</h3>", status_code=404)
 
-    return FileResponse(
-        latest_file,
-        filename=latest_file.name,
-        media_type="text/csv"
-    )
+    return FileResponse(latest_file, filename=latest_file.name, media_type="text/csv")
 
 
 # ================================

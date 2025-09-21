@@ -1,6 +1,10 @@
 from __future__ import annotations
-import yaml, os
-from typing import Dict, Any, Optional
+
+import os
+from typing import Any, Dict, Optional
+
+import yaml
+
 
 class Policy:
     def __init__(self, d: Dict[str, Any]):
@@ -24,15 +28,19 @@ class Policy:
     def version(self) -> str:
         return str(self.d.get("policy_version", "0"))
 
+
 def load_policy(path: Optional[str] = None) -> Policy:
     path = path or os.getenv("NOCTRIA_POLICY_FILE", "docs/codex/codex_noctria_policy.yaml")
     with open(path, "r", encoding="utf-8") as f:
         return Policy(yaml.safe_load(f))
 
+
 POLICY = load_policy()
+
 
 class GuardrailError(Exception):
     pass
+
 
 def _check_governance(context: Dict[str, Any]):
     gov = POLICY.governance()
@@ -45,6 +53,7 @@ def _check_governance(context: Dict[str, Any]):
             continue
         if (op == "<" and x < value) or (op == ">" and x > value):
             raise GuardrailError(f"Blocked by governance rule: {metric} {op} {value} (actual={x})")
+
 
 def enforce(agent: str, action: str, context: Dict[str, Any]):
     """

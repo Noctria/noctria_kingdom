@@ -11,6 +11,7 @@ scripts/generate_handoff.py
 - --airflow-container: （--include-airflow有効時）対象コンテナ名（デフォルト: noctria_airflow_scheduler）
 - --max-runs         : （--include-airflow有効時）一覧に載せる最大件数（デフォルト: 5）
 """
+
 from __future__ import annotations
 from pathlib import Path
 import argparse
@@ -25,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HANDOFF_DIR = ROOT / "handoff"
 HANDOFF_DIR.mkdir(exist_ok=True)
 
+
 # ------------------------
 # Shell helpers
 # ------------------------
@@ -38,6 +40,7 @@ def run(cmd: str, *, cwd: Path | None = None, check: bool = True) -> str:
             raise
         return e.output.strip() if e.output else ""
 
+
 def command_exists(cmd: str) -> bool:
     """Return True if command exists on PATH."""
     try:
@@ -45,6 +48,7 @@ def command_exists(cmd: str) -> bool:
         return True
     except Exception:
         return False
+
 
 # ------------------------
 # Git
@@ -66,6 +70,7 @@ def recent_commits(hours: int) -> List[Dict]:
             commits.append({"hash": h, "title": subj, "when": rel, "timestamp": ts})
     return commits
 
+
 # ------------------------
 # Next actions
 # ------------------------
@@ -74,6 +79,7 @@ DEFAULT_NEXT_ACTIONS = [
     "戦略指定パラメータの対応",
     "結果の artifact / PR コメント出力",
 ]
+
 
 def read_next_actions(path: str | None) -> List[str]:
     if not path:
@@ -88,6 +94,7 @@ def read_next_actions(path: str | None) -> List[str]:
             items.append(ln)
     return items or ["(次アクションが空)"]
 
+
 def file_contains(path: Path, needle: str) -> bool:
     if not path.exists() or not path.is_file():
         return False
@@ -96,6 +103,7 @@ def file_contains(path: Path, needle: str) -> bool:
         return needle in txt
     except Exception:
         return False
+
 
 def auto_complete_next(actions: List[str]) -> List[Tuple[str, bool]]:
     """
@@ -108,18 +116,26 @@ def auto_complete_next(actions: List[str]) -> List[Tuple[str, bool]]:
     repo_veritas_alt = ROOT / "scripts" / "veritas_local_test.py"  # 片方にあるケースも
 
     # 1) DAG 本処理の組み込み（render_report タスクが存在＆report.html を書いている）
-    dag_has_render_task = file_contains(dag_path, "render_report") and file_contains(dag_path, "report.html")
+    dag_has_render_task = file_contains(dag_path, "render_report") and file_contains(
+        dag_path, "report.html"
+    )
 
     # 2) 戦略指定パラメータの対応（DAG で NOCTRIA_STRATEGY_GLOB / NOCTRIA_EXTRA_ARGS を設定し実行へ渡す）
-    dag_sets_env = file_contains(dag_path, "NOCTRIA_STRATEGY_GLOB") and file_contains(dag_path, "NOCTRIA_EXTRA_ARGS")
+    dag_sets_env = file_contains(dag_path, "NOCTRIA_STRATEGY_GLOB") and file_contains(
+        dag_path, "NOCTRIA_EXTRA_ARGS"
+    )
     # 実スクリプト側が環境変数 or 引数を読む実装かは厳密にはソース依存。ここでは存在の痕跡だけ軽く見る
-    script_consumes_env = any([
-        file_contains(repo_veritas, "NOCTRIA_STRATEGY_GLOB") or file_contains(repo_veritas, "NOCTRIA_EXTRA_ARGS"),
-        file_contains(repo_veritas_alt, "NOCTRIA_STRATEGY_GLOB") or file_contains(repo_veritas_alt, "NOCTRIA_EXTRA_ARGS"),
-        # もしくは scripts/backtest_runner.py が受け取っている
-        file_contains(scripts_dir / "backtest_runner.py", "NOCTRIA_STRATEGY_GLOB") or
-        file_contains(scripts_dir / "backtest_runner.py", "NOCTRIA_EXTRA_ARGS"),
-    ])
+    script_consumes_env = any(
+        [
+            file_contains(repo_veritas, "NOCTRIA_STRATEGY_GLOB")
+            or file_contains(repo_veritas, "NOCTRIA_EXTRA_ARGS"),
+            file_contains(repo_veritas_alt, "NOCTRIA_STRATEGY_GLOB")
+            or file_contains(repo_veritas_alt, "NOCTRIA_EXTRA_ARGS"),
+            # もしくは scripts/backtest_runner.py が受け取っている
+            file_contains(scripts_dir / "backtest_runner.py", "NOCTRIA_STRATEGY_GLOB")
+            or file_contains(scripts_dir / "backtest_runner.py", "NOCTRIA_EXTRA_ARGS"),
+        ]
+    )
     strategy_params_ready = dag_sets_env and script_consumes_env
 
     # 3) 結果の artifact / PR コメント出力（GitHub Actions で artifact or コメント投稿）
@@ -127,7 +143,12 @@ def auto_complete_next(actions: List[str]) -> List[Tuple[str, bool]]:
     any_wf = list(gh_wf_dir.glob("*.yml")) + list(gh_wf_dir.glob("*.yaml"))
     artifact_or_comment = False
     for wf in any_wf:
-        if file_contains(wf, "upload-artifact") or file_contains(wf, "github-script") or file_contains(wf, "Create or update comment") or file_contains(wf, "issue_comment"):
+        if (
+            file_contains(wf, "upload-artifact")
+            or file_contains(wf, "github-script")
+            or file_contains(wf, "Create or update comment")
+            or file_contains(wf, "issue_comment")
+        ):
             artifact_or_comment = True
             break
 
@@ -143,6 +164,7 @@ def auto_complete_next(actions: List[str]) -> List[Tuple[str, bool]]:
         results.append((a, done))
     return results
 
+
 # ------------------------
 # Airflow backtests (optional)
 # ------------------------
@@ -157,27 +179,36 @@ def list_backtests_in_container(container: str, max_runs: int = 5) -> List[Dict]
     try:
         base = "/opt/airflow/backtests"
         # 直近ディレクトリを新しい順に
-        dirs = run(f'docker exec {shlex.quote(container)} bash -lc "ls -1t {base} 2>/dev/null | head -n {int(max_runs)}"', check=False)
+        dirs = run(
+            f'docker exec {shlex.quote(container)} bash -lc "ls -1t {base} 2>/dev/null | head -n {int(max_runs)}"',
+            check=False,
+        )
         run_ids = [d.strip() for d in dirs.splitlines() if d.strip()]
         results: List[Dict] = []
         for rid in run_ids:
+
             def exists(p: str) -> bool:
                 code = subprocess.call(
                     ["docker", "exec", container, "bash", "-lc", f"test -f {shlex.quote(p)}"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 return code == 0
+
             outdir = f"{base}/{rid}"
-            results.append({
-                "run_id": rid,
-                "has_conf": exists(f"{outdir}/conf.json"),
-                "has_result": exists(f"{outdir}/result.json"),
-                "has_html": exists(f"{outdir}/report.html"),
-                "has_stdout": exists(f"{outdir}/stdout.txt"),
-            })
+            results.append(
+                {
+                    "run_id": rid,
+                    "has_conf": exists(f"{outdir}/conf.json"),
+                    "has_result": exists(f"{outdir}/result.json"),
+                    "has_html": exists(f"{outdir}/report.html"),
+                    "has_stdout": exists(f"{outdir}/stdout.txt"),
+                }
+            )
         return results
     except Exception:
         return []
+
 
 # ------------------------
 # Main
@@ -186,8 +217,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--lookback-hours", type=int, default=24)
     ap.add_argument("--next-from", type=str, default=None)
-    ap.add_argument("--auto-complete-next", action="store_true", help="次アクションを自動判定して [x] を付ける")
-    ap.add_argument("--include-airflow", action="store_true", help="Airflow の backtests 一覧を付記する")
+    ap.add_argument(
+        "--auto-complete-next", action="store_true", help="次アクションを自動判定して [x] を付ける"
+    )
+    ap.add_argument(
+        "--include-airflow", action="store_true", help="Airflow の backtests 一覧を付記する"
+    )
     ap.add_argument("--airflow-container", type=str, default="noctria_airflow_scheduler")
     ap.add_argument("--max-runs", type=int, default=5)
     args = ap.parse_args()
@@ -263,6 +298,7 @@ def main():
     json_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(f"✅ Handoff written:\n- {md_path}\n- {json_path}")
+
 
 if __name__ == "__main__":
     main()

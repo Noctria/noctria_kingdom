@@ -26,6 +26,7 @@ INVENTOR_SYSTEM_PROMPT = """\
 - "followup_tests": 追試案
 """
 
+
 # =========================
 # 既存: データモデル (+最小強化)
 # =========================
@@ -347,7 +348,7 @@ class InventorScriptus:
         return InventorOutput(
             summary="失敗テストに対する最小修正案の下書き",
             root_causes=root_causes,
-            patch_suggestions=suggestions if suggestions else [self._generic_suggestion("")],
+            patch_suggestions=(suggestions if suggestions else [self._generic_suggestion("")]),
             followup_tests=followups,  # ← 空にならない
             generated_at=generated_at,
             trace_id=trace_id,
@@ -371,10 +372,10 @@ class InventorScriptus:
 
         header = (
             "# 🛠️ Inventor Scriptus — 修正案（Lv1）\n\n"
-            f"- Generated: `{context.get('generated_at','')}`\n"
-            f"- Pytest: total={context.get('pytest_summary',{}).get('total',0)}, "
-            f"failed={context.get('pytest_summary',{}).get('failed',0)}, "
-            f"errors={context.get('pytest_summary',{}).get('errors',0)}\n"
+            f"- Generated: `{context.get('generated_at', '')}`\n"
+            f"- Pytest: total={context.get('pytest_summary', {}).get('total', 0)}, "
+            f"failed={context.get('pytest_summary', {}).get('failed', 0)}, "
+            f"errors={context.get('pytest_summary', {}).get('errors', 0)}\n"
         )
         if context.get("trace_id"):
             header += f"- Trace ID: `{context.get('trace_id')}`\n"

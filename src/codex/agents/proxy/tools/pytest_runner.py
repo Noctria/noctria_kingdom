@@ -1,10 +1,10 @@
-cat > codex/agents/proxy/tools/pytest_runner.py << 'PY'
+cat > codex / agents / proxy / tools / pytest_runner.py << "PY"
 from __future__ import annotations
 
 import os
 import subprocess
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class PytestTool:
@@ -22,6 +22,7 @@ class PytestTool:
     - ログは codex_reports/proxy_pytest_last.log に保存
     - デフォルト timeout=180s（kwargs["timeout"] で上書き可）
     """
+
     name = "pytest"
 
     def __init__(self, cwd: str, reports_dir: Path):
@@ -77,7 +78,8 @@ class PytestTool:
         failed = 0
         try:
             import re
-            for line in (cp.stderr.splitlines() + cp.stdout.splitlines()):
+
+            for line in cp.stderr.splitlines() + cp.stdout.splitlines():
                 m = re.search(r"(\d+)\s+failed", line.lower())
                 if m:
                     failed = int(m.group(1))
@@ -103,5 +105,13 @@ class PytestTool:
         except Exception:
             pass
 
-        return {"ok": ok, "returncode": rc, "failed": failed, "status": status, "cmd": " ".join(cmd)}
+        return {
+            "ok": ok,
+            "returncode": rc,
+            "failed": failed,
+            "status": status,
+            "cmd": " ".join(cmd),
+        }
+
+
 PY

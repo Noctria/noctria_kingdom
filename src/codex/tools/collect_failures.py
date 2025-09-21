@@ -1,8 +1,11 @@
 # codex/tools/collect_failures.py
 from __future__ import annotations
-import json, sys
+
+import json
+import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
+
 
 def main():
     if len(sys.argv) < 3:
@@ -26,8 +29,8 @@ def main():
     else:
         lines.append(f"{len(failed)} failures detected. Drafting notes:\n")
         for i, t in enumerate(failed, 1):
-            nodeid = t.get("nodeid","")
-            longrepr = t.get("longrepr","") or t.get("calllongrepr","")
+            nodeid = t.get("nodeid", "")
+            longrepr = t.get("longrepr", "") or t.get("calllongrepr", "")
             # 短くトリミング
             snippet = str(longrepr)
             if len(snippet) > 1200:
@@ -57,6 +60,7 @@ def main():
         ]
 
     out_md.write_text("\n".join(lines))
+
 
 if __name__ == "__main__":
     main()

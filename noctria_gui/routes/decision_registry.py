@@ -13,17 +13,18 @@ Decision Registry ビュー & エクスポート（HUD）
 """
 
 from __future__ import annotations
+
 import csv
 import io
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 try:
     # src側のレジストリ
-    from src.core.decision_registry import tail_ledger, list_events
+    from src.core.decision_registry import list_events, tail_ledger
 except Exception:  # フォールバック（未配置でもGUIは生かす）
     tail_ledger = None  # type: ignore
     list_events = None  # type: ignore
@@ -91,7 +92,9 @@ def _extract_airflow_refs_from_extra(extra: Dict[str, Any]) -> List[Tuple[str, s
 async def decisions_index(
     request: Request,
     n: int = Query(200, ge=1, le=5000),
-    q: Optional[str] = Query(None, description="free-text (decision_id/kind/phase/issued_by に対する部分一致)"),
+    q: Optional[str] = Query(
+        None, description="free-text (decision_id/kind/phase/issued_by に対する部分一致)"
+    ),
     kind: Optional[str] = Query(None),
     phase: Optional[str] = Query(None),
     issued_by: Optional[str] = Query(None),
@@ -100,7 +103,10 @@ async def decisions_index(
     直近 n 件のイベントを一覧表示。q で横断検索、kind/phase/issued_by で追加フィルタ。
     """
     if tail_ledger is None:
-        return HTMLResponse("<h1>Decision Registry 未配備</h1><p>src/core/decision_registry.py を配置してください。</p>", status_code=501)
+        return HTMLResponse(
+            "<h1>Decision Registry 未配備</h1><p>src/core/decision_registry.py を配置してください。</p>",
+            status_code=501,
+        )
 
     rows: List[Dict[str, Any]] = tail_ledger(n=n)  # JSON文字列のまま返る想定
 
@@ -144,7 +150,10 @@ async def decisions_detail(request: Request, decision_id: str):
     指定 decision_id のイベント時系列を表示 + Airflow Run への相互リンク
     """
     if list_events is None:
-        return HTMLResponse("<h1>Decision Registry 未配備</h1><p>src/core/decision_registry.py を配置してください。</p>", status_code=501)
+        return HTMLResponse(
+            "<h1>Decision Registry 未配備</h1><p>src/core/decision_registry.py を配置してください。</p>",
+            status_code=501,
+        )
 
     events = list_events(decision_id=decision_id)  # JSON文字列のまま
     if not events:
@@ -173,7 +182,9 @@ async def decisions_detail(request: Request, decision_id: str):
             if key in seen:
                 continue
             seen.add(key)
-            airflow_refs.append({"dag_id": dag_id or "", "dag_run_id": dag_run_id, "ts_utc": ev.get("ts_utc", "")})
+            airflow_refs.append(
+                {"dag_id": dag_id or "", "dag_run_id": dag_run_id, "ts_utc": ev.get("ts_utc", "")}
+            )
 
     return _render(
         request,
@@ -258,7 +269,11 @@ async def decisions_export_csv(
     カラム: ts_utc, phase, decision_id, kind, issued_by, intent_json, policy_snapshot_json, extra_json
     """
     if tail_ledger is None:
-        return Response("Decision Registry not available", status_code=501, media_type="text/plain; charset=utf-8")
+        return Response(
+            "Decision Registry not available",
+            status_code=501,
+            media_type="text/plain; charset=utf-8",
+        )
 
     rows = _collect_list_for_export(n, q, kind, phase, issued_by)
 

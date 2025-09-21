@@ -3,7 +3,9 @@
 """
 
 import random
+
 import numpy as np
+
 
 class GeneticAlgorithm:
     def __init__(self, population_size=50, mutation_rate=0.01, generations=100):

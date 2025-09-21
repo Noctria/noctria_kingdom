@@ -7,10 +7,10 @@
 - Airflowワークフローにも対応
 """
 
-import shutil
 import json
-from pathlib import Path
-from src.core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR
+import shutil
+
+from src.core.path_config import STRATEGIES_DIR, VERITAS_EVAL_LOG
 
 # ========================================
 # 🏅 Veritas ML戦略昇格パス
@@ -18,6 +18,7 @@ from src.core.path_config import VERITAS_EVAL_LOG, STRATEGIES_DIR
 EVAL_LOG_PATH = VERITAS_EVAL_LOG
 SOURCE_DIR = STRATEGIES_DIR / "veritas_generated"
 DEST_DIR = STRATEGIES_DIR / "official"
+
 
 def promote_accepted_strategies():
     print("👑 [Veritas Machina] 合格戦略の公式昇格処理を開始…")
@@ -52,6 +53,7 @@ def promote_accepted_strategies():
             print(" -", f)
     else:
         print("🚫 昇格対象の戦略はありません。")
+
 
 if __name__ == "__main__":
     promote_accepted_strategies()

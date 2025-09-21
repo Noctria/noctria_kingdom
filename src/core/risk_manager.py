@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 class RiskManager:
     """Noctria Kingdom のリスク管理モジュール（Close 欄の自動補完に対応）"""
 
-    def __init__(self, historical_data: Optional[pd.DataFrame] = None, price_col: Optional[str] = None):
+    def __init__(
+        self,
+        historical_data: Optional[pd.DataFrame] = None,
+        price_col: Optional[str] = None,
+    ):
         """
         初期化：リスク評価に使用する市場データをロード
         :param historical_data: pd.DataFrame | None
@@ -26,7 +30,9 @@ class RiskManager:
         self.value_at_risk: float = np.inf
 
         if historical_data is None or len(historical_data) == 0:
-            logger.warning("【RiskManager初期化】履歴データが空です。リスク機能を限定モードにします。")
+            logger.warning(
+                "【RiskManager初期化】履歴データが空です。リスク機能を限定モードにします。"
+            )
             return
 
         # コピーして作業
@@ -36,7 +42,9 @@ class RiskManager:
         self._ensure_close_column(price_col=price_col)
 
         if "Close" not in self.data.columns:
-            logger.warning("【RiskManager初期化】'Close' 欄を補えませんでした。リスク機能を限定モードにします。")
+            logger.warning(
+                "【RiskManager初期化】'Close' 欄を補えませんでした。リスク機能を限定モードにします。"
+            )
             self.data = None
             return
 
@@ -76,7 +84,10 @@ class RiskManager:
         for alias in ("closeprice", "adj close", "adjclose", "price", "last"):
             if alias in cols_lower:
                 self.data["Close"] = self.data[cols_lower[alias]]
-                logger.info("RiskManager: 列 '%s' を Close として使用します。", cols_lower[alias])
+                logger.info(
+                    "RiskManager: 列 '%s' を Close として使用します。",
+                    cols_lower[alias],
+                )
                 return
 
         # 4) Bid/Ask からミッド合成
@@ -190,14 +201,26 @@ if __name__ == "__main__":
     print("🚨 異常:", rm.detect_anomalies())
 
     # Close なし（Bid/Ask から補完）
-    sample_ba = pd.DataFrame({
-        "Bid": np.random.normal(100, 0.5, 120),
-        "Ask": np.random.normal(100.1, 0.5, 120),
-    })
+    sample_ba = pd.DataFrame(
+        {
+            "Bid": np.random.normal(100, 0.5, 120),
+            "Ask": np.random.normal(100.1, 0.5, 120),
+        }
+    )
     rm2 = RiskManager(sample_ba)
-    print("📊(BA) 市場ボラ:", rm2.volatility, "Close 有無:", "Close" in (rm2.data.columns if rm2.data is not None else []))
+    print(
+        "📊(BA) 市場ボラ:",
+        rm2.volatility,
+        "Close 有無:",
+        "Close" in (rm2.data.columns if rm2.data is not None else []),
+    )
 
     # 別名から補完
     sample_alias = pd.DataFrame({"Price": np.random.normal(100, 1.0, 80)})
     rm3 = RiskManager(sample_alias)
-    print("📊(alias) 市場ボラ:", rm3.volatility, "Close 有無:", "Close" in (rm3.data.columns if rm3.data is not None else []))
+    print(
+        "📊(alias) 市場ボラ:",
+        rm3.volatility,
+        "Close 有無:",
+        "Close" in (rm3.data.columns if rm3.data is not None else []),
+    )

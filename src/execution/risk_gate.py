@@ -2,24 +2,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Dict, Any, List, Optional
-from datetime import datetime, time as dt_time, timezone
+from datetime import datetime, timezone
+from datetime import time as dt_time
+from typing import Any, Dict, List, Optional
 
 # -----------------------------------------------------------------------------
 # Imports (work both with `python -m src...` and direct `sys.path`="src")
 # -----------------------------------------------------------------------------
 try:
     # 標準のパス運用（<repo>/src を sys.path に入れている前提）
+    from plan_data.contracts import (
+        OrderRequest,  # 既存の契約 (symbol, intent, qty, order_type, limit_price, sources, trace_id)
+    )
     from plan_data.observability import log_alert
-    from plan_data.contracts import OrderRequest  # 既存の契約 (symbol, intent, qty, order_type, limit_price, sources, trace_id)
 except ModuleNotFoundError:  # 実行形態によっては src.* が必要な場合にフォールバック
-    from src.plan_data.observability import log_alert  # type: ignore
     from src.plan_data.contracts import OrderRequest  # type: ignore
+    from src.plan_data.observability import log_alert  # type: ignore
 
 
 @dataclass
 class GateResult:
     """ゲート結果（介入後の注文と、発火したアラートのサマリ）"""
+
     order: OrderRequest
     alerts: List[Dict[str, Any]]
 
@@ -58,8 +62,14 @@ def _in_trading_hours_utc(now: datetime, windows: List[str]) -> bool:
     return False
 
 
-def _emit(policy: str, reason: str, severity: str, trace_id: Optional[str],
-          details: Dict[str, Any], conn_str: Optional[str]) -> Dict[str, Any]:
+def _emit(
+    policy: str,
+    reason: str,
+    severity: str,
+    trace_id: Optional[str],
+    details: Dict[str, Any],
+    conn_str: Optional[str],
+) -> Dict[str, Any]:
     """
     ALERT を即時に DB へ記録し、サマリ dict を返す。
     ※呼び出し側で二重記録しないこと（この関数内で log_alert 済）
@@ -72,7 +82,12 @@ def _emit(policy: str, reason: str, severity: str, trace_id: Optional[str],
         trace_id=trace_id,
         conn_str=conn_str,
     )
-    return {"policy": policy, "reason": reason, "severity": severity, "details": details}
+    return {
+        "policy": policy,
+        "reason": reason,
+        "severity": severity,
+        "details": details,
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -120,7 +135,9 @@ def apply_risk_policy(
                 conn_str,
             )
         )
-        blocked = replace(order, intent="FLAT", qty=0.0, trace_id=getattr(order, "trace_id", trace_id))
+        blocked = replace(
+            order, intent="FLAT", qty=0.0, trace_id=getattr(order, "trace_id", trace_id)
+        )
         return GateResult(order=blocked, alerts=alerts)
 
     # 2) 取引時間帯（UTC）
@@ -136,7 +153,9 @@ def apply_risk_policy(
                 conn_str,
             )
         )
-        blocked = replace(order, intent="FLAT", qty=0.0, trace_id=getattr(order, "trace_id", trace_id))
+        blocked = replace(
+            order, intent="FLAT", qty=0.0, trace_id=getattr(order, "trace_id", trace_id)
+        )
         return GateResult(order=blocked, alerts=alerts)
 
     # 3) 連敗縮小
@@ -151,7 +170,11 @@ def apply_risk_policy(
                     f"shrink qty after {recent_consecutive_losses} losses -> {int(shrink_pct * 100)}%",
                     "LOW",
                     trace_id,
-                    {"before": qty, "after": new_qty, "losses": recent_consecutive_losses},
+                    {
+                        "before": qty,
+                        "after": new_qty,
+                        "losses": recent_consecutive_losses,
+                    },
                     conn_str,
                 )
             )
@@ -185,7 +208,12 @@ def apply_risk_policy(
                     f"qty adjusted for notional cap: {qty} -> {allowed} (cap={cap}, cur={current_position_notional})",
                     "HIGH",
                     trace_id,
-                    {"before": qty, "after": allowed, "cap": cap, "current": current_position_notional},
+                    {
+                        "before": qty,
+                        "after": allowed,
+                        "cap": cap,
+                        "current": current_position_notional,
+                    },
                     conn_str,
                 )
             )

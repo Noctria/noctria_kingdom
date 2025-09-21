@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 
 def _run(cmd: List[str], cwd: Optional[str] = None, check: bool = True) -> str:
@@ -63,7 +63,11 @@ class GitHelper:
         _run(["git", "fetch", self.remote, "--tags"], cwd=self.repo_dir, check=False)
 
     def pull_rebase(self) -> None:
-        _run(["git", "pull", "--rebase", self.remote, self.branch], cwd=self.repo_dir, check=False)
+        _run(
+            ["git", "pull", "--rebase", self.remote, self.branch],
+            cwd=self.repo_dir,
+            check=False,
+        )
 
     def push_with_retry(self) -> None:
         """
@@ -120,7 +124,13 @@ class GitHelper:
         # creatordate は軽量/注釈付きの双方で作成日時を表現してくれる
         fmt = "%(refname:short)|%(creatordate:iso8601)|%(objectname:short)|%(taggername)"
         out = _run(
-            ["git", "for-each-ref", "--sort=-creatordate", f"--format={fmt}", "refs/tags"],
+            [
+                "git",
+                "for-each-ref",
+                "--sort=-creatordate",
+                f"--format={fmt}",
+                "refs/tags",
+            ],
             cwd=self.repo_dir,
             check=False,
         ).strip()
@@ -146,7 +156,7 @@ class GitHelper:
         """
         # 注釈の有無
         tagger = _run(
-            ["git", "for-each-ref", f"--format=%(taggername)", f"refs/tags/{tag}"],
+            ["git", "for-each-ref", "--format=%(taggername)", f"refs/tags/{tag}"],
             cwd=self.repo_dir,
             check=False,
         ).strip()
@@ -157,6 +167,14 @@ class GitHelper:
 
         sha = _run(["git", "rev-list", "-n", "1", tag], cwd=self.repo_dir, check=False).strip()
         # 作成日時（コミット/タグの author 日付）
-        date = _run(["git", "log", "-1", "--format=%aI", tag], cwd=self.repo_dir, check=False).strip()
+        date = _run(
+            ["git", "log", "-1", "--format=%aI", tag], cwd=self.repo_dir, check=False
+        ).strip()
 
-        return {"name": tag, "sha": sha, "date": date, "message": msg, "annotated": annotated}
+        return {
+            "name": tag,
+            "sha": sha,
+            "date": date,
+            "message": msg,
+            "annotated": annotated,
+        }

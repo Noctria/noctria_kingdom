@@ -22,10 +22,10 @@ DEFAULT_POLICY: Dict[str, Any] = {
     "default": {
         "trading_hours_utc": ["00:00-23:59"],  # 例 "08:00-22:00"
         "max_consecutive_losses": 0,
-        "shrink_after_losses_pct": 50,         # N連敗以上で qty を%縮小
-        "max_order_qty": 5_000.0,              # 単発注文の上限
-        "max_position_notional": 50_000.0,     # 総量上限（簡易）
-        "forbidden_symbols": [],               # 完全禁止シンボル
+        "shrink_after_losses_pct": 50,  # N連敗以上で qty を%縮小
+        "max_order_qty": 5_000.0,  # 単発注文の上限
+        "max_position_notional": 50_000.0,  # 総量上限（簡易）
+        "forbidden_symbols": [],  # 完全禁止シンボル
     },
     "overrides": {
         # 例:
@@ -95,7 +95,10 @@ def _normalize_loaded(data: Any) -> Dict[str, Any]:
         # 既定と浅くマージ（欠損キーは埋める）
         merged = {
             "default": {**DEFAULT_POLICY["default"], **(data.get("default") or {})},
-            "overrides": {**DEFAULT_POLICY.get("overrides", {}), **(data.get("overrides") or {})},
+            "overrides": {
+                **DEFAULT_POLICY.get("overrides", {}),
+                **(data.get("overrides") or {}),
+            },
         }
         return _coerce_policy_types(merged)
 
@@ -116,10 +119,7 @@ def load_policy(path: Optional[str] = None) -> Dict[str, Any]:
       3) 'configs/risk_policy.yml'
     読み込み失敗や PyYAML 不在時は DEFAULT_POLICY を返す。
     """
-    candidate = Path(
-        path
-        or os.getenv("NOCTRIA_RISK_POLICY", "configs/risk_policy.yml")
-    )
+    candidate = Path(path or os.getenv("NOCTRIA_RISK_POLICY", "configs/risk_policy.yml"))
 
     if yaml is None or not candidate.exists():
         return dict(DEFAULT_POLICY)

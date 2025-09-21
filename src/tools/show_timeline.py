@@ -1,55 +1,14 @@
-# ============================================
-# File: src/tools/show_timeline.py
-# ============================================
-"""
-CLI: Show Noctria observability timeline & latency
-
-Usage examples:
-  # Show recent trace IDs (top 10)
-  python -m src.tools.show_timeline --list-traces
-
-  # Show timeline for a specific trace (compact)
-  python -m src.tools.show_timeline --trace TID
-
-  # Show timeline with pretty JSON payloads
-  python -m src.tools.show_timeline --trace TID --wide
-
-  # Ensure views & show last 14 days latency percentiles
-  python -m src.tools.show_timeline --daily-latency --days 14 --refresh-views
-
-Environment:
-  NOCTRIA_OBS_PG_DSN (e.g. postgresql://user:pass@localhost:5433/noctria_db)
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
-import sys
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Iterable, List, Optional, Sequence
 
-# ---------------------------------------------------------------------
-# Import path stabilization
-#   - Insert <repo>/src into sys.path so "from plan_data ..." works.
-#   - If available, delegate to core.path_config.ensure_import_path().
-# ---------------------------------------------------------------------
-SRC_DIR = Path(__file__).resolve().parents[1]  # .../<repo>/src
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
-try:
-    # Optional centralized import-path manager
-    from core.path_config import ensure_import_path  # type: ignore
-    ensure_import_path()
-except Exception:
-    pass
-
-# We reuse observability helpers (for ensure_* only).
-from plan_data.observability import ensure_tables, ensure_views, refresh_materialized  # type: ignore
+from plan_data.observability import (
+    ensure_views,
+    refresh_materialized,
+)
 
 
 # ---------------------------------------------------------------------
@@ -70,12 +29,14 @@ def _import_driver() -> _Driver:
         return _DRIVER
     try:
         import psycopg2 as _psycopg2  # type: ignore
+
         _DRIVER = _Driver(_psycopg2, "psycopg2")
         return _DRIVER
     except ModuleNotFoundError:
         pass
     try:
         import psycopg as _psycopg  # type: ignore
+
         _DRIVER = _Driver(_psycopg, "psycopg")
         return _DRIVER
     except ModuleNotFoundError as e:
@@ -105,8 +66,7 @@ def _get_dsn(env_dsn: Optional[str], cli_dsn: Optional[str]) -> str:
     dsn = cli_dsn or env_dsn or os.getenv("NOCTRIA_OBS_PG_DSN")
     if not dsn:
         raise SystemExit(
-            "ERROR: PostgreSQL DSN is not provided. "
-            "Set NOCTRIA_OBS_PG_DSN or pass --dsn."
+            "ERROR: PostgreSQL DSN is not provided. Set NOCTRIA_OBS_PG_DSN or pass --dsn."
         )
     return dsn
 
@@ -211,7 +171,7 @@ def action_show_timeline(dsn: str, trace_id: str, wide: bool, limit: Optional[in
         return
 
     # wide: pretty-print each row with JSON payload
-    for (ts, kind, action, payload) in rows:
+    for ts, kind, action, payload in rows:
         print(f"- ts: {ts}")
         print(f"  kind: {kind}")
         print(f"  action: {action}")
@@ -237,7 +197,11 @@ def action_daily_latency(dsn: str, days: int) -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Show obs timeline / latency")
     p.add_argument("--dsn", default=None, help="PostgreSQL DSN (overrides NOCTRIA_OBS_PG_DSN)")
-    p.add_argument("--refresh-views", action="store_true", help="Ensure/refresh timeline & latency views before querying")
+    p.add_argument(
+        "--refresh-views",
+        action="store_true",
+        help="Ensure/refresh timeline & latency views before querying",
+    )
     sub = p.add_subparsers(dest="cmd")
 
     s_list = sub.add_parser("list", help="List recent trace IDs")
@@ -286,7 +250,12 @@ def main() -> None:
         return action_list_traces(dsn, limit=args.limit)
     elif args.cmd == "timeline":
         ensure_views()
-        return action_show_timeline(dsn, trace_id=args.trace, wide=args.wide, limit=args.limit if args.limit > 0 else None)
+        return action_show_timeline(
+            dsn,
+            trace_id=args.trace,
+            wide=args.wide,
+            limit=args.limit if args.limit > 0 else None,
+        )
     elif args.cmd == "daily-latency":
         ensure_views()
         return action_daily_latency(dsn, days=args.days)

@@ -1,15 +1,17 @@
 import numpy as np
 
+
 class EnsembleLearning:
     """複数モデルを統合し、最適な市場予測を行う"""
-    
+
     def __init__(self, models):
         self.models = models
-    
+
     def predict(self, market_data):
         """各モデルの予測を統合"""
         predictions = [model.predict(market_data) for model in self.models]
         return np.mean(predictions)
+
 
 # ✅ アンサンブル学習適用テスト
 if __name__ == "__main__":

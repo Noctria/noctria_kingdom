@@ -33,14 +33,16 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
-from noctria_gui.routes.statistics import router as statistics_router  # noqa: F401 (side-effects)
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
+
+from noctria_gui.routes.statistics import router as statistics_router  # noqa: F401 (side-effects)
 
 # ---------------------------------------------------------------------------
 # import path: <repo_root>/src を最優先に追加
@@ -51,38 +53,14 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # ---------------------------------------------------------------------------
-# .env 読み込み（python-dotenv が無くても起動継続）
+# .env 読み込み（PROJECT_ROOT/.env → noctria_gui/.env）※best-effort
 # ---------------------------------------------------------------------------
 try:
-    from dotenv import load_dotenv  # type: ignore
     for _env_path in (PROJECT_ROOT / ".env", PROJECT_ROOT / "noctria_gui" / ".env"):
         if _env_path.exists():
             load_dotenv(_env_path, override=False)
-except Exception:
-    pass
-
-# ---------------------------------------------------------------------------
-# 集中管理パス設定（path_config が無くてもフォールバック）
-# ---------------------------------------------------------------------------
-_FALLBACK_STATIC_DIR = PROJECT_ROOT / "noctria_gui" / "static"
-_FALLBACK_TEMPLATES_DIR = PROJECT_ROOT / "noctria_gui" / "templates"
-try:
-    from src.core.path_config import (  # type: ignore
-        NOCTRIA_GUI_STATIC_DIR as _STATIC_DIR,
-        NOCTRIA_GUI_TEMPLATES_DIR as _TEMPLATES_DIR,
-    )
-    NOCTRIA_GUI_STATIC_DIR: Path = Path(str(_STATIC_DIR))
-    NOCTRIA_GUI_TEMPLATES_DIR: Path = Path(str(_TEMPLATES_DIR))
-except Exception:
-    NOCTRIA_GUI_STATIC_DIR = _FALLBACK_STATIC_DIR
-    NOCTRIA_GUI_TEMPLATES_DIR = _FALLBACK_TEMPLATES_DIR
-
-# 🆕 Codex レポートディレクトリ（存在しなければ作成）
-CODEX_REPORTS_DIR = PROJECT_ROOT / "codex_reports"
-try:
-    CODEX_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-except Exception:
-    pass
+except Exception as e:
+    logging.getLogger("noctria_gui.main").warning("dotenv load skipped: %s", e)
 
 # ---------------------------------------------------------------------------
 # logging
@@ -93,6 +71,15 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("noctria_gui.main")
+
+# LLM flags 起動ログ（env 読込後に一度だけ）
+logging.info(
+    "LLM flags: enabled=%s mode=%s base=%s model=%s",
+    os.getenv("NOCTRIA_LLM_ENABLED"),
+    os.getenv("NOCTRIA_HARMONIA_MODE"),
+    os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL"),
+    os.getenv("NOCTRIA_GPT_MODEL") or os.getenv("OPENAI_MODEL"),
+)
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -110,6 +97,30 @@ app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 # ---------------------------------------------------------------------------
 # 静的/テンプレートの安全マウント
 # ---------------------------------------------------------------------------
+# 集中管理パス設定（path_config が無くてもフォールバック）
+_FALLBACK_STATIC_DIR = PROJECT_ROOT / "noctria_gui" / "static"
+_FALLBACK_TEMPLATES_DIR = PROJECT_ROOT / "noctria_gui" / "templates"
+try:
+    from src.core.path_config import (  # type: ignore
+        NOCTRIA_GUI_STATIC_DIR as _STATIC_DIR,
+    )
+    from src.core.path_config import (
+        NOCTRIA_GUI_TEMPLATES_DIR as _TEMPLATES_DIR,
+    )
+
+    NOCTRIA_GUI_STATIC_DIR: Path = Path(str(_STATIC_DIR))
+    NOCTRIA_GUI_TEMPLATES_DIR: Path = Path(str(_TEMPLATES_DIR))
+except Exception:
+    NOCTRIA_GUI_STATIC_DIR = _FALLBACK_STATIC_DIR
+    NOCTRIA_GUI_TEMPLATES_DIR = _FALLBACK_TEMPLATES_DIR
+
+# 🆕 Codex レポートディレクトリ（存在しなければ作成）
+CODEX_REPORTS_DIR = PROJECT_ROOT / "codex_reports"
+try:
+    CODEX_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
 if NOCTRIA_GUI_STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(NOCTRIA_GUI_STATIC_DIR)), name="static")
     logger.info("Static mounted: %s", NOCTRIA_GUI_STATIC_DIR)
@@ -123,9 +134,12 @@ if CODEX_REPORTS_DIR.exists():
 else:
     logger.warning("Codex reports dir not found: %s (skip mounting)", CODEX_REPORTS_DIR)
 
-_tpl_dir = NOCTRIA_GUI_TEMPLATES_DIR if NOCTRIA_GUI_TEMPLATES_DIR.exists() else _FALLBACK_TEMPLATES_DIR
+_tpl_dir = (
+    NOCTRIA_GUI_TEMPLATES_DIR if NOCTRIA_GUI_TEMPLATES_DIR.exists() else _FALLBACK_TEMPLATES_DIR
+)
 templates = Jinja2Templates(directory=str(_tpl_dir))
 logger.info("Templates dir: %s", _tpl_dir)
+
 
 def from_json(value: Any) -> Any:
     if isinstance(value, str):
@@ -135,11 +149,13 @@ def from_json(value: Any) -> Any:
             return {}
     return value
 
+
 def tojson_filter(value: Any, indent: int = 2) -> Markup:
     try:
         return Markup(json.dumps(value, ensure_ascii=False, indent=indent))
     except Exception:
         return Markup("null")
+
 
 templates.env.filters["from_json"] = from_json
 templates.env.filters["tojson"] = tojson_filter
@@ -147,11 +163,14 @@ templates.env.filters["tojson"] = tojson_filter
 # ルーターから参照できるように公開（codex ルーターも利用）
 app.state.jinja_env = templates.env
 
+
 def render_template(request: Request, template_name: str, **ctx: Any) -> str:
     tmpl = templates.env.get_template(template_name)
     return tmpl.render(request=request, **ctx)
 
+
 app.state.render_template = render_template
+
 
 # ---------------------------------------------------------------------------
 # 🆕 GUIレイテンシ観測: リングバッファ & ミドルウェア（任意でJSONL追記）
@@ -166,10 +185,12 @@ class _LatencyStore:
     def snapshot(self, limit: int = 300) -> list[Dict[str, Any]]:
         return list(self._dq)[-limit:]
 
+
 if not hasattr(app.state, "latency_store"):
     app.state.latency_store = _LatencyStore(maxlen=10000)
 
 LAT_LOG_PATH = os.getenv("NOCTRIA_LATENCY_LOG", "logs/observability_gui_latency.jsonl")
+
 
 @app.middleware("http")
 async def latency_middleware(request: Request, call_next):
@@ -179,9 +200,12 @@ async def latency_middleware(request: Request, call_next):
 
     path = request.url.path
     # 自分自身や静的は除外
-    if not (path.startswith("/static") or path.startswith("/codex_reports") or path == "/favicon.ico"):
+    if not (
+        path.startswith("/static") or path.startswith("/codex_reports") or path == "/favicon.ico"
+    ):
         rec = {
-            "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) + f".{int((time.time()%1)*1000):03d}Z",
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            + f".{int((time.time() % 1) * 1000):03d}Z",
             "method": request.method,
             "path": path,
             "status": getattr(resp, "status_code", None),
@@ -198,6 +222,7 @@ async def latency_middleware(request: Request, call_next):
             pass
     return resp
 
+
 # ---------------------------------------------------------------------------
 # PDCAサマリーDB: ensure/health（best-effort）
 # ---------------------------------------------------------------------------
@@ -205,6 +230,7 @@ _SUMMARY_AVAILABLE = False
 _SUMMARY_DSN = None
 try:
     from src.plan_data import pdca_summary_service as _P  # type: ignore
+
     _SUMMARY_AVAILABLE = True
     try:
         _SUMMARY_DSN = getattr(_P, "_get_dsn", lambda: None)()
@@ -213,6 +239,7 @@ try:
 except Exception as _e:
     logger.warning("PDCA summary service not available: %r", _e)
     _SUMMARY_AVAILABLE = False
+
 
 @app.on_event("startup")
 def _startup_pdca_summary() -> None:
@@ -225,10 +252,12 @@ def _startup_pdca_summary() -> None:
     except Exception as e:
         logger.warning("PDCA summary DB init skipped: %r", e)
 
+
 # ---------------------------------------------------------------------------
 # ルーター安全取り込みユーティリティ
 # ---------------------------------------------------------------------------
 HAS_DASHBOARD = False
+
 
 def _safe_include(
     module_path: str,
@@ -259,12 +288,13 @@ def _safe_include(
         logger.warning("Skip router '%s' (%s): %s", module_path, attr, e)
         return False
 
+
 logger.info("Integrating routers...")
 
 # 主要ルーター群（存在しなくてもスキップ可）
 _safe_include("noctria_gui.routes.home_routes")
 _safe_include("noctria_gui.routes.dashboard")
-_safe_include("noctria_gui.routes.plan_news")   # Plan News 画面 & API
+_safe_include("noctria_gui.routes.plan_news")  # Plan News 画面 & API
 
 # 王系
 _safe_include("noctria_gui.routes.king_routes")
@@ -318,10 +348,9 @@ _safe_include("noctria_gui.routes.airflow_runs")
 # 🆕 バックテスト成果物ビュー（FastAPI or Flask どちらでも取り込み）
 #    - FastAPI 版: `router`
 #    - Flask 版  : `backtest_bp`（Starlette の ASGI 互換ラッパは不要。_safe_include が失敗したら警告）
-included_backtests = (
-    _safe_include("noctria_gui.routes.backtest_results", "router", tags=["backtests"])
-    or _safe_include("noctria_gui.routes.backtest_results", "backtest_bp")
-)
+included_backtests = _safe_include(
+    "noctria_gui.routes.backtest_results", "router", tags=["backtests"]
+) or _safe_include("noctria_gui.routes.backtest_results", "backtest_bp")
 if included_backtests:
     logger.info("Included backtest_results routes")
 else:
@@ -351,7 +380,9 @@ included = (
 if included:
     logger.info("Included router: noctria_gui.routes.observability_latency (any attr)")
 else:
-    logger.warning("Observability latency router not mounted (router/bp_obs_latency/obs_bp not found or incompatible)")
+    logger.warning(
+        "Observability latency router not mounted (router/bp_obs_latency/obs_bp not found or incompatible)"
+    )
 
 # 統治ルール可視化
 _safe_include("noctria_gui.routes.governance_rules")
@@ -361,6 +392,7 @@ _safe_include("noctria_gui.routes.codex")
 
 logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBOARD)
 
+
 # ---------------------------------------------------------------------------
 # Routes (root / favicon / toast-clear / health / exception handler)
 # ---------------------------------------------------------------------------
@@ -368,12 +400,14 @@ logger.info("✅ All available routers integrated. HAS_DASHBOARD=%s", HAS_DASHBO
 async def root_redirect():
     return RedirectResponse(url="/dashboard" if HAS_DASHBOARD else "/pdca/summary")
 
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     icon_path = NOCTRIA_GUI_STATIC_DIR / "favicon.ico"
     if icon_path.exists():
         return FileResponse(icon_path, media_type="image/x-icon")
     return Response(status_code=204)
+
 
 @app.get("/__clear_toast", include_in_schema=False)
 async def __clear_toast(request: Request):
@@ -383,6 +417,7 @@ async def __clear_toast(request: Request):
     except Exception:
         pass
     return Response(status_code=204)
+
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz():
@@ -412,17 +447,42 @@ async def healthz():
         }
     )
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    logger.error("Unhandled exception on %s %s: %s\nTraceback:\n%s", request.method, request.url, exc, tb)
-    return JSONResponse(status_code=500, content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"})
+    logger.error(
+        "Unhandled exception on %s %s: %s\nTraceback:\n%s", request.method, request.url, exc, tb
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "サーバー内部エラーが発生しました。管理者にお問い合わせください。"},
+    )
+
 
 # ---------------------------------------------------------------------------
 # Local dev (optional)
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("GUI_PORT", "8001"))
     reload_flag = os.getenv("UVICORN_RELOAD", "0").lower() in ("1", "true", "on")
     uvicorn.run("noctria_gui.main:app", host="0.0.0.0", port=port, reload=reload_flag)
+
+
+def _log_llm_usage(resp):
+    """Best-effort logging of OpenAI-like usage fields."""
+    try:
+        import logging  # local import safe
+
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            pt = getattr(u, "prompt_tokens", None)
+            ct = getattr(u, "completion_tokens", None)
+            tt = getattr(u, "total_tokens", None)
+            logging.info("LLM usage prompt=%s completion=%s total=%s", pt, ct, tt)
+        else:
+            logging.info("LLM usage unavailable (provider?)")
+    except Exception as _e:
+        logging.exception("LLM usage logging failed: %s", _e)

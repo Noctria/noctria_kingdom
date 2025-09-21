@@ -10,12 +10,13 @@
 """
 
 import logging
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.templating import Jinja2Templates
 from datetime import datetime
 
-from src.core.path_config import TOOLS_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
+
 from noctria_gui.services import statistics_service
 
 # プレフィックスは外部で付与される想定
@@ -38,47 +39,51 @@ async def show_statistics_dashboard(request: Request):
         # サービスからデータを取得
         all_logs = statistics_service.load_all_logs()
         stats = statistics_service.get_strategy_statistics()
-        
+
         # フィルタリングとソート
         filtered_logs = statistics_service.filter_logs(
             logs=all_logs,
             strategy=strategy,
             symbol=symbol,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
         )
         sorted_logs = statistics_service.sort_logs(
-            logs=filtered_logs,
-            sort_key="win_rate",
-            descending=True
+            logs=filtered_logs, sort_key="win_rate", descending=True
         )
-        
+
     except Exception as e:
         logging.error(f"Failed to process statistics data: {e}", exc_info=True)
         # エラー発生時も最低限の表示ができるように空のデータを渡す
-        return templates.TemplateResponse("statistics_dashboard.html", {
-            "request": request,
-            "stats": {},
-            "statistics": [],
-            "strategies": [],
-            "symbols": [],
-            "filters": {},
-            "error": "統計データの処理中にエラーが発生しました。"
-        })
+        return templates.TemplateResponse(
+            "statistics_dashboard.html",
+            {
+                "request": request,
+                "stats": {},
+                "statistics": [],
+                "strategies": [],
+                "symbols": [],
+                "filters": {},
+                "error": "統計データの処理中にエラーが発生しました。",
+            },
+        )
 
-    return templates.TemplateResponse("statistics_dashboard.html", {
-        "request": request,
-        "stats": stats,
-        "statistics": sorted_logs,
-        "strategies": statistics_service.get_available_strategies(all_logs),
-        "symbols": statistics_service.get_available_symbols(all_logs),
-        "filters": {
-            "strategy": strategy or "",
-            "symbol": symbol or "",
-            "start_date": start_date or "",
-            "end_date": end_date or "",
+    return templates.TemplateResponse(
+        "statistics_dashboard.html",
+        {
+            "request": request,
+            "stats": stats,
+            "statistics": sorted_logs,
+            "strategies": statistics_service.get_available_strategies(all_logs),
+            "symbols": statistics_service.get_available_symbols(all_logs),
+            "filters": {
+                "strategy": strategy or "",
+                "symbol": symbol or "",
+                "start_date": start_date or "",
+                "end_date": end_date or "",
+            },
         },
-    })
+    )
 
 
 @router.get("/export")
@@ -97,11 +102,8 @@ async def export_statistics_csv():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"CSVエクスポートに失敗しました: {e}")
 
-    return FileResponse(
-        path=output_path,
-        filename=output_path.name,
-        media_type="text/csv"
-    )
+    return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
+
 
 @router.get("/strategy_compare", response_class=HTMLResponse)
 async def strategy_compare(request: Request):
@@ -110,7 +112,7 @@ async def strategy_compare(request: Request):
     """
     strategy_1 = request.query_params.get("strategy_1", "").strip() or None
     strategy_2 = request.query_params.get("strategy_2", "").strip() or None
-    
+
     # 利用可能な戦略リストを取得してテンプレートに渡す
     all_logs = statistics_service.load_all_logs()
     available_strategies = statistics_service.get_available_strategies(all_logs)
@@ -127,7 +129,9 @@ async def strategy_compare(request: Request):
             context["error"] = "異なる戦略を選択してください。"
         else:
             try:
-                comparison_results = statistics_service.compare_strategies(all_logs, strategy_1, strategy_2)
+                comparison_results = statistics_service.compare_strategies(
+                    all_logs, strategy_1, strategy_2
+                )
                 context["comparison_results"] = comparison_results
             except Exception as e:
                 context["error"] = f"戦略比較の処理中にエラーが発生しました: {e}"

@@ -11,9 +11,10 @@ Airflow REST API を使った DAG トリガー処理モジュール
 """
 
 import os
-import requests
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import requests
 
 # .envの変数名に合わせて修正
 AIRFLOW_API_BASE_URL = os.getenv("AIRFLOW_API_URL", "http://localhost:8080/api/v1")
@@ -94,12 +95,14 @@ class AirflowDagTrigger:
 
 default_trigger = AirflowDagTrigger()
 
+
 def trigger_dag(
     dag_id: str,
     conf: Optional[Dict[str, Any]] = None,
     execution_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     return default_trigger.trigger_dag(dag_id=dag_id, conf=conf, execution_date=execution_date)
+
 
 def list_dags(limit: int = 1000) -> List[str]:
     return default_trigger.list_dags(limit=limit)

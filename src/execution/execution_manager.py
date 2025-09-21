@@ -1,5 +1,6 @@
 import MetaTrader5 as mt5
 
+
 class ExecutionManager:
     """注文のタイミングと流れを調整するモジュール"""
 
@@ -16,6 +17,7 @@ class ExecutionManager:
             return True
         else:
             return False
+
 
 # ✅ 実行管理テスト
 if __name__ == "__main__":

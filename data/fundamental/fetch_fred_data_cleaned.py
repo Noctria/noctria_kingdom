@@ -4,16 +4,13 @@
 import pandas as pd
 import requests
 
+
 def fetch_fred_data(api_key, series_id):
     """
     FRED APIからデータを取得し、DataFrameに整形
     """
     url = f"https://api.stlouisfed.org/fred/series/observations"
-    params = {
-        "series_id": series_id,
-        "api_key": api_key,
-        "file_type": "json"
-    }
+    params = {"series_id": series_id, "api_key": api_key, "file_type": "json"}
 
     response = requests.get(url, params=params)
     data = response.json()["observations"]
@@ -23,6 +20,7 @@ def fetch_fred_data(api_key, series_id):
     df = df[["realtime_start", "realtime_end", "date", "value"]]
 
     return df
+
 
 def main():
     # FRED APIキーとシリーズID
@@ -47,6 +45,7 @@ def main():
     # 必要ならCSV保存
     df.to_csv("data/fundamental/cleaned_fred_data.csv", index=False)
     print("\n✅ CSV保存完了: data/fundamental/cleaned_fred_data.csv")
+
 
 if __name__ == "__main__":
     main()

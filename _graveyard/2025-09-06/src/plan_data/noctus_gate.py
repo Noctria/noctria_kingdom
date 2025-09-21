@@ -17,8 +17,8 @@ class NoctusGateResult:
 
 
 # --- デフォルト閾値 ---
-DEFAULT_MAX_LOT_SIZE = 1.0          # 1.0 ロットを超えたらエラー
-DEFAULT_MAX_RISK_SCORE = 0.8        # 0.0〜1.0 のリスク指標、0.8超ならブロック
+DEFAULT_MAX_LOT_SIZE = 1.0  # 1.0 ロットを超えたらエラー
+DEFAULT_MAX_RISK_SCORE = 0.8  # 0.0〜1.0 のリスク指標、0.8超ならブロック
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:
@@ -122,8 +122,11 @@ def check_proposal(
             )
         except Exception as e:
             import logging
+
             logging.getLogger("noctria.noctus_gate").warning(
-                "emit_alert failed in NoctusGate: %s (trace_id=%s)", e, _get(proposal, "trace_id", None)
+                "emit_alert failed in NoctusGate: %s (trace_id=%s)",
+                e,
+                _get(proposal, "trace_id", None),
             )
 
     return result

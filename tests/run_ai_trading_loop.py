@@ -1,21 +1,19 @@
-from core.path_config import *
 # tests/run_ai_trading_loop.py
-
 import time
-import sys
-import os
+
 import numpy as np
 
-# ✅ プロジェクトルートをパスに追加
-
-# execution/ ディレクトリ
-from order_execution import OrderExecution
+# data/ ディレクトリ
+from market_data_fetcher import MarketDataFetcher
 
 # strategies/ ディレクトリ
 from NoctriaMasterAI import NoctriaMasterAI
 
-# data/ ディレクトリ
-from market_data_fetcher import MarketDataFetcher
+from core.path_config import *
+
+# ✅ プロジェクトルートをパスに追加
+# execution/ ディレクトリ
+from order_execution import OrderExecution
 
 # 各コンポーネント初期化
 fetcher = MarketDataFetcher()
@@ -29,9 +27,9 @@ while True:
 
     # 2️⃣ 必要な形に変換（AIに渡す辞書形式に統一）
     market_data = {
-        "observation": np.array([latest_price] * 12),      # 例: 観測データを価格で埋める
-        "historical_prices": np.random.rand(100, 5),      # 例: ダミーの過去データ
-        "price_change": np.random.randn() * 0.01          # 例: ダミーの変動率
+        "observation": np.array([latest_price] * 12),  # 例: 観測データを価格で埋める
+        "historical_prices": np.random.rand(100, 5),  # 例: ダミーの過去データ
+        "price_change": np.random.randn() * 0.01,  # 例: ダミーの変動率
     }
 
     # 3️⃣ AI戦略で分析

@@ -1,24 +1,40 @@
-# codex/run_codex_cycle.py
-from __future__ import annotations
-
+import importlib.util
 import json
+import logging
 import os
+import shlex
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
-import importlib.util
-import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import List, Tuple
+
+from dotenv import load_dotenv
+
+from codex.agents.harmonia import ReviewResult, review  # type: ignore
+from codex.agents.inventor import InventorOutput, propose_fixes  # type: ignore
+
+logging.info(
+    "LLM flags: enabled=%s mode=%s base=%s model=%s",
+    os.getenv("NOCTRIA_LLM_ENABLED"),
+    os.getenv("NOCTRIA_HARMONIA_MODE"),
+    os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL"),
+    os.getenv("NOCTRIA_GPT_MODEL") or os.getenv("OPENAI_MODEL"),
+)
+
+# codex/run_codex_cycle.py
+from __future__ import annotations
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 # ===== パス/レポート =====
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = PROJECT_ROOT / "codex_reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-JSON_PATH = REPORTS_DIR / "tmp.json"            # pytest-json-report の出力（またはJunit変換）
-JUNIT_PATH = REPORTS_DIR / "tmp.junit.xml"      # json-report が無い場合のフォールバック
+JSON_PATH = REPORTS_DIR / "tmp.json"  # pytest-json-report の出力（またはJunit変換）
+JUNIT_PATH = REPORTS_DIR / "tmp.junit.xml"  # json-report が無い場合のフォールバック
 LATEST_MD = REPORTS_DIR / "latest_codex_cycle.md"
 INVENTOR_MD = REPORTS_DIR / "inventor_suggestions.md"
 HARMONIA_MD = REPORTS_DIR / "harmonia_review.md"
@@ -31,8 +47,6 @@ DEFAULT_MINILOOP_TARGETS = [
 ]
 
 # ===== 依存（ローカル静的版のエージェント）=====
-from codex.agents.inventor import propose_fixes, InventorOutput  # type: ignore
-from codex.agents.harmonia import review, ReviewResult            # type: ignore
 
 
 # ===== 実行系ユーティリティ =====
@@ -44,8 +58,8 @@ def _has_pytest_json_report() -> bool:
 def _pytest_env() -> dict:
     """src レイアウト解決（全体pytest.iniに手を入れず両立）"""
     env = os.environ.copy()
-    add = f"{PROJECT_ROOT/'src'}:{PROJECT_ROOT}"
-    env["PYTHONPATH"] = f"{add}:{env.get('PYTHONPATH','')}".strip(":")
+    add = f"{PROJECT_ROOT / 'src'}:{PROJECT_ROOT}"
+    env["PYTHONPATH"] = f"{add}:{env.get('PYTHONPATH', '')}".strip(":")
     return env
 
 
@@ -60,7 +74,9 @@ def _run_pytest(pytest_args: List[str]) -> Tuple[int, str, str, bool]:
         cmd += ["--json-report", f"--json-report-file={JSON_PATH}"]
     else:
         cmd += [f"--junitxml={JUNIT_PATH}"]
-    proc = subprocess.run(cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, env=_pytest_env())
+    proc = subprocess.run(
+        cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, env=_pytest_env()
+    )
     return proc.returncode, proc.stdout, proc.stderr, used_json
 
 
@@ -79,7 +95,16 @@ def _load_result(used_json: bool) -> dict:
 
     # --- フォールバック: JUnit → 簡易 JSON ---
     if not JUNIT_PATH.exists():
-        return {"summary": {"total": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}, "tests": []}
+        return {
+            "summary": {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "errors": 0,
+                "skipped": 0,
+            },
+            "tests": [],
+        }
 
     root = ET.parse(JUNIT_PATH).getroot()
     suite = root.find("testsuite") or root
@@ -91,7 +116,7 @@ def _load_result(used_json: bool) -> dict:
 
     tests: List[dict] = []
     for tc in suite.iterfind("testcase"):
-        nodeid = f"{tc.attrib.get('classname','')}::{tc.attrib.get('name','')}".strip(":")
+        nodeid = f"{tc.attrib.get('classname', '')}::{tc.attrib.get('name', '')}".strip(":")
         outcome = "passed"
         call = {}
         f_elt, e_elt, s_elt = tc.find("failure"), tc.find("error"), tc.find("skipped")
@@ -107,7 +132,14 @@ def _load_result(used_json: bool) -> dict:
 
     passed = total - failures - errors - skipped
     return {
-        "summary": {"total": total, "passed": passed, "failed": failures, "errors": errors, "skipped": skipped, "duration": duration_sec},
+        "summary": {
+            "total": total,
+            "passed": passed,
+            "failed": failures,
+            "errors": errors,
+            "skipped": skipped,
+            "duration": duration_sec,
+        },
         "tests": tests,
     }
 
@@ -270,3 +302,20 @@ if __name__ == "__main__":
     result_dict = _load_result(used_json)
     JSON_PATH.write_text(json.dumps(result_dict, ensure_ascii=False, indent=2), encoding="utf-8")
     sys.exit(rc)
+
+
+def _log_llm_usage(resp):
+    """Best-effort logging of OpenAI-like usage fields."""
+    try:
+        import logging  # local import safe
+
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            pt = getattr(u, "prompt_tokens", None)
+            ct = getattr(u, "completion_tokens", None)
+            tt = getattr(u, "total_tokens", None)
+            logging.info("LLM usage prompt=%s completion=%s total=%s", pt, ct, tt)
+        else:
+            logging.info("LLM usage unavailable (provider?)")
+    except Exception as _e:
+        logging.exception("LLM usage logging failed: %s", _e)

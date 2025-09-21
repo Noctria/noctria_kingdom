@@ -8,12 +8,14 @@ DAGS_DIR = PROJECT_ROOT / "airflow_docker" / "dags"
 TARGET_EXTS = [".py"]
 ENV_PATH = Path("/opt/airflow/.env")
 
+
 def check_pythonpath():
     pythonpath = os.environ.get("PYTHONPATH", "")
     if "/opt/airflow" not in pythonpath:
         print("❌ PYTHONPATH に '/opt/airflow' が含まれていません")
     else:
         print("✅ PYTHONPATH 設定 OK:", pythonpath)
+
 
 def check_required_paths():
     required_paths = [
@@ -29,6 +31,7 @@ def check_required_paths():
         else:
             print(f"✅ 存在確認 OK: {path}")
 
+
 def extract_imports_from_file(file_path):
     imports = []
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -36,6 +39,7 @@ def extract_imports_from_file(file_path):
             if line.strip().startswith("from ") or line.strip().startswith("import "):
                 imports.append((i + 1, line.strip()))
     return imports
+
 
 def check_dag_imports():
     print("\n📦 DAG内のインポート文チェック:")
@@ -45,12 +49,14 @@ def check_dag_imports():
         for lineno, imp in imports:
             print(f"  L{lineno}: {imp}")
 
+
 def main():
     print("🔍 Noctria Kingdom インポートパスチェック")
     print("==========================================")
     check_pythonpath()
     check_required_paths()
     check_dag_imports()
+
 
 if __name__ == "__main__":
     main()

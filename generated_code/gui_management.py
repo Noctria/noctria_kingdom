@@ -3,14 +3,16 @@ import logging
 
 app = Flask(__name__)
 
-@app.route('/')
+
+@app.route("/")
 def dashboard():
     """Display the dashboard for GUI management."""
     try:
-        return render_template('dashboard.html')
+        return render_template("dashboard.html")
     except Exception as e:
         logging.error(f"Error rendering dashboard: {e}")
         raise
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np
+
 
 def simulate(data: pd.DataFrame) -> dict:
     """
@@ -23,9 +23,9 @@ def simulate(data: pd.DataFrame) -> dict:
     equity_curve = []
 
     for i in range(1, len(data)):
-        rsi = data.loc[i, 'RSI(14)']
-        spread = data.loc[i, 'spread']
-        price = data.loc[i, 'price']
+        rsi = data.loc[i, "RSI(14)"]
+        spread = data.loc[i, "spread"]
+        price = data.loc[i, "price"]
 
         if position == 0 and rsi > 50 and spread < 2:
             position = balance / price
@@ -41,7 +41,7 @@ def simulate(data: pd.DataFrame) -> dict:
         equity_curve.append(balance if position == 0 else position * price)
 
     if position > 0:
-        final_price = data.iloc[-1]['price']
+        final_price = data.iloc[-1]["price"]
         pnl = position * (final_price - entry_price)
         trades.append(pnl)
         balance += pnl
@@ -61,5 +61,5 @@ def simulate(data: pd.DataFrame) -> dict:
         "final_capital": balance,
         "win_rate": round(win_rate, 4),
         "max_drawdown": round(abs(max_drawdown), 4),
-        "total_trades": total_trades
+        "total_trades": total_trades,
     }

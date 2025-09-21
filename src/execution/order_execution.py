@@ -22,10 +22,10 @@
 
 from __future__ import annotations
 
-import os
 import math
+import os
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -71,7 +71,9 @@ def _pip_value_per_lot_in_account_ccy(
 
     if account_ccy.upper() != "USD":
         # 必要なら将来拡張（今は USD 口座のみ正式対応）
-        raise NotImplementedError("Only USD account is officially supported in this implementation.")
+        raise NotImplementedError(
+            "Only USD account is officially supported in this implementation."
+        )
 
     if q == "USD":
         # 例: EURUSD -> 1 pip = 100000 * 0.0001 = 10 USD / lot
@@ -93,10 +95,10 @@ def _pip_value_per_lot_in_account_ccy(
 @dataclass
 class OrderExecution:
     api_url: str = "http://host.docker.internal:5001/order"
-    max_risk_per_trade: float = 0.01    # 最大1%（1トレードあたり）
-    min_risk_per_trade: float = 0.005   # 最小0.5%
+    max_risk_per_trade: float = 0.01  # 最大1%（1トレードあたり）
+    min_risk_per_trade: float = 0.005  # 最小0.5%
     get_balance_api_url: Optional[str] = None
-    contract_size: int = 100_000        # 1Lotの通貨数量（FX一般）
+    contract_size: int = 100_000  # 1Lotの通貨数量（FX一般）
     account_ccy: str = "USD"
     timeout_sec: float = 6.0
 
@@ -121,7 +123,7 @@ class OrderExecution:
                 r = requests.get(self.get_balance_api_url, timeout=self.timeout_sec)
                 r.raise_for_status()
                 return float(r.json().get("balance", 0))
-            except Exception as e:
+            except Exception:
                 return None
 
         # ダミー
@@ -231,13 +233,13 @@ class OrderExecution:
         if not ok_max:
             return (
                 False,
-                f"リスクが上限({self.max_risk_per_trade*100:.2f}%)を超えます: {eff_percent*100:.2f}%",
+                f"リスクが上限({self.max_risk_per_trade * 100:.2f}%)を超えます: {eff_percent * 100:.2f}%",
                 {"eff_percent": eff_percent, "risk_amount": risk_amount},
             )
         if not ok_min:
             return (
                 False,
-                f"リスクが下限({self.min_risk_per_trade*100:.2f}%)未満です: {eff_percent*100:.2f}%",
+                f"リスクが下限({self.min_risk_per_trade * 100:.2f}%)未満です: {eff_percent * 100:.2f}%",
                 {"eff_percent": eff_percent, "risk_amount": risk_amount},
             )
 
@@ -250,7 +252,7 @@ class OrderExecution:
         self,
         *,
         symbol: str,
-        side: str,               # "buy" | "sell"
+        side: str,  # "buy" | "sell"
         entry_price: float,
         stop_loss_price: float,  # 必須（価格）
         take_profit_price: Optional[float] = None,
@@ -296,7 +298,7 @@ class OrderExecution:
         # 4) API送信
         payload = {
             "symbol": symbol,
-            "type": side.lower(),        # "buy" | "sell"
+            "type": side.lower(),  # "buy" | "sell"
             "lot": float(f"{lot:.2f}"),  # 刻み 0.01
             "entry_price": entry_price,
             "stop_loss": stop_loss_price,
@@ -311,7 +313,13 @@ class OrderExecution:
             r = requests.post(self.api_url, json=payload, timeout=self.timeout_sec)
             r.raise_for_status()
             resp = r.json()
-            return {"status": "ok", "message": "sent", "payload": payload, "response": resp, "debug": {**dbg1, **dbg2}}
+            return {
+                "status": "ok",
+                "message": "sent",
+                "payload": payload,
+                "response": resp,
+                "debug": {**dbg1, **dbg2},
+            }
         except requests.RequestException as e:
             return {
                 "status": "error",

@@ -1,11 +1,13 @@
 from datetime import datetime
+
 import pandas as pd
+
 
 def simulate(data: pd.DataFrame):
     """
     本戦略のエントリーポイント関数。
     Noctria王による統合判断に利用される形式で結果を返す。
-    
+
     引数:
         data (pd.DataFrame): 市場データ（Open, High, Low, Closeなど）
 
@@ -23,5 +25,5 @@ def simulate(data: pd.DataFrame):
         "tp": 10,
         "sl": 8,
         "confidence": 0.87,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }

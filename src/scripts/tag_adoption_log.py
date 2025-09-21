@@ -5,6 +5,7 @@ from pathlib import Path
 
 ADOPTION_LOG_DIR = Path("data/act_logs/veritas_adoptions")
 
+
 def assign_tags(log: dict) -> list[str]:
     tags = []
 
@@ -27,6 +28,7 @@ def assign_tags(log: dict) -> list[str]:
 
     return tags
 
+
 def process_logs():
     for path in sorted(ADOPTION_LOG_DIR.glob("veritas_log_*.json")):
         with open(path, "r", encoding="utf-8") as f:
@@ -39,6 +41,7 @@ def process_logs():
             json.dump(data, f, ensure_ascii=False, indent=2)
 
         print(f"✅ タグ更新済: {path.name}")
+
 
 if __name__ == "__main__":
     process_logs()

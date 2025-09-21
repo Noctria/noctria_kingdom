@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import csv
 import logging
-import os
 import sys
 from datetime import datetime, timedelta, timezone
 from io import StringIO
@@ -47,7 +46,10 @@ if str(PROJECT_ROOT) not in sys.path:
 # ---------------------------------------------------------------------
 logger = logging.getLogger("noctria.pdca.summary")
 if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+
 
 # ---------------------------------------------------------------------
 # templates
@@ -63,8 +65,10 @@ def _resolve_templates_dir() -> Path:
             pass
     return PROJECT_ROOT / "noctria_gui" / "templates"
 
+
 _TEMPLATES_DIR = _resolve_templates_dir()
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+
 
 # ---------------------------------------------------------------------
 # services (safe import)
@@ -72,10 +76,11 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 def _load_pdca_services():
     try:
         from src.plan_data.pdca_summary_service import (  # type: ignore
-            fetch_infer_calls,
-            aggregate_kpis,
             aggregate_by_day,
+            aggregate_kpis,
+            fetch_infer_calls,
         )
+
         logger.info("pdca_summary_service loaded.")
         return fetch_infer_calls, aggregate_kpis, aggregate_by_day
     except Exception as e:
@@ -101,12 +106,14 @@ def _load_pdca_services():
 
         return _fetch_infer_calls, _aggregate_kpis, _aggregate_by_day
 
+
 fetch_infer_calls, aggregate_kpis, aggregate_by_day = _load_pdca_services()
 
 # ---------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------
 SCHEMA_VERSION = "2025-08-01"
+
 
 def _parse_date_ymd(s: Optional[str]) -> Optional[datetime]:
     if not s:
@@ -118,6 +125,7 @@ def _parse_date_ymd(s: Optional[str]) -> Optional[datetime]:
         logger.warning("Invalid date format (expected YYYY-MM-DD): %s", s)
         return None
 
+
 def _default_range_days(days: int = 30) -> Tuple[datetime, datetime]:
     # ローカル日付（タイムゾーンを意識しつつ、日付のみを使う）
     today_local = datetime.now(timezone.utc).astimezone().date()
@@ -127,23 +135,28 @@ def _default_range_days(days: int = 30) -> Tuple[datetime, datetime]:
         datetime(today_local.year, today_local.month, today_local.day),
     )
 
-def _normalize_range(frm: Optional[datetime], to: Optional[datetime]) -> Tuple[datetime, datetime, str, str]:
+
+def _normalize_range(
+    frm: Optional[datetime], to: Optional[datetime]
+) -> Tuple[datetime, datetime, str, str]:
     if frm is None or to is None:
         frm, to = _default_range_days(30)
     if to < frm:
         frm, to = to, frm
     return frm, to, frm.date().isoformat(), to.date().isoformat()
 
+
 # ---------------------------------------------------------------------
 # router
 # ---------------------------------------------------------------------
 router = APIRouter(prefix="/pdca", tags=["PDCA"])
 
+
 @router.get("/summary", response_class=HTMLResponse, summary="PDCAサマリー（HTML）")
 async def pdca_summary_page(
     request: Request,
     from_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    to_date: Optional[str]   = Query(None, description="YYYY-MM-DD"),
+    to_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
 ) -> HTMLResponse:
     tpl = _TEMPLATES_DIR / "pdca_summary.html"
     if not tpl.exists():
@@ -157,7 +170,7 @@ async def pdca_summary_page(
         )
 
     frm = _parse_date_ymd(from_date)
-    to  = _parse_date_ymd(to_date)
+    to = _parse_date_ymd(to_date)
     _, _, default_from, default_to = _normalize_range(frm, to)
 
     # request.app.state.jinja_env を優先
@@ -168,19 +181,27 @@ async def pdca_summary_page(
         default_from=default_from,
         default_to=default_to,
         schema_version=SCHEMA_VERSION,
-        recent_adoptions_params={"pattern": "veritas-", "limit": 9, "cols": 3, "title": "🧩 直近採用タグ"},
+        recent_adoptions_params={
+            "pattern": "veritas-",
+            "limit": 9,
+            "cols": 3,
+            "title": "🧩 直近採用タグ",
+        },
     )
     return HTMLResponse(html)
+
 
 @router.get("/summary/data", response_class=JSONResponse, summary="PDCAサマリー（JSON）")
 async def pdca_summary_data(
     from_date: str = Query(..., description="YYYY-MM-DD"),
-    to_date:   str = Query(..., description="YYYY-MM-DD"),
+    to_date: str = Query(..., description="YYYY-MM-DD"),
 ) -> JSONResponse:
     frm = _parse_date_ymd(from_date)
-    to  = _parse_date_ymd(to_date)
+    to = _parse_date_ymd(to_date)
     if not frm or not to:
-        raise HTTPException(status_code=400, detail="from_date/to_date は YYYY-MM-DD 形式で指定してください。")
+        raise HTTPException(
+            status_code=400, detail="from_date/to_date は YYYY-MM-DD 形式で指定してください。"
+        )
 
     frm, to, from_str, to_str = _normalize_range(frm, to)
 
@@ -230,15 +251,18 @@ async def pdca_summary_data(
         headers=headers,
     )
 
+
 @router.get("/summary.csv", response_class=Response, summary="PDCAサマリー（日次CSV）")
 async def pdca_summary_csv(
     from_date: str = Query(..., description="YYYY-MM-DD"),
-    to_date:   str = Query(..., description="YYYY-MM-DD"),
+    to_date: str = Query(..., description="YYYY-MM-DD"),
 ) -> Response:
     frm = _parse_date_ymd(from_date)
-    to  = _parse_date_ymd(to_date)
+    to = _parse_date_ymd(to_date)
     if not frm or not to:
-        raise HTTPException(status_code=400, detail="from_date/to_date は YYYY-MM-DD 形式で指定してください。")
+        raise HTTPException(
+            status_code=400, detail="from_date/to_date は YYYY-MM-DD 形式で指定してください。"
+        )
 
     frm, to, from_str, to_str = _normalize_range(frm, to)
 
@@ -258,13 +282,15 @@ async def pdca_summary_csv(
     w = csv.writer(buf)
     w.writerow(["date", "evals", "adopted", "trades", "win_rate"])
     for r in series:
-        w.writerow([
-            r.get("date", ""),
-            r.get("evals", 0),
-            r.get("adopted", 0),
-            r.get("trades", 0),
-            "" if r.get("win_rate") is None else r.get("win_rate"),
-        ])
+        w.writerow(
+            [
+                r.get("date", ""),
+                r.get("evals", 0),
+                r.get("adopted", 0),
+                r.get("trades", 0),
+                "" if r.get("win_rate") is None else r.get("win_rate"),
+            ]
+        )
 
     headers = {
         "Content-Type": "text/csv; charset=utf-8",
@@ -273,31 +299,33 @@ async def pdca_summary_csv(
     }
     return Response(content=buf.getvalue(), headers=headers)
 
+
 # ---------------------------------------------------------------------
 # 互換API（旧フロント向け）— リダイレクトせず200でJSONを返す
 # ---------------------------------------------------------------------
 @router.get("/api/summary", include_in_schema=False)
 async def api_summary_legacy(
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    date_to:   Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
 ):
     # 値が無ければデフォルト30日
     frm = _parse_date_ymd(date_from)
-    to  = _parse_date_ymd(date_to)
+    to = _parse_date_ymd(date_to)
     if frm is None or to is None:
         frm, to, from_s, to_s = _normalize_range(frm, to)
     else:
         frm, to, from_s, to_s = _normalize_range(frm, to)
     return await pdca_summary_data(from_date=from_s, to_date=to_s)
 
+
 @router.get("/api/summary_timeseries", include_in_schema=False)
 async def api_summary_timeseries_legacy(
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    date_to:   Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
 ):
     # 当面は /summary/data と同形を返す
     frm = _parse_date_ymd(date_from)
-    to  = _parse_date_ymd(date_to)
+    to = _parse_date_ymd(date_to)
     if frm is None or to is None:
         frm, to, from_s, to_s = _normalize_range(frm, to)
     else:

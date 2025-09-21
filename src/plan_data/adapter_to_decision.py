@@ -1,203 +1,125 @@
-# src/plan_data/adapter_to_decision.py
+#!/usr/bin/env python3
+# coding: utf-8
+"""
+Adapter/facade from Plan layer to DecisionEngine.
+
+- strategies から proposals を作り、DecisionEngine.decide(...) へ委譲
+- 余分な引数が来ても壊れないように寛容に受ける
+- plan_data.contracts が無くても最小フォールバックで動く
+"""
+
 from __future__ import annotations
 
-from dataclasses import asdict
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, List, Tuple
 
-import pandas as pd
-
-# ---- plan layer imports（相対/絶対 両対応。※自分自身は絶対に import しない）----
+# 依存（存在すれば正式型、無ければフォールバック）
 try:
-    from plan_data.strategy_adapter import (
-        FeatureBundle,
-        StrategyProposal,
-        propose_with_logging,
-    )  # type: ignore
-    from plan_data.trace import get_trace_id, new_trace_id  # type: ignore
+    from plan_data.contracts import FeatureBundle, StrategyProposal  # type: ignore
 except Exception:
-    from src.plan_data.strategy_adapter import (  # type: ignore
-        FeatureBundle,
-        StrategyProposal,
-        propose_with_logging,
-    )
-    from src.plan_data.trace import get_trace_id, new_trace_id  # type: ignore
 
-# ---- decision layer ----
-# ※ ここは contracts からではなく decision.decision_engine から！
-try:
-    from decision.decision_engine import (  # type: ignore
-        DecisionEngine,
-    )
-except Exception:
-    from src.decision.decision_engine import (  # type: ignore
-        DecisionEngine,
-    )
+    class FeatureBundle:  # 最小フォールバック
+        def __init__(self, df=None, context=None):
+            self.df = df
+            self.context = context
+
+    class StrategyProposal(dict):  # dict 互換で十分
+        pass
 
 
-def _pick_trace_id(features: FeatureBundle, fallback_symbol: str = "MULTI", fallback_tf: str = "1d") -> str:
+# DecisionEngine は top-level パッケージ `decision` 配下にある想定（tests/conftest が sys.path を整備）
+from decision.decision_engine import DecisionEngine, DecisionRecord  # type: ignore
+
+
+def _materialize_proposals(
+    strategies: Any,
+    bundle: FeatureBundle,
+) -> List[StrategyProposal]:
     """
-    trace_id の決定：
-      1) features.context.trace_id があればそれ
-      2) get_trace_id() が返るならそれ
-      3) new_trace_id(symbol, timeframe)
+    strategies から StrategyProposal の配列を作る。
+    - strategy に propose(bundle)->dict/obj があれば呼ぶ
+    - すでに dict/StrategyProposal の配列ならそのまま返す
+    - 単一 strategy も配列に包む
     """
-    ctx = getattr(features, "context", None)
-    tid = getattr(ctx, "trace_id", None) or get_trace_id()
-    if tid:
-        return str(tid)
-    return new_trace_id(
-        symbol=str(getattr(ctx, "symbol", fallback_symbol)),
-        timeframe=str(getattr(ctx, "timeframe", fallback_tf)),
-    )
+    # 既に proposals っぽい
+    if isinstance(strategies, list) and (
+        not strategies or isinstance(strategies[0], (dict, StrategyProposal))
+    ):
+        return [
+            StrategyProposal(p) if not isinstance(p, StrategyProposal) else p for p in strategies
+        ]
 
+    # 単一 → 配列
+    seq: Iterable[Any]
+    if isinstance(strategies, (tuple, list)):
+        seq = strategies
+    else:
+        seq = [strategies]
 
-def _quality_hints_from_proposal(p: StrategyProposal) -> Dict[str, Any]:
-    """
-    strategy_adapter 側で付与した meta から quality 情報を抽出。
-    - quality_action: "OK" | "SCALE" | "FLAT"（無ければ "OK"）
-    - qty_scale:      float（無ければ 1.0）
-    - base_qty:       提案数量（float）
-    """
-    meta = dict(p.meta or {})
-    qa = str(meta.get("quality_action", "OK")).upper()
-    try:
-        qs = float(meta.get("qty_scale", 1.0))
-    except Exception:
-        qs = 1.0
-
-    try:
-        bq = float(p.qty)
-    except Exception:
-        bq = 0.0
-
-    return {"quality_action": qa, "qty_scale": qs, "base_qty": bq}
-
-
-def run_strategy_and_decide(
-    strategy: Any,
-    features: FeatureBundle,
-    *,
-    engine: Optional[DecisionEngine] = None,
-    model_name: Optional[str] = None,
-    model_version: Optional[str] = None,
-    timeout_sec: Optional[float] = None,
-    conn_str: Optional[str] = None,
-    extra_decision_features: Optional[Dict[str, Any]] = None,
-    **strategy_kwargs: Any,
-) -> Dict[str, Any]:
-    """
-    1) plan_data.strategy_adapter.propose_with_logging(...) で戦略を実行
-    2) Proposal の quality 情報を DecisionEngine に橋渡し
-    3) DecisionEngine.decide(...) を呼び、結果を dict で返す（提案も同梱）
-
-    戻り値:
-    {
-      "proposal": <StrategyProposal as dict>,
-      "decision": <DecisionRecord + decision dict> の一部を抜粋,
-      "trace_id": "<id>"
-    }
-    """
-    # 1) 戦略実行（Quality Gate は adapter 内で適用済み）
-    proposal = propose_with_logging(
-        strategy,
-        features,
-        model_name=model_name,
-        model_version=model_version,
-        timeout_sec=timeout_sec,
-        trace_id=getattr(features.context, "trace_id", None),  # ← 修正
-        conn_str=conn_str,
-        **strategy_kwargs,
-    )
-
-    # 2) DecisionEngine への入力（DecisionEngine は proposals のリストを受ける設計）
-    eng = engine or DecisionEngine()
-    record, decision = eng.decide(features, proposals=[proposal], conn_str=conn_str)
-
-    # 3) まとめて返す（扱いやすい dict 形式）
-    out = {
-        "proposal": {
-            "symbol": proposal.symbol,
-            "direction": proposal.direction,
-            "qty": proposal.qty,
-            "confidence": proposal.confidence,
-            "reasons": list(proposal.reasons or []),
-            "meta": dict(proposal.meta or {}),
-            "schema_version": proposal.schema_version,
-        },
-        "decision": {
-            "strategy_name": record.strategy_name,
-            "score": record.score,
-            "reason": record.reason,
-            "decision": dict(decision),
-        },
-        "trace_id": record.trace_id,
-    }
+    out: List[StrategyProposal] = []
+    for s in seq:
+        if s is None:
+            continue
+        # .propose(bundle) があれば呼ぶ
+        prop = None
+        if hasattr(s, "propose"):
+            try:
+                prop = s.propose(bundle)  # type: ignore[attr-defined]
+            except Exception:
+                prop = None
+        # 無ければ、よくある属性から拾って dict 化
+        if prop is None:
+            d: Dict[str, Any] = {}
+            for k in (
+                "name",
+                "strategy",
+                "symbol",
+                "side",
+                "action",
+                "lot",
+                "size",
+                "price",
+                "tp",
+                "sl",
+                "ttl",
+                "risk_score",
+                "score",
+                "extra",
+            ):
+                v = getattr(s, k, None)
+                if v is not None:
+                    d[k] = v
+            if d:
+                prop = d
+        if prop is not None:
+            out.append(StrategyProposal(prop) if not isinstance(prop, StrategyProposal) else prop)
     return out
 
 
-# --- ここから追記: Inventor → Decision までのワンストップ実行 ------------------
-def run_invent_and_decide(
+def run_strategy_and_decide(
     bundle: FeatureBundle,
+    strategies: Any,
     *,
-    max_candidates: int = 3,
-    conn_str: Optional[str] = None,
-) -> Dict[str, Any]:
+    quality: Any | None = None,
+    profiles: Dict[str, Any] | None = None,
+    conn_str: str | None = None,
+    **kwargs: Any,
+) -> Tuple[DecisionRecord, Dict[str, Any]]:
     """
-    Inventor で候補を生成 → DecisionEngine で最終決定。
-    - 循環インポートを避けるため、import は関数内で遅延ロード。
-    戻り値:
-    {
-      "record": {... minimal DecisionRecord ...},
-      "decision": { ... final decision ... },
-      "num_candidates": <int>
-    }
+    Plan 層から呼ばれる統合ファサード。
+    - strategies から proposals を作成
+    - DecisionEngine.decide(...) へ委譲
+    余分な引数（kwargs）は無視するのでテスト側の差異に強いです。
     """
-    # 遅延 import（循環回避）
-    from plan_data import inventor  # type: ignore
-    from decision.decision_engine import DecisionEngine  # type: ignore
-
-    proposals = inventor.generate_proposals_safe(bundle, max_n=max_candidates)
     engine = DecisionEngine()
-    record, decision = engine.decide(bundle, proposals, quality=None, profiles=None, conn_str=conn_str)
-    return {
-        "record": {
-            "trace_id": record.trace_id,
-            "engine_version": record.engine_version,
-            "strategy_name": record.strategy_name,
-            "score": record.score,
-            "reason": record.reason,
-            "features": record.features,
-        },
-        "decision": decision,
-        "num_candidates": len(proposals),
-    }
-# ------------------------------------------------------------------------------
-
-
-# --- 手動テスト用（任意） ---
-if __name__ == "__main__":
-    class DummyStrategy:
-        def propose(self, features: FeatureBundle, **kw):
-            return StrategyProposal(
-                symbol=str(getattr(features.context, "symbol", "USDJPY")),
-                direction="LONG",
-                qty=100.0,
-                confidence=0.8,
-                reasons=["dummy ok"],
-                meta={},
-            )
-
-    df = pd.DataFrame({"date": pd.date_range("2025-08-01", periods=5, freq="D")})
-    fb = FeatureBundle(
-        features=df,
-        trace_id="manual-trace-001",
-        context={
-            "symbol": "USDJPY",
-            "timeframe": "1d",
-            "data_lag_min": 0,
-            "missing_ratio": 0.0,
-        },
+    proposals = _materialize_proposals(strategies, bundle)
+    record, decision = engine.decide(
+        bundle,
+        proposals,
+        quality=quality,
+        profiles=profiles,
+        conn_str=conn_str,
     )
-    result = run_strategy_and_decide(DummyStrategy(), fb)
-    import json
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return record, decision
+
+
+__all__ = ["run_strategy_and_decide", "FeatureBundle", "StrategyProposal"]

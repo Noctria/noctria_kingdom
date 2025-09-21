@@ -26,14 +26,17 @@ if not logger.handlers:
 
 _OBS_MODE = os.getenv("NOCTRIA_OBS_MODE", "auto").strip().lower()  # auto|db|stdout|off
 
+
 def _mode() -> str:
     m = _OBS_MODE
     if m not in ("auto", "db", "stdout", "off"):
         return "auto"
     return m
 
+
 def _dsn_from(conn_str: Optional[str]) -> Optional[str]:
     return (conn_str or os.getenv("NOCTRIA_OBS_PG_DSN") or "").strip() or None
+
 
 def _effective_mode(conn_str: Optional[str]) -> str:
     m = _mode()
@@ -46,8 +49,10 @@ def _effective_mode(conn_str: Optional[str]) -> str:
     # auto
     return "db" if _dsn_from(conn_str) else "stdout"
 
+
 # --- severities & small utils -------------------------------------------------
 _SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
 
 def _normalize_severity(s: Optional[str]) -> str:
     if not s:
@@ -55,8 +60,10 @@ def _normalize_severity(s: Optional[str]) -> str:
     s2 = str(s).upper()
     return s2 if s2 in _SEVERITIES else "MEDIUM"
 
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
 
 def _json(obj: Any) -> str:
     try:
@@ -71,9 +78,11 @@ def _json(obj: Any) -> str:
         ensure_ascii=False,
     )
 
+
 # --- driver loader (lazy import) ----------------------------------------------
 _DRIVER: Optional[object] = None
 _DB_KIND: Optional[str] = None  # "psycopg2" or "psycopg"
+
 
 def _import_driver() -> Tuple[Optional[object], Optional[str]]:
     """ドライバを動的ロード（見つからなければ (None, None) を返す）"""
@@ -92,6 +101,7 @@ def _import_driver() -> Tuple[Optional[object], Optional[str]]:
         return _DRIVER, _DB_KIND
     except ModuleNotFoundError:
         return None, None
+
 
 @contextmanager
 def _get_conn(dsn: str):
@@ -114,6 +124,7 @@ def _get_conn(dsn: str):
         finally:
             conn.close()
 
+
 def _exec(dsn: str, sql: str, params: Optional[Iterable[Any]] = None) -> None:
     with _get_conn(dsn) as conn:
         if conn is None:
@@ -121,6 +132,7 @@ def _exec(dsn: str, sql: str, params: Optional[Iterable[Any]] = None) -> None:
             raise RuntimeError("No DB driver available")
         with conn.cursor() as cur:
             cur.execute(sql, params or ())
+
 
 def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
     with _get_conn(dsn) as conn:
@@ -130,9 +142,11 @@ def _fetchone(dsn: str, sql: str, params: Optional[Iterable[Any]] = None):
             cur.execute(sql, params or ())
             return cur.fetchone()
 
+
 # --- stdout helper ------------------------------------------------------------
 def _stdout_event(kind: str, payload: Dict[str, Any]) -> None:
     logger.info("[obs:stdout] %s %s", kind, _json(payload))
+
 
 # --- schema bootstrap ---------------------------------------------------------
 _CREATE_PLAN_RUNS = """
@@ -363,6 +377,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_obs_latency_daily_day
   ON obs_latency_daily(day);
 """
 
+
 # --- ensure / refresh ---------------------------------------------------------
 def ensure_tables(conn_str: Optional[str] = None) -> None:
     mode = _effective_mode(conn_str)
@@ -385,6 +400,7 @@ def ensure_tables(conn_str: Optional[str] = None) -> None:
     except Exception as e:
         logger.warning("ensure_tables failed: %s", e)
 
+
 def ensure_views(conn_str: Optional[str] = None) -> None:
     mode = _effective_mode(conn_str)
     if mode in ("stdout", "off"):
@@ -403,10 +419,12 @@ def ensure_views(conn_str: Optional[str] = None) -> None:
     except Exception as e:
         logger.warning("ensure_views failed: %s", e)
 
+
 def ensure_views_and_mvs(conn_str: Optional[str] = None) -> None:
     ensure_tables(conn_str)
     ensure_views(conn_str)
     logger.info("tables + views/mviews ensured.")
+
 
 def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = None) -> None:
     mode = _effective_mode(conn_str)
@@ -423,15 +441,20 @@ def refresh_latency_daily(concurrently: bool = True, conn_str: Optional[str] = N
             logger.info("obs_latency_daily refreshed CONCURRENTLY.")
             return
         except Exception as e:
-            logger.warning("CONCURRENTLY refresh failed: %s; falling back to non-concurrent refresh.", e)
+            logger.warning(
+                "CONCURRENTLY refresh failed: %s; falling back to non-concurrent refresh.",
+                e,
+            )
     try:
         _exec(dsn, "REFRESH MATERIALIZED VIEW obs_latency_daily;")
         logger.info("obs_latency_daily refreshed.")
     except Exception as e:
         logger.warning("refresh_latency_daily failed: %s", e)
 
+
 def refresh_materialized(conn_str: Optional[str] = None) -> None:
     refresh_latency_daily(concurrently=True, conn_str=conn_str)
+
 
 # --- public APIs --------------------------------------------------------------
 def log_plan_run(*args, **kwargs) -> Optional[int]:
@@ -439,17 +462,24 @@ def log_plan_run(*args, **kwargs) -> Optional[int]:
         return _log_plan_status(**kwargs)  # type: ignore[arg-type]
     return _log_plan_phase(*args, **kwargs)  # type: ignore[misc]
 
-def _log_plan_phase(conn_str: Optional[str],
-                    phase: str,
-                    rows: int,
-                    dur_sec: int,
-                    missing_ratio: float,
-                    error_rate: float,
-                    trace_id: Optional[str] = None) -> Optional[int]:
+
+def _log_plan_phase(
+    conn_str: Optional[str],
+    phase: str,
+    rows: int,
+    dur_sec: int,
+    missing_ratio: float,
+    error_rate: float,
+    trace_id: Optional[str] = None,
+) -> Optional[int]:
     mode = _effective_mode(conn_str)
     payload = {
-        "phase": phase, "rows": rows, "dur_sec": dur_sec,
-        "missing_ratio": missing_ratio, "error_rate": error_rate, "trace_id": trace_id,
+        "phase": phase,
+        "rows": rows,
+        "dur_sec": dur_sec,
+        "missing_ratio": missing_ratio,
+        "error_rate": error_rate,
+        "trace_id": trace_id,
         "ts": _utcnow().isoformat(),
     }
     if mode == "off":
@@ -467,7 +497,15 @@ def _log_plan_phase(conn_str: Optional[str],
         "INSERT INTO obs_plan_runs (ts, phase, dur_sec, rows, missing_ratio, error_rate, trace_id) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
     )
-    params = (_utcnow(), phase, int(dur_sec), int(rows), float(missing_ratio), float(error_rate), trace_id)
+    params = (
+        _utcnow(),
+        phase,
+        int(dur_sec),
+        int(rows),
+        float(missing_ratio),
+        float(error_rate),
+        trace_id,
+    )
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
@@ -475,15 +513,20 @@ def _log_plan_phase(conn_str: Optional[str],
         logger.warning("log_plan_run(phase) failed: %s (phase=%s, trace_id=%s)", e, phase, trace_id)
         return None
 
-def _log_plan_status(*, trace_id: str,
-                     status: str,
-                     started_at: Optional[datetime] = None,
-                     finished_at: Optional[datetime] = None,
-                     meta: Optional[Dict[str, Any]] = None,
-                     conn_str: Optional[str] = None) -> Optional[int]:
+
+def _log_plan_status(
+    *,
+    trace_id: str,
+    status: str,
+    started_at: Optional[datetime] = None,
+    finished_at: Optional[datetime] = None,
+    meta: Optional[Dict[str, Any]] = None,
+    conn_str: Optional[str] = None,
+) -> Optional[int]:
     mode = _effective_mode(conn_str)
     payload = {
-        "trace_id": trace_id, "status": status,
+        "trace_id": trace_id,
+        "status": status,
         "started_at": (started_at or (None if status != "START" else _utcnow())),
         "finished_at": (finished_at or (None if status != "END" else _utcnow())),
         "meta": meta or {},
@@ -503,13 +546,25 @@ def _log_plan_status(*, trace_id: str,
         "INSERT INTO obs_plan_runs (trace_id, started_at, finished_at, status, meta) "
         "VALUES (%s, %s, %s, %s, %s::jsonb) RETURNING id"
     )
-    params = (trace_id, payload["started_at"], payload["finished_at"], status, _json(meta or {}))
+    params = (
+        trace_id,
+        payload["started_at"],
+        payload["finished_at"],
+        status,
+        _json(meta or {}),
+    )
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
     except Exception as e:
-        logger.warning("log_plan_run(status) failed: %s (status=%s, trace_id=%s)", e, status, trace_id)
+        logger.warning(
+            "log_plan_run(status) failed: %s (status=%s, trace_id=%s)",
+            e,
+            status,
+            trace_id,
+        )
         return None
+
 
 def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     mode = _effective_mode(conn_str)
@@ -557,19 +612,43 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             "RETURNING id"
         )
         params = (
-            trace_id, ai_name, started_at, ended_at, status, note,
-            _json(params_json), _json(metrics_json),
-            duration_ms, duration_ms, started_at or _utcnow()
+            trace_id,
+            ai_name,
+            started_at,
+            ended_at,
+            status,
+            note,
+            _json(params_json),
+            _json(metrics_json),
+            duration_ms,
+            duration_ms,
+            started_at or _utcnow(),
         )
         try:
             row = _fetchone(dsn, sql, params)
             return row[0] if row else None  # type: ignore[index]
         except Exception as e:
-            logger.warning("log_infer_call(gui-compat) failed: %s (ai_name=%s, trace_id=%s)", e, ai_name, trace_id)
+            logger.warning(
+                "log_infer_call(gui-compat) failed: %s (ai_name=%s, trace_id=%s)",
+                e,
+                ai_name,
+                trace_id,
+            )
             return None
 
     # 新API（model_name/model/inputs/outputs/duration_ms など）
-    if any(k in kwargs for k in ("model_name", "model", "inputs", "outputs", "duration_ms", "dur_ms", "call_at")):
+    if any(
+        k in kwargs
+        for k in (
+            "model_name",
+            "model",
+            "inputs",
+            "outputs",
+            "duration_ms",
+            "dur_ms",
+            "call_at",
+        )
+    ):
         payload = dict(kwargs)
         payload["ts"] = _utcnow().isoformat()
         if mode == "off":
@@ -589,7 +668,11 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         ver: Optional[str] = kwargs.get("ver") or kwargs.get("model_version")
         call_at: Optional[datetime] = kwargs.get("call_at")
         try:
-            ms_val = kwargs.get("duration_ms") if kwargs.get("duration_ms") is not None else kwargs.get("dur_ms")
+            ms_val = (
+                kwargs.get("duration_ms")
+                if kwargs.get("duration_ms") is not None
+                else kwargs.get("dur_ms")
+            )
             ms_val = int(ms_val) if ms_val is not None else 0
         except Exception:
             ms_val = 0
@@ -610,15 +693,28 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             "RETURNING id"
         )
         params = (
-            trace_id, model_name, model, ver, call_at or _utcnow(),
-            ms_val, ms_val, bool(success), staleness,
-            _json(inputs or {}), _json(outputs or {})
+            trace_id,
+            model_name,
+            model,
+            ver,
+            call_at or _utcnow(),
+            ms_val,
+            ms_val,
+            bool(success),
+            staleness,
+            _json(inputs or {}),
+            _json(outputs or {}),
         )
         try:
             row = _fetchone(dsn, sql, params)
             return row[0] if row else None  # type: ignore[index]
         except Exception as e:
-            logger.warning("log_infer_call(new) failed: %s (model_name=%s, trace_id=%s)", e, model_name, trace_id)
+            logger.warning(
+                "log_infer_call(new) failed: %s (model_name=%s, trace_id=%s)",
+                e,
+                model_name,
+                trace_id,
+            )
             return None
 
     # 旧API（model/ver/dur_ms）
@@ -641,7 +737,11 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         dur_ms: int = int(kwargs["dur_ms"])
         success: bool = bool(kwargs["success"])
     except Exception as e:
-        logger.warning("log_infer_call(old) missing args: %s; kwargs keys=%s", e, list(kwargs.keys()))
+        logger.warning(
+            "log_infer_call(old) missing args: %s; kwargs keys=%s",
+            e,
+            list(kwargs.keys()),
+        )
         return None
 
     try:
@@ -654,7 +754,16 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         "INSERT INTO obs_infer_calls (ts, model, ver, dur_ms, success, feature_staleness_min, trace_id, duration_ms) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
     )
-    params = (_utcnow(), model, ver, dur_ms, success, feature_staleness_min, trace_id, dur_ms)
+    params = (
+        _utcnow(),
+        model,
+        ver,
+        dur_ms,
+        success,
+        feature_staleness_min,
+        trace_id,
+        dur_ms,
+    )
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
@@ -662,15 +771,19 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         logger.warning("log_infer_call(old) failed: %s (model=%s, trace_id=%s)", e, model, trace_id)
         return None
 
-def log_decision(*, trace_id: str,
-                 engine_version: str,
-                 strategy_name: str,
-                 score: float,
-                 reason: str,
-                 features: Dict[str, Any],
-                 decision: Dict[str, Any],
-                 made_at: Optional[datetime] = None,
-                 conn_str: Optional[str] = None) -> Optional[int]:
+
+def log_decision(
+    *,
+    trace_id: str,
+    engine_version: str,
+    strategy_name: str,
+    score: float,
+    reason: str,
+    features: Dict[str, Any],
+    decision: Dict[str, Any],
+    made_at: Optional[datetime] = None,
+    conn_str: Optional[str] = None,
+) -> Optional[int]:
     mode = _effective_mode(conn_str)
     payload = {
         "trace_id": trace_id,
@@ -698,31 +811,52 @@ def log_decision(*, trace_id: str,
         "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb) RETURNING id"
     )
     params = (
-        trace_id, made_at or _utcnow(), engine_version, strategy_name, float(score), reason,
-        _json(features or {}), _json(decision or {}),
+        trace_id,
+        made_at or _utcnow(),
+        engine_version,
+        strategy_name,
+        float(score),
+        reason,
+        _json(features or {}),
+        _json(decision or {}),
     )
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
     except Exception as e:
-        logger.warning("log_decision failed: %s (strategy=%s, trace_id=%s)", e, strategy_name, trace_id)
+        logger.warning(
+            "log_decision failed: %s (strategy=%s, trace_id=%s)",
+            e,
+            strategy_name,
+            trace_id,
+        )
         return None
 
-def log_exec_event(*, trace_id: str,
-                   symbol: str,
-                   side: str,
-                   size: float,
-                   provider: str,
-                   status: str,
-                   order_id: Optional[str] = None,
-                   response: Optional[Dict[str, Any]] = None,
-                   sent_at: Optional[datetime] = None,
-                   conn_str: Optional[str] = None) -> Optional[int]:
+
+def log_exec_event(
+    *,
+    trace_id: str,
+    symbol: str,
+    side: str,
+    size: float,
+    provider: str,
+    status: str,
+    order_id: Optional[str] = None,
+    response: Optional[Dict[str, Any]] = None,
+    sent_at: Optional[datetime] = None,
+    conn_str: Optional[str] = None,
+) -> Optional[int]:
     mode = _effective_mode(conn_str)
     payload = {
-        "trace_id": trace_id, "symbol": symbol, "side": side, "size": float(size),
-        "provider": provider, "status": status, "order_id": order_id,
-        "response": response or {}, "sent_at": (sent_at or _utcnow()).isoformat(),
+        "trace_id": trace_id,
+        "symbol": symbol,
+        "side": side,
+        "size": float(size),
+        "provider": provider,
+        "status": status,
+        "order_id": order_id,
+        "response": response or {},
+        "sent_at": (sent_at or _utcnow()).isoformat(),
     }
     if mode == "off":
         return None
@@ -740,23 +874,40 @@ def log_exec_event(*, trace_id: str,
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING id"
     )
     params = (
-        trace_id, sent_at or _utcnow(), symbol, side, float(size), provider, status, order_id, _json(response or {}),
+        trace_id,
+        sent_at or _utcnow(),
+        symbol,
+        side,
+        float(size),
+        provider,
+        status,
+        order_id,
+        _json(response or {}),
     )
     try:
         row = _fetchone(dsn, sql, params)
         return row[0] if row else None  # type: ignore[index]
     except Exception as e:
-        logger.warning("log_exec_event failed: %s (symbol=%s, status=%s, trace_id=%s)", e, symbol, status, trace_id)
+        logger.warning(
+            "log_exec_event failed: %s (symbol=%s, status=%s, trace_id=%s)",
+            e,
+            symbol,
+            status,
+            trace_id,
+        )
         return None
 
-def log_alert(*,
-              policy_name: str,
-              reason: str,
-              severity: str = "MEDIUM",
-              details: Optional[Dict[str, Any]] = None,
-              trace_id: Optional[str] = None,
-              created_at: Optional[datetime] = None,
-              conn_str: Optional[str] = None) -> Optional[int]:
+
+def log_alert(
+    *,
+    policy_name: str,
+    reason: str,
+    severity: str = "MEDIUM",
+    details: Optional[Dict[str, Any]] = None,
+    trace_id: Optional[str] = None,
+    created_at: Optional[datetime] = None,
+    conn_str: Optional[str] = None,
+) -> Optional[int]:
     mode = _effective_mode(conn_str)
     payload = {
         "created_at": (created_at or _utcnow()).isoformat(),
@@ -796,19 +947,24 @@ def log_alert(*,
         logger.warning("log_alert failed: %s (policy=%s, trace_id=%s)", e, policy_name, trace_id)
         return None
 
+
 # ---- thin wrapper: emit_alert (推奨インターフェイス) -------------------------
-def emit_alert(*,
-               kind: str,
-               reason: str,
-               severity: str = "MEDIUM",
-               trace_id: Optional[str] = None,
-               details: Optional[Dict[str, Any]] = None,
-               conn_str: Optional[str] = None) -> Optional[int]:
+def emit_alert(
+    *,
+    kind: str,
+    reason: str,
+    severity: str = "MEDIUM",
+    trace_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    conn_str: Optional[str] = None,
+) -> Optional[int]:
     """
     推奨API：policy_name= "PLAN.<subsystem>.<kind>" などの規約名で呼ぶ。
     例) emit_alert(kind="STATS.MISSING_CLOSE", reason="no *_close columns", severity="HIGH", trace_id=...)
     """
-    policy_name = f"PLAN.{kind}" if not kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI.")) else kind
+    policy_name = (
+        f"PLAN.{kind}" if not kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI.")) else kind
+    )
     return log_alert(
         policy_name=policy_name,
         reason=reason,
@@ -817,6 +973,7 @@ def emit_alert(*,
         trace_id=trace_id,
         conn_str=conn_str,
     )
+
 
 # --- ping & exports -----------------------------------------------------------
 def ping(conn_str: Optional[str] = None) -> bool:
@@ -835,10 +992,18 @@ def ping(conn_str: Optional[str] = None) -> bool:
         logger.warning("observability ping failed: %s", e)
         return False
 
+
 __all__ = [
-    "ensure_tables", "ensure_views", "ensure_views_and_mvs",
-    "refresh_latency_daily", "refresh_materialized",
-    "log_plan_run", "log_infer_call", "log_decision",
-    "log_exec_event", "log_alert", "emit_alert",
+    "ensure_tables",
+    "ensure_views",
+    "ensure_views_and_mvs",
+    "refresh_latency_daily",
+    "refresh_materialized",
+    "log_plan_run",
+    "log_infer_call",
+    "log_decision",
+    "log_exec_event",
+    "log_alert",
+    "emit_alert",
     "ping",
 ]

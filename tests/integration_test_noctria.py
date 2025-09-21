@@ -1,5 +1,7 @@
 import logging
+
 from core.Noctria import Noctria
+
 
 def test_noctria_execute_trade():
     """
@@ -19,6 +21,7 @@ def test_noctria_execute_trade():
     print("テスト結果:", result)
     assert result is not None, "No result returned"
     assert isinstance(result, str), "Result should be a string"
+
 
 if __name__ == "__main__":
     test_noctria_execute_trade()

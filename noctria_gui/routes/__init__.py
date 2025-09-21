@@ -7,13 +7,14 @@
 - routes/ 以下の各モジュールから `router` を自動で拾います
 """
 
-import sys
 import importlib
 import pkgutil
+import sys
 import traceback
 from pathlib import Path
-from fastapi import APIRouter
 from typing import List
+
+from fastapi import APIRouter
 
 # ───────────────────────────────────────────────
 # 🛠️ モジュール検索パスに src/ を明示追加

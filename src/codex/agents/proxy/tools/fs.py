@@ -1,9 +1,12 @@
 from __future__ import annotations
+
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 
 class FSTool:
     name = "fs"
+
     def __init__(self, root: Path):
         self.root = root
 
@@ -17,6 +20,7 @@ class FSTool:
         act = kwargs.get("action")
         if act == "read_text":
             p = self._abs(kwargs["path"])
-            if not p.exists(): return {"ok": False, "error": "not found"}
+            if not p.exists():
+                return {"ok": False, "error": "not found"}
             return {"ok": True, "text": p.read_text(encoding="utf-8")}
         return {"ok": False, "error": f"unknown fs action: {act}"}

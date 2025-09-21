@@ -8,14 +8,12 @@
 - 戦略比較フォーム＆結果表示も実装済み
 """
 
-from fastapi import APIRouter, Request, HTTPException, Query, Form
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from pathlib import Path
 import json
-import os
 
-from src.core.path_config import STRATEGIES_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, STRATEGIES_DIR
 
 router = APIRouter(tags=["strategy"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -31,10 +29,9 @@ async def list_strategies(request: Request):
     strategy_files = sorted(veritas_dir.glob("*.py"))
     strategy_names = [f.name for f in strategy_files]
 
-    return templates.TemplateResponse("strategies/list.html", {
-        "request": request,
-        "strategies": strategy_names
-    })
+    return templates.TemplateResponse(
+        "strategies/list.html", {"request": request, "strategies": strategy_names}
+    )
 
 
 @router.get("/view", response_class=HTMLResponse)
@@ -52,11 +49,9 @@ async def view_strategy(request: Request, name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ファイル読み込み失敗: {e}")
 
-    return templates.TemplateResponse("strategies/view.html", {
-        "request": request,
-        "filename": name,
-        "content": content
-    })
+    return templates.TemplateResponse(
+        "strategies/view.html", {"request": request, "filename": name, "content": content}
+    )
 
 
 @router.get("/overview", response_class=HTMLResponse)
@@ -77,10 +72,9 @@ async def strategy_overview(request: Request):
         except Exception as e:
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
 
-    return templates.TemplateResponse("strategies/strategies_overview.html", {
-        "request": request,
-        "strategies": data
-    })
+    return templates.TemplateResponse(
+        "strategies/strategies_overview.html", {"request": request, "strategies": data}
+    )
 
 
 @router.get("/search", response_class=HTMLResponse)
@@ -103,7 +97,11 @@ async def strategy_search(
             file_tags = j.get("tags", [])
             file_ai = j.get("ai", "")
 
-            if keyword and keyword.lower() not in name.lower() and not any(keyword.lower() in t.lower() for t in file_tags):
+            if (
+                keyword
+                and keyword.lower() not in name.lower()
+                and not any(keyword.lower() in t.lower() for t in file_tags)
+            ):
                 continue
 
             wr = j.get("win_rate")
@@ -132,15 +130,18 @@ async def strategy_search(
         except Exception as e:
             print(f"⚠️ 検索読み込み失敗: {file.name} - {e}")
 
-    return templates.TemplateResponse("strategies/search.html", {
-        "request": request,
-        "strategies": matched,
-        "keyword": keyword,
-        "min_win_rate": min_win_rate,
-        "max_drawdown": max_drawdown,
-        "tags": tags,
-        "ai": ai,
-    })
+    return templates.TemplateResponse(
+        "strategies/search.html",
+        {
+            "request": request,
+            "strategies": matched,
+            "keyword": keyword,
+            "min_win_rate": min_win_rate,
+            "max_drawdown": max_drawdown,
+            "tags": tags,
+            "ai": ai,
+        },
+    )
 
 
 @router.get("/export", response_class=FileResponse)
@@ -154,11 +155,7 @@ async def export_strategy(name: str):
 
     media_type = "text/x-python" if target.suffix == ".py" else "application/json"
 
-    return FileResponse(
-        path=target,
-        filename=target.name,
-        media_type=media_type
-    )
+    return FileResponse(path=target, filename=target.name, media_type=media_type)
 
 
 @router.get("/compare", response_class=HTMLResponse)

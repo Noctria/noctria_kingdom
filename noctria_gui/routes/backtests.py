@@ -107,9 +107,7 @@ async def backtests_list(request: Request):
     バックテスト一覧
     """
     dag_runs = _get_dag_runs()
-    return templates.TemplateResponse(
-        "backtests.html", {"request": request, "dag_runs": dag_runs}
-    )
+    return templates.TemplateResponse("backtests.html", {"request": request, "dag_runs": dag_runs})
 
 
 @router.get("/backtests/{dag_run_id}", response_class=HTMLResponse)
@@ -122,7 +120,9 @@ async def backtest_detail(request: Request, dag_run_id: str):
         return HTMLResponse(f"<pre>run_id={dag_run_id} not found</pre>", status_code=404)
 
     # Airflow Web UI へのリンクも用意
-    detail["logs_url"] = f"{AIRFLOW_BASE_URL.rstrip('/')}/dags/{DAG_ID}/grid?dag_run_id={dag_run_id}"
+    detail["logs_url"] = (
+        f"{AIRFLOW_BASE_URL.rstrip('/')}/dags/{DAG_ID}/grid?dag_run_id={dag_run_id}"
+    )
 
     return templates.TemplateResponse(
         "backtest_detail.html", {"request": request, "detail": detail}

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class HuberLoss(nn.Module):
     """
     Huber Loss の実装
@@ -26,6 +27,8 @@ class HuberLoss(nn.Module):
         is_small_error = torch.abs(error) <= self.delta
 
         # MSE (誤差が小さい場合) / MAE (誤差が大きい場合)
-        loss = torch.where(is_small_error, 0.5 * error ** 2, self.delta * (torch.abs(error) - 0.5 * self.delta))
+        loss = torch.where(
+            is_small_error, 0.5 * error**2, self.delta * (torch.abs(error) - 0.5 * self.delta)
+        )
 
         return loss.mean()

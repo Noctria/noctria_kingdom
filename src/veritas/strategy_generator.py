@@ -1,23 +1,23 @@
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import psycopg2
+import torch
+
+from core.logger import setup_logger
+from core.path_config import LOGS_DIR, STRATEGIES_DIR, VERITAS_MODELS_DIR
+from veritas.models.ml_model.simple_model import SimpleModel
+
 # src/veritas/strategy_generator.py
 
-import sys
-from pathlib import Path
 
 # --- ここで src ディレクトリの絶対パスを sys.path に追加 ---
 src_path = Path(__file__).resolve().parents[1]  # src/veritas/ の一つ上 = src/
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-import os
-import torch
-import psycopg2
-from datetime import datetime
-from typing import Optional
-
-from core.path_config import VERITAS_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
-from core.logger import setup_logger
-
-from veritas.models.ml_model.simple_model import SimpleModel
 
 logger = setup_logger("VeritasGenerator", LOGS_DIR / "veritas" / "generator.log")
 
@@ -29,6 +29,7 @@ DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 
 MODEL_PATH: Path = Path(os.getenv("VERITAS_MODEL_DIR", str(VERITAS_MODELS_DIR / "ml_model")))
+
 
 def load_ml_model() -> SimpleModel:
     """
@@ -43,7 +44,7 @@ def load_ml_model() -> SimpleModel:
         raise FileNotFoundError(f"Model file not found: {model_file}")
     model = SimpleModel()
     try:
-        state_dict = torch.load(str(model_file), map_location=torch.device('cpu'))
+        state_dict = torch.load(str(model_file), map_location=torch.device("cpu"))
         model.load_state_dict(state_dict)
         model.eval()
         logger.info("✅ MLモデルのロード完了")
@@ -52,6 +53,7 @@ def load_ml_model() -> SimpleModel:
         logger.error(f"モデルロード失敗: {e}", exc_info=True)
         raise
 
+
 def build_prompt(symbol: str, tag: str, target_metric: str) -> str:
     """
     戦略生成用プロンプトまたはパラメータ説明
@@ -59,6 +61,7 @@ def build_prompt(symbol: str, tag: str, target_metric: str) -> str:
     prompt = f"通貨ペア'{symbol}', 特性'{tag}', 目標指標'{target_metric}'に基づく取引戦略生成用パラメータ"
     logger.info(f"📝 生成されたパラメータ説明: {prompt}")
     return prompt
+
 
 def generate_strategy_code(prompt: str) -> str:
     """
@@ -69,6 +72,7 @@ def generate_strategy_code(prompt: str) -> str:
         model = load_ml_model()
         # TODO: 入力ベクトル・推論ロジックを本番仕様で置き換え
         import random
+
         random.seed(len(prompt))
         dummy_code = f"# Generated strategy code for prompt: {prompt}\n"
         dummy_code += f"def simulate():\n    return {random.uniform(0, 1):.4f}  # 戦略のスコア例\n"
@@ -78,6 +82,7 @@ def generate_strategy_code(prompt: str) -> str:
         logger.error(f"戦略コード生成失敗: {e}", exc_info=True)
         raise
 
+
 def save_to_db(prompt: str, response: str) -> None:
     """
     生成結果をPostgreSQL DBへ保存
@@ -85,12 +90,16 @@ def save_to_db(prompt: str, response: str) -> None:
     conn = None
     try:
         conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            port=DB_PORT,
         )
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO veritas_outputs (prompt, response, created_at) VALUES (%s, %s, %s)",
-                (prompt, response, datetime.now())
+                (prompt, response, datetime.now()),
             )
             conn.commit()
         logger.info("✅ 生成結果をDBに保存しました。")
@@ -100,6 +109,7 @@ def save_to_db(prompt: str, response: str) -> None:
     finally:
         if conn:
             conn.close()
+
 
 def save_to_file(code: str, tag: str) -> str:
     """
@@ -118,6 +128,7 @@ def save_to_file(code: str, tag: str) -> str:
         logger.error(f"戦略ファイル保存失敗: {e}", exc_info=True)
         raise
     return str(save_path)
+
 
 # ✅ テストブロック（本番DAG等からは直接呼ばれない）
 if __name__ == "__main__":

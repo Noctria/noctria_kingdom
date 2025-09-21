@@ -4,6 +4,7 @@ import shap
 import lime
 import lime.lime_tabular
 
+
 class ExplainableAI:
     """
     Explainable AI: 予測の透明性を向上するために SHAP と LIME を統合
@@ -13,6 +14,7 @@ class ExplainableAI:
         shap_explainer: SHAP による説明器
         lime_explainer: LIME による説明器
     """
+
     def __init__(self, model, data_sample=None):
         """
         コンストラクタ
@@ -31,17 +33,17 @@ class ExplainableAI:
             else:
                 num_features = 10
             data_sample = np.zeros((50, num_features))
-        
+
         # SHAPの初期化
         # モデルが深層学習の場合、DeepExplainer を利用する（場合により GradientExplainer も検討）
         self.shap_explainer = shap.DeepExplainer(model, data_sample)
-        
+
         # LIMEの初期化（タブラー型データとして設定）
         self.lime_explainer = lime.lime_tabular.LimeTabularExplainer(
             training_data=data_sample,
             feature_names=[f"feature_{i}" for i in range(data_sample.shape[1])],
             class_names=["output"],
-            discretize_continuous=True
+            discretize_continuous=True,
         )
 
     def explain_prediction_shap(self, market_data):
@@ -50,7 +52,7 @@ class ExplainableAI:
 
         Args:
             market_data (np.array): 説明対象のデータ (形状: (num_samples, num_features))
-        
+
         Returns:
             list: 各出力層の SHAP 値のリスト（モデルによる）
         """
@@ -63,7 +65,7 @@ class ExplainableAI:
 
         Args:
             market_data (np.array): 説明対象のデータ（形状: (1, num_features)）
-        
+
         Returns:
             explanation (LimeExplanation): LIME による説明オブジェクト
         """
@@ -71,11 +73,7 @@ class ExplainableAI:
         sample = market_data.flatten()
         # 予測関数として、モデルの predict メソッドを指定
         prediction_fn = lambda x: self.model.predict(x)
-        explanation = self.lime_explainer.explain_instance(
-            sample, 
-            prediction_fn, 
-            num_features=5
-        )
+        explanation = self.lime_explainer.explain_instance(sample, prediction_fn, num_features=5)
         return explanation
 
     def visualize_shap(self, market_data):
@@ -89,33 +87,36 @@ class ExplainableAI:
         shap_values = self.explain_prediction_shap(market_data)
         shap.summary_plot(shap_values, market_data)
 
+
 # ✅ シンプルなテストシミュレーション
 if __name__ == "__main__":
     # ダミーの Keras モデルを構築（入力次元: 10、出力: 1）
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(16, activation='relu', input_shape=(10,)),
-        tf.keras.layers.Dense(1, activation='linear')
-    ])
-    model.compile(optimizer='adam', loss='mse')
+    model = tf.keras.Sequential(
+        [
+            tf.keras.layers.Dense(16, activation="relu", input_shape=(10,)),
+            tf.keras.layers.Dense(1, activation="linear"),
+        ]
+    )
+    model.compile(optimizer="adam", loss="mse")
 
     # ダミーのサンプルデータ（50サンプル、10特徴量）を用意
     sample_data = np.random.rand(50, 10)
-    
+
     # Explainable AI モジュールを初期化
     explain_ai = ExplainableAI(model, data_sample=sample_data)
-    
+
     # テスト用の市場データサンプル（形状: (1, 10)）
     test_market_data = np.random.rand(1, 10)
     prediction = model.predict(test_market_data)
     print("Prediction:", prediction)
-    
+
     # SHAP による説明の取得
     shap_values = explain_ai.explain_prediction_shap(test_market_data)
     print("SHAP values:", shap_values)
-    
+
     # LIME による説明の取得
     lime_explanation = explain_ai.explain_prediction_lime(test_market_data)
     print("LIME explanation:", lime_explanation.as_list())
-    
+
     # ※ 可視化のサンプル（コード実行環境で実際にグラフを開く場合）
     # explain_ai.visualize_shap(test_market_data)

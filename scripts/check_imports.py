@@ -23,6 +23,7 @@ logger.debug(f"sys.path after update: {sys.path}")
 # 3. `GUI_TEMPLATES_DIR` の設定確認
 try:
     from src.core.path_config import GUI_TEMPLATES_DIR
+
     logger.debug(f"GUI_TEMPLATES_DIR: {GUI_TEMPLATES_DIR}")
 except ImportError as e:
     logger.error(f"Error importing GUI_TEMPLATES_DIR: {e}")
@@ -41,7 +42,7 @@ except ImportError as e:
     logger.debug(f"Current working directory: {os.getcwd()}")
 
 # 5. GUI_TEMPLATES_DIR のディレクトリ確認
-if 'GUI_TEMPLATES_DIR' in locals():
+if "GUI_TEMPLATES_DIR" in locals():
     if os.path.exists(GUI_TEMPLATES_DIR):
         logger.debug(f"GUI_TEMPLATES_DIR exists: {GUI_TEMPLATES_DIR}")
     else:
@@ -50,8 +51,15 @@ if 'GUI_TEMPLATES_DIR' in locals():
 # 6. `path_config.py` 内の重要なパスの存在確認
 logger.debug("Checking key paths in path_config.py...")
 paths_to_check = [
-    "PROJECT_ROOT", "SRC_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
-    "AIRFLOW_DOCKER_DIR", "DATA_DIR", "STATS_DIR", "VERITAS_DIR", "STRATEGIES_DIR"
+    "PROJECT_ROOT",
+    "SRC_DIR",
+    "NOCTRIA_GUI_TEMPLATES_DIR",
+    "NOCTRIA_GUI_STATIC_DIR",
+    "AIRFLOW_DOCKER_DIR",
+    "DATA_DIR",
+    "STATS_DIR",
+    "VERITAS_DIR",
+    "STRATEGIES_DIR",
 ]
 
 for path_name in paths_to_check:
@@ -80,7 +88,7 @@ for directory in critical_dirs:
         logger.error(f"Directory does not exist: {directory}")
 
 # 8. `GUI_TEMPLATES_DIR` が設定された場合にファイルが存在するかをチェック
-if 'GUI_TEMPLATES_DIR' in locals() and GUI_TEMPLATES_DIR:
+if "GUI_TEMPLATES_DIR" in locals() and GUI_TEMPLATES_DIR:
     logger.debug(f"Checking template directory: {GUI_TEMPLATES_DIR}")
     template_files = list(GUI_TEMPLATES_DIR.glob("*.html"))
     if template_files:

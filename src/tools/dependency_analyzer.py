@@ -1,6 +1,5 @@
 # tools/dependency_analyzer.py
 
-import os
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -9,7 +8,8 @@ TARGET_DIRS = ["veritas", "execution", "tests"]
 BASE_DIR = Path(__file__).resolve().parents[1]
 OUTPUT_FILE = BASE_DIR / "docs" / "diagnostics" / "dependency_map.txt"
 
-IMPORT_PATTERN = re.compile(r'^\s*(?:from|import)\s+([\w\.]+)')
+IMPORT_PATTERN = re.compile(r"^\s*(?:from|import)\s+([\w\.]+)")
+
 
 def analyze_imports(base_dir: Path, target_dirs: list) -> dict:
     dependencies = defaultdict(set)
@@ -34,6 +34,7 @@ def analyze_imports(base_dir: Path, target_dirs: list) -> dict:
 
     return dependencies
 
+
 def format_dependencies(deps: dict) -> str:
     lines = ["📊 Noctria Kingdom 依存関係診断マップ\n"]
     for module, imports in sorted(deps.items()):
@@ -43,5 +44,6 @@ def format_dependencies(deps: dict) -> str:
         lines.append("")  # 空行
     return "\n".join(lines)
 
+
 def main():
-    pr
+    return  # TODO: implement (fixed by fixer)

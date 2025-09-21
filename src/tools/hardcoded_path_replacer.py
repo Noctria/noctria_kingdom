@@ -1,9 +1,22 @@
-from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-import os
-import re
-import difflib
 import argparse
+import difflib
+import re
 from pathlib import Path
+
+from core.path_config import (
+    CORE_DIR,
+    DAGS_DIR,
+    DATA_DIR,
+    INSTITUTIONS_DIR,
+    LOGS_DIR,
+    MODELS_DIR,
+    PLUGINS_DIR,
+    SCRIPTS_DIR,
+    STRATEGIES_DIR,
+    TESTS_DIR,
+    TOOLS_DIR,
+    VERITAS_DIR,
+)
 
 # 🔁 ハードコードされたパスを path_config 定数へ置換するルール
 REPLACEMENT_RULES = {
@@ -24,13 +37,15 @@ REPLACEMENT_RULES = {
 # 🔍 すべての定数を収集（import挿入用）
 ALL_CONSTANTS = sorted(list(REPLACEMENT_RULES.values()))
 
+
 def show_diff(original: str, modified: str, file_path: Path):
     """差分表示"""
     diff = difflib.unified_diff(
-        original.splitlines(), modified.splitlines(),
+        original.splitlines(),
+        modified.splitlines(),
         fromfile=str(file_path),
         tofile=f"{file_path} (modified)",
-        lineterm=""
+        lineterm="",
     )
     print("\n".join(diff))
 
@@ -92,7 +107,9 @@ def scan_target(path: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="🛠 ハードコードされたパスを path_config 定数に置換")
+    parser = argparse.ArgumentParser(
+        description="🛠 ハードコードされたパスを path_config 定数に置換"
+    )
     parser.add_argument("--path", type=str, required=True, help="対象ファイルまたはディレクトリ")
     parser.add_argument("--dry-run", action="store_true", help="実際には書き換えずに変更内容を表示")
     parser.add_argument("--show-diff", action="store_true", help="差分を表示（dry-run時のみ）")

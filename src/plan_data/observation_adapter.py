@@ -17,18 +17,18 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Iterable, List, Optional, Sequence
+from typing import Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
 
-from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 from src.plan_data.feature_spec import (
     align_to_plan_features,  # snake化・数値化・欠損処理
     get_plan_feature_order,  # obs_dimに応じた列順を返す
 )
 
 # ---- 環境変数ヘルパ ---------------------------------------------------------
+
 
 def _to_int_or_none(x: Optional[str]) -> Optional[int]:
     if x is None:
@@ -92,6 +92,7 @@ def resolve_observation_columns(obs_dim: int) -> List[str]:
 
 
 # ---- メイン変換 -------------------------------------------------------------
+
 
 def _coerce_float_safe(v) -> float:
     try:

@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-import inspect
+
 import numpy as np
 
 log = logging.getLogger("Noctria")
@@ -47,8 +48,8 @@ except Exception:
 @dataclass
 class Decision:
     strategy: str
-    action: str         # "BUY" | "SELL" | "HOLD"
-    confidence: float   # 0.0 ~ 1.0
+    action: str  # "BUY" | "SELL" | "HOLD"
+    confidence: float  # 0.0 ~ 1.0
     reason: str
 
 
@@ -88,7 +89,10 @@ class Noctria:
             if p and p.exists():
                 self._try_add_prometheus(p)
             else:
-                log.info("PrometheusOracle 無効化（モデルファイル未検出）: %s", model_path_env)
+                log.info(
+                    "PrometheusOracle 無効化（モデルファイル未検出）: %s",
+                    model_path_env,
+                )
 
         if not self.strategies:
             log.info("有効な戦略が見つからなかったため、ダミー決断にフォールバックします。")

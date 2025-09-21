@@ -8,14 +8,13 @@
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict
 
 # ここに必要なモジュールをインポート
 from src.core.king_noctria import KingNoctria
 from src.strategies.prometheus_oracle import PrometheusOracle
-from src.core.path_config import PDCA_LOG_DIR
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 
 def get_dashboard_data() -> Dict[str, Any]:
@@ -29,10 +28,10 @@ def get_dashboard_data() -> Dict[str, Any]:
         king = KingNoctria()
         # 仮にKingNoctriaにstats()メソッドがある想定（要実装）
         stats = {
-            "avg_win_rate": 57.8,       # ダミー値
+            "avg_win_rate": 57.8,  # ダミー値
             "promoted_count": 9,
             "pushed_count": 20,
-            "oracle_metrics": {"RMSE": 0.0298}
+            "oracle_metrics": {"RMSE": 0.0298},
         }
 
         # 2. Prometheus Oracleの未来予測取得

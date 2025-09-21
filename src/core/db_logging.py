@@ -1,9 +1,9 @@
 # src/core/db_logging.py
-import os
 import json
 import logging
+import os
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import psycopg2
 import psycopg2.extras
@@ -13,6 +13,7 @@ _logger = logging.getLogger("db_logging")
 if not _logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
+
 def _get_conn():
     return psycopg2.connect(
         dbname=os.getenv("POSTGRES_DB", "airflow"),
@@ -21,6 +22,7 @@ def _get_conn():
         host=os.getenv("POSTGRES_HOST", "noctria_postgres"),
         port=int(os.getenv("POSTGRES_PORT", 5432)),
     )
+
 
 def log_event(
     table: str,

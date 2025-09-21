@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 import json as _json
 import sys as _sys
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 from . import observability
 
@@ -18,8 +18,8 @@ class NoctusGateResult:
 
 
 # --- デフォルト閾値 ---
-DEFAULT_MAX_LOT_SIZE = 1.0          # 1.0 ロットを超えたらエラー
-DEFAULT_MAX_RISK_SCORE = 0.8        # 0.0〜1.0 のリスク指標、0.8超ならブロック
+DEFAULT_MAX_LOT_SIZE = 1.0  # 1.0 ロットを超えたらエラー
+DEFAULT_MAX_RISK_SCORE = 0.8  # 0.0〜1.0 のリスク指標、0.8超ならブロック
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:

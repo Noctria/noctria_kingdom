@@ -15,23 +15,24 @@ from core.path_config import ORACLE_FORECAST_JSON
 import logging
 
 default_args = {
-    'owner': 'Prometheus',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    "owner": "Prometheus",
+    "depends_on_past": False,
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
 }
 
 dag = DAG(
-    dag_id='prometheus_strategy_dag',
+    dag_id="prometheus_strategy_dag",
     default_args=default_args,
-    description='🔮 Noctria Kingdomの未来予測官Prometheusによる予測DAG',
+    description="🔮 Noctria Kingdomの未来予測官Prometheusによる予測DAG",
     schedule_interval=None,
     start_date=datetime(2025, 6, 1),
     catchup=False,
-    tags=['noctria', 'forecasting', 'prometheus'],
+    tags=["noctria", "forecasting", "prometheus"],
 )
+
 
 def veritas_trigger_task(**kwargs):
     # もし将来XComや外部連携で使いたい場合に拡張
@@ -39,6 +40,7 @@ def veritas_trigger_task(**kwargs):
     reason = conf.get("reason", "理由未指定")
     print(f"【Prometheusトリガータスク・発令理由】{reason}")
     # 必要ならXComに理由を記録しても良い
+
 
 def prometheus_forecast_task(**kwargs):
     conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
@@ -62,15 +64,16 @@ def prometheus_forecast_task(**kwargs):
         logger.info(f"神託を保存: {ORACLE_FORECAST_JSON}")
 
         # 理由もXComへ（分析履歴トレース用）
-        ti = kwargs['ti']
-        ti.xcom_push(key='prometheus_forecast', value={
-            "head": predictions_df.head(1).to_dict("records"),
-            "trigger_reason": reason
-        })
+        ti = kwargs["ti"]
+        ti.xcom_push(
+            key="prometheus_forecast",
+            value={"head": predictions_df.head(1).to_dict("records"), "trigger_reason": reason},
+        )
     except Exception as e:
         logger = logging.getLogger("PrometheusForecast")
         logger.error(f"神託タスク中にエラー: {e}", exc_info=True)
         raise
+
 
 with dag:
     # veritas_task = PythonOperator(
@@ -80,9 +83,9 @@ with dag:
     # )
 
     forecast_task = PythonOperator(
-        task_id='prometheus_oracle_forecast_task',
+        task_id="prometheus_oracle_forecast_task",
         python_callable=prometheus_forecast_task,
-        provide_context=True
+        provide_context=True,
     )
 
     # 必要ならveritas_task >> forecast_task

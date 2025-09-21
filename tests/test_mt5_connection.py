@@ -1,6 +1,6 @@
 # test_mt5_connection.py
+
 import MetaTrader5 as mt5
-from datetime import datetime
 
 print("========== MetaTrader5接続テスト ==========")
 

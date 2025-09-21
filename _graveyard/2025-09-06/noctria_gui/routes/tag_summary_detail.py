@@ -32,15 +32,17 @@ async def show_tag_detail(request: Request, tag: str):
         filtered = [s for s in all_logs if tag in s.get("tags", [])]
     except Exception as e:
         return HTMLResponse(
-            content=f"<h2>⚠️ データの読み込みに失敗しました: {e}</h2>",
-            status_code=500
+            content=f"<h2>⚠️ データの読み込みに失敗しました: {e}</h2>", status_code=500
         )
 
-    return templates.TemplateResponse("tag_detail.html", {
-        "request": request,
-        "tag": tag,
-        "strategies": filtered,
-    })
+    return templates.TemplateResponse(
+        "tag_detail.html",
+        {
+            "request": request,
+            "tag": tag,
+            "strategies": filtered,
+        },
+    )
 
 
 @router.get("/tag-summary/detail/export")
@@ -61,21 +63,17 @@ async def export_tag_detail_csv(tag: str):
 
     with open(output_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "戦略名", "勝率", "最大DD", "取引回数", "タグ", "評価日時"
-        ])
+        writer.writerow(["戦略名", "勝率", "最大DD", "取引回数", "タグ", "評価日時"])
         for s in filtered:
-            writer.writerow([
-                s.get("strategy", ""),
-                s.get("win_rate", ""),
-                s.get("max_drawdown", ""),
-                s.get("num_trades", ""),
-                ", ".join(s.get("tags", [])),
-                s.get("timestamp", ""),
-            ])
+            writer.writerow(
+                [
+                    s.get("strategy", ""),
+                    s.get("win_rate", ""),
+                    s.get("max_drawdown", ""),
+                    s.get("num_trades", ""),
+                    ", ".join(s.get("tags", [])),
+                    s.get("timestamp", ""),
+                ]
+            )
 
-    return FileResponse(
-        output_path,
-        filename=filename,
-        media_type="text/csv"
-    )
+    return FileResponse(output_path, filename=filename, media_type="text/csv")

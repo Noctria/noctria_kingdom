@@ -12,14 +12,15 @@ from typing import Any, Dict, Optional, Type
 # ---- import 経路安定化 ----
 try:
     from src.core.path_config import ensure_import_path  # type: ignore
+
     ensure_import_path()
 except Exception:
     pass
 
 # ---- 明示的に src.* で統一 ----
+from src.plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
 from src.plan_data.collector import PlanDataCollector  # type: ignore
 from src.plan_data.strategy_adapter import FeatureBundle  # type: ignore
-from src.plan_data.adapter_to_decision import run_strategy_and_decide  # type: ignore
 
 
 def _snake_to_camel(s: str) -> str:
@@ -105,10 +106,14 @@ def _import_strategy(dotted: str):
     return _resolve_strategy_class(mod, cls_name)
 
 
-def build_features(symbol: str, timeframe: str, lookback: int,
-                   override_missing_ratio: Optional[float],
-                   override_data_lag_min: Optional[int],
-                   extra_ctx: Dict[str, Any]) -> FeatureBundle:
+def build_features(
+    symbol: str,
+    timeframe: str,
+    lookback: int,
+    override_missing_ratio: Optional[float],
+    override_data_lag_min: Optional[int],
+    extra_ctx: Dict[str, Any],
+) -> FeatureBundle:
     collector = PlanDataCollector()
     df, tid = collector.collect_all(lookback_days=max(lookback, 1))
     ctx: Dict[str, Any] = {
@@ -126,14 +131,30 @@ def build_features(symbol: str, timeframe: str, lookback: int,
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="Run strategy via adapter → DecisionEngine")
-    p.add_argument("--strategy", required=True, help="module:Class (e.g. src.strategies.aurus_singularis:AurusSingularis)")
+    p.add_argument(
+        "--strategy",
+        required=True,
+        help="module:Class (e.g. src.strategies.aurus_singularis:AurusSingularis)",
+    )
     p.add_argument("--symbol", default="USDJPY")
     p.add_argument("--timeframe", default="1d")
     p.add_argument("--lookback", type=int, default=90)
     p.add_argument("--trend", type=float, default=None, help="override trend_score (0..1)")
     p.add_argument("--volatility", type=float, default=None, help="override volatility (>=0)")
-    p.add_argument("--missing-ratio", type=float, default=None, dest="missing_ratio", help="simulate quality (e.g. 0.12)")
-    p.add_argument("--data-lag-min", type=int, default=None, dest="data_lag_min", help="simulate data lag minutes")
+    p.add_argument(
+        "--missing-ratio",
+        type=float,
+        default=None,
+        dest="missing_ratio",
+        help="simulate quality (e.g. 0.12)",
+    )
+    p.add_argument(
+        "--data-lag-min",
+        type=int,
+        default=None,
+        dest="data_lag_min",
+        help="simulate data lag minutes",
+    )
     p.add_argument("--pretty", action="store_true")
     return p.parse_args(argv)
 

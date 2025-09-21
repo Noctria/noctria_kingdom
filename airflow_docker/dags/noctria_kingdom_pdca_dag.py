@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from airflow.models.dag import DAG
+
 try:
     from airflow.operators.python import PythonOperator, get_current_context
 except Exception:
@@ -61,7 +62,6 @@ with DAG(
     # ※ DAG定義時の既定。実行時 conf で値は参照できるが、タスク数など“構造”は変えられない点に注意
     params={"worker_count": 3, "n_trials": 100},
 ) as dag:
-
     # DAG定義時の worker 数（構造はここで固定）
     _DEFAULT_WORKER_COUNT = int(dag.params.get("worker_count", 3))
 
@@ -120,7 +120,11 @@ with DAG(
         ctx = get_current_context()
         ti = ctx["ti"]
         # 実行時 conf の worker_count（多くても構造上の上限 _DEFAULT_WORKER_COUNT まで）
-        conf_wc = int((ctx.get("dag_run").conf or {}).get("worker_count", _DEFAULT_WORKER_COUNT)) if ctx.get("dag_run") else _DEFAULT_WORKER_COUNT
+        conf_wc = (
+            int((ctx.get("dag_run").conf or {}).get("worker_count", _DEFAULT_WORKER_COUNT))
+            if ctx.get("dag_run")
+            else _DEFAULT_WORKER_COUNT
+        )
         use_wc = min(conf_wc, _DEFAULT_WORKER_COUNT)
 
         logger.info(f"【選定理由】{_conf_reason()} / use_workers={use_wc}")
@@ -135,10 +139,16 @@ with DAG(
             return None
 
         # minimize（実行時 conf or params）で選定基準切替
-        params = (ctx.get("dag_run").conf or {}) if ctx.get("dag_run") else (ctx.get("params") or {})
+        params = (
+            (ctx.get("dag_run").conf or {}) if ctx.get("dag_run") else (ctx.get("params") or {})
+        )
         minimize = bool(str(params.get("minimize", "false")).lower() in ("1", "true", "yes"))
 
-        keyfunc = (lambda r: r.get("best_value", float("inf"))) if minimize else (lambda r: r.get("best_value", float("-inf")))
+        keyfunc = (
+            (lambda r: r.get("best_value", float("inf")))
+            if minimize
+            else (lambda r: r.get("best_value", float("-inf")))
+        )
         best = min(results, key=keyfunc) if minimize else max(results, key=keyfunc)
 
         # 後段タスク用に best_params をキー付きで渡す（互換維持）
@@ -217,8 +227,12 @@ with DAG(
 
         # productionメタのパス規約（apply_best_params_to_kingdom.py と合わせる）
         MODELS_DIR = Path(os.environ.get("NOCTRIA_MODELS_DIR", "/opt/airflow/data/models"))
-        PRODUCTION_DIR = Path(os.environ.get("NOCTRIA_PRODUCTION_DIR", str(MODELS_DIR / "production")))
-        META_NAME = os.environ.get("NOCTRIA_PRODUCTION_META_NAME", "metaai_production_metadata.json")
+        PRODUCTION_DIR = Path(
+            os.environ.get("NOCTRIA_PRODUCTION_DIR", str(MODELS_DIR / "production"))
+        )
+        META_NAME = os.environ.get(
+            "NOCTRIA_PRODUCTION_META_NAME", "metaai_production_metadata.json"
+        )
         META_PATH = PRODUCTION_DIR / META_NAME
 
         ctx = get_current_context()
@@ -249,13 +263,18 @@ with DAG(
         logger.info(f"王決断に使用するモデル: {prod_path}")
 
         from src.noctria_ai.noctria import Noctria
+
         try:
             result = Noctria().execute_trade()
             try:
                 log_event(
                     table="pdca_events",
                     event_type="ROYAL_DECISION",
-                    payload={"result": result, "reason": _conf_reason(), "model_path": str(prod_path)},
+                    payload={
+                        "result": result,
+                        "reason": _conf_reason(),
+                        "model_path": str(prod_path),
+                    },
                 )
             except Exception as e:
                 logger.warning(f"log_event 失敗（ROYAL_DECISION）: {e}")
@@ -266,7 +285,11 @@ with DAG(
                 log_event(
                     table="pdca_events",
                     event_type="ROYAL_DECISION_ERROR",
-                    payload={"error": str(e), "reason": _conf_reason(), "model_path": str(prod_path)},
+                    payload={
+                        "error": str(e),
+                        "reason": _conf_reason(),
+                        "model_path": str(prod_path),
+                    },
                 )
             except Exception as e2:
                 logger.warning(f"log_event 失敗（ROYAL_DECISION_ERROR）: {e2}")

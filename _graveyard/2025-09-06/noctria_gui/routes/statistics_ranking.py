@@ -62,14 +62,24 @@ def load_tag_statistics(from_date=None, to_date=None, tag_keyword=None):
 
     final_stats = []
     for tag, stats in tag_stats.items():
-        win_avg = round(sum(stats["win_rates"]) / len(stats["win_rates"]), 1) if stats["win_rates"] else None
-        dd_avg = round(sum(stats["drawdowns"]) / len(stats["drawdowns"]), 1) if stats["drawdowns"] else None
-        final_stats.append({
-            "tag": tag,
-            "count": stats["count"],
-            "avg_win": win_avg,
-            "avg_dd": dd_avg,
-        })
+        win_avg = (
+            round(sum(stats["win_rates"]) / len(stats["win_rates"]), 1)
+            if stats["win_rates"]
+            else None
+        )
+        dd_avg = (
+            round(sum(stats["drawdowns"]) / len(stats["drawdowns"]), 1)
+            if stats["drawdowns"]
+            else None
+        )
+        final_stats.append(
+            {
+                "tag": tag,
+                "count": stats["count"],
+                "avg_win": win_avg,
+                "avg_dd": dd_avg,
+            }
+        )
 
     return final_stats
 
@@ -86,21 +96,26 @@ async def tag_ranking(request: Request):
 
     stats = load_tag_statistics(from_date, to_date, tag_keyword)
 
-    ranking_win = sorted([s for s in stats if s["avg_win"] is not None], key=lambda x: x["avg_win"], reverse=True)
+    ranking_win = sorted(
+        [s for s in stats if s["avg_win"] is not None], key=lambda x: x["avg_win"], reverse=True
+    )
     ranking_dd = sorted([s for s in stats if s["avg_dd"] is not None], key=lambda x: x["avg_dd"])
     ranking_count = sorted(stats, key=lambda x: x["count"], reverse=True)
 
-    return templates.TemplateResponse("statistics_ranking.html", {
-        "request": request,
-        "ranking_win": ranking_win[:10],
-        "ranking_dd": ranking_dd[:10],
-        "ranking_count": ranking_count[:10],
-        "filter": {
-            "from": params.get("from") or "",
-            "to": params.get("to") or "",
-            "tag": tag_keyword or ""
-        }
-    })
+    return templates.TemplateResponse(
+        "statistics_ranking.html",
+        {
+            "request": request,
+            "ranking_win": ranking_win[:10],
+            "ranking_dd": ranking_dd[:10],
+            "ranking_count": ranking_count[:10],
+            "filter": {
+                "from": params.get("from") or "",
+                "to": params.get("to") or "",
+                "tag": tag_keyword or "",
+            },
+        },
+    )
 
 
 @router.get("/statistics/ranking/export")
@@ -127,5 +142,5 @@ async def export_tag_ranking_csv(request: Request):
     return StreamingResponse(
         iter([buffer.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

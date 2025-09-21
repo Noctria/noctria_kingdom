@@ -10,14 +10,14 @@
 
 import csv
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from core.path_config import (
-    PDCA_LOG_DIR,
     ACT_LOG_DIR,
-    TOOLS_DIR,
     LOGS_DIR,
+    PDCA_LOG_DIR,
+    TOOLS_DIR,
 )
 
 # PUSHログが存在する場合に限り処理
@@ -60,7 +60,7 @@ def normalize_log(entry: dict) -> dict:
         "status": entry.get("status", ""),
         "pushed": entry.get("pushed", ""),
         "note": entry.get("message", entry.get("note", "")),
-        "source": entry.get("__source__", "")
+        "source": entry.get("__source__", ""),
     }
 
 
@@ -85,7 +85,16 @@ def export_all_logs():
 
     with open(output_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(
-            f, fieldnames=["strategy", "symbol", "timestamp", "status", "pushed", "note", "source"]
+            f,
+            fieldnames=[
+                "strategy",
+                "symbol",
+                "timestamp",
+                "status",
+                "pushed",
+                "note",
+                "source",
+            ],
         )
         writer.writeheader()
         writer.writerows(all_logs)

@@ -1,5 +1,5 @@
-import os
 import json
+import os
 
 ROOT_DIR = "/noctria_kingdom"
 OUTPUT_PATH = os.path.join(ROOT_DIR, "logs", "refactor_plan.json")
@@ -8,8 +8,10 @@ OUTPUT_PATH = os.path.join(ROOT_DIR, "logs", "refactor_plan.json")
 IGNORED_DIRS = {"__pycache__", ".git", ".venv", "venv", ".idea", ".mypy_cache"}
 IGNORED_FILES = {".DS_Store", "Thumbs.db", "dummy"}
 
+
 def should_ignore(name):
     return name in IGNORED_DIRS or name in IGNORED_FILES
+
 
 def scan_structure(root_dir):
     plan = []
@@ -30,15 +32,18 @@ def scan_structure(root_dir):
             if "strategies" in relative_path and "veritas" not in relative_path:
                 if filename.endswith(".py") and "test" not in filename:
                     suggested_path = os.path.join("strategies", "veritas_generated", filename)
-                    plan.append({
-                        "src": relative_path,
-                        "dst": suggested_path,
-                        "reason": "Move to veritas_generated for consolidation",
-                    })
+                    plan.append(
+                        {
+                            "src": relative_path,
+                            "dst": suggested_path,
+                            "reason": "Move to veritas_generated for consolidation",
+                        }
+                    )
 
             # 絶対パス参照の修正対象なども検出可（今後拡張）
 
     return plan
+
 
 def main():
     plan = scan_structure(ROOT_DIR)
@@ -49,6 +54,7 @@ def main():
 
     print(f"✅ リファクタリング計画を出力: {OUTPUT_PATH}")
     print(f"🧩 対象ファイル数: {len(plan)} 件")
+
 
 if __name__ == "__main__":
     main()

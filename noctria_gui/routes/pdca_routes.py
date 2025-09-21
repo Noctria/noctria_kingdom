@@ -16,13 +16,13 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Request, Query, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 # ========================================
 _THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = _THIS_FILE.parents[2]  # <repo_root>
+
 
 # ========================================
 # 📁 テンプレートディレクトリ解決（安全フォールバック）
@@ -46,6 +47,7 @@ def _resolve_templates_dir() -> Path:
     # 1) src.core.path_config（推奨）
     try:
         from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR as _TPL  # type: ignore
+
         p = Path(str(_TPL))
         if p.exists():
             return p
@@ -55,6 +57,7 @@ def _resolve_templates_dir() -> Path:
     # 2) core.path_config（互換）
     try:
         from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR as _TPL  # type: ignore
+
         p = Path(str(_TPL))
         if p.exists():
             return p
@@ -68,6 +71,7 @@ def _resolve_templates_dir() -> Path:
 _TEMPLATES_DIR = _resolve_templates_dir()
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
+
 # ========================================
 # 📁 PDCAログディレクトリ解決（安全フォールバック）
 # ========================================
@@ -79,6 +83,7 @@ def _resolve_pdca_dir() -> Path:
     """
     try:
         from src.core.path_config import PDCA_LOG_DIR as _P  # type: ignore
+
         p = Path(str(_P))
         p.mkdir(parents=True, exist_ok=True)
         return p
@@ -90,21 +95,22 @@ def _resolve_pdca_dir() -> Path:
 
 _PDCA_DIR = _resolve_pdca_dir()
 
+
 # （任意）ポリシースナップショットを取れれば添付したい
 def _get_policy_snapshot() -> Dict[str, Any]:
     try:
         from src.core.policy_engine import get_snapshot  # type: ignore
+
         return dict(get_snapshot())
     except Exception:
         return {}
 
+
 # ========================================
 # ⚙️ ルーター設定
 # ========================================
-router = APIRouter(
-    prefix="/pdca-dashboard",
-    tags=["PDCA"]
-)
+router = APIRouter(prefix="/pdca-dashboard", tags=["PDCA"])
+
 
 # ========================================
 # 🔎 フィルタ抽出ユーティリティ
@@ -134,6 +140,7 @@ def _extract_filters(request: Request) -> Dict[str, Any]:
         "search": qp.get("search"),
     }
     return filters
+
 
 # ========================================
 # 🔍 ダッシュボード表示ルート
@@ -171,6 +178,7 @@ async def show_pdca_dashboard(request: Request):
         },
     )
 
+
 # ========================================
 # 🩺 ヘルスチェック/軽量データAPI
 # ========================================
@@ -186,6 +194,7 @@ async def pdca_dashboard_health():
         }
     )
 
+
 # =============================================================================
 # 📈 直近ログの軽量API（このルーターの中で使えるように安全実装）
 # =============================================================================
@@ -198,16 +207,33 @@ def _read_logs_dataframe():
     try:
         import pandas as pd  # type: ignore
     except Exception:
+
         class _Dummy:
             @property
-            def empty(self): return True
-            def __getattr__(self, _): return self
-            def copy(self): return self
-            def sort_values(self, *_, **__): return self
-            def head(self, *_): return self
-            def to_dict(self, *_, **__): return {}
-            def __getitem__(self, _): return self
-            def astype(self, *_ , **__): return self
+            def empty(self):
+                return True
+
+            def __getattr__(self, _):
+                return self
+
+            def copy(self):
+                return self
+
+            def sort_values(self, *_, **__):
+                return self
+
+            def head(self, *_):
+                return self
+
+            def to_dict(self, *_, **__):
+                return {}
+
+            def __getitem__(self, _):
+                return self
+
+            def astype(self, *_, **__):
+                return self
+
         return _Dummy()
 
     files = sorted(_PDCA_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -253,10 +279,18 @@ def api_recent(limit: int = Query(20, ge=1, le=100)):
         return {"rows": []}
 
     cols = [
-        "evaluated_at", "strategy", "tag",
-        "winrate_old", "winrate_new", "winrate_diff",
-        "maxdd_old", "maxdd_new", "maxdd_diff",
-        "trades_old", "trades_new", "notes",
+        "evaluated_at",
+        "strategy",
+        "tag",
+        "winrate_old",
+        "winrate_new",
+        "winrate_diff",
+        "maxdd_old",
+        "maxdd_new",
+        "maxdd_diff",
+        "trades_old",
+        "trades_new",
+        "notes",
     ]
     # 欠損列を埋める
     for c in cols:
@@ -278,8 +312,7 @@ def api_recent(limit: int = Query(20, ge=1, le=100)):
 
 @router.get("/api/strategy_detail", response_model=Dict[str, Any])
 def api_strategy_detail(
-    strategy: str = Query(..., min_length=1),
-    limit: int = Query(50, ge=1, le=500)
+    strategy: str = Query(..., min_length=1), limit: int = Query(50, ge=1, le=500)
 ):
     """
     指定戦略の履歴詳細（最新 limit 件）
@@ -302,10 +335,19 @@ def api_strategy_detail(
         return {"strategy": strategy, "rows": []}
 
     cols = [
-        "evaluated_at", "strategy", "tag",
-        "winrate_old", "winrate_new", "winrate_diff",
-        "maxdd_old", "maxdd_new", "maxdd_diff",
-        "trades_old", "trades_new", "notes", "__source_file",
+        "evaluated_at",
+        "strategy",
+        "tag",
+        "winrate_old",
+        "winrate_new",
+        "winrate_diff",
+        "maxdd_old",
+        "maxdd_new",
+        "maxdd_diff",
+        "trades_old",
+        "trades_new",
+        "notes",
+        "__source_file",
     ]
     for c in cols:
         if c not in getattr(dff, "columns", []):
@@ -322,6 +364,7 @@ def api_strategy_detail(
         rows = []
 
     return {"strategy": strategy, "rows": rows}
+
 
 # =============================================================================
 # ✅ Act(採用) API — 決裁台帳連携（decision_id 自動発行 / イベント記録）
@@ -350,7 +393,8 @@ def pdca_act(body: ActBody = Body(...)):
     # 2) Decision ledger 連携
     decision_id = body.decision_id
     try:
-        from src.core.decision_registry import create_decision, append_event  # type: ignore
+        from src.core.decision_registry import append_event, create_decision  # type: ignore
+
         if not decision_id:
             d = create_decision(
                 kind="act",
@@ -380,13 +424,18 @@ def pdca_act(body: ActBody = Body(...)):
         if _use_ledger:
             try:
                 from src.core.decision_registry import append_event  # re-import safe
+
                 phase = "completed" if res.ok else "failed"
-                append_event(decision_id or "-", phase, {
-                    "committed": res.committed,
-                    "git_tag": res.tag,
-                    "output_path": str(res.output_path) if res.output_path else None,
-                    "message": res.message,
-                })
+                append_event(
+                    decision_id or "-",
+                    phase,
+                    {
+                        "committed": res.committed,
+                        "git_tag": res.tag,
+                        "output_path": str(res.output_path) if res.output_path else None,
+                        "message": res.message,
+                    },
+                )
             except Exception:
                 pass
 
@@ -408,10 +457,12 @@ def pdca_act(body: ActBody = Body(...)):
         if _use_ledger:
             try:
                 from src.core.decision_registry import append_event
+
                 append_event(decision_id or "-", "failed", {"error": str(e)})
             except Exception:
                 pass
         raise
+
 
 # =============================================================================
 # 🧰 Airflow呼び出しユーティリティ
@@ -463,10 +514,16 @@ def _trigger_airflow_dag(dag_id: str, conf: Dict[str, Any]) -> Dict[str, Any]:
                 js = r.json()
             except Exception:
                 js = {}
-            return {"ok": True, "status_code": r.status_code, "response": js, "dag_run_id": js.get("dag_run_id")}
+            return {
+                "ok": True,
+                "status_code": r.status_code,
+                "response": js,
+                "dag_run_id": js.get("dag_run_id"),
+            }
         return {"ok": False, "status_code": r.status_code, "error": r.text}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
 
 # =============================================================================
 # 🔁 再評価トリガ API（単発）
@@ -483,7 +540,8 @@ def pdca_recheck(body: RecheckBody = Body(...)):
     # Decision
     decision_id = body.decision_id
     try:
-        from src.core.decision_registry import create_decision, append_event  # type: ignore
+        from src.core.decision_registry import append_event, create_decision  # type: ignore
+
         if not decision_id:
             d = create_decision(
                 kind="recheck",
@@ -510,7 +568,10 @@ def pdca_recheck(body: RecheckBody = Body(...)):
     if _use_ledger:
         try:
             from src.core.decision_registry import append_event
-            append_event(decision_id or "-", "started" if trig.get("ok") else "failed", {"airflow": trig})
+
+            append_event(
+                decision_id or "-", "started" if trig.get("ok") else "failed", {"airflow": trig}
+            )
         except Exception:
             pass
 
@@ -526,13 +587,14 @@ def pdca_recheck(body: RecheckBody = Body(...)):
         },
     )
 
+
 # =============================================================================
 # 🔁 一括再評価トリガ API
 #   - 日付範囲で pdca CSV を走査し、戦略のユニーク集合に対して個別DAGを多重起動
 # =============================================================================
 class RecheckAllBody(BaseModel):
     filter_date_from: str | None = None  # "YYYY-MM-DD"
-    filter_date_to: str | None = None    # "YYYY-MM-DD"
+    filter_date_to: str | None = None  # "YYYY-MM-DD"
     reason: str | None = None
     caller: str | None = "ui"
     limit: int = Field(50, ge=1, le=200)  # 安全制限
@@ -582,12 +644,13 @@ def pdca_recheck_all(body: RecheckAllBody = Body(...)):
 
     # 上限カット
     if len(strategies) > body.limit:
-        strategies = strategies[:body.limit]
+        strategies = strategies[: body.limit]
 
     # Decision（親決裁）
     parent_decision_id: Optional[str] = None
     try:
-        from src.core.decision_registry import create_decision, append_event  # type: ignore
+        from src.core.decision_registry import append_event, create_decision  # type: ignore
+
         d = create_decision(
             kind="recheck_all",
             issued_by=body.caller or "ui",
@@ -622,6 +685,7 @@ def pdca_recheck_all(body: RecheckAllBody = Body(...)):
         if _use_ledger:
             try:
                 from src.core.decision_registry import append_event
+
                 append_event(
                     parent_decision_id or "-",
                     "started" if trig.get("ok") else "failed",
@@ -639,6 +703,7 @@ def pdca_recheck_all(body: RecheckAllBody = Body(...)):
     if _use_ledger:
         try:
             from src.core.decision_registry import append_event
+
             append_event(parent_decision_id or "-", "completed", {"summary": summary})
         except Exception:
             pass

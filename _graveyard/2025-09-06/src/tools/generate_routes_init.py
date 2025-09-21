@@ -12,6 +12,7 @@ from pathlib import Path
 ROUTES_DIR = Path(__file__).resolve().parent.parent / "noctria_gui" / "routes"
 INIT_FILE = ROUTES_DIR / "__init__.py"
 
+
 def find_router_modules():
     """
     🔍 routes/ 配下の router 定義モジュールを収集
@@ -42,14 +43,14 @@ def generate_init_content(modules):
 
     for name in modules:
         lines.append(f"try:")
-        lines.append(f"    mod = importlib.import_module(f\".{{name}}\", package=__name__)")
-        lines.append(f"    if hasattr(mod, \"router\"):")
+        lines.append(f'    mod = importlib.import_module(f".{{name}}", package=__name__)')
+        lines.append(f'    if hasattr(mod, "router"):')
         lines.append(f"        routers.append(mod.router)")
-        lines.append(f"        print(f\"[routes] ✅ router 読込成功: {name}\")")
+        lines.append(f'        print(f"[routes] ✅ router 読込成功: {name}")')
         lines.append(f"    else:")
-        lines.append(f"        print(f\"[routes] ⚠️ router 未定義: {name}\")")
+        lines.append(f'        print(f"[routes] ⚠️ router 未定義: {name}")')
         lines.append(f"except Exception as e:")
-        lines.append(f"    print(f\"[routes] ❌ router 読込失敗: {name} - {{repr(e)}}\")\n")
+        lines.append(f'    print(f"[routes] ❌ router 読込失敗: {name} - {{repr(e)}}")\n')
 
     return "\n".join(lines)
 

@@ -2,13 +2,14 @@ import json
 import os
 from datetime import datetime
 
+
 def save_model_metadata(model_path, episode, total_reward, win_rate, extra_info=None):
     metadata = {
         "model_path": model_path,
         "episode": episode,
         "total_reward": total_reward,
         "win_rate": win_rate,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     if extra_info:
         metadata.update(extra_info)

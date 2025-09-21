@@ -7,10 +7,9 @@
 - 固定テンプレートだが、将来的にはLLMがコード自体を生成する想定。
 """
 
-import os
+import logging
 import re
 import sys
-import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -101,6 +100,7 @@ def simulate(data: pd.DataFrame) -> dict:
     }
 """
 
+
 # -------------------- ユーティリティ --------------------
 def _sanitize_filename(name: str) -> str:
     """安全なファイル名へ（英数字・ハイフン・アンダースコア以外を '_' に）"""
@@ -108,6 +108,7 @@ def _sanitize_filename(name: str) -> str:
     name = re.sub(r"\s+", "_", name)
     name = re.sub(r"[^A-Za-z0-9_\-]", "_", name)
     return name or "strategy"
+
 
 # -------------------- 主要関数 --------------------
 def generate_strategy_file(strategy_name: str) -> str:
@@ -128,15 +129,17 @@ def generate_strategy_file(strategy_name: str) -> str:
 
         logging.info(f"✅ 新たな戦略の羊皮紙を生成しました: {filepath}")
         return str(filepath)
-    except Exception as e:
+    except Exception:
         logging.error("❌ 戦略ファイルの生成中にエラーが発生しました", exc_info=True)
         raise
+
 
 def main():
     """スクリプトとして直接実行された際のメイン関数"""
     logging.info("--- 戦略生成スクリプトを開始します ---")
     generate_strategy_file("veritas_strategy")
     logging.info("--- 戦略生成スクリプトを完了しました ---")
+
 
 if __name__ == "__main__":
     main()

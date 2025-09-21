@@ -31,12 +31,12 @@ PDCAサマリー用のデータ取得＆KPI集計ユーティリティ
 
 from __future__ import annotations
 
-import os
-import json
 import hashlib
+import json
+import os
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Iterable
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 # ---- DB 接続（psycopg v3 → v2 フォールバック）----
 try:
@@ -165,7 +165,12 @@ def _first_int(d: Dict[str, Any], *keys: str) -> Optional[int]:
     return None
 
 
-def _derived_id(started_at: datetime, ai_name: str, decision_id: Optional[str], run_id: Optional[str]) -> str:
+def _derived_id(
+    started_at: datetime,
+    ai_name: str,
+    decision_id: Optional[str],
+    run_id: Optional[str],
+) -> str:
     """
     テーブルに id が無い場合の安定ID（ビューでも同一行なら同じIDになるよう構成）
     """
@@ -222,7 +227,17 @@ def fetch_infer_calls(from_date: datetime, to_date: datetime) -> List[InferRow]:
                             started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
                         if isinstance(ended_at, str):
                             ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-                        rows.append(InferRow(started_at, ended_at, ai_name, status, params, metrics, raw_id))
+                        rows.append(
+                            InferRow(
+                                started_at,
+                                ended_at,
+                                ai_name,
+                                status,
+                                params,
+                                metrics,
+                                raw_id,
+                            )
+                        )
                 except Exception:
                     # fallback: no id column
                     cur.execute(q_no_id, (start_utc, end_utc))
@@ -237,7 +252,17 @@ def fetch_infer_calls(from_date: datetime, to_date: datetime) -> List[InferRow]:
                             started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
                         if isinstance(ended_at, str):
                             ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-                        rows.append(InferRow(started_at, ended_at, ai_name, status, params, metrics, None))
+                        rows.append(
+                            InferRow(
+                                started_at,
+                                ended_at,
+                                ai_name,
+                                status,
+                                params,
+                                metrics,
+                                None,
+                            )
+                        )
     except Exception:
         # DBクエリが失敗してもUIを止めない
         return []
@@ -266,7 +291,14 @@ def _is_recheck(row: InferRow) -> bool:
     name = row.ai_name.lower()
     if "recheck" in name:
         return True
-    if _first_str(row.params_json, "recheck") in ("1", "true", "yes", "on", "True", "TRUE"):
+    if _first_str(row.params_json, "recheck") in (
+        "1",
+        "true",
+        "yes",
+        "on",
+        "True",
+        "TRUE",
+    ):
         return True
     reason = (_first_str(row.params_json, "reason") or "").lower()
     return "recheck" in reason
@@ -346,10 +378,10 @@ def aggregate_kpis(rows: List[InferRow]) -> Dict[str, Any]:
         "evals": total_evals,
         "rechecks": total_rechecks,
         "adopted": total_adopted,
-        "adopt_rate": adopt_rate,        # 0-1 or None
-        "adoption_rate": adopt_rate,     # 互換
-        "win_rate": agg_win_rate,        # 0-1 or None / （負値実装ならそのまま）
-        "max_drawdown": agg_max_dd,      # 例: -0.12 / 0.12
+        "adopt_rate": adopt_rate,  # 0-1 or None
+        "adoption_rate": adopt_rate,  # 互換
+        "win_rate": agg_win_rate,  # 0-1 or None / （負値実装ならそのまま）
+        "max_drawdown": agg_max_dd,  # 例: -0.12 / 0.12
         "trades": trades_sum,
     }
 
@@ -396,7 +428,14 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
             b["_win_rates"].append(wr)
         else:
             wins = _first_int(r.metrics_json, "wins", "n_wins", "successful_trades")
-            total = _first_int(r.metrics_json, "trades", "num_trades", "n_trades", "total_trades", "episodes")
+            total = _first_int(
+                r.metrics_json,
+                "trades",
+                "num_trades",
+                "n_trades",
+                "total_trades",
+                "episodes",
+            )
             if wins is not None and total:
                 b["_wins"] += wins
                 b["_total"] += total
@@ -421,7 +460,7 @@ def aggregate_by_day(rows: List[InferRow]) -> List[Dict[str, Any]]:
                 "evals": b["evals"],
                 "adopted": b["adopted"],
                 "trades": b["trades"],
-                "win_rate": wr,       # 0-1 or None / （負値実装でもそのまま）
+                "win_rate": wr,  # 0-1 or None / （負値実装でもそのまま）
                 "adopt_rate": adopt_rate,  # 0-1 or None
             }
         )
@@ -502,7 +541,10 @@ def get_details(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     if filters.get("date_to"):
         end = datetime.strptime(filters["date_to"], "%Y-%m-%d").date()
 
-    rows = fetch_infer_calls(datetime.combine(start, datetime.min.time()), datetime.combine(end, datetime.min.time()))
+    rows = fetch_infer_calls(
+        datetime.combine(start, datetime.min.time()),
+        datetime.combine(end, datetime.min.time()),
+    )
     det = _rows_to_details(rows)
 
     # フィルタ
@@ -539,7 +581,9 @@ def get_details(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     if sort == "win_rate":
         det.sort(key=lambda r: (r["win_rate"] is None, r["win_rate"]), reverse=True)
     elif sort in ("max_drawdown", "maxdd"):
-        det = [r for r in det if r["max_drawdown"] is not None] + [r for r in det if r["max_drawdown"] is None]
+        det = [r for r in det if r["max_drawdown"] is not None] + [
+            r for r in det if r["max_drawdown"] is None
+        ]
         det.sort(key=lambda r: (r["max_drawdown"] is None, r["max_drawdown"]))  # 小さい方が先
     elif sort == "trades":
         det.sort(key=lambda r: r["trades"], reverse=True)
@@ -549,7 +593,7 @@ def get_details(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     # limit/offset
     off = int(filters.get("offset") or 0)
     lim = int(filters.get("limit") or len(det))
-    return det[off: off + lim]
+    return det[off : off + lim]
 
 
 def get_summary(filters: Dict[str, Any]) -> Dict[str, Any]:
@@ -587,8 +631,10 @@ def get_summary(filters: Dict[str, Any]) -> Dict[str, Any]:
         "rows": len(det),
         "trades": int(k.get("trades") or 0),
         "adopted": int(k.get("adopted") or 0),
-        "avg_win_rate": float(k.get("win_rate")) if k.get("win_rate") is not None else None,
-        "avg_max_drawdown": float(k.get("max_drawdown")) if k.get("max_drawdown") is not None else None,
+        "avg_win_rate": (float(k.get("win_rate")) if k.get("win_rate") is not None else None),
+        "avg_max_drawdown": (
+            float(k.get("max_drawdown")) if k.get("max_drawdown") is not None else None
+        ),
     }
 
     # by_day
@@ -641,10 +687,20 @@ def get_entry_by_id(entry_id: str) -> Optional[Dict[str, Any]]:
                             params = _load_json(rec[5])
                             metrics = _load_json(rec[6])
                             if isinstance(started_at, str):
-                                started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                                started_at = datetime.fromisoformat(
+                                    started_at.replace("Z", "+00:00")
+                                )
                             if isinstance(ended_at, str):
                                 ended_at = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
-                            row = InferRow(started_at, ended_at, ai_name, status, params, metrics, raw_id)
+                            row = InferRow(
+                                started_at,
+                                ended_at,
+                                ai_name,
+                                status,
+                                params,
+                                metrics,
+                                raw_id,
+                            )
                             return _rows_to_details([row])[0]
                     except Exception:
                         # id列が無い／エラー → フォールバック（期間探索）

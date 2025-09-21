@@ -6,12 +6,16 @@ from collections import defaultdict
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # ← adjust if needed
 TARGET_DIRS = ["src", "noctria_gui", "tools", "scripts"]  # 走査したいディレクトリ名
 
+
 # --- ファイル名からノードID生成 ---
 def file_to_node(path):
     # ファイル名の拡張子・パス区切りを_に
     return str(path).replace("/", "_").replace(".", "_")
 
-def relpath(p): return os.path.relpath(p, PROJECT_ROOT)
+
+def relpath(p):
+    return os.path.relpath(p, PROJECT_ROOT)
+
 
 # --- 依存解析（import/static template依存） ---
 def analyze_imports(filepath):
@@ -32,11 +36,13 @@ def analyze_imports(filepath):
         for line in src.splitlines():
             if "templates" in line and (".html" in line or ".jinja" in line):
                 import re
+
                 found = re.findall(r'["\']([\w/]+\.(?:html|jinja2?))["\']', line)
                 templates.update(found)
     except Exception as e:
         print(f"[WARN] {filepath}: {e}")
     return imports, templates
+
 
 # --- すべての.pyファイルとtemplateファイルを探索 ---
 py_files = []
@@ -88,6 +94,7 @@ for n in list(node_files) + list(template_files):
     else:
         non_isolated.append(n)
 
+
 # --- Mermaid記法に出力 ---
 def print_mmd(edges, isolated, non_isolated, show_templates=True):
     print("flowchart TD")
@@ -101,10 +108,10 @@ def print_mmd(edges, isolated, non_isolated, show_templates=True):
     for n in isolated:
         print(f'    "{n}":::isolated')
     # スタイル
-    print('    classDef isolated fill:#fff,stroke:#a00,stroke-width:2px;')
+    print("    classDef isolated fill:#fff,stroke:#a00,stroke-width:2px;")
+
 
 print("# ------ 非孤立ファイル/テンプレート ------")
 print_mmd(edges, [], non_isolated)
 print("\n# ------ 孤立ファイル ------")
 print_mmd([], isolated, [])
-

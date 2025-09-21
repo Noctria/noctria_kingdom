@@ -8,14 +8,14 @@
 """
 
 import os
-import torch
-import psycopg2
-from datetime import datetime
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
+from datetime import datetime
 
-from src.core.path_config import HERMES_MODELS_DIR, STRATEGIES_DIR, LOGS_DIR
+import psycopg2
+import torch
 from src.core.logger import setup_logger
+from src.core.path_config import HERMES_MODELS_DIR, LOGS_DIR, STRATEGIES_DIR
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logger = setup_logger("HermesGenerator", LOGS_DIR / "hermes" / "generator.log")
 
@@ -28,6 +28,7 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 # 修正: MODEL_PATH は HERMES_MODELS_DIR に基づく
 MODEL_PATH = os.getenv("MODEL_DIR", str(HERMES_MODELS_DIR / "nous-hermes-2"))
 
+
 # --- LLMモデルのロード ---
 def load_llm_model():
     if not os.path.exists(MODEL_PATH):
@@ -38,6 +39,7 @@ def load_llm_model():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
     logger.info("✅ LLMモデルのロード完了")
     return model, tokenizer
+
 
 # --- プロンプト生成（Hermes仕様：自然言語→戦略コード）---
 def build_prompt(symbol: str, tag: str, target_metric: str) -> str:
@@ -50,12 +52,17 @@ def build_prompt(symbol: str, tag: str, target_metric: str) -> str:
     logger.info(f"📝 生成されたプロンプト: {prompt[:100]}...")
     return prompt
 
+
 # --- 戦略生成 ---
 def generate_strategy_code(prompt: str) -> str:
     model, tokenizer = load_llm_model()
     inputs = tokenizer(prompt, return_tensors="pt")
     with torch.no_grad():
-        outputs = model.generate(inputs["input_ids"], max_new_tokens=1024, pad_token_id=tokenizer.eos_token_id)
+        outputs = model.generate(
+            inputs["input_ids"],
+            max_new_tokens=1024,
+            pad_token_id=tokenizer.eos_token_id,
+        )
     generated_code = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     # 安全にPythonコード部分を抽出（def simulate以降）
@@ -65,17 +72,22 @@ def generate_strategy_code(prompt: str) -> str:
     logger.info("🤖 Hermesによる戦略コードの生成完了")
     return code_only
 
+
 # --- DB保存（生成プロンプト/コード記録）---
 def save_to_db(prompt: str, response: str):
     conn = None
     try:
         conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            port=DB_PORT,
         )
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO hermes_outputs (prompt, response, created_at) VALUES (%s, %s, %s)",
-                (prompt, response, datetime.now())
+                (prompt, response, datetime.now()),
             )
             conn.commit()
         logger.info("✅ 生成結果をDBに保存しました。")
@@ -85,6 +97,7 @@ def save_to_db(prompt: str, response: str):
     finally:
         if conn:
             conn.close()
+
 
 # --- ファイル保存 ---
 def save_to_file(code: str, tag: str) -> str:
@@ -101,6 +114,7 @@ def save_to_file(code: str, tag: str) -> str:
         logger.error(f"🚨 戦略ファイル保存に失敗: {e}", exc_info=True)
         raise
     return str(save_path)
+
 
 # --- サンプル実行ブロック ---
 if __name__ == "__main__":

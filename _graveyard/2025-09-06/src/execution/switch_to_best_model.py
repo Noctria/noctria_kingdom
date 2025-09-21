@@ -7,6 +7,7 @@ from core.NoctriaMasterAI import NoctriaMasterAI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+
 def find_best_model(metadata_path="logs/models/metadata.json"):
     if not os.path.exists(metadata_path):
         logging.warning("⚠️ メタデータがありません")
@@ -17,6 +18,7 @@ def find_best_model(metadata_path="logs/models/metadata.json"):
         return None
     best_model_info = df.loc[df["win_rate"].idxmax()]
     return best_model_info["model_path"]
+
 
 def switch_model(model_path):
     if not os.path.exists(model_path):
@@ -31,6 +33,7 @@ def switch_model(model_path):
     except Exception as e:
         logging.error(f"❌ モデルロード失敗: {e}")
         return False
+
 
 if __name__ == "__main__":
     logging.info("=== モデル自動切り替え開始 ===")

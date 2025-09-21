@@ -1,0 +1,27 @@
+- id: missing_yfinance
+  when_stdout_regex: "ImportError: yfinance"
+  guide: "オフライン環境では yfinance をスタブするか、collector をモックしてください。"
+  extra_files:
+    - "src/plan_data/collector.py"
+
+- id: statsmodels_missing
+  when_stdout_regex: "ModuleNotFoundError: No module named 'statsmodels'"
+  guide: "RiskManagerの時系列平滑はスタブしても良い。テストが求める最低限に揃える。"
+
+- id: obs_plan_runs_missing
+  when_stdout_regex: "obs_plan_runs.*(not increase|0 ==)"
+  guide: >
+    minidemo 実行後に観測DBへ1件INSERT。src/veritas/record_act_log.py にヘルパを作り、
+    plan_to_all_minidemo.main() の最後で呼ぶ。tests は触らない。
+  prefer_fix_in: "src"
+  extra_files:
+    - "src/plan_data/plan_to_all_minidemo.py"
+    - "src/veritas/record_act_log.py"
+
+- id: decide_needs_proposals
+  when_stdout_regex: "decide\\(\\) missing .* 'proposals'|TypeError: .*decide"
+  guide: >
+    DecisionEngine.decide(context, proposals=None) にし、None を [] として扱う。
+  prefer_fix_in: "src"
+  extra_files:
+    - "src/decision/decision_engine.py"

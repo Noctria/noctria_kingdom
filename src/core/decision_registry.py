@@ -25,14 +25,13 @@ from __future__ import annotations
 
 import csv
 import json
-import os
 import socket
 import threading
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 # =============================================================================
 # パス / 初期化
@@ -45,14 +44,14 @@ LEDGER_CSV = LEDGER_DIR / "ledger.csv"
 
 # 固定ヘッダ（順序固定）
 FIELDNAMES = [
-    "ts_utc",                 # ISO8601 UTC
-    "phase",                  # issued / accepted / started / completed / failed / ...
-    "decision_id",            # dc_{kind}_{ts}_{host}
-    "kind",                   # recheck / act / ...
-    "issued_by",              # king / ui / hermes / user-id ...
-    "intent_json",            # JSON string
-    "policy_snapshot_json",   # JSON string
-    "extra_json",             # JSON string
+    "ts_utc",  # ISO8601 UTC
+    "phase",  # issued / accepted / started / completed / failed / ...
+    "decision_id",  # dc_{kind}_{ts}_{host}
+    "kind",  # recheck / act / ...
+    "issued_by",  # king / ui / hermes / user-id ...
+    "intent_json",  # JSON string
+    "policy_snapshot_json",  # JSON string
+    "extra_json",  # JSON string
 ]
 
 # プロセス内ロック（簡易）
@@ -72,19 +71,21 @@ def get_ledger_path() -> Path:
 # データモデル
 # =============================================================================
 
+
 @dataclass
 class Decision:
     decision_id: str
-    kind: str                 # "recheck" | "act" | ...
+    kind: str  # "recheck" | "act" | ...
     issued_at_utc: str
-    issued_by: str            # "king" | "ui" | "hermes" | user-id 等
-    intent: Dict[str, Any]    # e.g. {"strategy": "USDJPY", ...}
+    issued_by: str  # "king" | "ui" | "hermes" | user-id 等
+    intent: Dict[str, Any]  # e.g. {"strategy": "USDJPY", ...}
     policy_snapshot: Dict[str, Any]
 
 
 # =============================================================================
 # ユーティリティ
 # =============================================================================
+
 
 def _now_ts() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -111,6 +112,7 @@ def _write_header_if_needed(csv_path: Path) -> None:
 # =============================================================================
 # 公開 API
 # =============================================================================
+
 
 def create_decision(
     kind: str,
@@ -149,6 +151,7 @@ def append_event(decision_id: str, phase: str, payload: Optional[Dict[str, Any]]
 # 内部: CSV 追記 / ローテーション
 # =============================================================================
 
+
 def _append_row(phase: str, decision_or_id: Decision | str, extra: Dict[str, Any]) -> None:
     ensure_dirs()
     csv_path = get_ledger_path()
@@ -156,7 +159,11 @@ def _append_row(phase: str, decision_or_id: Decision | str, extra: Dict[str, Any
     row = {
         "ts_utc": _now_ts(),
         "phase": phase,
-        "decision_id": decision_or_id.decision_id if isinstance(decision_or_id, Decision) else str(decision_or_id),
+        "decision_id": (
+            decision_or_id.decision_id
+            if isinstance(decision_or_id, Decision)
+            else str(decision_or_id)
+        ),
         "kind": getattr(decision_or_id, "kind", ""),
         "issued_by": getattr(decision_or_id, "issued_by", ""),
         "intent_json": _json_dumps(getattr(decision_or_id, "intent", {})),
@@ -193,7 +200,7 @@ def rotate_ledger(max_bytes: int = 50 * 1024 * 1024, keep: int = 3) -> Optional[
     # 末尾から順に繰り上げ
     for i in range(keep, 0, -1):
         src = LEDGER_CSV.with_suffix(LEDGER_CSV.suffix + f".{i}")
-        dst = LEDGER_CSV.with_suffix(LEDGER_CSV.suffix + f".{i+1}")
+        dst = LEDGER_CSV.with_suffix(LEDGER_CSV.suffix + f".{i + 1}")
         if src.exists():
             try:
                 if dst.exists():
@@ -220,6 +227,7 @@ def rotate_ledger(max_bytes: int = 50 * 1024 * 1024, keep: int = 3) -> Optional[
 # =============================================================================
 # 便利ユーティリティ（UI/デバッグ用）
 # =============================================================================
+
 
 def tail_ledger(n: int = 100) -> List[Dict[str, Any]]:
     """

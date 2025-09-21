@@ -176,8 +176,12 @@ async def backtests_report_html(request: Request, run_id: str):
 
     # 成果物の有無フラグ
     artifacts = {
-        "result_csv": _docker_exec_exists(AIRFLOW_SCHEDULER_CONTAINER, f"{BACKTEST_BASE_DIR}/{run_id}/result.csv"),
-        "stdout_txt": _docker_exec_exists(AIRFLOW_SCHEDULER_CONTAINER, f"{BACKTEST_BASE_DIR}/{run_id}/stdout.txt"),
+        "result_csv": _docker_exec_exists(
+            AIRFLOW_SCHEDULER_CONTAINER, f"{BACKTEST_BASE_DIR}/{run_id}/result.csv"
+        ),
+        "stdout_txt": _docker_exec_exists(
+            AIRFLOW_SCHEDULER_CONTAINER, f"{BACKTEST_BASE_DIR}/{run_id}/stdout.txt"
+        ),
     }
 
     render = getattr(request.app.state, "render_template", None)
@@ -186,5 +190,12 @@ async def backtests_report_html(request: Request, run_id: str):
         return HTMLResponse(f"<pre>{json.dumps(body, ensure_ascii=False, indent=2)}</pre>")
 
     return HTMLResponse(
-        render(request, "backtest_report.html", run_id=run_id, result=result, conf=conf, artifacts=artifacts)
+        render(
+            request,
+            "backtest_report.html",
+            run_id=run_id,
+            result=result,
+            conf=conf,
+            artifacts=artifacts,
+        )
     )

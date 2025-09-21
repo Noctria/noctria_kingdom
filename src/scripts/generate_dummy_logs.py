@@ -35,8 +35,8 @@ for i in range(10):
         "tags": random.sample(tag_pool, k=random.randint(1, 3)),
         "score": {
             "win_rate": round(random.uniform(40, 75), 1),
-            "max_drawdown": round(random.uniform(5, 20), 1)
-        }
+            "max_drawdown": round(random.uniform(5, 20), 1),
+        },
     }
 
     file_path = output_dir / f"veritas_log_{log_date}_{i}.json"

@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from data_loader import MarketDataFetcher
 
+
 class NoctriaRL(nn.Module):
     """市場適応型強化学習モデル（最適化アルゴリズム導入）"""
 
@@ -20,6 +21,7 @@ class NoctriaRL(nn.Module):
         x = torch.relu(self.fc3(x))
         return self.fc4(x)
 
+
 class RLTrainer:
     """市場データを活用したAIトレーダーの学習強化"""
 
@@ -31,7 +33,7 @@ class RLTrainer:
 
         # 最適化アルゴリズムを AdamW に変更
         self.optimizer = optim.AdamW(self.model.parameters(), lr=0.001, weight_decay=0.01)
-        
+
         self.gamma = 0.99  # 割引率
         self.epsilon = 1.0  # 探索率
         self.epsilon_decay = 0.97  # 探索率減衰
@@ -43,14 +45,23 @@ class RLTrainer:
         if "error" in market_data:
             return "Market data fetch failed."
 
-        state = torch.tensor([market_data["price"], market_data["volatility"], market_data["trend_strength"], market_data["news_sentiment"], 1], dtype=torch.float32)
+        state = torch.tensor(
+            [
+                market_data["price"],
+                market_data["volatility"],
+                market_data["trend_strength"],
+                market_data["news_sentiment"],
+                1,
+            ],
+            dtype=torch.float32,
+        )
         action_probs = self.model(state)
 
         best_action = torch.argmax(action_probs).item()
         reward = self.calculate_reward(best_action, market_data)
 
         # 最適化戦略適用
-        loss = -reward  
+        loss = -reward
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -66,6 +77,7 @@ class RLTrainer:
         risk_penalty = -abs(np.random.uniform(0, 0.3))  # リスク要素を追加
         stability_factor = 1 if np.random.uniform(0, 1) > 0.5 else -1
         return profit + risk_penalty + stability_factor
+
 
 # ✅ AIモデルのトレーニング実行
 if __name__ == "__main__":

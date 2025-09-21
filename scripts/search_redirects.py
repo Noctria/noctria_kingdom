@@ -1,12 +1,13 @@
 import os
 
+
 def search_redirects(directory: str):
     # 検索対象となるリダイレクトのパターン
     redirect_patterns = [
         "RedirectResponse",  # FastAPI のリダイレクト
-        "HTTPException",      # HTTPException でリダイレクトが発生する場合も
-        "return redirect",    # Python標準のリダイレクト記法
-        'redirect("/statistics"'  # URLに関するリダイレクト設定（修正）
+        "HTTPException",  # HTTPException でリダイレクトが発生する場合も
+        "return redirect",  # Python標準のリダイレクト記法
+        'redirect("/statistics"',  # URLに関するリダイレクト設定（修正）
     ]
 
     # ファイル走査
@@ -23,6 +24,7 @@ def search_redirects(directory: str):
                             print(f"リダイレクトが見つかりました: {file_path} (行 {line_num})")
                             print(f"コード: {line.strip()}")
                             print("-" * 50)
+
 
 if __name__ == "__main__":
     noctria_gui_dir = "/mnt/d/noctria_kingdom/noctria_gui"  # `noctria_gui` のパス

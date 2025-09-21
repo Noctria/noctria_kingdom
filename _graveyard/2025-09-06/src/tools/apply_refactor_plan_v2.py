@@ -5,6 +5,7 @@ from pathlib import Path
 
 PLAN_PATH = "logs/refactor_plan.json"
 
+
 def delete_path(path):
     try:
         if os.path.isdir(path):
@@ -14,6 +15,7 @@ def delete_path(path):
         print(f"🗑️ 削除: {path}")
     except Exception as e:
         print(f"⚠️ 削除失敗: {path} ({e})")
+
 
 def apply_refactor_plan():
     print("🔄 リファクタ計画を適用中...")
@@ -31,6 +33,7 @@ def apply_refactor_plan():
         delete_path(path)
 
     print(f"✅ リファクタ完了: {len(delete_list)} 件削除済み")
+
 
 if __name__ == "__main__":
     apply_refactor_plan()

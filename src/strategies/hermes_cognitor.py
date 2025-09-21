@@ -8,18 +8,15 @@
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
+
 
 class HermesCognitorStrategy:
-    def __init__(
-        self,
-        model: str = "gpt-4o",
-        feature_order: Optional[List[str]] = None
-    ):
+    def __init__(self, model: str = "gpt-4o", feature_order: Optional[List[str]] = None):
         self.model = model
         self.feature_order = feature_order or STANDARD_FEATURE_ORDER
 
@@ -28,7 +25,7 @@ class HermesCognitorStrategy:
         features: Dict[str, Any],
         labels: List[str],
         feature_order: Optional[List[str]] = None,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
     ) -> str:
         prompt = "以下の標準特徴量・要因ラベルをもとに市場戦略の説明文を生成してください。\n"
         if reason:
@@ -44,9 +41,9 @@ class HermesCognitorStrategy:
         features: Dict[str, Any],
         labels: List[str],
         feature_order: Optional[List[str]] = None,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
     ) -> str:
-        prompt = self._build_prompt(features, labels, feature_order, reason)
+        _prompt = self._build_prompt(features, labels, feature_order, reason)
         logging.info("HermesCognitor: プロンプト組み立て完了")
         # ※本番ではOpenAI API等で要約を生成（省略）
         return "[ダミー要約] " + (labels[0] if labels else "特徴量・要因から戦略説明")
@@ -55,7 +52,7 @@ class HermesCognitorStrategy:
         self,
         input_data: Dict[str, Any],
         decision_id: Optional[str] = None,
-        caller: Optional[str] = "king_noctria"
+        caller: Optional[str] = "king_noctria",
     ) -> Dict[str, Any]:
         features = input_data.get("features", {})
         labels = input_data.get("labels", [])
@@ -72,7 +69,8 @@ class HermesCognitorStrategy:
             "reason": reason,
             "llm_model": self.model,
             "decision_id": decision_id,
-            "caller": caller
+            "caller": caller,
         }
+
 
 # テスト例省略

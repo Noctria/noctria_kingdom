@@ -1,9 +1,9 @@
 # src/plan_data/inventor.py
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
-import random
 
 
 # =============================================================================
@@ -17,10 +17,12 @@ def _import_strategy_proposal():
     try:
         # 推奨（contracts 直下の正式モデル）
         from src.plan_data.contracts import StrategyProposal  # type: ignore
+
         return StrategyProposal
     except Exception:
         # プロジェクト差異へのフォールバック
         from src.plan_data.strategy_proposal import StrategyProposal  # type: ignore
+
         return StrategyProposal
 
 
@@ -121,6 +123,7 @@ class _ProposalView:
     - Harmonia が期待する属性（risk_adjusted / quality / risk_score / qty_raw / intent）を提供
     - その他の属性アクセスは StrategyProposal へ委譲
     """
+
     model: Any
     intent: str
     qty_raw: float
@@ -189,14 +192,14 @@ def generate_proposals(bundle_or_context: Any) -> List[Any]:
             strategy=strategy_name,
             intent=intent,
             trace_id=trace_id,
-            qty_raw=qty,   # スキーマ側で許容されている想定（既存コードも付与）
+            qty_raw=qty,  # スキーマ側で許容されている想定（既存コードも付与）
         )
 
         # Harmonia/Decision が参照する追加属性は ビュー で提供
         proposals.append(
             _ProposalView(
                 model=base,
-                intent="BUY" if intent == "LONG" else ("SELL" if intent == "SHORT" else "FLAT"),
+                intent=("BUY" if intent == "LONG" else ("SELL" if intent == "SHORT" else "FLAT")),
                 qty_raw=qty,
                 quality=quality,
                 risk_score=risk_score,

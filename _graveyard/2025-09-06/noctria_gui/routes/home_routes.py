@@ -23,19 +23,17 @@ async def home_redirect():
 # 以下はそのまま
 # ─────────────────────────────
 
+
 @router.get("/path-check", response_class=HTMLResponse)
 async def path_check_form(request: Request) -> HTMLResponse:
     categories = list(CATEGORY_MAP.keys())
-    return templates.TemplateResponse("path_checker.html", {
-        "request": request,
-        "categories": categories,
-        "result": None
-    })
+    return templates.TemplateResponse(
+        "path_checker.html", {"request": request, "categories": categories, "result": None}
+    )
+
 
 @router.get("/path-check/run", response_class=HTMLResponse)
-async def run_check(
-    request: Request, category: str = "all", strict: bool = False
-) -> HTMLResponse:
+async def run_check(request: Request, category: str = "all", strict: bool = False) -> HTMLResponse:
     command = ["python3", "tools/verify_path_config.py", "--json"]
     if category != "all":
         command += ["--category", category]
@@ -53,18 +51,20 @@ async def run_check(
             "stderr": proc.stderr.decode(errors="ignore"),
         }
 
-    return templates.TemplateResponse("path_checker.html", {
-        "request": request,
-        "categories": list(CATEGORY_MAP.keys()),
-        "selected_category": category,
-        "strict": strict,
-        "result": result_json,
-    })
+    return templates.TemplateResponse(
+        "path_checker.html",
+        {
+            "request": request,
+            "categories": list(CATEGORY_MAP.keys()),
+            "selected_category": category,
+            "strict": strict,
+            "result": result_json,
+        },
+    )
+
 
 @router.get("/api/check-paths", response_class=JSONResponse)
-async def check_paths_api(
-    category: str = "all", strict: bool = False
-) -> Any:
+async def check_paths_api(category: str = "all", strict: bool = False) -> Any:
     command = ["python3", "tools/verify_path_config.py", "--json"]
     if category != "all":
         command += ["--category", category]

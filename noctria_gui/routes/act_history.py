@@ -7,18 +7,20 @@
 """
 
 import logging
-from fastapi import APIRouter, Request, Form, Query, Depends, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 
 # --- 王国の基盤モジュールをインポート ---
-from src.core.path_config import TOOLS_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
+
 from noctria_gui.services import act_log_service
 
 # ロガー設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 router = APIRouter(prefix="/act-history", tags=["act-history"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -56,7 +58,7 @@ def get_filtered_logs(
         # 🔒 normalize_score() 内で score_mean を常に保証しておくこと
         return [act_log_service.normalize_score(log) for log in filtered]
 
-    except Exception as e:
+    except Exception:
         logging.error("ログのフィルタリング中にエラーが発生しました", exc_info=True)
         return []
 
@@ -64,8 +66,7 @@ def get_filtered_logs(
 # --- HTML表示用ルート ---
 @router.get("", response_class=HTMLResponse)
 async def show_act_history(
-    request: Request,
-    logs: List[Dict[str, Any]] = Depends(get_filtered_logs)
+    request: Request, logs: List[Dict[str, Any]] = Depends(get_filtered_logs)
 ):
     """
     GET /act-history - 採用ログの一覧を表示
@@ -74,11 +75,14 @@ async def show_act_history(
     for log in logs:
         tag_set.update(log.get("tags", []))
 
-    return templates.TemplateResponse("act_history.html", {
-        "request": request,
-        "logs": logs,
-        "tag_list": sorted(tag_set),
-    })
+    return templates.TemplateResponse(
+        "act_history.html",
+        {
+            "request": request,
+            "logs": logs,
+            "tag_list": sorted(tag_set),
+        },
+    )
 
 
 # --- 詳細表示ルート ---
@@ -91,10 +95,9 @@ async def show_act_detail(request: Request, log_id: str):
     if not log:
         raise HTTPException(status_code=404, detail="指定された戦略ログが見つかりませんでした。")
 
-    return templates.TemplateResponse("act_history_detail.html", {
-        "request": request,
-        "log": act_log_service.normalize_score(log)
-    })
+    return templates.TemplateResponse(
+        "act_history_detail.html", {"request": request, "log": act_log_service.normalize_score(log)}
+    )
 
 
 # --- 戦略再Pushルート ---
@@ -121,7 +124,10 @@ async def reevaluate_strategy(strategy_name: str = Form(...)):
     logging.info(f"戦略『{strategy_name}』の再評価命令を受理しました。")
     try:
         act_log_service.mark_for_reevaluation(strategy_name)
-        return {"status": "success", "message": f"戦略『{strategy_name}』に再評価マークを付けました。"}
+        return {
+            "status": "success",
+            "message": f"戦略『{strategy_name}』に再評価マークを付けました。",
+        }
     except Exception as e:
         logging.error("再評価マーク処理中にエラーが発生しました", exc_info=True)
         raise HTTPException(status_code=500, detail=f"再評価マーク処理中にエラー: {e}")
@@ -129,9 +135,7 @@ async def reevaluate_strategy(strategy_name: str = Form(...)):
 
 # --- CSVエクスポート ---
 @router.get("/export", response_class=FileResponse)
-async def export_act_log_csv(
-    logs: List[Dict[str, Any]] = Depends(get_filtered_logs)
-):
+async def export_act_log_csv(logs: List[Dict[str, Any]] = Depends(get_filtered_logs)):
     """
     GET /act-history/export - フィルタリング結果をCSV出力
     """
@@ -145,8 +149,4 @@ async def export_act_log_csv(
     if not success:
         raise HTTPException(status_code=500, detail="CSVファイルのエクスポートに失敗しました。")
 
-    return FileResponse(
-        output_path,
-        filename=output_path.name,
-        media_type="text/csv"
-    )
+    return FileResponse(output_path, filename=output_path.name, media_type="text/csv")

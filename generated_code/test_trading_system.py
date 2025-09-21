@@ -5,6 +5,7 @@
 # UUID: xxxx
 # 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。
 
+
 def collect_market_data():
     """
     テスト用ダミーの市場データ収集関数
@@ -12,6 +13,7 @@ def collect_market_data():
         dict: モック市場データ（テスト用）
     """
     return {"price": [100, 101, 102]}  # テストファイルと連動したダミー辞書
+
 
 # --- もし他にDataCollectorクラスを使いたい場合は下記も残してOK ---
 class DataCollector:

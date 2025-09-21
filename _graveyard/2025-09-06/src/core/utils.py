@@ -14,6 +14,7 @@ __all__ = [
     "log_metric",
 ]
 
+
 # -------------------------------------------------------------------
 # Logging
 # -------------------------------------------------------------------
@@ -44,10 +45,12 @@ def _import_pg():
     global _DB_IMPORT_WARNED
     try:
         import psycopg2 as _pg  # type: ignore
+
         return "psycopg2", _pg
     except ModuleNotFoundError:
         try:
             import psycopg as _pg  # type: ignore
+
             return "psycopg", _pg
         except ModuleNotFoundError:
             if not _DB_IMPORT_WARNED:

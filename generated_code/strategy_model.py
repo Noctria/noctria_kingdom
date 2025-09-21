@@ -7,6 +7,7 @@
 
 from typing import Any
 
+
 class StrategyModel:
     """
     戦略モデルの基礎クラス

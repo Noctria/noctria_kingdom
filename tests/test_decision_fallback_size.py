@@ -18,12 +18,14 @@ Inventor Guard: fallback:size の理由文字列検証用 軽量テスト
 """
 
 from __future__ import annotations
+
 import json
 import os
-from pathlib import Path
+import shlex
 import subprocess
 import sys
-import shlex
+from pathlib import Path
+
 import pytest
 
 
@@ -101,7 +103,11 @@ def _extract_decision(decision_like: dict) -> dict:
     """
     決定本体がネストされているケースにも緩く対応して dict を返す。
     """
-    if isinstance(decision_like, dict) and "decision" in decision_like and isinstance(decision_like["decision"], dict):
+    if (
+        isinstance(decision_like, dict)
+        and "decision" in decision_like
+        and isinstance(decision_like["decision"], dict)
+    ):
         return decision_like["decision"]
     return decision_like
 

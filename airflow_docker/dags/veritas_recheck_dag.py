@@ -46,6 +46,7 @@ try:
     # 期待: src/core/strategy_evaluator.py で実装済み
     from src.core.strategy_evaluator import evaluate_strategy, log_evaluation_result  # type: ignore
 except Exception:
+
     def evaluate_strategy(strategy_name: str) -> Dict[str, Any]:
         """
         フォールバックのダミー評価。
@@ -74,12 +75,20 @@ except Exception:
         log_dir.mkdir(parents=True, exist_ok=True)
         out = log_dir / "rechecks.csv"
         headers = [
-            "strategy", "evaluated_at",
-            "winrate_old", "winrate_new",
-            "maxdd_old", "maxdd_new",
-            "trades_old", "trades_new",
-            "tag", "notes",
-            "trigger_reason", "decision_id", "caller", "parent_dag",
+            "strategy",
+            "evaluated_at",
+            "winrate_old",
+            "winrate_new",
+            "maxdd_old",
+            "maxdd_new",
+            "trades_old",
+            "trades_new",
+            "tag",
+            "notes",
+            "trigger_reason",
+            "decision_id",
+            "caller",
+            "parent_dag",
         ]
         write_header = not out.exists()
         with out.open("a", newline="", encoding="utf-8") as f:
@@ -87,6 +96,7 @@ except Exception:
             if write_header:
                 w.writeheader()
             w.writerow({k: result.get(k) for k in headers})
+
 
 # -----------------------------------------------------------------------------
 # Airflow 設定
@@ -103,7 +113,7 @@ DEFAULT_ARGS = {
     dag_id="veritas_recheck_dag",
     default_args=DEFAULT_ARGS,
     description="特定の戦略を個別に再評価する（GUI/親DAGからのconf対応）",
-    schedule=None,        # Airflow 2.6+ 推奨表記
+    schedule=None,  # Airflow 2.6+ 推奨表記
     catchup=False,
     tags=["noctria", "veritas", "recheck"],
 )
@@ -140,7 +150,11 @@ def veritas_recheck_pipeline():
 
         log.info(
             "[decision_id:%s] 再評価受理: strategy=%s reason=%s caller=%s parent_dag=%s",
-            decision_id, strategy, reason, caller, parent_dag,
+            decision_id,
+            strategy,
+            reason,
+            caller,
+            parent_dag,
         )
 
         # --- 再評価

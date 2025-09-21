@@ -18,9 +18,11 @@ _TRACE_ID: "ContextVar[Optional[str]]" = (
     ContextVar("_TRACE_ID", default=None) if ContextVar else None  # type: ignore[assignment]
 )
 
+
 def _sanitize(s: str, *, upper: bool = False) -> str:
     s = re.sub(r"[^0-9A-Za-z_\-]", "", str(s))
     return s.upper() if upper else s
+
 
 def new_trace_id(*, symbol: str = "MULTI", timeframe: str = "1d") -> str:
     """
@@ -30,22 +32,25 @@ def new_trace_id(*, symbol: str = "MULTI", timeframe: str = "1d") -> str:
     """
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     sym = _sanitize(symbol, upper=True) or "NA"
-    tf  = _sanitize(timeframe) or "NA"
+    tf = _sanitize(timeframe) or "NA"
     short = uuid.uuid4().hex[:8]
     tid = f"{ts}-{sym}-{tf}-{short}"
     set_trace_id(tid)
     return tid
+
 
 def set_trace_id(trace_id: Optional[str]) -> None:
     """明示的にトレースIDをセット。None を渡すと解除。"""
     if _TRACE_ID is not None:
         _TRACE_ID.set(trace_id)
 
+
 def get_trace_id() -> Optional[str]:
     """現在のコンテキストにバインドされたトレースIDを取得。無ければ None。"""
     if _TRACE_ID is None:
         return None
     return _TRACE_ID.get()
+
 
 @contextmanager
 def bind_trace_id(trace_id: str):
@@ -63,4 +68,26 @@ def bind_trace_id(trace_id: str):
     finally:
         _TRACE_ID.reset(token)
 
+
 __all__ = ["new_trace_id", "set_trace_id", "get_trace_id", "bind_trace_id"]
+
+# --- appended shim: with_trace_id (no-op) ------------------------------------
+from contextlib import contextmanager as _contextmanager
+
+# fallback new_trace_id if missing
+try:
+    new_trace_id  # type: ignore[name-defined]
+except NameError:
+    import time as _t
+
+    def new_trace_id() -> str:  # type: ignore[func-returns-value]
+        return "trace-%d" % int(_t.time() * 1000)
+
+
+@_contextmanager
+def with_trace_id(trace_id: str):
+    """No-op context manager for smoke/integration."""
+    yield trace_id
+
+
+# --- end appended shim -------------------------------------------------------

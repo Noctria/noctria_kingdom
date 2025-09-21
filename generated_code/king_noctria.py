@@ -3,6 +3,7 @@ from strategy_decider import StrategyDecider
 from order_executor import OrderExecutor
 from risk_manager import RiskManager
 
+
 class KingNoctria:
     def __init__(self):
         self.data_fetcher = DataFetcher()
@@ -17,6 +18,7 @@ class KingNoctria:
             self.order_executor.execute_order(signal)
         except Exception as e:
             print(f"エラー: {str(e)}")
+
 
 def log_trade_execution_and_reason():
     # 実装に応じた記録

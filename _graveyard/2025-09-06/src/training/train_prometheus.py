@@ -39,7 +39,9 @@ def train_prometheus(
     model_path: Optional[Path] = None,
     feature_order: Optional[List[str]] = None,
 ):
-    oracle = PrometheusOracle(model_path=model_path, feature_order=feature_order or STANDARD_FEATURE_ORDER)
+    oracle = PrometheusOracle(
+        model_path=model_path, feature_order=feature_order or STANDARD_FEATURE_ORDER
+    )
 
     # モデルは再構築（学習時は常に新規）
     model = build_model(input_dim=len(oracle.feature_order))
@@ -59,7 +61,9 @@ def train_prometheus(
 if __name__ == "__main__":
     # === テスト用のダミーデータ ===
     rng = np.random.RandomState(0)
-    dummy_df = pd.DataFrame(rng.rand(100, len(STANDARD_FEATURE_ORDER)), columns=STANDARD_FEATURE_ORDER)
+    dummy_df = pd.DataFrame(
+        rng.rand(100, len(STANDARD_FEATURE_ORDER)), columns=STANDARD_FEATURE_ORDER
+    )
     dummy_df["target"] = dummy_df[STANDARD_FEATURE_ORDER[0]].shift(-1).fillna(0.0)
 
     train_prometheus(dummy_df, target_col="target", epochs=2, batch_size=8)

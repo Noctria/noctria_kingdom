@@ -18,6 +18,7 @@ if not LOG.handlers:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
+
 # ---------------------------
 # Ruff diagnostic data model
 # ---------------------------
@@ -41,7 +42,9 @@ class Diag:
             code=obj.get("code", ""),
             filename=obj.get("filename", ""),
             message=obj.get("message", ""),
-            location=Location(row=int(loc.get("row", 0) or 0), column=int(loc.get("column", 0) or 0)),
+            location=Location(
+                row=int(loc.get("row", 0) or 0), column=int(loc.get("column", 0) or 0)
+            ),
         )
 
 
@@ -88,13 +91,16 @@ def _append_noqa(line: str, code: str) -> str:
         return line
     if "# noqa" in line:
         # 既存の noqa にコードを追記
-        return re.sub(r"# noqa(?::\s*([A-Z0-9, ]+))?",
-                      lambda m: "# noqa: " + ((m.group(1) + ", " if m.group(1) else "") + code),
-                      line, count=1)
+        return re.sub(
+            r"# noqa(?::\s*([A-Z0-9, ]+))?",
+            lambda m: "# noqa: " + ((m.group(1) + ", " if m.group(1) else "") + code),
+            line,
+            count=1,
+        )
     # 末尾に付与（コメントや改行を壊さない）
     m = re.search(r"(\r?\n)$", line)
     if m:
-        return line[:m.start()] + f"  # noqa: {code}" + m.group(1)
+        return line[: m.start()] + f"  # noqa: {code}" + m.group(1)
     return line.rstrip("\n") + f"  # noqa: {code}\n"
 
 
@@ -170,7 +176,10 @@ def fix_F841(line: str, message: str) -> Tuple[str, bool]:
     型注釈・複合代入にもそこそこ耐える簡易置換。
     """
     # 例: "Local variable `policy` is assigned to but never used"
-    m = re.search(r"Local variable [`']?([A-Za-z_]\w*)[`']? is assigned to but never used", message)
+    m = re.search(
+        r"Local variable [`']?([A-Za-z_]\w*)[`']? is assigned to but never used",
+        message,
+    )
     if not m:
         return _append_noqa(line, "F841"), True
 
@@ -224,8 +233,11 @@ def apply_fixes(file_path: Path, diags: List[Diag]) -> Tuple[int, int]:
 
     lines = _read_lines(file_path)
     # 行番号ベースで後ろから適用（行ずれ防止）
-    targets = sorted([d for d in diags if Path(d.filename) == file_path],
-                     key=lambda d: d.location.row, reverse=True)
+    targets = sorted(
+        [d for d in diags if Path(d.filename) == file_path],
+        key=lambda d: d.location.row,
+        reverse=True,
+    )
 
     applied = 0
     kept = 0
@@ -271,9 +283,17 @@ def gpt_escalate(_unfixed: List[Diag], _paths: List[str]) -> None:
 # CLI
 # ---------------------------
 def main(argv: Optional[List[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="Auto-fix common Ruff issues (F401/F841/E402) with minimal changes.")
-    ap.add_argument("--use-gpt", action="store_true", help="未対応ルールをGPTに委譲（実装はスタブ）")
-    ap.add_argument("--run-ruff", action="store_true", help="開始前に ruff JSON を最新化してから処理")
+    ap = argparse.ArgumentParser(
+        description="Auto-fix common Ruff issues (F401/F841/E402) with minimal changes."
+    )
+    ap.add_argument(
+        "--use-gpt", action="store_true", help="未対応ルールをGPTに委譲（実装はスタブ）"
+    )
+    ap.add_argument(
+        "--run-ruff",
+        action="store_true",
+        help="開始前に ruff JSON を最新化してから処理",
+    )
     ap.add_argument("paths", nargs="+", help="対象ファイル（またはディレクトリ）")
     args = ap.parse_args(argv)
 
@@ -299,7 +319,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         total_kept += kept
         LOG.info("Fixed %d, kept %d @ %s", applied, kept, p)
 
-    LOG.info("SUMMARY: files=%d, applied=%d, remaining=%d", total_files, total_applied, total_kept)
+    LOG.info(
+        "SUMMARY: files=%d, applied=%d, remaining=%d",
+        total_files,
+        total_applied,
+        total_kept,
+    )
 
     # 追加で ruff を再実行して状況を出すと気持ちいい
     try:

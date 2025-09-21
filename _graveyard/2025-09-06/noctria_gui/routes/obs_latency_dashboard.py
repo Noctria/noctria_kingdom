@@ -15,6 +15,7 @@ except Exception as e:  # pragma: no cover
 
 bp_obs_latency = Blueprint("obs_latency", __name__)
 
+
 # ------------------------------
 # DB helpers
 # ------------------------------
@@ -25,10 +26,13 @@ def _dsn() -> str:
         os.getenv("PSQL_DSN", "postgresql://airflow:airflow@localhost:5432/airflow"),
     )
 
+
 @contextlib.contextmanager
 def _pg():
     if psycopg2 is None:
-        raise RuntimeError("psycopg2 が見つかりません。`pip install psycopg2-binary` を実行してください。")
+        raise RuntimeError(
+            "psycopg2 が見つかりません。`pip install psycopg2-binary` を実行してください。"
+        )
     conn = psycopg2.connect(_dsn())
     try:
         yield conn
@@ -36,12 +40,14 @@ def _pg():
         with contextlib.suppress(Exception):
             conn.close()
 
+
 def _q(sql: str, params: Tuple[Any, ...] = ()) -> List[Dict[str, Any]]:
     with _pg() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, params)
             rows = cur.fetchall()
             return [dict(r) for r in rows]
+
 
 # ------------------------------
 # Queries
@@ -75,6 +81,7 @@ ORDER BY finished_at DESC
 LIMIT 50;
 """
 
+
 # ------------------------------
 # Routes
 # ------------------------------
@@ -87,6 +94,7 @@ def api_latency_json():
     except Exception as e:
         current_app.logger.exception("latency.json error")
         return make_response({"error": str(e)}, 500)
+
 
 @bp_obs_latency.route("/observability/latency", methods=["GET"])
 def page_latency():

@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-
 # =============================================================================
 # 設定
 # =============================================================================
@@ -90,12 +89,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Run ruff with unified output")
     parser.add_argument("targets", nargs="*", help="Target files or directories")
     parser.add_argument("--fix", action="store_true", help="Apply fixes")
-    parser.add_argument(
-        "--output-json", type=str, default="last_run.json", help="JSON出力先"
-    )
-    parser.add_argument(
-        "--extra-args", type=str, help="Extra args to pass to ruff (string)"
-    )
+    parser.add_argument("--output-json", type=str, default="last_run.json", help="JSON出力先")
+    parser.add_argument("--extra-args", type=str, help="Extra args to pass to ruff (string)")
     args = parser.parse_args(argv)
 
     if not args.targets:

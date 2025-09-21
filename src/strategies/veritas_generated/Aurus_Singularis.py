@@ -17,8 +17,9 @@ Aurus_Singularis — Dummy but KPI-computable minimal strategy
 """
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Iterable, Tuple
+
 from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 NAME = "Aurus_Singularis"
 VERSION = "0.2.0-dummy"
@@ -26,13 +27,13 @@ VERSION = "0.2.0-dummy"
 
 @dataclass
 class Trade:
-    ts: str          # ISO8601 string
+    ts: str  # ISO8601 string
     symbol: str
-    side: str        # "BUY" | "SELL"
+    side: str  # "BUY" | "SELL"
     qty: float
     entry: float
     exit: float
-    ret_pct: float   # (exit/entry - 1) * 100
+    ret_pct: float  # (exit/entry - 1) * 100
 
 
 class AurusSingularis:
@@ -47,13 +48,20 @@ class AurusSingularis:
         self.lot = lot
 
     # ---- 必須: 最低限の“提案/シグナル”IF（GUIなどが参照しても落ちない） ----
-    def propose(self, market_data: Optional[Iterable[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    def propose(
+        self, market_data: Optional[Iterable[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
         """
         最小シグナル。市場データが無くても固定で返す。
         GUIやログで参照しても壊れないフィールド構成にしておく。
         """
         return [
-            {"symbol": self.symbol, "action": "HOLD", "confidence": 0.0, "ts": "1970-01-01T00:00:00Z"}
+            {
+                "symbol": self.symbol,
+                "action": "HOLD",
+                "confidence": 0.0,
+                "ts": "1970-01-01T00:00:00Z",
+            }
         ]
 
     # ---- KPIを通すための最小バックテスト実装 ----
@@ -64,7 +72,18 @@ class AurusSingularis:
         """
         if not closes or len(closes) < 6:
             # ダミーの価格列（単調増加+軽い揺らぎ）を生成
-            closes = [100.0, 101.0, 100.5, 101.5, 102.0, 101.8, 102.4, 102.2, 102.9, 103.1]
+            closes = [
+                100.0,
+                101.0,
+                100.5,
+                101.5,
+                102.0,
+                101.8,
+                102.4,
+                102.2,
+                102.9,
+                103.1,
+            ]
 
         trades = self._make_dummy_trades_from_prices(closes)
         kpi = self.kpis(trades)
@@ -80,10 +99,10 @@ class AurusSingularis:
         if n == 0:
             return {
                 "trades": 0,
-                "win_rate": 0.0,            # %（0..100）
-                "avg_return_pct": 0.0,      # %
-                "pnl_sum_pct": 0.0,         # %
-                "max_drawdown_pct": 0.0,    # %
+                "win_rate": 0.0,  # %（0..100）
+                "avg_return_pct": 0.0,  # %
+                "pnl_sum_pct": 0.0,  # %
+                "max_drawdown_pct": 0.0,  # %
             }
         wins = sum(1 for t in trades if t.ret_pct > 0)
         pnl_sum = sum(t.ret_pct for t in trades)
@@ -96,11 +115,11 @@ class AurusSingularis:
             curve.append(acc)
         mdd = _max_drawdown_from_curve(curve)
         return {
-            "trades": n,                                # 取引数
-            "win_rate": round(100.0 * wins / n, 2),     # 勝率（%）
-            "avg_return_pct": round(avg_ret, 4),        # 平均リターン（%）
-            "pnl_sum_pct": round(pnl_sum, 4),           # 合計PnL（%）
-            "max_drawdown_pct": round(mdd, 4),          # 最大DD（%）
+            "trades": n,  # 取引数
+            "win_rate": round(100.0 * wins / n, 2),  # 勝率（%）
+            "avg_return_pct": round(avg_ret, 4),  # 平均リターン（%）
+            "pnl_sum_pct": round(pnl_sum, 4),  # 合計PnL（%）
+            "max_drawdown_pct": round(mdd, 4),  # 最大DD（%）
         }
 
     # ---- 内部：価格列からダミー売買を合成 ----
@@ -117,7 +136,7 @@ class AurusSingularis:
             if i % 2 == 0:  # BUY
                 ret_pct = (exit_ / entry - 1.0) * 100.0
                 side = "BUY"
-            else:           # SELL
+            else:  # SELL
                 ret_pct = (entry / exit_ - 1.0) * 100.0  # 価格下落でプラス
                 side = "SELL"
             out.append(
@@ -178,6 +197,7 @@ class Strategy:
     """
     互換用クラスAPI（存在すれば GUI 側が拾える）
     """
+
     def compute_kpis(self) -> Dict[str, Any]:
         return compute_kpis()
 
@@ -191,7 +211,11 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "NAME", "VERSION",
-    "Trade", "AurusSingularis",
-    "compute_kpis", "run_backtest", "Strategy",
+    "NAME",
+    "VERSION",
+    "Trade",
+    "AurusSingularis",
+    "compute_kpis",
+    "run_backtest",
+    "Strategy",
 ]

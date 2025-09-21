@@ -1,17 +1,17 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
-
-from collections import defaultdict
-from statistics import mean, median
-from datetime import datetime
-from pathlib import Path
-import os
-import json
 import csv
 import io
-from typing import Optional, List, Dict, Any
+import json
+import os
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from statistics import mean, median
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from src.core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 # --- ここで prefix を付ける ---
 router = APIRouter(prefix="/statistics/compare", tags=["statistics_compare"])
@@ -43,7 +43,9 @@ def load_strategy_logs() -> List[Dict[str, Any]]:
     return data
 
 
-def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]) -> List[Dict[str, Any]]:
+def filter_by_date(
+    records: List[Dict[str, Any]], from_date: Optional[datetime], to_date: Optional[datetime]
+) -> List[Dict[str, Any]]:
     filtered = []
     for d in records:
         ts_str = d.get("timestamp", "")[:10]
@@ -56,7 +58,9 @@ def filter_by_date(records: List[Dict[str, Any]], from_date: Optional[datetime],
     return filtered
 
 
-def compute_statistics_grouped(data: List[Dict[str, Any]], mode: str) -> Dict[str, Dict[str, List[float]]]:
+def compute_statistics_grouped(
+    data: List[Dict[str, Any]], mode: str
+) -> Dict[str, Dict[str, List[float]]]:
     stat_map: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
     for entry in data:
         keys = [entry.get("strategy_name")] if mode == "strategy" else entry.get("tags", [])
@@ -83,17 +87,22 @@ async def compare_form(request: Request):
         strat_name = log.get("strategy")
         if strat_name and strat_name not in seen:
             seen.add(strat_name)
-            strategies.append({
-                "strategy": strat_name,
-                "win_rate": round(log.get("win_rate", 0)*100, 2),
-                "max_drawdown": round(log.get("max_drawdown", 0)*100, 2),
-                "num_trades": log.get("num_trades", 0),
-            })
+            strategies.append(
+                {
+                    "strategy": strat_name,
+                    "win_rate": round(log.get("win_rate", 0) * 100, 2),
+                    "max_drawdown": round(log.get("max_drawdown", 0) * 100, 2),
+                    "num_trades": log.get("num_trades", 0),
+                }
+            )
 
-    return templates.TemplateResponse("strategies/compare_form.html", {
-        "request": request,
-        "strategies": strategies,
-    })
+    return templates.TemplateResponse(
+        "strategies/compare_form.html",
+        {
+            "request": request,
+            "strategies": strategies,
+        },
+    )
 
 
 # ==============================
@@ -140,7 +149,7 @@ async def compare(request: Request) -> HTMLResponse:
             "key": key,
             "avg_win": round(mean(scores["win_rate"]), 2) if scores["win_rate"] else 0,
             "avg_dd": round(mean(scores["max_drawdown"]), 2) if scores["max_drawdown"] else 0,
-            "count": len(scores["win_rate"])
+            "count": len(scores["win_rate"]),
         }
         results.append(row)
 
@@ -154,24 +163,27 @@ async def compare(request: Request) -> HTMLResponse:
         "avg_win_median": round(median([r["avg_win"] for r in results]), 2) if results else 0,
         "avg_dd_mean": round(mean([r["avg_dd"] for r in results]), 2) if results else 0,
         "avg_dd_median": round(median([r["avg_dd"] for r in results]), 2) if results else 0,
-        "total_count": sum(r["count"] for r in results)
+        "total_count": sum(r["count"] for r in results),
     }
 
     all_keys = sorted(stat_map.keys())
 
-    return templates.TemplateResponse("statistics/statistics_compare.html", {
-        "request": request,
-        "mode": mode,
-        "sort": sort,
-        "keys": keys,
-        "all_keys": all_keys,
-        "results": results,
-        "summary": summary,
-        "filter": {
-            "from": request.query_params.get("from", ""),
-            "to": request.query_params.get("to", ""),
-        }
-    })
+    return templates.TemplateResponse(
+        "statistics/statistics_compare.html",
+        {
+            "request": request,
+            "mode": mode,
+            "sort": sort,
+            "keys": keys,
+            "all_keys": all_keys,
+            "results": results,
+            "summary": summary,
+            "filter": {
+                "from": request.query_params.get("from", ""),
+                "to": request.query_params.get("to", ""),
+            },
+        },
+    )
 
 
 @router.get("/compare/export")
@@ -193,7 +205,7 @@ async def export_csv(request: Request) -> StreamingResponse:
             "key": key,
             "avg_win": round(mean(scores["win_rate"]), 2) if scores["win_rate"] else "",
             "avg_dd": round(mean(scores["max_drawdown"]), 2) if scores["max_drawdown"] else "",
-            "count": len(scores["win_rate"])
+            "count": len(scores["win_rate"]),
         }
         rows.append(row)
 
@@ -203,6 +215,8 @@ async def export_csv(request: Request) -> StreamingResponse:
     writer.writerows(rows)
     output.seek(0)
 
-    return StreamingResponse(output, media_type="text/csv", headers={
-        "Content-Disposition": "attachment; filename=compare_result.csv"
-    })
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=compare_result.csv"},
+    )

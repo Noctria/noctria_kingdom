@@ -7,7 +7,6 @@
 - まだPushされていない（pushed=False）戦略をGitHubにPushする。
 """
 
-import os
 import json
 import logging
 import subprocess
@@ -16,10 +15,10 @@ from pathlib import Path
 
 # --- 王国の基盤モジュールをインポート ---
 # ✅ 修正: path_configから正しい変数名をインポート
-from src.core.path_config import PROJECT_ROOT, STRATEGIES_DIR, ACT_LOG_DIR, VERITAS_EVAL_LOG
+from src.core.path_config import PROJECT_ROOT, STRATEGIES_DIR, VERITAS_EVAL_LOG
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 
 def _run_git_command(cmd: list, cwd: Path):
@@ -33,6 +32,7 @@ def _run_git_command(cmd: list, cwd: Path):
         logging.error(f"❌ Gitコマンドの実行に失敗しました: {e.stderr}")
         raise  # エラーを再送出し、呼び出し元で処理できるようにする
 
+
 def _push_strategy_to_github(strategy_file_path: Path):
     """単一の戦略ファイルをGitリポジトリにadd, commit, pushする"""
     if not strategy_file_path.exists():
@@ -41,7 +41,9 @@ def _push_strategy_to_github(strategy_file_path: Path):
 
     repo_path = PROJECT_ROOT
     relative_path = strategy_file_path.relative_to(repo_path)
-    commit_message = f"👑 採用戦略の公式記録: {strategy_file_path.name} ({datetime.utcnow().date()})"
+    commit_message = (
+        f"👑 採用戦略の公式記録: {strategy_file_path.name} ({datetime.utcnow().date()})"
+    )
 
     try:
         _run_git_command(["git", "add", str(relative_path)], cwd=repo_path)
@@ -53,13 +55,14 @@ def _push_strategy_to_github(strategy_file_path: Path):
         # 必要に応じて、失敗した場合のロールバック処理などをここに追加
         raise
 
+
 def main():
     """
     Airflowから呼び出されるメイン関数。
     評価ログを読み込み、採用された戦略をGitHubにPushする。
     """
     logging.info("🚀 採用されし戦略の公式記録（GitHub Push）を開始します…")
-    
+
     if not VERITAS_EVAL_LOG.exists():
         logging.warning(f"評価ログが見つかりません: {VERITAS_EVAL_LOG}。処理をスキップします。")
         return
@@ -82,20 +85,23 @@ def main():
             # ✅ 修正: 正式な戦略はveritas_generatedからofficialに移動されている想定
             # このスクリプトは、`veritas_eval_dag`でofficialに移動されたものをPushする
             official_strategy_path = STRATEGIES_DIR / "official" / strategy_filename
-            
+
             try:
                 _push_strategy_to_github(official_strategy_path)
                 # TODO: Push成功後、評価ログのpushedフラグを更新する処理が必要
                 pushed_count += 1
             except Exception:
                 # _push_strategy_to_github内でエラーログは出力済み
-                logging.error(f"戦略『{strategy_filename}』のPushに失敗したため、次の戦略に進みます。")
+                logging.error(
+                    f"戦略『{strategy_filename}』のPushに失敗したため、次の戦略に進みます。"
+                )
                 continue
-    
+
     if pushed_count > 0:
         logging.info(f"📜 合計{pushed_count}件の戦略が王国の公式記録に刻まれました。")
     else:
         logging.info("📜 今回、新たに記録される戦略はありませんでした。")
+
 
 if __name__ == "__main__":
     main()

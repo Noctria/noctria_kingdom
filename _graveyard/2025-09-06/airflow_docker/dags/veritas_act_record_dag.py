@@ -15,6 +15,7 @@ default_args = {
     "retry_delay": timedelta(minutes=1),
 }
 
+
 def run_record_act_log(**kwargs):
     # Airflow confからパラメータ受信
     conf = kwargs.get("dag_run").conf if kwargs.get("dag_run") else {}
@@ -28,10 +29,11 @@ def run_record_act_log(**kwargs):
         raise ValueError("統治ID（decision_id）が指定されていません！Noctria王API経由のみ許可")
 
     # サブスクリプトにすべての情報を引数で渡す
-    cmd = f"python {SCRIPT_PATH} \"{decision_id}\" \"{reason}\" \"{caller}\""
+    cmd = f'python {SCRIPT_PATH} "{decision_id}" "{reason}" "{caller}"'
     exit_code = os.system(cmd)
     if exit_code != 0:
         raise RuntimeError(f"record_act_log.py 実行失敗: exit code {exit_code}")
+
 
 with DAG(
     dag_id="veritas_act_record_dag",
@@ -42,11 +44,8 @@ with DAG(
     catchup=False,
     tags=["veritas", "act", "pdca"],
 ) as dag:
-
     record_act = PythonOperator(
-        task_id="record_act_log",
-        python_callable=run_record_act_log,
-        provide_context=True
+        task_id="record_act_log", python_callable=run_record_act_log, provide_context=True
     )
 
     record_act

@@ -1,12 +1,12 @@
 # src/plan_data/plan_to_veritas_demo.py
 
 import json
-from pathlib import Path
 
 from src.core.path_config import DATA_DIR
-from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
+from src.plan_data.collector import ASSET_SYMBOLS, PlanDataCollector
 from src.plan_data.features import FeatureEngineer
 from src.strategies.veritas_machina import VeritasMachina
+
 
 def main():
     # 1. 市場データ収集（直近90日）
@@ -33,10 +33,11 @@ def main():
         decision_id="DEMO-P2V-001",
         caller="plan_to_veritas_demo",
         lookback=90,
-        symbol="USDJPY"
+        symbol="USDJPY",
     )
     print("🧠 Veritas Machina 戦略提案結果：")
     print(json.dumps(res, indent=2, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     main()

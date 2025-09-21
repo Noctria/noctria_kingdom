@@ -28,7 +28,6 @@ async def tag_heatmap(request: Request):
         tag_stats = []
         print(f"[tag_heatmap] ⚠️ 集計失敗: {e}")
 
-    return templates.TemplateResponse("strategies/tag_heatmap.html", {
-        "request": request,
-        "tag_stats": tag_stats
-    })
+    return templates.TemplateResponse(
+        "strategies/tag_heatmap.html", {"request": request, "tag_stats": tag_stats}
+    )

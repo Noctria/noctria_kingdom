@@ -8,6 +8,7 @@ router = APIRouter(prefix="/prometheus", tags=["PrometheusOracle"])
 
 logger = logging.getLogger("prometheus_routes")
 
+
 @router.get("/predict")
 async def predict(
     n_days: int = Query(14, ge=1, le=60, description="予測日数（1～60日）"),

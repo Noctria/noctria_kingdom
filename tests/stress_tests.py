@@ -1,6 +1,8 @@
 import time
+
 import numpy as np
 import pandas as pd
+
 
 class StressTest:
     """高頻度データ下でのシステム動作をチェックするモジュール"""
@@ -17,10 +19,16 @@ class StressTest:
             timestamp = time.time()
             price = np.random.uniform(1.2, 1.5)
             volume = np.random.randint(100, 10000)
-            self.data = pd.concat([self.data, pd.DataFrame([[timestamp, price, volume]], 
-                                                            columns=self.data.columns)], ignore_index=True)
+            self.data = pd.concat(
+                [
+                    self.data,
+                    pd.DataFrame([[timestamp, price, volume]], columns=self.data.columns),
+                ],
+                ignore_index=True,
+            )
             time.sleep(self.tick_rate)
         return self.data
+
 
 # ✅ 負荷検証テスト
 if __name__ == "__main__":

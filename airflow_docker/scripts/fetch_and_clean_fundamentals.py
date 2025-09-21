@@ -4,14 +4,11 @@
 import pandas as pd
 import requests
 
+
 def fetch_fred_data(api_key, series_id):
     print("⚔️ Aurus: FRED APIからデータを収集中…")
     url = f"https://api.stlouisfed.org/fred/series/observations"
-    params = {
-        "series_id": series_id,
-        "api_key": api_key,
-        "file_type": "json"
-    }
+    params = {"series_id": series_id, "api_key": api_key, "file_type": "json"}
 
     response = requests.get(url, params=params)
     data = response.json()["observations"]
@@ -20,6 +17,7 @@ def fetch_fred_data(api_key, series_id):
     df = df[["realtime_start", "realtime_end", "date", "value"]]
 
     return df
+
 
 def main():
     print("👑 王Noctria: Aurus、Prometheusよ、情報収集の任務を開始せよ！")
@@ -37,6 +35,7 @@ def main():
 
     print("✅ Aurus: data/fundamental/cleaned_cpi.csv に保存完了！")
     print("👑 王Noctria: 任務完了。次の戦略へ備えよ！")
+
 
 if __name__ == "__main__":
     main()

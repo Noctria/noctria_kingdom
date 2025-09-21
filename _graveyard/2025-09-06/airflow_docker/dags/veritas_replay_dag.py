@@ -5,12 +5,12 @@ from datetime import timedelta
 from core.path_config import EXECUTION_DIR
 
 default_args = {
-    'owner': 'noctria',
-    'depends_on_past': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
-    'email_on_failure': False,
-    'email_on_retry': False,
+    "owner": "noctria",
+    "depends_on_past": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
+    "email_on_failure": False,
+    "email_on_retry": False,
 }
 
 with DAG(
@@ -21,14 +21,13 @@ with DAG(
     catchup=False,
     default_args=default_args,
     params={
-        "log_path": "",       # 必須
-        "decision_id": "",    # 必須
-        "reason": "",         # 任意
-        "caller": "",         # 任意
+        "log_path": "",  # 必須
+        "decision_id": "",  # 必須
+        "reason": "",  # 任意
+        "caller": "",  # 任意
     },
-    tags=["veritas", "replay", "pdca"]
+    tags=["veritas", "replay", "pdca"],
 ) as dag:
-
     replay_from_log = BashOperator(
         task_id="replay_order_from_log",
         bash_command=(
@@ -40,5 +39,5 @@ with DAG(
             "--decision-id '{{{{ params.decision_id }}}}' "
             "--reason '{{{{ params.reason }}}}' "
             "--caller '{{{{ params.caller }}}}'"
-        )
+        ),
     )

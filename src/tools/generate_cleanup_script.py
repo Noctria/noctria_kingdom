@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 AUDIT_LOG_PATH = BASE_DIR / "logs" / "structure_audit.json"
 OUTPUT_SCRIPT = BASE_DIR / "tools" / "cleanup_commands.sh"
 
+
 def generate_cleanup_commands():
     if not AUDIT_LOG_PATH.exists():
         print(f"❌ 構造監査ログが見つかりません: {AUDIT_LOG_PATH}")
@@ -31,7 +32,7 @@ def generate_cleanup_commands():
         elif t == "duplicate_filename":
             # 原則として1つを残し、他は削除（要レビュー）
             paths = issue["paths"]
-            keep = paths[0]
+            _keep = paths[0]  # unused
             for path in paths[1:]:
                 cmds.append(f"# ⚠️ 重複: '{issue['name']}' → 一方を残す\n")
                 cmds.append(f"rm -f '{path}'  # duplicate_filename\n")
@@ -39,7 +40,7 @@ def generate_cleanup_commands():
         elif t == "duplicate_directory_case":
             # 名前が異なるだけで内容が重複していそうなディレクトリ
             paths = issue["paths"]
-            cmds.append(f"# ⚠️ 大文字小文字の混在 → 手動で統一検討\n")
+            cmds.append("# ⚠️ 大文字小文字の混在 → 手動で統一検討\n")
             for p in paths:
                 cmds.append(f"# ls '{p}'\n")
 
@@ -56,6 +57,7 @@ def generate_cleanup_commands():
         f.writelines(cmds)
 
     print(f"✅ 自動生成完了: {OUTPUT_SCRIPT}")
+
 
 if __name__ == "__main__":
     generate_cleanup_commands()

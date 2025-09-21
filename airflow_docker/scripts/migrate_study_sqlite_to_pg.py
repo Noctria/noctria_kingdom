@@ -16,11 +16,7 @@ pg_storage = RDBStorage(postgres_url)
 
 # === PostgreSQLにStudyを作成（存在チェック） ===
 try:
-    optuna.create_study(
-        study_name=study_name,
-        storage=pg_storage,
-        direction=study.direction
-    )
+    optuna.create_study(study_name=study_name, storage=pg_storage, direction=study.direction)
     print(f"✅ PostgreSQLに新Study作成: {study_name}")
 except optuna.exceptions.DuplicatedStudyError:
     print(f"⚠️ PostgreSQLに既にStudyが存在: {study_name}")

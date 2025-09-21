@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 
 def load_strategy_template() -> str:
@@ -22,11 +22,11 @@ def load_strategy_template() -> str:
         # このスクリプトと同じ階層にある'templates'フォルダ内のテンプレートを指す
         # 注意: このパスが機能するには、`llm_server/templates/strategy_template.py`というファイル構造が必要です。
         template_path = Path(__file__).parent / "templates" / "strategy_template.py"
-        
+
         if not template_path.exists():
             logging.error(f"戦略の羊皮紙が見つかりません。パス: {template_path}")
             raise FileNotFoundError(f"Template not found at: {template_path}")
-            
+
         logging.info(f"戦略の羊皮紙を読み込みました: {template_path}")
         return template_path.read_text(encoding="utf-8")
 
@@ -55,4 +55,3 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"テスト中に予期せぬエラーが発生しました: {e}")
     logging.info("--- 羊皮紙読み込み機能の単体テストを終了 ---")
-

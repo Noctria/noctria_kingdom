@@ -6,18 +6,20 @@
 - 戦略の再評価ログをフィルター・ソートして履歴画面に表示
 """
 
+import json
 import logging
-from fastapi import APIRouter, Request, Query
+from datetime import datetime
+
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from datetime import datetime
-import json
-from src.core.path_config import PDCA_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, PDCA_LOG_DIR
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 @router.get("/pdca", response_class=HTMLResponse)
 async def show_pdca_dashboard(
@@ -62,26 +64,28 @@ async def show_pdca_dashboard(
         if tags:
             tag_set.update(tags)
 
-        logs.append({
-            "filename": log_file.name,
-            "path": str(log_file),
-            "strategy": data.get("strategy", "N/A"),
-            "timestamp": ts_str,
-            "timestamp_dt": ts_dt,
-            "signal": data.get("signal", "N/A"),
-            "symbol": data.get("symbol", "N/A"),
-            "lot": data.get("lot", "N/A"),
-            "tp": data.get("tp", "N/A"),
-            "sl": data.get("sl", "N/A"),
-            "win_rate": data.get("win_rate"),
-            "max_dd": data.get("max_dd"),
-            "win_rate_before": data.get("win_rate_before"),
-            "win_rate_after": data.get("win_rate_after"),
-            "max_dd_before": data.get("max_dd_before"),
-            "max_dd_after": data.get("max_dd_after"),
-            "tags": tags,
-            "json_text": json.dumps(data, indent=2, ensure_ascii=False),
-        })
+        logs.append(
+            {
+                "filename": log_file.name,
+                "path": str(log_file),
+                "strategy": data.get("strategy", "N/A"),
+                "timestamp": ts_str,
+                "timestamp_dt": ts_dt,
+                "signal": data.get("signal", "N/A"),
+                "symbol": data.get("symbol", "N/A"),
+                "lot": data.get("lot", "N/A"),
+                "tp": data.get("tp", "N/A"),
+                "sl": data.get("sl", "N/A"),
+                "win_rate": data.get("win_rate"),
+                "max_dd": data.get("max_dd"),
+                "win_rate_before": data.get("win_rate_before"),
+                "win_rate_after": data.get("win_rate_after"),
+                "max_dd_before": data.get("max_dd_before"),
+                "max_dd_after": data.get("max_dd_after"),
+                "tags": tags,
+                "json_text": json.dumps(data, indent=2, ensure_ascii=False),
+            }
+        )
 
     def matches(log):
         try:
@@ -134,25 +138,27 @@ async def show_pdca_dashboard(
         sort_key = sort.lstrip("-")
         if sort_key in ["timestamp_dt", "win_rate", "max_dd"]:
             filtered_logs.sort(
-                key=lambda x: x.get(sort_key) if x.get(sort_key) is not None else 0,
-                reverse=reverse
+                key=lambda x: x.get(sort_key) if x.get(sort_key) is not None else 0, reverse=reverse
             )
 
-    return templates.TemplateResponse("pdca_history.html", {
-        "request": request,
-        "logs": filtered_logs,
-        "filters": {
-            "strategy": strategy or "",
-            "symbol": symbol or "",
-            "signal": signal or "",
-            "tag": tag or "",
-            "date_from": date_from or "",
-            "date_to": date_to or "",
+    return templates.TemplateResponse(
+        "pdca_history.html",
+        {
+            "request": request,
+            "logs": filtered_logs,
+            "filters": {
+                "strategy": strategy or "",
+                "symbol": symbol or "",
+                "signal": signal or "",
+                "tag": tag or "",
+                "date_from": date_from or "",
+                "date_to": date_to or "",
+            },
+            "sort": sort or "",
+            "available_tags": sorted(tag_set),
+            "diff_filter": diff_filter or "",
+            "win_rate_min_diff": win_rate_min_diff or "",
+            "recheck_success": recheck_success,
+            "recheck_fail": recheck_fail,
         },
-        "sort": sort or "",
-        "available_tags": sorted(tag_set),
-        "diff_filter": diff_filter or "",
-        "win_rate_min_diff": win_rate_min_diff or "",
-        "recheck_success": recheck_success,
-        "recheck_fail": recheck_fail,
-    })
+    )

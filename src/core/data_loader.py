@@ -1,6 +1,21 @@
+import json
+import logging
+import warnings
+from pathlib import (
+    Path,
+)  # buffer_pathでstr型が渡される場合に備えて残す（外部指定ありの場合のみ）
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+import requests
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
+from src.core.path_config import DATA_DIR  # パス定数をimport
+
 # core/data_loader.py
 
-import warnings
+
 warnings.filterwarnings("once", category=DeprecationWarning)
 warnings.warn(
     "DEPRECATED: `src.core.data_loader.MarketDataFetcher` は将来廃止予定です。"
@@ -9,17 +24,9 @@ warnings.warn(
     stacklevel=2,
 )
 
-import requests
-import numpy as np
-import logging
-import pandas as pd
-import json
-from src.core.path_config import DATA_DIR   # パス定数をimport
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from typing import Optional, List, Dict, Any
-from pathlib import Path  # buffer_pathでstr型が渡される場合に備えて残す（外部指定ありの場合のみ）
 
 DEFAULT_BUFFER_PATH = DATA_DIR / "market_data_buffer.json"  # バッファはdata配下に統一
+
 
 class MarketDataFetcher:
     """市場データをAPI経由で取得し、トレンドを解析する
@@ -36,7 +43,7 @@ class MarketDataFetcher:
         self.logger.setLevel(logging.INFO)
         if not self.logger.hasHandlers():
             handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - %(message)s'))
+            handler.setFormatter(logging.Formatter("%(asctime)s - [%(levelname)s] - %(message)s"))
             self.logger.addHandler(handler)
 
         # 起動時にバッファロード
@@ -77,7 +84,7 @@ class MarketDataFetcher:
             "from_symbol": symbol[:3],
             "to_symbol": symbol[3:],
             "interval": "5min",
-            "apikey": self.api_key
+            "apikey": self.api_key,
         }
         try:
             response = requests.get(self.base_url, params=params, timeout=10)
@@ -128,7 +135,7 @@ class MarketDataFetcher:
                 "trend_direction_score": trend_score,
                 "sma_score": sma_score,
                 "news_sentiment": 0.5,
-                "trend_prediction": trend_prediction
+                "trend_prediction": trend_prediction,
             }
         except Exception as e:
             self.logger.error(f"データ取得時にエラー発生: {e}")
@@ -171,7 +178,7 @@ class MarketDataFetcher:
             "from_symbol": from_symbol,
             "to_symbol": to_symbol,
             "apikey": self.api_key,
-            "outputsize": "compact"
+            "outputsize": "compact",
         }
 
         try:
@@ -188,8 +195,7 @@ class MarketDataFetcher:
 
             raw = data["Time Series FX (Daily)"]
             records = [
-                {"date": date, "close": float(info["4. close"])}
-                for date, info in raw.items()
+                {"date": date, "close": float(info["4. close"])} for date, info in raw.items()
             ]
             df = pd.DataFrame(records)
             df["date"] = pd.to_datetime(df["date"])

@@ -6,14 +6,16 @@ integrate_multiple_fundamental_data.py
 
 import pandas as pd
 
+
 def load_fundamental_data(path, col_name):
     """
     単一ファンダ指標のCSVを読み込み、指定列名にリネームして返す。
     """
-    df = pd.read_csv(path, parse_dates=['date'])
-    df.rename(columns={'value': col_name}, inplace=True)
-    df.set_index('date', inplace=True)
+    df = pd.read_csv(path, parse_dates=["date"])
+    df.rename(columns={"value": col_name}, inplace=True)
+    df.set_index("date", inplace=True)
     return df
+
 
 def integrate_fundamentals(ohlcv_path, fundamental_files, output_path):
     """
@@ -29,28 +31,29 @@ def integrate_fundamentals(ohlcv_path, fundamental_files, output_path):
         出力先パス
     """
     # OHLCVデータ（ヘッダあり）
-    ohlcv_df = pd.read_csv(
-        ohlcv_path,
-        parse_dates=['Datetime']
+    ohlcv_df = pd.read_csv(ohlcv_path, parse_dates=["Datetime"])
+    ohlcv_df.rename(
+        columns={
+            "Datetime": "datetime",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+        },
+        inplace=True,
     )
-    ohlcv_df.rename(columns={
-        'Datetime': 'datetime',
-        'Open': 'open',
-        'High': 'high',
-        'Low': 'low',
-        'Close': 'close'
-    }, inplace=True)
-    ohlcv_df.set_index('datetime', inplace=True)
+    ohlcv_df.set_index("datetime", inplace=True)
 
     # ファンダ指標を順に統合
     for col_name, file_path in fundamental_files.items():
         print(f"統合中: {col_name} ← {file_path}")
         fund_df = load_fundamental_data(file_path, col_name)
-        ohlcv_df[col_name] = fund_df[col_name].reindex(ohlcv_df.index, method='ffill')
+        ohlcv_df[col_name] = fund_df[col_name].reindex(ohlcv_df.index, method="ffill")
 
     # 出力
     ohlcv_df.to_csv(output_path)
     print(f"統合データを {output_path} に保存しました。")
+
 
 if __name__ == "__main__":
     # OHLCVデータ
@@ -58,11 +61,11 @@ if __name__ == "__main__":
 
     # ファンダ指標ファイル群（ffr・gdpを含めた完全版）
     fundamental_files = {
-        'cpi': 'data/fundamental/cleaned_cpi.csv',
-        'interest_diff': 'data/fundamental/cleaned_interest_diff.csv',
-        'unemployment': 'data/fundamental/cleaned_unemployment.csv',
-        'ffr': 'data/fundamental/cleaned_ffr.csv',
-        'gdp': 'data/fundamental/cleaned_gdp.csv'
+        "cpi": "data/fundamental/cleaned_cpi.csv",
+        "interest_diff": "data/fundamental/cleaned_interest_diff.csv",
+        "unemployment": "data/fundamental/cleaned_unemployment.csv",
+        "ffr": "data/fundamental/cleaned_ffr.csv",
+        "gdp": "data/fundamental/cleaned_gdp.csv",
     }
 
     output_csv = "data/preprocessed_usdjpy_with_fundamental.csv"

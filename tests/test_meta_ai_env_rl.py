@@ -1,8 +1,9 @@
 # tests/test_meta_ai_env_rl.py
 
-import gym
 from stable_baselines3 import PPO
+
 from core.meta_ai_env import MetaAIEnv
+
 
 def main():
     print("✅ MetaAI統合強化学習テスト開始")
@@ -26,6 +27,7 @@ def main():
             obs = env.reset()
 
     print("✅ MetaAI統合強化学習テスト完了！")
+
 
 if __name__ == "__main__":
     main()

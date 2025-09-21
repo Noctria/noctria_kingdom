@@ -16,6 +16,7 @@ from core.path_config import STRATEGIES_DIR
 # 対象ディレクトリ
 GENERATED_DIR = STRATEGIES_DIR / "veritas_generated"
 
+
 def load_strategy_logs():
     logs = []
     for file in GENERATED_DIR.glob("*.json"):
@@ -27,14 +28,17 @@ def load_strategy_logs():
             print(f"⚠️ 読み込み失敗: {file.name} - {e}")
     return logs
 
+
 def summarize_by_tag(logs):
-    tag_summary = defaultdict(lambda: {
-        "count": 0,
-        "win_rates": [],
-        "trade_counts": [],
-        "max_drawdowns": [],
-        "strategy_names": [],
-    })
+    tag_summary = defaultdict(
+        lambda: {
+            "count": 0,
+            "win_rates": [],
+            "trade_counts": [],
+            "max_drawdowns": [],
+            "strategy_names": [],
+        }
+    )
 
     for log in logs:
         tags = log.get("tags", [])
@@ -59,6 +63,7 @@ def summarize_by_tag(logs):
 
     return tag_summary
 
+
 def display_summary(tag_summary):
     print("📊 タグ別統計概要")
     print("-" * 50)
@@ -71,6 +76,7 @@ def display_summary(tag_summary):
         print(f"  - 戦略例: {', '.join(stats['strategy_names'][:3])}")
         print()
 
+
 def export_summary_to_json(tag_summary, output_path: Path):
     export_data = {}
     for tag, stats in tag_summary.items():
@@ -79,12 +85,13 @@ def export_summary_to_json(tag_summary, output_path: Path):
             "average_win_rate": round(mean(stats["win_rates"]), 2),
             "average_trade_count": round(mean(stats["trade_counts"]), 1),
             "average_max_drawdown": round(mean(stats["max_drawdowns"]), 2),
-            "sample_strategies": stats["strategy_names"][:5]
+            "sample_strategies": stats["strategy_names"][:5],
         }
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(export_data, f, indent=2, ensure_ascii=False)
     print(f"✅ JSON出力完了: {output_path}")
+
 
 if __name__ == "__main__":
     logs = load_strategy_logs()

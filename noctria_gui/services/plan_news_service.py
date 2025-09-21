@@ -45,9 +45,10 @@ def fetch_news_timeline(
      ORDER BY date ASC;
     """
     dsn = _get_dsn()
-    with psycopg2.connect(dsn) as conn, conn.cursor(
-        cursor_factory=psycopg2.extras.DictCursor
-    ) as cur:
+    with (
+        psycopg2.connect(dsn) as conn,
+        conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur,
+    ):
         cur.execute(sql, (asset, date_from, date_from, date_to, date_to))
         rows = cur.fetchall()
 

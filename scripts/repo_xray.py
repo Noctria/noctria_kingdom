@@ -10,15 +10,22 @@ ROOT = Path(__file__).resolve().parents[1]
 # 走査対象ディレクトリ（重複防止のため親ディレクトリを外す）
 WF_DIRS = [ROOT / ".github" / "workflows"]
 AIRFLOW_DIRS = [ROOT / "airflow_docker" / "dags", ROOT / "dags"]
-CODE_DIRS = [ROOT / "src", ROOT / "experts", ROOT / "autogen_scripts", ROOT / "tools", ROOT / "scripts"]
+CODE_DIRS = [
+    ROOT / "src",
+    ROOT / "experts",
+    ROOT / "autogen_scripts",
+    ROOT / "tools",
+    ROOT / "scripts",
+]
 
 PATTERNS = {
-    "inventor":  re.compile(r"\bInventor\b|inventor", re.I),
-    "harmonia":  re.compile(r"\bHarmonia\b|harmonia|rerank", re.I),
-    "pdca":      re.compile(r"\bPDCA\b|pdca_agent|decision", re.I),
-    "veritas":   re.compile(r"\bVeritas\b|veritas|strategy", re.I),
-    "airflow":   re.compile(r"\bairflow\b|DAG\s*\(", re.I),
+    "inventor": re.compile(r"\bInventor\b|inventor", re.I),
+    "harmonia": re.compile(r"\bHarmonia\b|harmonia|rerank", re.I),
+    "pdca": re.compile(r"\bPDCA\b|pdca_agent|decision", re.I),
+    "veritas": re.compile(r"\bVeritas\b|veritas|strategy", re.I),
+    "airflow": re.compile(r"\bairflow\b|DAG\s*\(", re.I),
 }
+
 
 def read_text_safe(p: Path, limit_bytes: int = 200_000) -> str:
     try:
@@ -29,7 +36,10 @@ def read_text_safe(p: Path, limit_bytes: int = 200_000) -> str:
     except Exception:
         return ""
 
-def list_files(dirs: List[Path], exts: Tuple[str,...] = (".py", ".yml", ".yaml", ".md")) -> List[Path]:
+
+def list_files(
+    dirs: List[Path], exts: Tuple[str, ...] = (".py", ".yml", ".yaml", ".md")
+) -> List[Path]:
     """重複パスを絶対パスで排除しつつ収集"""
     seen = set()
     out: List[Path] = []
@@ -50,6 +60,7 @@ def list_files(dirs: List[Path], exts: Tuple[str,...] = (".py", ".yml", ".yaml",
             out.append(rp)
     return out
 
+
 def parse_workflow_meta(yml_text: str) -> Dict[str, str]:
     # very light parse（PyYAML不使用）
     name = ""
@@ -65,6 +76,7 @@ def parse_workflow_meta(yml_text: str) -> Dict[str, str]:
             break
     return {"name": name or "(no name)", "valid": has_on}
 
+
 def parse_airflow_dag_ids(py_text: str) -> List[str]:
     ids = set()
     for m in re.finditer(r"dag_id\s*=\s*['\"]([^'\"]+)['\"]", py_text):
@@ -73,6 +85,7 @@ def parse_airflow_dag_ids(py_text: str) -> List[str]:
         ids.add(m.group(2))
     return sorted(ids)
 
+
 def grep_patterns(txt: str) -> List[str]:
     hits = []
     for key, rx in PATTERNS.items():
@@ -80,20 +93,23 @@ def grep_patterns(txt: str) -> List[str]:
             hits.append(key)
     return hits
 
-def git_top_dirs() -> List[Tuple[int,str]]:
+
+def git_top_dirs() -> List[Tuple[int, str]]:
     try:
         import subprocess
+
         res = subprocess.run(
-            ["git","ls-files"], cwd=str(ROOT), check=True, capture_output=True, text=True
+            ["git", "ls-files"], cwd=str(ROOT), check=True, capture_output=True, text=True
         )
-        counts: Dict[str,int] = {}
+        counts: Dict[str, int] = {}
         for line in res.stdout.splitlines():
-            d = line.rsplit("/",1)[0] if "/" in line else "."
-            counts[d] = counts.get(d,0)+1
-        ranked = sorted(((c,d) for d,c in counts.items()), reverse=True)
+            d = line.rsplit("/", 1)[0] if "/" in line else "."
+            counts[d] = counts.get(d, 0) + 1
+        ranked = sorted(((c, d) for d, c in counts.items()), reverse=True)
         return ranked[:20]
     except Exception:
         return []
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -106,18 +122,16 @@ def main():
     out_base.parent.mkdir(parents=True, exist_ok=True)
 
     # Workflows（on: が無い yml は除外）
-    wf_files = list_files(WF_DIRS, exts=(".yml",".yaml"))
+    wf_files = list_files(WF_DIRS, exts=(".yml", ".yaml"))
     workflows = []
     for p in wf_files:
         t = read_text_safe(p)
         meta = parse_workflow_meta(t)
         if not meta["valid"]:
             continue
-        workflows.append({
-            "path": str(p.relative_to(root)),
-            "name": meta["name"],
-            "trigger_hint": "on:"
-        })
+        workflows.append(
+            {"path": str(p.relative_to(root)), "name": meta["name"], "trigger_hint": "on:"}
+        )
 
     # Airflow DAGs（重複排除済のファイル集合から抽出）
     dag_py = list_files(AIRFLOW_DIRS, exts=(".py",))
@@ -126,22 +140,19 @@ def main():
         t = read_text_safe(p)
         ids = parse_airflow_dag_ids(t)
         if ids:
-            dags.append({
-                "path": str(p.relative_to(root)),
-                "dag_ids": ids
-            })
+            dags.append({"path": str(p.relative_to(root)), "dag_ids": ids})
 
     # Pattern hits
-    code_files = list_files(CODE_DIRS, exts=(".py",".md",".yml",".yaml"))
+    code_files = list_files(CODE_DIRS, exts=(".py", ".md", ".yml", ".yaml"))
     buckets: Dict[str, List[str]] = {k: [] for k in PATTERNS.keys()}
     for p in code_files:
         t = read_text_safe(p)
         for h in grep_patterns(t):
             buckets[h].append(str(p.relative_to(root)))
-    buckets = {k: sorted(set(v)) for k,v in buckets.items()}
+    buckets = {k: sorted(set(v)) for k, v in buckets.items()}
 
     # Top dirs
-    dir_ranking = [{"count": c, "dir": d} for c,d in git_top_dirs()]
+    dir_ranking = [{"count": c, "dir": d} for c, d in git_top_dirs()]
 
     result = {
         "root": str(root),
@@ -187,13 +198,19 @@ def main():
     md_path = out_base.with_suffix(".md")
     md_path.write_text("\n".join(md) + "\n", encoding="utf-8")
 
-    print(json.dumps({
-        "ok": True,
-        "json": str(json_path),
-        "md": str(md_path),
-        "workflows": len(result["workflows"]),
-        "airflow_dags": len(result["airflow_dags"]),
-    }, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "json": str(json_path),
+                "md": str(md_path),
+                "workflows": len(result["workflows"]),
+                "airflow_dags": len(result["airflow_dags"]),
+            },
+            ensure_ascii=False,
+        )
+    )
+
 
 if __name__ == "__main__":
     sys.exit(main())

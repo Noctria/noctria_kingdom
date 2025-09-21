@@ -25,6 +25,7 @@ class NoctriaFXTradingEnv(gym.Env):
       - レガシー推論（6次元モデル）は obs_dim=6 を明示
       - 8列で新規学習→保存したモデルは Box(..., (8,), float32) 固定になる
     """
+
     metadata = {"render_modes": ["human"]}
 
     def __init__(
@@ -68,10 +69,7 @@ class NoctriaFXTradingEnv(gym.Env):
         self._t = 0
 
     def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        options: Optional[Dict[str, Any]] = None
+        self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
         if seed is not None:
@@ -89,7 +87,9 @@ class NoctriaFXTradingEnv(gym.Env):
         assert self.action_space.contains(action), f"invalid action {action}"
 
         # ダミー遷移（数値安定化）
-        self._state = (self._state + self._rng.normal(0, 0.05, size=(self.obs_dim,))).astype(np.float32)
+        self._state = (self._state + self._rng.normal(0, 0.05, size=(self.obs_dim,))).astype(
+            np.float32
+        )
         self._state = np.nan_to_num(self._state, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
         # ダミー報酬（本番はPnL等へ差し替え）

@@ -33,9 +33,9 @@ class CentralBankAI:
         unemployment = data.get("unemployment", 0.0)
 
         score = (
-            self.normalize_cpi(cpi) * self.weights["cpi"] +
-            self.normalize_interest_diff(interest) * self.weights["interest_diff"] +
-            self.normalize_unemployment(unemployment) * self.weights["unemployment"]
+            self.normalize_cpi(cpi) * self.weights["cpi"]
+            + self.normalize_interest_diff(interest) * self.weights["interest_diff"]
+            + self.normalize_unemployment(unemployment) * self.weights["unemployment"]
         )
 
         return round(score, 4)

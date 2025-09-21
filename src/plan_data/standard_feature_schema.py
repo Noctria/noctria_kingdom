@@ -11,19 +11,15 @@ STANDARD_FEATURE_ORDER = [
     # 市場・テクニカル（最小セット）
     "usdjpy_close",
     "usdjpy_volatility_5d",
-
     # リスク資産／恐怖指数
     "sp500_close",
     "vix_close",
-
     # ニュース集計
     "news_count",
-
     # マクロ
     "cpiaucsl_value",
     "fedfunds_value",
     "unrate_value",
-
     # 必要に応じてこの下に追加（snake_caseで）
     # "dxy_close",
     # "us10y_close",

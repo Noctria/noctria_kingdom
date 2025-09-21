@@ -74,21 +74,15 @@ async def plan_news_page(
 )
 def api_news_timeline(
     asset: str = Query(..., description="例: USDJPY"),
-    date_from: Optional[str] = Query(
-        None, description="YYYY-MM-DD（含む）。指定がなければ全期間"
-    ),
-    date_to: Optional[str] = Query(
-        None, description="YYYY-MM-DD（含む）。指定がなければ全期間"
-    ),
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD（含む）。指定がなければ全期間"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD（含む）。指定がなければ全期間"),
 ):
     try:
         data = fetch_news_timeline(asset=asset, date_from=date_from, date_to=date_to)
         return JSONResponse(data)
     except Exception as e:
         tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-        return JSONResponse(
-            {"error": f"{type(e).__name__}: {e}", "trace": tb}, status_code=500
-        )
+        return JSONResponse({"error": f"{type(e).__name__}: {e}", "trace": tb}, status_code=500)
 
 
 # -----------------------------
@@ -103,12 +97,8 @@ def api_event_impact(
     event_tag: str = Query(..., description="例: CPI, FOMC, BOJ"),
     start: int = Query(-3, ge=-30, le=30, description="イベント相対日（開始, 例:-3）"),
     end: int = Query(3, ge=-30, le=30, description="イベント相対日（終了, 例:3）"),
-    date_from: Optional[str] = Query(
-        None, description="YYYY-MM-DD（含む）。指定がなければ全期間"
-    ),
-    date_to: Optional[str] = Query(
-        None, description="YYYY-MM-DD（含む）。指定がなければ全期間"
-    ),
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD（含む）。指定がなければ全期間"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD（含む）。指定がなければ全期間"),
 ):
     if start > end:
         raise HTTPException(status_code=400, detail="start は end 以下である必要があります")
@@ -124,6 +114,4 @@ def api_event_impact(
         return JSONResponse(data)
     except Exception as e:
         tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-        return JSONResponse(
-            {"error": f"{type(e).__name__}: {e}", "trace": tb}, status_code=500
-        )
+        return JSONResponse({"error": f"{type(e).__name__}: {e}", "trace": tb}, status_code=500)
