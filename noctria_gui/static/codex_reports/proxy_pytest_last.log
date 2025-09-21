@@ -1,4 +1,4 @@
-........................................                                 [100%]
+s........................................                                [100%]
 ==================================== PASSES ====================================
 ______________________________ test_floor_mod_cpu ______________________________
 ----------------------------- Captured stdout call -----------------------------
@@ -28,12 +28,12 @@ WARNING  QUALITY.DATA_LAG:quality_gate.py:1784 {'kind': 'QUALITY.DATA_LAG', 'dat
 WARNING  QUALITY.DATA_LAG:quality_gate.py:1904 {'kind': 'QUALITY.DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002', 'level': 'WARNING'}
 - generated xml file: /mnt/d/noctria_kingdom/src/codex_reports/pytest_last.xml -
 =========================== short test summary info ============================
-PASSED tests/test_decision_fallback_size.py::test_fallback_size_reason_matches_implementation
 PASSED tests/test_dummy.py::test_basic
 PASSED tests/test_floor_mod.py::test_floor_mod_cpu
 PASSED tests/test_floor_mod_gpu.py::test_floor_mod_gpu
 PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_sets_risk_adjusted_and_orders
 PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_penalizes_with_lag_and_missing_ratio
+PASSED tests/test_minidemo_smoke.py::test_minidemo_offline_smoke
 PASSED tests/test_path_config.py::test_path_exists[BASE_DIR]
 PASSED tests/test_path_config.py::test_path_exists[AIRFLOW_DIR]
 PASSED tests/test_path_config.py::test_path_exists[CORE_DIR]
@@ -68,5 +68,5 @@ PASSED tests/test_quality_gate_alerts.py::test_quality_gate_emits_alert_on_data_
 PASSED tests/test_trace_and_integration.py::test_trace_id_format
 PASSED tests/test_trace_and_integration.py::test_minidemo_writes_db
 PASSED tests/test_trace_decision_e2e.py::test_decision_minidemo_writes_db
-40 passed, 2 warnings in 59.87s
+SKIPPED [1] tests/test_decision_fallback_size.py:124: 最新の decision を取得できませんでした（軽量CIのため SKIP）。
 
