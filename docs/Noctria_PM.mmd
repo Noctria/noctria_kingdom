@@ -1,5 +1,5 @@
 graph TD
-  A[docs/governance/king_ops_prompt.yaml<br/>Noctria王 憲章&運用YAML] -->|load| B[config_loader.py]
+  A[docs/governance/king_ops_prompt.yaml<br/>Noctria Charter & Ops] -->|load| B[config_loader.py]
 
   subgraph Core_Minimal_Python
     B --> C[kpi_store.py<br/>obs_codex_kpi I/O]
@@ -24,13 +24,13 @@ graph TD
   R1 --> S2
   C --> E
   C --> G
-  E -->|WARN/CRITICAL| J
+  E -->|WARN or CRITICAL| J
   G --> O1[docs/reports/daily/YYYY-MM-DD.md]
   I --> O2[reports/veritas/**/reliability.png]
   J --> O3[docs/decisions/YYYY/*.md]
 
   C --> F
-  F -->|pass/fail| H
+  F -->|pass or fail| H
 
-  A -->|decision_rules / action_map| H
-  H -->|Orders(草案)| G
+  A -->|rules: decision_rules + action_map| H
+  H -->|orders draft| G
