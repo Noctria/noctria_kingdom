@@ -8,3 +8,86 @@ yq -i '.qa.static_analysis = {
   "ci_job":"PYTHONPATH=. ruff check src/ tests/"
 }' $FILE
 
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Cost Optimization（新設） ==========
+yq -i '.cost_optimization = {
+  "policy_version":"v1",
+  "model_tiering":{
+    "default":"mini",
+    "tiers":[
+      {"name":"mini","use_for":["日次レポート初稿","軽量分類","要約"],"max_ctx_tokens":8000},
+      {"name":"standard","use_for":["RAG+要約","生成→校正"],"gate":"quality.slo_ok == true OR fallback_needed"},
+      {"name":"premium","use_for":["精密説明","高リスク決裁案"],"gate":"only_if(decision.critical==true OR qa_blocker==true)"}
+    ],
+    "fallback_rules":[
+      {"from":"mini","to":"standard","when":"quality_score<target OR parse_error>=1"},
+      {"from":"standard","to":"premium","when":"critical_decision AND reviewer_requests=='escalate'"}
+    ]
+  },
+  "prompt_diet":{
+    "shared_header_id":"KING_HDR_001",
+    "max_history_turns":6,
+    "history_summarization":"auto_when(turns>6 OR tokens>4k)",
+    "rag":{
+      "max_chunks":6,
+      "min_score":0.75,
+      "dedupe_by":"content_hash"
+    }
+  },
+  "caching":{
+    "enabled":true,
+    "key":"hash(model,shared_header_id,instruction,user_query,rag_chunk_ids)",
+    "ttl_minutes":1440,
+    "version_stamp":"data_snapshot_id|git_sha"
+  },
+  "streaming_and_cutoff":{
+    "enabled":true,
+    "soft_token_cap":800,
+    "hard_token_cap":1200,
+    "on_cap_reached":"finish_with_summary"
+  },
+  "retry_and_escalate":{
+    "max_retries":1,
+    "cheap_retry_on":"rate_limit|transient_error|parse_error",
+    "escalate_if":"critical_request AND (parse_error OR qos_below_target)"
+  },
+  "offline_precompute":{
+    "embeddings":"precompute_on_commit",
+    "templates":"local_cache",
+    "btft_reports":"batch_generate_offline"
+  },
+  "budgets":{
+    "per_run_tokens_max": 40000,
+    "per_day_jpy_max": 1200,
+    "per_month_jpy_max": 25000,
+    "action_on_exceed":[ "warn", "switch_to_mini", "require_human_ack"]
+  },
+  "observability":{
+    "metrics":[
+      "llm_prompt_tokens_total","llm_completion_tokens_total","llm_invocations_total",
+      "llm_cache_hit_ratio","llm_cost_jpy_total","llm_cost_jpy_per_report"
+    ],
+    "logs":"logs/llm/*.jsonl",
+    "sampling":"100% for critical, 20% for normal"
+  },
+  "governance":{
+    "change_control":"アップグレード/モデル切替は change_management 経由",
+    "reviewer":"king",
+    "notes":"節約で品質が落ちた場合は decision_registry に根拠付きで例外記録"
+  }
+}' $FILE
+
+# ========== Scripts/CIへのフック（任意：既存に追記） ==========
+yq -i '.scripts.cost_report = "scripts/report_llm_costs.py --from today-7d --to today --out reports/costs"' $FILE
+yq -i '.testing.cost_guards = [
+  {"id":"COST01","target":"1レポート当たりコスト","expect":"llm_cost_jpy_per_report ≤ 120"},
+  {"id":"COST02","target":"キャッシュ","expect":"llm_cache_hit_ratio ≥ 0.25"}
+]' $FILE
+
+# 既存の observability にメトリクス名を追記（存在すればマージ）
+yq -i '
+  .observability.metrics.api += ["llm_invocations_total","llm_prompt_tokens_total","llm_completion_tokens_total"] |
+  .observability.metrics.btft += ["llm_cost_jpy_total"]
+' $FILE
+
