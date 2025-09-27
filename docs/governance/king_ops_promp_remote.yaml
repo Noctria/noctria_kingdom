@@ -1,0 +1,10 @@
+FILE=docs/governance/king_ops_prompt.yaml
+
+# --- QAセクションに ruff を明記 ---
+yq -i '.qa.static_analysis = {
+  "tool":"ruff",
+  "config":".ruff.toml",
+  "policy":"すべての新規/修正コードは ruff check --fix を通過必須",
+  "ci_job":"PYTHONPATH=. ruff check src/ tests/"
+}' $FILE
+
