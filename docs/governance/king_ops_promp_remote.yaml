@@ -91,3 +91,24 @@ yq -i '
   .observability.metrics.btft += ["llm_cost_jpy_total"]
 ' $FILE
 
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+yq -i '.guidelines.prompt_basics = {
+  "scope":"全AIエージェント共通",
+  "structure":[
+    "1. Role: AIエージェントの役割を明示する（例: 戦略生成AI, 評価AI, リスク管理AIなど）",
+    "2. Goal: 今回のタスクの目的を一文で定義",
+    "3. Constraints: 出力形式や数値制約などを列挙",
+    "4. Input: 必要な文脈/データ/ログを提示",
+    "5. Output: 期待する形式を明記（JSON/Markdown/表など）",
+    "6. Evaluation: 成功基準や判定条件を簡潔に明示"
+  ],
+  "principles":[
+    "全AIは再現可能な形式で出力すること",
+    "無関係な情報や過剰な推測は返さないこと",
+    "失敗や曖昧な場合は fallback（警告＋簡易出力）で応答すること",
+    "出力は後続の自動処理に適合すること（例: JSONなら必ずvalid JSON）"
+  ]
+}' $FILE
+
