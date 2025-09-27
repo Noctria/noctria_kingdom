@@ -1,0 +1,38 @@
+graph TD
+  A[docs/governance/king_ops_prompt.yaml<br/>Noctria王の憲章&運用YAML] -->|load| B[config_loader.py]
+
+  subgraph Core Minimal Python
+    B --> C[kpi_store.py<br/>obs_codex_kpi I/O]
+    B --> D[triage_rules.py]
+    B --> E[alert_engine.py]
+    B --> F[gatekeeper.py]
+    B --> G[report_builder.py]
+    B --> H[pipeline_runner.py]
+    B --> I[reliability_plot.py]
+    B --> J[decision_log.py]
+  end
+
+  subgraph Scripts (薄いラッパ)
+    S1[evaluate_veritas.py] --> R1[(reports/veritas/run_*/)]
+    S2[log_kpi_from_reports.py] -->|write| C
+    S3[plot_reliability.py] -->|use| I
+    S4[generate_daily_report.py] -->|use| G
+    S5[run_veritas_pipeline.py] -->|orchestrate| H
+    S6[kpi_quickpeek.py] -->|read| C
+  end
+
+  R1 --> S2
+  C --> E
+  C --> G
+  E -->|WARN/CRITICAL| J
+  G --> O1[docs/reports/daily/YYYY-MM-DD.md]
+  I --> O2[reports/veritas/**/reliability.png]
+  J --> O3[docs/decisions/YYYY/*.md]
+
+  %% Gates
+  C --> F
+  F -->|pass/fail| H
+
+  %% Action map hint (YAML→訓示)
+  A -->|decision_rules/action_map| H
+  H -->|Orders(草案)| G
