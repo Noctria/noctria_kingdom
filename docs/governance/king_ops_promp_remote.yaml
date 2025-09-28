@@ -839,3 +839,34 @@ yq -i '.golden_dataset = {
 
 # YAML 検証
 yq e . "$FILE" >/dev/null && echo "YAML OK（golden_dataset 追加済み）" || echo "YAML NG"
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# === Trading Performance KPIs を追加 ===
+yq -i '
+.kpi_definitions.win_rate = {
+  "description":"勝率（勝ちトレード数 / 総トレード数）",
+  "target":{"goal":0.55,"warn":0.52,"critical":0.50}
+}
+' $FILE
+
+yq -i '
+.kpi_definitions.sharpe_ratio = {
+  "description":"リスク調整後の収益性（>1.5推奨）",
+  "target":{"goal":1.5,"warn":1.2,"critical":1.0}
+}
+' $FILE
+
+yq -i '
+.kpi_definitions.profit_factor = {
+  "description":"総利益 / 総損失。>1.5で健全、1.0割れは赤字",
+  "target":{"goal":1.5,"warn":1.3,"critical":1.0}
+}
+' $FILE
+
+yq -i '
+.kpi_definitions.max_drawdown = {
+  "description":"資産ピークからの最大下落幅。資金防衛の重要指標",
+  "target":{"goal":0.10,"warn":0.15,"critical":0.20}
+}
+' $FILE
