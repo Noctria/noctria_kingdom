@@ -814,3 +814,28 @@ yq -i '.weekly_slide_deck.slides += [
 
 # ========== YAML 検証 ==========
 yq e . "$FILE" >/dev/null && echo "YAML OK（drift監視 追記完了）" || echo "YAML NG"
+
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Golden Dataset Policy ==========
+yq -i '.golden_dataset = {
+  "description":"実験・モデル・評価の基準となるゴールデン・データセットを制定し、毎回そこで性能が崩れないことを保証する",
+  "location":"data/golden/", 
+  "rules":[
+    "全モデル/戦略は golden dataset で最低基準を満たすこと",
+    "回帰検出の下限値を定義（例: Brier<=0.20, ECE<=0.35, Adv.pass>=0.40）",
+    "基準を満たさない場合はBT/FTや本番適用を禁止"
+  ],
+  "ci_hooks":{
+    "smoke_test":"pytest tests/golden --maxfail=1 -q",
+    "required_before":["backtest","forwardtest","deployment"]
+  },
+  "reporting":{
+    "path":"reports/golden/{date}.md",
+    "content":["基準KPI","直近runとの比較","合否判定","回帰警告"]
+  }
+}' $FILE
+
+# YAML 検証
+yq e . "$FILE" >/dev/null && echo "YAML OK（golden_dataset 追加済み）" || echo "YAML NG"
