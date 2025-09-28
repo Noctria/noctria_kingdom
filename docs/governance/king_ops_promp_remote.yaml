@@ -870,3 +870,29 @@ yq -i '
   "target":{"goal":0.10,"warn":0.15,"critical":0.20}
 }
 ' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# === Trading Performance Decision Rules を追加 ===
+yq -i '
+.decision_rules.trading_performance = {
+  "rules":[
+    {
+      "if":"win_rate < 0.52 for 3 runs",
+      "then":"Veritas に戦略特徴量再設計を指示"
+    },
+    {
+      "if":"sharpe_ratio < 1.2 for 3 runs",
+      "then":"Aurus に実行効率最適化を指示"
+    },
+    {
+      "if":"profit_factor < 1.3",
+      "then":"Prometheus に予測活用率改善を指示"
+    },
+    {
+      "if":"max_drawdown > 0.15",
+      "then":"Noctus にセーフモード発動を検討させる"
+    }
+  ]
+}
+' $FILE
