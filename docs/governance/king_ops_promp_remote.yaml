@@ -896,3 +896,35 @@ yq -i '
   ]
 }
 ' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# === Trading KPIs を kpi_alerts.metrics に追加 ===
+yq -i '
+.kpi_alerts.metrics += [
+  {
+    "key":"win_rate",
+    "good_is":"high",
+    "warn_when":{"absolute_below":0.52,"lookback_runs":3},
+    "critical_when":{"absolute_below":0.50,"consecutive":2}
+  },
+  {
+    "key":"sharpe_ratio",
+    "good_is":"high",
+    "warn_when":{"absolute_below":1.2,"lookback_runs":3},
+    "critical_when":{"absolute_below":1.0,"consecutive":2}
+  },
+  {
+    "key":"profit_factor",
+    "good_is":"high",
+    "warn_when":{"absolute_below":1.3,"lookback_runs":3},
+    "critical_when":{"absolute_below":1.0,"consecutive":2}
+  },
+  {
+    "key":"max_drawdown",
+    "good_is":"low",
+    "warn_when":{"absolute_above":0.15,"lookback_runs":3},
+    "critical_when":{"absolute_above":0.20,"consecutive":1}
+  }
+]
+' $FILE
