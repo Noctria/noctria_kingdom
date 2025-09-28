@@ -700,3 +700,117 @@ yq -i '.doc_ops.file_locations.cost_meters = "metrics/cost/"' $FILE
 
 # ===== 検証（新設/追記部分をざっと出力） =====
 yq e '.cost_meters,.cost_policies,.testing.cost_smoke,.kpi_alerts.cost,.decision_registry.cost_rules' "$FILE"
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Drift/Shift 監視の中核セクション ==========
+yq -i '.drift_monitoring = {
+  "windows":{"reference_days":30,"tracking_days":7},
+  "segment_by":["pair","session(JPY/EU/US)","regime_id"],
+  "metrics":{
+    "psi":{"warn":0.1,"critical":0.25},
+    "kl":{"warn":0.05,"critical":0.15},
+    "js":{"warn":0.03,"critical":0.10},
+    "mean_abs_delta":{"warn":2.0,"critical":4.0}
+  },
+  "featuresets":{
+    "raw_ticks":["mid_return_1s","spread_bp","vol_5s"],
+    "features":["rsi_14","ema_20_minus_ema_50","atr_14","hour_sin","hour_cos"],
+    "labels":["y_next_up"]
+  },
+  "prediction":{
+    "bins":[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],
+    "warn":{"proba_mean_delta":0.05,"calibration_gap_delta":0.02},
+    "critical":{"proba_mean_delta":0.10,"calibration_gap_delta":0.04}
+  },
+  "schedules":{
+    "weekly":"Sun 09:00 UTC",
+    "post_event":"major_econ_events|abnormal_volatility"
+  },
+  "artifacts":{"dir":"reports/drift","index":"reports/drift/index.md","db":"obs_codex_drift"},
+  "actions":{
+    "on_warn":["flag SHIFT","append to handover","prepare bins/T dry-runs"],
+    "on_critical":["raise CRITICAL alert","decision_registry auto-rule: drift_critical"]
+  }
+}' $FILE
+
+# ========== scripts 追記（CIに依存しない運用コマンド） ==========
+yq -i '.scripts.compute_data_drift = "データ分布ドリフト計測（PSI/KL/JS/平均差）→ reports/drift/data_*"' $FILE
+yq -i '.scripts.compute_pred_drift = "予測分布・校正ギャップのドリフト計測 → reports/drift/pred_*"' $FILE
+yq -i '.scripts.post_event_drift_check = "重要イベント後の即時ドリフトチェック（データ/予測の両方）"' $FILE
+yq -i '.scripts.register_drift_findings = "ドリフト結果を obs_codex_drift と decision_registry に登録"' $FILE
+
+# ========== KPI警報への組み込み ==========
+yq -i '.kpi_alerts.metrics += [
+  {"key":"data_psi","good_is":"low","warn_when":{"absolute_above":0.10,"lookback_runs":1},"critical_when":{"absolute_above":0.25,"consecutive":1}},
+  {"key":"pred_proba_mean_delta","good_is":"low","warn_when":{"absolute_above":0.05,"lookback_runs":1},"critical_when":{"absolute_above":0.10,"consecutive":1}},
+  {"key":"calibration_gap_delta","good_is":"low","warn_when":{"absolute_above":0.02,"lookback_runs":1},"critical_when":{"absolute_above":0.04,"consecutive":1}}
+]' $FILE
+
+# ========== decision_registry 自動ルール（ドリフト→標準オーダー） ==========
+yq -i '.decision_registry.auto_rules += [
+  {"id":"DRIFT_WARN","when":{"any_of":[
+      {"metric":"data_psi","op":">","value":0.10},
+      {"metric":"pred_proba_mean_delta","op":">","value":0.05},
+      {"metric":"calibration_gap_delta","op":">","value":0.02}
+    ]},
+    "then":{"level":"WARN","triage":"SHIFT",
+      "orders":[
+        "bins=12/T=prior_T で再校正 DRY×1",
+        "whale_watch とセットでイベント影響の有無を確認",
+        "次runで再計測し decision_log へ追記"
+      ],
+      "success_criteria":"次runでドリフト指標がwarn未満 or KPI悪化停止"
+    }
+  },
+  {"id":"DRIFT_CRITICAL","when":{"any_of":[
+      {"metric":"data_psi","op":">=","value":0.25},
+      {"metric":"pred_proba_mean_delta","op":">=","value":0.10},
+      {"metric":"calibration_gap_delta","op":">=","value":0.04}
+    ]},
+    "then":{"level":"CRITICAL","triage":"SHIFT",
+      "orders":[
+        "bins固定 + T再最適化 DRY×3（NLL≤+0.05 ガード）",
+        "post_event_drift_check を直近24hで再走",
+        "必要なら閾値固定の暫定セーフ構成で影響緩和"
+      ],
+      "success_criteria":"24h以内に critical 未満へ復帰"
+    }
+  }
+]' $FILE
+
+# ========== Observability 追記 ==========
+yq -i '.observability.metrics.drift = ["data_psi","kl_divergence","js_divergence","pred_proba_mean_delta","calibration_gap_delta"]' $FILE
+yq -i '.doc_ops.file_locations.drift_reports = "reports/drift/"' $FILE
+
+# ========== Runbook（ドリフト対応） ==========
+yq -i '.runbooks.drift_incident = {
+  "trigger":"data_psi>=0.25 or pred_proba_mean_delta>=0.10 or calibration_gap_delta>=0.04",
+  "steps":[
+    "1) 影響範囲を特定（pair/セッション/レジーム別の上位3件）",
+    "2) whale_watch の大型フローと時刻相関を確認",
+    "3) bins固定 + prior_T 比較のDRY（NLLガード≤+0.05）",
+    "4) pred_drift と reliability の再生成→日次レポへ反映",
+    "5) decision_log を更新し Change Draft 必要性を判定"
+  ],
+  "owner":"prometheus","backup":"king","sla":{"ack_min":30,"mitigate_hours":24}
+}' $FILE
+
+# ========== Testing（スモーク） ==========
+yq -i '.testing.drift_smoke = [
+  {"id":"D01","target":"compute_data_drift","expect":"reports/drift/data_*.json 生成 & PSI 数値>0"},
+  {"id":"D02","target":"compute_pred_drift","expect":"reports/drift/pred_*.json 生成 & proba_mean_delta 計算"},
+  {"id":"D03","target":"post_event_drift_check","expect":"イベント後に index.md 更新 & decision_registry に記録"}
+]' $FILE
+
+# ========== レポートへの自然な組み込み（Daily/Weekly） ==========
+yq -i '.report_templates.daily.sections += [
+  {"id":"drift_watch","title":"## Drift Watch","body":"- data_PSI: {data_psi_latest:.3f} / KL: {kl_latest:.3f} / JS: {js_latest:.3f}\n- pred: Δmean(p)= {proba_mean_delta:.3f} / calib_gap Δ= {calib_gap_delta:.3f}\n- segment(top): {top_segments}\n- 所感: {drift_comment_one_line}"}
+]' $FILE
+
+yq -i '.weekly_slide_deck.slides += [
+  {"id":"s4_drift_summary","title":"Slide 4 — Drift & Regime","body":"**結論（1行）**: {drift_exec_one_line}\n\n- data PSI (top3): {psi_top3}\n- pred Δmean(p) / calib_gap: {pred_drift_brief}\n- 関連イベント/whales: {event_whale_brief}\n- 是正アクション: {drift_actions_one_line}"}
+]' $FILE
+
+# ========== YAML 検証 ==========
+yq e . "$FILE" >/dev/null && echo "YAML OK（drift監視 追記完了）" || echo "YAML NG"
