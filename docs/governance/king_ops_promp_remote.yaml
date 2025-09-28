@@ -487,3 +487,106 @@ yq -i '.agent_policies = {
   ],
   "explainability":"agents must emit why->how->result in logs"
 }' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Resource Policy（リソース/予算配分） ==========
+yq -i '.resource_policy = {
+  "budgets":{
+    "monthly_usd_limit":300,
+    "gpt_api":{"cap_usd":120,"soft_alert_pct":0.7,"hard_block_pct":1.0,"auto_downgrade":true},
+    "compute":{"cpu_hours_cap":250,"gpu_hours_cap":60,"storage_gb_cap":200}
+  },
+  "allocation_rules":{
+    "weights":{"calibration":0.4,"robustness":0.3,"automation":0.2,"reporting":0.1},
+    "rebalance_on":{"ece_worsen_runs":2,"adv_pass_below":0.35},
+    "link_to_backlog":true
+  },
+  "scheduler_hints":{
+    "offpeak_windows_utc":["00:00-06:00"],
+    "priority_queue":["critical_fixes","btft_summary","api_contracts","nice_to_have"]
+  },
+  "approval_rules":{
+    "spend_over_usd":50,
+    "requires":["king","human_pm"]
+  },
+  "observability":{
+    "cost_meters":{
+      "gpt":"metrics/cost/gpt_api_usd.jsonl",
+      "compute":"metrics/cost/compute_hours.jsonl",
+      "storage":"metrics/cost/storage_gb.jsonl"
+    }
+  },
+  "integration":{
+    "slo_burn_to_actions":{
+      "burn_gt_2_0":"dry_run_bins_fixed",
+      "burn_gt_4_0":"freeze_new_features_and_focus_hotfix",
+      "burn_le_1_0":"normal_ops"
+    },
+    "decision_registry_link":true
+  }
+}' $FILE
+
+# ========== Stakeholder Reporting（報告体制） ==========
+yq -i '.stakeholder_reporting = {
+  "audiences":{
+    "human_pm":{"cadence":["daily","weekly","critical"],"channels":["docs","chat"],"owner":"king"},
+    "risk_committee":{"cadence":["weekly","critical"],"channels":["docs"],"owner":"noctus"},
+    "investor":{"cadence":["monthly"],"channels":["slides","pdf"],"owner":"king"}
+  },
+  "artifacts":{
+    "daily":"docs/reports/daily/{YYYY-MM-DD}.md",
+    "weekly":"docs/reports/weekly/{YYYY}-W{WW}.md",
+    "monthly":"docs/reports/monthly/{YYYY-MM}.md",
+    "slides_weekly":"docs/reports/weekly/slides/{YYYY}-W{WW}.md"
+  },
+  "templates":{
+    "risk_brief":"指標/逸脱/対応/次アクションを1画面で",
+    "exec_one_liner":"結論を1行→数値→命令の順"
+  },
+  "auto_include_links":["decisions_dir","changes_dir","btft_summary","audit_log"]
+}' $FILE
+
+# ========== Risk Register（リスク登録簿） ==========
+yq -i '.risk_register = {
+  "categories":[
+    {"code":"market","label":"市場・ボラティリティ"},
+    {"code":"model","label":"モデル/過校正"},
+    {"code":"data","label":"データ品質/遅延"},
+    {"code":"ops","label":"運用・SLO/SLA"},
+    {"code":"compliance","label":"規制/法務"},
+    {"code":"security","label":"セキュリティ/鍵"}
+  ],
+  "entry_schema":{
+    "risk_id":"<YYYYMMDD>-<slug>",
+    "category":"<market|model|data|ops|compliance|security>",
+    "description":"<何が起きうるか>",
+    "likelihood":"<low|med|high>",
+    "impact":"<low|med|high>",
+    "owner":"<king|noctus|prometheus|veritas|aurus|human_pm>",
+    "mitigations":["<手当>"],
+    "triggers":["<観測条件>"],
+    "status":"<open|mitigating|closed>",
+    "links":{"decision":"<path-or-->","change":"<path-or-->"}
+  },
+  "defaults":{
+    "triggers":{
+      "data":["data_missing_rate>0.10(2x)","feature_null_rate>0.05(2x)"],
+      "ops":["slo_burn_1h>2.0","api_p95_latency_ms>300(15m)"],
+      "model":["ece>critical","brier>warn(3x)"]
+    },
+    "mitigations":{
+      "market":["position_size_floor","safe_mode_consideration"],
+      "model":["calibration_dry_runs","prior_T_fallback"],
+      "data":["re-ingest","schema_check","gap_fill"]
+    }
+  },
+  "escalation":{
+    "when":["security","compliance","ops_critical"],
+    "notify":["human_pm","risk_committee"],
+    "deadline_hours":24
+  }
+}' $FILE
+
+# 検証（新設セクションを表示）
+yq e '.resource_policy,.stakeholder_reporting,.risk_register' "$FILE"
