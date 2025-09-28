@@ -364,3 +364,126 @@ yq -i '.orchestration = {
     "kpi_logging":"airflow_docker/dags/log_kpi_from_reports.py"
   }
 }' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Agent Architecture（最先端機構の総括） ==========
+yq -i '.agent_architecture = {
+  "enabled": true,
+  "layers": ["orchestrator(king)","planner","specialists","safety_gate"],
+  "router": {
+    "intent_detection": ["reporting","api","bt","ft","gui","governance","whale_watch"],
+    "dispatch_policy": "skill>latency>cost の優先順で担当を選定",
+    "fallback": "king"
+  },
+  "mixture_of_agents": {
+    "status": "on",
+    "selection": "score-based",
+    "scores": ["expertise_match","historical_success","cost_score"]
+  }
+}' $FILE
+
+# ========== Planning & Reflection（計画と反省） ==========
+yq -i '.agent_planning = {
+  "task_decomposition": {"status":"on","max_depth":3},
+  "reflection_loop": {
+    "status":"on",
+    "critique_style":"facts-first",
+    "retry_max":2,
+    "exit_criteria":"acceptance_checklist を満たす"
+  },
+  "verification": {
+    "contracts_check":"api/gui/contracts",
+    "tests_minimal":["testing.smoke","testing.api_smoke","testing.btft_smoke"]
+  }
+}' $FILE
+
+# ========== RAG & Tools（検索拡張と道具） ==========
+yq -i '.rag_and_tools = {
+  "rag": {
+    "status":"on",
+    "sources":["docs/","reports/","obs_codex_kpi","btft_summary","decision_registry","whale_watch"],
+    "vector_store":"optional",
+    "citation_required": true
+  },
+  "tools": {
+    "shell":"sandboxed(docker)",
+    "sql":"read-only by default",
+    "http":"allowlist domains only",
+    "limits":{"max_calls_per_task":12}
+  }
+}' $FILE
+
+# ========== Uncertainty & Safety（不確実性と安全弁） ==========
+yq -i '.agent_safety = {
+  "uncertainty": {"require_confidence_score": true, "low_confidence_threshold": 0.45},
+  "actions_guard": {
+    "require_approval_if":["prod_change","budget_risk","live_trade_param_change"]
+  },
+  "debate": {"status":"on","roles":["pro","con"],"timeout_s":"8"}
+}' $FILE
+
+# ========== Self-Improvement Proposals（自己改善提案） ==========
+yq -i '.self_improvement = {
+  "proposal_channel":"docs/proposals/{YYYYMMDD}_{slug}.md",
+  "requires_human_approval": true,
+  "template": {
+    "title":"<one-line>",
+    "problem":"<facts>",
+    "benefit":"<metric impact / cost>",
+    "risk":"<what could go wrong>",
+    "pilot":"<how to try safely>",
+    "rollout_gate":"automation_gates"
+  },
+  "review_cadence":"weekly"
+}' $FILE
+
+# ========== Cost-Aware Orchestration（コスト感度） ==========
+yq -i '.cost_policies = {
+  "monthly_budget_usd": 200.0,
+  "per_task_cap_usd": 2.0,
+  "routing_rules":[
+    "short/simple → small model",
+    "complex/critical → large model + tools",
+    "analysis_token_cap: 3k by default"
+  ],
+  "auto_downgrade_on_coverage": true
+}' $FILE
+
+# ========== Test-time Compute Allocation ==========
+yq -i '.compute_allocation = {
+  "dynamic_steps": {"status":"on","easy_max_steps":3,"hard_max_steps":10},
+  "hardness_detector": {"signals":["uncertainty↑","contract_violation_risk","missing_citations"]},
+  "tool_budget":{"max_tools":12,"max_runtime_s":120}
+}' $FILE
+
+# ========== Sandboxed Execution（隔離実行） ==========
+yq -i '.sandbox = {
+  "engine":"Docker",
+  "policy":[
+    "no external network unless allowlisted",
+    "read-only mounts for data snapshots",
+    "artifacts exported to reports/artifacts/"
+  ]
+}' $FILE
+
+# ========== Bi-directional Linking（Decision ↔ Change）既存ガイドの強化 ==========
+yq -i '.doc_ops.guidelines.bidirectional_links = {
+  "purpose":"判断と実装変更の追跡性・説明責任を高める",
+  "rules":[
+    "Decision作成時: change_candidates[] を列挙",
+    "Change作成時: related_decisions[] を必須",
+    "日次/週次レポートでリンク健全性をチェック"
+  ],
+  "checks":{"on_daily":"broken_links==0","on_weekly":"coverage≥95%"}
+}' $FILE
+
+# ========== Router / Debate / SLO連携の自動ルール ==========
+yq -i '.agent_policies = {
+  "auto_rules":[
+    "if slo.burn_rate_24h>2.0 → planner: add task calib_bins_fixed_dry_run",
+    "if whale_watch.alerts>0 → add task review_flow_impact & risk_mitigation",
+    "if api.latency_p95>contracts.api.error_budget.p95_latency_ms → open incident runbook"
+  ],
+  "explainability":"agents must emit why->how->result in logs"
+}' $FILE
