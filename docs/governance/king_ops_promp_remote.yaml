@@ -590,3 +590,113 @@ yq -i '.risk_register = {
 
 # 検証（新設セクションを表示）
 yq e '.resource_policy,.stakeholder_reporting,.risk_register' "$FILE"
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Cost Meters（原データの定義と集計ルール） ==========
+yq -i '.cost_meters = {
+  "sources":{
+    "gpt_api":"metrics/cost/gpt_api_usd.jsonl",
+    "compute_cpu":"metrics/cost/compute_cpu_hours.jsonl",
+    "compute_gpu":"metrics/cost/compute_gpu_hours.jsonl",
+    "storage":"metrics/cost/storage_gb.jsonl"
+  },
+  "rollup_rules":{
+    "gpt_api":{"window":"month_to_date","agg":"sum_usd"},
+    "compute_cpu":{"window":"month_to_date","agg":"sum_hours"},
+    "compute_gpu":{"window":"month_to_date","agg":"sum_hours"},
+    "storage":{"window":"latest","agg":"latest_gb"}
+  },
+  "budgets_link":{
+    "gpt_api_usd_cap":"resource_policy.budgets.gpt_api.cap_usd",
+    "compute_cpu_hours_cap":"resource_policy.budgets.compute.cpu_hours_cap",
+    "compute_gpu_hours_cap":"resource_policy.budgets.compute.gpu_hours_cap",
+    "storage_gb_cap":"resource_policy.budgets.compute.storage_gb_cap"
+  },
+  "alerts":{
+    "soft_pct":0.70,
+    "hard_pct":1.00
+  },
+  "notes":"集計はスクリプト側で実施（例: scripts/rollup_costs.py が MTD を吐く）"
+}' $FILE
+
+# ========== Cost Policies（閾値超過時の標準アクション） ==========
+yq -i '.cost_policies = {
+  "soft_breach_actions":[
+    "LLM: モデル/温度の段階的ダウングレード（gov.llm_usage_guidanceに従う）",
+    "生成長文を抑制（要約/抽象化）＆ バッチ化を強化",
+    "次サイクルの探索計算資源を robustness→reporting へ一部振替"
+  ],
+  "hard_breach_actions":[
+    "新規実験の凍結（critical以外）",
+    "高コスト推論の即時停止、fallbackルートのみ許可",
+    "human_pm 承認なしの追加支出を禁止"
+  ],
+  "owners":{"primary":"king","backup":"human_pm"},
+  "escalation":{"notify":["human_pm"],"deadline_hours":24}
+}' $FILE
+
+# ========== Testing（コストの最小スモーク） ==========
+yq -i '.testing.cost_smoke = [
+  {"id":"COST01","target":"GPT API cost MTD","expect":"jsonl が存在し MTD USD を算出できる"},
+  {"id":"COST02","target":"Compute hours MTD","expect":"cpu/gpu hours を合算し可視化可能"},
+  {"id":"COST03","target":"Storage GB","expect":"最新GBを取得し閾値比較できる"}
+]' $FILE
+
+# ========== KPI Alerts（コスト系の簡易アラート） ==========
+yq -i '.kpi_alerts.cost = {
+  "metrics":[
+    {"key":"gpt_cost_usd_mtd","good_is":"low","warn_when":{"pct_of_cap_above":0.70},"critical_when":{"pct_of_cap_above":1.00}},
+    {"key":"cpu_hours_mtd","good_is":"low","warn_when":{"pct_of_cap_above":0.80},"critical_when":{"pct_of_cap_above":1.00}},
+    {"key":"gpu_hours_mtd","good_is":"low","warn_when":{"pct_of_cap_above":0.80},"critical_when":{"pct_of_cap_above":1.00}},
+    {"key":"storage_gb","good_is":"low","warn_when":{"pct_of_cap_above":0.80},"critical_when":{"pct_of_cap_above":1.00}}
+  ],
+  "templates":{
+    "warn":{"title":"[WARN] Cost budget approaching — {metric}","body":"value={value} cap={cap} ({pct:.0%}) / owner: {owner} / next: cost_policies.soft_breach_actions"},
+    "critical":{"title":"[CRITICAL] Cost budget exceeded — {metric}","body":"value={value} cap={cap} ({pct:.0%}) / owner: {owner} / actions: cost_policies.hard_breach_actions"}
+  }
+}' $FILE
+
+# ========== Report Templates（Daily/Weekly/Monthly にコスト節） ==========
+# Daily へ Cost Snapshot セクションを追記
+yq -i '
+  (.report_templates.daily.sections += [{
+    "id":"cost_snapshot",
+    "title":"## Cost Snapshot (MTD)",
+    "body": "| item | value | cap | pct |\\n|---|---:|---:|---:|\\n| GPT API (USD) | {gpt_cost_usd_mtd:.2f} | {gpt_cost_cap_usd:.2f} | {gpt_cost_pct_txt} |\\n| CPU hours | {cpu_hours_mtd:.1f} | {cpu_hours_cap:.1f} | {cpu_hours_pct_txt} |\\n| GPU hours | {gpu_hours_mtd:.1f} | {gpu_hours_cap:.1f} | {gpu_hours_pct_txt} |\\n| Storage (GB) | {storage_gb_latest:.1f} | {storage_gb_cap:.1f} | {storage_pct_txt} |\\n\\n- 予算コメント: {cost_comment_one_line}"
+  }])
+' $FILE
+
+# Weekly へ Cost Summary を追記
+yq -i '
+  (.report_templates.weekly.sections += [{
+    "id":"cost_summary",
+    "title":"## Cost Summary (MTD)",
+    "body":"- GPT API: {gpt_cost_usd_mtd:.2f}/{gpt_cost_cap_usd:.2f} USD ({gpt_cost_pct_txt})\\n- Compute: CPU {cpu_hours_mtd:.1f}/{cpu_hours_cap:.1f} h, GPU {gpu_hours_mtd:.1f}/{gpu_hours_cap:.1f} h\\n- Storage: {storage_gb_latest:.1f}/{storage_gb_cap:.1f} GB\\n- ポリシー適用: {cost_policy_applied_or_dash}"
+  }])
+' $FILE
+
+# Monthly へ Cost Review を追記
+yq -i '
+  (.report_templates.monthly.sections += [{
+    "id":"cost_review",
+    "title":"## Cost Review (Month)",
+    "body":"| item | actual | budget | Δ |\\n|---|---:|---:|---:|\\n| GPT API (USD) | {gpt_cost_usd_month:.2f} | {gpt_cost_cap_usd:.2f} | {gpt_cost_delta_usd:.2f} |\\n| CPU hours | {cpu_hours_month:.1f} | {cpu_hours_cap:.1f} | {cpu_hours_delta:.1f} |\\n| GPU hours | {gpu_hours_month:.1f} | {gpu_hours_cap:.1f} | {gpu_hours_delta:.1f} |\\n| Storage (GB) | {storage_gb_month_end:.1f} | {storage_gb_cap:.1f} | {storage_gb_delta:.1f} |\\n\\n- 所感: {cost_insight_one_line}\\n- 来月の配分変更案: {reallocation_one_line}"
+  }])
+' $FILE
+
+# ========== Decision Registry 連携（コスト → 自動ルールのひな型） ==========
+yq -i '.decision_registry.cost_rules = {
+  "map":[
+    {"when":"gpt_cost_pct>=0.70 && gpt_cost_pct<1.00","then":"LLM_tier_downgrade","orders":["use_small_model_for_non_critical","summarization_first","batch_llm_requests"]},
+    {"when":"gpt_cost_pct>=1.00","then":"freeze_new_experiments","orders":["stop_non_critical_jobs","fallback_only","require_human_pm_for_extra_spend"]}
+  ],
+  "owner":"king",
+  "status":"active"
+}' $FILE
+
+# ========== Doc Ops（リンク場所を明示） ==========
+yq -i '.doc_ops.file_locations.cost_meters = "metrics/cost/"' $FILE
+
+# ===== 検証（新設/追記部分をざっと出力） =====
+yq e '.cost_meters,.cost_policies,.testing.cost_smoke,.kpi_alerts.cost,.decision_registry.cost_rules' "$FILE"
