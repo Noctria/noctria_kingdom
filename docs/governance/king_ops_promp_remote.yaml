@@ -346,3 +346,21 @@ yq -i '.doc_ops.file_locations.llm_logs = "logs/llm/"' $FILE
 # 検証
 yq e . "$FILE" >/dev/null && echo "YAML OK（LLM/ML方針 追加）" || echo "YAML NG"
 
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+yq -i '.orchestration = {
+  "engine":"Docker + Apache Airflow",
+  "principles":[
+    "全ジョブはDockerコンテナ内で実行されることを基本とする",
+    "依存関係・環境差異はDockerfile / docker-compose で管理",
+    "日次/週次/月次のワークフローはAirflow DAGとして定義・実行",
+    "重要ジョブにはAirflow Sensors / Retries を設定し可観測性を確保",
+    "Airflow WebUIにより可視化・失敗検知・リトライを統一管理"
+  ],
+  "examples":{
+    "backtest_pipeline":"airflow_docker/dags/run_backtest.py",
+    "forwardtest_pipeline":"airflow_docker/dags/run_forwardtest.py",
+    "kpi_logging":"airflow_docker/dags/log_kpi_from_reports.py"
+  }
+}' $FILE
