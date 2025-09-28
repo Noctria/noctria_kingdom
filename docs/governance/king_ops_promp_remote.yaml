@@ -176,4 +176,173 @@ yq -i '.decision_registry.progress_linking = {
 # ========== 週次スライドへの要約差し込み ==========
 yq -i '.weekly_slide_deck.variables.progress_summary = "Score={score:.2f} / Q={Q:.2f} S={S:.2f} C={C:.2f} G={G:.2f}（vs先週 {delta_sign}{delta:.02f}）"' $FILE
 
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== LLM/ML の利用方針（上位ガイド） ==========
+yq -i '.ai_usage.llm.policy = {
+  "purpose":"LLMは意思決定の補助・要約・コーディング支援・自然言語I/Oに限定し、取引実行の最終判断には直接用いない（統計的KPIと規程でゲート）。",
+  "when_to_use":[
+    "自然言語→構造化（要件→YAML, JSON）",
+    "レポート要約/ドラフト（daily/weekly/月次の草案）",
+    "コード提案/レビュー（ruff/pytestとgate連携）",
+    "過去ドキュメント検索と回答（RAG）",
+    "異常説明の仮説列挙（triage補助）"
+  ],
+  "when_not_to_use":[
+    "直接の発注・建玉・ポジション変更（人間/Noctus gate必須）",
+    "数値ゴールドセットがあるのに推測で上書きする行為",
+    "API契約やSLOを逸脱する出力（JSON構造崩れ等）"
+  ],
+  "human_in_the_loop":[
+    "Change Draftの承認（king/human_pm）",
+    "CIゲートを越えるリリース",
+    "高リスク閾値の変更・資金管理パラメータ変更"
+  ]
+}' $FILE
+
+# ========== LLM モード別（役割/出力/制約） ==========
+yq -i '.ai_usage.llm.modes = {
+  "advisor":{"desc":"要約/論点整理/代替案提示","temperature":0.2,"max_tokens":"guard:cost_saver"},
+  "copilot":{"desc":"コード補助/差分提案","temperature":0.1,"require_tests":true,"require_ruff":true},
+  "generator":{"desc":"テンプレ/ドラフト生成（レポ/スクリプト雛形）","temperature":0.3,"json_mode":true,"schema_required":true}
+}' $FILE
+
+# ========== プロンプト基本（全AI共通） ==========
+yq -i '.ai_usage.llm.prompt_basics = {
+  "structure":["system","role","task","constraints","io_format","examples","critique"],
+  "constraints":[
+    "根拠を列挙（参照・計算・前提を分離）",
+    "不確実性は不確実と明記（≠断定）",
+    "数値は桁・単位を明示、近似は~記号",
+    "出力は指定スキーマに厳密準拠"
+  ],
+  "io_format":{
+    "default":"JSON（strict）",
+    "fallback":"YAML",
+    "schema_violation":"即fail & 再生成"
+  },
+  "few_shot_examples":{
+    "max":3,
+    "source":"docs/examples/ 以下のゴールドテンプレ参照"
+  }
+}' $FILE
+
+# ========== RAG（検索拡張生成） ==========
+yq -i '.ai_usage.llm.rag = {
+  "enabled":true,
+  "corpora":["docs/governance","docs/reports","docs/decisions","docs/change","reports/*/summary.json"],
+  "embedding_refresh_days":7,
+  "cite_policy":"回答は参照元パス・行/章を付記（可能な範囲で）",
+  "fallback":"信頼ソース無し→推測禁止→TODO/UNKNOWNでエスカレーション"
+}' $FILE
+
+# ========== LLM 出力の厳格化（構造化/検証） ==========
+yq -i '.ai_usage.llm.structured_output = {
+  "schema_repo":"docs/schemas/",
+  "schemas":{
+    "decision_entry":"decision_entry.schema.json",
+    "change_draft":"change_draft.schema.json",
+    "daily_report_section":"daily_section.schema.json",
+    "whale_watch_item":"whale_item.schema.json"
+  },
+  "validators":["jsonschema","pydantic"],
+  "on_violation":["reject","regen_once","log:docs/audit/llm_violation.log"]
+}' $FILE
+
+# ========== LLM コスト最適化（拡張） ==========
+yq -i '.ai_usage.llm.cost_controls = {
+  "router":{
+    "small_first":true,
+    "rules":[
+      "要約/分類/抽出→中小モデル",
+      "数式/コード合成→中〜大型（必要時のみ）",
+      "長文RAG→分割＋map-reduce＋要約"
+    ]
+  },
+  "caching":{
+    "semantic_cache":true,
+    "ttl_hours":72,
+    "fingerprint":"(prompt+retrieval_ids+version)"
+  },
+  "compression":{
+    "context_prune":true,
+    "report_slimming":"不要セクション自動削除",
+    "numeric_focus":"表はCSV/JSON化して渡す"
+  },
+  "budgets":{"daily_usd_max":10,"per_task_usd_max":1.0},
+  "telemetry":"logs/llm/cost_usage.jsonl"
+}' $FILE
+
+# ========== LLM 安全性/レッドチーミング ==========
+yq -i '.ai_usage.llm.safety = {
+  "hallucination_tests":["closed_book_QA_on_known_docs","counterfactual_prompts"],
+  "jailbreak_guards":["system_prompt_lock","tool_only_mode"],
+  "pii_masking":true,
+  "trading_guard":"LLMは売買命令を直接生成しない。提案→Noctus gate→王承認。",
+  "red_team_frequency_days":14,
+  "report_to":"docs/reports/redteam/YYYY-MM.md"
+}' $FILE
+
+# ========== ML パイプライン（学習/登録/配備） ==========
+yq -i '.ai_usage.ml.pipeline = {
+  "stages":["ingest","feature","train","validate","register","candidate_deploy"],
+  "data_versioning":"data_snapshot_id 必須（doc_ops.review_checklist と連動）",
+  "model_registry":"models/registry.jsonl",
+  "artifacts":["metrics.json","calibration.json","reliability.png","feature_importance.json"],
+  "train_cmd_example":"PYTHONPATH=. python src/train/train_model.py --config configs/train/*.yaml",
+  "register_rule":"validation_pass==true AND guardrails_pass==true"
+}' $FILE
+
+# ========== ML 評価/ガードレール ==========
+yq -i '.ai_usage.ml.evaluation = {
+  "offline_metrics":["brier","ece","auroc","f1@optimal_threshold","psi_inputs"],
+  "backtest_alignment":"BT/FT 指標はkpi_definitions/alertsと同一キーで帳尻合わせ",
+  "ab_test":{"enabled":true,"holdout_policy":"time-split","duration_days_min":3},
+  "guardrails":{
+    "ece_improve_min":0.02,
+    "nll_degradation_max":0.05,
+    "adv_pass_min":0.40
+  },
+  "fail_actions":["rollback_to_prior","open_change_draft","add_to_decision_log"]
+}' $FILE
+
+# ========== ML 監視/ドリフト検知 ==========
+yq -i '.ai_usage.ml.monitoring = {
+  "input_drift":["psi>0.2 warn","psi>0.3 critical"],
+  "label_delay_watch":"label_lag_skew",
+  "calibration_drift":"ece_calibration",
+  "routing_on_drift":"gate partial / 再校正DRYを指示",
+  "link_to":"kpi_alerts & action_map"
+}' $FILE
+
+# ========== ツール連携（関数呼び出し・JSON-RPC） ==========
+yq -i '.ai_usage.tool_use = {
+  "pattern":"LLM→tool呼び出し→検証→整形出力",
+  "allowed_tools":["python_eval_sandbox","sql_reader","bt_runner","forward_runner","whale_watch.fetch"],
+  "budget_per_call_ms":2000,
+  "retry_policy":{"max":1,"backoff_ms":200}
+}' $FILE
+
+# ========== 役割分担（LLM vs ルール/数値） ==========
+yq -i '.ai_usage.decision_split = {
+  "llm_good_for":["要約/仮説/レポドラフト/説明/分類/RAG回答"],
+  "rules_numbers_for":["発注/損益管理/KPI判定/ゲート通過/安全弁作動"],
+  "escalation":"相反時は数値優先、LLM提案はdecision_logへ記録"
+}' $FILE
+
+# ========== テスト拡充（LLM/ML 特有） ==========
+yq -i '.testing.llm_ml = [
+  {"id":"LLM01","target":"構造化出力","expect":"JSON schema 100%準拠（0違反）"},
+  {"id":"LLM02","target":"RAG正答率","expect":"ゴールド集合で ≥80%"},
+  {"id":"LLM03","target":"コスト上限","expect":"日次 ≤ $10（telemetryで検証）"},
+  {"id":"ML01","target":"BT/FT 整合","expect":"offline→BT→FTの符号一致（悪化時はalerts発火）"},
+  {"id":"ML02","target":"ドリフト検知","expect":"PSI>0.3でcriticalを記録＆対応起票"}
+]' $FILE
+
+# ========== ドキュメント/運用の繋ぎ ==========
+yq -i '.doc_ops.file_locations.schemas = "docs/schemas/"' $FILE
+yq -i '.doc_ops.file_locations.llm_logs = "logs/llm/"' $FILE
+
+# 検証
+yq e . "$FILE" >/dev/null && echo "YAML OK（LLM/ML方針 追加）" || echo "YAML NG"
 
