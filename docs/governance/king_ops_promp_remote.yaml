@@ -112,3 +112,68 @@ yq -i '.guidelines.prompt_basics = {
   ]
 }' $FILE
 
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== 進捗の定量化（スコアカード＋個別メトリクス定義） ==========
+yq -i '.progress = {
+  "scorecard":{
+    "weights":{"quality":0.45,"speed":0.25,"cost":0.15,"governance":0.15},
+    "composite_formula":"S = 0.45*Q + 0.25*S + 0.15*C + 0.15*G  # 各カテゴリは0〜1で正規化"
+  },
+  "metrics":[
+    {"id":"Q1","name":"ECE改善率","source":"obs_codex_kpi_latest","window_runs":5,"compute":"max(0, (ece_base - ece_latest)/max(ece_base,1e-6))","target":0.05,"direction":"up"},
+    {"id":"Q2","name":"Brier改善率","source":"obs_codex_kpi_latest","window_runs":5,"compute":"max(0, (brier_base - brier_latest)/max(brier_base,1e-6))","target":0.02,"direction":"up"},
+    {"id":"Q3","name":"頑健性達成度","source":"adversarial_tests","window_runs":5,"compute":"clip((adv_latest-0.40)/0.10,0,1)","target":0.0,"direction":"up"},
+    {"id":"S1","name":"MTTA（警報応答）中央値","source":"decision_registry","window_days":7,"compute":"median(minutes_to_ack)","target":15,"direction":"down"},
+    {"id":"S2","name":"MTTR（是正完了）中央値","source":"decision_registry","window_days":30,"compute":"median(hours_to_close)","target":24,"direction":"down"},
+    {"id":"S3","name":"日次レポート準時率","source":"docs/reports/daily","window_days":14,"compute":"on_time_count/total","target":0.95,"direction":"up"},
+    {"id":"C1","name":"1kリクエストあたりAPI原価","source":"billing/api","window_days":30,"compute":"cost_usd/requests*1000","target":-1,"direction":"down"},
+    {"id":"C2","name":"GPU時間/週","source":"billing/compute","window_days":7,"compute":"gpu_hours","target":-1,"direction":"down"},
+    {"id":"C3","name":"LLMキャッシュヒット率","source":"llm/telemetry","window_days":7,"compute":"cache_hits/total_calls","target":0.50,"direction":"up"},
+    {"id":"G1","name":"変更成功率","source":"change_management","window_days":30,"compute":"changes_passed/changes_total","target":0.80,"direction":"up"},
+    {"id":"G2","name":"回帰テスト合格率","source":"testing/ci_or_local","window_days":7,"compute":"passed/total","target":0.98,"direction":"up"},
+    {"id":"G3","name":"双方向リンク充足率","source":"decision_registry","window_days":30,"compute":"bi_links_ok/decisions_with_change","target":1.0,"direction":"up"}
+  ],
+  "normalization":{
+    "up":"score = clamp(value/target,0,1)",
+    "down":"score = clamp(target/max(value,1e-6),0,1)",
+    "note":"target=-1 は純モニタ（スコア計算から除外）"
+  },
+  "category_map":{
+    "quality":["Q1","Q2","Q3"],
+    "speed":["S1","S2","S3"],
+    "cost":["C1","C2","C3"],
+    "governance":["G1","G2","G3"]
+  },
+  "reporting":{
+    "cadence":{"weekly":"Sun 10:30 JST","monthly":"MonthEnd 16:00 JST"},
+    "artifacts":{"weekly_md":"docs/reports/weekly/progress/{YYYY}-W{WW}.md","monthly_md":"docs/reports/monthly/progress/{YYYY-MM}.md","json":"reports/progress/progress_{YYYYMMDD}.json"},
+    "dashboard":"docs/reports/progress/index.md"
+  },
+  "alerts":{
+    "degradation_rules":[
+      {"when":"composite_drop_pct>=10% vs last4w avg","then":"raise WARN in daily"},
+      {"when":"any_metric_below_floor:true","then":"raise CRITICAL & open decision"}
+    ],
+    "floors":{"Q1":0.02,"Q2":0.005,"G2":0.95}
+  }
+}' $FILE
+
+# ========== スクリプト定義（生成／公開） ==========
+yq -i '.scripts.calculate_progress = "進捗メトリクスを収集→正規化→合成スコア算出し JSON/MD を生成"' $FILE
+yq -i '.scripts.publish_progress = "進捗レポートを docs/reports/progress/ に公開（週次・月次）"' $FILE
+
+# ========== ドキュメント配置を追記 ==========
+yq -i '.doc_ops.file_locations.progress_root = "docs/reports/progress/"' $FILE
+yq -i '.doc_ops.file_locations.progress_json = "reports/progress/"' $FILE
+
+# ========== decision_registry 連携（自動参照） ==========
+yq -i '.decision_registry.progress_linking = {
+  "attach_weekly_progress_to_decision":"最新週次の composite_score とカテゴリ別スコアを Decision の参照欄に自動追記",
+  "open_decision_on_drop":"compositeが前週比-10%以下で自動的にWARN Decision起票（ドラフト）"
+}' $FILE
+
+# ========== 週次スライドへの要約差し込み ==========
+yq -i '.weekly_slide_deck.variables.progress_summary = "Score={score:.2f} / Q={Q:.2f} S={S:.2f} C={C:.2f} G={G:.2f}（vs先週 {delta_sign}{delta:.02f}）"' $FILE
+
+
