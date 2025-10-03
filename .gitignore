@@ -89,3 +89,5 @@ bins/
 # Ignore large visualization artifacts
 viz/*.json
 viz/*.mmd
+
+actions-runner/
