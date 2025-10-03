@@ -1,0 +1,29 @@
+sequenceDiagram
+  autonumber
+  participant Y as Noctria王(YAML)
+  participant PR as pipeline_runner.py
+  participant EV as evaluate_veritas.py
+  participant KS as kpi_store.py
+  participant AE as alert_engine.py
+  participant RP as reliability_plot.py
+  participant RB as report_builder.py
+  participant DL as decision_log.py
+
+  Y->>PR: 設定ロード（targets / rules / templates）
+  PR->>EV: 戦略評価実行（run_* 生成）
+  EV-->>PR: reports/veritas/run_*/meta.json
+
+  PR->>KS: KPI書き込み（obs_codex_kpi）
+  PR->>AE: アラート評価（baseline/閾値）
+  AE-->>PR: NONE | WARN | CRITICAL, テンプレ文
+
+  alt WARN/CRITICAL
+    PR->>DL: Decision Log 生成（YAMLテンプレ埋め）
+    DL-->>PR: docs/decisions/YYYY/…md
+  end
+
+  PR->>RP: reliability.png 生成
+  PR->>RB: Daily Markdown 生成（ExecSummary/警報/訓示）
+  RB-->>PR: docs/reports/daily/YYYY-MM-DD.md
+
+  PR-->>Y: 実行結果（KPI, 警報, 訓示）を反映

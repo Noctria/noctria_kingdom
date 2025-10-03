@@ -1,0 +1,930 @@
+FILE=docs/governance/king_ops_prompt.yaml
+
+# --- QAセクションに ruff を明記 ---
+yq -i '.qa.static_analysis = {
+  "tool":"ruff",
+  "config":".ruff.toml",
+  "policy":"すべての新規/修正コードは ruff check --fix を通過必須",
+  "ci_job":"PYTHONPATH=. ruff check src/ tests/"
+}' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Cost Optimization（新設） ==========
+yq -i '.cost_optimization = {
+  "policy_version":"v1",
+  "model_tiering":{
+    "default":"mini",
+    "tiers":[
+      {"name":"mini","use_for":["日次レポート初稿","軽量分類","要約"],"max_ctx_tokens":8000},
+      {"name":"standard","use_for":["RAG+要約","生成→校正"],"gate":"quality.slo_ok == true OR fallback_needed"},
+      {"name":"premium","use_for":["精密説明","高リスク決裁案"],"gate":"only_if(decision.critical==true OR qa_blocker==true)"}
+    ],
+    "fallback_rules":[
+      {"from":"mini","to":"standard","when":"quality_score<target OR parse_error>=1"},
+      {"from":"standard","to":"premium","when":"critical_decision AND reviewer_requests=='escalate'"}
+    ]
+  },
+  "prompt_diet":{
+    "shared_header_id":"KING_HDR_001",
+    "max_history_turns":6,
+    "history_summarization":"auto_when(turns>6 OR tokens>4k)",
+    "rag":{
+      "max_chunks":6,
+      "min_score":0.75,
+      "dedupe_by":"content_hash"
+    }
+  },
+  "caching":{
+    "enabled":true,
+    "key":"hash(model,shared_header_id,instruction,user_query,rag_chunk_ids)",
+    "ttl_minutes":1440,
+    "version_stamp":"data_snapshot_id|git_sha"
+  },
+  "streaming_and_cutoff":{
+    "enabled":true,
+    "soft_token_cap":800,
+    "hard_token_cap":1200,
+    "on_cap_reached":"finish_with_summary"
+  },
+  "retry_and_escalate":{
+    "max_retries":1,
+    "cheap_retry_on":"rate_limit|transient_error|parse_error",
+    "escalate_if":"critical_request AND (parse_error OR qos_below_target)"
+  },
+  "offline_precompute":{
+    "embeddings":"precompute_on_commit",
+    "templates":"local_cache",
+    "btft_reports":"batch_generate_offline"
+  },
+  "budgets":{
+    "per_run_tokens_max": 40000,
+    "per_day_jpy_max": 1200,
+    "per_month_jpy_max": 25000,
+    "action_on_exceed":[ "warn", "switch_to_mini", "require_human_ack"]
+  },
+  "observability":{
+    "metrics":[
+      "llm_prompt_tokens_total","llm_completion_tokens_total","llm_invocations_total",
+      "llm_cache_hit_ratio","llm_cost_jpy_total","llm_cost_jpy_per_report"
+    ],
+    "logs":"logs/llm/*.jsonl",
+    "sampling":"100% for critical, 20% for normal"
+  },
+  "governance":{
+    "change_control":"アップグレード/モデル切替は change_management 経由",
+    "reviewer":"king",
+    "notes":"節約で品質が落ちた場合は decision_registry に根拠付きで例外記録"
+  }
+}' $FILE
+
+# ========== Scripts/CIへのフック（任意：既存に追記） ==========
+yq -i '.scripts.cost_report = "scripts/report_llm_costs.py --from today-7d --to today --out reports/costs"' $FILE
+yq -i '.testing.cost_guards = [
+  {"id":"COST01","target":"1レポート当たりコスト","expect":"llm_cost_jpy_per_report ≤ 120"},
+  {"id":"COST02","target":"キャッシュ","expect":"llm_cache_hit_ratio ≥ 0.25"}
+]' $FILE
+
+# 既存の observability にメトリクス名を追記（存在すればマージ）
+yq -i '
+  .observability.metrics.api += ["llm_invocations_total","llm_prompt_tokens_total","llm_completion_tokens_total"] |
+  .observability.metrics.btft += ["llm_cost_jpy_total"]
+' $FILE
+
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+yq -i '.guidelines.prompt_basics = {
+  "scope":"全AIエージェント共通",
+  "structure":[
+    "1. Role: AIエージェントの役割を明示する（例: 戦略生成AI, 評価AI, リスク管理AIなど）",
+    "2. Goal: 今回のタスクの目的を一文で定義",
+    "3. Constraints: 出力形式や数値制約などを列挙",
+    "4. Input: 必要な文脈/データ/ログを提示",
+    "5. Output: 期待する形式を明記（JSON/Markdown/表など）",
+    "6. Evaluation: 成功基準や判定条件を簡潔に明示"
+  ],
+  "principles":[
+    "全AIは再現可能な形式で出力すること",
+    "無関係な情報や過剰な推測は返さないこと",
+    "失敗や曖昧な場合は fallback（警告＋簡易出力）で応答すること",
+    "出力は後続の自動処理に適合すること（例: JSONなら必ずvalid JSON）"
+  ]
+}' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== 進捗の定量化（スコアカード＋個別メトリクス定義） ==========
+yq -i '.progress = {
+  "scorecard":{
+    "weights":{"quality":0.45,"speed":0.25,"cost":0.15,"governance":0.15},
+    "composite_formula":"S = 0.45*Q + 0.25*S + 0.15*C + 0.15*G  # 各カテゴリは0〜1で正規化"
+  },
+  "metrics":[
+    {"id":"Q1","name":"ECE改善率","source":"obs_codex_kpi_latest","window_runs":5,"compute":"max(0, (ece_base - ece_latest)/max(ece_base,1e-6))","target":0.05,"direction":"up"},
+    {"id":"Q2","name":"Brier改善率","source":"obs_codex_kpi_latest","window_runs":5,"compute":"max(0, (brier_base - brier_latest)/max(brier_base,1e-6))","target":0.02,"direction":"up"},
+    {"id":"Q3","name":"頑健性達成度","source":"adversarial_tests","window_runs":5,"compute":"clip((adv_latest-0.40)/0.10,0,1)","target":0.0,"direction":"up"},
+    {"id":"S1","name":"MTTA（警報応答）中央値","source":"decision_registry","window_days":7,"compute":"median(minutes_to_ack)","target":15,"direction":"down"},
+    {"id":"S2","name":"MTTR（是正完了）中央値","source":"decision_registry","window_days":30,"compute":"median(hours_to_close)","target":24,"direction":"down"},
+    {"id":"S3","name":"日次レポート準時率","source":"docs/reports/daily","window_days":14,"compute":"on_time_count/total","target":0.95,"direction":"up"},
+    {"id":"C1","name":"1kリクエストあたりAPI原価","source":"billing/api","window_days":30,"compute":"cost_usd/requests*1000","target":-1,"direction":"down"},
+    {"id":"C2","name":"GPU時間/週","source":"billing/compute","window_days":7,"compute":"gpu_hours","target":-1,"direction":"down"},
+    {"id":"C3","name":"LLMキャッシュヒット率","source":"llm/telemetry","window_days":7,"compute":"cache_hits/total_calls","target":0.50,"direction":"up"},
+    {"id":"G1","name":"変更成功率","source":"change_management","window_days":30,"compute":"changes_passed/changes_total","target":0.80,"direction":"up"},
+    {"id":"G2","name":"回帰テスト合格率","source":"testing/ci_or_local","window_days":7,"compute":"passed/total","target":0.98,"direction":"up"},
+    {"id":"G3","name":"双方向リンク充足率","source":"decision_registry","window_days":30,"compute":"bi_links_ok/decisions_with_change","target":1.0,"direction":"up"}
+  ],
+  "normalization":{
+    "up":"score = clamp(value/target,0,1)",
+    "down":"score = clamp(target/max(value,1e-6),0,1)",
+    "note":"target=-1 は純モニタ（スコア計算から除外）"
+  },
+  "category_map":{
+    "quality":["Q1","Q2","Q3"],
+    "speed":["S1","S2","S3"],
+    "cost":["C1","C2","C3"],
+    "governance":["G1","G2","G3"]
+  },
+  "reporting":{
+    "cadence":{"weekly":"Sun 10:30 JST","monthly":"MonthEnd 16:00 JST"},
+    "artifacts":{"weekly_md":"docs/reports/weekly/progress/{YYYY}-W{WW}.md","monthly_md":"docs/reports/monthly/progress/{YYYY-MM}.md","json":"reports/progress/progress_{YYYYMMDD}.json"},
+    "dashboard":"docs/reports/progress/index.md"
+  },
+  "alerts":{
+    "degradation_rules":[
+      {"when":"composite_drop_pct>=10% vs last4w avg","then":"raise WARN in daily"},
+      {"when":"any_metric_below_floor:true","then":"raise CRITICAL & open decision"}
+    ],
+    "floors":{"Q1":0.02,"Q2":0.005,"G2":0.95}
+  }
+}' $FILE
+
+# ========== スクリプト定義（生成／公開） ==========
+yq -i '.scripts.calculate_progress = "進捗メトリクスを収集→正規化→合成スコア算出し JSON/MD を生成"' $FILE
+yq -i '.scripts.publish_progress = "進捗レポートを docs/reports/progress/ に公開（週次・月次）"' $FILE
+
+# ========== ドキュメント配置を追記 ==========
+yq -i '.doc_ops.file_locations.progress_root = "docs/reports/progress/"' $FILE
+yq -i '.doc_ops.file_locations.progress_json = "reports/progress/"' $FILE
+
+# ========== decision_registry 連携（自動参照） ==========
+yq -i '.decision_registry.progress_linking = {
+  "attach_weekly_progress_to_decision":"最新週次の composite_score とカテゴリ別スコアを Decision の参照欄に自動追記",
+  "open_decision_on_drop":"compositeが前週比-10%以下で自動的にWARN Decision起票（ドラフト）"
+}' $FILE
+
+# ========== 週次スライドへの要約差し込み ==========
+yq -i '.weekly_slide_deck.variables.progress_summary = "Score={score:.2f} / Q={Q:.2f} S={S:.2f} C={C:.2f} G={G:.2f}（vs先週 {delta_sign}{delta:.02f}）"' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== LLM/ML の利用方針（上位ガイド） ==========
+yq -i '.ai_usage.llm.policy = {
+  "purpose":"LLMは意思決定の補助・要約・コーディング支援・自然言語I/Oに限定し、取引実行の最終判断には直接用いない（統計的KPIと規程でゲート）。",
+  "when_to_use":[
+    "自然言語→構造化（要件→YAML, JSON）",
+    "レポート要約/ドラフト（daily/weekly/月次の草案）",
+    "コード提案/レビュー（ruff/pytestとgate連携）",
+    "過去ドキュメント検索と回答（RAG）",
+    "異常説明の仮説列挙（triage補助）"
+  ],
+  "when_not_to_use":[
+    "直接の発注・建玉・ポジション変更（人間/Noctus gate必須）",
+    "数値ゴールドセットがあるのに推測で上書きする行為",
+    "API契約やSLOを逸脱する出力（JSON構造崩れ等）"
+  ],
+  "human_in_the_loop":[
+    "Change Draftの承認（king/human_pm）",
+    "CIゲートを越えるリリース",
+    "高リスク閾値の変更・資金管理パラメータ変更"
+  ]
+}' $FILE
+
+# ========== LLM モード別（役割/出力/制約） ==========
+yq -i '.ai_usage.llm.modes = {
+  "advisor":{"desc":"要約/論点整理/代替案提示","temperature":0.2,"max_tokens":"guard:cost_saver"},
+  "copilot":{"desc":"コード補助/差分提案","temperature":0.1,"require_tests":true,"require_ruff":true},
+  "generator":{"desc":"テンプレ/ドラフト生成（レポ/スクリプト雛形）","temperature":0.3,"json_mode":true,"schema_required":true}
+}' $FILE
+
+# ========== プロンプト基本（全AI共通） ==========
+yq -i '.ai_usage.llm.prompt_basics = {
+  "structure":["system","role","task","constraints","io_format","examples","critique"],
+  "constraints":[
+    "根拠を列挙（参照・計算・前提を分離）",
+    "不確実性は不確実と明記（≠断定）",
+    "数値は桁・単位を明示、近似は~記号",
+    "出力は指定スキーマに厳密準拠"
+  ],
+  "io_format":{
+    "default":"JSON（strict）",
+    "fallback":"YAML",
+    "schema_violation":"即fail & 再生成"
+  },
+  "few_shot_examples":{
+    "max":3,
+    "source":"docs/examples/ 以下のゴールドテンプレ参照"
+  }
+}' $FILE
+
+# ========== RAG（検索拡張生成） ==========
+yq -i '.ai_usage.llm.rag = {
+  "enabled":true,
+  "corpora":["docs/governance","docs/reports","docs/decisions","docs/change","reports/*/summary.json"],
+  "embedding_refresh_days":7,
+  "cite_policy":"回答は参照元パス・行/章を付記（可能な範囲で）",
+  "fallback":"信頼ソース無し→推測禁止→TODO/UNKNOWNでエスカレーション"
+}' $FILE
+
+# ========== LLM 出力の厳格化（構造化/検証） ==========
+yq -i '.ai_usage.llm.structured_output = {
+  "schema_repo":"docs/schemas/",
+  "schemas":{
+    "decision_entry":"decision_entry.schema.json",
+    "change_draft":"change_draft.schema.json",
+    "daily_report_section":"daily_section.schema.json",
+    "whale_watch_item":"whale_item.schema.json"
+  },
+  "validators":["jsonschema","pydantic"],
+  "on_violation":["reject","regen_once","log:docs/audit/llm_violation.log"]
+}' $FILE
+
+# ========== LLM コスト最適化（拡張） ==========
+yq -i '.ai_usage.llm.cost_controls = {
+  "router":{
+    "small_first":true,
+    "rules":[
+      "要約/分類/抽出→中小モデル",
+      "数式/コード合成→中〜大型（必要時のみ）",
+      "長文RAG→分割＋map-reduce＋要約"
+    ]
+  },
+  "caching":{
+    "semantic_cache":true,
+    "ttl_hours":72,
+    "fingerprint":"(prompt+retrieval_ids+version)"
+  },
+  "compression":{
+    "context_prune":true,
+    "report_slimming":"不要セクション自動削除",
+    "numeric_focus":"表はCSV/JSON化して渡す"
+  },
+  "budgets":{"daily_usd_max":10,"per_task_usd_max":1.0},
+  "telemetry":"logs/llm/cost_usage.jsonl"
+}' $FILE
+
+# ========== LLM 安全性/レッドチーミング ==========
+yq -i '.ai_usage.llm.safety = {
+  "hallucination_tests":["closed_book_QA_on_known_docs","counterfactual_prompts"],
+  "jailbreak_guards":["system_prompt_lock","tool_only_mode"],
+  "pii_masking":true,
+  "trading_guard":"LLMは売買命令を直接生成しない。提案→Noctus gate→王承認。",
+  "red_team_frequency_days":14,
+  "report_to":"docs/reports/redteam/YYYY-MM.md"
+}' $FILE
+
+# ========== ML パイプライン（学習/登録/配備） ==========
+yq -i '.ai_usage.ml.pipeline = {
+  "stages":["ingest","feature","train","validate","register","candidate_deploy"],
+  "data_versioning":"data_snapshot_id 必須（doc_ops.review_checklist と連動）",
+  "model_registry":"models/registry.jsonl",
+  "artifacts":["metrics.json","calibration.json","reliability.png","feature_importance.json"],
+  "train_cmd_example":"PYTHONPATH=. python src/train/train_model.py --config configs/train/*.yaml",
+  "register_rule":"validation_pass==true AND guardrails_pass==true"
+}' $FILE
+
+# ========== ML 評価/ガードレール ==========
+yq -i '.ai_usage.ml.evaluation = {
+  "offline_metrics":["brier","ece","auroc","f1@optimal_threshold","psi_inputs"],
+  "backtest_alignment":"BT/FT 指標はkpi_definitions/alertsと同一キーで帳尻合わせ",
+  "ab_test":{"enabled":true,"holdout_policy":"time-split","duration_days_min":3},
+  "guardrails":{
+    "ece_improve_min":0.02,
+    "nll_degradation_max":0.05,
+    "adv_pass_min":0.40
+  },
+  "fail_actions":["rollback_to_prior","open_change_draft","add_to_decision_log"]
+}' $FILE
+
+# ========== ML 監視/ドリフト検知 ==========
+yq -i '.ai_usage.ml.monitoring = {
+  "input_drift":["psi>0.2 warn","psi>0.3 critical"],
+  "label_delay_watch":"label_lag_skew",
+  "calibration_drift":"ece_calibration",
+  "routing_on_drift":"gate partial / 再校正DRYを指示",
+  "link_to":"kpi_alerts & action_map"
+}' $FILE
+
+# ========== ツール連携（関数呼び出し・JSON-RPC） ==========
+yq -i '.ai_usage.tool_use = {
+  "pattern":"LLM→tool呼び出し→検証→整形出力",
+  "allowed_tools":["python_eval_sandbox","sql_reader","bt_runner","forward_runner","whale_watch.fetch"],
+  "budget_per_call_ms":2000,
+  "retry_policy":{"max":1,"backoff_ms":200}
+}' $FILE
+
+# ========== 役割分担（LLM vs ルール/数値） ==========
+yq -i '.ai_usage.decision_split = {
+  "llm_good_for":["要約/仮説/レポドラフト/説明/分類/RAG回答"],
+  "rules_numbers_for":["発注/損益管理/KPI判定/ゲート通過/安全弁作動"],
+  "escalation":"相反時は数値優先、LLM提案はdecision_logへ記録"
+}' $FILE
+
+# ========== テスト拡充（LLM/ML 特有） ==========
+yq -i '.testing.llm_ml = [
+  {"id":"LLM01","target":"構造化出力","expect":"JSON schema 100%準拠（0違反）"},
+  {"id":"LLM02","target":"RAG正答率","expect":"ゴールド集合で ≥80%"},
+  {"id":"LLM03","target":"コスト上限","expect":"日次 ≤ $10（telemetryで検証）"},
+  {"id":"ML01","target":"BT/FT 整合","expect":"offline→BT→FTの符号一致（悪化時はalerts発火）"},
+  {"id":"ML02","target":"ドリフト検知","expect":"PSI>0.3でcriticalを記録＆対応起票"}
+]' $FILE
+
+# ========== ドキュメント/運用の繋ぎ ==========
+yq -i '.doc_ops.file_locations.schemas = "docs/schemas/"' $FILE
+yq -i '.doc_ops.file_locations.llm_logs = "logs/llm/"' $FILE
+
+# 検証
+yq e . "$FILE" >/dev/null && echo "YAML OK（LLM/ML方針 追加）" || echo "YAML NG"
+
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+yq -i '.orchestration = {
+  "engine":"Docker + Apache Airflow",
+  "principles":[
+    "全ジョブはDockerコンテナ内で実行されることを基本とする",
+    "依存関係・環境差異はDockerfile / docker-compose で管理",
+    "日次/週次/月次のワークフローはAirflow DAGとして定義・実行",
+    "重要ジョブにはAirflow Sensors / Retries を設定し可観測性を確保",
+    "Airflow WebUIにより可視化・失敗検知・リトライを統一管理"
+  ],
+  "examples":{
+    "backtest_pipeline":"airflow_docker/dags/run_backtest.py",
+    "forwardtest_pipeline":"airflow_docker/dags/run_forwardtest.py",
+    "kpi_logging":"airflow_docker/dags/log_kpi_from_reports.py"
+  }
+}' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Agent Architecture（最先端機構の総括） ==========
+yq -i '.agent_architecture = {
+  "enabled": true,
+  "layers": ["orchestrator(king)","planner","specialists","safety_gate"],
+  "router": {
+    "intent_detection": ["reporting","api","bt","ft","gui","governance","whale_watch"],
+    "dispatch_policy": "skill>latency>cost の優先順で担当を選定",
+    "fallback": "king"
+  },
+  "mixture_of_agents": {
+    "status": "on",
+    "selection": "score-based",
+    "scores": ["expertise_match","historical_success","cost_score"]
+  }
+}' $FILE
+
+# ========== Planning & Reflection（計画と反省） ==========
+yq -i '.agent_planning = {
+  "task_decomposition": {"status":"on","max_depth":3},
+  "reflection_loop": {
+    "status":"on",
+    "critique_style":"facts-first",
+    "retry_max":2,
+    "exit_criteria":"acceptance_checklist を満たす"
+  },
+  "verification": {
+    "contracts_check":"api/gui/contracts",
+    "tests_minimal":["testing.smoke","testing.api_smoke","testing.btft_smoke"]
+  }
+}' $FILE
+
+# ========== RAG & Tools（検索拡張と道具） ==========
+yq -i '.rag_and_tools = {
+  "rag": {
+    "status":"on",
+    "sources":["docs/","reports/","obs_codex_kpi","btft_summary","decision_registry","whale_watch"],
+    "vector_store":"optional",
+    "citation_required": true
+  },
+  "tools": {
+    "shell":"sandboxed(docker)",
+    "sql":"read-only by default",
+    "http":"allowlist domains only",
+    "limits":{"max_calls_per_task":12}
+  }
+}' $FILE
+
+# ========== Uncertainty & Safety（不確実性と安全弁） ==========
+yq -i '.agent_safety = {
+  "uncertainty": {"require_confidence_score": true, "low_confidence_threshold": 0.45},
+  "actions_guard": {
+    "require_approval_if":["prod_change","budget_risk","live_trade_param_change"]
+  },
+  "debate": {"status":"on","roles":["pro","con"],"timeout_s":"8"}
+}' $FILE
+
+# ========== Self-Improvement Proposals（自己改善提案） ==========
+yq -i '.self_improvement = {
+  "proposal_channel":"docs/proposals/{YYYYMMDD}_{slug}.md",
+  "requires_human_approval": true,
+  "template": {
+    "title":"<one-line>",
+    "problem":"<facts>",
+    "benefit":"<metric impact / cost>",
+    "risk":"<what could go wrong>",
+    "pilot":"<how to try safely>",
+    "rollout_gate":"automation_gates"
+  },
+  "review_cadence":"weekly"
+}' $FILE
+
+# ========== Cost-Aware Orchestration（コスト感度） ==========
+yq -i '.cost_policies = {
+  "monthly_budget_usd": 200.0,
+  "per_task_cap_usd": 2.0,
+  "routing_rules":[
+    "short/simple → small model",
+    "complex/critical → large model + tools",
+    "analysis_token_cap: 3k by default"
+  ],
+  "auto_downgrade_on_coverage": true
+}' $FILE
+
+# ========== Test-time Compute Allocation ==========
+yq -i '.compute_allocation = {
+  "dynamic_steps": {"status":"on","easy_max_steps":3,"hard_max_steps":10},
+  "hardness_detector": {"signals":["uncertainty↑","contract_violation_risk","missing_citations"]},
+  "tool_budget":{"max_tools":12,"max_runtime_s":120}
+}' $FILE
+
+# ========== Sandboxed Execution（隔離実行） ==========
+yq -i '.sandbox = {
+  "engine":"Docker",
+  "policy":[
+    "no external network unless allowlisted",
+    "read-only mounts for data snapshots",
+    "artifacts exported to reports/artifacts/"
+  ]
+}' $FILE
+
+# ========== Bi-directional Linking（Decision ↔ Change）既存ガイドの強化 ==========
+yq -i '.doc_ops.guidelines.bidirectional_links = {
+  "purpose":"判断と実装変更の追跡性・説明責任を高める",
+  "rules":[
+    "Decision作成時: change_candidates[] を列挙",
+    "Change作成時: related_decisions[] を必須",
+    "日次/週次レポートでリンク健全性をチェック"
+  ],
+  "checks":{"on_daily":"broken_links==0","on_weekly":"coverage≥95%"}
+}' $FILE
+
+# ========== Router / Debate / SLO連携の自動ルール ==========
+yq -i '.agent_policies = {
+  "auto_rules":[
+    "if slo.burn_rate_24h>2.0 → planner: add task calib_bins_fixed_dry_run",
+    "if whale_watch.alerts>0 → add task review_flow_impact & risk_mitigation",
+    "if api.latency_p95>contracts.api.error_budget.p95_latency_ms → open incident runbook"
+  ],
+  "explainability":"agents must emit why->how->result in logs"
+}' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Resource Policy（リソース/予算配分） ==========
+yq -i '.resource_policy = {
+  "budgets":{
+    "monthly_usd_limit":300,
+    "gpt_api":{"cap_usd":120,"soft_alert_pct":0.7,"hard_block_pct":1.0,"auto_downgrade":true},
+    "compute":{"cpu_hours_cap":250,"gpu_hours_cap":60,"storage_gb_cap":200}
+  },
+  "allocation_rules":{
+    "weights":{"calibration":0.4,"robustness":0.3,"automation":0.2,"reporting":0.1},
+    "rebalance_on":{"ece_worsen_runs":2,"adv_pass_below":0.35},
+    "link_to_backlog":true
+  },
+  "scheduler_hints":{
+    "offpeak_windows_utc":["00:00-06:00"],
+    "priority_queue":["critical_fixes","btft_summary","api_contracts","nice_to_have"]
+  },
+  "approval_rules":{
+    "spend_over_usd":50,
+    "requires":["king","human_pm"]
+  },
+  "observability":{
+    "cost_meters":{
+      "gpt":"metrics/cost/gpt_api_usd.jsonl",
+      "compute":"metrics/cost/compute_hours.jsonl",
+      "storage":"metrics/cost/storage_gb.jsonl"
+    }
+  },
+  "integration":{
+    "slo_burn_to_actions":{
+      "burn_gt_2_0":"dry_run_bins_fixed",
+      "burn_gt_4_0":"freeze_new_features_and_focus_hotfix",
+      "burn_le_1_0":"normal_ops"
+    },
+    "decision_registry_link":true
+  }
+}' $FILE
+
+# ========== Stakeholder Reporting（報告体制） ==========
+yq -i '.stakeholder_reporting = {
+  "audiences":{
+    "human_pm":{"cadence":["daily","weekly","critical"],"channels":["docs","chat"],"owner":"king"},
+    "risk_committee":{"cadence":["weekly","critical"],"channels":["docs"],"owner":"noctus"},
+    "investor":{"cadence":["monthly"],"channels":["slides","pdf"],"owner":"king"}
+  },
+  "artifacts":{
+    "daily":"docs/reports/daily/{YYYY-MM-DD}.md",
+    "weekly":"docs/reports/weekly/{YYYY}-W{WW}.md",
+    "monthly":"docs/reports/monthly/{YYYY-MM}.md",
+    "slides_weekly":"docs/reports/weekly/slides/{YYYY}-W{WW}.md"
+  },
+  "templates":{
+    "risk_brief":"指標/逸脱/対応/次アクションを1画面で",
+    "exec_one_liner":"結論を1行→数値→命令の順"
+  },
+  "auto_include_links":["decisions_dir","changes_dir","btft_summary","audit_log"]
+}' $FILE
+
+# ========== Risk Register（リスク登録簿） ==========
+yq -i '.risk_register = {
+  "categories":[
+    {"code":"market","label":"市場・ボラティリティ"},
+    {"code":"model","label":"モデル/過校正"},
+    {"code":"data","label":"データ品質/遅延"},
+    {"code":"ops","label":"運用・SLO/SLA"},
+    {"code":"compliance","label":"規制/法務"},
+    {"code":"security","label":"セキュリティ/鍵"}
+  ],
+  "entry_schema":{
+    "risk_id":"<YYYYMMDD>-<slug>",
+    "category":"<market|model|data|ops|compliance|security>",
+    "description":"<何が起きうるか>",
+    "likelihood":"<low|med|high>",
+    "impact":"<low|med|high>",
+    "owner":"<king|noctus|prometheus|veritas|aurus|human_pm>",
+    "mitigations":["<手当>"],
+    "triggers":["<観測条件>"],
+    "status":"<open|mitigating|closed>",
+    "links":{"decision":"<path-or-->","change":"<path-or-->"}
+  },
+  "defaults":{
+    "triggers":{
+      "data":["data_missing_rate>0.10(2x)","feature_null_rate>0.05(2x)"],
+      "ops":["slo_burn_1h>2.0","api_p95_latency_ms>300(15m)"],
+      "model":["ece>critical","brier>warn(3x)"]
+    },
+    "mitigations":{
+      "market":["position_size_floor","safe_mode_consideration"],
+      "model":["calibration_dry_runs","prior_T_fallback"],
+      "data":["re-ingest","schema_check","gap_fill"]
+    }
+  },
+  "escalation":{
+    "when":["security","compliance","ops_critical"],
+    "notify":["human_pm","risk_committee"],
+    "deadline_hours":24
+  }
+}' $FILE
+
+# 検証（新設セクションを表示）
+yq e '.resource_policy,.stakeholder_reporting,.risk_register' "$FILE"
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Cost Meters（原データの定義と集計ルール） ==========
+yq -i '.cost_meters = {
+  "sources":{
+    "gpt_api":"metrics/cost/gpt_api_usd.jsonl",
+    "compute_cpu":"metrics/cost/compute_cpu_hours.jsonl",
+    "compute_gpu":"metrics/cost/compute_gpu_hours.jsonl",
+    "storage":"metrics/cost/storage_gb.jsonl"
+  },
+  "rollup_rules":{
+    "gpt_api":{"window":"month_to_date","agg":"sum_usd"},
+    "compute_cpu":{"window":"month_to_date","agg":"sum_hours"},
+    "compute_gpu":{"window":"month_to_date","agg":"sum_hours"},
+    "storage":{"window":"latest","agg":"latest_gb"}
+  },
+  "budgets_link":{
+    "gpt_api_usd_cap":"resource_policy.budgets.gpt_api.cap_usd",
+    "compute_cpu_hours_cap":"resource_policy.budgets.compute.cpu_hours_cap",
+    "compute_gpu_hours_cap":"resource_policy.budgets.compute.gpu_hours_cap",
+    "storage_gb_cap":"resource_policy.budgets.compute.storage_gb_cap"
+  },
+  "alerts":{
+    "soft_pct":0.70,
+    "hard_pct":1.00
+  },
+  "notes":"集計はスクリプト側で実施（例: scripts/rollup_costs.py が MTD を吐く）"
+}' $FILE
+
+# ========== Cost Policies（閾値超過時の標準アクション） ==========
+yq -i '.cost_policies = {
+  "soft_breach_actions":[
+    "LLM: モデル/温度の段階的ダウングレード（gov.llm_usage_guidanceに従う）",
+    "生成長文を抑制（要約/抽象化）＆ バッチ化を強化",
+    "次サイクルの探索計算資源を robustness→reporting へ一部振替"
+  ],
+  "hard_breach_actions":[
+    "新規実験の凍結（critical以外）",
+    "高コスト推論の即時停止、fallbackルートのみ許可",
+    "human_pm 承認なしの追加支出を禁止"
+  ],
+  "owners":{"primary":"king","backup":"human_pm"},
+  "escalation":{"notify":["human_pm"],"deadline_hours":24}
+}' $FILE
+
+# ========== Testing（コストの最小スモーク） ==========
+yq -i '.testing.cost_smoke = [
+  {"id":"COST01","target":"GPT API cost MTD","expect":"jsonl が存在し MTD USD を算出できる"},
+  {"id":"COST02","target":"Compute hours MTD","expect":"cpu/gpu hours を合算し可視化可能"},
+  {"id":"COST03","target":"Storage GB","expect":"最新GBを取得し閾値比較できる"}
+]' $FILE
+
+# ========== KPI Alerts（コスト系の簡易アラート） ==========
+yq -i '.kpi_alerts.cost = {
+  "metrics":[
+    {"key":"gpt_cost_usd_mtd","good_is":"low","warn_when":{"pct_of_cap_above":0.70},"critical_when":{"pct_of_cap_above":1.00}},
+    {"key":"cpu_hours_mtd","good_is":"low","warn_when":{"pct_of_cap_above":0.80},"critical_when":{"pct_of_cap_above":1.00}},
+    {"key":"gpu_hours_mtd","good_is":"low","warn_when":{"pct_of_cap_above":0.80},"critical_when":{"pct_of_cap_above":1.00}},
+    {"key":"storage_gb","good_is":"low","warn_when":{"pct_of_cap_above":0.80},"critical_when":{"pct_of_cap_above":1.00}}
+  ],
+  "templates":{
+    "warn":{"title":"[WARN] Cost budget approaching — {metric}","body":"value={value} cap={cap} ({pct:.0%}) / owner: {owner} / next: cost_policies.soft_breach_actions"},
+    "critical":{"title":"[CRITICAL] Cost budget exceeded — {metric}","body":"value={value} cap={cap} ({pct:.0%}) / owner: {owner} / actions: cost_policies.hard_breach_actions"}
+  }
+}' $FILE
+
+# ========== Report Templates（Daily/Weekly/Monthly にコスト節） ==========
+# Daily へ Cost Snapshot セクションを追記
+yq -i '
+  (.report_templates.daily.sections += [{
+    "id":"cost_snapshot",
+    "title":"## Cost Snapshot (MTD)",
+    "body": "| item | value | cap | pct |\\n|---|---:|---:|---:|\\n| GPT API (USD) | {gpt_cost_usd_mtd:.2f} | {gpt_cost_cap_usd:.2f} | {gpt_cost_pct_txt} |\\n| CPU hours | {cpu_hours_mtd:.1f} | {cpu_hours_cap:.1f} | {cpu_hours_pct_txt} |\\n| GPU hours | {gpu_hours_mtd:.1f} | {gpu_hours_cap:.1f} | {gpu_hours_pct_txt} |\\n| Storage (GB) | {storage_gb_latest:.1f} | {storage_gb_cap:.1f} | {storage_pct_txt} |\\n\\n- 予算コメント: {cost_comment_one_line}"
+  }])
+' $FILE
+
+# Weekly へ Cost Summary を追記
+yq -i '
+  (.report_templates.weekly.sections += [{
+    "id":"cost_summary",
+    "title":"## Cost Summary (MTD)",
+    "body":"- GPT API: {gpt_cost_usd_mtd:.2f}/{gpt_cost_cap_usd:.2f} USD ({gpt_cost_pct_txt})\\n- Compute: CPU {cpu_hours_mtd:.1f}/{cpu_hours_cap:.1f} h, GPU {gpu_hours_mtd:.1f}/{gpu_hours_cap:.1f} h\\n- Storage: {storage_gb_latest:.1f}/{storage_gb_cap:.1f} GB\\n- ポリシー適用: {cost_policy_applied_or_dash}"
+  }])
+' $FILE
+
+# Monthly へ Cost Review を追記
+yq -i '
+  (.report_templates.monthly.sections += [{
+    "id":"cost_review",
+    "title":"## Cost Review (Month)",
+    "body":"| item | actual | budget | Δ |\\n|---|---:|---:|---:|\\n| GPT API (USD) | {gpt_cost_usd_month:.2f} | {gpt_cost_cap_usd:.2f} | {gpt_cost_delta_usd:.2f} |\\n| CPU hours | {cpu_hours_month:.1f} | {cpu_hours_cap:.1f} | {cpu_hours_delta:.1f} |\\n| GPU hours | {gpu_hours_month:.1f} | {gpu_hours_cap:.1f} | {gpu_hours_delta:.1f} |\\n| Storage (GB) | {storage_gb_month_end:.1f} | {storage_gb_cap:.1f} | {storage_gb_delta:.1f} |\\n\\n- 所感: {cost_insight_one_line}\\n- 来月の配分変更案: {reallocation_one_line}"
+  }])
+' $FILE
+
+# ========== Decision Registry 連携（コスト → 自動ルールのひな型） ==========
+yq -i '.decision_registry.cost_rules = {
+  "map":[
+    {"when":"gpt_cost_pct>=0.70 && gpt_cost_pct<1.00","then":"LLM_tier_downgrade","orders":["use_small_model_for_non_critical","summarization_first","batch_llm_requests"]},
+    {"when":"gpt_cost_pct>=1.00","then":"freeze_new_experiments","orders":["stop_non_critical_jobs","fallback_only","require_human_pm_for_extra_spend"]}
+  ],
+  "owner":"king",
+  "status":"active"
+}' $FILE
+
+# ========== Doc Ops（リンク場所を明示） ==========
+yq -i '.doc_ops.file_locations.cost_meters = "metrics/cost/"' $FILE
+
+# ===== 検証（新設/追記部分をざっと出力） =====
+yq e '.cost_meters,.cost_policies,.testing.cost_smoke,.kpi_alerts.cost,.decision_registry.cost_rules' "$FILE"
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Drift/Shift 監視の中核セクション ==========
+yq -i '.drift_monitoring = {
+  "windows":{"reference_days":30,"tracking_days":7},
+  "segment_by":["pair","session(JPY/EU/US)","regime_id"],
+  "metrics":{
+    "psi":{"warn":0.1,"critical":0.25},
+    "kl":{"warn":0.05,"critical":0.15},
+    "js":{"warn":0.03,"critical":0.10},
+    "mean_abs_delta":{"warn":2.0,"critical":4.0}
+  },
+  "featuresets":{
+    "raw_ticks":["mid_return_1s","spread_bp","vol_5s"],
+    "features":["rsi_14","ema_20_minus_ema_50","atr_14","hour_sin","hour_cos"],
+    "labels":["y_next_up"]
+  },
+  "prediction":{
+    "bins":[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],
+    "warn":{"proba_mean_delta":0.05,"calibration_gap_delta":0.02},
+    "critical":{"proba_mean_delta":0.10,"calibration_gap_delta":0.04}
+  },
+  "schedules":{
+    "weekly":"Sun 09:00 UTC",
+    "post_event":"major_econ_events|abnormal_volatility"
+  },
+  "artifacts":{"dir":"reports/drift","index":"reports/drift/index.md","db":"obs_codex_drift"},
+  "actions":{
+    "on_warn":["flag SHIFT","append to handover","prepare bins/T dry-runs"],
+    "on_critical":["raise CRITICAL alert","decision_registry auto-rule: drift_critical"]
+  }
+}' $FILE
+
+# ========== scripts 追記（CIに依存しない運用コマンド） ==========
+yq -i '.scripts.compute_data_drift = "データ分布ドリフト計測（PSI/KL/JS/平均差）→ reports/drift/data_*"' $FILE
+yq -i '.scripts.compute_pred_drift = "予測分布・校正ギャップのドリフト計測 → reports/drift/pred_*"' $FILE
+yq -i '.scripts.post_event_drift_check = "重要イベント後の即時ドリフトチェック（データ/予測の両方）"' $FILE
+yq -i '.scripts.register_drift_findings = "ドリフト結果を obs_codex_drift と decision_registry に登録"' $FILE
+
+# ========== KPI警報への組み込み ==========
+yq -i '.kpi_alerts.metrics += [
+  {"key":"data_psi","good_is":"low","warn_when":{"absolute_above":0.10,"lookback_runs":1},"critical_when":{"absolute_above":0.25,"consecutive":1}},
+  {"key":"pred_proba_mean_delta","good_is":"low","warn_when":{"absolute_above":0.05,"lookback_runs":1},"critical_when":{"absolute_above":0.10,"consecutive":1}},
+  {"key":"calibration_gap_delta","good_is":"low","warn_when":{"absolute_above":0.02,"lookback_runs":1},"critical_when":{"absolute_above":0.04,"consecutive":1}}
+]' $FILE
+
+# ========== decision_registry 自動ルール（ドリフト→標準オーダー） ==========
+yq -i '.decision_registry.auto_rules += [
+  {"id":"DRIFT_WARN","when":{"any_of":[
+      {"metric":"data_psi","op":">","value":0.10},
+      {"metric":"pred_proba_mean_delta","op":">","value":0.05},
+      {"metric":"calibration_gap_delta","op":">","value":0.02}
+    ]},
+    "then":{"level":"WARN","triage":"SHIFT",
+      "orders":[
+        "bins=12/T=prior_T で再校正 DRY×1",
+        "whale_watch とセットでイベント影響の有無を確認",
+        "次runで再計測し decision_log へ追記"
+      ],
+      "success_criteria":"次runでドリフト指標がwarn未満 or KPI悪化停止"
+    }
+  },
+  {"id":"DRIFT_CRITICAL","when":{"any_of":[
+      {"metric":"data_psi","op":">=","value":0.25},
+      {"metric":"pred_proba_mean_delta","op":">=","value":0.10},
+      {"metric":"calibration_gap_delta","op":">=","value":0.04}
+    ]},
+    "then":{"level":"CRITICAL","triage":"SHIFT",
+      "orders":[
+        "bins固定 + T再最適化 DRY×3（NLL≤+0.05 ガード）",
+        "post_event_drift_check を直近24hで再走",
+        "必要なら閾値固定の暫定セーフ構成で影響緩和"
+      ],
+      "success_criteria":"24h以内に critical 未満へ復帰"
+    }
+  }
+]' $FILE
+
+# ========== Observability 追記 ==========
+yq -i '.observability.metrics.drift = ["data_psi","kl_divergence","js_divergence","pred_proba_mean_delta","calibration_gap_delta"]' $FILE
+yq -i '.doc_ops.file_locations.drift_reports = "reports/drift/"' $FILE
+
+# ========== Runbook（ドリフト対応） ==========
+yq -i '.runbooks.drift_incident = {
+  "trigger":"data_psi>=0.25 or pred_proba_mean_delta>=0.10 or calibration_gap_delta>=0.04",
+  "steps":[
+    "1) 影響範囲を特定（pair/セッション/レジーム別の上位3件）",
+    "2) whale_watch の大型フローと時刻相関を確認",
+    "3) bins固定 + prior_T 比較のDRY（NLLガード≤+0.05）",
+    "4) pred_drift と reliability の再生成→日次レポへ反映",
+    "5) decision_log を更新し Change Draft 必要性を判定"
+  ],
+  "owner":"prometheus","backup":"king","sla":{"ack_min":30,"mitigate_hours":24}
+}' $FILE
+
+# ========== Testing（スモーク） ==========
+yq -i '.testing.drift_smoke = [
+  {"id":"D01","target":"compute_data_drift","expect":"reports/drift/data_*.json 生成 & PSI 数値>0"},
+  {"id":"D02","target":"compute_pred_drift","expect":"reports/drift/pred_*.json 生成 & proba_mean_delta 計算"},
+  {"id":"D03","target":"post_event_drift_check","expect":"イベント後に index.md 更新 & decision_registry に記録"}
+]' $FILE
+
+# ========== レポートへの自然な組み込み（Daily/Weekly） ==========
+yq -i '.report_templates.daily.sections += [
+  {"id":"drift_watch","title":"## Drift Watch","body":"- data_PSI: {data_psi_latest:.3f} / KL: {kl_latest:.3f} / JS: {js_latest:.3f}\n- pred: Δmean(p)= {proba_mean_delta:.3f} / calib_gap Δ= {calib_gap_delta:.3f}\n- segment(top): {top_segments}\n- 所感: {drift_comment_one_line}"}
+]' $FILE
+
+yq -i '.weekly_slide_deck.slides += [
+  {"id":"s4_drift_summary","title":"Slide 4 — Drift & Regime","body":"**結論（1行）**: {drift_exec_one_line}\n\n- data PSI (top3): {psi_top3}\n- pred Δmean(p) / calib_gap: {pred_drift_brief}\n- 関連イベント/whales: {event_whale_brief}\n- 是正アクション: {drift_actions_one_line}"}
+]' $FILE
+
+# ========== YAML 検証 ==========
+yq e . "$FILE" >/dev/null && echo "YAML OK（drift監視 追記完了）" || echo "YAML NG"
+
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# ========== Golden Dataset Policy ==========
+yq -i '.golden_dataset = {
+  "description":"実験・モデル・評価の基準となるゴールデン・データセットを制定し、毎回そこで性能が崩れないことを保証する",
+  "location":"data/golden/", 
+  "rules":[
+    "全モデル/戦略は golden dataset で最低基準を満たすこと",
+    "回帰検出の下限値を定義（例: Brier<=0.20, ECE<=0.35, Adv.pass>=0.40）",
+    "基準を満たさない場合はBT/FTや本番適用を禁止"
+  ],
+  "ci_hooks":{
+    "smoke_test":"pytest tests/golden --maxfail=1 -q",
+    "required_before":["backtest","forwardtest","deployment"]
+  },
+  "reporting":{
+    "path":"reports/golden/{date}.md",
+    "content":["基準KPI","直近runとの比較","合否判定","回帰警告"]
+  }
+}' $FILE
+
+# YAML 検証
+yq e . "$FILE" >/dev/null && echo "YAML OK（golden_dataset 追加済み）" || echo "YAML NG"
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# === Trading Performance KPIs を追加 ===
+yq -i '
+.kpi_definitions.win_rate = {
+  "description":"勝率（勝ちトレード数 / 総トレード数）",
+  "target":{"goal":0.55,"warn":0.52,"critical":0.50}
+}
+' $FILE
+
+yq -i '
+.kpi_definitions.sharpe_ratio = {
+  "description":"リスク調整後の収益性（>1.5推奨）",
+  "target":{"goal":1.5,"warn":1.2,"critical":1.0}
+}
+' $FILE
+
+yq -i '
+.kpi_definitions.profit_factor = {
+  "description":"総利益 / 総損失。>1.5で健全、1.0割れは赤字",
+  "target":{"goal":1.5,"warn":1.3,"critical":1.0}
+}
+' $FILE
+
+yq -i '
+.kpi_definitions.max_drawdown = {
+  "description":"資産ピークからの最大下落幅。資金防衛の重要指標",
+  "target":{"goal":0.10,"warn":0.15,"critical":0.20}
+}
+' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# === Trading Performance Decision Rules を追加 ===
+yq -i '
+.decision_rules.trading_performance = {
+  "rules":[
+    {
+      "if":"win_rate < 0.52 for 3 runs",
+      "then":"Veritas に戦略特徴量再設計を指示"
+    },
+    {
+      "if":"sharpe_ratio < 1.2 for 3 runs",
+      "then":"Aurus に実行効率最適化を指示"
+    },
+    {
+      "if":"profit_factor < 1.3",
+      "then":"Prometheus に予測活用率改善を指示"
+    },
+    {
+      "if":"max_drawdown > 0.15",
+      "then":"Noctus にセーフモード発動を検討させる"
+    }
+  ]
+}
+' $FILE
+
+FILE=docs/governance/king_ops_prompt.yaml
+
+# === Trading KPIs を kpi_alerts.metrics に追加 ===
+yq -i '
+.kpi_alerts.metrics += [
+  {
+    "key":"win_rate",
+    "good_is":"high",
+    "warn_when":{"absolute_below":0.52,"lookback_runs":3},
+    "critical_when":{"absolute_below":0.50,"consecutive":2}
+  },
+  {
+    "key":"sharpe_ratio",
+    "good_is":"high",
+    "warn_when":{"absolute_below":1.2,"lookback_runs":3},
+    "critical_when":{"absolute_below":1.0,"consecutive":2}
+  },
+  {
+    "key":"profit_factor",
+    "good_is":"high",
+    "warn_when":{"absolute_below":1.3,"lookback_runs":3},
+    "critical_when":{"absolute_below":1.0,"consecutive":2}
+  },
+  {
+    "key":"max_drawdown",
+    "good_is":"low",
+    "warn_when":{"absolute_above":0.15,"lookback_runs":3},
+    "critical_when":{"absolute_above":0.20,"consecutive":1}
+  }
+]
+' $FILE
