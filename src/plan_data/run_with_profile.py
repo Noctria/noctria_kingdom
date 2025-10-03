@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
+
 import pandas as pd
+
+from plan_data.adapter_to_decision import run_strategy_and_decide
+from plan_data.profile_loader import (
+    PlanProfile,
+    apply_profile_to_bundle,
+    load_yaml,
+    resolve_profile,
+)
 
 # plan layer
 from plan_data.strategy_adapter import FeatureBundle, StrategyProposal
-from plan_data.profile_loader import load_yaml, resolve_profile, apply_profile_to_bundle, PlanProfile
-from plan_data.adapter_to_decision import run_strategy_and_decide
+
 
 def apply_profile(
     bundle: FeatureBundle,
@@ -20,10 +28,11 @@ def apply_profile(
     既存 profile_loader を利用して、bundle.context に profile 値を注入して返す。
     """
     sym = symbol or (bundle.context.get("symbol") if bundle and bundle.context else None)
-    tf  = timeframe or (bundle.context.get("timeframe") if bundle and bundle.context else None)
+    tf = timeframe or (bundle.context.get("timeframe") if bundle and bundle.context else None)
     prof = resolve_profile(config_root, symbol=sym, timeframe=tf)
     new_bundle = apply_profile_to_bundle(bundle, prof)
     return new_bundle, prof
+
 
 def run_with_profile(
     strategy: Any,
@@ -68,6 +77,7 @@ def run_with_profile(
 
 # --- 最小の手動テスト ---
 if __name__ == "__main__":
+
     class DummyStrategy:
         def propose(self, features: FeatureBundle, **kw):
             # adapter 側の Quality Gate により qty は縮小される前提。ここはベース数量を返すだけ。
@@ -100,4 +110,5 @@ if __name__ == "__main__":
         extra_decision_features={"trend_score": 0.72, "volatility": 0.12},
     )
     import json
+
     print(json.dumps(out, indent=2, ensure_ascii=False))

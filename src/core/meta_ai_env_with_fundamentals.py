@@ -8,6 +8,7 @@ import gymnasium as gym
 import numpy as np
 import pandas as pd
 
+
 class TradingEnvWithFundamentals(gym.Env):
     def __init__(self, data_path):
         """
@@ -16,8 +17,8 @@ class TradingEnvWithFundamentals(gym.Env):
         data_path: str
             統合済みデータ（テクニカル + ファンダ）CSVファイルパス
         """
-        self.data = pd.read_csv(data_path, parse_dates=['datetime'])
-        self.data.set_index('datetime', inplace=True)
+        self.data = pd.read_csv(data_path, parse_dates=["datetime"])
+        self.data.set_index("datetime", inplace=True)
         self.current_step = 0
 
         # 観測空間（例: open, high, low, close, volume, cpi, interest_diff, unemployment）
@@ -25,7 +26,7 @@ class TradingEnvWithFundamentals(gym.Env):
             low=-np.inf,
             high=np.inf,
             shape=(self.data.shape[1],),  # カラム数が観測次元
-            dtype=np.float32
+            dtype=np.float32,
         )
 
         # 行動空間例（0=Hold, 1=Buy, 2=Sell）
@@ -53,6 +54,7 @@ class TradingEnvWithFundamentals(gym.Env):
 
     def render(self):
         pass  # 可視化不要な場合は空でOK
+
 
 if __name__ == "__main__":
     # 簡単な動作確認

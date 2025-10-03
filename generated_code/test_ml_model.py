@@ -1,9 +1,11 @@
 import numpy as np
 from ml_model import VeritasModel
 
+
 def test_model_initialization():
     model = VeritasModel()
     assert model.model is not None
+
 
 def test_model_predict():
     model = VeritasModel()

@@ -13,6 +13,7 @@ from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # 共通パス管理
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 def _decimal_to_float(obj):
     """再帰的にDecimal型をfloat化（dict/リスト/単体対応）"""
     if isinstance(obj, dict):
@@ -22,6 +23,7 @@ def _decimal_to_float(obj):
     elif isinstance(obj, Decimal):
         return float(obj)
     return obj
+
 
 def fetch_devcycle_history(limit=100):
     db = {
@@ -33,18 +35,32 @@ def fetch_devcycle_history(limit=100):
     }
     conn = psycopg2.connect(**db)
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, turn_number, started_at, finished_at, passed_tests, total_tests, pass_rate,
                generated_files, review_comments, failed, fail_reason, extra_info, created_at
         FROM ai_devcycle_turn_history
         ORDER BY id DESC LIMIT %s
-    """, (limit,))
+    """,
+        (limit,),
+    )
     rows = cur.fetchall()
     cur.close()
     conn.close()
     keys = [
-        "id", "turn_number", "started_at", "finished_at", "passed_tests", "total_tests", "pass_rate",
-        "generated_files", "review_comments", "failed", "fail_reason", "extra_info", "created_at"
+        "id",
+        "turn_number",
+        "started_at",
+        "finished_at",
+        "passed_tests",
+        "total_tests",
+        "pass_rate",
+        "generated_files",
+        "review_comments",
+        "failed",
+        "fail_reason",
+        "extra_info",
+        "created_at",
     ]
     history = []
     for row in rows:
@@ -60,10 +76,14 @@ def fetch_devcycle_history(limit=100):
         history.append(record)
     return list(reversed(history))  # 昇順（古い→新しい順）にする
 
+
 @router.get("/devcycle/history", response_class=HTMLResponse)
 async def devcycle_history(request: Request):
     history = fetch_devcycle_history(50)
-    return templates.TemplateResponse("devcycle_history.html", {
-        "request": request,
-        "history": history,
-    })
+    return templates.TemplateResponse(
+        "devcycle_history.html",
+        {
+            "request": request,
+            "history": history,
+        },
+    )

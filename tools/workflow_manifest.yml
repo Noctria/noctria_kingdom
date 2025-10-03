@@ -1,0 +1,55 @@
+# tools/workflow_manifest.yml
+# ── 自動タグよりも強い「明示マッピング」。正規化の決定版として固定化 ──
+# ここに載せたファイルは、patterns より優先してステージに割り振られます。
+
+assign:
+  collect:
+    - "src/plan_data/collector/market_collector.py"
+    - "src/plan_data/datafeeds/alphavantage_client.py"
+    - "src/plan_data/run_pdca_plan_workflow.py"
+    - "src/plan_data/inventor.py"
+
+  analyze:
+    - "src/plan_data/statistics.py"
+    - "src/plan_data/analyzer/feature_builder.py"
+
+  plan:
+    - "src/plan_data/planner/strategy_planner.py"
+
+  backtest:
+    - "src/strategies/backtest/run_backtest.py"
+    - "airflow_docker/dags/noctria_backtest_dag.py"
+
+  forwardtest:
+    - "airflow_docker/dags/forward_test_dag.py"
+    - "tests/forward_test_meta_ai.py"
+
+  fintokei_check:
+    - "src/core/fintokei/ruleset.py"
+    - "src/plan_data/quality_gate.py"
+    - "src/plan_data/noctus_gate.py"
+
+  mt5_order:
+    - "src/core/brokers/mt5/mt5_client.py"
+    - "src/core/execution/order_router.py"
+    - "order_api.py"
+    - "src/execution/order_execution.py"
+
+  settlement:
+    - "src/core/settlement/settle_engine.py"
+
+  result_analyze:
+    - "noctria_gui/routes/pdca_summary.py"
+    - "src/execution/trade_analysis.py"
+    - "noctria_gui/routes/backtest_results.py"
+
+  merge_info:
+    - "src/plan_data/merge/merge_latest_results.py"
+
+  replanning:
+    - "src/plan_data/planner/replan.py"
+
+  pdca:
+    - "scripts/pdca_autofix_orchestrator.py"
+    - "scripts/run_pdca_agents.py"
+    - "noctria_gui/routes/pdca_summary.py"

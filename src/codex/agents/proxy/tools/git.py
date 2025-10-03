@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 
 class GitTool:
@@ -12,6 +12,7 @@ class GitTool:
     - apply_patch(check_only=True/False): -p1 を基本に、失敗時は -p2, -p0 を自動フォールバック
     - restore_worktree(): 追跡ファイル変更を破棄 + 未追跡のうち keep_dirs は残す
     """
+
     name = "git"
 
     def __init__(self, cwd: str, keep_dirs: List[str] | None = None):

@@ -1,11 +1,13 @@
-# src/noctria_gui/services/conversation_history_manager.py
-
 import json
 from typing import List, Dict, Optional
 from fastapi import Depends
 from openai import OpenAI
 import asyncio
 import threading
+from fastapi import Request
+
+# src/noctria_gui/services/conversation_history_manager.py
+
 
 class ConversationHistoryManager:
     """
@@ -18,7 +20,9 @@ class ConversationHistoryManager:
     _lock = threading.Lock()
     _user_histories: Dict[str, List[Dict[str, str]]] = {}
 
-    def __init__(self, openai_client: OpenAI, user_id: Optional[str] = None, max_history_length: int = 20):
+    def __init__(
+        self, openai_client: OpenAI, user_id: Optional[str] = None, max_history_length: int = 20
+    ):
         self.openai = openai_client
         self.user_id = user_id or "default_user"
         self.max_history_length = max_history_length
@@ -30,7 +34,7 @@ class ConversationHistoryManager:
     def add_message(self, role: str, content: str):
         with self._lock:
             history = self._user_histories.setdefault(self.user_id, [])
-            history.append({'role': role, 'content': content})
+            history.append({"role": role, "content": content})
             if len(history) > self.max_history_length:
                 history.pop(0)
 
@@ -47,28 +51,28 @@ class ConversationHistoryManager:
 
         response = await asyncio.to_thread(
             lambda: self.openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}]
+                model="gpt-4o", messages=[{"role": "user", "content": prompt}]
             )
         )
         return response.choices[0].message.content
 
     def save_history(self, path: str):
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self.get_history(), f, ensure_ascii=False, indent=2)
 
     def load_history(self, path: str):
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             history = json.load(f)
         with self._lock:
             self._user_histories[self.user_id] = history
 
+
 # 依存注入用ファクトリ関数例
-from fastapi import Request
+
 
 def get_conversation_history_manager(
     request: Request,
-    openai_client: OpenAI = Depends()  # 事前にget_openai_client()をDepends登録しておく想定
+    openai_client: OpenAI = Depends(),  # 事前にget_openai_client()をDepends登録しておく想定
 ) -> ConversationHistoryManager:
     # 例: ユーザー識別にAuthorizationヘッダーやCookieを利用してuser_idを決定
     user_id = request.headers.get("X-User-ID", "default_user")

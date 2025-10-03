@@ -13,7 +13,7 @@ snapshot_download(
     repo_id="NousResearch/Nous-Hermes-2-Mistral-7B-DPO",
     local_dir=TARGET_DIR,
     local_dir_use_symlinks=False,
-    token=HF_TOKEN
+    token=HF_TOKEN,
 )
 
 print(f"✅ モデルを {TARGET_DIR} にダウンロードしました")

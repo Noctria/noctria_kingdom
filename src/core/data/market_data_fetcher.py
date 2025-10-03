@@ -4,13 +4,13 @@
 # - 既存 data_loader の実装を再利用しつつ、返却は (df, FetchMeta)
 
 from __future__ import annotations
+
 import time
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, Tuple
+from typing import Optional, Tuple
 
 import pandas as pd
 import yfinance as yf
-
 from src.core.logger import setup_logger
 
 
@@ -56,7 +56,10 @@ class MarketDataFetcher:
         # ---------- Alpha Vantage ブリッジ ----------
         if source == "alphavantage":
             # 既存の Alpha Vantage 実装をブリッジ（src.core.data_loader.MarketDataFetcher）
-            from src.core.data_loader import MarketDataFetcher as _AlphaV  # 互換レイヤ or 既存クラス
+            from src.core.data_loader import (
+                MarketDataFetcher as _AlphaV,  # 互換レイヤ or 既存クラス
+            )
+
             av = _AlphaV(api_key=self.alphavantage_api_key)
 
             # symbol 正規化： "USDJPY" / "USDJPY=X" / "USD/JPY" などから from/to を抽出
@@ -108,7 +111,11 @@ class MarketDataFetcher:
         for attempt in range(1, self.retries + 1):
             try:
                 df = yf.download(
-                    symbol, interval=interval, period=period, progress=False, threads=False
+                    symbol,
+                    interval=interval,
+                    period=period,
+                    progress=False,
+                    threads=False,
                 )
                 if df is not None and not df.empty:
                     break
@@ -122,7 +129,11 @@ class MarketDataFetcher:
             return (
                 pd.DataFrame(),
                 FetchMeta(
-                    symbol=symbol, interval=interval, period=period, source="yfinance", note=note
+                    symbol=symbol,
+                    interval=interval,
+                    period=period,
+                    source="yfinance",
+                    note=note,
                 ),
             )
 

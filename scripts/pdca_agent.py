@@ -22,10 +22,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-
 # ---------- Shell helpers ----------
 
-def run(cmd: list[str], check: bool = True, capture: bool = False, cwd: str | None = None) -> subprocess.CompletedProcess:
+
+def run(
+    cmd: list[str], check: bool = True, capture: bool = False, cwd: str | None = None
+) -> subprocess.CompletedProcess:
     kwargs = dict(text=True, cwd=cwd)
     if capture:
         kwargs["stdout"] = subprocess.PIPE
@@ -41,13 +43,18 @@ def run(cmd: list[str], check: bool = True, capture: bool = False, cwd: str | No
 
 # ---------- Decision I/O ----------
 
+
 def load_latest_decision() -> Dict[str, Any]:
     """
     scripts.show_last_inventor_decision --json を呼び出して JSON を取得。
     取得に失敗したら {} を返す。
     """
     try:
-        cp = run([sys.executable, "-m", "scripts.show_last_inventor_decision", "--json"], check=True, capture=True)
+        cp = run(
+            [sys.executable, "-m", "scripts.show_last_inventor_decision", "--json"],
+            check=True,
+            capture=True,
+        )
         raw = (cp.stdout or "").strip()
         return json.loads(raw or "{}")
     except Exception as e:
@@ -79,6 +86,7 @@ def should_adopt(decision: Dict[str, Any], *, min_lift: float = 0.0) -> Tuple[bo
 
 # ---------- Git operations ----------
 
+
 def git_current_branch() -> str:
     cp = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True)
     return (cp.stdout or "").strip()
@@ -89,7 +97,9 @@ def ensure_clean_worktree() -> None:
     run(["git", "status", "--porcelain"], capture=True)
 
 
-def create_adopt_branch_and_commit(decision: Dict[str, Any], *, prefix: str = "auto/adopt") -> Tuple[str, list[str]]:
+def create_adopt_branch_and_commit(
+    decision: Dict[str, Any], *, prefix: str = "auto/adopt"
+) -> Tuple[str, list[str]]:
     """
     - auto/adopt-YYYYMMDD-HHMMSS ブランチを作成
     - codex_reports/decision_registry.jsonl に追記
@@ -104,10 +114,13 @@ def create_adopt_branch_and_commit(decision: Dict[str, Any], *, prefix: str = "a
     # レジストリに追記（無ければ作る）
     reg = Path("codex_reports/decision_registry.jsonl")
     reg.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps({
-        "ts": dt.datetime.now(dt.UTC).isoformat(),
-        "decision": decision,
-    }, ensure_ascii=False)
+    line = json.dumps(
+        {
+            "ts": dt.datetime.now(dt.UTC).isoformat(),
+            "decision": decision,
+        },
+        ensure_ascii=False,
+    )
     with reg.open("a", encoding="utf-8") as f:
         f.write(line + "\n")
 
@@ -131,12 +144,19 @@ def push_branch(branch: str) -> None:
 
 # ---------- CLI ----------
 
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="PDCA Agent: recheck & adopt")
     ap.add_argument("--dryrun", action="store_true", help="変更を加えず判定ログのみ出力")
-    ap.add_argument("--min-lift", type=float, default=0.0, help="採用に必要な最小 lift（既定: 0.0）")
+    ap.add_argument(
+        "--min-lift", type=float, default=0.0, help="採用に必要な最小 lift（既定: 0.0）"
+    )
     ap.add_argument("--branch-prefix", type=str, default="auto/adopt", help="作成ブランチの接頭辞")
-    ap.add_argument("--auto-adopt", action="store_true", help="（将来用）自動で main に取り込む。通常は PR 作成に任せる")
+    ap.add_argument(
+        "--auto-adopt",
+        action="store_true",
+        help="（将来用）自動で main に取り込む。通常は PR 作成に任せる",
+    )
     args = ap.parse_args()
 
     ensure_clean_worktree()
@@ -165,7 +185,9 @@ def main() -> int:
 
     # auto-adopt（将来的な自動マージ）はここで別途実装する想定
     if args.auto_adopt:
-        print("Notice:  auto_adopt flag is set, but auto-merge is delegated to workflow protections.")
+        print(
+            "Notice:  auto_adopt flag is set, but auto-merge is delegated to workflow protections."
+        )
     return 0
 
 

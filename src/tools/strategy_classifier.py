@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-import os
-import shutil
 import re
+import shutil
 from pathlib import Path
 
 from core.path_config import STRATEGY_OFFICIAL_DIR
+
 
 # === ヘッダーコメントからメタ情報を抽出する ===
 def extract_metadata_from_file(file_path):
@@ -23,6 +23,7 @@ def extract_metadata_from_file(file_path):
             if asset and strategy_type:
                 break
     return asset, strategy_type
+
 
 # === ファイルを分類先へ移動する ===
 def classify_strategies():
@@ -45,6 +46,7 @@ def classify_strategies():
 
     if moved_count == 0:
         print("🔍 分類対象ファイルはありませんでした。")
+
 
 if __name__ == "__main__":
     print("👑 Noctria Kingdom: 戦略分類スクリプト 起動")

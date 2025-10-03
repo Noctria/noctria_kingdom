@@ -16,6 +16,7 @@ from src.plan_data.statistics import PlanStatistics
 
 from src.strategies.prometheus_oracle import PrometheusOracle
 
+
 def main():
     # --- ① 市場データ・特徴量生成 ---
     collector = PlanDataCollector()
@@ -28,7 +29,9 @@ def main():
     # --- ② Prometheus Oracleで未来予測 ---
     oracle = PrometheusOracle()
     n_days = 14
-    forecast_df = oracle.predict_with_confidence(n_days=n_days, output="df", decision_id="DEMO-001", caller="plan_to_prometheus_demo")
+    forecast_df = oracle.predict_with_confidence(
+        n_days=n_days, output="df", decision_id="DEMO-001", caller="plan_to_prometheus_demo"
+    )
     print(f"\n🔮 Prometheusによる未来予測({n_days}日):")
     print(forecast_df.head())
 
@@ -42,6 +45,7 @@ def main():
     json_path = DATA_DIR / "prometheus_forecast_demo.json"
     forecast_df.to_json(json_path, orient="records", force_ascii=False, indent=2)
     print(f"\n📁 予測結果JSON: {json_path.resolve()}")
+
 
 if __name__ == "__main__":
     main()

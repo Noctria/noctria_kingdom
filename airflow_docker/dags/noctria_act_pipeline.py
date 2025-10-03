@@ -1,3 +1,16 @@
+from __future__ import annotations
+
+import json
+import os
+import sys
+from datetime import datetime, timedelta
+from glob import glob
+from typing import Any, Dict, List
+
+from airflow.models import DAG
+from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
+
 # =========================
 # Noctria Act 層 自動化 一式
 #  - Airflow DAG: 再評価結果の集計→採用判定→Git Push→Gitタグ付け→Decision Registry記録
@@ -25,13 +38,6 @@
     }
 """
 
-import os
-import sys
-from datetime import datetime, timedelta
-
-from airflow.models import DAG
-from airflow.operators.python import PythonOperator
-from airflow.utils.trigger_rule import TriggerRule
 
 # --- Airflowからsrc/配下をimport可能に ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -51,17 +57,21 @@ DEFAULT_ARGS = {
 
 DAG_ID = "noctria_act_pipeline"
 
+
 def _collect_recheck_summary(**context):
     # 遅延インポート
     from pdca.selector import collect_candidates_summary
+
     conf = context["dag_run"].conf or {}
     lookback_days = int(conf.get("LOOKBACK_DAYS", 30))
     summary = collect_candidates_summary(lookback_days=lookback_days)
     # XCom返却
     return summary
 
+
 def _decide_adoption(**context):
     from pdca.selector import choose_best_candidate
+
     conf = context["dag_run"].conf or {}
     summary = context["ti"].xcom_pull(task_ids="collect_recheck_summary")
     if not summary:
@@ -74,18 +84,24 @@ def _decide_adoption(**context):
     decision = choose_best_candidate(summary=summary, **params)
     return decision
 
+
 def _adopt_and_push(**context):
     from pdca.apply_adoption import adopt_and_push
+
     conf = context["dag_run"].conf or {}
     decision = context["ti"].xcom_pull(task_ids="decide_adoption")
     dry_run = bool(conf.get("DRY_RUN", False))
     tag_prefix = str(conf.get("TAG_PREFIX", "veritas"))
     release_notes = str(conf.get("RELEASE_NOTES", "PDCA auto adopt"))
-    result = adopt_and_push(decision=decision, dry_run=dry_run, tag_prefix=tag_prefix, release_notes=release_notes)
+    result = adopt_and_push(
+        decision=decision, dry_run=dry_run, tag_prefix=tag_prefix, release_notes=release_notes
+    )
     return result
+
 
 def _record_decision(**context):
     from core.decision_registry import DecisionRegistry
+
     decision = context["ti"].xcom_pull(task_ids="decide_adoption") or {}
     adopt_result = context["ti"].xcom_pull(task_ids="adopt_and_push") or {}
     try:
@@ -104,6 +120,7 @@ def _record_decision(**context):
         # ベストエフォートで継続
         return {"recorded": False, "error": str(e)}
 
+
 with DAG(
     dag_id=DAG_ID,
     description="Noctria PDCA Act: adopt & push & tag",
@@ -113,7 +130,6 @@ with DAG(
     catchup=False,
     tags=["noctria", "pdca", "act"],
 ) as dag:
-
     t_collect = PythonOperator(
         task_id="collect_recheck_summary",
         python_callable=_collect_recheck_summary,
@@ -154,15 +170,10 @@ PDCA 再評価結果の集計と、採用候補の選定ロジック。
   2) 将来的にDB (obs_* テーブル) へ切替可能
 """
 
-from __future__ import annotations
-import os
-import json
-from glob import glob
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PDCA_DIR = os.path.join(PROJECT_ROOT, "..", "data", "pdca_logs", "veritas_orders")
+
 
 def _read_jsonl(path: str) -> List[Dict[str, Any]]:
     rows = []
@@ -179,6 +190,7 @@ def _read_jsonl(path: str) -> List[Dict[str, Any]]:
                 continue
     return rows
 
+
 def _list_jsonl_files(lookback_days: int) -> List[str]:
     if not os.path.exists(DATA_PDCA_DIR):
         return []
@@ -193,6 +205,7 @@ def _list_jsonl_files(lookback_days: int) -> List[str]:
         except Exception:
             continue
     return sorted(out)
+
 
 def collect_candidates_summary(lookback_days: int = 30) -> Dict[str, Any]:
     """
@@ -231,10 +244,15 @@ def collect_candidates_summary(lookback_days: int = 30) -> Dict[str, Any]:
             if best is None:
                 best = t
                 continue
-            if (t["winrate_pct"], -t["max_drawdown_pct"], t["num_trades"]) > (best["winrate_pct"], -best["max_drawdown_pct"], best["num_trades"]):
+            if (t["winrate_pct"], -t["max_drawdown_pct"], t["num_trades"]) > (
+                best["winrate_pct"],
+                -best["max_drawdown_pct"],
+                best["num_trades"],
+            ):
                 best = t
         s["best"] = best
     return {"lookback_days": lookback_days, "candidates": summary}
+
 
 def choose_best_candidate(
     summary: Dict[str, Any],
@@ -275,15 +293,27 @@ def choose_best_candidate(
         pass_trades = best["num_trades"] >= MIN_TRADES
         if pass_win and pass_dd and pass_trades:
             if best_choice is None:
-                best_choice = {"strategy_id": sid, "baseline": {"win": baseline_win, "dd": baseline_dd}, "best": best}
+                best_choice = {
+                    "strategy_id": sid,
+                    "baseline": {"win": baseline_win, "dd": baseline_dd},
+                    "best": best,
+                }
             else:
                 # さらに優れたものを選ぶ
                 if (best["winrate_pct"], -best["max_drawdown_pct"], best["num_trades"]) > (
-                    best_choice["best"]["winrate_pct"], -best_choice["best"]["max_drawdown_pct"], best_choice["best"]["num_trades"]
+                    best_choice["best"]["winrate_pct"],
+                    -best_choice["best"]["max_drawdown_pct"],
+                    best_choice["best"]["num_trades"],
                 ):
-                    best_choice = {"strategy_id": sid, "baseline": {"win": baseline_win, "dd": baseline_dd}, "best": best}
+                    best_choice = {
+                        "strategy_id": sid,
+                        "baseline": {"win": baseline_win, "dd": baseline_dd},
+                        "best": best,
+                    }
         else:
-            reasons.append(f"{sid}: winΔ={delta_win:.2f} ddΔ={delta_dd:.2f} trades={best['num_trades']} -> pass_win={pass_win} pass_dd={pass_dd} pass_trades={pass_trades}")
+            reasons.append(
+                f"{sid}: winΔ={delta_win:.2f} ddΔ={delta_dd:.2f} trades={best['num_trades']} -> pass_win={pass_win} pass_dd={pass_dd} pass_trades={pass_trades}"
+            )
 
     if best_choice:
         return {"adopt": True, "choice": best_choice, "reasons": reasons}
@@ -301,32 +331,28 @@ def choose_best_candidate(
  - adopt報告用の結果を返却
 """
 
-from __future__ import annotations
-import os
-import json
-import time
-from typing import Dict, Any
-from datetime import datetime
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STRATEGIES_DIR = os.path.join(PROJECT_ROOT, "strategies", "veritas_generated")
 
+
 def _safe_mkdir(p: str):
     if not os.path.exists(p):
         os.makedirs(p, exist_ok=True)
+
 
 def _make_strategy_filename(strategy_id: str) -> str:
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     base = strategy_id.replace("/", "_").replace(" ", "_")
     return f"{base}_{ts}.py"
 
+
 def _render_strategy_stub(strategy_id: str, params: Dict[str, Any], metrics: Dict[str, Any]) -> str:
     # ここではスタブ戦略を生成：実環境ではVeritas出力やテンプレート合成に置き換え可能
-    return f'''# Auto-generated by PDCA Act
+    return f"""# Auto-generated by PDCA Act
 # strategy_id: {strategy_id}
 # generated_at: {datetime.utcnow().isoformat()}Z
 
-from typing import Any, Dict
 
 class Strategy_{strategy_id.replace("-", "_").replace(" ", "_")}:
     def __init__(self, params: Dict[str, Any]):
@@ -338,9 +364,15 @@ class Strategy_{strategy_id.replace("-", "_").replace(" ", "_")}:
 
 PARAMS = {json.dumps(params, ensure_ascii=False, indent=2)}
 METRICS = {json.dumps(metrics, ensure_ascii=False, indent=2)}
-'''
+"""
 
-def adopt_and_push(decision: Dict[str, Any], dry_run: bool = False, tag_prefix: str = "veritas", release_notes: str = "") -> Dict[str, Any]:
+
+def adopt_and_push(
+    decision: Dict[str, Any],
+    dry_run: bool = False,
+    tag_prefix: str = "veritas",
+    release_notes: str = "",
+) -> Dict[str, Any]:
     from core.git_utils import GitHelper
 
     if not decision or not decision.get("adopt"):
@@ -354,8 +386,12 @@ def adopt_and_push(decision: Dict[str, Any], dry_run: bool = False, tag_prefix: 
         "winrate_pct": best.get("winrate_pct"),
         "max_drawdown_pct": best.get("max_drawdown_pct"),
         "num_trades": best.get("num_trades"),
-        "baseline_win": decision.get("baseline", {}).get("win") if decision.get("baseline") else choice.get("baseline", {}).get("win"),
-        "baseline_dd": decision.get("baseline", {}).get("dd") if decision.get("baseline") else choice.get("baseline", {}).get("dd"),
+        "baseline_win": decision.get("baseline", {}).get("win")
+        if decision.get("baseline")
+        else choice.get("baseline", {}).get("win"),
+        "baseline_dd": decision.get("baseline", {}).get("dd")
+        if decision.get("baseline")
+        else choice.get("baseline", {}).get("dd"),
     }
 
     _safe_mkdir(STRATEGIES_DIR)

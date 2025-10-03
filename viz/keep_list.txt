@@ -1,0 +1,18 @@
+# auto-generated from NOCTRIA_CORE_REQUIRED markers
+airflow_docker/dags/noctria_kingdom_dag.py
+airflow_docker/dags/noctria_kingdom_pdca_dag.py
+noctria_gui/routes/observability.py
+noctria_gui/routes/statistics/statistics_dashboard.py
+src/codex/prompts/loader.py
+src/core/king_noctria.py
+src/core/path_config.py
+src/core/utils.py
+src/hermes/strategy_generator.py
+src/plan_data/collector.py
+src/plan_data/noctus_gate.py
+src/plan_data/trace.py
+src/scripts/__init__.py
+src/strategies/hermes_cognitor.py
+src/strategies/levia_tempest.py
+src/strategies/noctus_sentinella.py
+src/strategies/prometheus_oracle.py

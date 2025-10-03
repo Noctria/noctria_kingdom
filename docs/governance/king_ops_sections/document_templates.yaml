@@ -1,0 +1,209 @@
+# =======================================================
+# ドキュメント雛形テンプレ（Decision / Change）
+# =======================================================
+document_templates:
+  meta:
+    id_rules:
+      decision_id:
+        pattern: "{YYYYMMDD}-{metric}-{level}-{suffix}"
+        suffix_rule: "a1, a2, … 連番。同日・同指標で複数なら a2 以降。"
+      change_id:
+        pattern: "{YYYYMMDD}-{short-slug}"
+        slug_rule: "短い英小文字・ハイフン（例: calib-bins12 / rollback-priorT）"
+    enums:
+      level: ["NONE","NOTICE","WARN","CRITICAL"]
+      status: ["open","monitoring","closed","rolled_back","rejected"]
+      impact_level: ["low","medium","high"]
+    defaults:
+      owner: "王（Noctria）"
+      timezone: "UTC"
+
+  # ---------------------------
+  # Decision Log
+  # ---------------------------
+  decision_log:
+    file_naming:
+      pattern: "docs/decisions/{YYYY}/{YYYYMMDD}_{slug}.md"
+      slug_rule: "短い英小文字とハイフン。例: ece-warn-a1 / brier-critical-hotfix"
+    front_matter:
+      - "title: 'Decision — {decision_id}'"
+      - "tags: ['decision','noctria','kpi']"
+    markdown_template: |
+      # Decision — {decision_id}
+
+      **When (UTC)**: {time_utc}
+      **Level**: {level}
+      **Metric**: {metric}
+      **Owner**: {owner}
+
+      ## 0) Context
+      - decision_id: {decision_id}
+      - linked_changes: {linked_changes_or_dash}
+      - severity: {severity_or_dash}  <!-- optional: 1..5 -->
+      - impact_level: {impact_level_or_dash}  <!-- low|medium|high -->
+      - tags: {tags_or_dash}
+
+      ## 1) 事実（Facts）
+      - 最新値: {latest_value}
+      - 基準({baseline_label}): {baseline_value}
+      - 偏差(符号付き): {deviation_signed}
+      - 連続回数: {consecutive_or_dash}
+      - 参考: 直近 runs 概況 {runs_brief}
+      - 添付: {attachments_or_dash}  <!-- 画像/表: reliability.png 等 -->
+
+      ## 2) 判断（Decision）
+      - 種別: {level} → **{action_brief}**
+
+      ## 3) 根拠（Evidence）
+      - トリアージ: **{triage_category}**
+      - 根拠メモ:
+        - {evidence_1}
+        - {evidence_2}
+
+      ## 4) 王の命（Orders）
+      1) {order_1}
+      2) {order_2}
+      3) {order_3}
+
+      **成功条件**: {success_criteria_line}
+
+      ## 5) 検証計画（Verification）
+      - 検証ウィンドウ: {verify_window_desc}  <!-- 例: 次の3 runs / 24h -->
+      - チェック指標: {verify_metrics_line}
+      - 締切: {verify_due_utc}
+
+      ## 6) フォローアップ
+      - ステータス: {status}  <!-- open|monitoring|closed|rolled_back|rejected -->
+      - 次確認: {next_check_date}
+      - 参照:
+        - Daily: {daily_report_link_or_dash}
+        - Change Draft: {change_draft_link_or_dash}
+
+      ## 7) 監査（Audit）
+      - author_signature: {author_signature_or_dash}
+      - git_sha: `{git_sha}`
+      - data_snapshot_id: `{data_snapshot_id}`
+
+    acceptance_checklist:
+      - "レベル（NONE/WARN/CRITICAL）が明記されている"
+      - "最新値・基準・偏差・連続回数の数字が入っている"
+      - "Orders が最大3点で可観測（検証可能）"
+      - "成功条件が1行で定義されている"
+      - "検証ウィンドウ/締切が書かれている"
+      - "次回の確認日が書かれている"
+      - "linked_changes[] が必要時に埋まっている"
+
+    pr_snippet: |
+      **Decision {decision_id} — {metric}/{level}**
+      - 根拠: {triage_category} / dev={deviation_signed} / baseline={baseline_value}
+      - 命令: {orders_brief_one_line}
+      - 成功条件: {success_criteria_line}
+      - 検証: {verify_window_desc} by {verify_due_utc}
+      - リンク: {daily_report_link_or_dash} / {change_draft_link_or_dash}
+
+  # ---------------------------
+  # Change Draft
+  # ---------------------------
+  change_draft:
+    file_naming:
+      pattern: "docs/change/{YYYYMMDD}-{short-slug}.md"
+      slug_rule: "短い要約（英小文字・ハイフン）。例: calib-bins12 / rollback-priorT"
+    front_matter:
+      - "title: 'Change Draft — {change_id}'"
+      - "tags: ['change','noctria','kpi','rollback']"
+    markdown_template: |
+      # Change Draft — {change_id}
+
+      **Requester**: {requester}
+      **Owner**: {owner}
+      **Created (UTC)**: {created_at}
+
+      ## 0) Context
+      - linked_decisions: {linked_decisions_or_dash}
+      - impact_level: {impact_level}  <!-- low|medium|high -->
+      - risk_score(1..5x1..5): {risk_score_or_dash}
+      - tags: {tags_or_dash}
+
+      ## 1) 背景・問題（Problem）
+      - 事実: {problem_fact_line}
+      - ベースライン: {baseline_brief}
+      - KPI影響: {kpi_impact_short}
+      - 添付: {attachments_or_dash}
+
+      ## 2) 目的（Objective）
+      - 定量目標: {objective_quant_line}
+
+      ## 3) 範囲（Scope）
+      - 対象: {scope_target}
+      - 影響外: {scope_out_of}
+
+      ## 4) 影響評価（Impact Assessment）
+      - 指標基準: Brier(avg5)={brier_avg_last5}, ECE(avg5)={ece_avg_last5}, Adv.pass(min5)={adv_pass_min_last5}
+      - リスク:
+        - {risk_1}
+        - {risk_2}
+      - 軽減策:
+        - {mitigation_1}
+        - {mitigation_2}
+
+      ## 5) ロールアウト計画（Rollout Plan）
+      - Dry-runs: 3 回
+      - 手順:
+        1) evaluate_veritas（both / bins=12 / guard）
+        2) KPI記録（log_kpi_from_reports）
+        3) reliability 可視化（plot_reliability）
+      - 受け入れ基準:
+        - Brier ≤ baseline + 0.005
+        - ECE ≤ baseline - 0.02
+        - Adv.pass ≥ 0.40
+      - 本番適用ゲート: automation_gates.gate_full_autonomy
+      - 検証締切: {verification_due_utc}
+
+      ## 6) ロールバック計画（Rollback Plan）
+      - トリガ: {rollback_trigger_1}, {rollback_trigger_2}
+      - 行動: {rollback_action_1}, {rollback_action_2}
+      - ロールバック責任者: {rollback_owner_or_dash}
+
+      ## 7) 承認（Approvals）
+      - 王（Noctria）: {approve_state_king} / 備考: {approve_note_king}
+      - 人間PM（必要時）: {approve_state_hpm} / 備考: {approve_note_hpm}
+
+      ## 8) 実行ログ（Execution Log）
+      - {utc_time} | {actor} | {cmd_or_action} | {result} | {artifact_or_dash}
+
+      ## 9) まとめ（Summary）
+      - 変更前後のKPI差分: {delta_brief}
+      - 気づき: {insights_one_line}
+      - 次のアクション: {next_action_one_line}
+
+      ## 10) 監査（Audit）
+      - author_signature: {author_signature_or_dash}
+      - git_sha: `{git_sha}`
+      - data_snapshot_id: `{data_snapshot_id}`
+
+    acceptance_checklist:
+      - "問題→目的→範囲→影響→ロールアウト→ロールバック→承認→実行ログ→まとめの順で記載"
+      - "受け入れ基準が数値で書かれている"
+      - "ロールバックのトリガ/責任者/手順が明記されている"
+      - "linked_decisions[] が埋まっている（起票元がある場合）"
+
+    pr_snippet: |
+      **Change {change_id} — {short_slug}**
+      - 目的: {objective_quant_line}
+      - 影響: {impact_level} / リスク: {risk_score_or_dash}
+      - 手順: DRYx3 → log → plot
+      - 受け入れ: Brier≤+0.005 / ECE≤-0.02 / Adv≥0.40
+      - ロールバック: {rollback_trigger_1} → {rollback_action_1}
+      - 決定リンク: {linked_decisions_or_dash}
+      - 監査: sha={git_sha}, data={data_snapshot_id}
+
+  # ---------------------------
+  # 相互リンク運用
+  # ---------------------------
+  bidirectional_links_guideline:
+    purpose: "Decision と Change の相互追跡性・説明責任の強化"
+    rules:
+      - "Decisionから起票したChangeのIDを必ず参照欄に記載（複数可）"
+      - "Change Draft側にも『根拠Decision』として対応するDecision IDを記載"
+      - "Close/Promote/Rollback時: 双方の最終状態とKPI差分を相互更新"
+    violation_handling: "週次統合レビューで検知し、修復提案を自動生成（scripts.link_decisions_changes で補完）"

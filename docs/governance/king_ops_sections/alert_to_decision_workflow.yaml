@@ -1,0 +1,150 @@
+# =======================================================
+# 警報→Decision Log→Change Draft 連結ワークフロー
+# =======================================================
+alert_to_decision_workflow:
+  objectives:
+    - "警報発生から Decision Log 起票までの平均時間(MTTA)を短縮"
+    - "CRITICAL は Decision Log と Change Draft を同一日内に必ず作成"
+    - "証跡(links/artifacts)の完全性 100% を維持"
+
+  kpi_for_pm:
+    mtta_minutes_target: { warn: 60, critical: 15 }
+    mttr_hours_target: { warn: 24, critical: 24 }
+    # 追加: 分布を監視（中央値と90%点）
+    targets_distribution:
+      mtta_p50_min: { warn: 30, critical: 10 }
+      mtta_p90_max: { warn: 60, critical: 15 }
+      mttr_p90_max_hours: { warn: 24, critical: 24 }
+
+  triggers:
+    - when: "WARN"
+      actions:
+        - "document_templates.decision_log をコピペし、当日中に起票"
+        - "daily の『📣 王の訓示』へ最大3点の是正案を反映"
+      decision_id_pattern: "{YYYYMMDD}-{metric}-warn-{suffix}"
+      required_fields:
+        - level
+        - metric
+        - latest_value
+        - baseline_value
+        - deviation_signed
+        - triage_category
+        - orders
+        - success_criteria_line
+        - next_check_date
+      required_artifacts:
+        - "reliability.png（該当run）"
+        - "runsテーブルの抜粋（last5）: dailyに埋込 or リンク"
+
+    - when: "CRITICAL"
+      actions:
+        - "document_templates.decision_log と document_templates.change_draft を即時起票（同日）"
+        - "cadence.daily の臨時レビューを開催（最短枠）"
+        - "必要に応じてセーフモード是非を Noctus と協議"
+      decision_id_pattern: "{YYYYMMDD}-{metric}-critical-{suffix}"
+      required_fields:
+        - level
+        - metric
+        - consecutive_or_dash
+        - orders
+        - success_criteria_line
+        - next_check_date
+      required_artifacts:
+        - "検知ログ（アラート通知テンプレ filled）"
+        - "失敗/回帰ログ（ある場合）"
+        - "変更案の受入基準（Change draft の acceptance）"
+
+  defaults:
+    decision_suffix_rule: "a1, a2, … の連番。1日に同一指標で複数なら a2, a3 を付す。"
+    change_slug_rule: "短い要約（英小文字・ハイフン）例: calib-bins12, rollback-priorT"
+    timezone: "UTC"
+
+  # 追加: 状態と遷移のガード
+  states:
+    allowed: ["alerted","decision_open","change_open","monitoring","closed","rolled_back"]
+    transitions:
+      - from: alerted
+        to: decision_open
+        guard: "MTTA <= target & required_fields/artifacts を満たす"
+      - from: decision_open
+        to: change_open
+        when: "CRITICAL"
+      - from: { any: true }
+        to: monitoring
+        guard: "orders 実行開始 & 検証ウィンドウ設定済"
+      - from: monitoring
+        to: closed
+        guard: "success_criteria 達成"
+      - from: monitoring
+        to: rolled_back
+        guard: "rollback_triggers 満たす"
+
+  # 追加: 自動フック（スクリプトやCIから呼び出し）
+  automation_hooks:
+    on_alert_created:
+      - "scripts.generate_change_from_decision  # CRITICALのみ"
+      - "scripts.link_decisions_changes         # 双方向リンク補完"
+      - "create_pr_snippet: decisions/changes をPR説明文に貼る"
+    on_decision_opened:
+      - "scripts.reconcile_daily_with_decisions --date {today}"
+    on_change_opened:
+      - "scripts.validate_daily_report --block-on missing_required_sections"
+    on_closure:
+      - "scripts.link_decisions_changes"
+      - "scripts.publish_daily_report --dry-run=false"
+
+  # 追加: 失敗時扱いとリトライ
+  failure_handling:
+    retry:
+      max_attempts: 3
+      backoff_minutes: [2, 5, 10]
+    on_retry_exhausted:
+      escalate_to: ["human_pm","king"]
+      create_issue: true
+      annotate_daily: true
+
+  # 追加: 可観測性（収集メトリクス）
+  observability:
+    metrics:
+      - name: workflow_mtta_minutes
+        labels: [level]
+      - name: workflow_mttr_hours
+        labels: [level]
+      - name: workflow_slo_breach_count
+        labels: [type]   # mtta|mttr|artifacts_missing|lint_fail
+      - name: workflow_auto_generated_docs
+        labels: [type]   # decision|change
+    logs:
+      path: "docs/audit/{YYYY}/{YYYYMMDD}.log"
+      entries:
+        - "who: <actor> | action: open_decision | id: <decision_id> | at: <UTC>"
+        - "who: <actor> | action: open_change | id: <change_id> | at: <UTC>"
+        - "who: <actor> | action: link | d: <decision_id> | c: <change_id> | at: <UTC>"
+
+  # 追加: Lint/バリデーション
+  lint:
+    required_sections_decision:
+      - "Facts"
+      - "Decision"
+      - "Evidence"
+      - "Orders"
+      - "Verification"
+      - "Follow-up"
+    required_sections_change:
+      - "Problem"
+      - "Objective"
+      - "Scope"
+      - "Impact Assessment"
+      - "Rollout Plan"
+      - "Rollback Plan"
+      - "Approvals"
+      - "Execution Log"
+      - "Summary"
+    block_on_missing: true
+
+  acceptance_checklist:
+    - "WARN: MTTA ≤ 60分, 同日中に Decision Log 起票"
+    - "CRITICAL: MTTA ≤ 15分, 同日中に Decision Log と Change Draft を起票"
+    - "Daily に『🔔 警報』『📣 王の訓示』『参照』の3節が反映されている"
+    - "必須アーティファクト（画像/ログ/テーブル）が添付 or リンク済み"
+    - "lint 通過（必須セクション/フィールド/リンク）"

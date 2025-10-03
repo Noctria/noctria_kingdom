@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+
 class NoctriaEnv:
     def __init__(self):
         self.current_step = 0
@@ -8,9 +9,7 @@ class NoctriaEnv:
         self.state_dim = 12
         self.action_space = [-1, 0, 1]  # SELL, HOLD, BUY
 
-        self.trade_history = pd.DataFrame({
-            "profit": [10, -5, 15, -7, 20, -10, 5, -2, 12, -3]
-        })
+        self.trade_history = pd.DataFrame({"profit": [10, -5, 15, -7, 20, -10, 5, -2, 12, -3]})
 
     def reset(self):
         self.current_step = 0

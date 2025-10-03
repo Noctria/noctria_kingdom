@@ -1,0 +1,120 @@
+# =======================================================
+# 観測可能性（Logs/Metrics/Traces）
+# =======================================================
+observability:
+  correlation:
+    fields:
+      - "request_id"     # X-Request-Id（API契約で定義）
+      - "trace_id"       # X-Trace-Id / W3C traceparent
+      - "run_id"         # BT/FT/評価の一意ID
+      - "git_sha"        # Reproフッターと一致
+      - "env"            # dev|stg|prod
+    propagate_headers: ["X-Request-Id","X-Trace-Id","traceparent","tracestate"]
+
+  logs:
+    paths:
+      api: "logs/api/*.log"
+      bt:  "logs/bt/*.log"
+      ft:  "logs/ft/*.log"
+    format: "jsonl"
+    level:  { dev: "DEBUG", stg: "INFO", prod: "INFO" }
+    rotation:
+      max_size_mb: 100
+      max_files: 7
+      compress: true
+    retention_days: { dev: 7, stg: 30, prod: 90 }
+    schema:               # 最低限のフィールド契約
+      required: ["ts","level","logger","msg","env","request_id","trace_id"]
+      optional: ["pair","latency_ms","status","git_sha","run_id","component"]
+      ts_format: "RFC3339"
+    pii_redaction:
+      enabled: true
+      rules:
+        - pattern: "(?i)(authorization: Bearer )[A-Za-z0-9._-]+"
+          replace: "\\1***"
+        - pattern: "(?i)email=([^&\\s]+)"
+          replace: "email=<redacted>"
+    sampling:             # 高頻度ログの抑制
+      rate_per_sec_max: 50   # コンポーネント単位
+      drop_below_level: "DEBUG"
+
+  metrics:
+    backend: "prometheus"
+    conventions:
+      unit_suffix: true     # *_ms, *_total など
+      labels:
+        common: ["env","pair","model_ver"]
+        cardinality_guards:
+          pair_max: 20      # ラベル高カーディナリティの暴走防止
+    api:
+      counters:
+        - name: "predict_requests_total"
+          help: "Total requests"
+          labels: ["status_class"]  # 2xx/4xx/5xx
+      histograms:
+        - name: "predict_latency_ms"
+          help: "End-to-end latency"
+          buckets_ms: [25,50,100,150,250,400,600,1000]
+      gauges:
+        - name: "rate_limit_active_tokens"
+          help: "Active tokens in window"
+    btft:
+      counters:
+        - name: "bt_runs_total"
+        - name: "ft_runs_total"
+      gauges:
+        - name: "btft_summary_age_minutes"
+      alerts_bridge:        # KPIアラートとの橋渡し
+        - source_metric: "btft_summary_age_minutes"
+          rule: "value > 60"
+          raise: "WARN"
+    kpi_bridge:
+      export_from_db: true
+      series:
+        - name: "kpi_brier_score"
+        - name: "kpi_ece_calibration"
+        - name: "kpi_adv_pass_rate"
+
+  traces:
+    enabled: { dev: true, stg: true, prod: true }
+    sampler:
+      dev: { type: "always_on" }
+      stg: { type: "parent_or_ratio", ratio: 0.2 }
+      prod:{ type: "tail_sampling", targets: [{"service":"api","p95_latency_ms_gt":300,"ratio":1.0},{"status_class":"5xx","ratio":1.0},{"default":0.05}] }
+    exporter:
+      type: "otlp"
+      endpoint_env_var: "OTEL_EXPORTER_OTLP_ENDPOINT"
+      timeout_ms: 2000
+    resources:
+      service_name: "noctria"
+      attributes: ["env","git_sha","model_ver"]
+    span_attributes:
+      include: ["pair","bins","calib_T","request_bytes","response_bytes"]
+
+  dashboards:
+    refs:
+      - "grafana:/noctria/api-overview"     # RPS/latency/errors（RED）
+      - "grafana:/noctria/model-health"     # Brier/ECE/Adv.Pass
+      - "grafana:/noctria/btft-freshness"   # FRESH_* SLO
+    min_panels_check: ["p95","5xx_rate","error_budget_burn"]
+
+  alerts:
+    # 運用しやすい最小ルール（KPIアラートと重複させない設計）
+    rules:
+      - id: "A_API_P95"
+        expr: "predict_latency_ms:p95 > 300 for 5m"
+        severity: "warn"
+        route: "oncall"
+      - id: "A_API_5XX"
+        expr: "predict_5xx_total:rate5m > 0.01"
+        severity: "critical"
+        route: "oncall"
+      - id: "A_FRESH_FT"
+        expr: "btft_summary_age_minutes > 20"
+        severity: "warn"
+        route: "pm"
+    dedup:
+      window_minutes: 30
+      group_by: ["env","id"]
+    silence_windows:
+      cron: [{ when: "0 9 * * *", duration_minutes: 20, reason: "日次FT締切付近の揺らぎ" }]

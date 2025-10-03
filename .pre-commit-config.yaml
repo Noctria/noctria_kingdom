@@ -1,44 +1,25 @@
-# ===============================================
-# 🛡️ Noctria Kingdom pre-commit 統治設定ファイル
-# - ルート自動生成・コード整形・静的解析を統一
-# - routes/__init__.py 自動更新は王国標準
-# ===============================================
-
 repos:
-  # 🔍 基本チェック（改行・空白・衝突など）
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-      - id: check-merge-conflict        # 🔀 マージ衝突チェック
-      - id: end-of-file-fixer           # ⏎ 最終行改行補正
-      - id: trailing-whitespace         # 🚫 行末空白除去
-
-  # 🎨 コードフォーマット（Black）
-  - repo: https://github.com/psf/black
-    rev: 24.3.0
-    hooks:
-      - id: black
-        language_version: python3
-
-  # 🧹 静的解析（Flake8）
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-
-  # 🧭 import文の順序統一（reorder-python-imports）
-  - repo: https://github.com/asottile/reorder_python_imports
-    rev: v3.12.0
-    hooks:
-      - id: reorder-python-imports
-
-  # 🛠️ ローカルフック：routes/__init__.py 自動生成
-  - repo: local
-    hooks:
-      - id: generate-routes-init
-        name: 🛠 Auto-generate routes/__init__.py
-        entry: python3 tools/generate_routes_init.py
-        language: system
-        files: ^noctria_gui/routes/.*\.py$
-        always_run: true
-        pass_filenames: false
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.6.9
+  hooks:
+  - id: ruff
+    args:
+    - --fix
+  - id: ruff-format
+- repo: local
+  hooks:
+  - id: pytest
+    name: pytest
+    entry: pytest -q --maxfail=1 --disable-warnings -rA
+    language: system
+    pass_filenames: false
+  - id: pytest-lite
+    name: pytest (lite)
+    language: system
+    pass_filenames: true
+    types:
+    - python
+    files: ^(src/|tests/|noctria_gui/).*\.py$
+    exclude: ^(.github/workflows/|\.devcontainer/|scripts/|.*\.md$)
+    entry: bash -c "pytest -q -k 'not e2e and not heavy' -m 'not heavy' --maxfail=1
+      --disable-warnings"

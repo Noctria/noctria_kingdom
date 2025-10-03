@@ -1,0 +1,49 @@
+# docs/governance/doc_ops.yaml
+# =======================================================
+# ドキュメント運用ポリシー（再現フッター追加）
+# =======================================================
+
+doc_ops:
+  updates:
+    - "警報が出た日は必ず decision_log を1件作成"
+    - "CRITICAL日には change_management テンプレでドラフトを必ず起票"
+    - "日次レポートには【警報】セクションを固定配置（無い日も『検出なし』を明記）"
+    - "週次/月次レポートには直近の警報まとめと対応状況を必ず反映"
+  file_locations:
+    daily_reports: "docs/reports/daily/YYYY-MM-DD.md"
+    weekly_reports: "docs/reports/weekly/YYYY-WW.md"
+    monthly_reports: "docs/reports/monthly/YYYY-MM.md"
+    decisions: "docs/decisions/YYYY/"
+    changes: "docs/change/*.md"
+    gui_root: "noctria_kingdom/noctria_gui"
+    api_root: "noctria_kingdom/api"
+    bt_reports: "reports/backtest/"
+    ft_reports: "reports/forwardtest/"
+    api_contract_reports: "reports/api_contract/"
+    logs_root: "logs/"
+    btft_summary: "reports/btft_summary/"
+    governance_review: "docs/governance/review/"
+  review_checklist:
+    - "KPI現状とベースライン差分が言語化されているか"
+    - "triageカテゴリと根拠が1行で読めるか"
+    - "明日の一手が最大3点に絞られているか"
+    - "CRITICAL時の是正計画（Dry-run/受け入れ基準/ロールバック）が書かれているか"
+    - "【再現フッター】git_sha / data_snapshot_id / model_ver / seed / T / bins が記載されているか"
+  reproducibility_footer:
+    required_fields:
+      - "git_sha"
+      - "data_snapshot_id"
+      - "model_version"
+      - "random_seed"
+      - "temperature_T"
+      - "bins"
+    placement: "各レポートの末尾に固定配置"
+    example: |
+      ---
+      reproducibility:
+        git_sha: abc1234
+        data_snapshot_id: 2025-09-28T09:00Z
+        model_version: veritas-1.2.3
+        random_seed: 42
+        temperature_T: 1.8
+        bins: 12

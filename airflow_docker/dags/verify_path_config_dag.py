@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
@@ -17,8 +18,7 @@ with DAG(
     catchup=False,
     tags=["noctria", "integrity", "structure"],
 ) as dag:
-
     verify_path_integrity = BashOperator(
         task_id="verify_path_integrity",
-        bash_command="python3 tools/verify_path_config.py --strict --show-paths"
+        bash_command="python3 tools/verify_path_config.py --strict --show-paths",
     )

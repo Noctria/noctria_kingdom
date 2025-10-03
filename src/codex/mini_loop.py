@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from codex.run_codex_cycle import run_cycle, JSON_PATH, LATEST_MD
+from codex.run_codex_cycle import JSON_PATH, LATEST_MD, run_cycle
 
 # レポジトリルート（…/noctria_kingdom）
 REPO_ROOT = Path(__file__).resolve().parents[1]

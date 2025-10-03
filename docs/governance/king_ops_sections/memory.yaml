@@ -1,0 +1,11 @@
+memory_policy:
+  fields:
+    - key: "project_state"
+      ttl_days: 30
+    - key: "todos"
+      ttl_days: 14
+    - key: "blocked"
+      ttl_days: 7
+  redact:
+    patterns:
+      - "(OPENAI_API_KEY=)[A-Za-z0-9-_]+"

@@ -1,15 +1,16 @@
 # airflow_docker/dags/noctria_backtest_dag.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-
 import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timedelta
 from typing import Any, Dict
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+
 
 # ===== ユーティリティ =====
 def _mk_outdir(run_id: str) -> str:
@@ -35,6 +36,7 @@ def _heavy_env_ready() -> bool:
     """重依存が使えるか軽く判定"""
     try:
         import importlib
+
         importlib.import_module("torch")  # noqa: F401
         return True
     except Exception:

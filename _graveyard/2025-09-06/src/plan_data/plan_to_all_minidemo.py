@@ -111,10 +111,15 @@ def main():
 
         # NewsAPI 未設定時は NaN になりやすいので 0 埋め
         news_cols = [
-            "news_count", "news_positive", "news_negative",
-            "news_positive_ratio", "news_negative_ratio",
-            "news_spike_flag", "news_count_change",
-            "news_positive_lead", "news_negative_lead",
+            "news_count",
+            "news_positive",
+            "news_negative",
+            "news_positive_ratio",
+            "news_negative_ratio",
+            "news_spike_flag",
+            "news_count_change",
+            "news_positive_lead",
+            "news_negative_lead",
         ]
         for col in news_cols:
             if col in feat_df.columns:
@@ -144,7 +149,11 @@ def main():
         latest_row = valid_df.iloc[-1]
 
         # 実在する列のみを order にする（順序は STANDARD_FEATURE_ORDER 準拠）
-        feature_order = available_cols if available_cols else [c for c in STANDARD_FEATURE_ORDER if c in valid_df.columns]
+        feature_order = (
+            available_cols
+            if available_cols
+            else [c for c in STANDARD_FEATURE_ORDER if c in valid_df.columns]
+        )
 
         # 値が NaN ならその列の直近値で補完、無ければ 0.0
         feature_dict: Dict[str, float] = {}
@@ -224,13 +233,19 @@ def main():
             trace_id=trace_id,
             feature_staleness_min=feature_staleness_min,
             func=lambda: prometheus_ai.predict_future(
-                valid_df, n_days=5, decision_id="ALLDEMO-004", caller="plan_to_all", reason="一括デモ"
+                valid_df,
+                n_days=5,
+                decision_id="ALLDEMO-004",
+                caller="plan_to_all",
+                reason="一括デモ",
             ),
         )
         # JSON保存のために date を文字列へ
         if isinstance(pred_df, pd.DataFrame) and "date" in pred_df.columns:
             pred_df = pred_df.copy()
-            pred_df["date"] = pd.to_datetime(pred_df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+            pred_df["date"] = pd.to_datetime(pred_df["date"], errors="coerce").dt.strftime(
+                "%Y-%m-%d"
+            )
 
         print("\n🔮 Prometheus予測:\n", pred_df.head(5))
 

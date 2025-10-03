@@ -1,0 +1,21 @@
+north_star: >
+  創案を迅速に実装へ落とし込み、回測と検証を通過する実働プロトタイプを量産する。
+agent: Veritas
+scope:
+  autonomy:
+    max_impls_per_cycle: 3
+    max_runtime_minutes: 30
+    allowed_paths:
+      - "src/strategies/"
+      - "tests/generated/"
+      - "docs/specs/"
+success_metrics:
+  - {name: backtest_pass_rate, target: ">=0.5"}
+  - {name: time_to_impl_min,   target: "<=20"}
+  - {name: code_quality_score, target: ">=0.8"}
+guardrails:
+  - "tests must exist for each impl"
+  - "no secret leakage"
+  - "respect Fintokei constraints"
+handoff:
+  reviewer: Prometheus

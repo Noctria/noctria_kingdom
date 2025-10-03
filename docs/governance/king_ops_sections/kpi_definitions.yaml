@@ -1,0 +1,104 @@
+# =======================================================
+# KPI 定義（機械可読 + 検証ルールつき）
+# =======================================================
+kpi_definitions:
+  _defaults:
+    baseline:
+      mode: moving_window         # fixed_window | moving_window
+      window_runs: 5
+      robust_stat: median         # mean | median | trimmed_mean
+      min_samples: 20
+    evaluation:
+      timezone: UTC
+      drop_nan: true
+      drop_inf: true
+      require_monotonic_time: true
+    reporting:
+      decimals: 4                 # 表示小数
+      good_is_badge: true         # ↑/↓ の方向バッジ表示
+
+  brier_score:
+    description: "確率予測の平均二乗誤差。低いほど良い。"
+    good_is: low
+    unit: "abs error^2"
+    formula: "mean((p - y)^2), y∈{0,1}"
+    range: [0.0, 1.0]
+    aggregation:
+      baseline: { mode: moving_window, window_runs: 5, robust_stat: median, min_samples: 20 }
+      scoring: mean
+    decomposition:
+      enabled: true
+      components: ["uncertainty", "resolution", "reliability"]
+    exclusions:
+      - "samples < 5"
+      - "label ∉ {0,1}"
+    reporting:
+      decimals: 4
+      notes:
+        - "Brier↓=良。ECEや信頼度曲線と併読すること。"
+
+  ece_calibration:
+    description: "信頼度と実測の乖離。低いほど良い。"
+    good_is: low
+    unit: "absolute gap"
+    # 代表的な定義（等幅ビンの期待較正誤差）
+    formula: "sum_k (n_k / N) * |acc_k - conf_k|"
+    range: [0.0, 1.0]
+    evaluation:
+      bins:
+        policy_ref: "decision_rules.calibration_policy.binning"
+        fallback_bins: 10
+        min_bin_size: 5
+      confidence_interval:
+        method: "bootstrap"
+        n_boot: 1000
+        alpha: 0.05
+    aggregation:
+      baseline: { mode: moving_window, window_runs: 5, robust_stat: median, min_samples: 20 }
+      scoring: mean
+    exclusions:
+      - "N < evaluation.bins.min_bin_size * 3"
+    reporting:
+      decimals: 4
+      notes:
+        - "binsはサンプル数に応じて自動調整。CIを併記可。"
+
+  adversarial_pass_rate:
+    description: "逆境テストの合格率。高いほど良い。"
+    good_is: high
+    unit: "ratio"
+    formula: "passes / total_scenarios"
+    range: [0.0, 1.0]
+    evaluation:
+      scenario_suite_ref: "backlog.BL-010"   # シナリオ強度の段階化
+      min_scenarios: 10
+      stratified: true                       # レジーム別/ペア別の層化
+    aggregation:
+      baseline: { mode: moving_window, window_runs: 5, robust_stat: median, min_samples: 10 }
+      scoring: mean
+    exclusions:
+      - "total_scenarios < evaluation.min_scenarios"
+    reporting:
+      decimals: 3
+      notes:
+        - "層化平均と最小合格率(min by stratum)を併記推奨。"
+
+  # ---- 共通バリデーション（lint用） ----
+  validation:
+    require_fields:
+      - "*.description"
+      - "*.good_is"
+      - "*.formula"
+      - "*.range"
+      - "*.aggregation.baseline.window_runs"
+      - "*.aggregation.baseline.robust_stat"
+    enums:
+      good_is: ["low", "high"]
+      aggregation.baseline.robust_stat: ["mean", "median", "trimmed_mean"]
+    guards:
+      - rule: "range[0] >= 0"
+        message: "下限は0以上であること"
+      - rule: "range[1] <= 1"
+        message: "上限は1以下であること"
+      - rule: "aggregation.baseline.window_runs >= 3"
+        message: "window_runsは3以上にすること"

@@ -22,7 +22,4 @@ def get_veritas_eval_logs():
             logs = json.load(f)
             return logs
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"ログ読み込み失敗: {str(e)}"}
-        )
+        return JSONResponse(status_code=500, content={"error": f"ログ読み込み失敗: {str(e)}"})

@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from airflow import DAG
@@ -38,6 +38,7 @@ DEFAULT_ARGS = {
     "retries": 0,
 }
 
+
 # ==== ユーティリティ ======================================================
 def _safe_to_float(x) -> Optional[float]:
     try:
@@ -46,6 +47,7 @@ def _safe_to_float(x) -> Optional[float]:
         return float(x)
     except Exception:
         return None
+
 
 def _load_pdca_logs() -> pd.DataFrame:
     """
@@ -79,11 +81,16 @@ def _load_pdca_logs() -> pd.DataFrame:
 
     # 必須列の補完
     for col in [
-        "strategy", "evaluated_at",
-        "winrate_old", "winrate_new",
-        "maxdd_old", "maxdd_new",
-        "trades_old", "trades_new",
-        "tag", "notes",
+        "strategy",
+        "evaluated_at",
+        "winrate_old",
+        "winrate_new",
+        "maxdd_old",
+        "maxdd_new",
+        "trades_old",
+        "trades_new",
+        "tag",
+        "notes",
     ]:
         if col not in df_all.columns:
             df_all[col] = None
@@ -119,7 +126,9 @@ def _apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
     if df_from:
         res = res[res["evaluated_at"] >= pd.to_datetime(df_from, errors="coerce")]
     if df_to:
-        res = res[res["evaluated_at"] <= pd.to_datetime(df_to, errors="coerce") + pd.Timedelta(days=1)]
+        res = res[
+            res["evaluated_at"] <= pd.to_datetime(df_to, errors="coerce") + pd.Timedelta(days=1)
+        ]
 
     # 勝率/最大DD
     wr_min = filters.get("winrate_diff_min")
@@ -179,9 +188,7 @@ def _select_targets(conf: Dict[str, Any]) -> List[str]:
     df = _load_pdca_logs()
     if not df.empty:
         dff = _apply_filters(df, filters)
-        strategies = (
-            dff["strategy"].dropna().astype(str).str.strip().tolist()
-        )
+        strategies = dff["strategy"].dropna().astype(str).str.strip().tolist()
         strategies = [s for s in strategies if s]
         if strategies:
             return sorted(set(strategies))

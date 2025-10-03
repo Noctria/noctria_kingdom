@@ -9,7 +9,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-
 DEFAULT_JSON = "codex_reports/tmp.json"
 DEFAULT_OUT = "codex_reports/patch_notes.md"
 

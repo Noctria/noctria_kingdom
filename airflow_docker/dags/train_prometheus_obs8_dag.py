@@ -1,3 +1,16 @@
+from __future__ import annotations
+
+import importlib
+import json
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+
 # airflow_docker/dags/train_prometheus_obs8_dag.py
 # -*- coding: utf-8 -*-
 """
@@ -23,23 +36,11 @@ then evaluate N episodes and stamp results into metadata.json.
 - eval_deterministic (bool or "true"/"false", default: ENV EVAL_DETERMINISTIC or true)
 """
 
-from __future__ import annotations
-
-import os
-import sys
-import json
-import importlib
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict
 
 # --- ensure src importable in Airflow containers ---
 for p in ("/opt/airflow/src", "/opt/airflow"):
     if p not in sys.path:
         sys.path.append(p)
-
-from airflow import DAG
-from airflow.operators.python import PythonOperator
 
 
 def _safe_get(d: Dict[str, Any], key: str, cast, default=None):
@@ -95,9 +96,9 @@ with DAG(
         """
         # delayed imports
         from src.utils.model_io import (
-            infer_obs_dim_from_env,
-            build_model_path,
             atomic_save_model,
+            build_model_path,
+            infer_obs_dim_from_env,
         )
         from stable_baselines3 import PPO
 
@@ -159,8 +160,8 @@ with DAG(
         - eval_n_episodes: from conf or ENV EVAL_N_EPISODES or 5
         - eval_deterministic: from conf or ENV EVAL_DETERMINISTIC or True
         """
-        from stable_baselines3 import PPO
         import numpy as np
+        from stable_baselines3 import PPO
 
         # pull model dir from XCom (train task return)
         ti = context["ti"]
@@ -244,15 +245,17 @@ with DAG(
             if meta_path.exists():
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta.setdefault("evaluation", {})
-            meta["evaluation"].update({
-                "evaluated_at_utc": datetime.utcnow().isoformat(timespec="seconds"),
-                "n_episodes": int(n_episodes),
-                "deterministic": bool(deterministic),
-                "avg_reward": float(avg),
-                "std_reward": float(std),
-                "win_rate": float(win_rate),
-                "ep_len_mean": float(ep_len_mean),
-            })
+            meta["evaluation"].update(
+                {
+                    "evaluated_at_utc": datetime.utcnow().isoformat(timespec="seconds"),
+                    "n_episodes": int(n_episodes),
+                    "deterministic": bool(deterministic),
+                    "avg_reward": float(avg),
+                    "std_reward": float(std),
+                    "win_rate": float(win_rate),
+                    "ep_len_mean": float(ep_len_mean),
+                }
+            )
             meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"[OK] stamped evaluation into: {meta_path}")
 

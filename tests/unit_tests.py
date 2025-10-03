@@ -1,9 +1,10 @@
 # tests/unit_tests.py
 import unittest
 
+from execution.order_execution import OrderExecution
+
 # --- SUT imports --------------------------------------------------------------
 from strategies.Aurus_Singularis import AurusSingularis
-from execution.order_execution import OrderExecution
 
 # `ORDER_TYPE_BUY` がプロジェクト側に定義されていればそれを使用し、
 # 見つからない環境でもテストが動くようフォールバックを用意する

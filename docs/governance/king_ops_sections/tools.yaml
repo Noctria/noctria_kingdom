@@ -1,0 +1,40 @@
+tools:
+  allowlist:
+    - id: git.diff_docs
+      kind: shell
+      entry: python scripts/generate_docs_diff_report.py --range {range} --path docs/ --json-sidecar docs/_generated/diff_report.json --summary-only --find-renames
+      params:
+        required:
+          - range
+      safety:
+        cwd: .
+        network: false
+    - id: pytest.lite
+      kind: shell
+      entry: pytest -q -k 'not e2e and not heavy' -m 'not heavy' --maxfail=1 --disable-warnings
+      safety:
+        cwd: .
+        network: false
+    - id: deps.install_gui
+      kind: shell
+      entry: pip install -r requirements_gui.txt
+      safety:
+        cwd: .
+        network: true
+    - id: gh.runner_smoke
+      kind: workflow
+      workflow: .github/workflows/runner-smoke.yml
+      dispatch: workflow_dispatch
+    - id: weekly.consolidate
+      kind: shell
+      entry: python scripts/weekly_consolidate_from_diff_json.py --json docs/_generated/diff_report.json
+      safety:
+        cwd: .
+        network: false
+    - id: git.auto_pr
+      kind: shell
+      entry: 'python scripts/git_auto_pr.py --files docs/_generated/weekly_insert.md docs/_generated/diff_report.json docs/_generated/diff_report.md --title "chore: weekly report update" --branch-prefix "chore/weekly-report-" --base "main"'
+      safety:
+        cwd: .
+        network: true
+  denylist: []

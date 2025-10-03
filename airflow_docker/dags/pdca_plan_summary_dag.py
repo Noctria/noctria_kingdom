@@ -1,9 +1,9 @@
 # airflow_docker/dags/pdca_plan_summary_dag.py
 
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.utils.dates import days_ago
-from datetime import datetime
 
 default_args = {
     "owner": "noctria",
@@ -20,9 +20,8 @@ with DAG(
     catchup=False,
     tags=["pdca", "plan", "ai", "summary"],
 ) as dag:
-
     make_plan_summary = BashOperator(
         task_id="make_plan_summary",
         bash_command="PYTHONPATH=/opt/airflow/src python /opt/airflow/src/plan_data/run_pdca_plan_workflow.py",
-        env={"PYTHONPATH": "/opt/airflow/src"}
+        env={"PYTHONPATH": "/opt/airflow/src"},
     )

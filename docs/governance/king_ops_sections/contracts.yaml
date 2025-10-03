@@ -1,0 +1,118 @@
+# =======================================================
+# API 契約（/predict 最小I/O）
+# =======================================================
+contracts:
+  api:
+    predict:
+      meta:
+        method: "POST"
+        path: "/predict"
+        content_type: "application/json; charset=utf-8"
+        auth: { type: "bearer", required: true, scopes: ["predict:read"] }
+        idempotency:
+          header: "Idempotency-Key"         # 同一キーは一定時間同一応答
+          ttl_seconds: 300
+        tracing_headers:
+          request_id: "X-Request-Id"
+          trace_id:   "X-Trace-Id"
+        caching:
+          response_headers:
+            - "Cache-Control: no-store"
+            - "Pragma: no-cache"
+        slo:
+          p95_latency_ms_max: 300
+          availability_pct_month_min: 99.0
+
+      request_schema:
+        pair: "string 例: EURUSD（大文字アルファベット6）"
+        timestamp: "int(epoch_sec) — サーバ時刻との差 |Δ| ≤ 60s"
+        features: "array<number>（必須・長さ≥1）"
+        feature_schema_id: "string(optional) — 事前合意した特徴量スキーマID/ハッシュ"
+        version: "string(optional) — クライアント要求の推論APIバージョン"
+        request_meta: "object(optional) — 任意のタグ（backtest_id, run_id など）"
+
+      response_schema:
+        pair: "string"
+        timestamp: "int(epoch_sec) — 入力を反映（矯正時はserver_tsも併記）"
+        server_ts: "int(epoch_sec) — サーバ受理時刻"
+        proba_up:   "number[0,1]"
+        proba_down: "number[0,1]"
+        calibrated: "bool"
+        model_ver: "string"
+        calib_T:   "number"
+        bins:      "int"
+        uncertainty:
+          ece_bin: "number(optional) — 当該ビンのECE見積もり"
+          nll:     "number(optional)"
+        warnings: "array<string>(optional) — 境界条件/補正の注意書き"
+        latency_ms: "number"
+
+      validation_rules:
+        - "proba_up + proba_down ∈ [1-1e-6, 1+1e-6]"
+        - "timestamp <= now()+60s（超過は 422）"
+        - "features.length >= 1"
+        - "pair ∈ 通貨ペア許可集合（環境ごとに定義）"
+        - "calib_T > 0, bins ∈ {10,12,15}"
+
+      rate_limit:
+        scope: "per IP & per token（厳しい方を適用）"
+        stg: "60 rpm / IP, 600 rph / token"
+        prod: "120 rpm / IP, 1200 rph / token"
+        headers:
+          - "X-RateLimit-Limit"
+          - "X-RateLimit-Remaining"
+          - "Retry-After  # 429時"
+
+      timeouts_ms:
+        read: 2500
+        write: 2500
+
+      errors:
+        schema:
+          code: "string — machine code（例: VALIDATION_ERROR）"
+          message: "string — 人間可読"
+          details: "object(optional) — フィールドごとのエラー"
+        statuses:
+          - { http: 400, code: "BAD_REQUEST",        when: "JSON/型不正・必須欠落" }
+          - { http: 401, code: "UNAUTHORIZED",       when: "トークン欠落/失効" }
+          - { http: 403, code: "FORBIDDEN",          when: "scope不足" }
+          - { http: 422, code: "VALIDATION_ERROR",   when: "timestamp未来・pair不許可 等" }
+          - { http: 429, code: "RATE_LIMITED",       when: "レート制限超過（Retry-After付与）" }
+          - { http: 503, code: "MODEL_UNAVAILABLE",  when: "モデル/依存先一時不可（ブレーカ発動含む）" }
+
+      examples:
+        request:
+          json: |
+            {
+              "pair": "EURUSD",
+              "timestamp": 1738212345,
+              "features": [0.12, -1.9, 4.0, 0.003],
+              "feature_schema_id": "fs_v3_bf0c9a12",
+              "version": "v1",
+              "request_meta": {"run_id": "ft_2025-01-12"}
+            }
+        response_ok:
+          json: |
+            {
+              "pair": "EURUSD",
+              "timestamp": 1738212345,
+              "server_ts": 1738212346,
+              "proba_up": 0.612345,
+              "proba_down": 0.387655,
+              "calibrated": true,
+              "model_ver": "mvt-1.4.2",
+              "calib_T": 1.23,
+              "bins": 12,
+              "uncertainty": {"ece_bin": 0.031, "nll": 0.676},
+              "warnings": [],
+              "latency_ms": 142.0
+            }
+        response_error_422:
+          json: |
+            {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "timestamp is too far in the future",
+                "details": {"timestamp": "Δ=+125s > 60s"}
+              }
+            }

@@ -1,0 +1,112 @@
+version: 1
+policy:
+  selection_mode: "rule-then-fallback"   # rule-then-fallback | weighted-random
+  max_lines: 1                            # レポート冒頭は1文
+  language: "ja"
+  variables:
+    - name: date
+      required: true
+    - name: run_id
+      required: false
+    - name: kpi.brier
+      required: true
+    - name: kpi.ece
+      required: true
+    - name: kpi.adv_pass
+      required: true
+    - name: trend.brier        # down/flat/up（ε=0.01 基準）
+      required: true
+    - name: trend.ece
+      required: true
+    - name: trend.adv_pass
+      required: true
+  thresholds:
+    improve_epsilon: 0.01                 # 改善/悪化の最小幅
+    degradation_guard:
+      brier_max: 0.22
+      ece_max: 0.42
+      adv_min: 0.35
+
+rules:
+  - id: "improving_confidence"
+    when:
+      all:
+        - trend.ece == "down"             # ECEは小さいほど良い → down = 改善
+        - trend.brier == "down"
+    pick:
+      pool: ["A-1","C-3","D-3"]
+      strategy: "first-fit"
+
+  - id: "stable_but_high_risk"
+    when:
+      all:
+        - trend.ece in ["flat","down"]
+        - trend.brier in ["flat","down"]
+        - kpi.adv_pass < 0.35
+    pick:
+      pool: ["B-2","B-3","A-2"]
+
+  - id: "degradation_detected"
+    when:
+      any:
+        - trend.ece == "up"
+        - trend.brier == "up"
+    pick:
+      pool: ["A-3","B-1","D-2"]
+
+fallback:
+  weighted:
+    "A-1": 2
+    "C-1": 1
+    "D-1": 1
+
+guards:
+  no_repeat_last_code: true               # 直前runで選んだcodeの連続選択を禁止
+  emergency_mode:
+    trigger:
+      all:
+        - kpi.adv_pass < 0.25
+        - kpi.ece > 0.42
+    force_pool: ["B-2","B-3"]            # 緊急時はリスク警句を優先
+
+edicts:
+  # A. KPI基盤系
+  - code: "A-1"
+    text: "数の知恵を集めよ、勝利の礎となすべし"
+    tags: ["kpi","foundation","improvement"]
+  - code: "A-2"
+    text: "計測なき改善なし、改善なき勝利なし"
+    tags: ["kpi","discipline"]
+  - code: "A-3"
+    text: "数値は嘘をつかぬ、誤るは人なり"
+    tags: ["kpi","alert"]
+
+  # B. 戦略/リスク系
+  - code: "B-1"
+    text: "風の流れを読み、嵐をも制せよ"
+    tags: ["risk","strategy"]
+  - code: "B-2"
+    text: "一瞬の油断が千日の損となる"
+    tags: ["risk","discipline"]
+  - code: "B-3"
+    text: "敵は市場にあらず、己が慢心にあり"
+    tags: ["risk","mindset"]
+
+  # C. 自律/学習系
+  - code: "C-1"
+    text: "失敗は知恵の種なり、芽吹かせて刈り取れ"
+    tags: ["learning","autonomy"]
+  - code: "C-3"
+    text: "王国は日々に学び、日々に強くなる"
+    tags: ["learning","culture"]
+
+  # D. 精神/文化系
+  - code: "D-1"
+    text: "王国は一つ、志も一つ"
+    tags: ["unity","culture"]
+  - code: "D-2"
+    text: "統治とは重荷にあらず、未来を築く誉れなり"
+    tags: ["leadership","culture"]
+  - code: "D-3"
+    text: "今日もまた、王国の旗を高く掲げよ"
+    tags: ["spirit","momentum"]

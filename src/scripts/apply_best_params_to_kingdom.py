@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import os
 import shutil
 import tempfile
@@ -11,14 +10,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+
 # ------------------------------------------------------------
 # ロガー（プロジェクト共通ロガーがあれば利用、無ければ標準logging）
 # ------------------------------------------------------------
 def _setup_logger() -> logging.Logger:
     logger_name = "ApplyBestParamsToKingdom"
     try:
-        from src.core.path_config import LOGS_DIR  # type: ignore
         from src.core.logger import setup_logger  # type: ignore
+        from src.core.path_config import LOGS_DIR  # type: ignore
 
         log_path = Path(LOGS_DIR) / "scripts" / "apply_best_params_to_kingdom.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -41,9 +41,7 @@ logger = _setup_logger()
 #   - NOCTRIA_PRODUCTION_META_NAME   : 省略時 "metaai_production_metadata.json"
 # ------------------------------------------------------------
 MODELS_DIR = Path(os.environ.get("NOCTRIA_MODELS_DIR", "/opt/airflow/data/models"))
-PRODUCTION_DIR = Path(
-    os.environ.get("NOCTRIA_PRODUCTION_DIR", str(MODELS_DIR / "production"))
-)
+PRODUCTION_DIR = Path(os.environ.get("NOCTRIA_PRODUCTION_DIR", str(MODELS_DIR / "production")))
 LATEST_NAME = os.environ.get("NOCTRIA_PRODUCTION_LATEST_NAME", "metaai_production_latest.zip")
 META_NAME = os.environ.get("NOCTRIA_PRODUCTION_META_NAME", "metaai_production_metadata.json")
 
@@ -153,7 +151,9 @@ def _save_meta(path: Path, data: Dict[str, Any]) -> None:
 #     "old_score": -inf
 #   }
 # ------------------------------------------------------------
-def apply_best_params_to_kingdom(model_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def apply_best_params_to_kingdom(
+    model_info: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     if not model_info:
         detail = "model_info が空です"
         logger.warning(detail)
@@ -218,7 +218,9 @@ def apply_best_params_to_kingdom(model_info: Optional[Dict[str, Any]] = None) ->
         }
         _save_meta(META_PATH, new_meta)
 
-        logger.info(f"✅ 昇格完了: {promoted_model_path}（score {new_score:.4f} > {old_score:.4f}）")
+        logger.info(
+            f"✅ 昇格完了: {promoted_model_path}（score {new_score:.4f} > {old_score:.4f}）"
+        )
         return {
             "status": "OK",
             "detail": "promoted",
@@ -236,7 +238,9 @@ def apply_best_params_to_kingdom(model_info: Optional[Dict[str, Any]] = None) ->
             "detail": detail,
             "error": traceback.format_exc(),
             "production_model_path": None,
-            "new_score": float(model_info.get("evaluation_score", 0.0)) if model_info else float("nan"),
+            "new_score": (
+                float(model_info.get("evaluation_score", 0.0)) if model_info else float("nan")
+            ),
             "old_score": float("-inf"),
         }
 

@@ -1,3 +1,18 @@
+import datetime as _dt
+import difflib
+import json
+import os
+import re
+import subprocess
+import sys as _sys
+from pathlib import Path
+from pathlib import Path as _P
+from typing import Any, Dict, List, Optional, Tuple
+
+from codex.agents.harmonia import ReviewResult, review  # ← API版レビュー
+from codex.agents.inventor import InventorOutput, PatchSuggestion, propose_fixes
+from codex.tools.json_parse import build_pytest_result_for_inventor, load_json
+
 # codex/tools/review_pipeline.py
 # -*- coding: utf-8 -*-
 """
@@ -45,8 +60,6 @@ from __future__ import annotations
 # Permanent import-path bootstrap (works for `python codex/tools/review_pipeline.py`)
 # Adds PROJECT_ROOT and PROJECT_ROOT/src into sys.path.
 # ---------------------------------------------------------------------------
-import sys as _sys
-from pathlib import Path as _P
 
 _ROOT = _P(__file__).resolve().parents[2]  # repo/（典型配置: repo/codex/tools/review_pipeline.py）
 for _p in (_ROOT, _ROOT / "src"):
@@ -54,20 +67,8 @@ for _p in (_ROOT, _ROOT / "src"):
     if _sp not in _sys.path:
         _sys.path.insert(0, _sp)
 
-import datetime as _dt
-import json
-import os
-import re
-import difflib
-import subprocess
-from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
-
-from codex.tools.json_parse import load_json, build_pytest_result_for_inventor
 
 # 既存 Inventor / Harmonia(API) インターフェース
-from codex.agents.inventor import propose_fixes, InventorOutput, PatchSuggestion
-from codex.agents.harmonia import review, ReviewResult  # ← API版レビュー
 
 # オフライン Harmonia（存在しなければ後述のフォールバックを使用）
 try:
@@ -81,18 +82,23 @@ except Exception:
 # まず既存の推定を採用
 ROOT = Path(__file__).resolve().parents[2]
 
+
 # 可能なら Git 上のルートを優先して利用（src/ 下に移動しても破綻しないように）
 def _git_repo_root_fallback() -> Path:
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
-            check=True, capture_output=True, text=True, cwd=str(ROOT)
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
         ).stdout.strip()
         if out:
             return Path(out)
     except Exception:
         pass
     return ROOT
+
 
 ROOT = _git_repo_root_fallback()
 REPORTS_DIR = ROOT / "codex_reports"
@@ -117,18 +123,16 @@ PATCHES_INDEX = REPORTS_DIR / "patches_index.md"
 # Helpers
 # ---------------------------------------------------------------------------
 def _md_escape(x: str) -> str:
-    return (
-        x.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return x.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _now_iso() -> str:
     return _dt.datetime.now(_dt.timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-def _extract_summary_and_failed_tests(data: Dict[str, Any]) -> Tuple[Dict[str, int], List[Dict[str, Any]]]:
+def _extract_summary_and_failed_tests(
+    data: Dict[str, Any],
+) -> Tuple[Dict[str, int], List[Dict[str, Any]]]:
     """
     pytest-json-report の構造から合計/失敗の要約と、失敗テストの明細を抽出。
     - 失敗が無ければ failed_tests は空配列を返す。
@@ -166,9 +170,9 @@ def _render_pytest_summary_md(summary: Dict[str, int], failed_tests: List[Dict[s
     lines.append("# 🧪 Pytest Summary")
     lines.append("")
     lines.append(f"- Generated: `{_now_iso()}`")
-    lines.append(f"- Passed: **{summary.get('passed',0)}**")
-    lines.append(f"- Failed: **{summary.get('failed',0)}**")
-    lines.append(f"- Total : **{summary.get('total',0)}**")
+    lines.append(f"- Passed: **{summary.get('passed', 0)}**")
+    lines.append(f"- Failed: **{summary.get('failed', 0)}**")
+    lines.append(f"- Total : **{summary.get('total', 0)}**")
     lines.append("")
     if failed_tests:
         lines.append("## ❌ Failures")
@@ -177,7 +181,7 @@ def _render_pytest_summary_md(summary: Dict[str, int], failed_tests: List[Dict[s
             msg = (f.get("message") or "").strip()
             lines.append(f"- **{tc}**")
             if msg:
-                lines.append(f"  - `{msg[:350] + ('...' if len(msg)>350 else '')}`")
+                lines.append(f"  - `{msg[:350] + ('...' if len(msg) > 350 else '')}`")
         lines.append("")
     return "\n".join(lines)
 
@@ -246,9 +250,12 @@ def _make_unified_diff_from_before_after(file_path: str, before: str, after: str
     b_label = f"b/{file_path}"
 
     diff = difflib.unified_diff(
-        before_lines, after_lines,
-        fromfile=a_label, tofile=b_label,
-        fromfiledate=_now_iso(), tofiledate=_now_iso(),
+        before_lines,
+        after_lines,
+        fromfile=a_label,
+        tofile=b_label,
+        fromfiledate=_now_iso(),
+        tofiledate=_now_iso(),
         n=3,
     )
     return "".join(diff)
@@ -271,8 +278,8 @@ def write_inventor_markdown(
     lines.append(f"- Generated at: `{_now_iso()}`")
     if pytest_summary:
         lines.append(
-            f"- Pytest Summary: **{pytest_summary.get('passed',0)}/{pytest_summary.get('total',0)} passed**, "
-            f"failed={pytest_summary.get('failed',0)}"
+            f"- Pytest Summary: **{pytest_summary.get('passed', 0)}/{pytest_summary.get('total', 0)} passed**, "
+            f"failed={pytest_summary.get('failed', 0)}"
         )
     if header_note:
         lines.append(f"- Note: {_md_escape(header_note)}")
@@ -340,7 +347,7 @@ def write_harmonia_markdown(
     rv: ReviewResult,
     *,
     header_note: Optional[str] = None,
-    pytest_summary: Optional[Dict[str, int]] = None
+    pytest_summary: Optional[Dict[str, int]] = None,
 ) -> None:
     lines: List[str] = []
     lines.append("# Harmonia Ordinis — レビューレポート")
@@ -348,8 +355,8 @@ def write_harmonia_markdown(
     lines.append(f"- Generated at: `{_now_iso()}`")
     if pytest_summary:
         lines.append(
-            f"- Pytest Summary: **{pytest_summary.get('passed',0)}/{pytest_summary.get('total',0)} passed**, "
-            f"failed={pytest_summary.get('failed',0)}"
+            f"- Pytest Summary: **{pytest_summary.get('passed', 0)}/{pytest_summary.get('total', 0)} passed**, "
+            f"failed={pytest_summary.get('failed', 0)}"
         )
     if header_note:
         lines.append(f"- Context: {_md_escape(header_note)}")
@@ -409,7 +416,9 @@ def write_patch_files(out: InventorOutput) -> List[Tuple[Path, PatchSuggestion]]
     return saved
 
 
-def _write_single_patch_from_external(seq: int, title: str, file_path: str, patch_text: str) -> Optional[Path]:
+def _write_single_patch_from_external(
+    seq: int, title: str, file_path: str, patch_text: str
+) -> Optional[Path]:
     """
     外部 JSON アイテム（unified diff テキスト）から .patch を書き出す。
     """
@@ -492,7 +501,9 @@ def generate_patches_from_external() -> List[Tuple[Path, Dict[str, Any]]]:
         if isinstance(item.get("patch"), str) and item["patch"].strip():
             patch_text = item["patch"]
         elif item.get("before") is not None and item.get("after") is not None:
-            patch_text = _make_unified_diff_from_before_after(file_path, str(item["before"]), str(item["after"]))
+            patch_text = _make_unified_diff_from_before_after(
+                file_path, str(item["before"]), str(item["after"])
+            )
         else:
             # 生成できない
             continue
@@ -511,7 +522,11 @@ def generate_patches_from_external() -> List[Tuple[Path, Dict[str, Any]]]:
 def _run(cmd: List[str], cwd: Optional[Path] = None, allow_fail: bool = False) -> str:
     try:
         res = subprocess.run(
-            cmd, cwd=str(cwd or ROOT), check=not allow_fail, capture_output=True, text=True
+            cmd,
+            cwd=str(cwd or ROOT),
+            check=not allow_fail,
+            capture_output=True,
+            text=True,
         )
         return res.stdout.strip()
     except subprocess.CalledProcessError as e:
@@ -592,9 +607,17 @@ def save_patch_from_git_diff(
             parts.append(d2)
 
     if not parts:
-        return {"ok": False, "reason": "no-changes", "patch_path": None, "files_changed": 0,
-                "insertions": 0, "deletions": 0, "head_state": _current_state_id(),
-                "base_commit": _git_short_sha("HEAD"), "meta": {}}
+        return {
+            "ok": False,
+            "reason": "no-changes",
+            "patch_path": None,
+            "files_changed": 0,
+            "insertions": 0,
+            "deletions": 0,
+            "head_state": _current_state_id(),
+            "base_commit": _git_short_sha("HEAD"),
+            "meta": {},
+        }
 
     unified = "\n".join(parts).strip()
     if not unified.endswith("\n"):
@@ -695,8 +718,16 @@ def main() -> int:
                 encoding="utf-8",
             )
 
-        PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []), encoding="utf-8")
-        write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None, generated_patches=None)
+        PYTEST_SUMMARY_MD.write_text(
+            _render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []),
+            encoding="utf-8",
+        )
+        write_inventor_markdown(
+            empty_inv,
+            header_note=header_note,
+            pytest_summary=None,
+            generated_patches=None,
+        )
         write_patches_index()  # 空でも再生成
         return 0
 
@@ -720,8 +751,16 @@ def main() -> int:
                 encoding="utf-8",
             )
 
-        PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []), encoding="utf-8")
-        write_inventor_markdown(empty_inv, header_note=header_note, pytest_summary=None, generated_patches=None)
+        PYTEST_SUMMARY_MD.write_text(
+            _render_pytest_summary_md({"passed": 0, "failed": 0, "total": 0}, []),
+            encoding="utf-8",
+        )
+        write_inventor_markdown(
+            empty_inv,
+            header_note=header_note,
+            pytest_summary=None,
+            generated_patches=None,
+        )
         write_patches_index()
         return 0
 
@@ -731,7 +770,9 @@ def main() -> int:
         header_note = "All tests passed. Keeping suggestions minimal."
 
     # pytest サマリ MD を保存（GUIで表示）
-    PYTEST_SUMMARY_MD.write_text(_render_pytest_summary_md(pytest_summary, failed_tests), encoding="utf-8")
+    PYTEST_SUMMARY_MD.write_text(
+        _render_pytest_summary_md(pytest_summary, failed_tests), encoding="utf-8"
+    )
 
     # Inventor 生成
     inv = _build_inventor_from_json(data)

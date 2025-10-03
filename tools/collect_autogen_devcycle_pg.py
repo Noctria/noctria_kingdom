@@ -9,14 +9,15 @@ LOG_PATH = "generated_code/chat_log.txt"
 DB_CONFIG = dict(
     dbname="airflow",
     user="airflow",
-    password="airflow",   # ←実際の値に変更必須
-    host="localhost",     # or 'db' などDocker構成に応じて
-    port=5432
+    password="airflow",  # ←実際の値に変更必須
+    host="localhost",  # or 'db' などDocker構成に応じて
+    port=5432,
 )
 
 # === パターン定義 ===
-TURN_PATTERN = re.compile(r'ERROR collecting generated_code/(test_turn(\d+)\.py)')
-ERR_TYPE_PATTERN = re.compile(r'(RequestException|AssertionError|NetworkError|Exception|ERROR)')
+TURN_PATTERN = re.compile(r"ERROR collecting generated_code/(test_turn(\d+)\.py)")
+ERR_TYPE_PATTERN = re.compile(r"(RequestException|AssertionError|NetworkError|Exception|ERROR)")
+
 
 def parse_errors(log_path):
     """
@@ -43,22 +44,25 @@ def parse_errors(log_path):
                         "failed": False,
                         "fail_reason": "",
                         "extra_info": {"fail_types": {}, "fail_count": 0},
-                        "created_at": datetime.now()
+                        "created_at": datetime.now(),
                     }
             err_types = ERR_TYPE_PATTERN.findall(line)
             if err_types and current_turn is not None:
                 turn_stats[current_turn]["failed"] = True
                 turn_stats[current_turn]["fail_reason"] = "; ".join(set(err_types))
                 for t in err_types:
-                    turn_stats[current_turn]["extra_info"]["fail_types"][t] = \
+                    turn_stats[current_turn]["extra_info"]["fail_types"][t] = (
                         turn_stats[current_turn]["extra_info"]["fail_types"].get(t, 0) + 1
+                    )
                     turn_stats[current_turn]["extra_info"]["fail_count"] += 1
 
     # 合格数・総数のダミー値。pytest等と連携したい場合はここを修正
     for t, row in turn_stats.items():
         row["total_tests"] = row["extra_info"]["fail_count"] or 1
         row["passed_tests"] = 0 if row["failed"] else row["total_tests"]
-        row["pass_rate"] = 100.0 * row["passed_tests"] / row["total_tests"] if row["total_tests"] else 0.0
+        row["pass_rate"] = (
+            100.0 * row["passed_tests"] / row["total_tests"] if row["total_tests"] else 0.0
+        )
 
         # TODO: ログからstarted_at, finished_atを正確にパースできるならここでセットする
         if row["started_at"] is None:
@@ -68,6 +72,7 @@ def parse_errors(log_path):
 
     return [v for _, v in sorted(turn_stats.items())]
 
+
 def upsert_devcycle_turn(history_rows):
     """
     ai_devcycle_turn_history テーブルへUPSERT
@@ -76,7 +81,8 @@ def upsert_devcycle_turn(history_rows):
         with psycopg2.connect(**DB_CONFIG) as conn:
             with conn.cursor() as cur:
                 for row in history_rows:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO ai_devcycle_turn_history
                           (turn_number, started_at, finished_at, passed_tests, total_tests, pass_rate,
                            generated_files, review_comments, failed, fail_reason, extra_info, created_at)
@@ -95,23 +101,26 @@ def upsert_devcycle_turn(history_rows):
                             extra_info=EXCLUDED.extra_info,
                             finished_at=EXCLUDED.finished_at,
                             created_at=EXCLUDED.created_at
-                    """, {
-                        "turn_number": row["turn_number"],
-                        "started_at": row["started_at"],
-                        "finished_at": row["finished_at"],
-                        "passed_tests": row["passed_tests"],
-                        "total_tests": row["total_tests"],
-                        "pass_rate": row["pass_rate"],
-                        "generated_files": row["generated_files"],
-                        "review_comments": row["review_comments"],
-                        "failed": row["failed"],
-                        "fail_reason": row["fail_reason"],
-                        "extra_info": json.dumps(row["extra_info"], ensure_ascii=False),
-                        "created_at": row["created_at"],
-                    })
+                    """,
+                        {
+                            "turn_number": row["turn_number"],
+                            "started_at": row["started_at"],
+                            "finished_at": row["finished_at"],
+                            "passed_tests": row["passed_tests"],
+                            "total_tests": row["total_tests"],
+                            "pass_rate": row["pass_rate"],
+                            "generated_files": row["generated_files"],
+                            "review_comments": row["review_comments"],
+                            "failed": row["failed"],
+                            "fail_reason": row["fail_reason"],
+                            "extra_info": json.dumps(row["extra_info"], ensure_ascii=False),
+                            "created_at": row["created_at"],
+                        },
+                    )
             conn.commit()
     except Exception as e:
         print(f"DB書き込みエラー: {e}")
+
 
 if __name__ == "__main__":
     print("Parsing log and upserting turn KPI to Postgres...")

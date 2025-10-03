@@ -1,0 +1,19 @@
+agent:
+  enabled: true
+  max_steps: 5
+  step_timeout_sec: 60
+  allow_self_reflect: true
+  safety:
+    allow_shell: false
+    rate_limit_per_min: 10
+    max_tokens_per_call: 3000
+    red_team_prompts: false
+  memory:
+    enabled: true
+    backend: "jsonl"
+    path: "data/agent_memory.jsonl"
+    retention_days: 30
+    keys: ["project_state","decisions","todos","blocked"]
+  planner:
+    style: "short"
+    require_json: ["NEXT_ACTIONS"]

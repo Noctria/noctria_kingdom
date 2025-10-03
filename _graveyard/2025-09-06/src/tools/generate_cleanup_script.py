@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 AUDIT_LOG_PATH = BASE_DIR / "logs" / "structure_audit.json"
 OUTPUT_SCRIPT = BASE_DIR / "tools" / "cleanup_commands.sh"
 
+
 def generate_cleanup_commands():
     if not AUDIT_LOG_PATH.exists():
         print(f"❌ 構造監査ログが見つかりません: {AUDIT_LOG_PATH}")
@@ -56,6 +57,7 @@ def generate_cleanup_commands():
         f.writelines(cmds)
 
     print(f"✅ 自動生成完了: {OUTPUT_SCRIPT}")
+
 
 if __name__ == "__main__":
     generate_cleanup_commands()

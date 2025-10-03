@@ -14,18 +14,20 @@ from typing import List, Optional, Literal, Dict, Any
 import json
 import logging
 
+
 def parse_date_safe(date_str: str) -> Optional[datetime]:
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
         return None
 
+
 def load_and_aggregate_pdca_logs(
     log_dir: Path,
     from_date: Optional[datetime] = None,
     to_date: Optional[datetime] = None,
     mode: Literal["strategy", "tag"] = "strategy",
-    limit: int = 20
+    limit: int = 20,
 ) -> Dict[str, Any]:
     """
     再評価/採用ログ(JSON群)を集計。改善率・DD改善などを計算。
@@ -55,17 +57,19 @@ def load_and_aggregate_pdca_logs(
 
             status = data.get("status") or "unknown"
 
-            raw_results.append({
-                "strategy": data.get("strategy"),
-                "tag": data.get("tag", "unknown"),
-                "win_rate_before": win_before,
-                "win_rate_after": win_after,
-                "diff": round(win_after - win_before, 2),
-                "max_dd_before": dd_before,
-                "max_dd_after": dd_after,
-                "dd_diff": round(dd_before - dd_after, 2),
-                "status": status
-            })
+            raw_results.append(
+                {
+                    "strategy": data.get("strategy"),
+                    "tag": data.get("tag", "unknown"),
+                    "win_rate_before": win_before,
+                    "win_rate_after": win_after,
+                    "diff": round(win_after - win_before, 2),
+                    "max_dd_before": dd_before,
+                    "max_dd_after": dd_after,
+                    "dd_diff": round(dd_before - dd_after, 2),
+                    "status": status,
+                }
+            )
         except Exception as e:
             logging.warning(f"[PDCA_LOG] ログ読み込み失敗: {file} {e}")
             continue
@@ -95,25 +99,24 @@ def load_and_aggregate_pdca_logs(
 
         adopted = any(g["status"] == "adopted" for g in group)
 
-        detail_rows.append({
-            "strategy": key,
-            "win_rate_before": round(avg_win_rate_before, 2),
-            "win_rate_after": round(avg_win_rate_after, 2),
-            "diff": avg_diff,
-            "max_dd_before": round(avg_dd_before, 2),
-            "max_dd_after": round(avg_dd_after, 2),
-            "status": "adopted" if adopted else "pending",
-        })
+        detail_rows.append(
+            {
+                "strategy": key,
+                "win_rate_before": round(avg_win_rate_before, 2),
+                "win_rate_after": round(avg_win_rate_after, 2),
+                "diff": avg_diff,
+                "max_dd_before": round(avg_dd_before, 2),
+                "max_dd_after": round(avg_dd_after, 2),
+                "status": "adopted" if adopted else "pending",
+            }
+        )
 
     detail_rows.sort(key=lambda x: x["diff"], reverse=True)
     limited_rows = detail_rows[:limit]
 
     chart_labels = [r["strategy"] for r in limited_rows]
     chart_data = [r["diff"] for r in limited_rows]
-    chart_dd_data = [
-        round(r["max_dd_before"] - r["max_dd_after"], 2)
-        for r in limited_rows
-    ]
+    chart_dd_data = [round(r["max_dd_before"] - r["max_dd_after"], 2) for r in limited_rows]
 
     all_diffs = [r["diff"] for r in raw_results]
     all_dd_diffs = [r["dd_diff"] for r in raw_results]
@@ -133,5 +136,5 @@ def load_and_aggregate_pdca_logs(
             "labels": chart_labels,
             "data": chart_data,
             "dd_data": chart_dd_data,
-        }
+        },
     }

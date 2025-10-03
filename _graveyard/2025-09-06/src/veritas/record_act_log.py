@@ -19,6 +19,7 @@ from src.core.path_config import VERITAS_EVAL_LOG, DATA_DIR
 ACT_LOG_DIR = DATA_DIR / "act_logs"
 PUSH_LOG_PATH = DATA_DIR / "push_logs" / "push_history.json"
 
+
 # ========================================
 # 🔍 すでに記録済みかチェック
 # ========================================
@@ -28,6 +29,7 @@ def is_already_recorded(strategy_name: str) -> bool:
     for file in ACT_LOG_DIR.glob(f"{strategy_name.replace('.py','')}_*.json"):
         return True
     return False
+
 
 # ========================================
 # 🔍 push履歴から該当戦略がPushされたか
@@ -49,6 +51,7 @@ def is_pushed(strategy_name: str, timestamp: str) -> bool:
             except Exception:
                 continue
     return False
+
 
 # ========================================
 # 🧠 Actログ生成（ML評価合格のみ）
@@ -86,10 +89,10 @@ def record_act_log():
                 "final_capital": entry.get("final_capital"),
                 "win_rate": entry.get("win_rate"),
                 "max_drawdown": entry.get("max_drawdown"),
-                "total_trades": entry.get("total_trades")
+                "total_trades": entry.get("total_trades"),
             },
             "reason": entry.get("reason", "ML評価基準を満たしたため"),
-            "pushed": is_pushed(strategy_name, timestamp)
+            "pushed": is_pushed(strategy_name, timestamp),
         }
 
         filename = f"{strategy_name.replace('.py','')}_{timestamp.replace(':','-')}.json"
@@ -104,6 +107,7 @@ def record_act_log():
         print("ℹ️ 採用された新規戦略はありませんでした。")
     else:
         print(f"📜 王国の記録: {count} 件の昇格ログを記録しました。")
+
 
 # ========================================
 # 🏁 実行

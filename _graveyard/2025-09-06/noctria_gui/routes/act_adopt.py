@@ -105,12 +105,21 @@ def _trigger_core(
             except Exception:
                 pass
             if dag_run_id:
-                return RedirectResponse(url=f"/airflow/runs/{dag_run_id}?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER)
-            return RedirectResponse(url=f"/airflow/runs?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER)
+                return RedirectResponse(
+                    url=f"/airflow/runs/{dag_run_id}?dag_id={dag_id}",
+                    status_code=HTTP_303_SEE_OTHER,
+                )
+            return RedirectResponse(
+                url=f"/airflow/runs?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER
+            )
         except Exception as e:
             # hooks 経由で失敗した場合は、そのままUI通知
             try:
-                request.session["toast"] = {"type": "error", "message": "Trigger failed", "detail": str(e)}
+                request.session["toast"] = {
+                    "type": "error",
+                    "message": "Trigger failed",
+                    "detail": str(e),
+                }
             except Exception:
                 pass
             return RedirectResponse(url="/act/adopt", status_code=HTTP_303_SEE_OTHER)
@@ -119,7 +128,11 @@ def _trigger_core(
     if make_airflow_client is None:
         # 開発時確認用: 実際には発火できないが、入力内容を返す
         return JSONResponse(
-            {"ok": False, "reason": "airflow_client_not_found", "would_trigger": {"dag_id": dag_id, "conf": conf}},
+            {
+                "ok": False,
+                "reason": "airflow_client_not_found",
+                "would_trigger": {"dag_id": dag_id, "conf": conf},
+            },
             status_code=501,
         )
     try:
@@ -127,15 +140,27 @@ def _trigger_core(
         resp = client.trigger_dag(dag_id, conf=conf)  # 互換API
         dag_run_id = resp.get("dag_run_id") or resp.get("run_id") or ""
         try:
-            request.session["toast"] = {"type": "success", "message": f"DAG triggered: {dag_id}", "detail": str(resp)}
+            request.session["toast"] = {
+                "type": "success",
+                "message": f"DAG triggered: {dag_id}",
+                "detail": str(resp),
+            }
         except Exception:
             pass
         if dag_run_id:
-            return RedirectResponse(url=f"/airflow/runs/{dag_run_id}?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER)
-        return RedirectResponse(url=f"/airflow/runs?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER)
+            return RedirectResponse(
+                url=f"/airflow/runs/{dag_run_id}?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER
+            )
+        return RedirectResponse(
+            url=f"/airflow/runs?dag_id={dag_id}", status_code=HTTP_303_SEE_OTHER
+        )
     except Exception as e:
         try:
-            request.session["toast"] = {"type": "error", "message": "Trigger failed", "detail": str(e)}
+            request.session["toast"] = {
+                "type": "error",
+                "message": "Trigger failed",
+                "detail": str(e),
+            }
         except Exception:
             pass
         return RedirectResponse(url="/act/adopt", status_code=HTTP_303_SEE_OTHER)

@@ -19,7 +19,9 @@ except Exception:
     from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR  # when running from repo root
 
 TEMPLATE_DIR: Path = (
-    NOCTRIA_GUI_TEMPLATES_DIR if NOCTRIA_GUI_TEMPLATES_DIR.exists() else Path("noctria_gui/templates")
+    NOCTRIA_GUI_TEMPLATES_DIR
+    if NOCTRIA_GUI_TEMPLATES_DIR.exists()
+    else Path("noctria_gui/templates")
 )
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
@@ -83,6 +85,7 @@ def _fetchall(sql: str, params: Iterable[Any] = ()) -> List[Tuple]:
 # Router
 # --------------------------------------------------------------------
 router = APIRouter(prefix="/pdca", tags=["PDCA / Observability"])
+
 
 # --------------------------------------------------------------------
 # /pdca/timeline
@@ -171,7 +174,8 @@ def pdca_timeline(
             (*params_ev, limit),
         )
         events = [
-            {"trace_id": r[0], "ts": r[1], "kind": r[2], "action": r[3], "payload": None} for r in rows
+            {"trace_id": r[0], "ts": r[1], "kind": r[2], "action": r[3], "payload": None}
+            for r in rows
         ]
 
     # テンプレへ（前に共有したテンプレと互換のキー名）
@@ -233,7 +237,14 @@ def pdca_latency_daily(
 
     # テンプレへ（配列と表データの両方を渡しておく）
     items = [
-        {"day": labels[i], "p50_ms": p50[i], "p90_ms": p90[i], "p95_ms": p95[i], "max_ms": mx[i], "traces": n[i]}
+        {
+            "day": labels[i],
+            "p50_ms": p50[i],
+            "p90_ms": p90[i],
+            "p95_ms": p95[i],
+            "max_ms": mx[i],
+            "traces": n[i],
+        }
         for i in range(len(labels))
     ]
     return templates.TemplateResponse(

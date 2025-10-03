@@ -1,6 +1,7 @@
 import random
 import numpy as np
 
+
 class PrioritizedExperienceReplay:
     """
     TD誤差に基づいてサンプルの優先度を設定する経験リプレイバッファ
@@ -54,7 +55,15 @@ class PrioritizedExperienceReplay:
         weights = (len(self.buffer) * probs[indices]) ** -1  # 重要度サンプリングの重み
 
         states, actions, rewards, next_states, dones = zip(*batch)
-        return np.array(states), np.array(actions), np.array(rewards), np.array(next_states), np.array(dones), weights, indices
+        return (
+            np.array(states),
+            np.array(actions),
+            np.array(rewards),
+            np.array(next_states),
+            np.array(dones),
+            weights,
+            indices,
+        )
 
     def update_priorities(self, indices, td_errors):
         """

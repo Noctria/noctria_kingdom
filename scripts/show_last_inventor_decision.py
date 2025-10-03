@@ -32,8 +32,8 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, Optional, Tuple, List
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 # ログ探索パスと抽出パターン
 LOG_GLOB = "/opt/airflow/logs/dag_id=inventor_pipeline/run_id=*/task_id=run_inventor_and_decide/*"
@@ -41,17 +41,20 @@ RETURNED_PATTERN = re.compile(r"Returned value was:\s+(.*)")
 
 # ---------- 基本ユーティリティ ----------
 
+
 def _iso_to_dt(s: str) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except Exception:
         return None
 
+
 def _file_mtime_dt(path: str) -> datetime:
     try:
         return datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
     except Exception:
         return datetime.now(timezone.utc)
+
 
 def _load_result_from_log(path: str) -> Optional[Dict[str, Any]]:
     """ログ内の 'Returned value was:' 行の JSON もしくは Python dict をパースして返す。"""
@@ -63,11 +66,12 @@ def _load_result_from_log(path: str) -> Optional[Dict[str, Any]]:
             return None
         raw = matches[-1].strip()
         try:
-            return json.loads(raw)             # JSON 優先
+            return json.loads(raw)  # JSON 優先
         except Exception:
-            return ast.literal_eval(raw)       # Python dict repr も許容
+            return ast.literal_eval(raw)  # Python dict repr も許容
     except Exception:
         return None
+
 
 def _extract_created_at(result: Dict[str, Any]) -> Optional[datetime]:
     """result.meta.created_at（ISO）を datetime(UTC) にして返す。なければ None。"""
@@ -77,6 +81,7 @@ def _extract_created_at(result: Dict[str, Any]) -> Optional[datetime]:
         if isinstance(ca, str):
             return _iso_to_dt(ca)
     return None
+
 
 def _is_passed_result(result: Dict[str, Any]) -> bool:
     """スキップではなく decision.size > 0 を満たす場合に True。"""
@@ -89,13 +94,16 @@ def _is_passed_result(result: Dict[str, Any]) -> bool:
     except Exception:
         return False
 
+
 def _format_json(obj: Any) -> str:
     try:
         return json.dumps(obj, ensure_ascii=False, indent=2)
     except Exception:
         return str(obj)
 
+
 # ---------- メトリクス出力 ----------
+
 
 def _emit_metrics(result: Dict[str, Any]) -> None:
     """
@@ -126,7 +134,9 @@ def _emit_metrics(result: Dict[str, Any]) -> None:
     print(f'noctria_inventor_decision_size{{symbol="{symbol}",timeframe="{timeframe}"}} {size}')
     print(f'noctria_inventor_decision_skipped{{reason="{reason_tag}"}} {1 if skipped else 0}')
 
+
 # ---------- 最新 Run の選定（created_at / mtime ベース） ----------
+
 
 def _pick_latest(
     only_passed: bool,
@@ -168,23 +178,45 @@ def _pick_latest(
     _, best_path, best_result = candidates[0]
     return best_path, best_result
 
+
 # ---------- CLI ----------
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Show last Inventor decision (from Airflow logs)")
-    ap.add_argument("--only-passed", action="store_true",
-                    help="通過Run（skippedでない & decision.size>0）だけを対象にする")
-    ap.add_argument("--assert-size-passed", action="store_true",
-                    help="対象Runで decision.size>0 を必須にする（満たなければ非ゼロ終了）")
-    ap.add_argument("--since-minutes", type=int, default=None,
-                    help="直近 N 分の Run だけを対象にする（古い成功の誤検知を防止）")
-    ap.add_argument("--emit-metrics", action="store_true",
-                    help="Prometheus 1行メトリクスを出力する（size/skipped）")
-    ap.add_argument("--save", type=str, default=None,
-                    help="表示した JSON をファイル保存するパス（コンテナ内パス）")
+    ap.add_argument(
+        "--only-passed",
+        action="store_true",
+        help="通過Run（skippedでない & decision.size>0）だけを対象にする",
+    )
+    ap.add_argument(
+        "--assert-size-passed",
+        action="store_true",
+        help="対象Runで decision.size>0 を必須にする（満たなければ非ゼロ終了）",
+    )
+    ap.add_argument(
+        "--since-minutes",
+        type=int,
+        default=None,
+        help="直近 N 分の Run だけを対象にする（古い成功の誤検知を防止）",
+    )
+    ap.add_argument(
+        "--emit-metrics",
+        action="store_true",
+        help="Prometheus 1行メトリクスを出力する（size/skipped）",
+    )
+    ap.add_argument(
+        "--save",
+        type=str,
+        default=None,
+        help="表示した JSON をファイル保存するパス（コンテナ内パス）",
+    )
     # 追加: 機械可読JSONのみ吐く
-    ap.add_argument("--json", action="store_true",
-                    help="機械可読JSONを標準出力（見つからなければ {} を出力し、常に exit 0）")
+    ap.add_argument(
+        "--json",
+        action="store_true",
+        help="機械可読JSONを標準出力（見つからなければ {} を出力し、常に exit 0）",
+    )
     args = ap.parse_args()
 
     log_path, result = _pick_latest(only_passed=args.only_passed, since_minutes=args.since_minutes)
@@ -195,6 +227,7 @@ def main() -> int:
         # フォールバック: ログが無い環境（CIランナー等）では、既知の成果物パスから読む
         if not payload:
             from pathlib import Path
+
             for p in [
                 Path("codex_reports/inventor_last.json"),
                 Path("codex_reports/latest_inventor_decision.json"),
@@ -206,7 +239,10 @@ def main() -> int:
                         payload = json.loads(p.read_text(encoding="utf-8"))
                         break
                     except Exception as e:
-                        print(f"::warning:: failed to read fallback decision file {p}: {e}", file=sys.stderr)
+                        print(
+                            f"::warning:: failed to read fallback decision file {p}: {e}",
+                            file=sys.stderr,
+                        )
 
         # 保存オプションがあれば保存（エラーでも終了コードは 0 にする）
         if args.save:
@@ -254,6 +290,7 @@ def main() -> int:
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -21,6 +21,7 @@ Env (any of the following auth styles work):
 
 If REST fails (or AIRFLOW_BASE_URL is not set), try `airflow dags trigger` via CLI.
 """
+
 from __future__ import annotations
 
 import base64
@@ -30,15 +31,17 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from urllib import request, error
+from typing import Any, Dict, Optional
+from urllib import error, request
 
 DAG_ID = "noctria_backtest_dag"
 DEFAULT_TIMEOUT = 20  # seconds
 BACKOFF_DELAYS = [0, 1, 2, 4]  # seconds
 
 
-def _auth_header(token: Optional[str], user: Optional[str], password: Optional[str]) -> Optional[str]:
+def _auth_header(
+    token: Optional[str], user: Optional[str], password: Optional[str]
+) -> Optional[str]:
     """Return Authorization header value (Bearer > Basic) or None."""
     if token:
         return f"Bearer {token}"
@@ -48,7 +51,9 @@ def _auth_header(token: Optional[str], user: Optional[str], password: Optional[s
     return None
 
 
-def _post_json(url: str, payload: Dict[str, Any], auth_header: Optional[str], timeout: float) -> str:
+def _post_json(
+    url: str, payload: Dict[str, Any], auth_header: Optional[str], timeout: float
+) -> str:
     req = request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
     req.add_header("Content-Type", "application/json")
     if auth_header:
@@ -73,7 +78,9 @@ def trigger_via_rest(
     payload = {"dag_run_id": dag_run_id, "conf": conf}
     auth_header = _auth_header(token, user, password)
 
-    print(f"[INFO] Trying REST API (base_url={base_url}, auth={'Bearer' if token else ('Basic' if user and password else 'none')})")
+    print(
+        f"[INFO] Trying REST API (base_url={base_url}, auth={'Bearer' if token else ('Basic' if user and password else 'none')})"
+    )
     last_exc: Optional[Exception] = None
     for i, delay in enumerate(BACKOFF_DELAYS):
         if delay:

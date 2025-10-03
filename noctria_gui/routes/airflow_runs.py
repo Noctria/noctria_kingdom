@@ -16,10 +16,11 @@ Airflow DAG 実行履歴ビュー
 """
 
 from __future__ import annotations
+
 import json
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
 # Airflowクライアント
@@ -30,7 +31,7 @@ except Exception:
 
 # Decision Registry 照会（相互リンク用）
 try:
-    from src.core.decision_registry import tail_ledger, list_events
+    from src.core.decision_registry import list_events, tail_ledger
 except Exception:
     tail_ledger = None  # type: ignore
     list_events = None  # type: ignore
@@ -72,8 +73,14 @@ def _find_related_decisions_by_run(
             found_id = (
                 extra.get("dag_run_id")
                 or extra.get("run_id")
-                or (isinstance(extra.get("airflow"), dict) and (extra["airflow"].get("dag_run_id") or extra["airflow"].get("run_id")))
-                or (isinstance(extra.get("conf"), dict) and (extra["conf"].get("dag_run_id") or extra["conf"].get("run_id")))
+                or (
+                    isinstance(extra.get("airflow"), dict)
+                    and (extra["airflow"].get("dag_run_id") or extra["airflow"].get("run_id"))
+                )
+                or (
+                    isinstance(extra.get("conf"), dict)
+                    and (extra["conf"].get("dag_run_id") or extra["conf"].get("run_id"))
+                )
             )
             if found_id and str(found_id) == str(dag_run_id):
                 related.append(r)
@@ -83,7 +90,11 @@ def _find_related_decisions_by_run(
         if d_id:
             for ev in list_events(decision_id=str(d_id)) or []:
                 # 重複を避ける（decision_id と ts_utc でユニーク化）
-                if not any(x.get("decision_id") == ev.get("decision_id") and x.get("ts_utc") == ev.get("ts_utc") for x in related):
+                if not any(
+                    x.get("decision_id") == ev.get("decision_id")
+                    and x.get("ts_utc") == ev.get("ts_utc")
+                    for x in related
+                ):
                     related.append(ev)
 
     # 新しい順に
@@ -147,7 +158,9 @@ async def run_detail(
     # 失敗時の簡易ヒント（Best-effort）
     failure_hint = None
     if (run.get("state") or "").lower() in ("failed", "up_for_retry"):
-        failure_hint = "Git 認証・ブランチの不整合、または戦略ファイル生成パスの権限を確認してください。"
+        failure_hint = (
+            "Git 認証・ブランチの不整合、または戦略ファイル生成パスの権限を確認してください。"
+        )
 
     # Decision Registry との突き合わせ
     conf = run.get("conf") if isinstance(run.get("conf"), dict) else {}

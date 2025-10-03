@@ -184,7 +184,9 @@ def main() -> None:
     trace_id = new_trace_id(symbol=SYMBOL, timeframe="demo")
 
     # 2) PLAN スパン開始ログ（新API）
-    log_plan_run(trace_id=trace_id, status="START", started_at=_now_utc(), meta={"demo": "decision_minidemo"})
+    log_plan_run(
+        trace_id=trace_id, status="START", started_at=_now_utc(), meta={"demo": "decision_minidemo"}
+    )
 
     # 3) 特徴量（ダミー生成）※本来は collector→features→analyzer
     features = fake_plan_features()
@@ -203,7 +205,9 @@ def main() -> None:
             # qty は大きめにして gate の clamp / ALERT 発火を狙う
             ord_req = OrderRequest(
                 symbol=req.symbol,
-                intent="LONG" if result.decision.get("action") in ("enter_trend", "range_trade") else "SHORT",
+                intent="LONG"
+                if result.decision.get("action") in ("enter_trend", "range_trade")
+                else "SHORT",
                 qty=10000.0,
                 order_type="MARKET",
                 limit_price=None,

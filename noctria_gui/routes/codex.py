@@ -21,10 +21,10 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Any, Tuple, List
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -75,11 +75,13 @@ def _scan_patches() -> List[Dict[str, Any]]:
     for f in sorted(PATCHES_DIR.glob("*.patch")):
         try:
             stat = f.stat()
-            items.append({
-                "filename": f.name,
-                "size": stat.st_size,
-                "relpath": f"codex_reports/patches/{f.name}",
-            })
+            items.append(
+                {
+                    "filename": f.name,
+                    "size": stat.st_size,
+                    "relpath": f"codex_reports/patches/{f.name}",
+                }
+            )
         except Exception:
             continue
     return items

@@ -1,0 +1,13 @@
+catalog:
+  spec_to_green_rate:
+    formula: "passed_specs / total_specs"
+    window: "rolling_10_cycles"
+    owner: "Inventor"
+  backtest_pass_rate:
+    formula: "passed_impls / total_impls"
+    window: "rolling_20_impls"
+    owner: "Veritas"
+  diversity_score:
+    formula: "1 - mean_pairwise_corr(features)"
+    window: "rolling_30_candidates"
+    owner: "King"

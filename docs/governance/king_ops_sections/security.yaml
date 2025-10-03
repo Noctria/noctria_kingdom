@@ -1,0 +1,92 @@
+# =======================================================
+# セキュリティ最小（Secrets と鍵運用）
+# =======================================================
+security:
+  owners:
+    dpo: "king"
+    stewards: ["noctus","aurus"]
+    contacts: ["#noctria-ops","oncall-pager"]
+
+  stores:
+    - name: "GitHub Actions Secrets"
+      envs: ["stg","prod"]
+      notes: "OIDCでクラウドに短期トークンを発行。長期鍵は不可。"
+    - name: "SOPS + age (repo-encrypted)"
+      envs: ["dev","stg"]
+      files: ["secrets/*.enc.yaml"]
+      notes: "PRレビュー可能な最小構成のみ。平文コミット禁止。"
+    - name: "Cloud Secret Manager / KMS"
+      envs: ["stg","prod"]
+      notes: "鍵束の最終保管庫。監査ログとIAMで最小権限。"
+
+  retrieval_policy:
+    dev:  "dotenv(.env.local) → ローカルのみ。*.env* は常時 .gitignore。"
+    stg:  "GitHub OIDC → Cloud Secret Manager からTTL短い一時トークン取得。"
+    prod: "同上 + ワークロードID（サーバ側）で自動ローテ。人手配布禁止。"
+
+  rotation:
+    default_days: 90
+    per_secret:
+      api_external_fx: 60
+      db_password: 120
+      signing_key: 180
+    schedule: "毎月第1営業日 10:00 JST（stagger有効）"
+    stagger: true
+    grace_days: 7
+    alerting:
+      before_expiry_days: [14,7,1]
+      recipients: ["king","noctus"]
+    post_rotate_checks:
+      - "stg: A01/A02/A03 api_smoke を全てpass"
+      - "prod: p95/5xx 10分監視し回帰なし"
+
+  access_control:
+    rbac:
+      apply_prod: ["king","human_pm"]
+      read_only: ["prometheus","veritas","aurus","noctus"]
+    mfa_required: true
+    least_privilege: true
+    ip_allowlist: ["prod-admin-vpn"]
+    token_ttl_minutes:
+      ci_jobs: 60
+      runtime: 30
+
+  encryption:
+    in_transit: "TLS >=1.2, HSTS"
+    at_rest: "KMS管理キー（自前鍵は保有しない）"
+    signing:
+      artifact_signing: true
+      algorithm: "sigstore/cosign（キーレス推奨）"
+
+  masked_logging:
+    keys: ["API_KEY","DB_PASSWORD","ACCESS_TOKEN","REFRESH_TOKEN","WEBHOOK_SECRET"]
+    strategy: "中央マスカ(****) + サンプラの例外禁止"
+
+  scanning_ci:
+    tools: ["gitleaks","trufflehog"]
+    fail_on_find: true
+    blocked_files: ["*.pem","*.p12","*.key","*.env","secrets/*.yaml"]
+    precommit_hook: true
+
+  audit_log:
+    location: "docs/audit/{YYYY}/{YYYYMMDD}.log"
+    events:
+      - "who:<actor> action:read secret:<name> at:<UTC>"
+      - "who:<actor> action:rotate secret:<name> old_ver:V{n} new_ver:V{n+1} at:<UTC>"
+
+  naming_convention:
+    prefix_by_env: ["DEV_","STG_","PROD_"]
+    format: "ENV_PREFIX + DOMAIN + PURPOSE（例: PROD_API_FX_PROVIDER）"
+
+  emergency_revocation:
+    playbook:
+      - "1) 露出疑い発見（gitleaks/外部連絡）→ SEV2で宣言"
+      - "2) 影響資産の列挙（監査ログ/利用サービス）"
+      - "3) 15分以内に該当Secretを無効化→新規発行→デプロイ"
+      - "4) 24h以内にポストモーテム→再発防止（CIルール/教育）"
+    link: "safety_and_access.break_glass"
+
+  keys_ssh:
+    allowed_algorithms: ["ed25519"]
+    rotation_days: 180
+    agent_forwarding: "prodで禁止"

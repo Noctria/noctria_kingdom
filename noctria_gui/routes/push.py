@@ -7,32 +7,35 @@
 - Pushログの閲覧／検索／CSV出力／詳細表示
 """
 
-import logging
-import json
 import csv
 import io
+import json
+import logging
 import os
-from fastapi import APIRouter, Request, Query, Form, HTTPException, Depends
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from datetime import datetime
-from typing import Optional, List, Dict, Any
 
 # --- 王国の基盤モジュールをインポート ---
-from src.core.path_config import PUSH_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, PUSH_LOG_DIR
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 router = APIRouter(prefix="/push", tags=["Push"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
 
 # --- Pydanticモデル定義 ---
 class DAGTriggerResponse(BaseModel):
     detail: str
     dag_run_id: Optional[str] = None
     response_body: Optional[str] = None
+
 
 # --- 依存性注入（DI）によるログフィルタリングの共通化 ---
 def get_filtered_push_logs(
@@ -73,7 +76,9 @@ def get_filtered_push_logs(
 
     return logs
 
+
 # --- ルート定義 ---
+
 
 @router.post("/trigger", response_model=DAGTriggerResponse)
 async def trigger_push_dag(strategy_name: str = Form(...)):
@@ -93,12 +98,16 @@ async def trigger_push_dag(strategy_name: str = Form(...)):
 
     try:
         import httpx
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 dag_trigger_url,
-                auth=(os.getenv("AIRFLOW_USERNAME", "airflow"), os.getenv("AIRFLOW_PASSWORD", "airflow")),
+                auth=(
+                    os.getenv("AIRFLOW_USERNAME", "airflow"),
+                    os.getenv("AIRFLOW_PASSWORD", "airflow"),
+                ),
                 json=payload,
-                timeout=15
+                timeout=15,
             )
             response.raise_for_status()
 
@@ -107,17 +116,21 @@ async def trigger_push_dag(strategy_name: str = Form(...)):
 
     except httpx.HTTPStatusError as e:
         logging.error(f"Airflow APIエラー (HTTP {e.response.status_code}): {e.response.text}")
-        return {"detail": f"❌ Airflowエラー応答 (HTTP {e.response.status_code})", "response_body": e.response.text}
+        return {
+            "detail": f"❌ Airflowエラー応答 (HTTP {e.response.status_code})",
+            "response_body": e.response.text,
+        }
     except Exception as e:
         logging.error(f"Airflowへの通信に失敗しました: {e}", exc_info=True)
         return {"detail": f"🚨 Airflow通信失敗: {e}"}
+
 
 @router.get("/history", response_class=HTMLResponse)
 def view_push_history(
     request: Request,
     sort: str = Query(default="desc"),
     page: int = Query(default=1, ge=1),
-    logs: List[Dict[str, Any]] = Depends(get_filtered_push_logs)
+    logs: List[Dict[str, Any]] = Depends(get_filtered_push_logs),
 ):
     """フィルタリングされたPush履歴を表示する"""
     logs.sort(key=lambda x: x.get("timestamp", ""), reverse=(sort != "asc"))
@@ -130,14 +143,18 @@ def view_push_history(
     page = min(page, total_pages)
     start_idx = (page - 1) * page_size
 
-    return templates.TemplateResponse("push_history.html", {
-        "request": request,
-        "logs": logs[start_idx : start_idx + page_size],
-        "tag_list": tag_list,
-        "total_count": total_count,
-        "total_pages": total_pages,
-        "current_page": page,
-    })
+    return templates.TemplateResponse(
+        "push_history.html",
+        {
+            "request": request,
+            "logs": logs[start_idx : start_idx + page_size],
+            "tag_list": tag_list,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "current_page": page,
+        },
+    )
+
 
 @router.get("/export")
 def export_push_history_csv(logs: List[Dict[str, Any]] = Depends(get_filtered_push_logs)):
@@ -147,15 +164,18 @@ def export_push_history_csv(logs: List[Dict[str, Any]] = Depends(get_filtered_pu
 
     output = io.StringIO()
     fieldnames = ["timestamp", "strategy", "tag", "message", "signature"]
-    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(logs)
 
     output.seek(0)
     filename = f"push_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    return StreamingResponse(output, media_type="text/csv", headers={
-        "Content-Disposition": f"attachment; filename={filename}"
-    })
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
 
 @router.get("/detail/{log_timestamp}", response_class=HTMLResponse)
 def push_history_detail(request: Request, log_timestamp: str):
@@ -170,7 +190,4 @@ def push_history_detail(request: Request, log_timestamp: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ログファイルの読み込みに失敗しました: {e}")
 
-    return templates.TemplateResponse("push_history_detail.html", {
-        "request": request,
-        "log": log
-    })
+    return templates.TemplateResponse("push_history_detail.html", {"request": request, "log": log})

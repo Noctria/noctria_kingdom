@@ -1,7 +1,8 @@
-import psycopg2
 import json
-from datetime import datetime
 import os
+from datetime import datetime
+
+import psycopg2
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,6 +16,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 if not DB_PASSWORD or DB_PASSWORD == "your_password_here":
     raise RuntimeError("DB_PASSWORD が設定されていません。環境変数を確認してください。")
 
+
 def insert_turn_history(
     turn_number: int,
     passed_tests: int,
@@ -24,18 +26,14 @@ def insert_turn_history(
     failed: bool,
     fail_reason: str = None,
     extra_info: dict = None,
-    finished_at: datetime = None
+    finished_at: datetime = None,
 ) -> int:
     pass_rate = round((passed_tests / total_tests) * 100, 2) if total_tests else 0.0
 
     conn = None
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
         )
         cur = conn.cursor()
         sql = """

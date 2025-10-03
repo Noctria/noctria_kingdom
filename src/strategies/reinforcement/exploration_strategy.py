@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class ExplorationStrategy:
     """
     強化学習における探索戦略を管理
@@ -8,7 +9,15 @@ class ExplorationStrategy:
     - Softmax Exploration (スケーリング調整)
     """
 
-    def __init__(self, action_dim, epsilon=1.0, epsilon_decay=0.99, min_epsilon=0.05, c_ucb=2.0, tau=1.0):
+    def __init__(
+        self,
+        action_dim,
+        epsilon=1.0,
+        epsilon_decay=0.99,
+        min_epsilon=0.05,
+        c_ucb=2.0,
+        tau=1.0,
+    ):
         """
         初期化
         :param action_dim: 行動の次元数
@@ -51,7 +60,7 @@ class ExplorationStrategy:
             action = np.random.randint(self.action_dim)  # ランダム探索
         else:
             action = np.argmax(q_values)  # 最適行動
-        
+
         # 市場変動に応じた探索率調整
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
         return action
@@ -62,7 +71,9 @@ class ExplorationStrategy:
         """
         total_count = np.sum(self.action_counts) + 1e-5  # 計算の安定性を確保
         avg_action_values = self.action_values / (self.action_counts + 1e-5)  # 平均リターンの考慮
-        ucb_values = avg_action_values + self.c_ucb * np.sqrt(np.log(total_count) / (self.action_counts + 1e-5))
+        ucb_values = avg_action_values + self.c_ucb * np.sqrt(
+            np.log(total_count) / (self.action_counts + 1e-5)
+        )
 
         action = np.argmax(ucb_values)
         self.action_counts[action] += 1
@@ -75,6 +86,6 @@ class ExplorationStrategy:
         q_scaled = q_values - np.max(q_values)  # 勾配爆発防止
         exp_q = np.exp(q_scaled / self.tau)
         probs = exp_q / np.sum(exp_q)
-        
+
         action = np.random.choice(self.action_dim, p=probs)
         return action

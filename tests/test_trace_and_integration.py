@@ -1,14 +1,13 @@
 # tests/test_trace_and_integration.py
 import os
 import re
-import json
-from pathlib import Path
 
 import pytest
 
 
 def test_trace_id_format():
     from src.plan_data.trace import new_trace_id
+
     tid = new_trace_id(symbol="USDJPY", timeframe="1d")
     # 例: 20250813-123045-USDJPY-1d-a1b2c3d4
     assert re.match(r"^\d{8}-\d{6}-[A-Z0-9\-_]+-[A-Za-z0-9\-_]+-[0-9a-f]{8}$", tid)
@@ -43,6 +42,7 @@ def test_minidemo_writes_db(monkeypatch, stub_collector, stub_strategies, tmp_da
 
     # 実行（DB書き込みは本物、ネットはオフ）
     from src.plan_data.plan_to_all_minidemo import main
+
     main()
 
     after_plan = _count("obs_plan_runs")

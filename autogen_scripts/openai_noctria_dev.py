@@ -1,15 +1,16 @@
-import os
 import asyncio
-import subprocess
-import re
-from dotenv import load_dotenv
-from openai import OpenAI
 import datetime
-import sys
-from uuid import uuid4
 import json
 import logging
+import os
+import re
+import subprocess
+import sys
 from logging.handlers import RotatingFileHandler
+from uuid import uuid4
+
+from dotenv import load_dotenv
+from openai import OpenAI
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "utils")))
 from cycle_logger import insert_turn_history
@@ -45,13 +46,15 @@ ENV_INFO = (
 logger = logging.getLogger("openai_noctria_dev")
 logger.setLevel(logging.INFO)
 handler = RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
-formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter("[%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+
 
 def log_message(message: str):
     print(message)
     logger.info(message)
+
 
 def load_file(path, max_chars=None):
     try:
@@ -63,6 +66,7 @@ def load_file(path, max_chars=None):
     except Exception:
         return ""
 
+
 def build_prompt_with_latest_knowledge(prompt: str) -> str:
     knowledge = load_file(KNOWLEDGE_PATH)
     mmd = load_file(MMD_PATH)
@@ -73,6 +77,7 @@ def build_prompt_with_latest_knowledge(prompt: str) -> str:
         f"{prompt}"
     )
 
+
 def role_prompt_template(role):
     base_req = (
         "・knowledge.md/Noctria連携図を毎ターン最新で反映せよ。\n"
@@ -82,22 +87,21 @@ def role_prompt_template(role):
     )
     if role == "design":
         return (
-            base_req +
-            "あなたはAI設計責任者です。USD/JPY自動トレードAIの戦略設計をNoctriaガイドラインに従い厳格に設計し、設計根拠・バージョン・ABテスト要否・説明責任コメントも必ず明記。\n"
+            base_req
+            + "あなたはAI設計責任者です。USD/JPY自動トレードAIの戦略設計をNoctriaガイドラインに従い厳格に設計し、設計根拠・バージョン・ABテスト要否・説明責任コメントも必ず明記。\n"
             "注文執行・最終判断は必ずsrc/core/king_noctria.pyに集約すること。\n"
             "複数ファイル分割時は # ファイル名: filename.py を必ず明示。\n"
         )
     if role == "implement":
         return (
-            base_req +
-            "設計AI指示・Noctria連携図・ガイドライン・最新knowledge.mdを厳守し、コードを生成せよ。\n"
+            base_req
+            + "設計AI指示・Noctria連携図・ガイドライン・最新knowledge.mdを厳守し、コードを生成せよ。\n"
             "パス指定は全てpath_config.pyからimportし、バージョン/説明/ABテストラベル/倫理コメントを各ファイルに付与。\n"
             "GUIはhud_style.cssのHUD準拠。\n"
         )
     if role == "test":
         return (
-            base_req +
-            "【自動テスト設計・品質ガイドライン】\n"
+            base_req + "【自動テスト設計・品質ガイドライン】\n"
             "- テストファイルには**Pythonコードのみ**を記載し、絶対にマークダウン記法（```や```pythonなど）は使わないこと。\n"
             "- 全テスト関数のうち**50%以上は「正常系（合格パターン）」**とすること。\n"
             "- 正常系: 実際に合格する出力をassertするテストを明記（例：add(2,3)==5）。\n"
@@ -114,21 +118,23 @@ def role_prompt_template(role):
         )
     if role == "review":
         return (
-            base_req +
-            "生成物・テストをknowledge.md/連携図/全ガイドラインに照らして厳格レビューし、リファクタ案/退行検知/倫理逸脱や障害があれば即時警告・是正策もコメントし履歴化。\n"
+            base_req
+            + "生成物・テストをknowledge.md/連携図/全ガイドラインに照らして厳格レビューし、リファクタ案/退行検知/倫理逸脱や障害があれば即時警告・是正策もコメントし履歴化。\n"
         )
     if role == "doc":
         return (
-            base_req +
-            "Noctria連携図・knowledge.mdをもとに構成説明・パス集中管理意義・バージョン履歴・AI自動化・倫理運用手順をREADME/ドキュメントとして自動生成し、全てにバージョン/説明責任を付与。\n"
+            base_req
+            + "Noctria連携図・knowledge.mdをもとに構成説明・パス集中管理意義・バージョン履歴・AI自動化・倫理運用手順をREADME/ドキュメントとして自動生成し、全てにバージョン/説明責任を付与。\n"
         )
     return base_req
+
 
 def get_role_prompts():
     return {
         role: build_prompt_with_latest_knowledge(role_prompt_template(role))
         for role in ["design", "implement", "test", "review", "doc"]
     }
+
 
 def git_commit_and_push(repo_dir: str, message: str) -> bool:
     try:
@@ -141,7 +147,10 @@ def git_commit_and_push(repo_dir: str, message: str) -> bool:
         log_message(f"Git commit/push failed: {e}")
         return False
 
-def build_file_header(filename: str, ai_name: str = "openai_noctria_dev.py", version: str = "v0.1.0"):
+
+def build_file_header(
+    filename: str, ai_name: str = "openai_noctria_dev.py", version: str = "v0.1.0"
+):
     now = datetime.datetime.now().isoformat()
     uid = str(uuid4())
     return (
@@ -153,6 +162,7 @@ def build_file_header(filename: str, ai_name: str = "openai_noctria_dev.py", ver
         "# 説明責任: このファイルはNoctria Kingdomナレッジベース・ガイドライン・設計根拠を遵守し自動生成されています。\n"
         "\n"
     )
+
 
 def save_ai_generated_file(file_path: str, content: str):
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -167,6 +177,7 @@ def save_ai_generated_file(file_path: str, content: str):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(merged)
 
+
 def split_files_from_response(response: str):
     pattern = r"# ファイル名:\s*(.+?\.py)\s*\n"
     splits = re.split(pattern, response)
@@ -179,19 +190,27 @@ def split_files_from_response(response: str):
         i += 2
     return files
 
+
 def sanitize_filename(fname: str) -> str:
     fname = fname.replace("\\", "/")
     while fname.startswith("./"):
         fname = fname[2:]
     while fname.startswith("generated_code/"):
-        fname = fname[len("generated_code/"):]
+        fname = fname[len("generated_code/") :]
     # basenameのみでflat化（サブディレクトリ不可）
     return os.path.basename(fname)
 
+
 def run_pytest_and_collect_detail(test_dir: str):
-    import shutil
     report_file = os.path.join(test_dir, "pytest_result.json")
-    cmd = ["pytest", test_dir, "--json-report", f"--json-report-file={report_file}", "--disable-warnings", "-q"]
+    cmd = [
+        "pytest",
+        test_dir,
+        "--json-report",
+        f"--json-report-file={report_file}",
+        "--disable-warnings",
+        "-q",
+    ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if not os.path.exists(report_file):
         return 0, 0, 0, [], result.stdout + "\n" + result.stderr
@@ -207,7 +226,7 @@ def run_pytest_and_collect_detail(test_dir: str):
             detail = {
                 "name": t.get("nodeid"),
                 "outcome": t.get("outcome"),
-                "message": t.get("call", {}).get("longrepr", "") if t.get("call") else ""
+                "message": t.get("call", {}).get("longrepr", "") if t.get("call") else "",
             }
             error_details.append(detail)
         if os.path.exists(report_file):
@@ -215,9 +234,16 @@ def run_pytest_and_collect_detail(test_dir: str):
                 os.remove(report_file)
             except Exception:
                 pass
-        return pass_count, total, fail_count + error_count, error_details, result.stdout + "\n" + result.stderr
+        return (
+            pass_count,
+            total,
+            fail_count + error_count,
+            error_details,
+            result.stdout + "\n" + result.stderr,
+        )
     except Exception as e:
         return 0, 0, 0, [], f"pytest解析エラー: {e}\n{result.stdout}\n{result.stderr}"
+
 
 async def call_openai(client, messages, retry=3, delay=2):
     for attempt in range(retry):
@@ -230,25 +256,30 @@ async def call_openai(client, messages, retry=3, delay=2):
             )
             return response.choices[0].message.content
         except Exception as e:
-            log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
-            print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
+            log_message(f"API呼び出しエラー(試行 {attempt + 1}/{retry}): {e}")
+            print(f"API呼び出しエラー(試行 {attempt + 1}/{retry}): {e}", file=sys.stderr)
             if attempt + 1 == retry:
-                log_message(f"最終試行でAPI呼び出しに失敗しました。処理を中断します。")
+                log_message("最終試行でAPI呼び出しに失敗しました。処理を中断します。")
                 raise RuntimeError("OpenAI API呼び出しが最終試行で失敗しました。") from e
             await asyncio.sleep(delay)
 
+
 # --- 未定義シンボル自動注入ロジック ---
+
 
 def run_find_undefined_symbols():
     subprocess.run(["python3", FIND_UNDEF_SCRIPT], check=True)
 
+
 def run_generate_skeleton_files():
     subprocess.run(["python3", GENERATE_SKELETON_SCRIPT], check=True)  # ここで骨格生成を呼ぶ
+
 
 def run_gen_prompt_for_undefined_symbols():
     subprocess.run(["python3", GEN_PROMPT_SCRIPT], check=True)
     with open(PROMPT_OUT, "r", encoding="utf-8") as f:
         return f.read()
+
 
 async def call_openai_for_missing_symbols(client, prompt):
     messages = [{"role": "user", "content": prompt}]
@@ -265,6 +296,7 @@ async def call_openai_for_missing_symbols(client, prompt):
             await asyncio.sleep(2)
     raise RuntimeError("AI補完失敗")
 
+
 async def auto_fix_missing_symbols(client, max_attempts=5):
     attempts = 0
     while attempts < max_attempts:
@@ -278,7 +310,7 @@ async def auto_fix_missing_symbols(client, max_attempts=5):
             break
         with open(UNDEF_FILE, "r", encoding="utf-8") as f:
             content = f.read().strip()
-        print(f"[auto_fix] undefined_symbols.txt内容 (試行{attempts+1}回目):\n{content}")
+        print(f"[auto_fix] undefined_symbols.txt内容 (試行{attempts + 1}回目):\n{content}")
         if not content or content.lower().startswith("=== 0 missing"):
             print("[auto_fix] 未定義なしと判断、ループ終了")
             break
@@ -289,6 +321,7 @@ async def auto_fix_missing_symbols(client, max_attempts=5):
     else:
         print("[auto_fix] 最大試行回数到達、強制終了")
         log_message("[auto_fix] 最大試行回数到達、強制終了")
+
 
 def save_and_commit_ai_files(ai_response):
     files = split_files_from_response(ai_response)
@@ -303,10 +336,11 @@ def save_and_commit_ai_files(ai_response):
         log_message(f"[auto_fix] AIのコード保存: {file_path}")
     git_commit_and_push(OUTPUT_DIR, "fix: 自動未定義シンボル補完")
 
+
 async def multi_agent_loop(client, max_turns=10):
     consecutive_fails = 0
     for turn in range(max_turns):
-        print(f"\n=== Turn {turn+1} ===")
+        print(f"\n=== Turn {turn + 1} ===")
 
         # 1. 未定義シンボル自動補完（全消えるまで）
         await auto_fix_missing_symbols(client, max_attempts=5)
@@ -343,7 +377,7 @@ async def multi_agent_loop(client, max_turns=10):
             if role in ("implement", "test", "doc"):
                 files = split_files_from_response(response)
                 if not files:
-                    filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn+1}.py")
+                    filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn + 1}.py")
                     save_ai_generated_file(filename, response)
                     print(f"{role} AIのコード保存: {filename}")
                     log_message(f"{role} AIのコード保存: {filename}")
@@ -355,21 +389,23 @@ async def multi_agent_loop(client, max_turns=10):
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
 
-                commit_message = f"{role} AI generated files - turn {turn+1}"
+                commit_message = f"{role} AI generated files - turn {turn + 1}"
                 if not git_commit_and_push(OUTPUT_DIR, commit_message):
-                    print(f"警告: Git連携に失敗しました。手動でコミットを確認してください。")
+                    print("警告: Git連携に失敗しました。手動でコミットを確認してください。")
 
                 if role == "test":
-                    passed, total, failed, details, log = await asyncio.to_thread(run_pytest_and_collect_detail, OUTPUT_DIR)
+                    passed, total, failed, details, log = await asyncio.to_thread(
+                        run_pytest_and_collect_detail, OUTPUT_DIR
+                    )
                     print(f"テスト実行結果: 合格={passed} / 総数={total} / 失敗={failed}")
                     log_message(f"テスト結果:\n{log}")
                     pytest_results = dict(
                         passed_tests=passed,
                         total_tests=total,
                         failed=failed > 0,
-                        fail_reason=details[0]['message'][:100] if details and failed > 0 else None,
+                        fail_reason=details[0]["message"][:100] if details and failed > 0 else None,
                         details=details,
-                        pytest_log=log
+                        pytest_log=log,
                     )
                     if failed > 0:
                         error_in_turn = True
@@ -382,26 +418,25 @@ async def multi_agent_loop(client, max_turns=10):
 
         # 進捗DB保存
         try:
-            generated_files = len([
-                f for f in os.listdir(OUTPUT_DIR)
-                if os.path.isfile(os.path.join(OUTPUT_DIR, f))
-            ])
+            generated_files = len(
+                [f for f in os.listdir(OUTPUT_DIR) if os.path.isfile(os.path.join(OUTPUT_DIR, f))]
+            )
             passed_tests = pytest_results.get("passed_tests", 0)
             total_tests = pytest_results.get("total_tests", 0)
             review_comments = 1
             failed = error_in_turn
             fail_reason = pytest_results.get("fail_reason") if failed else None
             extra_info = {
-                "turn": turn+1,
+                "turn": turn + 1,
                 "ai_roles": order,
                 "pytest_details": pytest_results.get("details", []),
                 "pytest_log": pytest_results.get("pytest_log", ""),
-                "note": "auto-recorded from openai_noctria_dev.py (pytest詳細収集版)"
+                "note": "auto-recorded from openai_noctria_dev.py (pytest詳細収集版)",
             }
             finished_at = datetime.datetime.now()
 
             insert_turn_history(
-                turn_number=turn+1,
+                turn_number=turn + 1,
                 passed_tests=passed_tests,
                 total_tests=total_tests,
                 generated_files=generated_files,
@@ -409,16 +444,18 @@ async def multi_agent_loop(client, max_turns=10):
                 failed=failed,
                 fail_reason=fail_reason,
                 extra_info=extra_info,
-                finished_at=finished_at
+                finished_at=finished_at,
             )
-            print(f"[DB記録] ターン{turn+1} の実績をDB保存しました")
+            print(f"[DB記録] ターン{turn + 1} の実績をDB保存しました")
         except Exception as e:
-            print(f"[DB記録エラー] ターン{turn+1}: {e}")
+            print(f"[DB記録エラー] ターン{turn + 1}: {e}")
 
         if error_in_turn:
             consecutive_fails += 1
             if consecutive_fails >= 3:
-                print("\n[ALERT] 3ターン連続エラー/品質退行を検出。AI自動生成を停止し、人間承認フローに移行します。")
+                print(
+                    "\n[ALERT] 3ターン連続エラー/品質退行を検出。AI自動生成を停止し、人間承認フローに移行します。"
+                )
                 log_message("3連続エラーにより自動停止・人間承認待ち。")
                 print("承認・指示があるまで続行しません。qで終了。Enterで再開可。")
                 user_input = await asyncio.to_thread(input)
@@ -442,12 +479,14 @@ async def multi_agent_loop(client, max_turns=10):
     print("\n=== 多役割AI対話ワークフロー終了 ===")
     log_message("=== 多役割AI対話ワークフロー終了 ===")
 
+
 async def main():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEYが設定されていません。")
     client = OpenAI(api_key=api_key)
     await multi_agent_loop(client, max_turns=10)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

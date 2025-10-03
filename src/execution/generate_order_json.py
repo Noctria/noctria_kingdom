@@ -7,29 +7,40 @@
 - Airflowから呼び出される。再送（--from-log）にも完全対応。
 """
 
-import json
-import importlib.util
-import logging
 import argparse
-from pathlib import Path
+import importlib.util
+import json
+import logging
 from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
 
-from src.core.path_config import STRATEGIES_DIR, VERITAS_ORDER_JSON, PDCA_LOG_DIR, VERITAS_EVAL_LOG
+from src.core.path_config import (
+    PDCA_LOG_DIR,
+    STRATEGIES_DIR,
+    VERITAS_EVAL_LOG,
+    VERITAS_ORDER_JSON,
+)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
+
 
 def _load_simulate_function(filepath: Path):
     try:
         spec = importlib.util.spec_from_file_location("strategy_module", str(filepath))
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        if not hasattr(module, 'simulate'):
+        if not hasattr(module, "simulate"):
             raise AttributeError("指定された戦略モジュールにsimulate関数が存在しません。")
         return module.simulate
     except Exception as e:
-        logging.error(f"戦略モジュールの読み込みに失敗しました: {filepath}, エラー: {e}", exc_info=True)
+        logging.error(
+            f"戦略モジュールの読み込みに失敗しました: {filepath}, エラー: {e}",
+            exc_info=True,
+        )
         raise
+
 
 def _get_best_adopted_strategy() -> str:
     if not VERITAS_EVAL_LOG.exists():
@@ -41,6 +52,7 @@ def _get_best_adopted_strategy() -> str:
         raise ValueError("採用基準を満たした戦略が存在しません。")
     best_strategy = max(passed_strategies, key=lambda r: r.get("final_capital", 0))
     return best_strategy.get("strategy")
+
 
 def _save_order_and_log(signal_data: dict):
     # EA命令ファイル出力
@@ -57,6 +69,7 @@ def _save_order_and_log(signal_data: dict):
         json.dump(signal_data, f, indent=2, ensure_ascii=False)
     logging.info(f"🗂️ PDCA履歴ログを保存しました: {log_path}")
 
+
 def generate_order_from_log(log_path: Path):
     """
     PDCA履歴ログからそのまま命令JSONとPDCA履歴を復元
@@ -70,6 +83,7 @@ def generate_order_from_log(log_path: Path):
     _save_order_and_log(signal_data)
     logging.info("📜 ログ再送が完了しました。")
 
+
 def main():
     """
     最良の採用戦略に基づき、EAへの命令JSONを生成する。
@@ -82,7 +96,9 @@ def main():
         if not strategy_path.exists():
             raise FileNotFoundError(f"公式戦略ファイルが見つかりません: {strategy_path}")
         simulate = _load_simulate_function(strategy_path)
-        market_data = pd.DataFrame({'price': [150.0] * 100, 'RSI(14)': [60] * 100, 'spread': [1.5] * 100})
+        market_data = pd.DataFrame(
+            {"price": [150.0] * 100, "RSI(14)": [60] * 100, "spread": [1.5] * 100}
+        )
         result = simulate(market_data)
         signal = {
             "strategy": best_strategy_filename,
@@ -101,8 +117,11 @@ def main():
         logging.error(f"EA命令の生成中に致命的なエラーが発生しました: {e}", exc_info=True)
         raise
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Veritas戦略からEA命令JSONを生成または再送するスクリプト")
+    parser = argparse.ArgumentParser(
+        description="Veritas戦略からEA命令JSONを生成または再送するスクリプト"
+    )
     parser.add_argument("--from-log", type=str, help="再送用のPDCAログファイルパス")
     args = parser.parse_args()
     if args.from_log:

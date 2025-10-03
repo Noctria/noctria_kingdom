@@ -1,11 +1,72 @@
-......                                                                   [100%]
+s........................................                                [100%]
 ==================================== PASSES ====================================
+______________________________ test_floor_mod_cpu ______________________________
+----------------------------- Captured stdout call -----------------------------
+CPU FloorMod result: tf.Tensor([123456789         0], shape=(2,), dtype=int32)
+______________________________ test_floor_mod_gpu ______________________________
+----------------------------- Captured stdout call -----------------------------
+GPU FloorMod result: tf.Tensor([123456789         0], shape=(2,), dtype=int32)
+________________ test_quality_gate_emits_alert_on_missing_ratio ________________
+------------------------------ Captured log call -------------------------------
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:847 {'kind': 'QUALITY.MISSING_RATIO', 'missing_ratio': 0.12, 'threshold': 0.1, 'trace': 'test-trace-quality-001', 'level': 'WARNING'}
+WARNING  QUALITY:quality_gate.py:851 {'kind': 'QUALITY', 'event': 'MISSING_RATIO', 'missing_ratio': 0.12, 'threshold': 0.1, 'trace': 'test-trace-quality-001'}
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:1376 ALERT
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:1466 {'kind': 'QUALITY.MISSING_RATIO', 'missing_ratio': 0.12, 'threshold': 0.1, 'trace': 'test-trace-quality-001', 'level': 'WARNING'}
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:1540 ALERT
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:1608 {'kind': 'QUALITY.MISSING_RATIO', 'missing_ratio': 0.12, 'trace': 'test-trace-quality-001'}
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:1774 {'kind': 'QUALITY.MISSING_RATIO', 'missing_ratio': 0.12, 'threshold': 0.1, 'trace': 'test-trace-quality-001', 'level': 'WARNING'}
+WARNING  QUALITY.MISSING_RATIO:quality_gate.py:1883 {'kind': 'QUALITY.MISSING_RATIO', 'missing_ratio': 0.12, 'threshold': 0.1, 'trace': 'test-trace-quality-001', 'level': 'WARNING'}
+__________________ test_quality_gate_emits_alert_on_data_lag ___________________
+------------------------------ Captured log call -------------------------------
+WARNING  QUALITY.DATA_LAG:quality_gate.py:888 {'kind': 'QUALITY.DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002', 'level': 'WARNING'}
+WARNING  QUALITY:quality_gate.py:892 {'kind': 'QUALITY', 'event': 'DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002'}
+WARNING  QUALITY.DATA_LAG:quality_gate.py:1384 ALERT
+WARNING  QUALITY.DATA_LAG:quality_gate.py:1475 {'kind': 'QUALITY.DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002', 'level': 'WARNING'}
+WARNING  QUALITY.DATA_LAG:quality_gate.py:1546 ALERT
+WARNING  QUALITY.DATA_LAG:quality_gate.py:1615 {'kind': 'QUALITY.DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002'}
+WARNING  QUALITY.DATA_LAG:quality_gate.py:1784 {'kind': 'QUALITY.DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002', 'level': 'WARNING'}
+WARNING  QUALITY.DATA_LAG:quality_gate.py:1904 {'kind': 'QUALITY.DATA_LAG', 'data_lag_min': 45.0, 'trace': 'test-trace-quality-002', 'level': 'WARNING'}
 - generated xml file: /mnt/d/noctria_kingdom/src/codex_reports/pytest_last.xml -
 =========================== short test summary info ============================
-PASSED actions-runner/_work/noctria_kingdom/noctria_kingdom/tests/test_decision_fallback_size.py::test_fallback_size_reason_matches_implementation
-PASSED actions-runner/_work/noctria_kingdom/noctria_kingdom/tests/test_harmonia_rerank.py::test_harmonia_rerank_sets_risk_adjusted_and_orders
-PASSED actions-runner/_work/noctria_kingdom/noctria_kingdom/tests/test_harmonia_rerank.py::test_harmonia_rerank_penalizes_with_lag_and_missing_ratio
-PASSED tests/test_decision_fallback_size.py::test_fallback_size_reason_matches_implementation
+PASSED tests/test_dummy.py::test_basic
+PASSED tests/test_floor_mod.py::test_floor_mod_cpu
+PASSED tests/test_floor_mod_gpu.py::test_floor_mod_gpu
 PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_sets_risk_adjusted_and_orders
 PASSED tests/test_harmonia_rerank.py::test_harmonia_rerank_penalizes_with_lag_and_missing_ratio
+PASSED tests/test_minidemo_smoke.py::test_minidemo_offline_smoke
+PASSED tests/test_path_config.py::test_path_exists[BASE_DIR]
+PASSED tests/test_path_config.py::test_path_exists[AIRFLOW_DIR]
+PASSED tests/test_path_config.py::test_path_exists[CORE_DIR]
+PASSED tests/test_path_config.py::test_path_exists[VERITAS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[STRATEGIES_DIR]
+PASSED tests/test_path_config.py::test_path_exists[OFFICIAL_STRATEGIES_DIR]
+PASSED tests/test_path_config.py::test_path_exists[GENERATED_STRATEGIES_DIR]
+PASSED tests/test_path_config.py::test_path_exists[EXECUTION_DIR]
+PASSED tests/test_path_config.py::test_path_exists[DATA_DIR]
+PASSED tests/test_path_config.py::test_path_exists[RAW_DATA_DIR]
+PASSED tests/test_path_config.py::test_path_exists[PROCESSED_DATA_DIR]
+PASSED tests/test_path_config.py::test_path_exists[FUNDAMENTAL_DATA_DIR]
+PASSED tests/test_path_config.py::test_path_exists[MODELS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[LATEST_MODELS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[ARCHIVE_MODELS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[LLM_SERVER_DIR]
+PASSED tests/test_path_config.py::test_path_exists[GUI_DIR]
+PASSED tests/test_path_config.py::test_path_exists[EXPERTS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[TOOLS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[TESTS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[DOCS_DIR]
+PASSED tests/test_path_config.py::test_path_exists[AIRFLOW_LOG_DIR]
+PASSED tests/test_path_config.py::test_path_exists[VERITAS_EVAL_LOG]
+PASSED tests/test_policy_guard.py::test_inventor_can_propose_patch_basic
+PASSED tests/test_policy_guard.py::test_inventor_blocked_when_no_tests
+PASSED tests/test_policy_guard.py::test_governance_alignment_boundary_blocks
+PASSED tests/test_policy_guard.py::test_governance_failing_tests_blocks
+PASSED tests/test_policy_guard.py::test_harmonia_alignment_required
+PASSED tests/test_policy_guard.py::test_harmonia_alignment_ok
+PASSED tests/test_quality_gate_alerts.py::test_quality_gate_emits_alert_on_missing_ratio
+PASSED tests/test_quality_gate_alerts.py::test_quality_gate_emits_alert_on_data_lag
+PASSED tests/test_trace_and_integration.py::test_trace_id_format
+PASSED tests/test_trace_and_integration.py::test_minidemo_writes_db
+PASSED tests/test_trace_decision_e2e.py::test_decision_minidemo_writes_db
+SKIPPED [1] tests/test_decision_fallback_size.py:124: 最新の decision を取得できませんでした（軽量CIのため SKIP）。
 

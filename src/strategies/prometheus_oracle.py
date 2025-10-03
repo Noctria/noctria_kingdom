@@ -1,3 +1,20 @@
+# [NOCTRIA_CORE_REQUIRED]
+from __future__ import annotations
+
+import json
+import logging
+import os
+from datetime import datetime, timedelta
+from importlib import import_module
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
+from src.core.path_config import DATA_DIR, ORACLE_FORECAST_JSON, VERITAS_MODELS_DIR
+from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
+
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -13,22 +30,10 @@
 - TensorFlow / SB3 は「必要になった時だけ」import（Gunicorn起動を軽量化）
 """
 
-from __future__ import annotations
-
-import json
-import logging
-import os
-from importlib import import_module
-from pathlib import Path
-from typing import Optional, List, Any, Dict, Tuple
-
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
 
 # ===== Optional deps（遅延importのためダミーを用意） =====
-tf = None          # type: ignore  # TensorFlow: 遅延import
-PPO = None         # type: ignore  # SB3: 遅延import
+tf = None  # type: ignore  # TensorFlow: 遅延import
+PPO = None  # type: ignore  # SB3: 遅延import
 
 # gymnasium は比較的軽量なのでそのまま（無ければ None）
 try:
@@ -36,8 +41,6 @@ try:
 except Exception:
     gym = None  # type: ignore
 
-from src.core.path_config import VERITAS_MODELS_DIR, ORACLE_FORECAST_JSON, DATA_DIR
-from src.plan_data.standard_feature_schema import STANDARD_FEATURE_ORDER
 
 log = logging.getLogger(__name__)
 if not log.handlers:
@@ -215,7 +218,10 @@ class PrometheusOracle:
             self.load()
             return True
         except Exception as e:
-            log.warning("PrometheusOracle: モデルロードに失敗しました（遅延ロード）。理由: %s", e)
+            log.warning(
+                "PrometheusOracle: モデルロードに失敗しました（遅延ロード）。理由: %s",
+                e,
+            )
             return False
 
     # ---------- Keras 前処理 ----------
@@ -246,44 +252,55 @@ class PrometheusOracle:
     ) -> pd.DataFrame:
         if self.backend != "keras":
             # Keras じゃない時は落とさずダミー返却
-            log.warning("predict_future は Keras 専用です（現在: %s）。ダミーを返します。", self.backend or "(none)")
-            return pd.DataFrame({
-                "date": [str(datetime.today())[:10]],
-                "forecast": [np.nan],
-                "lower": [np.nan],
-                "upper": [np.nan],
-                "decision_id": [decision_id],
-                "caller": [caller],
-                "reason": [f"backend={self.backend or 'none'} is not keras"],
-            })
+            log.warning(
+                "predict_future は Keras 専用です（現在: %s）。ダミーを返します。",
+                self.backend or "(none)",
+            )
+            return pd.DataFrame(
+                {
+                    "date": [str(datetime.today())[:10]],
+                    "forecast": [np.nan],
+                    "lower": [np.nan],
+                    "upper": [np.nan],
+                    "decision_id": [decision_id],
+                    "caller": [caller],
+                    "reason": [f"backend={self.backend or 'none'} is not keras"],
+                }
+            )
 
         if not self._ensure_loaded():
-            return pd.DataFrame({
-                "date": [str(datetime.today())[:10]],
-                "forecast": [np.nan],
-                "lower": [np.nan],
-                "upper": [np.nan],
-                "decision_id": [decision_id],
-                "caller": [caller],
-                "reason": ["keras model load failed"],
-            })
+            return pd.DataFrame(
+                {
+                    "date": [str(datetime.today())[:10]],
+                    "forecast": [np.nan],
+                    "lower": [np.nan],
+                    "upper": [np.nan],
+                    "decision_id": [decision_id],
+                    "caller": [caller],
+                    "reason": ["keras model load failed"],
+                }
+            )
 
         clean = self._align_and_clean(features_df)
         n = min(n_days, len(clean))
         if n == 0:
             log.warning("predict_future: 入力行が0のためダミー行を返します。")
-            return pd.DataFrame({
-                "date": [str(datetime.today())[:10]],
-                "forecast": [np.nan],
-                "lower": [np.nan],
-                "upper": [np.nan],
-                "decision_id": [decision_id],
-                "caller": [caller],
-                "reason": [reason],
-            })
+            return pd.DataFrame(
+                {
+                    "date": [str(datetime.today())[:10]],
+                    "forecast": [np.nan],
+                    "lower": [np.nan],
+                    "upper": [np.nan],
+                    "decision_id": [decision_id],
+                    "caller": [caller],
+                    "reason": [reason],
+                }
+            )
 
         df_input = clean.tail(n)
-        y_pred = np.asarray(self.model.predict(df_input.values, verbose=0)).astype(np.float32).flatten()
+        y_pred = (
+            np.asarray(self.model.predict(df_input.values, verbose=0)).astype(np.float32).flatten()
+        )
 
         if len(y_pred) > 1 and not np.allclose(np.std(y_pred), 0.0):
             confidence_margin = float(np.std(y_pred) * 1.5)
@@ -300,15 +317,17 @@ class PrometheusOracle:
         else:
             dates = [(datetime.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(n)]
 
-        return pd.DataFrame({
-            "date": dates,
-            "forecast": np.round(y_pred, 4),
-            "lower": np.round(y_lower, 4),
-            "upper": np.round(y_upper, 4),
-            "decision_id": decision_id,
-            "caller": caller,
-            "reason": reason,
-        })
+        return pd.DataFrame(
+            {
+                "date": dates,
+                "forecast": np.round(y_pred, 4),
+                "lower": np.round(y_lower, 4),
+                "upper": np.round(y_upper, 4),
+                "decision_id": decision_id,
+                "caller": caller,
+                "reason": reason,
+            }
+        )
 
     def write_forecast_json(
         self,
@@ -348,7 +367,9 @@ class PrometheusOracle:
         env_spec = os.environ.get("PROMETHEUS_ENV", "")
         env_kwargs_text = os.environ.get("PROMETHEUS_ENV_KWARGS", "{}")
         try:
-            env_kwargs: Dict[str, Any] = json.loads(env_kwargs_text) if env_kwargs_text.strip() else {}
+            env_kwargs: Dict[str, Any] = (
+                json.loads(env_kwargs_text) if env_kwargs_text.strip() else {}
+            )
         except Exception:
             env_kwargs = {}
             log.warning("PROMETHEUS_ENV_KWARGS の JSON 解析に失敗。空dictを使用します。")
@@ -366,16 +387,20 @@ class PrometheusOracle:
 
         # --- 形状ガード（モデル観測次元 vs Env観測次元の突合）---
         try:
-            model_obs_space = getattr(getattr(self.model, "policy", None), "observation_space", None) \
-                              or getattr(self.model, "observation_space", None)
+            model_obs_space = getattr(
+                getattr(self.model, "policy", None), "observation_space", None
+            ) or getattr(self.model, "observation_space", None)
             obs_shape_model: Tuple[int, ...] = tuple(getattr(model_obs_space, "shape", ()) or ())
-            obs_shape_env: Tuple[int, ...] = tuple(getattr(env.observation_space, "shape", ()) or ())
+            obs_shape_env: Tuple[int, ...] = tuple(
+                getattr(env.observation_space, "shape", ()) or ()
+            )
 
             if obs_shape_model and obs_shape_env and (obs_shape_model != obs_shape_env):
                 log.warning(
                     "SB3 形状不一致につき HOLD: model_obs=%s, env_obs=%s. "
                     "学習時と同一のEnv / 特徴次元に揃えてください。",
-                    obs_shape_model, obs_shape_env
+                    obs_shape_model,
+                    obs_shape_env,
                 )
                 try:
                     env.close()
@@ -445,7 +470,11 @@ class PrometheusOracle:
         return {
             "backend": self.backend or "(none)",
             "ready": self.model is not None,
-            "model_path": str(self._loaded_path or self.model_path) if (self._loaded_path or self.model_path) else None,
+            "model_path": (
+                str(self._loaded_path or self.model_path)
+                if (self._loaded_path or self.model_path)
+                else None
+            ),
             "sb3_root": root,
             "latest_dir": latest_dir,
             "meta": self._meta,

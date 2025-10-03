@@ -9,15 +9,15 @@
 """
 
 import logging
-from fastapi import APIRouter, Request, Form, HTTPException
+
+import httpx
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-import httpx
-
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from src.core.dag_trigger import list_dags  # trigger_dagは廃止
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -33,17 +33,11 @@ async def get_trigger_page(request: Request):
     except Exception as e:
         logging.error(f"Airflow DAG一覧取得に失敗: {e}", exc_info=True)
         dag_list = []
-    return templates.TemplateResponse("trigger.html", {
-        "request": request,
-        "dag_list": dag_list
-    })
+    return templates.TemplateResponse("trigger.html", {"request": request, "dag_list": dag_list})
 
 
 @router.post("/trigger")
-async def handle_trigger_command(
-    dag_id: str = Form(...),
-    manual_reason: str = Form(...)
-):
+async def handle_trigger_command(dag_id: str = Form(...), manual_reason: str = Form(...)):
     """
     POST /trigger - 王Noctria API経由で王命/DAG起動コマンドを発令
     """
@@ -55,11 +49,8 @@ async def handle_trigger_command(
                 "http://localhost:8000/api/king/command",
                 json={
                     "command": "trigger_dag",
-                    "args": {
-                        "dag_id": dag_id,
-                        "reason": manual_reason
-                    }
-                }
+                    "args": {"dag_id": dag_id, "reason": manual_reason},
+                },
             )
         if response.status_code == 200:
             data = response.json()
@@ -69,7 +60,7 @@ async def handle_trigger_command(
                 "dag_id": dag_id,
                 "decision_id": data.get("decision_id"),
                 "king_response": data,
-                "reason": manual_reason
+                "reason": manual_reason,
             }
             logging.info(res["message"])
             return JSONResponse(content=res)
@@ -85,6 +76,6 @@ async def handle_trigger_command(
             detail={
                 "status": "error",
                 "message": "王命APIの発令中に予期せぬ問題が発生しました。",
-                "error_details": str(e)
-            }
+                "error_details": str(e),
+            },
         )

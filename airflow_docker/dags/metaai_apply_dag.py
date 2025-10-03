@@ -1,17 +1,17 @@
 # dags/metaai_apply_dag.py
 
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
+
 from airflow.decorators import dag, task
-from airflow.operators.python import get_current_context
 
-
-from core.path_config import LOGS_DIR
 from core.logger import setup_logger
+from core.path_config import LOGS_DIR
 from scripts.apply_best_params_to_metaai import apply_best_params_to_metaai
 
 dag_log_path = LOGS_DIR / "dags" / "metaai_apply_dag.log"
 logger = setup_logger("MetaAIApplyDAG", dag_log_path)
+
 
 @dag(
     dag_id="metaai_apply_dag",
@@ -20,9 +20,7 @@ logger = setup_logger("MetaAIApplyDAG", dag_log_path)
     catchup=False,
     tags=["noctria", "metaai", "retrain", "apply"],
     description="📌 MetaAIに指定された最適パラメータを適用し、再学習・評価・保存する単体DAG",
-    params={
-        "best_params": {}
-    }
+    params={"best_params": {}},
 )
 def metaai_apply_pipeline():
     """
@@ -34,6 +32,7 @@ def metaai_apply_pipeline():
     @task
     def apply_task(params: Any) -> Dict:
         from airflow.decorators import get_current_context
+
         ctx = get_current_context()
         conf = ctx["dag_run"].conf if ctx.get("dag_run") and ctx["dag_run"].conf else {}
         reason = conf.get("reason", "理由未指定")
@@ -48,13 +47,11 @@ def metaai_apply_pipeline():
 
         model_info = apply_best_params_to_metaai(best_params=best_params)
         # 理由も返却データに含めてXComへ
-        result = {
-            "model_info": model_info,
-            "trigger_reason": reason
-        }
+        result = {"model_info": model_info, "trigger_reason": reason}
         logger.info(f"✅ MetaAIへの継承が完了しました: {result}")
         return result
 
     apply_task(params="{{ params }}")
+
 
 metaai_apply_pipeline()

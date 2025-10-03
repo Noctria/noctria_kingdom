@@ -1,0 +1,214 @@
+# =======================================================
+# レポート書式テンプレ（再現フッター追記）
+# =======================================================
+report_templates:
+  conventions:
+    writing_style:
+      tone: "簡潔・事実ベース・命令形（王の訓示）。主観は避け、数値→根拠→命令の順。"
+      bullets_max: 5
+      orders_max: 3
+      emoji_policy:
+        allow: true
+        guide: ["警報: 🔔","訓示/命令: 📣","チェックポイント: ✅"]
+    notations:
+      arrow_delta: { up: "⬆", down: "⬇", flat: "→" }
+      kpi_keys: ["brier_score","ece_calibration","adversarial_pass_rate"]
+      baseline_format: "{win}r {stat}"
+      date_format: "YYYY-MM-DD"
+    links:
+      change_dir: "docs/change/"
+      decisions_dir: "docs/decisions/"
+  # 共通の再現フッターフィールド（daily/weekly/monthly で展開）
+  repro_fields:
+    - "git_sha"
+    - "data_snapshot_id"
+    - "model_ver"
+    - "seed"
+    - "temperature_T"
+    - "bins"
+
+  daily:
+    path: "docs/reports/daily/{YYYY-MM-DD}.md"
+    front_matter:
+      - "title: 'Daily Report — {date}'"
+      - "tags: ['daily','kpi','noctria']"
+    sections:
+      - id: "header"
+        title: "# Daily Report — {date}"
+        body: |
+          生成: {utc_time} UTC / 担当: 王
+      - id: "exec_summary"
+        title: "## Executive Summary（1分）"
+        body: |
+          - 今日の結論: **{today_conclusion_one_line}**
+          - 警報: {alerts_brief}
+          - 指標: Brier {brier_latest:.3f} / ECE {ece_latest:.3f} / Adv {adv_latest:.2f}
+          - 王の訓示（要旨）: {orders_brief_one_line}
+          - アクション: {next_actions_one_line}（締切 {deadline_or_dash}）
+      - id: "kpi_snapshot"
+        title: "## KPI Snapshot (last {runs} runs)"
+        body: |
+          | metric | latest | baseline({baseline_label}) | Δ (signed) |
+          |---|---:|---:|---:|
+          | Brier | {brier_latest:.4f} | {brier_base_txt} | {brier_dev_signed} |
+          | ECE   | {ece_latest:.4f}   | {ece_base_txt}   | {ece_dev_signed} |
+          | Adv.Pass | {adv_latest:.4f} | {adv_base_txt} | {adv_dev_signed} |
+          <details><summary>runs</summary>
+
+          | run_id | at | brier | ece | adv_pass | samples |
+          |---|---|---:|---:|---:|---:|
+          {runs_table_rows}
+          </details>
+      - id: "alerts"
+        title: "## 🔔 警報"
+        body: |
+          {if_any_alerts}
+          - **{level}** [{metric}] value={value:.4f} baseline({baseline_label})={baseline:.4f} dev={deviation_signed} consec={consecutive}
+            - 原因仮説: **{triage_category}**（根拠: {triage_evidence_short}）
+            - 初期対応: {initial_action}
+          {endif}
+          {if_no_alerts}
+          - 検出なし（全指標で安定）
+          {endif}
+      # 警報の表形式（多数同時発火時に切替可能）
+      - id: "alerts_table"
+        title: "## 🔔 警報（表形式オプション）"
+        body: |
+          | metric | level | value | baseline | dev | consec | 仮説 | 初期対応 |
+          |---|---|---:|---:|---:|---:|---|---|
+          {alerts_table_rows}
+      - id: "orders"
+        title: "## 📣 王の訓示（Orders）"
+        body: |
+          1) {order_1}
+          2) {order_2}
+          3) {order_3}
+          成功条件: {success_criteria_line}
+      - id: "whale_watch"
+        title: "## Whale Watch"
+        body: |
+          - 観測期間: {ww_window}
+          - 検知件数: {ww_count}
+          - 代表例: {ww_top_events}
+          - リスク評価: {ww_risk_brief}
+          - 対応: {ww_orders_one_line}
+      - id: "slo_burn"
+        title: "## SLO Burn-rate"
+        body: |
+          - predict p95: value={p95_ms} / SLO={slo_p95_ms} → burn={burn_p95} {burn_p95_emoji}
+          - availability: value={avail_pct} / SLO={slo_avail_pct} → burn={burn_avail} {burn_avail_emoji}
+          - 直近FT締切: value={ft_ready_utc} / SLO={slo_ft_deadline} → burn={burn_ft} {burn_ft_emoji}
+          - 自動アクション: {auto_actions_taken_or_none}
+      - id: "handover"
+        title: "## Handover（翌日）"
+        body: |
+          - 重点: {focus_one_line}
+          - チェックポイント: {checkpoint_1}, {checkpoint_2}
+          - タスク: {task_1_time} {task_1}, {task_2_time} {task_2}
+      - id: "log_refs"
+        title: "## 参照"
+        body: |
+          - decision_log: {decision_log_path_or_dash}
+          - change_draft: {change_draft_path_or_dash}
+          - kpi_db_view: obs_codex_kpi_latest
+      - id: "repro_footer"
+        title: "## Reproducibility"
+        body: |
+          - git_sha: `{git_sha}`
+          - data_snapshot_id: `{data_snapshot_id}`
+          - model_ver: `{model_ver}`
+          - seed: `{seed}`
+          - temperature_T: `{temperature_T}`
+          - bins: `{bins}`
+
+    acceptance_checklist:
+      - "KPIの最新値・基準・符号付き偏差が表として載っている"
+      - "警報の有無が明確で、triage と初期対応が併記"
+      - "王の訓示が最大3点で、成功条件が1行"
+      - "handover に翌日の時刻付きタスクが最低2件"
+      - "decision_log / change_draft の参照が記載"
+      - "Reproducibility フッターが埋まっている"
+
+  weekly:
+    path: "docs/reports/weekly/{YYYY}-W{WW}.md"
+    front_matter:
+      - "title: 'Weekly Report — {year}-W{week}'"
+      - "tags: ['weekly','kpi','noctria']"
+    sections:
+      - id: "header"
+        title: "# Weekly Review — {year}-W{week}"
+        body: "期間: {from_date}〜{to_date}（JST）"
+      - id: "trend"
+        title: "## KPI Trend"
+        body: |
+          - Brier: {brier_trend_line}
+          - ECE: {ece_trend_line}
+          - Adv.Pass: {adv_trend_line}
+          - 転換点/イベント: {events_one_line}
+      - id: "wins_losses"
+        title: "## Wins / Losses"
+        body: |
+          **Wins**
+          - {win_1}
+          - {win_2}
+          **Losses**
+          - {loss_1}
+          - {loss_2}
+      - id: "changes"
+        title: "## 変更管理の進捗"
+        body: |
+          - 起票: {changes_open_count} / 完了: {changes_closed_count} / 保留: {changes_onhold_count}
+          - 注目: {one_change_link_or_dash}
+      - id: "next_week_focus"
+        title: "## 来週の焦点（最大3点）"
+        body: |
+          1) {focus1}
+          2) {focus2}
+          3) {focus3}
+      - id: "repro_footer"
+        title: "## Reproducibility"
+        body: |
+          - git_sha: `{git_sha}`
+          - data_snapshot_id: `{data_snapshot_id}`
+
+  monthly:
+    path: "docs/reports/monthly/{YYYY-MM}.md"
+    sections:
+      - id: "header"
+        title: "# Monthly Review — {year}-{month}"
+        body: "対象期間: {from_date}〜{to_date}"
+      - id: "kpi_summary"
+        title: "## KPI Summary（平均/最小/最大/改善率）"
+        body: |
+          | metric | avg | min | max | Δ vs 前月 |
+          |---|---:|---:|---:|---:|
+          | Brier | {brier_avg:.4f} | {brier_min:.4f} | {brier_max:.4f} | {brier_mom_delta} |
+          | ECE   | {ece_avg:.4f}   | {ece_min:.4f}   | {ece_max:.4f}   | {ece_mom_delta} |
+          | Adv.Pass | {adv_avg:.4f} | {adv_min:.4f} | {adv_max:.4f} | {adv_mom_delta} |
+      - id: "guardrails_review"
+        title: "## ガードレール再点検"
+        body: |
+          - kpi_targets: 妥当性 {targets_ok|needs_update}（根拠: {targets_reason}）
+          - automation_gates: {gates_ok|hold}（根拠: {gates_reason}）
+      - id: "resource_allocation"
+        title: "## リソース再配分の裁定"
+        body: |
+          - 重点投資領域: {priority_area_1}, {priority_area_2}
+          - 減額/停止: {deprioritized_area_or_dash}
+      - id: "governance_review"
+        title: "## ガバナンスレビュー"
+        body: |
+          - 今月の change_management 実施件数: {changes_count}
+          - open/closed/rollback: {changes_summary}
+          - doc_ops コンプライアンス: {doc_ops_compliance_pct}%
+      - id: "next_month_objectives"
+        title: "## 来月の目標（SMART）"
+        body: |
+          1) {obj1}
+          2) {obj2}
+          3) {obj3}
+      - id: "repro_footer"
+        title: "## Reproducibility"
+        body: |
+          - git_sha: `{git_sha}`
+          - data_snapshot_id: `{data_snapshot_id}`

@@ -22,10 +22,9 @@ LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 log_path = os.path.join(LOG_DIR, "veritas_trigger.log")
 logging.basicConfig(
-    filename=log_path,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    filename=log_path, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
+
 
 # ===============================
 # ✅ 外部呼び出し用 FastAPI ルート
@@ -33,6 +32,7 @@ logging.basicConfig(
 class VeritasTriggerRequest(BaseModel):
     conf: dict = {}
     dag_id: str = "veritas_master_dag"
+
 
 @router.post("/trigger/veritas")
 def trigger_veritas(request: VeritasTriggerRequest):
@@ -44,18 +44,13 @@ def trigger_veritas(request: VeritasTriggerRequest):
     AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
 
     execution_date = datetime.utcnow().isoformat()
-    payload = {
-        "conf": request.conf,
-        "execution_date": execution_date
-    }
+    payload = {"conf": request.conf, "execution_date": execution_date}
 
     trigger_url = f"{AIRFLOW_API_URL}/dags/{request.dag_id}/dagRuns"
 
     try:
         response = requests.post(
-            trigger_url,
-            auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
-            json=payload
+            trigger_url, auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD), json=payload
         )
 
         if response.status_code in (200, 201, 202):
@@ -64,7 +59,7 @@ def trigger_veritas(request: VeritasTriggerRequest):
                 "status": "success",
                 "dag_id": request.dag_id,
                 "execution_date": execution_date,
-                "response": response.json()
+                "response": response.json(),
             }
         else:
             logging.error(f"[FAILED] {response.status_code}: {response.text}")
@@ -88,23 +83,18 @@ def trigger_recheck_dag(strategy_name: str) -> requests.Response:
     dag_id = "veritas_recheck_dag"
 
     execution_date = datetime.utcnow().isoformat()
-    payload = {
-        "conf": {"strategy_name": strategy_name},
-        "execution_date": execution_date
-    }
+    payload = {"conf": {"strategy_name": strategy_name}, "execution_date": execution_date}
 
     trigger_url = f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns"
 
-    response = requests.post(
-        trigger_url,
-        auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
-        json=payload
-    )
+    response = requests.post(trigger_url, auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD), json=payload)
 
     if response.status_code in (200, 201, 202):
         logging.info(f"[TRIGGERED] DAG={dag_id} | strategy={strategy_name} | Payload={payload}")
     else:
-        logging.error(f"[FAILED] DAG={dag_id} | Status={response.status_code} | Text={response.text}")
+        logging.error(
+            f"[FAILED] DAG={dag_id} | Status={response.status_code} | Text={response.text}"
+        )
 
     return response
 
@@ -112,7 +102,9 @@ def trigger_recheck_dag(strategy_name: str) -> requests.Response:
 # =========================================
 # 🆕 内部からの呼び出し用（戦略生成用）
 # =========================================
-def trigger_generate_dag(symbol: str = "", tag: str = "", target_metric: str = "") -> requests.Response:
+def trigger_generate_dag(
+    symbol: str = "", tag: str = "", target_metric: str = ""
+) -> requests.Response:
     """
     🧠 Veritas戦略生成 DAG（veritas_generate_dag）をトリガー
     """
@@ -123,25 +115,19 @@ def trigger_generate_dag(symbol: str = "", tag: str = "", target_metric: str = "
 
     execution_date = datetime.utcnow().isoformat()
     payload = {
-        "conf": {
-            "symbol": symbol,
-            "tag": tag,
-            "target_metric": target_metric
-        },
-        "execution_date": execution_date
+        "conf": {"symbol": symbol, "tag": tag, "target_metric": target_metric},
+        "execution_date": execution_date,
     }
 
     trigger_url = f"{AIRFLOW_API_URL}/dags/{dag_id}/dagRuns"
 
-    response = requests.post(
-        trigger_url,
-        auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
-        json=payload
-    )
+    response = requests.post(trigger_url, auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD), json=payload)
 
     if response.status_code in (200, 201, 202):
         logging.info(f"[TRIGGERED] DAG={dag_id} | Payload={payload}")
     else:
-        logging.error(f"[FAILED] DAG={dag_id} | Status={response.status_code} | Text={response.text}")
+        logging.error(
+            f"[FAILED] DAG={dag_id} | Status={response.status_code} | Text={response.text}"
+        )
 
     return response

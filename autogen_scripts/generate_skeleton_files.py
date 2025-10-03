@@ -4,6 +4,7 @@ import re
 FOLDER = "./generated_code"
 UNDEF_FILE = "./autogen_scripts/undefined_symbols.txt"
 
+
 def add_skeleton_to_file(file_path, symbol):
     if not os.path.exists(file_path):
         with open(file_path, "w", encoding="utf-8") as f:
@@ -17,7 +18,11 @@ def add_skeleton_to_file(file_path, symbol):
         def_pattern = re.compile(rf"^def\s+{re.escape(symbol)}\b", re.MULTILINE)
         const_pattern = re.compile(rf"^{re.escape(symbol)}\s*=", re.MULTILINE)
 
-        if class_pattern.search(content) or def_pattern.search(content) or const_pattern.search(content):
+        if (
+            class_pattern.search(content)
+            or def_pattern.search(content)
+            or const_pattern.search(content)
+        ):
             # すでに骨格あり
             return
 
@@ -31,6 +36,7 @@ def add_skeleton_to_file(file_path, symbol):
         else:
             # 関数骨格
             f.write(f"def {symbol}(*args, **kwargs):\n    pass\n\n")
+
 
 def generate_skeleton_files():
     if not os.path.exists(UNDEF_FILE):
@@ -53,6 +59,7 @@ def generate_skeleton_files():
 
     if count == 0:
         print("[骨格生成] 追加すべき未定義シンボルが見つかりませんでした。")
+
 
 if __name__ == "__main__":
     generate_skeleton_files()

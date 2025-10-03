@@ -7,6 +7,7 @@ from stable_baselines3 import PPO
 from core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
 from core.path_config import MODELS_DIR, DATA_DIR, LOGS_DIR
 
+
 def evaluate_metaai_model():
     """
     最新のMetaAIモデルを評価し、累積報酬をログに出力する。

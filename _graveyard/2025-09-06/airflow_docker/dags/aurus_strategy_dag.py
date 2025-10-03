@@ -36,10 +36,12 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
+
 def _reason_from_conf() -> str:
     ctx = get_current_context()
     dr = ctx.get("dag_run")
     return (dr.conf or {}).get("reason", "理由未指定") if dr else "理由未指定"
+
 
 def _safe_db_log(event_type: str, payload: dict):
     if _db_log_event is None:
@@ -54,6 +56,7 @@ def _safe_db_log(event_type: str, payload: dict):
     except Exception as e:
         # DBロギングは失敗しても落とさない
         logger.debug(f"pdca_events log skipped: {e}")
+
 
 def trigger_task():
     reason = _reason_from_conf()
@@ -72,8 +75,11 @@ def trigger_task():
         "trigger_reason": reason,
     }
 
-    _safe_db_log("AURUS_TRIGGERED", {"reason": reason, "sample_keys": list(mock_market_data.keys())})
+    _safe_db_log(
+        "AURUS_TRIGGERED", {"reason": reason, "sample_keys": list(mock_market_data.keys())}
+    )
     return mock_market_data  # XCom: return_value
+
 
 def strategy_task():
     ctx = get_current_context()
@@ -83,10 +89,20 @@ def strategy_task():
     input_data = ctx["ti"].xcom_pull(task_ids="trigger_task")
     if not input_data:
         # フォールバック（最低限の構造）
-        input_data = {k: 0.0 for k in [
-            "price", "volume", "sentiment", "trend_strength", "volatility",
-            "order_block", "momentum", "trend_prediction", "liquidity_ratio"
-        ]}
+        input_data = {
+            k: 0.0
+            for k in [
+                "price",
+                "volume",
+                "sentiment",
+                "trend_strength",
+                "volatility",
+                "order_block",
+                "momentum",
+                "trend_prediction",
+                "liquidity_ratio",
+            ]
+        }
         input_data["trigger_reason"] = reason
 
     try:
@@ -106,6 +122,7 @@ def strategy_task():
         # エラーでもDAG全体は継続させたい運用なら None を返す
         return None
 
+
 with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
@@ -115,7 +132,6 @@ with DAG(
     catchup=False,
     tags=["noctria", "trend-analysis"],
 ) as dag:
-
     t1 = PythonOperator(
         task_id="trigger_task",
         python_callable=trigger_task,

@@ -1,0 +1,104 @@
+# =======================================================
+# Safety / Access / Audit
+# =======================================================
+safety_and_access:
+  break_glass:
+    description: "重大障害時にゲートやテストを一時バイパスする緊急手続き（最小権限・時間限定）"
+    allowed_when:
+      - "市場ショックで損失拡大の恐れ"
+      - "データ汚染で通常評価不能"
+    constraints:
+      timebox_minutes: 120            # 改善: 時間制限（超過は自動失効）
+      scope_allowlist:                # 改善: 影響範囲を明示的に限定
+        - "calibration.apply"         # 例: 校正パラメタ適用のみ
+        - "api.rate_limit_adjust"
+      scope_denylist:
+        - "model_replace"             # モデル差し替えは禁止（緊急時でも）
+        - "trade_live_enable"         # ライブ有効化は禁止
+      cooldown_hours: 24              # 改善: 再発火までの冷却期間
+    approvals:
+      required_quorum: 2              # 改善: 二重承認（デュアルコントロール）
+      roles: ["human_pm","king"]
+      mfa_required: true              # 改善: 承認時にMFA必須
+    steps:
+      - "Noctus が『緊急宣言』を起票（decision_log: level=CRITICAL, reason=break_glass, id=BG-{YYYYMMDD}-{seq})"
+      - "human_pm と king の二者承認（quorum満たすまで適用不可）"
+      - "影響範囲（scope_allowlist）と有効期限（timebox）を発行時に明記"
+      - "適用直後に監視を強化（SLO Burn/損益・ドローダウンを5分間隔で記録）"
+      - "適用後24h以内にロールバック判定＆事後分析をdailyに追記（Postmortemリンク）"
+    notifications:                    # 改善: 即時通知
+      channels: ["#noctria-ops","email:ops@noctria.example"]
+      include_artifacts: true
+    compensating_controls:            # 改善: 代替統制
+      - "全変更に対する即時スナップショット（git_sha / flags / env）"
+      - "レートリミットとサーキットブレーカの閾値を一段引き締め"
+    postmortem:
+      template: "docs/templates/incident_timeline.md"
+      owners: ["noctus","king"]
+      due_hours: 48
+
+  roles_permissions:                  # 改善: RBACを具体アクションで管理
+    mfa_required: true
+    session_timeout_minutes: 60
+    dual_control:
+      apply_prod: true                # 本番適用は常に二名承認
+    ip_allowlist_enabled: false       # 必要に応じてtrueにできる
+    rbac:
+      apply_prod: ["king","human_pm"]
+      change_gate_config: ["king"]
+      read_only: ["prometheus","veritas","aurus","noctus"]
+      incident_command: ["noctus","king"]
+
+  audit_log:
+    location: "docs/audit/{YYYY}/{YYYYMMDD}.log"
+    rotation: "daily"                 # 改善: ローテーション
+    retention_days: 180               # 改善: 保持期間
+    format: "jsonl"                   # 改善: 機械可読
+    integrity:
+      hashing: "sha256-chain"         # 改善: 逐次ハッシュで改ざん検知
+      signer: "ops-svc-key"           # 署名キー名（保管はKMS）
+    redact_rules:
+      - "api_keys"
+      - "access_tokens"
+      - "customer_identifiers"
+    schema:                           # 改善: 必須フィールドを固定
+      - ts_utc
+      - who
+      - role
+      - action           # apply | rollback | flag_change | break_glass_open | break_glass_close
+      - target           # e.g., calibration.T/bins, api.rate_limit
+      - params           # 重要パラメタのみ（秘匿値はハッシュ化）
+      - git_sha
+      - result           # ok | warn | fail
+      - evidence_refs    # ファイル/レポートへの相対パス
+    events:
+      - "who:<actor> | action:apply | git_sha:<sha> | target:T=<T>,bins=<bins> | ts_utc:<UTC>"
+      - "who:<actor> | action:rollback | reason:<text> | ts_utc:<UTC>"
+      - "who:<actor> | action:break_glass_open | id:<BG-id> | scope:<scopes> | expires_in:<mins>"
+      - "who:<actor> | action:break_glass_close | id:<BG-id> | outcome:<rolled_back|kept>"
+
+  access_reviews:                     # 改善: 権限の棚卸し
+    cadence: "quarterly"
+    reviewers: ["king","human_pm"]
+    checklist:
+      - "不要アカウントの剥奪"
+      - "read_only ロールの逸脱確認"
+      - "デュアルコントロール設定の検証ログあり"
+    evidence_output: "docs/audit/access_review/{YYYYQ}.md"
+
+  secrets_policy:                     # 改善: 秘匿情報の扱い
+    storage: "KMS+sealed secrets"
+    rotation_days: 90
+    env_prefix_allowlist: ["NK_", "NOCTRIA_"]
+    commit_blocker: true              # 秘密がコミットに混入したらCIでブロック
+    detection:
+      scanners: ["gitleaks","trufflehog"]
+      schedule: "weekly"
+
+  observability_hooks:                # 改善: 監視と自動是正の接続点
+    emit_metrics:
+      - "security.break_glass_active"
+      - "security.dual_control_pending"
+      - "audit.write_errors"
+    auto_remediation:
+      on_audit_write_error: "fallback to secondary store + page human_pm"

@@ -1,0 +1,128 @@
+[
+  {
+    "date":"2025-09-12",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-13",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-14",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-15",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-16",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-17",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-18",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-19",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-20",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-21",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-22",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-23",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-24",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  },
+  {
+    "date":"2025-09-25",
+    "forecast":0.0108000003,
+    "lower":-1.989199996,
+    "upper":2.0107998848,
+    "decision_id":"TEST-PROM-FORECAST",
+    "caller":"smoke_test",
+    "reason":"try_prometheus_oracle backend=keras"
+  }
+]

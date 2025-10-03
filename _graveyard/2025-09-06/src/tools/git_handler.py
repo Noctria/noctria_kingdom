@@ -16,6 +16,7 @@ GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_REPO = os.getenv("GITHUB_REPO")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
+
 def push_to_github(file_path: str, commit_message: str):
     """指定されたファイルをGitリポジトリに追加、コミット、プッシュする"""
     if not os.path.exists(file_path):
@@ -36,7 +37,7 @@ def push_to_github(file_path: str, commit_message: str):
             run(["git", "push", remote_url], check=True, capture_output=True, text=True)
         else:
             run(["git", "push"], check=True, capture_output=True, text=True)
-            
+
         logger.info("✅ GitHubへのプッシュが完了しました。")
 
     except CalledProcessError as e:
@@ -44,7 +45,7 @@ def push_to_github(file_path: str, commit_message: str):
         if "nothing to commit, working tree clean" in e.stderr:
             logger.warning("⚠️ コミットする変更がありませんでした。プッシュをスキップします。")
             return
-            
+
         logger.error(f"❌ Git操作に失敗しました (Exit Code: {e.returncode})")
         logger.error(f"   - STDOUT: {e.stdout}")
         logger.error(f"   - STDERR: {e.stderr}")

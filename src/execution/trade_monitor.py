@@ -1,7 +1,8 @@
 import datetime
 import os
-import pandas as pd
+
 import MetaTrader5 as mt5
+import pandas as pd
 from core.Noctria import Noctria
 
 
@@ -13,7 +14,7 @@ class TradeMonitor:
         self.last_trade_date = trade_date
 
     def check_trade_activity(self):
-        """ 30日間無トレードの失格防止チェック """
+        """30日間無トレードの失格防止チェック"""
         if self.last_trade_date:
             days_since = (datetime.datetime.now() - self.last_trade_date).days
             if days_since >= 30:

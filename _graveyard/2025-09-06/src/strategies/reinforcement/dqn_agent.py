@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
+
 class DQNAgent:
     def __init__(self, state_dim, action_dim, learning_rate=1e-4, gamma=0.99):
         self.state_dim = state_dim
@@ -14,7 +15,7 @@ class DQNAgent:
             nn.ReLU(),
             nn.Linear(128, 128),
             nn.ReLU(),
-            nn.Linear(128, action_dim)
+            nn.Linear(128, action_dim),
         )
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
 
@@ -36,7 +37,9 @@ class DQNAgent:
             if dones[i]:
                 target_q_values[i, actions[i]] = rewards[i]
             else:
-                target_q_values[i, actions[i]] = rewards[i] + self.gamma * torch.max(next_q_values[i])
+                target_q_values[i, actions[i]] = rewards[i] + self.gamma * torch.max(
+                    next_q_values[i]
+                )
 
         loss = nn.MSELoss()(q_values, target_q_values)
         self.optimizer.zero_grad()

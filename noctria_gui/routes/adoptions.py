@@ -10,13 +10,14 @@
 """
 
 from __future__ import annotations
+
 import csv
 import io
 import json
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 try:
     from src.core.git_utils import GitHelper
@@ -112,11 +113,13 @@ async def adoptions_index(
 
     if q:
         ql = q.lower()
+
         def _hit(r: Dict[str, Any]) -> bool:
             return any(
                 (str(r.get(k, "")) or "").lower().find(ql) >= 0
                 for k in ("tag", "sha", "decision_id", "decision_phase")
             )
+
         rows = [r for r in rows if _hit(r)]
 
     return _render(
@@ -142,12 +145,27 @@ async def adoptions_csv(
     if q:
         ql = q.lower()
         rows = [
-            r for r in rows
-            if any((str(r.get(k, "")) or "").lower().find(ql) >= 0 for k in ("tag", "sha", "decision_id", "decision_phase"))
+            r
+            for r in rows
+            if any(
+                (str(r.get(k, "")) or "").lower().find(ql) >= 0
+                for k in ("tag", "sha", "decision_id", "decision_phase")
+            )
         ]
 
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=["tag", "date", "sha", "annotated", "decision_id", "decision_ts_utc", "decision_phase"])
+    w = csv.DictWriter(
+        buf,
+        fieldnames=[
+            "tag",
+            "date",
+            "sha",
+            "annotated",
+            "decision_id",
+            "decision_ts_utc",
+            "decision_phase",
+        ],
+    )
     w.writeheader()
     w.writerows(rows)
     data = buf.getvalue()
@@ -168,7 +186,11 @@ async def adoptions_json(
     if q:
         ql = q.lower()
         rows = [
-            r for r in rows
-            if any((str(r.get(k, "")) or "").lower().find(ql) >= 0 for k in ("tag", "sha", "decision_id", "decision_phase"))
+            r
+            for r in rows
+            if any(
+                (str(r.get(k, "")) or "").lower().find(ql) >= 0
+                for k in ("tag", "sha", "decision_id", "decision_phase")
+            )
         ]
     return JSONResponse(rows)

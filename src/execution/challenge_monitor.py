@@ -1,8 +1,6 @@
 # challenge_monitor.py
-import time
 # ※実際の環境では smtplib などを利用してメールを送るなどのアラート機能を実装できます
-from email.mime.text import MIMEText
-import smtplib
+
 
 class ChallengeMonitor:
     """
@@ -10,6 +8,7 @@ class ChallengeMonitor:
     リスク管理モジュール（RiskControl）と連携して、
     1日損失率や総損失率が事前の閾値に近づいた場合にアラートを発する仕組みです。
     """
+
     def __init__(self, risk_control, alert_threshold_daily=0.045, alert_threshold_overall=0.09):
         self.risk_control = risk_control
         self.alert_threshold_daily = alert_threshold_daily
@@ -48,7 +47,6 @@ class ChallengeMonitor:
 # テスト運用用
 if __name__ == "__main__":
     from risk_control import RiskControl
-    import numpy as np
 
     # 初期資本金 100万円の RiskControl インスタンスを生成
     risk_control = RiskControl(initial_capital=1000000)

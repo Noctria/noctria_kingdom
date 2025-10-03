@@ -1,0 +1,31 @@
+{% extends "base_hud.html" %}
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-semibold mb-4">📋 {{ title }}</h1>
+  <div class="text-sm text-gray-400 mb-4">limit={{ limit }}</div>
+
+  {% if items and items|length > 0 %}
+  <div class="grid gap-4">
+    {% for it in items %}
+    <div class="bg-gray-800/60 rounded-2xl shadow-lg p-5 border border-gray-700">
+      <div class="flex justify-between items-center mb-2">
+        <div class="text-sm text-gray-400">created_at</div>
+        <div class="font-mono text-sm">{{ it.created_at }}</div>
+      </div>
+      <div class="grid gap-2">
+        <div class="bg-black/30 rounded-xl p-3"><span class="text-gray-400 mr-2">①</span>{{ it.lines[0] }}</div>
+        <div class="bg-black/30 rounded-xl p-3"><span class="text-gray-400 mr-2">②</span>{{ it.lines[1] }}</div>
+        <div class="bg-black/30 rounded-xl p-3"><span class="text-gray-400 mr-2">③</span>{{ it.lines[2] }}</div>
+      </div>
+      <div class="mt-3 text-xs text-gray-400">
+        trace_id: <a class="underline" href="/pdca/summary_card?trace_id={{ it.trace_id }}">{{ it.trace_id }}</a>
+      </div>
+      <div class="mt-1 text-xs text-gray-500">model: <span class="font-mono">{{ it.model_used or "-" }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="text-gray-400">表示できる要約がまだありません。</div>
+  {% endif %}
+</div>
+{% endblock %}

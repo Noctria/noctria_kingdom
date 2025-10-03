@@ -17,6 +17,7 @@ NEW_PATH = "/opt/airflow"
 # 📂 対象拡張子
 target_exts = [".py", ".sh", ".yaml", ".yml", ".env", ".txt", ".md"]
 
+
 def scan_file(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         lines = f.readlines()
@@ -27,17 +28,16 @@ def scan_file(file_path):
             found.append((idx + 1, line.strip()))
     return found
 
+
 def walk_and_scan(root_dir):
     report = []
     for path in root_dir.rglob("*"):
         if path.is_file() and path.suffix in target_exts:
             hits = scan_file(path)
             if hits:
-                report.append({
-                    "file": path,
-                    "matches": hits
-                })
+                report.append({"file": path, "matches": hits})
     return report
+
 
 def apply_fixes(entries):
     for entry in entries:
@@ -50,6 +50,7 @@ def apply_fixes(entries):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(new_content)
             print(f"✅ 修正: {path.relative_to(ROOT)}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

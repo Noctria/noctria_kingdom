@@ -12,23 +12,24 @@ from pathlib import Path
 # === DAG定義 ===
 
 default_args = {
-    'owner': 'Veritas',
-    'depends_on_past': False,
-    'start_date': datetime(2025, 6, 1),
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 0,
-    'retry_delay': timedelta(minutes=2),
+    "owner": "Veritas",
+    "depends_on_past": False,
+    "start_date": datetime(2025, 6, 1),
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 0,
+    "retry_delay": timedelta(minutes=2),
 }
 
 dag = DAG(
-    dag_id='veritas_eval_single_dag',
+    dag_id="veritas_eval_single_dag",
     default_args=default_args,
-    description='🔁 単一戦略を評価（スクリプト経由）',
+    description="🔁 単一戦略を評価（スクリプト経由）",
     schedule_interval=None,
     catchup=False,
-    tags=['veritas', 'pdca', 'single_eval'],
+    tags=["veritas", "pdca", "single_eval"],
 )
+
 
 def call_single_eval_script():
     context = get_current_context()
@@ -41,7 +42,7 @@ def call_single_eval_script():
     # 📦 評価スクリプトを subprocess 経由で呼び出し
     subprocess.run(
         ["python3", "/noctria_kingdom/scripts/evaluate_single_strategy.py", strategy_name],
-        check=True
+        check=True,
     )
 
     # ✅ 評価完了後、PDCAログに recheck_timestamp を追記
@@ -64,9 +65,10 @@ def call_single_eval_script():
         print(f"❌ ログ更新に失敗: {e}")
         raise
 
+
 # === DAG登録 ===
 with dag:
     eval_task = PythonOperator(
-        task_id='evaluate_single_strategy_by_script',
+        task_id="evaluate_single_strategy_by_script",
         python_callable=call_single_eval_script,
     )

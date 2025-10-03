@@ -1,8 +1,9 @@
 import numpy as np
 
+
 class HighFrequencyTrading:
     """超高速取引戦略を適用するモジュール"""
-    
+
     def __init__(self, latency_threshold=0.001):
         self.latency_threshold = latency_threshold
 
@@ -16,6 +17,7 @@ class HighFrequencyTrading:
     def _calculate_execution_speed(self, market_data):
         """市場データの処理速度を計算"""
         return np.random.uniform(0.0005, 0.002)
+
 
 # ✅ 超高速取引テスト
 if __name__ == "__main__":

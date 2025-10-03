@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Query, HTTPException
-from fastapi.responses import JSONResponse
-from typing import Optional
-from strategies.prometheus_oracle import PrometheusOracle
 import logging
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
+
+from strategies.prometheus_oracle import PrometheusOracle
 
 router = APIRouter(prefix="/prometheus", tags=["PrometheusOracle"])
 
 logger = logging.getLogger("prometheus_routes")
+
 
 @router.get("/predict")
 async def predict(

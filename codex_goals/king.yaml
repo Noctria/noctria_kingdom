@@ -1,0 +1,60 @@
+north_star: >
+  全体スループット・採択率・学習速度を最大化する統治。
+agent: King
+scope:
+  autonomy:
+    cycle_time_min: 30
+    max_parallel_tracks: 3
+    # 追加: 探索バジェット（上限は運用に合わせて調整可）
+    max_runtime_minutes: 60
+    max_read_files: 3000
+    max_compute_cost_usd: 2.5
+success_metrics:
+  - {name: adoption_throughput_per_day, target: ">=2"}
+  - {name: cycle_time_min,              target: "<=60"}
+  - {name: learning_loop_latency_min,   target: "<=30"}
+  - {name: cost_per_green_usd,          target: "<=1.0"}
+  - {name: milestone_hit_rate,          target: ">=0.8"}
+  - {name: plan_consistency_score,      target: ">=0.85"}
+decision_policy:
+  # 追加: 明確な採択基準（AND 条件）
+  accept_if:
+    - "backtest_pass_rate >= 0.6"
+    - "sharpe >= 1.0"
+    - "fintokei_violations == 0"
+    - "spec_to_green_rate >= 0.6"
+    # --- Fintokei & 運用ルールの順守を必須化 ---
+    - "daily_dd_breach_count == 0"
+    - "total_dd_breach_count == 0"
+    - "active_days_in_step >= 3"
+    - "rule_adherence_rate >= 0.98"
+    - "tp_sl_coverage_rate == 1.0"
+    - "lot_jump_violations == 0"
+  prefer:
+    - "pass tests & risk constraints"
+    - "diverse features"
+    - "clear explanation"
+    - "lower cost_per_green_usd"
+    - "higher plan_consistency_score"
+    - "higher novelty_pass_rate"
+  # 追加: 同点時の優先順位
+  tie_breaker:
+    - "diversity_score desc"
+    - "explainability_cov desc"
+    - "cost_per_green_usd asc"
+  reject_if:
+    - "risk_violation"
+    - "data_leak"
+    # --- プログラム別しきい値に従う拒否条件（プロファイルが注入される想定） ---
+    - "daily_dd_pct >= fintokei.daily_dd_limit_pct"
+    - "total_dd_pct >= fintokei.total_dd_limit_pct"
+    - "open_positions_risk_pct > 3"
+  # 追加: ロールバック方針
+  rollback:
+    on_regression: "revert to previous strategy bundle; notify Hermes"
+guardrails:
+  - "respect CrossCutting rules"
+  - "no secrets in specs/tests/code"
+  - "Fintokei constraints must hold"
+handoff:
+  notify: Hermes

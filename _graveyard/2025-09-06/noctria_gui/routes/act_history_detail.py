@@ -17,7 +17,7 @@ from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from noctria_gui.services import act_log_service
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 # ✅ 修正: ルーターのprefixを/act-historyに統一
 router = APIRouter(prefix="/act-history", tags=["act-history-detail"])
@@ -35,18 +35,19 @@ async def show_act_history_detail(request: Request, log_id: str):
     try:
         # サービス層を通じて、IDでログを取得
         log = act_log_service.get_log_by_id(log_id)
-        
+
         if not log:
             logging.warning(f"指定された採用ログが見つかりませんでした: {log_id}")
-            raise HTTPException(status_code=404, detail=f"ID '{log_id}' の採用記録は見つかりませんでした。")
+            raise HTTPException(
+                status_code=404, detail=f"ID '{log_id}' の採用記録は見つかりませんでした。"
+            )
 
         # テンプレートに渡す前にデータを正規化
         normalized_log = act_log_service.normalize_score(log)
-        
-        return templates.TemplateResponse("act_history_detail.html", {
-            "request": request,
-            "log": normalized_log
-        })
+
+        return templates.TemplateResponse(
+            "act_history_detail.html", {"request": request, "log": normalized_log}
+        )
 
     except HTTPException:
         # 404エラーはそのまま再送出
@@ -54,4 +55,3 @@ async def show_act_history_detail(request: Request, log_id: str):
     except Exception as e:
         logging.error(f"ログ詳細の取得中に予期せぬエラーが発生しました: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="ログ詳細の表示中に内部エラーが発生しました。")
-

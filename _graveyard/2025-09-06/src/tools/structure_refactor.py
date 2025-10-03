@@ -1,9 +1,14 @@
 from core.path_config import CORE_DIR, DAGS_DIR, DATA_DIR, INSTITUTIONS_DIR, LOGS_DIR, MODELS_DIR, PLUGINS_DIR, SCRIPTS_DIR, STRATEGIES_DIR, TESTS_DIR, TOOLS_DIR, VERITAS_DIR
-# tools/structure_refactor.py
 
 from pathlib import Path
 import os
 import sys
+from core.path_config import (
+from tools.hardcoded_path_replacer import replace_paths
+from tools.structure_auditor import audit_structure  # ← 明示的に audit_structure を呼ぶ
+
+# tools/structure_refactor.py
+
 
 # 🔧 パスを通す（/mnt/d/noctria_kingdom を PYTHONPATH に追加する想定）
 CURRENT_FILE = Path(__file__).resolve()
@@ -11,12 +16,9 @@ ROOT_DIR = CURRENT_FILE.parent.parent
 sys.path.append(str(ROOT_DIR))
 
 # === 各種モジュールインポート ===
-from core.path_config import (
     DAGS_DIR, PLUGINS_DIR, SCRIPTS_DIR, CORE_DIR, STRATEGIES_DIR,
     VERITAS_DIR, TOOLS_DIR
 )
-from tools.hardcoded_path_replacer import replace_paths
-from tools.structure_auditor import audit_structure  # ← 明示的に audit_structure を呼ぶ
 
 # === 対象ディレクトリ（v3.0構成）===
 TARGETS = [

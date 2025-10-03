@@ -9,19 +9,22 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, Dict, Any, List
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 # ---- logger ----
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
 # ---- optional deps / paths ----
 try:
     import tensorflow as tf  # type: ignore
+
     TF_AVAILABLE = True
 except Exception:
     tf = None  # type: ignore
@@ -55,6 +58,7 @@ class AurusSingularis:
     - feature_order: List[str] 入力 dict をこの順にベクトル化（欠損は 0.0）
     - model_path   : 任意。指定 or 既定パスが存在し、TensorFlow 利用可能ならロードを試みる
     """
+
     def __init__(
         self,
         model_path: Optional[Path] = None,
@@ -62,7 +66,9 @@ class AurusSingularis:
     ):
         self.feature_order: List[str] = feature_order or list(STANDARD_FEATURE_ORDER)
         # 既定の保存先（存在しなくてもOK、ロード時のみ参照）
-        self.model_path: Path = model_path or (Path(VERITAS_MODELS_DIR) / "aurus_singularis_v3.keras")
+        self.model_path: Path = model_path or (
+            Path(VERITAS_MODELS_DIR) / "aurus_singularis_v3.keras"
+        )
         self.model = self._maybe_load_or_build_model(input_dim=len(self.feature_order))
 
     # ------------------------------
@@ -83,14 +89,20 @@ class AurusSingularis:
         # ざっくりした小型モデル（学習前提／デモ用）
         logger.info("🧪 新規モデル構築 (input_dim=%d)", input_dim)
         try:
-            model = tf.keras.Sequential([
-                tf.keras.layers.Input(shape=(input_dim,)),
-                tf.keras.layers.Dense(64, activation="relu"),
-                tf.keras.layers.Dropout(0.1),
-                tf.keras.layers.Dense(32, activation="relu"),
-                tf.keras.layers.Dense(3, activation="softmax"),  # 0=SELL, 1=HOLD, 2=BUY
-            ])
-            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+            model = tf.keras.Sequential(
+                [
+                    tf.keras.layers.Input(shape=(input_dim,)),
+                    tf.keras.layers.Dense(64, activation="relu"),
+                    tf.keras.layers.Dropout(0.1),
+                    tf.keras.layers.Dense(32, activation="relu"),
+                    tf.keras.layers.Dense(3, activation="softmax"),  # 0=SELL, 1=HOLD, 2=BUY
+                ]
+            )
+            model.compile(
+                optimizer="adam",
+                loss="sparse_categorical_crossentropy",
+                metrics=["accuracy"],
+            )
             return model
         except Exception as e:
             logger.warning("モデル構築失敗（ヒューリスティックへフォールバック）: %s", e)
@@ -150,8 +162,8 @@ class AurusSingularis:
         return {
             "name": "AurusSingularis",
             "type": "comprehensive_analysis_report",
-            "signal": signal,                  # "BUY" | "SELL" | "HOLD"
-            "confidence": round(base_conf, 4), # 0.5〜0.85
+            "signal": signal,  # "BUY" | "SELL" | "HOLD"
+            "confidence": round(base_conf, 4),  # 0.5〜0.85
             "priority": "high" if base_conf >= 0.7 else "medium",
             "reason": "heuristic_rsi_rule",
         }
@@ -172,6 +184,7 @@ class AurusSingularis:
 
         try:
             import pandas as pd  # optional; 与えられた型に応じて抽出
+
             if isinstance(feat_df, pd.DataFrame):
                 feature_order = [c for c in feat_df.columns if c != label_col]
                 X = feat_df[feature_order].to_numpy(dtype=np.float32)
@@ -224,12 +237,14 @@ class AurusSingularis:
             out = self._heuristic_propose(feature_dict)
 
         # メタ付与（上流で使いやすいように）
-        out.update({
-            "decision_id": decision_id,
-            "caller": caller,
-        })
+        out.update(
+            {
+                "decision_id": decision_id,
+                "caller": caller,
+            }
+        )
         if reason:
-            out["reason"] = f"{out.get('reason','')}; {reason}".strip("; ")
+            out["reason"] = f"{out.get('reason', '')}; {reason}".strip("; ")
         return out
 
 

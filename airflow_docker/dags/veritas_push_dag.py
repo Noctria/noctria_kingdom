@@ -1,10 +1,12 @@
+import logging
+from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from datetime import datetime, timedelta
-import logging
 
 logger = logging.getLogger("airflow.task")
+
 
 def trigger_veritas_push(**context):
     dag_run = context.get("dag_run")
@@ -20,7 +22,9 @@ def trigger_veritas_push(**context):
         logger.error("統治ID（decision_id）が指定されていません！王API経由のみ許可")
         raise ValueError("decision_idが必要です。Noctria王API経由でのみDAG起動が許可されます。")
 
-    logger.info(f"🚀 [decision_id:{decision_id}] Starting GitHub push for strategy: {strategy_name} at {timestamp} / 呼出元: {caller} / 理由: {reason}")
+    logger.info(
+        f"🚀 [decision_id:{decision_id}] Starting GitHub push for strategy: {strategy_name} at {timestamp} / 呼出元: {caller} / 理由: {reason}"
+    )
 
     # --- GitHub push ロジック ---
     # 例: GitPythonで実装
@@ -32,7 +36,10 @@ def trigger_veritas_push(**context):
     # repo.remote().push()
     # --- または外部スクリプト実行も同様にdecision_id/理由/callerを引数で渡す ---
 
-    logger.info(f"✅ [decision_id:{decision_id}] Strategy '{strategy_name}' pushed successfully by {caller}.")
+    logger.info(
+        f"✅ [decision_id:{decision_id}] Strategy '{strategy_name}' pushed successfully by {caller}."
+    )
+
 
 default_args = {
     "start_date": days_ago(1),
@@ -46,13 +53,10 @@ with DAG(
     schedule_interval=None,
     default_args=default_args,
     catchup=False,
-    tags=["veritas", "strategy", "push"]
+    tags=["veritas", "strategy", "push"],
 ) as dag:
-
     push_task = PythonOperator(
-        task_id="trigger_veritas_push",
-        python_callable=trigger_veritas_push,
-        provide_context=True
+        task_id="trigger_veritas_push", python_callable=trigger_veritas_push, provide_context=True
     )
 
     push_task

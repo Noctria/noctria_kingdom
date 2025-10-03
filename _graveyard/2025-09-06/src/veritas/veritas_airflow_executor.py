@@ -17,10 +17,7 @@ class VeritasAirflowExecutor:
         """指定DAGを起動"""
         endpoint = f"{self.airflow_host}/api/v1/dags/{dag_id}/dagRuns"
         dag_run_id = f"{dag_id}__{datetime.utcnow().isoformat()}"
-        payload = {
-            "conf": conf or {},
-            "dag_run_id": dag_run_id
-        }
+        payload = {"conf": conf or {}, "dag_run_id": dag_run_id}
 
         response = requests.post(endpoint, headers=self.headers, data=json.dumps(payload))
         response.raise_for_status()
@@ -74,14 +71,14 @@ if __name__ == "__main__":
         "short_interest": 0.5,
         "momentum": 0.9,
         "trend_prediction": 0.6,
-        "liquidity_ratio": 1.2
+        "liquidity_ratio": 1.2,
     }
 
     result = executor.run_strategy(
         dag_id="prometheus_strategy_dag",
         task_id="prometheus_forecast_task",
         conf={"market_data": mock_market_data},
-        xcom_key="prometheus_forecast"
+        xcom_key="prometheus_forecast",
     )
 
     print(f"🎯 最終判断（Prometheus）: {result}")

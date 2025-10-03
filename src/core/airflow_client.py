@@ -52,7 +52,12 @@ def _parse_bool_env(val: Optional[str], default: bool = False) -> bool:
 
 def _now_utc_iso() -> str:
     # 末尾Zで統一（AirflowはISO8601を受け付ける）
-    return datetime.utcnow().replace(microsecond=0, tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.utcnow()
+        .replace(microsecond=0, tzinfo=timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _json_default(o: Any) -> Any:
@@ -107,14 +112,23 @@ class AirflowRESTClient:
             self._root_base = self._root_base[: -len("/api/v1")]
 
         self.token = token or os.getenv("AIRFLOW_API_TOKEN") or os.getenv("AIRFLOW_TOKEN")
-        self.username = username or os.getenv("AIRFLOW_API_USERNAME") or os.getenv("AIRFLOW_USERNAME")
-        self.password = password or os.getenv("AIRFLOW_API_PASSWORD") or os.getenv("AIRFLOW_PASSWORD")
+        self.username = (
+            username or os.getenv("AIRFLOW_API_USERNAME") or os.getenv("AIRFLOW_USERNAME")
+        )
+        self.password = (
+            password or os.getenv("AIRFLOW_API_PASSWORD") or os.getenv("AIRFLOW_PASSWORD")
+        )
 
         if verify_ssl is None:
-            verify_ssl = _parse_bool_env(os.getenv("AIRFLOW_API_VERIFY_SSL") or os.getenv("AIRFLOW_VERIFY_SSL"), default=False)
+            verify_ssl = _parse_bool_env(
+                os.getenv("AIRFLOW_API_VERIFY_SSL") or os.getenv("AIRFLOW_VERIFY_SSL"),
+                default=False,
+            )
         self.verify_ssl = bool(verify_ssl)
 
-        self.timeout_sec = int(os.getenv("AIRFLOW_API_TIMEOUT_SEC") or os.getenv("AIRFLOW_TIMEOUT_SEC") or timeout_sec)
+        self.timeout_sec = int(
+            os.getenv("AIRFLOW_API_TIMEOUT_SEC") or os.getenv("AIRFLOW_TIMEOUT_SEC") or timeout_sec
+        )
         self._session = session or requests.Session()
 
         if not (self.token or (self.username and self.password)):
@@ -140,7 +154,9 @@ class AirflowRESTClient:
             return (self.username, self.password)
         return None
 
-    def _request(self, method: str, path: str, *, use_root: bool = False, **kwargs) -> requests.Response:
+    def _request(
+        self, method: str, path: str, *, use_root: bool = False, **kwargs
+    ) -> requests.Response:
         base = self._root_base if use_root else self.base_url
         url = f"{base}{path}"
         # 既定の headers / auth / verify / timeout を補完
@@ -206,7 +222,9 @@ class AirflowRESTClient:
         return r.json()
 
     # 互換エイリアス（既存GUIから呼ばれる）
-    def trigger_dag(self, dag_id: str, *, conf: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def trigger_dag(
+        self, dag_id: str, *, conf: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> Dict[str, Any]:
         return self.trigger_dag_run(dag_id=dag_id, conf=conf, **kwargs)
 
     def get_dag_run(self, dag_id: str, dag_run_id: str) -> Dict[str, Any]:
@@ -293,7 +311,10 @@ def make_airflow_client() -> AirflowRESTClient:
     token = os.getenv("AIRFLOW_API_TOKEN") or os.getenv("AIRFLOW_TOKEN") or None
     user = os.getenv("AIRFLOW_API_USERNAME") or os.getenv("AIRFLOW_USERNAME") or None
     pwd = os.getenv("AIRFLOW_API_PASSWORD") or os.getenv("AIRFLOW_PASSWORD") or None
-    verify = _parse_bool_env(os.getenv("AIRFLOW_API_VERIFY_SSL") or os.getenv("AIRFLOW_VERIFY_SSL"), default=False)
+    verify = _parse_bool_env(
+        os.getenv("AIRFLOW_API_VERIFY_SSL") or os.getenv("AIRFLOW_VERIFY_SSL"),
+        default=False,
+    )
     timeout = int(os.getenv("AIRFLOW_API_TIMEOUT_SEC") or os.getenv("AIRFLOW_TIMEOUT_SEC") or "15")
 
     return AirflowRESTClient(

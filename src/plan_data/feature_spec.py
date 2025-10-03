@@ -25,11 +25,10 @@ Noctria Kingdom - Plan層 標準特徴量セット・スキーマ & ユーティ
 
 from __future__ import annotations
 
-from typing import Iterable, Optional, List, Sequence
+from typing import Iterable, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
-
 
 # =====================================================================
 # 仕様カタログ（Plan が出力・整形後に“あり得る”代表列の一覧）
@@ -37,31 +36,48 @@ import pandas as pd
 # =====================================================================
 PLAN_FEATURE_COLUMNS: List[str] = [
     # タイムキー / メタ
-    "date", "tag", "strategy",
-
+    "date",
+    "tag",
+    "strategy",
     # ===== USDJPY（基本パネル）=====
-    "usdjpy_close", "usdjpy_volume", "usdjpy_return",
-    "usdjpy_volatility_5d", "usdjpy_volatility_20d", "usdjpy_rsi_14d",
-    "usdjpy_gc_flag", "usdjpy_po_up", "usdjpy_po_down",
-
+    "usdjpy_close",
+    "usdjpy_volume",
+    "usdjpy_return",
+    "usdjpy_volatility_5d",
+    "usdjpy_volatility_20d",
+    "usdjpy_rsi_14d",
+    "usdjpy_gc_flag",
+    "usdjpy_po_up",
+    "usdjpy_po_down",
     # ===== 市場関連の代表指標 =====
     "sp500_close",
     "vix_close",
-
     # ===== ニュース（GNews を主とする）=====
-    "news_count", "news_positive", "news_negative",
-    "news_positive_ratio", "news_negative_ratio", "news_spike_flag",
-
+    "news_count",
+    "news_positive",
+    "news_negative",
+    "news_positive_ratio",
+    "news_negative_ratio",
+    "news_spike_flag",
     # ===== マクロ（FRED互換カラム：値は NaN 可）=====
-    "cpiaucsl_value", "cpiaucsl_diff", "cpiaucsl_spike_flag",
-    "fedfunds_value", "fedfunds_diff", "fedfunds_spike_flag",
+    "cpiaucsl_value",
+    "cpiaucsl_diff",
+    "cpiaucsl_spike_flag",
+    "fedfunds_value",
+    "fedfunds_diff",
+    "fedfunds_spike_flag",
     "unrate_value",
-
     # ===== 経済イベント（日次フラグ；CSV由来。無ければ欠損でOK）=====
-    "fomc", "cpi", "nfp", "ecb", "boj", "gdp",
-
+    "fomc",
+    "cpi",
+    "nfp",
+    "ecb",
+    "boj",
+    "gdp",
     # ===== 検証系（統計/評価ログ）=====
-    "win_rate", "max_dd", "num_trades",
+    "win_rate",
+    "max_dd",
+    "num_trades",
 ]
 
 
@@ -88,36 +104,78 @@ FEATURE_SPEC: Sequence[str] = STANDARD_FEATURE_ORDER
 # =====================================================================
 # サンプル DataFrame（仕様確認用）
 # =====================================================================
-SAMPLE_PLAN_DF = pd.DataFrame([
-    {
-        "Date": "2025-08-01", "tag": "bull_trend", "strategy": "v2-ma-cross",
-        "USDJPY_Close": 155.23, "USDJPY_Volume": 4000, "USDJPY_Return": 0.002,
-        "USDJPY_Volatility_5d": 0.007, "USDJPY_Volatility_20d": 0.009, "USDJPY_RSI_14d": 72.4,
-        "USDJPY_GC_Flag": 1, "USDJPY_PO_UP": 1, "USDJPY_PO_DOWN": 0,
-        "sp500_close": 5588.5, "vix_close": 14.2,
-        "News_Count": 21, "News_Positive": 9, "News_Negative": 6,
-        "News_Positive_Ratio": 0.428, "News_Negative_Ratio": 0.286, "News_Spike_Flag": 0,
-        "CPIAUCSL_Value": 310.12, "CPIAUCSL_Diff": 0.13, "CPIAUCSL_Spike_Flag": 0,
-        "FEDFUNDS_Value": 5.25, "FEDFUNDS_Diff": 0.00, "FEDFUNDS_Spike_Flag": 0,
-        "unrate_value": 4.1,
-        "FOMC": 1, "NFP": 0,
-        "win_rate": 0.81, "max_dd": -7.4, "num_trades": 32,
-    },
-    {
-        "Date": "2025-08-02", "tag": "range", "strategy": "v2-ma-cross",
-        "USDJPY_Close": 154.88, "USDJPY_Volume": 3100, "USDJPY_Return": -0.0023,
-        "USDJPY_Volatility_5d": 0.008, "USDJPY_Volatility_20d": 0.010, "USDJPY_RSI_14d": 60.5,
-        "USDJPY_GC_Flag": 0, "USDJPY_PO_UP": 0, "USDJPY_PO_DOWN": 0,
-        "sp500_close": 5592.3, "vix_close": 13.9,
-        "News_Count": 16, "News_Positive": 3, "News_Negative": 7,
-        "News_Positive_Ratio": 0.188, "News_Negative_Ratio": 0.438, "News_Spike_Flag": 0,
-        "CPIAUCSL_Value": 310.13, "CPIAUCSL_Diff": 0.01, "CPIAUCSL_Spike_Flag": 0,
-        "FEDFUNDS_Value": 5.25, "FEDFUNDS_Diff": 0.00, "FEDFUNDS_Spike_Flag": 0,
-        "unrate_value": 4.1,
-        "FOMC": 0, "NFP": 1,
-        "win_rate": 0.75, "max_dd": -8.9, "num_trades": 28,
-    },
-])
+SAMPLE_PLAN_DF = pd.DataFrame(
+    [
+        {
+            "Date": "2025-08-01",
+            "tag": "bull_trend",
+            "strategy": "v2-ma-cross",
+            "USDJPY_Close": 155.23,
+            "USDJPY_Volume": 4000,
+            "USDJPY_Return": 0.002,
+            "USDJPY_Volatility_5d": 0.007,
+            "USDJPY_Volatility_20d": 0.009,
+            "USDJPY_RSI_14d": 72.4,
+            "USDJPY_GC_Flag": 1,
+            "USDJPY_PO_UP": 1,
+            "USDJPY_PO_DOWN": 0,
+            "sp500_close": 5588.5,
+            "vix_close": 14.2,
+            "News_Count": 21,
+            "News_Positive": 9,
+            "News_Negative": 6,
+            "News_Positive_Ratio": 0.428,
+            "News_Negative_Ratio": 0.286,
+            "News_Spike_Flag": 0,
+            "CPIAUCSL_Value": 310.12,
+            "CPIAUCSL_Diff": 0.13,
+            "CPIAUCSL_Spike_Flag": 0,
+            "FEDFUNDS_Value": 5.25,
+            "FEDFUNDS_Diff": 0.00,
+            "FEDFUNDS_Spike_Flag": 0,
+            "unrate_value": 4.1,
+            "FOMC": 1,
+            "NFP": 0,
+            "win_rate": 0.81,
+            "max_dd": -7.4,
+            "num_trades": 32,
+        },
+        {
+            "Date": "2025-08-02",
+            "tag": "range",
+            "strategy": "v2-ma-cross",
+            "USDJPY_Close": 154.88,
+            "USDJPY_Volume": 3100,
+            "USDJPY_Return": -0.0023,
+            "USDJPY_Volatility_5d": 0.008,
+            "USDJPY_Volatility_20d": 0.010,
+            "USDJPY_RSI_14d": 60.5,
+            "USDJPY_GC_Flag": 0,
+            "USDJPY_PO_UP": 0,
+            "USDJPY_PO_DOWN": 0,
+            "sp500_close": 5592.3,
+            "vix_close": 13.9,
+            "News_Count": 16,
+            "News_Positive": 3,
+            "News_Negative": 7,
+            "News_Positive_Ratio": 0.188,
+            "News_Negative_Ratio": 0.438,
+            "News_Spike_Flag": 0,
+            "CPIAUCSL_Value": 310.13,
+            "CPIAUCSL_Diff": 0.01,
+            "CPIAUCSL_Spike_Flag": 0,
+            "FEDFUNDS_Value": 5.25,
+            "FEDFUNDS_Diff": 0.00,
+            "FEDFUNDS_Spike_Flag": 0,
+            "unrate_value": 4.1,
+            "FOMC": 0,
+            "NFP": 1,
+            "win_rate": 0.75,
+            "max_dd": -8.9,
+            "num_trades": 28,
+        },
+    ]
+)
 
 
 # =====================================================================
@@ -134,22 +192,18 @@ _SNAKE_RENAMES = {
     "USDJPY_GC_Flag": "usdjpy_gc_flag",
     "USDJPY_PO_UP": "usdjpy_po_up",
     "USDJPY_PO_DOWN": "usdjpy_po_down",
-
     "News_Count": "news_count",
     "News_Positive": "news_positive",
     "News_Negative": "news_negative",
     "News_Positive_Ratio": "news_positive_ratio",
     "News_Negative_Ratio": "news_negative_ratio",
     "News_Spike_Flag": "news_spike_flag",
-
     "CPIAUCSL_Value": "cpiaucsl_value",
     "CPIAUCSL_Diff": "cpiaucsl_diff",
     "CPIAUCSL_Spike_Flag": "cpiaucsl_spike_flag",
-
     "FEDFUNDS_Value": "fedfunds_value",
     "FEDFUNDS_Diff": "fedfunds_diff",
     "FEDFUNDS_Spike_Flag": "fedfunds_spike_flag",
-
     "FOMC": "fomc",
     "NFP": "nfp",
     # すでに snake_case のもの（sp500_close, vix_close 等）はそのまま
@@ -200,7 +254,9 @@ def align_to_feature_spec(
             work[numeric_cols]
             .apply(pd.to_numeric, errors="coerce")
             .replace([np.inf, -np.inf], np.nan)
-            .ffill().bfill().fillna(fill_value)
+            .ffill()
+            .bfill()
+            .fillna(fill_value)
             .astype(np.float32)
         )
     return work
@@ -219,11 +275,14 @@ def select_standard_8(df: pd.DataFrame) -> pd.DataFrame:
 # 追加拡張候補（“標準8列”を超えるときに優先的に採用する列）
 _FALLBACK_NUMERIC_ORDER: List[str] = [
     # 市況系
-    "sp500_close", "vix_close",
+    "sp500_close",
+    "vix_close",
     # ニュース代表
     "news_count",
     # マクロ代表（NaN 許容）
-    "cpiaucsl_value", "fedfunds_value", "unrate_value",
+    "cpiaucsl_value",
+    "fedfunds_value",
+    "unrate_value",
 ]
 
 # 文字列・メタ系は除外

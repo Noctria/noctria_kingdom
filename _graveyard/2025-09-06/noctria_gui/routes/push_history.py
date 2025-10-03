@@ -9,6 +9,7 @@ templates = Jinja2Templates(directory="noctria_gui/templates")
 
 PUSH_LOG_DIR = Path("logs/push")  # pushログ保存ディレクトリ
 
+
 @router.get("/", summary="Push履歴ページ")
 async def push_history(request: Request):
     logs = []
@@ -18,15 +19,13 @@ async def push_history(request: Request):
         "tag": request.query_params.get("tag", ""),
         "start_date": request.query_params.get("start_date", ""),
         "end_date": request.query_params.get("end_date", ""),
-        "sort": request.query_params.get("sort", "desc")
+        "sort": request.query_params.get("sort", "desc"),
     }
-    return templates.TemplateResponse("push_history.html", {
-        "request": request,
-        "logs": logs,
-        "filters": filters,
-        "total_pages": 1,
-        "current_page": 1
-    })
+    return templates.TemplateResponse(
+        "push_history.html",
+        {"request": request, "logs": logs, "filters": filters, "total_pages": 1, "current_page": 1},
+    )
+
 
 @router.post("/trigger", summary="Pushトリガー")
 async def push_trigger(strategy_name: str = Form(...)):

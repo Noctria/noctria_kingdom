@@ -1,3 +1,12 @@
+import logging
+import os
+import sys
+from datetime import datetime, timedelta
+
+from airflow.decorators import dag, task
+from src.execution.generate_order_json import main as generate_order_main
+from src.veritas.evaluate_veritas import main as evaluate_main
+
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -7,12 +16,6 @@
 - 命令JSONファイルを生成するまでの一連のプロセスを自動化する。
 """
 
-import logging
-import sys
-import os
-from datetime import datetime, timedelta
-
-from airflow.decorators import dag, task
 
 # --- 王国の基盤モジュールをインポート ---
 # ✅ 修正: Airflowが'src'モジュールを見つけられるように、プロジェクトルートをシステムパスに追加
@@ -22,9 +25,7 @@ if project_root not in sys.path:
 
 # ✅ 修正: 各スクリプトからメインの処理関数をインポート
 # 存在しないモジュールを削除し、必要なものを正しくインポート
-from src.veritas.evaluate_veritas import main as evaluate_main
 # from src.veritas.promote_accepted_strategies import main as promote_main # このスクリプトは存在しない可能性
-from src.execution.generate_order_json import main as generate_order_main
 
 # === DAG基本設定 ===
 default_args = {
@@ -34,6 +35,7 @@ default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=3),
 }
+
 
 @dag(
     dag_id="veritas_to_order_pipeline",
@@ -74,6 +76,7 @@ def veritas_to_order_pipeline():
     generate_order_task = generate_order_json_task()
 
     evaluate_task >> generate_order_task
+
 
 # DAGのインスタンス化
 veritas_to_order_pipeline()

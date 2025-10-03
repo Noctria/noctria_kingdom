@@ -1,0 +1,80 @@
+roles:
+  - class_name: collect
+    label: "Collect"
+    patterns:
+      - "*collect*"
+      - "*collector*"
+      - "*ingest*"
+      - "*fetch*"
+
+  - class_name: analyze
+    label: "Analyze"
+    patterns:
+      - "*analyz*"
+      - "*metrics*"
+      - "*report*"
+      - "*observe*"
+
+  - class_name: plan
+    label: "Plan"
+    patterns:
+      - "*plan*"
+      - "*aurus*"
+      - "*veritas*"
+      - "*strategy*"
+      - "*design*"
+
+  - class_name: backtest
+    label: "Backtest"
+    patterns:
+      - "*backtest*"
+      - "*bt*"
+
+  - class_name: forwardtest
+    label: "ForwardTest"
+    patterns:
+      - "*forward*"
+      - "*ft*"
+
+  - class_name: fintokei_check
+    label: "FintokeiCheck"
+    patterns:
+      - "*fintokei*"
+      - "*rule*"
+      - "*check*"
+
+  - class_name: mt5_order
+    label: "MT5Order"
+    patterns:
+      - "*mt5*"
+      - "*order*"
+      - "*trade*"
+
+  - class_name: settlement
+    label: "Settlement"
+    patterns:
+      - "*settlement*"
+      - "*close*"
+      - "*position*"
+      - "*pnl*"
+
+  - class_name: result_analyze
+    label: "ResultAnalyze"
+    patterns:
+      - "*analyz*"
+      - "*result*"
+      - "*eval*"
+
+  - class_name: merge_info
+    label: "MergeInfo"
+    patterns:
+      - "*merge*"
+      - "*integrat*"
+      - "*sync*"
+
+  - class_name: replanning
+    label: "Replanning"
+    patterns:
+      - "*replan*"
+      - "*update_plan*"
+      - "*adapt*"

@@ -1,0 +1,191 @@
+stages_order:
+  - collect
+  - analyze
+  - plan
+  - backtest
+  - forwardtest
+  - fintokei_check
+  - mt5_order
+  - settlement
+  - result_analyze
+  - merge_info
+  - replanning
+
+roles:
+  # ① 情報収集
+  - class_name: collect
+    label: "Collect"
+    patterns:
+      - "src/core/data_loader.py"
+      - "src/core/market_loader.py"
+      - "src/core/data/market_data_fetcher.py"
+      - "src/plan_data/collector.py"
+      - "src/plan_data/observation_adapter.py"
+      - "data/tradingview_fetcher.py"
+      - "data/fundamental/*.py"
+      - "data/preprocessing/*.py"
+      - "airflow_docker/scripts/fetch_and_clean_fundamentals.py"
+      - "airflow_docker/dags/*collect*.py"
+      - "airflow_docker/dags/inventor_pipeline_dag.py"
+
+  # ② 収集データの分析
+  - class_name: analyze
+    label: "Analyze"
+    patterns:
+      - "src/plan_data/analyzer.py"
+      - "src/plan_data/statistics.py"
+      - "src/plan_data/features.py"
+      - "src/plan_data/feature_spec.py"
+      - "data/ensemble_learning.py"
+      - "data/explainable_ai.py"
+      - "data/market_regime_detector.py"
+      - "data/sentiment_analysis.py"
+      - "airflow_docker/scripts/evaluate_generated_strategies.py"
+      - "airflow_docker/scripts/analyze_results.py"
+
+  # ③ プラン検討・作成
+  - class_name: plan
+    label: "Plan"
+    patterns:
+      - "src/plan_data/inventor.py"
+      - "src/plan_data/llm_plan_prompt.py"
+      - "src/plan_data/strategy_adapter.py"
+      - "src/plan_data/run_inventor.py"
+      - "src/plan_data/run_pdca_plan_workflow.py"
+      - "src/plan_data/profile_loader.py"
+      - "src/plan_data/plan_to_*_demo.py"   # aurus/levia/noctus/prometheus/veritas/hermes
+      - "src/strategies/*_design*.py"       # 将来の設計ファイル向け
+
+  # ④ バックテスト
+  - class_name: backtest
+    label: "Backtest"
+    patterns:
+      - "scripts/backtest_runner.py"
+      - "airflow_docker/dags/noctria_backtest_dag.py"
+      - "airflow_docker/dags/veritas_eval*.py"
+      - "airflow_docker/dags/simulate_strategy_dag.py"
+      - "tests/backtesting.py"
+      - "tests/backtesting/*.py"
+      - "src/execution/trade_simulator.py"
+
+  # ⑤ フォワードテスト
+  - class_name: forwardtest
+    label: "ForwardTest"
+    patterns:
+      - "tests/forward_test_*.py"
+      - "airflow_docker/dags/*forward*.py"
+      - "src/execution/simulate_official_strategy.py"
+
+  # ⑥ Fintokei ルールチェック
+  - class_name: fintokei_check
+    label: "Fintokei"
+    patterns:
+      - "src/plan_data/fintokei_rules.py"
+      - "src/codex_reports/fintokei_rulecheck.*"
+      - "docs/rules/fintokei/*.md"
+      - "src/execution/risk_policy.py"
+      - "src/core/risk_control.py"
+      - "src/execution/risk_gate.py"
+
+  # ⑦ MT5 受発注
+  - class_name: mt5_order
+    label: "MT5 Order"
+    patterns:
+      - "order_api.py"
+      - "mt5_test.py"
+      - "experts/*.mq5"
+      - "src/execution/order_execution.py"
+      - "src/execution/optimized_order_execution.py"
+      - "src/execution/generate_order_json.py"
+      - "src/core/airflow_client.py"        # Airflow経由の発注橋渡し
+
+  # ⑧ 決裁処理（該当が少ないため広めのフック）
+  - class_name: settlement
+    label: "Settlement"
+    patterns:
+      - "**/*settle*.py"
+      - "src/execution/save_model_metadata.py"   # 実運用では約定/決裁ログ確定に近い位置づけ
+      - "src/execution/trade_monitor.py"
+
+  # ⑨ 結果分析
+  - class_name: result_analyze
+    label: "Result Analyze"
+    patterns:
+      - "src/execution/trade_analysis.py"
+      - "airflow_docker/scripts/plot_trade_performance.py"
+      - "noctria_gui/routes/backtest_results.py"
+      - "noctria_gui/routes/statistics*.py"
+      - "noctria_gui/routes/statistics/**/*.py"
+      - "data/stats/*.json"
+
+  # ⑩ 情報マージ（結果→知識へ反映）
+  - class_name: merge_info
+    label: "Merge Info"
+    patterns:
+      - "src/plan_data/adapter_to_decision.py"
+      - "src/plan_data/pdca_summary_service.py"
+      - "src/plan_data/observation_adapter.py"
+      - "src/plan_data/run_with_profile.py"
+      - "src/plan_data/trace.py"
+
+  # ⑪ 再プラン
+  - class_name: replanning
+    label: "Re-Plan"
+    patterns:
+      - "src/plan_data/run_pdca_plan_workflow.py"
+      - "src/plan_data/inventor.py"
+      - "src/plan_data/plan_to_*_demo.py"
+
+  # --- 横断カテゴリ（可視化用） ---
+  - class_name: pdca
+    label: "PDCA"
+    patterns:
+      - "scripts/pdca_*.py"
+      - "scripts/run_pdca_agents.py"
+      - "src/core/strategy_evaluator.py"
+      - "src/core/decision_registry.py"
+      - "noctria_gui/routes/pdca*.py"
+      - "airflow_docker/dags/*pdca*.py"
+      - "src/plan_data/quality_gate.py"
+      - "src/plan_data/noctus_gate.py"
+
+  - class_name: airflow
+    label: "Airflow"
+    patterns:
+      - "airflow_docker/dags/*.py"
+      - "airflow_docker/docker/*.py"
+      - "airflow_docker/scripts/*.py"
+
+  - class_name: gui
+    label: "GUI"
+    patterns:
+      - "noctria_gui/routes/*.py"
+      - "noctria_gui/templates/**/*.html"
+      - "noctria_gui/static/**/*.css"
+      - "noctria_gui/main.py"
+      - "noctria_gui/backend/app/main.py"
+
+  - class_name: docs
+    label: "Docs"
+    patterns:
+      - "docs/**/*.md"
+      - "docs/**/*.yaml"
+      - "docs/**/diagrams/*.mmd"
+
+styles:
+  collect:        "fill:#0ea5e9,stroke:#075985,color:#ffffff"
+  analyze:        "fill:#22c55e,stroke:#065f46,color:#ffffff"
+  plan:           "fill:#3b82f6,stroke:#1e40af,color:#ffffff"
+  backtest:       "fill:#f59e0b,stroke:#b45309,color:#111111"
+  forwardtest:    "fill:#fbbf24,stroke:#92400e,color:#111111"
+  fintokei_check: "fill:#a78bfa,stroke:#6d28d9,color:#ffffff"
+  mt5_order:      "fill:#14b8a6,stroke:#0f766e,color:#111111"
+  settlement:     "fill:#ef4444,stroke:#991b1b,color:#ffffff"
+  result_analyze: "fill:#84cc16,stroke:#3f6212,color:#111111"
+  merge_info:     "fill:#94a3b8,stroke:#475569,color:#111111"
+  replanning:     "fill:#60a5fa,stroke:#1d4ed8,color:#ffffff"
+  pdca:           "fill:#14b8a6,stroke:#0f766e,color:#111111"
+  airflow:        "fill:#60a5fa,stroke:#1d4ed8,color:#ffffff"
+  gui:            "fill:#a78bfa,stroke:#6d28d9,color:#ffffff"
+  docs:           "fill:#94a3b8,stroke:#475569,color:#111111"
+  spine:          "fill:#111827,stroke:#ef4444,stroke-width:3px,color:#ffffff"  # 幹ハイライト

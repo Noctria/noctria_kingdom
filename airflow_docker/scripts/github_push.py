@@ -25,6 +25,7 @@ if dotenv_path.exists():
 else:
     print(f"⚠️ .envファイルが見つかりません（継続）: {dotenv_path}")
 
+
 # ================================
 # 🛠️ コマンド実行ユーティリティ
 # ================================
@@ -42,6 +43,7 @@ def run_command(cmd: List[str], allow_fail: bool = False) -> subprocess.Complete
             print(f"✅ 出力:\n{result.stdout.strip()}")
 
     return result
+
 
 # ================================
 # 🚀 メイン処理
@@ -61,8 +63,7 @@ def main():
 
     # ✅ コミット（変更がない場合はスキップ）
     commit_result = run_command(
-        ["git", "commit", "-m", "🤖 Veritas採用戦略を自動コミット"],
-        allow_fail=True
+        ["git", "commit", "-m", "🤖 Veritas採用戦略を自動コミット"], allow_fail=True
     )
 
     output = (commit_result.stdout or "") + (commit_result.stderr or "")
@@ -74,6 +75,7 @@ def main():
     run_command(["git", "push", "origin", "main"])
 
     print("✅ GitHubへのPushが完了しました")
+
 
 # ================================
 # 🔧 Airflowなどから呼び出し可能

@@ -12,17 +12,21 @@ Usage:
 """
 
 from __future__ import annotations
-from pathlib import Path
+
 import json
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
 
 def check_file(path: Path) -> bool:
     return path.exists() and path.is_file()
 
+
 def check_dir(path: Path) -> bool:
     return path.exists() and path.is_dir()
+
 
 def main() -> None:
     report = {
@@ -37,18 +41,22 @@ def main() -> None:
             "patches_dir": check_dir(ROOT / "src/codex_reports/patches"),
             "patch_file_sample": any(
                 p.suffix == ".patch" for p in (ROOT / "src/codex_reports/patches").glob("*.patch")
-            ) if check_dir(ROOT / "src/codex_reports/patches") else False,
+            )
+            if check_dir(ROOT / "src/codex_reports/patches")
+            else False,
             "apply_patch_script": check_file(ROOT / "scripts/apply_codex_patch.sh"),
         },
         "Lv3": {
             "pdca_agent": check_file(ROOT / "scripts/pdca_agent.py"),
-            "inventor_pipeline_dag": check_file(ROOT / "airflow_docker/dags/inventor_pipeline_dag.py"),
+            "inventor_pipeline_dag": check_file(
+                ROOT / "airflow_docker/dags/inventor_pipeline_dag.py"
+            ),
             "decision_registry": check_file(ROOT / "codex_reports/decision_registry.jsonl"),
         },
         "GUI": {
             "codex_html": check_file(ROOT / "noctria_gui/templates/codex.html"),
             "codex_route": check_file(ROOT / "noctria_gui/routes/codex.py"),
-        }
+        },
     }
 
     # 判定ロジック
@@ -60,10 +68,7 @@ def main() -> None:
     if report["Lv3"]["pdca_agent"] and report["Lv3"]["inventor_pipeline_dag"]:
         level = "Lv3"
 
-    result = {
-        "detected_level": level,
-        "details": report
-    }
+    result = {"detected_level": level, "details": report}
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
 

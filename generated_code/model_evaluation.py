@@ -2,6 +2,7 @@ from keras.models import Sequential
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import logging
 
+
 def evaluate_model(model: Sequential, X_test, y_test):
     """Evaluate the trained model."""
     try:

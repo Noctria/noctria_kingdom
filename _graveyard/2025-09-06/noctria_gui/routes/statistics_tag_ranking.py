@@ -17,7 +17,7 @@ from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from noctria_gui.services import statistics_service
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 router = APIRouter(tags=["tag-ranking"])
 # ✅ 修正: 正しい変数名を使用
@@ -28,7 +28,7 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 async def tag_ranking_dashboard(
     request: Request,
     sort_by: str = Query(default="promotion_rate", description="ソートキー"),
-    order: str = Query(default="desc", regex="^(asc|desc)$")
+    order: str = Query(default="desc", regex="^(asc|desc)$"),
 ):
     """
     📌 タグ × 指標のランキングページを表示
@@ -44,10 +44,10 @@ async def tag_ranking_dashboard(
 
         # ✅ ソート（昇順 or 降順）
         # max_drawdownのみ昇順（値が小さい方が良い）、他は降順がデフォルト
-        if order == 'desc':
-            reverse_sort = sort_by != 'max_drawdown'
-        else: # order == 'asc'
-            reverse_sort = sort_by == 'max_drawdown'
+        if order == "desc":
+            reverse_sort = sort_by != "max_drawdown"
+        else:  # order == 'asc'
+            reverse_sort = sort_by == "max_drawdown"
 
         tag_stats_list.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse_sort)
 
@@ -56,9 +56,12 @@ async def tag_ranking_dashboard(
         tag_stats_list = []
         # raise HTTPException(status_code=500, detail="統計データの集計中にエラーが発生しました。")
 
-    return templates.TemplateResponse("statistics_tag_ranking.html", {
-        "request": request,
-        "tag_stats": tag_stats_list,
-        "current_sort": sort_by,
-        "current_order": order,
-    })
+    return templates.TemplateResponse(
+        "statistics_tag_ranking.html",
+        {
+            "request": request,
+            "tag_stats": tag_stats_list,
+            "current_sort": sort_by,
+            "current_order": order,
+        },
+    )

@@ -1,0 +1,98 @@
+# =======================================================
+# Testing（最小回帰テスト & SLA）
+# =======================================================
+testing:
+  smoke:
+    - id: "T01"
+      target: "scripts/evaluate_veritas"
+      expect: "reports/veritas/run_*/meta.json 生成 & 0例外"
+    - id: "T02"
+      target: "scripts/log_kpi_from_reports"
+      expect: "obs_codex_kpi に最新1件挿入 & スキーマ整合"
+    - id: "T03"
+      target: "scripts/plot_reliability"
+      expect: "reliability.png 生成 & ファイルサイズ>0"
+    - id: "T04"
+      target: "scripts/generate_daily_report"
+      expect: "docs/reports/daily/{today}.md 生成 & KPI表含む"
+    - id: "GOLDEN"
+      target: "smoke:golden"
+      expect: "ゴールデン・データセットで過去ベスト±許容内を維持（回帰検出下限）"
+
+  regression_min:
+    - id: "R01"
+      name: "Calibration guard"
+      rule: "NLL劣化 <= 0.05 & ECE改善 >= 0.02 を満たさない変更はfail"
+    - id: "R02"
+      name: "Robustness floor"
+      rule: "Adv.pass < 0.35 のrunはfail（適用不可）"
+    - id: "R03"   # 改善: GUI回帰テスト追加
+      name: "GUI minimal flow"
+      rule: "主要ボタン・入力フォームのDOM存在とonClickレスポンス確認"
+
+  api_smoke:
+    - id: "A01"
+      target: "FastAPI 起動"
+      expect: "GET /health → 200 & body.ok==true"
+    - id: "A02"
+      target: "OpenAPI"
+      expect: "GET /openapi.json → 200 & 必須スキーマを含む"
+    - id: "A03"
+      target: "主要エンドポイント"
+      expect: "POST /predict にダミーを送って 200/422 のいずれか（契約厳守）"
+
+  gui_smoke:
+    - id: "G01"
+      target: "GUI ビルド"
+      expect: "noctria_kingdom/noctria_gui/dist が生成されサイズ>0"
+    - id: "G02"
+      target: "E2E（GUI→API）"
+      expect: "最小ユーザージャーニー（入力→予測→結果表示）が通る"
+    - id: "G03"   # 改善: ビジュアル回帰
+      target: "GUI スナップショット比較"
+      expect: "主要ページのDOM/スクリーンショット差分 < 2%"
+
+  btft_smoke:
+    - id: "B01"
+      target: "バックテスト"
+      expect: "reports/backtest/*/summary.json 生成 & KPI が数値"
+    - id: "F01"
+      target: "フォワードテスト"
+      expect: "reports/forwardtest/*/summary.json 生成 & KPI が数値"
+    - id: "S01"
+      target: "サマリー集計"
+      expect: "reports/btft_summary/index.md 生成 & 直近比較表が作成"
+
+  contracts:
+    api:
+      required_endpoints:
+        - { method: "GET", path: "/health" }
+        - { method: "GET", path: "/openapi.json" }
+        - { method: "POST", path: "/predict" }
+      error_budget:
+        p95_latency_ms: 300
+        availability_pct_month: 99.0
+    gui:
+      base_path: "noctria_kingdom/noctria_gui"
+      build_cmd: "make build  # or npm run build"
+      publish_dir: "noctria_kingdom/noctria_gui/dist"
+
+  load_smoke:
+    - { id: "L01", target: "POST /predict p95", expect: "20req で p95 ≤ 300ms (stg)" }
+    - { id: "L02", target: "エラーバジェット", expect: "月間 5xx ≤ 1%" }
+
+  freshness:
+    - { id: "FRESH_BT",  target: "BTレポート鮮度", expect: "前日分まで存在（<=1日遅延）" }
+    - { id: "FRESH_FT",  target: "FT日次締切",     expect: "09:20 UTC までに summary.json 生成" }
+    - { id: "FRESH_SUM", target: "集計公開",         expect: "09:40 UTC までに btft_summary/index.md 公開" }
+
+  sla:
+    ci_time_minutes_max: 20
+    daily_gen_by_utc: "09:10"
+    alert_on_violation: true     # 改善: SLA違反を即時アラート化
+    retry_policy:                # 改善: 失敗時の扱い
+      max_retries: 2
+      backoff_minutes: 5
+    escalation:                  # 改善: 臨界対応
+      on_ci_timeout: "王 + human_pm に即時通知"
+      on_btft_freshness_fail: "次runで再試行しfailならCRITICAL起票"

@@ -1,6 +1,7 @@
 import numpy as np
 import cvxpy as cp
 
+
 class PortfolioOptimizer:
     """
     ポートフォリオ最適化戦略
@@ -32,9 +33,9 @@ class PortfolioOptimizer:
 
         # 制約条件
         constraints = [
-            cp.sum(weights) == 1,   # 全資産の合計は 1
-            weights >= 0,           # ネガティブウェイトなし (ショート禁止)
-            risk <= self.risk_tolerance  # 許容リスク以下
+            cp.sum(weights) == 1,  # 全資産の合計は 1
+            weights >= 0,  # ネガティブウェイトなし (ショート禁止)
+            risk <= self.risk_tolerance,  # 許容リスク以下
         ]
 
         # 最適化問題を解く

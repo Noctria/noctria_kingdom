@@ -1,23 +1,37 @@
+# [NOCTRIA_CORE_REQUIRED]
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📌 Noctria Kingdom Path Config (v5.1)
+📌 Noctria Kingdom Path Config (v6.0)
 
-- 王国全体のパス構造を一元管理
-- Docker/WSL/ローカル差異を吸収し、ENVで上書き可能
+- 王国全体のパス構造を一元管理（ENVで上書き可能 / Docker・WSL・ローカル差異を吸収）
 - 実行層リネーム（execution -> do）に互換レイヤで対応
 - ✅ ensure_import_path(): エントリポイント側で呼べば import 経路を安定化
 - ✅ NOCTRIA_AUTOPATH=1 で import 時に自動で sys.path を整備（任意）
-- ✅ NEW: ensure_strategy_packages(): strategies 配下に __init__.py を自動整備
+- ✅ ensure_strategy_packages(): strategies 配下に __init__.py を自動整備
 - ✅ NOCTRIA_AUTOINIT=1 で __init__.py を自動生成（任意）
+- ✅ ensure_runtime_dirs(): ランタイムで必要となる主要ディレクトリを生成（存在時はNO-OP）
+- ✅ NOCTRIA_AUTODIRS=1 で起動時に ensure_runtime_dirs を自動実行（任意）
+- ✅ path_summary(): 主要パスを辞書で可視化（デバッグ/GUI用）
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+import logging
 import os
 import sys
 from contextlib import contextmanager
+from pathlib import Path
+
+# ---------------------------------------------------------
+# logger (軽量なINFOログを出す。二重ハンドラは避ける)
+# ---------------------------------------------------------
+_logger = logging.getLogger("noctria.path_config")
+if not _logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    _logger.addHandler(_handler)
+_logger.setLevel(logging.INFO)
 
 # =========================================================
 # 🏰 基本ディレクトリ判定（Docker or ローカル）＋ENV上書き
@@ -27,7 +41,11 @@ _env_root = os.getenv("NOCTRIA_PROJECT_ROOT")
 if _env_root:
     PROJECT_ROOT = Path(_env_root).resolve()
 else:
-    PROJECT_ROOT = Path("/opt/airflow").resolve() if Path("/opt/airflow").exists() else Path(__file__).resolve().parents[2]
+    PROJECT_ROOT = (
+        Path("/opt/airflow").resolve()
+        if Path("/opt/airflow").exists()
+        else Path(__file__).resolve().parents[2]
+    )
 
 SRC_DIR = PROJECT_ROOT / "src"
 BASE_DIR = PROJECT_ROOT  # 歴史的互換（BASE_DIR = プロジェクトルート）
@@ -62,7 +80,9 @@ DO_DIR = DO_DIR_CANDIDATE if DO_DIR_CANDIDATE.exists() else EXECUTION_DIR_CANDID
 EXECUTION_DIR = DO_DIR  # 旧名互換
 
 # --- 専門領域・アダプタ等 ---
-EXPERTS_DIR = (PROJECT_ROOT / "experts") if (PROJECT_ROOT / "experts").exists() else (SRC_DIR / "experts")
+EXPERTS_DIR = (
+    (PROJECT_ROOT / "experts") if (PROJECT_ROOT / "experts").exists() else (SRC_DIR / "experts")
+)
 NOCTRIA_AI_DIR = SRC_DIR / "noctria_ai"
 TOOLS_DIR = SRC_DIR / "tools"
 
@@ -84,7 +104,11 @@ LOCAL_DATA_PATH = DATA_DIR / "local_data"
 FEATURES_PATH = PROCESSED_DATA_DIR / "features"
 MODEL_PATH = DATA_DIR / "models" / "latest_model.pkl"
 
-INSTITUTIONS_DIR = (AIRFLOW_DOCKER_DIR / "institutions") if (AIRFLOW_DOCKER_DIR / "institutions").exists() else PROJECT_ROOT / "institutions"
+INSTITUTIONS_DIR = (
+    (AIRFLOW_DOCKER_DIR / "institutions")
+    if (AIRFLOW_DOCKER_DIR / "institutions").exists()
+    else PROJECT_ROOT / "institutions"
+)
 
 PDCA_LOG_DIR = DATA_DIR / "pdca_logs" / "veritas_orders"
 ACT_LOG_DIR = DATA_DIR / "act_logs" / "veritas_adoptions"
@@ -102,9 +126,12 @@ NOCTRIA_GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
 LLM_SERVER_DIR = PROJECT_ROOT / "llm_server"
 DOCS_DIR = PROJECT_ROOT / "docs"
 TESTS_DIR = PROJECT_ROOT / "tests"
+GOALS_DIR = PROJECT_ROOT / "codex_goals"  # ← 公式: Codex Goal Charter置き場
+REPORTS_DIR = PROJECT_ROOT / "reports"  # ← 公式: レポート/可視化の出力先（Hermes等）
+
 
 # --- 互換性のためのエイリアス ---
-GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # <--- 修正: エイリアスを追加
+GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # 既存参照の後方互換
 
 # =========================================================
 # 📄 主要ファイルパス（王国の記録物）
@@ -112,18 +139,21 @@ GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # <--- 修正: エイリアスを
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
 
-# Windows MT5ユーザパス（WSL/Windows混在対策）
-MT5_USER_PATH = Path(
-    os.getenv(
-        "MT5_USER_PATH",
-        "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files",
-    )
+# Windows MT5ユーザパス（WSL/Windows混在対策） + 環境変数の ~ 展開に対応
+_mt5_env = os.getenv(
+    "MT5_USER_PATH",
+    "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/"
+    "D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files",
 )
+if _mt5_env:
+    _mt5_env = os.path.expanduser(_mt5_env)
+MT5_USER_PATH = Path(_mt5_env)
+
 if MT5_USER_PATH.exists():
     VERITAS_ORDER_JSON = MT5_USER_PATH / "veritas_signal.json"
 else:
     TEMP_DIR = PROJECT_ROOT / "tmp"
-    TEMP_DIR.mkdir(exist_ok=True)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
     VERITAS_ORDER_JSON = TEMP_DIR / "veritas_signal.json"
 
 # =========================================================
@@ -161,12 +191,15 @@ CATEGORY_MAP = {
     "legacy": "📜 旧版戦略",
 }
 
+
 # =========================================================
 # ✅ パス整合性・import パス整備ユーティリティ
 # =========================================================
 def _lint_path_config():
     """各 Path が存在するかの簡易チェック（GUI/CLI デバッグ用）"""
-    return {k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")}
+    return {
+        k: v.exists() for k, v in globals().items() if isinstance(v, Path) and not k.startswith("_")
+    }
 
 
 def _str(p: Path) -> str:
@@ -214,7 +247,6 @@ def with_import_path(**kwargs):
         sys.path[:] = before
 
 
-# --- NEW: strategies パッケージの __init__.py を自動整備（任意） ---
 def ensure_strategy_packages() -> None:
     """
     strategies 配下を import できるように __init__.py を自動整備する。
@@ -225,48 +257,140 @@ def ensure_strategy_packages() -> None:
         init_file = d / "__init__.py"
         if not init_file.exists():
             try:
-                init_file.write_text("# package init (auto-created by path_config)\n", encoding="utf-8")
+                init_file.write_text(
+                    "# package init (auto-created by path_config)\n", encoding="utf-8"
+                )
             except Exception:
                 # 失敗しても致命ではない
                 pass
 
 
-# ENV で自動適用したい場合（明示 opt-in）
+def ensure_runtime_dirs() -> None:
+    """初回起動で必要になりがちなディレクトリを生成しておく（存在すれば何もしない）"""
+    for d in [
+        DATA_DIR,
+        RAW_DATA_DIR,
+        PROCESSED_DATA_DIR,
+        STATS_DIR,
+        PDCA_LOG_DIR,
+        ACT_LOG_DIR,
+        PUSH_LOG_DIR,
+        AIRFLOW_DOCKER_DIR,
+        DAGS_DIR,
+        LOGS_DIR,
+        NOCTRIA_GUI_DIR,
+        NOCTRIA_GUI_TEMPLATES_DIR,
+        NOCTRIA_GUI_STATIC_DIR,
+    ]:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            # 生成に失敗しても致命ではない（権限等は個別に対処）
+            pass
+
+
+def path_summary() -> dict:
+    """主要パスの文字列ダンプ（ログ/GUIで可視化しやすい）"""
+    keys = [
+        "PROJECT_ROOT",
+        "SRC_DIR",
+        "DAGS_DIR",
+        "LOGS_DIR",
+        "STRATEGIES_DIR",
+        "DO_DIR",
+        "NOCTRIA_GUI_DIR",
+        "LLM_SERVER_DIR",
+        "DATA_DIR",
+        "VERITAS_DIR",
+        "HERMES_DIR",
+    ]
+    out: dict[str, str] = {}
+    for k in keys:
+        v = globals().get(k)
+        try:
+            out[k] = str(v.resolve()) if isinstance(v, Path) else str(v)
+        except Exception:
+            out[k] = str(v)
+    return out
+
+
+# =========================================================
+# ENVでの自動適用（明示 opt-in）
+# =========================================================
 if os.getenv("NOCTRIA_AUTOPATH", "").lower() in {"1", "true", "yes"}:
     ensure_import_path()
+    _logger.info("NOCTRIA_AUTOPATH enabled: sys.path prepared")
 
 if os.getenv("NOCTRIA_AUTOINIT", "").lower() in {"1", "true", "yes"}:
     ensure_strategy_packages()
+    _logger.info("NOCTRIA_AUTOINIT enabled: strategies __init__.py ensured")
+
+if os.getenv("NOCTRIA_AUTODIRS", "").lower() in {"1", "true", "yes"}:
+    ensure_runtime_dirs()
+    _logger.info("NOCTRIA_AUTODIRS enabled: runtime directories ensured")
 
 # =========================================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
 # =========================================================
 __all__ = [
     # ルート
-    "PROJECT_ROOT", "SRC_DIR", "BASE_DIR",
+    "PROJECT_ROOT",
+    "SRC_DIR",
+    "BASE_DIR",
     # Airflow
-    "AIRFLOW_DOCKER_DIR", "DAGS_DIR", "LOGS_DIR", "PLUGINS_DIR", "AIRFLOW_SCRIPTS_DIR", "AIRFLOW_API_BASE",
+    "AIRFLOW_DOCKER_DIR",
+    "DAGS_DIR",
+    "LOGS_DIR",
+    "PLUGINS_DIR",
+    "AIRFLOW_SCRIPTS_DIR",
+    "AIRFLOW_API_BASE",
     # コア/スクリプト/AI
-    "CORE_DIR", "SCRIPTS_DIR", "VERITAS_DIR", "STRATEGIES_DIR", "STRATEGIES_VERITAS_GENERATED_DIR",
+    "CORE_DIR",
+    "SCRIPTS_DIR",
+    "VERITAS_DIR",
+    "STRATEGIES_DIR",
+    "STRATEGIES_VERITAS_GENERATED_DIR",
     # 実行層（新旧互換）
-    "DO_DIR", "EXECUTION_DIR",
+    "DO_DIR",
+    "EXECUTION_DIR",
     # 周辺領域
-    "EXPERTS_DIR", "NOCTRIA_AI_DIR", "TOOLS_DIR",
+    "EXPERTS_DIR",
+    "NOCTRIA_AI_DIR",
+    "TOOLS_DIR",
     # モデル/AI
-    "VERITAS_MODELS_DIR", "HERMES_DIR", "HERMES_MODELS_DIR",
+    "VERITAS_MODELS_DIR",
+    "HERMES_DIR",
+    "HERMES_MODELS_DIR",
     # データ領域
-    "DATA_DIR", "RAW_DATA_DIR", "PROCESSED_DATA_DIR", "STATS_DIR",
+    "DATA_DIR",
+    "RAW_DATA_DIR",
+    "PROCESSED_DATA_DIR",
+    "STATS_DIR",
     "INSTITUTIONS_DIR",
-    "PDCA_LOG_DIR", "ACT_LOG_DIR", "PUSH_LOG_DIR", "ORACLE_FORECAST_JSON",
+    "PDCA_LOG_DIR",
+    "ACT_LOG_DIR",
+    "PUSH_LOG_DIR",
+    "ORACLE_FORECAST_JSON",
     # GUI/Docs/Tests/LLM
-    "NOCTRIA_GUI_DIR", "NOCTRIA_GUI_TEMPLATES_DIR", "NOCTRIA_GUI_STATIC_DIR",
-    "NOCTRIA_GUI_ROUTES_DIR", "NOCTRIA_GUI_SERVICES_DIR",
-    "GUI_TEMPLATES_DIR",  # <--- 修正: エイリアスを公開リストに追加
-    "LLM_SERVER_DIR", "DOCS_DIR", "TESTS_DIR",
+    "NOCTRIA_GUI_DIR",
+    "NOCTRIA_GUI_TEMPLATES_DIR",
+    "NOCTRIA_GUI_STATIC_DIR",
+    "NOCTRIA_GUI_ROUTES_DIR",
+    "NOCTRIA_GUI_SERVICES_DIR",
+    "GUI_TEMPLATES_DIR",
+    "LLM_SERVER_DIR",
+    "DOCS_DIR",
+    "TESTS_DIR",
+    "GOALS_DIR",
+    "REPORTS_DIR",
     # 主要ファイル
-    "VERITAS_EVAL_LOG", "MARKET_DATA_CSV", "VERITAS_ORDER_JSON",
+    "VERITAS_EVAL_LOG",
+    "MARKET_DATA_CSV",
+    "VERITAS_ORDER_JSON",
     # スクリプト/Repo
-    "VERITAS_GENERATE_SCRIPT", "VERITAS_EVALUATE_SCRIPT", "GITHUB_PUSH_SCRIPT",
+    "VERITAS_GENERATE_SCRIPT",
+    "VERITAS_EVALUATE_SCRIPT",
+    "GITHUB_PUSH_SCRIPT",
     "GITHUB_REPO_URL",
     # 分類
     "CATEGORY_MAP",
@@ -275,4 +399,21 @@ __all__ = [
     "ensure_import_path",
     "with_import_path",
     "ensure_strategy_packages",
+    "ensure_runtime_dirs",
+    "path_summary",
+    # テスト互換用
+    "AIRFLOW_DIR",
 ]
+
+# tests/test_path_config.py が参照する AIRFLOW_DIR を必ず用意する
+AIRFLOW_DIR = PROJECT_ROOT / "airflow_docker" / "dags"
+
+# ---- Auto-added safe fallbacks (only if missing) ----
+OFFICIAL_STRATEGIES_DIR = PROJECT_ROOT / "src/strategies/official"
+GENERATED_STRATEGIES_DIR = PROJECT_ROOT / "src/strategies/generated"
+FUNDAMENTAL_DATA_DIR = PROJECT_ROOT / "data/fundamental"
+MODELS_DIR = PROJECT_ROOT / "models"
+LATEST_MODELS_DIR = PROJECT_ROOT / "models/latest"
+ARCHIVE_MODELS_DIR = PROJECT_ROOT / "models/archive"
+GUI_DIR = PROJECT_ROOT / "noctria_gui"
+AIRFLOW_LOG_DIR = PROJECT_ROOT / "airflow_docker/logs"

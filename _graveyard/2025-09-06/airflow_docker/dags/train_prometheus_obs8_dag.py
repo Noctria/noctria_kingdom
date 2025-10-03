@@ -1,3 +1,13 @@
+import os
+import sys
+import json
+import importlib
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+
 # airflow_docker/dags/train_prometheus_obs8_dag.py
 # -*- coding: utf-8 -*-
 """
@@ -25,21 +35,11 @@ then evaluate N episodes and stamp results into metadata.json.
 
 from __future__ import annotations
 
-import os
-import sys
-import json
-import importlib
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict
 
 # --- ensure src importable in Airflow containers ---
 for p in ("/opt/airflow/src", "/opt/airflow"):
     if p not in sys.path:
         sys.path.append(p)
-
-from airflow import DAG
-from airflow.operators.python import PythonOperator
 
 
 def _safe_get(d: Dict[str, Any], key: str, cast, default=None):
@@ -244,15 +244,17 @@ with DAG(
             if meta_path.exists():
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta.setdefault("evaluation", {})
-            meta["evaluation"].update({
-                "evaluated_at_utc": datetime.utcnow().isoformat(timespec="seconds"),
-                "n_episodes": int(n_episodes),
-                "deterministic": bool(deterministic),
-                "avg_reward": float(avg),
-                "std_reward": float(std),
-                "win_rate": float(win_rate),
-                "ep_len_mean": float(ep_len_mean),
-            })
+            meta["evaluation"].update(
+                {
+                    "evaluated_at_utc": datetime.utcnow().isoformat(timespec="seconds"),
+                    "n_episodes": int(n_episodes),
+                    "deterministic": bool(deterministic),
+                    "avg_reward": float(avg),
+                    "std_reward": float(std),
+                    "win_rate": float(win_rate),
+                    "ep_len_mean": float(ep_len_mean),
+                }
+            )
             meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"[OK] stamped evaluation into: {meta_path}")
 

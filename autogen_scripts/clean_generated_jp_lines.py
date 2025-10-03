@@ -13,7 +13,7 @@ for fname in os.listdir(FOLDER):
             r"^(?:(?:[\u3000-\u303F\u3040-\u30FF\u4E00-\u9FFFぁ-んァ-ヶー。、．,.：].*)|(?:.*[。、「」]+.*))$",
             "",
             code,
-            flags=re.MULTILINE
+            flags=re.MULTILINE,
         )
         # 連続空行1つに
         code = re.sub(r"\n{3,}", "\n\n", code)

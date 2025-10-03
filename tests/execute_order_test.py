@@ -1,7 +1,4 @@
 from core.path_config import *
-import sys
-import os
-
 from order_execution import OrderExecution  # execution/order_execution.py
 
 if __name__ == "__main__":

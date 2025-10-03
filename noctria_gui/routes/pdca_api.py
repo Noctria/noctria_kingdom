@@ -19,32 +19,34 @@ PDCA API Router — summary/details/entry + exports
 """
 
 from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Query, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 # 依存サービス（あれば利用、無ければダミーへフォールバック）
 try:
     from src.plan_data.pdca_summary_service import (
-        get_summary,
-        get_details,
-        get_entry_by_id,
-        get_entry_by_date_tag,
-        ExportFormat,
         ExportError,
+        ExportFormat,
+        get_details,
+        get_entry_by_date_tag,
+        get_entry_by_id,
+        get_summary,
     )
+
     _HAS_SERVICE = True
 except Exception:
     _HAS_SERVICE = False
 
     # ---- フォールバック実装（最小限） ----
     # ダミーデータを返す純Python版。テーブルスキーマは本番と同一に合わせる。
-    from random import Random
     from datetime import timedelta
+    from random import Random
 
     class ExportError(RuntimeError):
         pass
@@ -71,13 +73,18 @@ except Exception:
             "max_drawdown": round(dd, 4),
             "rechecks": rng.randint(0, 3),
             "trades": trades,
-            "evals": {"rmse": round(rng.uniform(0.1, 0.6), 4), "mae": round(rng.uniform(0.05, 0.4), 4)},
+            "evals": {
+                "rmse": round(rng.uniform(0.1, 0.6), 4),
+                "mae": round(rng.uniform(0.05, 0.4), 4),
+            },
             "adopted": adopted,
         }
 
     def _gen_range(date_from: Optional[str], date_to: Optional[str]):
         end = datetime.strptime(date_to, "%Y-%m-%d") if date_to else datetime.utcnow()
-        start = datetime.strptime(date_from, "%Y-%m-%d") if date_from else (end - timedelta(days=14))
+        start = (
+            datetime.strptime(date_from, "%Y-%m-%d") if date_from else (end - timedelta(days=14))
+        )
         cur = start
         while cur <= end:
             yield cur
@@ -116,7 +123,7 @@ except Exception:
         # limit/offset
         off = int(filters.get("offset") or 0)
         lim = int(filters.get("limit") or len(arr))
-        return arr[off: off + lim]
+        return arr[off : off + lim]
 
     def get_summary(filters: Dict[str, Any]) -> Dict[str, Any]:
         det = get_details({**filters, "limit": filters.get("limit") or 5000})  # summary用に十分多め
@@ -132,7 +139,9 @@ except Exception:
         dd_sum = 0.0
         for r in det:
             d = r["date"]
-            by_day.setdefault(d, {"date": d, "rows": 0, "trades": 0, "avg_win_rate": 0.0, "avg_max_drawdown": 0.0})
+            by_day.setdefault(
+                d, {"date": d, "rows": 0, "trades": 0, "avg_win_rate": 0.0, "avg_max_drawdown": 0.0}
+            )
             bd = by_day[d]
             bd["rows"] += 1
             bd["trades"] += r["trades"]
@@ -168,10 +177,12 @@ except Exception:
     def get_entry_by_date_tag(date: str, tag: str) -> Optional[Dict[str, Any]]:
         det = get_details({"date_from": date, "date_to": date, "tag": tag})
         return det[0] if det else None
+
     # ---- フォールバック終わり ----
 
 
 router = APIRouter(prefix="/pdca/api", tags=["pdca"])
+
 
 # ---- モデル定義（返却整形の型保証に使用） ----
 class TotalsModel(BaseModel):
@@ -181,12 +192,14 @@ class TotalsModel(BaseModel):
     avg_win_rate: float
     avg_max_drawdown: float
 
+
 class ByDayModel(BaseModel):
     date: str
     rows: int
     trades: int
     avg_win_rate: float
     avg_max_drawdown: float
+
 
 class DetailModel(BaseModel):
     id: str
@@ -200,6 +213,7 @@ class DetailModel(BaseModel):
     trades: int
     evals: Dict[str, Any]
     adopted: bool
+
 
 class SummaryResponse(BaseModel):
     totals: TotalsModel
@@ -218,14 +232,16 @@ def _with_request_id(payload: Any, status_code: int = 200) -> JSONResponse:
 def api_summary(
     request: Request,
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    date_to: Optional[str]   = Query(None, description="YYYY-MM-DD"),
-    tag: Optional[str]       = Query(None),
-    win_diff: Optional[float]= Query(None, ge=0.0, le=1.0, description="勝率差分しきい値（0-1）"),
-    dd_diff: Optional[float] = Query(None, ge=0.0, le=1.0, description="最大DDしきい値（0-1, 以下）"),
-    min_trades: Optional[int]= Query(None, ge=0),
-    sort: Optional[str]      = Query(None, description="win_rate|max_drawdown|maxdd|trades|date"),
-    limit: Optional[int]     = Query(None, ge=1, le=10000),
-    offset: Optional[int]    = Query(0, ge=0),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    tag: Optional[str] = Query(None),
+    win_diff: Optional[float] = Query(None, ge=0.0, le=1.0, description="勝率差分しきい値（0-1）"),
+    dd_diff: Optional[float] = Query(
+        None, ge=0.0, le=1.0, description="最大DDしきい値（0-1, 以下）"
+    ),
+    min_trades: Optional[int] = Query(None, ge=0),
+    sort: Optional[str] = Query(None, description="win_rate|max_drawdown|maxdd|trades|date"),
+    limit: Optional[int] = Query(None, ge=1, le=10000),
+    offset: Optional[int] = Query(0, ge=0),
     with_details: Optional[bool] = Query(True),
 ):
     try:
@@ -248,21 +264,23 @@ def api_summary(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"summary failed: {type(e).__name__}: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"summary failed: {type(e).__name__}: {e}"
+        ) from e
 
 
 @router.get("/details", response_model=List[DetailModel])
 def api_details(
     request: Request,
     date_from: Optional[str] = Query(None),
-    date_to: Optional[str]   = Query(None),
-    tag: Optional[str]       = Query(None),
-    win_diff: Optional[float]= Query(None, ge=0.0, le=1.0),
+    date_to: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    win_diff: Optional[float] = Query(None, ge=0.0, le=1.0),
     dd_diff: Optional[float] = Query(None, ge=0.0, le=1.0),
-    min_trades: Optional[int]= Query(None, ge=0),
-    sort: Optional[str]      = Query(None),
-    limit: Optional[int]     = Query(2000, ge=1, le=20000),
-    offset: Optional[int]    = Query(0, ge=0),
+    min_trades: Optional[int] = Query(None, ge=0),
+    sort: Optional[str] = Query(None),
+    limit: Optional[int] = Query(2000, ge=1, le=20000),
+    offset: Optional[int] = Query(0, ge=0),
 ):
     try:
         filters = {
@@ -281,7 +299,9 @@ def api_details(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"details failed: {type(e).__name__}: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"details failed: {type(e).__name__}: {e}"
+        ) from e
 
 
 @router.get("/entry")
@@ -312,16 +332,29 @@ def api_entry(
 def api_export_csv(
     request: Request,
     date_from: Optional[str] = Query(None),
-    date_to: Optional[str]   = Query(None),
-    tag: Optional[str]       = Query(None),
+    date_to: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
 ):
     try:
         # まず details を取得してCSVにする（サービス側でCSV生成できるなら差し替え）
-        rows = get_details({"date_from": date_from, "date_to": date_to, "tag": tag, "limit": 100000})
+        rows = get_details(
+            {"date_from": date_from, "date_to": date_to, "tag": tag, "limit": 100000}
+        )
         if not rows:
             return _with_request_id("", status_code=200)
         # 手軽なCSV化
-        cols = ["id","decision_id","run_id","date","tag","win_rate","max_drawdown","rechecks","trades","adopted"]
+        cols = [
+            "id",
+            "decision_id",
+            "run_id",
+            "date",
+            "tag",
+            "win_rate",
+            "max_drawdown",
+            "rechecks",
+            "trades",
+            "adopted",
+        ]
         lines = [",".join(cols)]
         for r in rows:
             line = ",".join(str(r.get(c, "")) for c in cols)
@@ -331,18 +364,24 @@ def api_export_csv(
         resp.headers["Content-Disposition"] = 'attachment; filename="pdca_export.csv"'
         return resp
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"export csv failed: {type(e).__name__}: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"export csv failed: {type(e).__name__}: {e}"
+        ) from e
 
 
 @router.get("/export.json")
 def api_export_json(
     request: Request,
     date_from: Optional[str] = Query(None),
-    date_to: Optional[str]   = Query(None),
-    tag: Optional[str]       = Query(None),
+    date_to: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
 ):
     try:
-        rows = get_details({"date_from": date_from, "date_to": date_to, "tag": tag, "limit": 100000})
+        rows = get_details(
+            {"date_from": date_from, "date_to": date_to, "tag": tag, "limit": 100000}
+        )
         return _with_request_id(rows)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"export json failed: {type(e).__name__}: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"export json failed: {type(e).__name__}: {e}"
+        ) from e

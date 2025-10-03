@@ -1,8 +1,6 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import numpy as np
 from torch.utils.tensorboard import SummaryWriter
+
 
 class DQNBacktest:
     """
@@ -27,17 +25,19 @@ class DQNBacktest:
         self.writer = SummaryWriter(log_dir="runs/dqn_backtest")
 
     def train(self, batch_size=32):
-        """ バックテストの実行 """
+        """バックテストの実行"""
         for epoch in range(self.num_epochs):
             if self.replay_buffer.size() < batch_size:
                 continue  # バッファが十分に溜まるまで待機
 
-            states, actions, rewards, next_states, dones, _, _ = self.replay_buffer.sample(batch_size)
+            states, actions, rewards, next_states, dones, _, _ = self.replay_buffer.sample(
+                batch_size
+            )
             states_tensor = torch.tensor(states, dtype=torch.float32)
             next_states_tensor = torch.tensor(next_states, dtype=torch.float32)
-            actions_tensor = torch.tensor(actions, dtype=torch.int64)
-            rewards_tensor = torch.tensor(rewards, dtype=torch.float32)
-            dones_tensor = torch.tensor(dones, dtype=torch.float32)
+            _actions_tensor = torch.tensor(actions, dtype=torch.int64)
+            _rewards_tensor = torch.tensor(rewards, dtype=torch.float32)
+            _dones_tensor = torch.tensor(dones, dtype=torch.float32)
 
             # Q値の計算
             q_values = self.model(states_tensor)

@@ -6,16 +6,17 @@
 - 王命（DAGトリガー）をGUIフォームから発令
 """
 
-from fastapi import APIRouter, Request, Form
+import os
+from datetime import datetime
+from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
-from dotenv import load_dotenv
-from datetime import datetime
-from pathlib import Path
-import requests
-import os
 
 # =========================
 # ✅ 環境変数読み込み（Airflowと共有）
@@ -34,36 +35,26 @@ AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "airflow")
 router = APIRouter(prefix="/trigger", tags=["Trigger"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
+
 # =========================
 # 📄 トリガーフォーム表示
 # =========================
 @router.get("/", response_class=HTMLResponse)
 async def render_trigger_form(request: Request):
-    return templates.TemplateResponse("trigger.html", {
-        "request": request,
-        "result": None
-    })
+    return templates.TemplateResponse("trigger.html", {"request": request, "result": None})
+
 
 # =========================
 # 🚀 DAGトリガー実行
 # =========================
 @router.post("/", response_class=HTMLResponse)
-async def trigger_pdca_from_gui(
-    request: Request,
-    manual_reason: str = Form(...)
-):
+async def trigger_pdca_from_gui(request: Request, manual_reason: str = Form(...)):
     dag_run_id = f"manual_gui__{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    payload = {
-        "dag_run_id": dag_run_id,
-        "conf": {"trigger_source": manual_reason}
-    }
+    payload = {"dag_run_id": dag_run_id, "conf": {"trigger_source": manual_reason}}
 
     try:
         response = requests.post(
-            AIRFLOW_API_URL,
-            auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),
-            json=payload,
-            timeout=10
+            AIRFLOW_API_URL, auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD), json=payload, timeout=10
         )
 
         if response.status_code in (200, 201):
@@ -74,7 +65,4 @@ async def trigger_pdca_from_gui(
     except Exception as e:
         result_msg = f"❌ 通信エラー: {e}"
 
-    return templates.TemplateResponse("trigger.html", {
-        "request": request,
-        "result": result_msg
-    })
+    return templates.TemplateResponse("trigger.html", {"request": request, "result": result_msg})

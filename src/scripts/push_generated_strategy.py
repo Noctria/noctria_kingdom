@@ -1,7 +1,9 @@
-from core.path_config import BASE_DIR
-import subprocess
 import os
+import subprocess
 from datetime import datetime
+
+from core.path_config import BASE_DIR
+
 
 def push_generated_strategies():
     repo_dir = str(BASE_DIR)

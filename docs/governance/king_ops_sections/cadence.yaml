@@ -1,0 +1,56 @@
+# =======================================================
+# コミュニケーション & 会議体（当番/SLO追記）
+# =======================================================
+cadence:
+  timezone: "Asia/Tokyo"
+
+  daily:
+    time_local: "09:45"
+    responder: "king"
+    backup_responder: "noctus"
+    mtta_minutes: { warn: 60, critical: 15 }
+    mttr_hours: { warn: 24, critical: 24 }
+    agenda:
+      - "前夜～当朝の警報レビュー（WARN/CRITICAL）"
+      - "王の訓示（明日の一手を1～3点）"
+      - "handover 草案の最終化"
+    notes: |
+      変更検出ゼロなら governance_reviews.lightweight_daily は自動スキップ（最大3日連続まで）。
+      3日超は強制実施。
+    escalation:
+      fallback_if_no_response: "human_pm"
+      notify_channel: "#noctria-alerts"
+
+  weekly:
+    day_local: "Sun"
+    time_local: "10:30"
+    agenda:
+      - "週次KPIの俯瞰（推移・転換点）"
+      - "変更管理の進捗レビュー／gate可否"
+      - "翌週の重点リソース配分"
+    outputs:
+      - "docs/reports/weekly/YYYY-WW.md"
+      - "slides/weekly/YYYY-WW.pdf"
+
+  monthly:
+    day_local: "MonthEnd"
+    time_local: "16:00"
+    agenda:
+      - "月次KPI総括・ガードレールの見直し"
+      - "自動化レベル（automation_gates）の再判定"
+    outputs:
+      - "docs/reports/monthly/YYYY-MM.md"
+      - "slides/monthly/YYYY-MM.pdf"
+
+  # --- 改善メタ情報 ---
+  meta:
+    acceptance_checklist:
+      - "各 cadence に agenda が定義されている"
+      - "daily/weekly/monthly に outputs が存在する"
+      - "responder と backup_responder が distinct である"
+    alerts_integration:
+      slack_channel: "#noctria-ops"
+      email: "ops@noctria.example"
+    metrics:
+      track_attendance: true
+      track_sla_compliance: true

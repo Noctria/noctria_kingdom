@@ -11,4 +11,3 @@ def build_plan_prompt(stats, anomalies, last_act):
         "→ これらを考慮して次に実施すべき施策をAI的に推奨してください。"
     )
     return prompt
-

@@ -2,17 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Protocol, Optional, Tuple
+from typing import Any, Dict, List, Protocol, Tuple
 
 
 class Tool(Protocol):
     name: str
 
-    def describe(self) -> str:
-        ...
+    def describe(self) -> str: ...
 
-    def run(self, **kwargs) -> Dict[str, Any]:
-        ...
+    def run(self, **kwargs) -> Dict[str, Any]: ...
 
 
 @dataclass
@@ -20,11 +18,13 @@ class Policy:
     """
     代理AIの行動ガード。必要に応じて強化していく想定。
     """
+
     deny_globs: List[str] = field(default_factory=lambda: ["**/.git/**", "**/node_modules/**"])
     max_patch_bytes: int = 256_000
 
     def allow_path(self, path: str) -> bool:
         from fnmatch import fnmatch
+
         for g in self.deny_globs:
             if fnmatch(path, g):
                 return False
@@ -78,7 +78,10 @@ class Agent:
         # 1) 索引の読み込み
         idx = self.use("fs", action="read_text", path="codex_reports/patches_index.md")
         if not idx.get("ok"):
-            return {"ok": False, "error": f"cannot read patches_index.md: {idx.get('error')}"}
+            return {
+                "ok": False,
+                "error": f"cannot read patches_index.md: {idx.get('error')}",
+            }
 
         text = idx.get("text", "")
         patches = self._extract_patch_names_from_index(text)
@@ -129,6 +132,7 @@ class Agent:
         左列リンクの “FILENAME” を抽出して返す。
         """
         import re
+
         names = re.findall(r"\|\s*\[([^\]]+)\]\(patches/[^)]+\)", md_text)
         # 重複を避けるため順序維持で一意化
         seen = set()

@@ -12,18 +12,28 @@ Usage:
     --out   codex_reports/context/tests_map.json \
     --top   12
 """
+
 from __future__ import annotations
-from pathlib import Path
-import argparse, json, os, re, subprocess, sys, ast
+
+import argparse
+import ast
+import json
+import os
+import re
+import subprocess
+import sys
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
 
 # ---------------- helpers ----------------
 def read_allowed(p: Path) -> list[str]:
     if not p.exists():
         return []
     return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
 
 def _snake_tokens(s: str) -> list[str]:
     toks = []
@@ -32,6 +42,7 @@ def _snake_tokens(s: str) -> list[str]:
         if len(part) >= 3:
             toks.append(part)
     return toks
+
 
 def _ast_symbols(py_path: Path) -> list[str]:
     """source から関数/クラス名を抽出（短すぎは除外）"""
@@ -46,6 +57,7 @@ def _ast_symbols(py_path: Path) -> list[str]:
         return names
     except Exception:
         return []
+
 
 def derive_keywords(allowed_paths: list[str]) -> list[str]:
     """
@@ -69,7 +81,7 @@ def derive_keywords(allowed_paths: list[str]) -> list[str]:
         dotted = rel
         for prefix in ("src/", "./"):
             if dotted.startswith(prefix):
-                dotted = dotted[len(prefix):]
+                dotted = dotted[len(prefix) :]
         dotted = dotted[:-3] if dotted.endswith(".py") else dotted
         if dotted:
             dotted = dotted.replace("/", ".")
@@ -91,6 +103,7 @@ def derive_keywords(allowed_paths: list[str]) -> list[str]:
     # 3文字未満は除外
     return [k for k in kws if len(k) >= 3]
 
+
 def collect_tests_via_pytest() -> list[str]:
     """
     pytest -q --collect-only の出力から nodeid を収集。
@@ -100,7 +113,10 @@ def collect_tests_via_pytest() -> list[str]:
     try:
         out = subprocess.run(
             ["pytest", "-q", "--collect-only"],
-            cwd=str(ROOT), capture_output=True, text=True, check=False
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
         )
         for ln in (out.stdout or "").splitlines():
             ln = ln.strip()
@@ -116,22 +132,25 @@ def collect_tests_via_pytest() -> list[str]:
             nodeids.append(rel)
 
     # 一意化
-    seen=set(); uniq=[]
+    seen = set()
+    uniq = []
     for n in nodeids:
         if n not in seen:
-            seen.add(n); uniq.append(n)
+            seen.add(n)
+            uniq.append(n)
     return uniq
 
-def score_tests(nodeids: list[str], keywords: list[str]) -> list[tuple[str,int]]:
+
+def score_tests(nodeids: list[str], keywords: list[str]) -> list[tuple[str, int]]:
     """
     テスト本文に対する素朴スコア:
       +2: ファイル名stemがキーワードに一致
       +count: 本文にキーワード出現
     """
-    scores: dict[str,int] = defaultdict(int)
+    scores: dict[str, int] = defaultdict(int)
     kw_low = [k.lower() for k in keywords]
     for node in nodeids:
-        test_path = node.split("::",1)[0]
+        test_path = node.split("::", 1)[0]
         p = ROOT / test_path
         try:
             text = p.read_text(encoding="utf-8", errors="ignore")
@@ -142,17 +161,19 @@ def score_tests(nodeids: list[str], keywords: list[str]) -> list[tuple[str,int]]
         if base in kw_low:
             scores[node] += 2
         for k in kw_low:
-            if not k: continue
+            if not k:
+                continue
             cnt = low.count(k)
             if cnt:
                 scores[node] += cnt
-    ranked = sorted(scores.items(), key=lambda kv:(-kv[1], kv[0]))
+    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
     return ranked
 
-def write_tests_map(out_path: Path, ranked: list[tuple[str,int]], top: int, debug: dict):
+
+def write_tests_map(out_path: Path, ranked: list[tuple[str, int]], top: int, debug: dict):
     out_path = out_path.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    selected = [n for n,_ in ranked[:top]] if ranked else []
+    selected = [n for n, _ in ranked[:top]] if ranked else []
     data = {
         "generated_by": "scripts/map_tests.py",
         "top": top,
@@ -167,27 +188,28 @@ def write_tests_map(out_path: Path, ranked: list[tuple[str,int]], top: int, debu
         rel = out_path
     print(f"+ wrote {rel} ({len(selected)} tests)")
 
+
 # ---------------- main ----------------
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--allow", default=str(ROOT/"codex_reports/context/allowed_files.txt"))
-    ap.add_argument("--out",   default=str(ROOT/"codex_reports/context/tests_map.json"))
-    ap.add_argument("--top",   type=int, default=12)
+    ap.add_argument("--allow", default=str(ROOT / "codex_reports/context/allowed_files.txt"))
+    ap.add_argument("--out", default=str(ROOT / "codex_reports/context/tests_map.json"))
+    ap.add_argument("--top", type=int, default=12)
     args = ap.parse_args()
 
     allow = Path(args.allow)
-    outp  = Path(args.out)
+    outp = Path(args.out)
 
     allowed_paths = read_allowed(allow)
     keywords = derive_keywords(allowed_paths)
-    nodeids  = collect_tests_via_pytest()
-    ranked   = score_tests(nodeids, keywords)
+    nodeids = collect_tests_via_pytest()
+    ranked = score_tests(nodeids, keywords)
 
     debug = {
         "allowed_count": len(allowed_paths),
         "keywords": keywords[:50],
         "all_tests_found": len(nodeids),
-        "ranked_nonzero": sum(1 for _,s in ranked if s > 0),
+        "ranked_nonzero": sum(1 for _, s in ranked if s > 0),
     }
 
     # フォールバック: マッチ0件なら全テストから上位Nを採用
@@ -196,6 +218,7 @@ def main():
         ranked = [(n, 0) for n in nodeids]
 
     write_tests_map(outp, ranked, args.top, debug)
+
 
 if __name__ == "__main__":
     main()

@@ -46,15 +46,17 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import yaml
+
     HAS_YAML = True
 except Exception:
     HAS_YAML = False
 
 
 BEGIN_TMPL = "<!-- AUTODOC:BEGIN mode=file_content path_globs={path} title={title} -->"
-END_TMPL   = "<!-- AUTODOC:END -->"
+END_TMPL = "<!-- AUTODOC:END -->"
 
 H2_RE = re.compile(r"(?m)^##\s+.*$")  # 同レベル見出しの検出用
+
 
 @dataclass
 class SectionRule:
@@ -63,6 +65,7 @@ class SectionRule:
     title: Optional[str] = None
     fence: Optional[str] = None
 
+
 @dataclass
 class FileRule:
     file: str
@@ -70,13 +73,17 @@ class FileRule:
     sections: List[SectionRule]
     keep_heading: bool = True
 
+
 def _load_config(path: Path) -> Dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     if path.suffix.lower() in (".yml", ".yaml"):
         if not HAS_YAML:
-            raise RuntimeError("PyYAML が必要です。`pip install pyyaml` を実行するか JSON に変換してください。")
+            raise RuntimeError(
+                "PyYAML が必要です。`pip install pyyaml` を実行するか JSON に変換してください。"
+            )
         return yaml.safe_load(text)
     return json.loads(text)
+
 
 def _quote_if_needed(val: str) -> str:
     if val is None:
@@ -85,7 +92,8 @@ def _quote_if_needed(val: str) -> str:
         return '"' + val.replace('"', '\\"') + '"'
     return val
 
-def _find_section_span(text: str, heading_rx: re.Pattern) -> Optional[Tuple[int,int,int,int]]:
+
+def _find_section_span(text: str, heading_rx: re.Pattern) -> Optional[Tuple[int, int, int, int]]:
     """
     見出し行の span と本文の span を返す:
       returns (heading_start, heading_end, body_start, body_end)
@@ -98,17 +106,24 @@ def _find_section_span(text: str, heading_rx: re.Pattern) -> Optional[Tuple[int,
 
     # 次の H2 を探す（自身の終端から）
     next_h2 = H2_RE.search(text, heading_end)
-    body_start = heading_end + 1 if heading_end < len(text) and text[heading_end] == "\n" else heading_end
+    body_start = (
+        heading_end + 1 if heading_end < len(text) and text[heading_end] == "\n" else heading_end
+    )
     body_end = next_h2.start() if next_h2 else len(text)
     return (heading_start, heading_end, body_start, body_end)
+
 
 def _ensure_dir(path: Path):
     path.mkdir(parents=True, exist_ok=True)
 
+
 def _write_file(path: Path, content: str):
     path.write_text(content, encoding="utf-8")
 
-def _wrap_one_file(docs_root: Path, repo_root: Path, rule: FileRule, dry_run: bool, backup: bool) -> Tuple[bool,str]:
+
+def _wrap_one_file(
+    docs_root: Path, repo_root: Path, rule: FileRule, dry_run: bool, backup: bool
+) -> Tuple[bool, str]:
     md_path = (docs_root / rule.file).resolve()
     if not md_path.exists():
         return (False, f"Not found: {md_path}")
@@ -122,7 +137,7 @@ def _wrap_one_file(docs_root: Path, repo_root: Path, rule: FileRule, dry_run: bo
 
     # セクション順に処理（前から置換すると index がずれるので、後ろの方から処理）
     # → 一旦マッチ位置を集めてから後方へ向けて置換
-    matches: List[Tuple[SectionRule, Tuple[int,int,int,int]]] = []
+    matches: List[Tuple[SectionRule, Tuple[int, int, int, int]]] = []
     for s in rule.sections:
         heading_rx = re.compile(s.heading_regex, re.MULTILINE)
         span = _find_section_span(text, heading_rx)
@@ -171,13 +186,20 @@ def _wrap_one_file(docs_root: Path, repo_root: Path, rule: FileRule, dry_run: bo
     _write_file(md_path, text)
     return (True, f"Wrapped {total_changes} section(s)")
 
+
 def main():
-    ap = argparse.ArgumentParser(description="Wrap Markdown sections with AUTODOC blocks and extract bodies to partial files.")
+    ap = argparse.ArgumentParser(
+        description="Wrap Markdown sections with AUTODOC blocks and extract bodies to partial files."
+    )
     ap.add_argument("--docs-root", type=Path, default=Path("docs"))
     ap.add_argument("--repo-root", type=Path, default=Path("."))
     ap.add_argument("--config", type=Path, required=True)
-    ap.add_argument("--dry-run", type=lambda x: str(x).lower() in ("1","true","yes","y"), default=True)
-    ap.add_argument("--backup",  type=lambda x: str(x).lower() in ("1","true","yes","y"), default=True)
+    ap.add_argument(
+        "--dry-run", type=lambda x: str(x).lower() in ("1", "true", "yes", "y"), default=True
+    )
+    ap.add_argument(
+        "--backup", type=lambda x: str(x).lower() in ("1", "true", "yes", "y"), default=True
+    )
     args = ap.parse_args()
 
     docs_root = args.docs_root.resolve()
@@ -204,7 +226,9 @@ def main():
             sections=sections,
             keep_heading=bool(r.get("keep_heading", True)),
         )
-        updated, msg = _wrap_one_file(docs_root, repo_root, file_rule, dry_run=args.dry_run, backup=args.backup)
+        updated, msg = _wrap_one_file(
+            docs_root, repo_root, file_rule, dry_run=args.dry_run, backup=args.backup
+        )
         scanned += 1
         icon = "✅" if updated else "—"
         print(f"## {file_rule.file}\n- {icon} {msg}\n")
@@ -214,6 +238,7 @@ def main():
     print(f"Summary: changed={changed}, scanned={scanned}")
     if args.dry_run:
         print("Note: dry-run mode; no files were written.")
+
 
 if __name__ == "__main__":
     main()

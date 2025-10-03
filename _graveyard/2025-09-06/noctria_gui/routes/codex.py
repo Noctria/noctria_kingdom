@@ -75,11 +75,13 @@ def _scan_patches() -> List[Dict[str, Any]]:
     for f in sorted(PATCHES_DIR.glob("*.patch")):
         try:
             stat = f.stat()
-            items.append({
-                "filename": f.name,
-                "size": stat.st_size,
-                "relpath": f"codex_reports/patches/{f.name}",
-            })
+            items.append(
+                {
+                    "filename": f.name,
+                    "size": stat.st_size,
+                    "relpath": f"codex_reports/patches/{f.name}",
+                }
+            )
         except Exception:
             continue
     return items

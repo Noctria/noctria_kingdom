@@ -1,0 +1,96 @@
+# =======================================================
+# Whale Watch（大口トレーダー動向）
+# =======================================================
+whale_watch:
+  owners: ["veritas","prometheus"]   # 生成/解析の責務
+  timezone: "UTC"
+  sources:
+    - name: "onchain_cfds"
+      enabled: false
+      notes: "入手性と遅延未確定のため保留"
+    - name: "ex_orderbook"
+      enabled: true
+      exchanges: ["major_fx_broker_1","major_fx_broker_2"]
+      schema:
+        - { field: "ts", type: "int64(epoch_ms)" }
+        - { field: "pair", type: "str" }
+        - { field: "bid_vol", type: "float" }
+        - { field: "ask_vol", type: "float" }
+        - { field: "trade_notional_usd", type: "float" }
+      qos:
+        max_lag_seconds_warn: 120
+        max_lag_seconds_critical: 300
+        drop_if_duplicate_ts: true
+  ingestion:
+    dedup_keys: ["ts","pair","exchange"]
+    resample: { rule: "1m", agg: ["sum","max"] }
+    normalize:
+      - rule: "notional_usd = price * size * multiplier"   # 必要時
+      - rule: "zscore by pair (rolling=24h) for spike detection"
+    retention_days: 180
+    storage: "warehouse/whale/{date}/*.parquet"
+  detection:
+    window_minutes: 30
+    threshold_std: 3.0
+    min_notional_usd: 5_000_000
+    indices:
+      # 以前のKPI群と整合 — kpi_alertsでも参照可
+      whale_imbalance_index:
+        formula: "(bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9)"
+        smooth: "ema(α=0.2)"
+        warn: 0.65
+        critical: 0.80
+      whale_pressure_index:
+        formula: "zscore(trade_notional_signed, 24h)"
+        warn: 0.70
+        critical: 0.85
+      whale_spike_events:
+        rule: "zscore(notional_usd, 24h) >= threshold_std"
+        aggregation: "count within window_minutes"
+        warn:  >2
+        critical: >5
+  correlation:
+    with_kpis: ["brier_score","ece_calibration","adversarial_pass_rate"]
+    lags_hours: [0,1,2,3,6]
+    output: "reports/whale/correlation_{YYYY-MM-DD}.md"
+    success_hint: "lag<=3h で相関方向が一貫"
+  outputs:
+    daily_json: "reports/whale_watch/{YYYY-MM-DD}.json"
+    table_csv:  "reports/whale/table_{YYYY-MM-DD}.csv"
+    kpi: ["event_count","max_notional","weighted_direction","whale_imbalance_index","whale_pressure_index"]
+    freshness_check:
+      max_age_minutes_warn: 30
+      max_age_minutes_critical: 60
+  integration:
+    daily_report_section: "report_templates.daily.sections.whale_watch"
+    decision_hint: "急増時はスプレッド/滑り/一時停止ルールの再確認"
+    auto_rules_link: "kpi_alerts.metrics[*whale*]"   # 既存アラート群と連動
+  observability:
+    metrics:
+      - whale_trades_detected
+      - whale_net_flow_usd
+      - whale_pressure_index
+      - whale_flow_imbalance
+    logs: "logs/whale/*.log"
+    alert_bridge:
+      warn_when:
+        - key: "whale_imbalance_index"  # detection.indices.warn と揃える
+          absolute_above: 0.65
+      critical_when:
+        - key: "whale_pressure_index"
+          absolute_above: 0.85
+  runbooks:
+    spike_incident: "runbooks.whale_spike_incident"
+    spike_watch: "runbooks.whale_spike"
+  data_quality:
+    checks:
+      - id: "WQ01"
+        rule: "missing_rate(pair, 1h) <= 0.02"
+      - id: "WQ02"
+        rule: "ts_monotonic(pair)==true"
+      - id: "WQ03"
+        rule: "notional_usd>=0, finite"
+    enforcement: { bt: "strict", ft: "strict", api_predict: "warn" }
+  privacy:
+    pii: false
+    note: "個人特定不可・集計以上のみ（約定ブロックは閾値で匿名化）"

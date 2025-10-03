@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Dict, Any, List, Optional, Union, Tuple
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from statistics import mean, stdev
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -20,19 +20,23 @@ import pandas as pd
 # ---- imports（相対/絶対の両対応）----
 try:
     from plan_data.collector import PlanDataCollector  # type: ignore
+
     # emit_alert がなければ log_alert へフォールバックするため両方try
     try:
-        from plan_data.observability import log_plan_run, emit_alert, log_alert  # type: ignore
+        from plan_data.observability import emit_alert, log_alert, log_plan_run  # type: ignore
     except Exception:
-        from plan_data.observability import log_plan_run, log_alert  # type: ignore
+        from plan_data.observability import log_alert, log_plan_run  # type: ignore
+
         emit_alert = None  # type: ignore
     from plan_data.trace import new_trace_id  # type: ignore
 except Exception:  # 実行環境により src. 付きでの実行も許容
     from src.plan_data.collector import PlanDataCollector  # type: ignore
+
     try:
-        from src.plan_data.observability import log_plan_run, emit_alert, log_alert  # type: ignore
+        from src.plan_data.observability import emit_alert, log_alert, log_plan_run  # type: ignore
     except Exception:
-        from src.plan_data.observability import log_plan_run, log_alert  # type: ignore
+        from src.plan_data.observability import log_alert, log_plan_run  # type: ignore
+
         emit_alert = None  # type: ignore
     from src.plan_data.trace import new_trace_id  # type: ignore
 
@@ -116,15 +120,37 @@ def _kpi_error_ratio(df: pd.DataFrame, kpi_cols: List[str]) -> float:
     return float(df[present].isna().sum().sum()) / float(denom)
 
 
-def _emit(kind: str, reason: str, *, trace_id: Optional[str], severity: str = "MEDIUM", details: Optional[Dict[str, Any]] = None) -> None:
+def _emit(
+    kind: str,
+    reason: str,
+    *,
+    trace_id: Optional[str],
+    severity: str = "MEDIUM",
+    details: Optional[Dict[str, Any]] = None,
+) -> None:
     """observability.emit_alert があれば使用、なければ log_alert で代替。"""
     try:
         if emit_alert is not None:  # type: ignore
-            emit_alert(kind=kind if kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI.")) else f"PLAN.{kind}",
-                       reason=reason, severity=severity, trace_id=trace_id, details=details)  # type: ignore
+            emit_alert(
+                kind=(
+                    kind
+                    if kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI."))
+                    else f"PLAN.{kind}"
+                ),
+                reason=reason,
+                severity=severity,
+                trace_id=trace_id,
+                details=details,
+            )  # type: ignore
         else:
             # log_alert は policy_name で受ける想定
-            log_alert(policy_name=f"PLAN.{kind}", reason=reason, severity=severity, details=details, trace_id=trace_id)  # type: ignore
+            log_alert(
+                policy_name=f"PLAN.{kind}",
+                reason=reason,
+                severity=severity,
+                details=details,
+                trace_id=trace_id,
+            )  # type: ignore
     except Exception:
         # 観測が落ちても本処理は止めない
         pass
@@ -194,11 +220,13 @@ def attach_kpis(
 
     # win_rate（rolling）
     wins = (ret > 0).astype("float")
-    out["win_rate"] = wins.rolling(window=win_window, min_periods=max(5, win_window // 3)).mean() * 100.0
+    out["win_rate"] = (
+        wins.rolling(window=win_window, min_periods=max(5, win_window // 3)).mean() * 100.0
+    )
 
     # num_trades（rollingでの“有意な変化”回数っぽい proxy）
     eps = ret.abs().rolling(window=5, min_periods=3).std() * 0.1
-    active = (ret.abs() > eps.fillna(0))
+    active = ret.abs() > eps.fillna(0)
     out["num_trades"] = active.rolling(window=win_window, min_periods=max(5, win_window // 3)).sum()
 
     # sharpe（rolling）
@@ -218,7 +246,11 @@ def attach_kpis(
                 reason=f"kpi_nan_ratio={err_ratio:.3f} exceeds threshold",
                 severity=("HIGH" if err_ratio > 0.8 else "MEDIUM"),
                 trace_id=trace_id,
-                details={"kpi_cols": kpi_cols, "nan_ratio": round(err_ratio, 3), "rows": len(out)},
+                details={
+                    "kpi_cols": kpi_cols,
+                    "nan_ratio": round(err_ratio, 3),
+                    "rows": len(out),
+                },
             )
 
         log_plan_run(
@@ -246,7 +278,9 @@ class PlanStatistics:
         use_timeseries: bool = True,
         lookback_days: int = 365,
         trace_id: Optional[str] = None,
-        df: Optional[Union[pd.DataFrame, Tuple[pd.DataFrame, str], dict]] = None,  # DataFrame / (df, trace_id) / dict(旧)
+        df: Optional[
+            Union[pd.DataFrame, Tuple[pd.DataFrame, str], dict]
+        ] = None,  # DataFrame / (df, trace_id) / dict(旧)
     ):
         """
         df を明示指定しない場合は collector.collect_all(...) を実行して取得。
@@ -266,7 +300,11 @@ class PlanStatistics:
                 collected_df = df  # 旧仕様も許容
         else:
             collected = self.collector.collect_all(lookback_days=lookback_days)
-            if isinstance(collected, tuple) and len(collected) == 2 and isinstance(collected[0], pd.DataFrame):
+            if (
+                isinstance(collected, tuple)
+                and len(collected) == 2
+                and isinstance(collected[0], pd.DataFrame)
+            ):
                 collected_df, collected_tid = collected
             else:
                 collected_df = collected  # 旧仕様（df のみ or dict）
@@ -336,7 +374,11 @@ class PlanStatistics:
             }
 
         # binary フラグ
-        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "win_flag" in self._data.columns:
+        if (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and "win_flag" in self._data.columns
+        ):
             vals = pd.to_numeric(self._data["win_flag"], errors="coerce").dropna().tolist()
             return {
                 "count": len(vals),
@@ -354,9 +396,17 @@ class PlanStatistics:
         優先順: DF の 'max_dd'（rolling）→ 'drawdown' → 評価ログの 'drawdown'
         """
         dd: List[float]
-        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "max_dd" in self._data.columns:
+        if (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and "max_dd" in self._data.columns
+        ):
             dd = pd.to_numeric(self._data["max_dd"], errors="coerce").dropna().tolist()
-        elif self._is_timeseries and isinstance(self._data, pd.DataFrame) and "drawdown" in self._data.columns:
+        elif (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and "drawdown" in self._data.columns
+        ):
             dd = pd.to_numeric(self._data["drawdown"], errors="coerce").dropna().tolist()
         elif isinstance(self._data, dict) and "eval_results" in self._data:
             evals = self._data["eval_results"]
@@ -390,7 +440,12 @@ class PlanStatistics:
                 }
             return result
 
-        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and ("tag" in self._data.columns) and ("win_flag" in self._data.columns):
+        if (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and ("tag" in self._data.columns)
+            and ("win_flag" in self._data.columns)
+        ):
             df = self._data
             tag_stats = df.groupby("tag")["win_flag"].agg(["count", "mean", "std"]).reset_index()
             return tag_stats.to_dict(orient="records")
@@ -434,7 +489,11 @@ class PlanStatistics:
     def news_stats(self) -> Dict[str, Any]:
         """ニュース件数とポジ/ネガ件数の統計"""
         stats: Dict[str, Any] = {}
-        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "news_count" in self._data.columns:
+        if (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and "news_count" in self._data.columns
+        ):
             nc = pd.to_numeric(self._data["news_count"], errors="coerce").dropna()
             stats["news_count"] = {
                 "mean": int(nc.mean()) if not nc.empty else 0,
@@ -442,7 +501,11 @@ class PlanStatistics:
                 "min": int(nc.min()) if not nc.empty else 0,
                 "max": int(nc.max()) if not nc.empty else 0,
             }
-        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "news_positive" in self._data.columns:
+        if (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and "news_positive" in self._data.columns
+        ):
             np_ = pd.to_numeric(self._data["news_positive"], errors="coerce").dropna()
             stats["news_positive"] = {
                 "mean": int(np_.mean()) if not np_.empty else 0,
@@ -450,7 +513,11 @@ class PlanStatistics:
                 "min": int(np_.min()) if not np_.empty else 0,
                 "max": int(np_.max()) if not np_.empty else 0,
             }
-        if self._is_timeseries and isinstance(self._data, pd.DataFrame) and "news_negative" in self._data.columns:
+        if (
+            self._is_timeseries
+            and isinstance(self._data, pd.DataFrame)
+            and "news_negative" in self._data.columns
+        ):
             nn = pd.to_numeric(self._data["news_negative"], errors="coerce").dropna()
             stats["news_negative"] = {
                 "mean": int(nn.mean()) if not nn.empty else 0,
@@ -522,7 +589,11 @@ __all__ = [
 if __name__ == "__main__":
     # 1) 収集（新仕様に合わせてアンパック）
     collected = PlanDataCollector().collect_all(lookback_days=240)
-    if isinstance(collected, tuple) and len(collected) == 2 and isinstance(collected[0], pd.DataFrame):
+    if (
+        isinstance(collected, tuple)
+        and len(collected) == 2
+        and isinstance(collected[0], pd.DataFrame)
+    ):
         base_df, tid = collected
     else:
         base_df, tid = (collected if isinstance(collected, pd.DataFrame) else pd.DataFrame()), None
@@ -535,6 +606,13 @@ if __name__ == "__main__":
     summary = stats.get_summary()
 
     import json
+
     pd.set_option("display.max_columns", 120)
-    print("[KPI columns present?]", {"win_rate": "win_rate" in df_kpi.columns, "max_dd": "max_dd" in df_kpi.columns})
+    print(
+        "[KPI columns present?]",
+        {
+            "win_rate": "win_rate" in df_kpi.columns,
+            "max_dd": "max_dd" in df_kpi.columns,
+        },
+    )
     print(json.dumps(summary, indent=2, ensure_ascii=False))

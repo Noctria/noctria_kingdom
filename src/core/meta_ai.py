@@ -1,14 +1,24 @@
+from pathlib import Path  # added by fixer
+from typing import Any, List
+
 import gym
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any
+
 
 # MetaAIは純粋な「環境」となり、エージェント（PPO）は外部で定義・学習します。
 class MetaAIEnv(gym.Env):
     """
     MetaAI: 各戦略AIの意見を観測し、最適な最終判断を下すことを学習する強化学習環境。
     """
-    def __init__(self, df: pd.DataFrame, strategy_agents: List[Any], initial_balance: float = 100000.0, transaction_cost: float = 0.001):
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        strategy_agents: List[Any],
+        initial_balance: float = 100000.0,
+        transaction_cost: float = 0.001,
+    ):
         super(MetaAIEnv, self).__init__()
 
         self.df = df
@@ -20,9 +30,10 @@ class MetaAIEnv(gym.Env):
         num_market_features = self.df.shape[1]
         num_strategy_signals = len(self.strategy_agents)
         self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
+            low=-np.inf,
+            high=np.inf,
             shape=(num_market_features + num_strategy_signals,),
-            dtype=np.float32
+            dtype=np.float32,
         )
 
         # アクション空間：0: HOLD, 1: BUY, 2: SELL
@@ -49,7 +60,7 @@ class MetaAIEnv(gym.Env):
         self.net_worth_history = [self.initial_balance]
         self.current_position = 0  # 0: No position, 1: Long, -1: Short
         self.entry_price = 0
-        
+
         return self._get_observation()
 
     def step(self, action: int):
@@ -58,28 +69,28 @@ class MetaAIEnv(gym.Env):
         done = self.current_step >= len(self.df) - 1
 
         # ★修正点: actionに基づいて実際の損益を計算
-        current_price = self.df['close'].iloc[self.current_step]
-        last_price = self.df['close'].iloc[self.current_step - 1]
-        
+        current_price = self.df["close"].iloc[self.current_step]
+        last_price = self.df["close"].iloc[self.current_step - 1]
+
         profit_loss = 0
-        if self.current_position == 1: # Long position
+        if self.current_position == 1:  # Long position
             profit_loss = (current_price - last_price) * (self.balance / last_price)
-        elif self.current_position == -1: # Short position
+        elif self.current_position == -1:  # Short position
             profit_loss = (last_price - current_price) * (self.balance / last_price)
 
         self.balance += profit_loss
-        
+
         # Actionの実行
         cost = 0
-        if action == 1 and self.current_position != 1: # Buy
+        if action == 1 and self.current_position != 1:  # Buy
             self.current_position = 1
             self.entry_price = current_price
             cost = self.balance * self.transaction_cost
-        elif action == 2 and self.current_position != -1: # Sell
+        elif action == 2 and self.current_position != -1:  # Sell
             self.current_position = -1
             self.entry_price = current_price
             cost = self.balance * self.transaction_cost
-        elif action == 0: # Hold
+        elif action == 0:  # Hold
             self.current_position = 0
 
         self.balance -= cost
@@ -93,28 +104,30 @@ class MetaAIEnv(gym.Env):
             reward = sharpe_ratio
         else:
             reward = 0
-            
+
         return self._get_observation(), reward, done, {}
+
 
 # ================================================
 # ✅ 学習と推論の実行例（このロジックは外部スクリプトやDAGに配置する）
 # ================================================
-if __name__ == '__main__':
+if __name__ == "__main__":
     from stable_baselines3 import PPO
 
     # --- ダミーの戦略AI（四臣）を準備 ---
     class DummyAgent:
         def __init__(self, action_type):
             self.action_type = action_type
+
         def process(self, market_state):
-            return self.action_type # 常に同じ判断を返す
+            return self.action_type  # 常に同じ判断を返す
 
     strategy_agents_list = [
-        DummyAgent(1), # Aurusは常にBuy
-        DummyAgent(-1), # Leviaは常にSell
+        DummyAgent(1),  # Aurusは常にBuy
+        DummyAgent(-1),  # Leviaは常にSell
         DummyAgent(0),  # Noctusは常にHold
     ]
-    
+
     # --- データ準備 ---
     # 実際のパスに合わせて要調整
     df_path = "data/sample_test_data.csv"
@@ -122,9 +135,11 @@ if __name__ == '__main__':
         # ダミーデータ作成
         dates = pd.date_range(start="2024-01-01", periods=200)
         data = np.random.randn(200, 5).cumsum(axis=0)
-        df_dummy = pd.DataFrame(data, index=dates, columns=['open', 'high', 'low', 'close', 'volume'])
+        df_dummy = pd.DataFrame(
+            data, index=dates, columns=["open", "high", "low", "close", "volume"]
+        )
         df_dummy.to_csv(df_path)
-    
+
     df_main = pd.read_csv(df_path, index_col=0, parse_dates=True)
 
     # 1. 環境のインスタンス化
@@ -135,7 +150,7 @@ if __name__ == '__main__':
     print("2. PPOエージェントを生成し、学習を開始します...")
     agent = PPO("MlpPolicy", env, verbose=1)
     agent.learn(total_timesteps=20000)
-    
+
     # 3. 学習済みエージェントを使った推論（意思決定）
     print("\n3. 学習済みエージェントで意思決定を行います...")
     obs = env.reset()

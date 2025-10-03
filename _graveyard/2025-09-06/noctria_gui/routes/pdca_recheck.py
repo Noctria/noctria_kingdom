@@ -51,7 +51,11 @@ except Exception:  # pragma: no cover
     NOCTRIA_GUI_TEMPLATES_DIR = PROJECT_ROOT / "noctria_gui" / "templates"
     _PDCA_LOG_DIR_SETTING = None
 
-PDCA_DIR = Path(_PDCA_LOG_DIR_SETTING) if _PDCA_LOG_DIR_SETTING else (PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders")
+PDCA_DIR = (
+    Path(_PDCA_LOG_DIR_SETTING)
+    if _PDCA_LOG_DIR_SETTING
+    else (PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders")
+)
 PDCA_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/pdca", tags=["PDCA"])
@@ -95,7 +99,14 @@ def _now_utc_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _obs_safe_log(trace_id: str, ai_name: str, params: Dict[str, Any], metrics: Dict[str, Any], status: str, note: str) -> None:
+def _obs_safe_log(
+    trace_id: str,
+    ai_name: str,
+    params: Dict[str, Any],
+    metrics: Dict[str, Any],
+    status: str,
+    note: str,
+) -> None:
     if ensure_tables and log_infer_call:
         try:
             ensure_tables()
@@ -118,6 +129,7 @@ def _obs_safe_log(trace_id: str, ai_name: str, params: Dict[str, Any], metrics: 
 def _policy_snapshot() -> Dict[str, Any]:
     try:
         from src.core.policy_engine import get_snapshot  # type: ignore
+
         return dict(get_snapshot())
     except Exception:
         return {}
@@ -127,7 +139,9 @@ def _ledger_issue(kind: str, issued_by: str, intent: Dict[str, Any]) -> Optional
     if not create_decision:
         return None
     try:
-        d = create_decision(kind, issued_by=issued_by, intent=intent, policy_snapshot=_policy_snapshot())
+        d = create_decision(
+            kind, issued_by=issued_by, intent=intent, policy_snapshot=_policy_snapshot()
+        )
         return d.decision_id
     except Exception:
         return None
@@ -186,7 +200,9 @@ def _read_candidate_strategies(
     dt = _parse_ymd(date_to)
 
     try:
-        files = sorted(PDCA_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)[:max_files]
+        files = sorted(
+            PDCA_DIR.glob("rechecks_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True
+        )[:max_files]
     except Exception:
         files = []
 
@@ -244,7 +260,16 @@ def _to_float(v: Any, default: float = 0.0) -> float:
 def _airflow_trigger_via_cli(dag_id: str, conf: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
     try:
         run_id = f"manual__noctria__{conf.get('decision_id','unknown')}"
-        cmd = ["airflow", "dags", "trigger", dag_id, "--run-id", run_id, "--conf", json.dumps(conf, ensure_ascii=False)]
+        cmd = [
+            "airflow",
+            "dags",
+            "trigger",
+            dag_id,
+            "--run-id",
+            run_id,
+            "--conf",
+            json.dumps(conf, ensure_ascii=False),
+        ]
         cp = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
         ok = cp.returncode == 0
         msg = cp.stdout.strip() if ok else (cp.stderr.strip() or cp.stdout.strip())
@@ -258,11 +283,14 @@ def _airflow_trigger_via_cli(dag_id: str, conf: Dict[str, Any]) -> Tuple[bool, s
 # ------------------------------------------------------------
 _RULES = RulesEngine() if RulesEngine else None
 
-def _evaluate_precheck(strategy: str,
-                       current_dd: float,
-                       dd_threshold: float,
-                       decision_id: Optional[str],
-                       trace_id: Optional[str]) -> bool:
+
+def _evaluate_precheck(
+    strategy: str,
+    current_dd: float,
+    dd_threshold: float,
+    decision_id: Optional[str],
+    trace_id: Optional[str],
+) -> bool:
     """
     再評価実施前の統治ルールチェック。
     RulesEngine が無い環境では True（通過）として処理継続。
@@ -298,7 +326,13 @@ async def recheck_strategy(
     - 成功時は /strategies/detail/{strategy_name} へ 303 Redirect
     """
     if not _strategy_exists(strategy_name):
-        return JSONResponse(status_code=404, content={"detail": f"戦略が存在しません: {strategy_name}", "strategy_name": strategy_name})
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": f"戦略が存在しません: {strategy_name}",
+                "strategy_name": strategy_name,
+            },
+        )
 
     dag_id = DEFAULT_SINGLE_RECHECK_DAG.strip()
     trace_id = str(uuid.uuid4())
@@ -385,7 +419,13 @@ async def recheck_strategy(
             note="GUI trigger single recheck failed",
         )
         _ledger_event(decision_id, "failed", {"error": str(e)})
-        return JSONResponse(status_code=500, content={"detail": f"Airflow DAGトリガー失敗: {str(e)}", "strategy_name": strategy_name})
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": f"Airflow DAGトリガー失敗: {str(e)}",
+                "strategy_name": strategy_name,
+            },
+        )
 
     # ✅ Redirect: /strategies/detail/{name}?trace_id=...&decision_id=...
     safe_name = urllib.parse.quote(strategy_name, safe="")
@@ -400,7 +440,9 @@ async def recheck_all(
     filter_date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
     max_targets: int = Query(30, ge=1, le=200, description="最大トリガ件数（安全上限あり）"),
     dd_threshold: float = Query(5.0, description="許容ドローダウン閾値（%）"),
-    dd_current_map: Optional[Dict[str, float]] = Body(None, embed=True, description="戦略ごとの現在DD（%）, 例: {'A':4.2,'B':6.1}"),
+    dd_current_map: Optional[Dict[str, float]] = Body(
+        None, embed=True, description="戦略ごとの現在DD（%）, 例: {'A':4.2,'B':6.1}"
+    ),
 ) -> JSONResponse:
     """
     期間で抽出された複数戦略を対象に Airflow を順次トリガ。
@@ -408,9 +450,18 @@ async def recheck_all(
     - decision_id は戦略ごとに自動発行
     - 失敗しても全体は続行
     """
-    strategies = _read_candidate_strategies(filter_date_from, filter_date_to, max_targets=max_targets)
+    strategies = _read_candidate_strategies(
+        filter_date_from, filter_date_to, max_targets=max_targets
+    )
     if not strategies:
-        return JSONResponse({"ok": True, "message": "対象戦略が見つかりませんでした。", "triggered": 0, "results": []})
+        return JSONResponse(
+            {
+                "ok": True,
+                "message": "対象戦略が見つかりませんでした。",
+                "triggered": 0,
+                "results": [],
+            }
+        )
 
     results: List[Dict[str, Any]] = []
     dag_id = BULK_RECHECK_DAG.strip()
@@ -420,7 +471,11 @@ async def recheck_all(
         decision_id = _ledger_issue(
             kind="recheck",
             issued_by="ui",
-            intent={"strategy": s, "reason": reason, "filter": {"from": filter_date_from, "to": filter_date_to}},
+            intent={
+                "strategy": s,
+                "reason": reason,
+                "filter": {"from": filter_date_from, "to": filter_date_to},
+            },
         )
         _ledger_event(decision_id, "accepted", {"endpoint": "/pdca/recheck_all"})
 
@@ -436,8 +491,20 @@ async def recheck_all(
             trace_id=trace_id,
         )
         if not ok_rule:
-            results.append({"strategy": s, "ok": False, "blocked_by_rule": True, "reason": "drawdown_guard", "current_dd": cur_dd})
-            _ledger_event(decision_id, "failed", {"blocked_by_rule": True, "rule": "risk.stop_drawdown", "current_dd": cur_dd})
+            results.append(
+                {
+                    "strategy": s,
+                    "ok": False,
+                    "blocked_by_rule": True,
+                    "reason": "drawdown_guard",
+                    "current_dd": cur_dd,
+                }
+            )
+            _ledger_event(
+                decision_id,
+                "failed",
+                {"blocked_by_rule": True, "rule": "risk.stop_drawdown", "current_dd": cur_dd},
+            )
             continue
 
         conf = {
@@ -479,7 +546,15 @@ async def recheck_all(
             )
             _ledger_event(decision_id, "completed", {"dag_run_id": dag_run_id, "response": res})
 
-            results.append({"strategy": s, "ok": True, "message": "Triggered", "dag_run_id": dag_run_id, "decision_id": decision_id})
+            results.append(
+                {
+                    "strategy": s,
+                    "ok": True,
+                    "message": "Triggered",
+                    "dag_run_id": dag_run_id,
+                    "decision_id": decision_id,
+                }
+            )
         except Exception as e:
             _obs_safe_log(
                 trace_id=trace_id,
@@ -491,7 +566,15 @@ async def recheck_all(
             )
             _ledger_event(decision_id, "failed", {"error": str(e)})
 
-            results.append({"strategy": s, "ok": False, "message": f"Trigger failed: {e}", "dag_run_id": None, "decision_id": decision_id})
+            results.append(
+                {
+                    "strategy": s,
+                    "ok": False,
+                    "message": f"Trigger failed: {e}",
+                    "dag_run_id": None,
+                    "decision_id": decision_id,
+                }
+            )
 
     succeeded = sum(1 for r in results if r["ok"])
     failed = len(results) - succeeded

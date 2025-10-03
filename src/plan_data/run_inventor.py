@@ -191,7 +191,11 @@ def run_inventor_and_decide(
             trace_id,
         )
         if applied:
-            LOGGER.info("[Decision] fallback_size_applied size=%s trace=%s", decision["size"], trace_id)
+            LOGGER.info(
+                "[Decision] fallback_size_applied size=%s trace=%s",
+                decision["size"],
+                trace_id,
+            )
     except Exception:
         # ログは落とさない
         pass
@@ -203,7 +207,7 @@ def run_inventor_and_decide(
         "decision": decision,
         "meta": {
             "created_at": _now_iso(),
-            "ranked_top_quality": getattr(ranked[0], "quality", None) if ranked else None,
+            "ranked_top_quality": (getattr(ranked[0], "quality", None) if ranked else None),
             "proposals_count": len(proposals),
         },
     }

@@ -1,0 +1,27 @@
+version: 1
+dataset:
+  split: {mode: "time", train: "T-24m..T-6m", valid: "T-6m..T-3m", test: "T-3m..T"}
+  fees:  {commission_bp: 1.0, slippage_bp: 1.0}
+  timezone: "UTC"
+backtest:
+  seed: 20240901
+  walk_forward: {window_m: 12, step_m: 3}
+  constraints: {max_positions: 5, max_leverage: 1.0}
+metrics:
+  primary: [sharpe, max_dd, win_rate, profit_factor]
+  compliance: [daily_dd_pct, total_dd_pct, open_positions_risk_pct]
+  calibration: [brier_score, ece_calibration]
+  robustness: [adversarial_pass_rate]
+logging:
+  predicted_prob_required: true
+  dataset_hash: "sha256(files)"
+  snapshot_eval_data: true
+adversarial_suite:
+  include: [noise_injection, time_shift, regime_flip]
+  pass_threshold: 0.7
+acceptance:
+  unit_test: "all_green"
+  risk: "no_violation"
+  performance: {sharpe_min: 1.0, pass_rate_min: 0.6}
+report:
+  must_include: [data_source, params, equity_curve, drawdown, trades_csv]

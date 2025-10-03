@@ -1,0 +1,127 @@
+# =======================================================
+# 自己改善提案ループ（Noctria 提案 → 人間承認）
+# =======================================================
+suggestion_registry:
+  schema_version: "1.1"
+  path: "docs/governance/suggestions/{YYYY}/{YYYYMMDD}_{slug}.md"
+
+  intake:
+    from: ["Noctria王","臣下AI","人間PM","CI（自動検知）"]  # 追加: CI起案も可
+    channel: ["PRコメント","CLI","GUIフォーム"]            # 追加
+    rate_limit_per_actor_per_day: 10                       # 迷惑起票防止
+    template:
+      title: "Suggestion — {slug}"
+      front_matter:
+        - "author: {actor}"
+        - "created_utc: {now}"
+        - "labels: {labels_csv}"
+        - "status: proposed"                                # proposed|accepted|rejected|deferred|in_progress|implemented|archived
+        - "links: {decision_ids?,change_ids?,issues?}"
+      body_fields:
+        - "背景"
+        - "提案内容"
+        - "影響範囲"
+        - "コスト/便益"
+        - "代替案"
+        - "採否基準"
+        - "想定リスク"
+        - "検証計画（メトリクス/期間/ガードレール）"      # 追加
+        - "ロールバック方針（必要なら）"                   # 追加
+
+  evaluation:
+    owner: "human_pm"
+    cadence: "weekly"
+    sla_hours:
+      triage: 72
+      decision_post: 120
+    scoring:                                             # 追加: 定量評価
+      model: "ICE"                                      # ICE or RICE
+      fields: { impact: "1-5", confidence: "0.0-1.0", ease: "1-5", reach?: "1-5" }
+      auto_estimate_hints: ["過去類似の効果量","工数実績","KPI弾性"]
+    risk_classification:
+      levels: ["low","medium","high"]
+      rules:
+        - "prod直結の自動化拡張は>=medium"
+        - "ガードレール緩和はhigh → Change Draft必須"
+
+  triage:
+    labels: ["gov/構成","kpi/改善","ops/効率","cost/削減","security"]
+    duplicate_detection:
+      enabled: true
+      method: "近傍ベクトル+正規化スラグ一致"            # 追加
+      action_on_hit: "既存票へマージし、重複をアーカイブ"
+    meeting_agenda_inject:
+      weekly: "cadence.weekly に『Suggestions』節を自動挿入"
+
+  adoption_rule:
+    requires_approval: true
+    approver: "human_pm"
+    secondary_approver_optional: "king"                  # 追加: highリスク時に要求
+    merge_target: "docs/governance/king_ops_prompt.yaml"
+    merge_method: "weekly_consolidation"
+    guardrails:
+      - "high リスクは document_templates.change_draft を同時起票"
+      - "KPIに直接影響する変更は testing.regression_min を必須参照"
+
+  implementation_tracking:
+    backlog_linkage: true
+    create_backlog_item_on_accept: true
+    backlog_category_map:
+      "kpi/改善": "calibration"
+      "ops/効率": "automation"
+      "gov/構成": "reporting"
+      "cost/削減": "automation"
+    fields_on_move_to_in_progress:
+      - "owner"
+      - "milestone"
+      - "expected_eta_utc"
+      - "test_ids"                                       # Txx/Rxx 紐付け
+
+  outcomes:                                              # 追加: 結果検証を強制
+    required_on_close: ["before_metrics","after_metrics","delta","学び","次アクション"]
+    metrics_examples: ["brier_score","ece_calibration","adversarial_pass_rate","ci_time_minutes"]
+    acceptance_gate:
+      min_observation_runs: 3
+      baseline: { window_runs: 5, robust_stat: "median" }
+      pass_if:
+        - "ECE <= baseline - 0.02 もしくは Brier <= baseline - 0.005"
+        - "adversarial_pass_rate の悪化なし"
+    archive_path: "docs/governance/suggestions/archive/{YYYY}/{id}.md"
+
+  automation_hooks:                                      # 追加: 自動化連携
+    ci_checks:
+      - "テンプレ必須項目の埋め忘れ検出"
+      - "duplicate_detection → 重複時は警告/マージ提案"
+    governance_bot:
+      create_pr_on_accept: true
+      update_king_ops_sections: true
+      post_weekly_digest: "docs/governance/review/weekly_{YYYY-WW}.md"
+
+  examples:
+    filename_pattern: "docs/governance/suggestions/2025/20250306_bins-12-guard-tighten.md"
+    minimal_markdown: |
+      ---
+      author: Noctria王
+      created_utc: 2025-03-06T09:10:00Z
+      labels: [kpi/改善]
+      status: proposed
+      links: []
+      ---
+      # 背景
+      直近3runでECEが0.38→0.41へ悪化。bins=10固定が疑わしい。
+      # 提案内容
+      binsをサンプル依存で12/15化し、guard_nll_deg=0.05を維持。
+      # 影響範囲
+      evaluate_veritas.py の校正パラメータ。
+      # コスト/便益
+      コスト: 0.5h、便益: ECE -0.02見込み。
+      # 代替案
+      閾値最適化のみ先行。
+      # 採否基準
+      3run平均でECE -0.02以上改善、Brier +0.005以内。
+      # 想定リスク
+      サンプル不足時のT不安定化。
+      # 検証計画（メトリクス/期間/ガードレール）
+      3 dry-runs、NLL≤+0.05、Adv.pass ≥0.40維持。
+      # ロールバック方針
+      prior_Tへ戻す。

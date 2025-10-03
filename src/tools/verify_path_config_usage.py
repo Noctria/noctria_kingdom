@@ -1,19 +1,19 @@
-import os
 import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TARGET_DIRS = ["core", "veritas", "execution", "airflow_docker", "scripts", "tests"]
 PATTERNS = [
-    r'["\']data/',                        # "data/" or 'data/'
-    r'["\']\.\/data/',                    # "./data/" (相対)
-    r'["\']/noctria_kingdom/',            # 絶対ハードコード
-    r'["\']/mnt/[a-z]/noctria-kingdom',   # WSLパス
-    r'sys\.path\.append\(',               # sys.path.append 使用の直接操作
-    r'\.\./',                             # 上位ディレクトリ参照
+    r'["\']data/',  # "data/" or 'data/'
+    r'["\']\.\/data/',  # "./data/" (相対)
+    r'["\']/noctria_kingdom/',  # 絶対ハードコード
+    r'["\']/mnt/[a-z]/noctria-kingdom',  # WSLパス
+    r"sys\.path\.append\(",  # sys.path.append 使用の直接操作
+    r"\.\./",  # 上位ディレクトリ参照
 ]
 
 EXCLUDE_FILES = ["core/path_config.py"]
+
 
 def scan_file(file_path: Path):
     violations = []
@@ -27,6 +27,7 @@ def scan_file(file_path: Path):
                     violations.append((lineno, line.strip()))
                     break
     return violations
+
 
 def scan_project():
     total_issues = 0
@@ -47,6 +48,7 @@ def scan_project():
         print("✅ All clean. No hardcoded paths found.")
     else:
         print(f"⚠️ Total issues detected: {total_issues}")
+
 
 if __name__ == "__main__":
     scan_project()

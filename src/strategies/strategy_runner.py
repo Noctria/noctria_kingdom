@@ -1,5 +1,6 @@
-from tradingview_fetcher import process_tradingview_data
 from strategy_optimizer import select_best_strategy, strategies_performance
+from tradingview_fetcher import process_tradingview_data
+
 
 def apply_tradingview_strategy(data):
     """TradingView市場データを活用し、戦略適用"""
@@ -13,7 +14,7 @@ def apply_tradingview_strategy(data):
         rsi_value = processed_data["RSI(14)"].iloc[-1]
         atr_value = processed_data["ATR(14)"].iloc[-1]  # 追加
         trend_sma = processed_data["SMA(50)"].iloc[-1]  # 追加
-        
+
         if rsi_value > 50 and trend_sma > processed_data["price"].iloc[-1] and atr_value < 1.5:
             processed_data["strategy_signal"] = "BUY"
         elif rsi_value < 50 and trend_sma < processed_data["price"].iloc[-1] and atr_value < 1.5:

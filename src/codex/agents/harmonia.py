@@ -1,14 +1,16 @@
 # src/codex/agents/harmonia.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Tuple, Iterable
-import textwrap
-import logging
-import os
-import json
-import math
 import datetime as dt
+import json
+import logging
+import math
+import os
+import textwrap
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from codex.prompts.loader import load_noctria_system_prompt  # ★ 共通SPローダー
 
 from .inventor import InventorOutput, PatchSuggestion
 
@@ -34,6 +36,11 @@ HARMONIA_SYSTEM_PROMPT = """\
 - "comments": 箇条書き
 """
 
+# ★ 共通System Prompt v1.5 を先頭に、Harmonia固有規範を後置
+COMMON_SP = load_noctria_system_prompt("v1.5")
+SYSTEM_PROMPT_HARMONIA = COMMON_SP + "\n\n" + HARMONIA_SYSTEM_PROMPT
+
+
 # =============================================================================
 # モード・重み設定
 # =============================================================================
@@ -48,6 +55,7 @@ _DEFAULT_WEIGHTS = {
     "risk": 0.60,
     "size": 0.25,
 }
+
 
 def _load_weights() -> Dict[str, float]:
     raw = os.getenv("HARMONIA_WEIGHTS", "").strip()
@@ -72,9 +80,9 @@ def _load_weights() -> Dict[str, float]:
 class ReviewResult:
     verdict: str  # "APPROVE" | "REVISE"
     comments: List[str]
-    generated_at: str = dt.datetime.now(
-        tz=dt.timezone(dt.timedelta(hours=9))
-    ).isoformat(timespec="seconds")
+    generated_at: str = dt.datetime.now(tz=dt.timezone(dt.timedelta(hours=9))).isoformat(
+        timespec="seconds"
+    )
     trace_id: Optional[str] = None
 
 
@@ -89,7 +97,8 @@ class HarmoniaOrdinis:
     # ===== 低レベルチェック =====
     def _check_minimal_change(self, ps: PatchSuggestion) -> Optional[str]:
         if not ps.pseudo_diff or ps.pseudo_diff.strip() in {
-            "(N/A)", "(N/A: まず再現最小化とデバッグログ挿入で原因特定)"
+            "(N/A)",
+            "(N/A: まず再現最小化とデバッグログ挿入で原因特定)",
         }:
             return f"`{ps.file}` の差分が不明瞭。最小差分の擬似diffを提示してください。"
         if "from .* import *" in ps.pseudo_diff:
@@ -112,7 +121,9 @@ class HarmoniaOrdinis:
         if "strategy_adapter.py" in ps.file and (
             "dict()" in ps.pseudo_diff or "model_dump" in ps.pseudo_diff
         ):
-            notes.append("pydantic v1 (`.dict()`) / v2 (`.model_dump()`) 両対応メモを備考に追記してください。")
+            notes.append(
+                "pydantic v1 (`.dict()`) / v2 (`.model_dump()`) 両対応メモを備考に追記してください。"
+            )
         return notes
 
     # ===== 構造化レビュー =====
@@ -126,7 +137,9 @@ class HarmoniaOrdinis:
 
         for ps in inventor_out.patch_suggestions:
             if ps.file.startswith("(検出できず)"):
-                comments.append("修正対象の特定が曖昧。具体ファイル・関数・差分を明記して再提案を。")
+                comments.append(
+                    "修正対象の特定が曖昧。具体ファイル・関数・差分を明記して再提案を。"
+                )
                 verdict = "REVISE"
 
             msg = self._check_minimal_change(ps)
@@ -151,11 +164,11 @@ class HarmoniaOrdinis:
 
         LOGGER.info(
             "[Harmonia] review_structured verdict=%s comments=%d trace_id=%s",
-            verdict, len(comments), inventor_out.trace_id,
+            verdict,
+            len(comments),
+            inventor_out.trace_id,
         )
-        return ReviewResult(
-            verdict=verdict, comments=comments, trace_id=inventor_out.trace_id
-        )
+        return ReviewResult(verdict=verdict, comments=comments, trace_id=inventor_out.trace_id)
 
     # ===== Markdown レビュー（mini_loop 用） =====
     def review_markdown(
@@ -183,26 +196,33 @@ class HarmoniaOrdinis:
             return "📐 方針:\n" + "\n".join(f"- {p}" for p in principles)
 
         def _check_repro() -> str:
-            ok = "pytest -q -k" in inventor_suggestions or "python -m codex.mini_loop" in inventor_suggestions
+            ok = (
+                "pytest -q -k" in inventor_suggestions
+                or "python -m codex.mini_loop" in inventor_suggestions
+            )
             return "✅ 再現手順あり。" if ok else "⚠️ 再現手順不足。"
 
         header = "# 🧭 Harmonia Ordinis — レビュー（Lv1）\n\n"
         if not failures:
             return header + "✅ 失敗なし。レビュー不要。\n"
 
-        body = "\n\n".join([
-            _check_completeness(),
-            _check_side_effects(),
-            _check_guidelines(),
-            _check_repro(),
-        ])
-        tail = textwrap.dedent("""
+        body = "\n\n".join(
+            [
+                _check_completeness(),
+                _check_side_effects(),
+                _check_guidelines(),
+                _check_repro(),
+            ]
+        )
+        tail = textwrap.dedent(
+            """
         ---
         #### 次のアクション
         1. 影響範囲の小さい修正を優先
         2. 失敗再現の最小テストを追加
         3. `pytest -q --maxfail=20 --durations=10` で全体再実行
-        """)
+        """
+        )
         return header + body + "\n" + tail
 
     # ===== 構造化結果 → Markdown =====
@@ -220,43 +240,72 @@ class HarmoniaOrdinis:
 
 
 # =============================================================================
-# 既存互換 API
+# 既存互換 API（LLMを使うレビュー：System=共通SP+Harmonia規範）
 # =============================================================================
 def _api_review(inventor_out: InventorOutput) -> Optional[ReviewResult]:
+    # OpenAIクライアントの取得（新API優先、旧APIにフォールバック）
+    client = None
     try:
-        import openai  # type: ignore
+        from openai import OpenAI  # type: ignore
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA"))
     except Exception:
-        LOGGER.warning("openai 未導入のため APIレビューはスキップします。")
-        return None
+        try:
+            import openai  # type: ignore
+
+            openai.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")
+            client = openai
+        except Exception:
+            LOGGER.warning("openai クライアントを初期化できないため APIレビューはスキップします。")
+            return None
 
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")
-    if not api_key:
+    if not (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")):
         LOGGER.warning("OPENAI_API_KEY が未設定のため APIレビューはスキップします。")
         return None
 
     try:
         payload = {
             "patch_count": len(getattr(inventor_out, "patch_suggestions", []) or []),
-            "followup_tests": bool(getattr(inventor_out, "followup_tests", None)),
-            "files": [getattr(ps, "file", "") for ps in (getattr(inventor_out, "patch_suggestions", []) or [])][:10],
+            "has_followup_tests": bool(getattr(inventor_out, "followup_tests", None)),
+            "files": [
+                getattr(ps, "file", "")
+                for ps in (getattr(inventor_out, "patch_suggestions", []) or [])
+            ][:12],
+            "trace_id": inventor_out.trace_id,
         }
-        resp = openai.chat.completions.create(  # type: ignore
-            model=model,
-            messages=[
-                {"role": "system", "content": HARMONIA_SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ],
-            temperature=0.2,
-            max_tokens=400,
-        )
-        text = (resp.choices[0].message.content or "").strip()
+
+        # 新API経路
+        if hasattr(client, "chat") and hasattr(client.chat, "completions"):
+            resp = client.chat.completions.create(  # type: ignore
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT_HARMONIA},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                temperature=0.2,
+                max_tokens=400,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+        else:
+            # 旧API互換（念のため）
+            resp = client.ChatCompletion.create(  # type: ignore
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT_HARMONIA},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                temperature=0.2,
+                max_tokens=400,
+            )
+            text = (resp["choices"][0]["message"]["content"] or "").strip()
+
     except Exception as e:
         LOGGER.exception("APIレビューに失敗: %s", e)
         return None
 
     verdict = "APPROVE" if "approve" in text.lower() else "REVISE"
-    comments = [c for c in text.split("\n") if c.strip()][:20]
+    comments = [c for c in text.split("\n") if c.strip()][:40]
     return ReviewResult(verdict=verdict, comments=comments, trace_id=inventor_out.trace_id)
 
 
@@ -386,7 +435,8 @@ def rerank_candidates(
         try:
             LOGGER.info(
                 "[Harmonia] reranked(simple) %d -> %d top_intent=%s trace=%s",
-                len(base_list), len(ranked),
+                len(base_list),
+                len(ranked),
                 _intent_for_bonus(ranked[0]) if ranked else None,
                 ctx.get("trace_id"),
             )
@@ -412,7 +462,8 @@ def rerank_candidates(
     try:
         LOGGER.info(
             "[Harmonia] reranked(weighted) %d -> %d top_scores=%s",
-            len(base_list), len(ranked_w),
+            len(base_list),
+            len(ranked_w),
             [getattr(p, "__harmonia_score", None) for p in ranked_w[:3]],
         )
     except Exception:

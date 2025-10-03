@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+import importlib
+import pkgutil
+from typing import List
+from fastapi import APIRouter
+
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -7,8 +14,6 @@
 - routes/ 以下の各モジュールから `router` を自動で拾います
 """
 
-import sys
-from pathlib import Path
 
 # ────────────────────────────────────────────────────────
 # 🛠️ 最初に一度だけ src/ をモジュール検索パスに追加
@@ -19,10 +24,6 @@ src_dir = Path(__file__).resolve().parents[2] / "src"  # src/を明示的に設�
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-import importlib
-import pkgutil
-from fastapi import APIRouter
-from typing import List
 
 # ✅ router 一覧（FastAPI本体に登録されるルーター群）
 routers: List[APIRouter] = []
@@ -41,4 +42,3 @@ for finder, module_name, ispkg in pkgutil.iter_modules(__path__):
     if isinstance(router, APIRouter):
         routers.append(router)
         print(f"🔍 loaded router from {full_module_name}")
-

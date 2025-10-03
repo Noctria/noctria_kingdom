@@ -6,6 +6,7 @@
 """
 
 import sys
+
 from core.strategy_evaluator import evaluate_strategy
 
 

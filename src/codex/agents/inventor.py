@@ -1,17 +1,29 @@
 # src/codex/agents/inventor.py
+# -*- coding: utf-8 -*-
+"""
+Inventor Scriptus — 失敗テストに対する最小差分の修正案を提示する開発者AI。
+- 共通 System Prompt v1.5 を先頭に、Inventor固有規範を後置して LLM を呼び出す経路を用意
+- LLMを使わないヒューリスティック経路も維持（既存互換）
+- Ruffレポート連携の軽いヘルパも提供
+"""
+
 from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import textwrap
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# =========================
-# 既存: システムプロンプト
-# =========================
+from codex.prompts.loader import load_noctria_system_prompt
+
+# =============================================================================
+# 共通SP + Inventor固有ルール（System Prompt）
+# =============================================================================
+
 INVENTOR_SYSTEM_PROMPT = """\
 あなたは Noctria 王国の開発者AI『Inventor Scriptus』です。
 役割: 失敗したテストに対し、原因仮説→修正方針→具体的な変更点を提案します。
@@ -19,16 +31,28 @@ INVENTOR_SYSTEM_PROMPT = """\
 - いきなり大改修せず、最小差分でテストを通す方針を優先
 - 王国のコーディング規約（contractsの後方互換、observability統一）を尊重
 - 変更は「パッチ候補（擬似diff）」「対象ファイル」「対象関数」を明記して提示
-出力形式:
-- "summary": 要約
-- "root_causes": 箇条書き
-- "patch_suggestions": [{file, function, pseudo_diff, rationale}]
-- "followup_tests": 追試案
+出力形式(JSON必須):
+{
+  "summary": "要約",
+  "root_causes": ["..."],
+  "patch_suggestions": [{"file": "...", "function": "...", "pseudo_diff": "...", "rationale": "..."}],
+  "followup_tests": ["..."]
+}
 """
 
-# =========================
-# 既存: データモデル (+最小強化)
-# =========================
+# 共通 System Prompt v1.5 を先頭に、Inventor用の規範を後置
+COMMON_SP = load_noctria_system_prompt("v1.5")
+SYSTEM_PROMPT_INVENTOR = COMMON_SP + "\n\n" + INVENTOR_SYSTEM_PROMPT
+
+# 使用モデル（環境変数優先）
+DEFAULT_MODEL = os.getenv("NOCTRIA_GPT_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+
+
+# =============================================================================
+# データモデル
+# =============================================================================
+
+
 @dataclass
 class PatchSuggestion:
     file: str
@@ -43,20 +67,16 @@ class InventorOutput:
     root_causes: List[str]
     patch_suggestions: List[PatchSuggestion]
     followup_tests: List[str]
-
-    # ★ 最小強化: 生成時刻とトレースID（観測性）
     generated_at: str
     trace_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        # asdict で十分（PatchSuggestion も展開される）
         return asdict(self)
 
     def to_markdown(self) -> str:
         lines: List[str] = []
         lines.append("# 🛠️ Inventor Scriptus — 修正案（Lv1）")
 
-        # 既定は JST
         lines.append(f"\n- Generated: `{self.generated_at}`\n")
         if self.trace_id:
             lines.append(f"- Trace ID: `{self.trace_id}`\n")
@@ -89,9 +109,91 @@ class InventorOutput:
         return "\n".join(lines)
 
 
-# =====================================
-# 新規: ヒューリスティック & 互換クラス
-# =====================================
+# =============================================================================
+# LLM呼び出し（新API/旧API両対応・JSON安全化）
+# =============================================================================
+
+
+def _choose_client():
+    """
+    OpenAI 新API優先（openai>=1.x の OpenAI クライアント）→ 失敗時に旧APIへフォールバック。
+    戻り値:
+      ("new", client) or ("old", client) or (None, None)
+    """
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY_NOCTRIA")
+    if not api_key:
+        return None, None
+    try:
+        from openai import OpenAI  # type: ignore
+
+        return "new", OpenAI(api_key=api_key)
+    except Exception:
+        try:
+            import openai  # type: ignore
+
+            openai.api_key = api_key
+            return "old", openai
+        except Exception:
+            return None, None
+
+
+def call_inventor_llm(user_prompt: str, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
+    """
+    - System: SYSTEM_PROMPT_INVENTOR（共通SP v1.5 + Inventor規範）
+    - User:   失敗サマリ/トレース/文脈 など
+    返り値: JSON(辞書) — 失敗時は {"error": "..."} を返す
+    """
+    mode, client = _choose_client()
+    if client is None:
+        return {"error": "OPENAI_API_KEY 未設定またはクライアント初期化失敗"}
+
+    try:
+        if mode == "new":
+            resp = client.chat.completions.create(  # type: ignore
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT_INVENTOR},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.0,
+                response_format={"type": "json_object"},
+            )
+            txt = (resp.choices[0].message.content or "{}").strip()
+        else:
+            # 旧API
+            resp = client.ChatCompletion.create(  # type: ignore
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT_INVENTOR},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.0,
+            )
+            txt = (resp["choices"][0]["message"]["content"] or "{}").strip()
+
+        # JSONとして安全に解釈（壊れていた場合は最低限の骨組みに落とす）
+        try:
+            data = json.loads(txt)
+        except Exception:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        # 最低限のキーを確保
+        data.setdefault("summary", "")
+        data.setdefault("root_causes", [])
+        data.setdefault("patch_suggestions", [])
+        data.setdefault("followup_tests", [])
+        return data
+
+    except Exception as e:
+        return {"error": f"LLM call failed: {type(e).__name__}: {e}"}
+
+
+# =============================================================================
+# 既存ヒューリスティック版（非LLM） + 互換API
+# =============================================================================
+
+
 @dataclass
 class _FailureCase:
     nodeid: str
@@ -104,8 +206,8 @@ class InventorScriptus:
     """
     - Lv1 ヒューリスティック提案器
     - 互換API:
-        * propose_fixes_structured(pytest_result) -> InventorOutput  （既存の構造化呼び出し向け）
-        * propose_fixes(failures, context) -> str                      （mini_loop の Markdown 出力向け）
+        * propose_fixes_structured(pytest_result) -> InventorOutput  （構造化）
+        * propose_fixes(failures, context) -> str                      （Markdown）
     - 追加API（ruff連携・最小実装）:
         * load_ruff_report(report_path) -> None
         * summarize_ruff() -> str
@@ -114,7 +216,6 @@ class InventorScriptus:
 
     # ====== ruff runner 連携（追加） ======
     def __init__(self) -> None:
-        # ruff レポートを読み込んだ結果を保持（任意）
         self._ruff_report: Dict[str, Any] = {}
 
     def load_ruff_report(self, report_path: str | Path) -> None:
@@ -148,9 +249,7 @@ class InventorScriptus:
         )
 
     def next_action_from_ruff(self) -> str:
-        """
-        Ruff の returncode / patch 有無から単純な次アクションを提案。
-        """
+        """Ruff の returncode / patch 有無から単純な次アクションを提案。"""
         if not self._ruff_report:
             return "No ruff report loaded."
         rc = self._ruff_report.get("returncode")
@@ -247,7 +346,7 @@ class InventorScriptus:
             rationale="`pytest -q -k <nodeid>` で特定、ログ追加、最小差分での修正を優先。",
         )
 
-    # ====== 既存の具体例ルール（プロジェクト固有） ======
+    # ====== プロジェクト固有の例 ======
     def _project_specific_rule(self, name: str, tb: str) -> Optional[PatchSuggestion]:
         # 例: Noctus/FeatureContext パターン
         if "test_noctus_gate_block" in name and "AttributeError" in tb and "context.get" in tb:
@@ -281,10 +380,10 @@ class InventorScriptus:
             )
         return None
 
-    # ====== 構造化出力（既存互換 + 最小強化） ======
+    # ====== 構造化出力 ======
     def propose_fixes_structured(self, pytest_result: Dict[str, Any]) -> InventorOutput:
         """
-        pytest_result 例（柔軟に対応）:
+        pytest_result 例:
           {
             "failures": [{"nodeid": "...", "traceback": "...", "message": "..."}],
             "trace_id": "...",  # 任意
@@ -328,7 +427,6 @@ class InventorScriptus:
         trace_id = pytest_result.get("trace_id")
 
         if not failures_in:
-            # 失敗なしでも観測情報は付けて返す
             return InventorOutput(
                 summary="失敗なし。修正提案は不要です。",
                 root_causes=[],
@@ -338,7 +436,7 @@ class InventorScriptus:
                 trace_id=trace_id,
             )
 
-        # ★ 最小強化: followup_tests を必ず最低1件は入れる
+        # followupは最低1件は入れる
         followups: List[str] = [
             "pytest -q -k <failing-nodeid>",
             "pytest -q tests/test_quality_gate_alerts.py tests/test_noctus_gate_block.py",
@@ -347,16 +445,16 @@ class InventorScriptus:
         return InventorOutput(
             summary="失敗テストに対する最小修正案の下書き",
             root_causes=root_causes,
-            patch_suggestions=suggestions if suggestions else [self._generic_suggestion("")],
-            followup_tests=followups,  # ← 空にならない
+            patch_suggestions=(suggestions if suggestions else [self._generic_suggestion("")]),
+            followup_tests=followups,
             generated_at=generated_at,
             trace_id=trace_id,
         )
 
-    # ====== Markdown 出力（mini_loop 用の互換API） ======
+    # ====== Markdown 出力（mini_loop 向け） ======
     def propose_fixes(self, failures: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
         """
-        mini_loop 互換: 失敗配列 + サマリコンテキストを受け取り、Markdown を返す
+        失敗配列 + サマリ文脈を受け取り、Markdown を返す。
         failures: [{nodeid, outcome, duration, traceback}, ...]
         """
         fs = [
@@ -371,10 +469,10 @@ class InventorScriptus:
 
         header = (
             "# 🛠️ Inventor Scriptus — 修正案（Lv1）\n\n"
-            f"- Generated: `{context.get('generated_at','')}`\n"
-            f"- Pytest: total={context.get('pytest_summary',{}).get('total',0)}, "
-            f"failed={context.get('pytest_summary',{}).get('failed',0)}, "
-            f"errors={context.get('pytest_summary',{}).get('errors',0)}\n"
+            f"- Generated: `{context.get('generated_at', '')}`\n"
+            f"- Pytest: total={context.get('pytest_summary', {}).get('total', 0)}, "
+            f"failed={context.get('pytest_summary', {}).get('failed', 0)}, "
+            f"errors={context.get('pytest_summary', {}).get('errors', 0)}\n"
         )
         if context.get("trace_id"):
             header += f"- Trace ID: `{context.get('trace_id')}`\n"
@@ -428,9 +526,68 @@ class InventorScriptus:
         return header + "\n".join(blocks) + tail
 
 
-# ======================================================
+# =============================================================================
+# LLMルート（必要に応じて使う）
+# =============================================================================
+
+
+def propose_fixes_with_llm(
+    pytest_result: Dict[str, Any], model: str = DEFAULT_MODEL
+) -> InventorOutput:
+    """
+    LLMでの提案ルート。LLMが使えない/失敗時は安全側の空提案を返す。
+    """
+    failures = pytest_result.get("failures") or pytest_result.get("cases") or []
+    tb_tail = "\n\n".join((f.get("traceback", "") or "")[-2000:] for f in failures[:5])
+    jst = dt.timezone(dt.timedelta(hours=9))
+    generated_at = dt.datetime.now(tz=jst).isoformat(timespec="seconds")
+
+    user_prompt = textwrap.dedent(f"""\
+    次のpytest失敗の要約から、最小差分の修正案をJSONで返してください。
+    - 返却スキーマは system prompt の出力形式に従うこと
+    - テストや契約の後方互換を最優先
+    - 影響範囲は最小限
+
+    ==== Tracebacks (tail) ====
+    {tb_tail}
+    """)
+
+    res = call_inventor_llm(user_prompt, model=model)
+    if "error" in res:
+        return InventorOutput(
+            summary=f"LLM呼び出しに失敗: {res['error']}",
+            root_causes=[],
+            patch_suggestions=[],
+            followup_tests=["pytest -q -k <failing-nodeid>"],
+            generated_at=generated_at,
+            trace_id=pytest_result.get("trace_id"),
+        )
+
+    ps = [
+        PatchSuggestion(
+            file=p.get("file", ""),
+            function=p.get("function", ""),
+            pseudo_diff=p.get("pseudo_diff", ""),
+            rationale=p.get("rationale", ""),
+        )
+        for p in res.get("patch_suggestions", []) or []
+    ]
+
+    return InventorOutput(
+        summary=res.get("summary", ""),
+        root_causes=res.get("root_causes", []) or [],
+        patch_suggestions=ps,
+        followup_tests=res.get("followup_tests", []) or ["pytest -q -k <failing-nodeid>"],
+        generated_at=generated_at,
+        trace_id=pytest_result.get("trace_id"),
+    )
+
+
+# =============================================================================
 # 既存互換: モジュールレベル関数（壊さないために残す）
-# ======================================================
+# =============================================================================
+
+
 def propose_fixes(pytest_result: Dict[str, Any]) -> InventorOutput:
     """
     既存呼び出し互換の関数。内部で InventorScriptus を使って構造化結果を返す。

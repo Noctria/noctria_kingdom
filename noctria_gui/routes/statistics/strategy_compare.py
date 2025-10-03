@@ -7,16 +7,16 @@
 - compare_form.html + compare_result.html を統一運用
 """
 
-from fastapi import APIRouter, Request, Form
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
-from typing import List, Dict, Any
-import json
-import os
-import logging
-
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, ACT_LOG_DIR
+from src.core.path_config import ACT_LOG_DIR, NOCTRIA_GUI_TEMPLATES_DIR
 
 router = APIRouter(tags=["statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
@@ -49,21 +49,23 @@ async def compare_form(request: Request):
         name = log.get("strategy_name")
         if not name:
             continue
-        strategies.append({
-            "strategy": name,
-            "win_rate": log.get("score", {}).get("win_rate", 0),
-            "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
-            "num_trades": log.get("score", {}).get("num_trades", 0)
-        })
+        strategies.append(
+            {
+                "strategy": name,
+                "win_rate": log.get("score", {}).get("win_rate", 0),
+                "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
+                "num_trades": log.get("score", {}).get("num_trades", 0),
+            }
+        )
 
     # 重複除去（戦略名で一意化）
     unique = {s["strategy"]: s for s in strategies}
     strategies = list(unique.values())
 
-    return templates.TemplateResponse("strategies/compare_form.html", {
-        "request": request,
-        "strategies": sorted(strategies, key=lambda x: x["strategy"])
-    })
+    return templates.TemplateResponse(
+        "strategies/compare_form.html",
+        {"request": request, "strategies": sorted(strategies, key=lambda x: x["strategy"])},
+    )
 
 
 @router.post("/compare/render", response_class=HTMLResponse)
@@ -77,17 +79,18 @@ async def render_comparison(request: Request, selected: List[str] = Form(...)):
     for log in logs:
         name = log.get("strategy_name")
         if name in selected:
-            filtered.append({
-                "strategy": name,
-                "win_rate": log.get("score", {}).get("win_rate", 0),
-                "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
-                "num_trades": log.get("score", {}).get("num_trades", 0)
-            })
+            filtered.append(
+                {
+                    "strategy": name,
+                    "win_rate": log.get("score", {}).get("win_rate", 0),
+                    "max_drawdown": log.get("score", {}).get("max_drawdown", 0),
+                    "num_trades": log.get("score", {}).get("num_trades", 0),
+                }
+            )
 
-    return templates.TemplateResponse("strategies/compare_result.html", {
-        "request": request,
-        "strategies": filtered
-    })
+    return templates.TemplateResponse(
+        "strategies/compare_result.html", {"request": request, "strategies": filtered}
+    )
 
 
 @router.get("/strategy/compare")

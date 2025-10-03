@@ -1,10 +1,10 @@
 # codex/tools/patch_gen.py
 from __future__ import annotations
-import os
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Iterable, Tuple
+from typing import List
 
 from codex.agents.inventor import InventorOutput, PatchSuggestion
 
@@ -44,12 +44,16 @@ def _normalize_pseudo_diff(diff_text: str) -> str:
     if not t:
         return ""
     lines = t.splitlines()
-    has_headers = any(l.startswith("--- ") for l in lines) and any(l.startswith("+++ ") for l in lines)
+    has_headers = any(l.startswith("--- ") for l in lines) and any(
+        l.startswith("+++ ") for l in lines
+    )
     if has_headers:
         return t + "\n"
     # ヘッダ無し → そのままブロックとして保存（後段の適用器は対象外）
     wrapped = []
-    wrapped.append("# NOTE: This patch was generated from a pseudo diff without unified-diff headers.")
+    wrapped.append(
+        "# NOTE: This patch was generated from a pseudo diff without unified-diff headers."
+    )
     wrapped.append("#       Please review and convert to a proper unified diff before applying.")
     wrapped.append("")
     wrapped.extend(lines)

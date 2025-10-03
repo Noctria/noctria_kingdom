@@ -17,6 +17,7 @@ from core.path_config import STRATEGIES_DIR, LOGS_DIR, DATA_DIR
 from core.market_loader import load_market_data
 from core.strategy_evaluator import evaluate_strategy, is_strategy_adopted
 
+
 def main():
     if len(sys.argv) < 2:
         print("❌ 戦略ファイル名（例: veritas_strategy_20250710_0900.py）を引数に指定してください")
@@ -96,6 +97,7 @@ def main():
         json.dump(pdca_data, f, indent=2, ensure_ascii=False)
 
     print(f"📄 PDCAログ更新: {pdca_log_path}")
+
 
 if __name__ == "__main__":
     main()

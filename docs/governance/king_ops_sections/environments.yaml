@@ -1,0 +1,116 @@
+# =======================================================
+# Environments
+# =======================================================
+environments:
+  # 共有デフォルト（各envはここを継承して上書き）
+  _base:
+    health:
+      api: "/health"
+      openapi: "/openapi.json"
+    auth:
+      required: false           # prodでtrueへ上書き
+      type: "bearer"            # または "mtls"
+      scopes: ["predict:read"]
+    tls:
+      enforce_https: false      # prodでtrueへ上書き
+      hsts: false               # prodでtrueへ上書き
+    rate_limit:
+      rps: 0                    # 0は無制限。stg/prodで値設定
+      burst: 0
+    breaker:
+      enabled: false
+      error_rate_threshold_pct: 5
+      sleep_window_sec: 30
+    logging:
+      format: "console"         # prodで "json"
+      pii_redaction: true
+    feature_flags:
+      allow: []                 # 明示allow
+      deny: []                  # 明示deny（deny優先）
+    monitoring:
+      synthetic:
+        enabled: true
+        probes:
+          - name: "api_health"
+            method: "GET"
+            path: "/health"
+            expect_status: 200
+          - name: "predict_smoke"
+            method: "POST"
+            path: "/predict"
+            expect_status_in: [200, 422]
+            p95_ms_max: 300
+    rollout_ring: "stg"         # dev/stg/prodで上書き
+    maintenance_windows:
+      - cron: "0 9 * * *"       # 09:00 UTCに20分
+        duration_minutes: 20
+
+  dev:
+    <<: *_base
+    api_base: "http://localhost:8000"
+    gui_base: "http://localhost:5173"
+    notes: "個人PC想定"
+    logging: { format: "console", pii_redaction: true }
+    feature_flags:
+      allow: ["debug_metrics"]
+    monitoring: { synthetic: { enabled: false } }   # ローカルは監視オフ
+    rollout_ring: "dev"
+
+  stg:
+    <<: *_base
+    api_base: "https://stg.api.noctria.local"
+    gui_base: "https://stg.gui.noctria.local"
+    notes: "契約/負荷/回帰の主戦"
+    auth: { required: true, type: "bearer", scopes: ["predict:read"] }
+    tls: { enforce_https: true, hsts: true }
+    logging: { format: "json", pii_redaction: true }
+    rate_limit: { rps: 20, burst: 40 }
+    breaker: { enabled: true, error_rate_threshold_pct: 10, sleep_window_sec: 15 }
+    feature_flags:
+      allow: ["rate_limit","logging_json"]
+    monitoring:
+      synthetic:
+        enabled: true
+        probes:
+          - name: "api_health"
+            method: "GET"
+            path: "/health"
+            expect_status: 200
+          - name: "openapi_contract"
+            method: "GET"
+            path: "/openapi.json"
+            expect_status: 200
+          - name: "predict_smoke"
+            method: "POST"
+            path: "/predict"
+            expect_status_in: [200, 422]
+            p95_ms_max: 300
+    rollout_ring: "stg"
+
+  prod:
+    <<: *_base
+    api_base: "https://api.noctria.example"
+    gui_base: "https://app.noctria.example"
+    notes: "本番。変更はgate通過時のみ"
+    auth: { required: true, type: "bearer", scopes: ["predict:read"] }
+    tls: { enforce_https: true, hsts: true }
+    logging: { format: "json", pii_redaction: true }
+    rate_limit: { rps: 50, burst: 100 }
+    breaker: { enabled: true, error_rate_threshold_pct: 5, sleep_window_sec: 30 }
+    feature_flags:
+      allow: ["rate_limit","audit_log","breaker"]
+      deny: ["debug_metrics"]   # 本番で明示禁止
+    monitoring:
+      synthetic:
+        enabled: true
+        probes:
+          - name: "api_health"
+            method: "GET"
+            path: "/health"
+            expect_status: 200
+          - name: "predict_slo_guard"
+            method: "POST"
+            path: "/predict"
+            expect_status_in: [200, 422]
+            p95_ms_max: 300
+    rollout_ring: "prod"

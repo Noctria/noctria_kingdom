@@ -9,8 +9,7 @@
 import json
 from collections import defaultdict
 from statistics import mean
-from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 from src.core.path_config import STRATEGIES_DIR
 
@@ -35,13 +34,15 @@ def summarize_by_tag(logs: List[Dict]) -> List[Dict]:
     """
     🧠 タグごとに統計情報を集計
     """
-    tag_summary = defaultdict(lambda: {
-        "count": 0,
-        "win_rates": [],
-        "trade_counts": [],
-        "max_drawdowns": [],
-        "strategy_names": set(),
-    })
+    tag_summary = defaultdict(
+        lambda: {
+            "count": 0,
+            "win_rates": [],
+            "trade_counts": [],
+            "max_drawdowns": [],
+            "strategy_names": set(),
+        }
+    )
 
     for log in logs:
         tags = log.get("tags", [])
@@ -67,14 +68,22 @@ def summarize_by_tag(logs: List[Dict]) -> List[Dict]:
 
     summary_data = []
     for tag, stats in tag_summary.items():
-        summary_data.append({
-            "tag": tag,
-            "strategy_count": stats["count"],
-            "average_win_rate": round(mean(stats["win_rates"]), 2) if stats["win_rates"] else 0.0,
-            "average_trade_count": round(mean(stats["trade_counts"]), 1) if stats["trade_counts"] else 0.0,
-            "average_max_drawdown": round(mean(stats["max_drawdowns"]), 2) if stats["max_drawdowns"] else 0.0,
-            "sample_strategies": sorted(list(stats["strategy_names"]))[:5]
-        })
+        summary_data.append(
+            {
+                "tag": tag,
+                "strategy_count": stats["count"],
+                "average_win_rate": round(mean(stats["win_rates"]), 2)
+                if stats["win_rates"]
+                else 0.0,
+                "average_trade_count": round(mean(stats["trade_counts"]), 1)
+                if stats["trade_counts"]
+                else 0.0,
+                "average_max_drawdown": round(mean(stats["max_drawdowns"]), 2)
+                if stats["max_drawdowns"]
+                else 0.0,
+                "sample_strategies": sorted(list(stats["strategy_names"]))[:5],
+            }
+        )
 
     # 🧭 表示を戦略数の多い順に並べ替え
     return sorted(summary_data, key=lambda x: x["strategy_count"], reverse=True)

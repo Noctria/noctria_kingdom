@@ -1,0 +1,43 @@
+# =======================================================
+# 付録：Handoverの“警報追記”テンプレ（改良版）
+# =======================================================
+handover_alert_appendix:
+  section_title: "🔔 警報サマリ"
+
+  # デフォルトは箇条書き。テンプレ変数は generator 側で埋め込み。
+  bullets:
+    - "- 日付/Run: {date} / {run_id}"
+    - "- 種別: {level} / 指標: {metric}"
+    - "- 値: {latest:.4f} / 基準({win}r {stat}): {base:.4f} / 偏差: {dev:+.4f}"
+    - "- 原因仮説: {triage}（根拠: {evidence_short}）"
+    - "- 明日の一手: {next_step}"
+    - "- 成功条件: {success_criteria_short}"
+    - "- エスカレーション: {escalation_action}"
+    - "- 変更管理: {change_id_hint}"
+
+  # 表形式で出したい場合のオプション（必要なときだけ使用）
+  table:
+    header: "| 指標 | 最新値 | 基準({win}r {stat}) | 偏差 | 種別 | 仮説 | 次アクション |"
+    separator: "|---|---:|---:|---:|:--:|---|---|"
+    row_template: "| {metric} | {latest:.4f} | {base:.4f} | {dev:+.4f} | {level} | {triage} | {next_step} |"
+
+  # レンダリングモードの指定（'bullets' or 'table'）。未指定なら bullets を推奨。
+  render_mode_default: "bullets"
+
+  # 候補となる変数一覧（生成器のバリデーション用メモ）
+  variables_required:
+    - date
+    - run_id
+    - level
+    - metric
+    - latest
+    - base
+    - dev
+    - win
+    - stat
+    - triage
+    - evidence_short
+    - next_step
+    - success_criteria_short
+    - escalation_action
+    - change_id_hint

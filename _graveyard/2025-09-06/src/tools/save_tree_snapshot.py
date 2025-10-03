@@ -7,6 +7,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[1]
 OUTPUT_FILE = BASE_DIR / "docs" / "diagnostics" / "tree_snapshot.txt"
 
+
 def save_tree_snapshot():
     print("🌲 tree -L 3 を取得中...")
 
@@ -19,7 +20,7 @@ def save_tree_snapshot():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            check=True
+            check=True,
         )
 
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
@@ -32,6 +33,7 @@ def save_tree_snapshot():
         print("   sudo apt install tree")
     except subprocess.CalledProcessError as e:
         print(f"⚠️ エラー発生:\n{e.stderr}")
+
 
 if __name__ == "__main__":
     save_tree_snapshot()

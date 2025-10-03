@@ -4,10 +4,13 @@
 import json
 import os
 
+
 def apply_best_params():
     best_params_file = "/opt/airflow/logs/best_params.json"
     if not os.path.exists(best_params_file):
-        print(f"❌ ファイルが存在しません: {best_params_file}。最適化タスクがまだ完了していない可能性があります。スキップします。")
+        print(
+            f"❌ ファイルが存在しません: {best_params_file}。最適化タスクがまだ完了していない可能性があります。スキップします。"
+        )
         return
 
     # best_params.json の読み込み
@@ -21,11 +24,13 @@ def apply_best_params():
     # 例: EA設定ファイルの更新、トレード環境への反映 など
     print("⚡ Levia: 最適化内容を王国の戦闘システムに即時適用しました。")
 
+
 def main():
     print("👑 王Noctria: Leviaよ、Prometheusが見つけた最適な戦略を即時適用せよ！")
     print("⚡ Levia: 最適化された戦略を王国の戦闘システムに反映します。")
     apply_best_params()
     print("✅ 王Noctria: Leviaの任務完了。王国は更なる高みへ！")
+
 
 if __name__ == "__main__":
     main()

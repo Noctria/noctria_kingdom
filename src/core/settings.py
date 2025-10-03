@@ -1,6 +1,7 @@
 # core/settings.py
 
 import os
+
 from dotenv import load_dotenv
 
 # .env を読み込む

@@ -1,5 +1,6 @@
 from model_design import build_model
 
+
 def test_build_model():
     """Test model building."""
     try:

@@ -1,8 +1,8 @@
 # airflow_docker/dags/inventor_pipeline_dag.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import uuid
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from airflow import DAG
@@ -14,6 +14,7 @@ default_args = {
     "retries": 1,
     "retry_delay": timedelta(minutes=1),
 }
+
 
 def _qres_to_dict(obj: Any) -> Dict[str, Any]:
     """
@@ -80,6 +81,7 @@ with DAG(
         # Airflow 2系互換：get_current_context は operators.python 側にある環境が多い
         try:
             from airflow.operators.python import get_current_context  # type: ignore
+
             conf: Dict[str, Any] = (get_current_context().get("dag_run").conf) or {}
         except Exception:
             conf = {}
@@ -108,9 +110,11 @@ with DAG(
         """
         # 遅延 import（DAG パース時に重い import を避ける）
         from src.plan_data.quality_gate import evaluate_quality  # 実プロジェクト名に合わせる
+
         try:
             # 推奨の契約モデル
             from src.plan_data.contracts import FeatureBundle  # = FeatureBundleV1
+
             use_model = True
         except Exception:
             FeatureBundle = dict  # type: ignore
@@ -122,11 +126,15 @@ with DAG(
         ctx = {"symbol": str(ctx_in["symbol"]), "timeframe": str(ctx_in["timeframe"])}
 
         # pydantic v2: extra=forbid を想定。余計なキーは渡さない
-        fb = FeatureBundle(features=feats, trace_id=trace_id, context=ctx) if use_model else {
-            "features": feats,
-            "trace_id": trace_id,
-            "context": ctx,
-        }
+        fb = (
+            FeatureBundle(features=feats, trace_id=trace_id, context=ctx)
+            if use_model
+            else {
+                "features": feats,
+                "trace_id": trace_id,
+                "context": ctx,
+            }
+        )
 
         # 実測（evaluate_quality から取得）
         qres = evaluate_quality(fb)
@@ -158,14 +166,18 @@ with DAG(
                 lack.append(f"missing_ratio {missing_ratio:.3f}>{miss_max:.3f}")
             if data_lag_min > lag_max_min:
                 lack.append(f"data_lag_min {data_lag_min:.1f}>{lag_max_min:.1f}")
-            reason = (reason + " | " if reason else "") + "quality_threshold_not_met: " + ", ".join(lack)
+            reason = (
+                (reason + " | " if reason else "") + "quality_threshold_not_met: " + ", ".join(lack)
+            )
 
         # details に実測を明示
-        details.update({
-            "missing_ratio": missing_ratio,
-            "data_lag_min": data_lag_min,
-            "thresholds": {"missing_max": miss_max, "lag_max_min": lag_max_min},
-        })
+        details.update(
+            {
+                "missing_ratio": missing_ratio,
+                "data_lag_min": data_lag_min,
+                "thresholds": {"missing_max": miss_max, "lag_max_min": lag_max_min},
+            }
+        )
 
         return {
             "trace_id": trace_id,

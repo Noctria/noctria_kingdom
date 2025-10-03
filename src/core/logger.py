@@ -3,6 +3,7 @@
 import logging
 import sys
 from pathlib import Path
+
 from core.path_config import LOGS_DIR
 
 
@@ -21,11 +22,11 @@ def setup_logger(name: str, log_file: Path, level=logging.INFO) -> logging.Logge
 
     formatter = logging.Formatter(
         fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # 📁 ファイル出力ハンドラ
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 

@@ -1,10 +1,9 @@
 # src/plan_data/run_pdca_plan_workflow.py
 
-import pandas as pd
-from datetime import datetime, timedelta
-from collector import PlanDataCollector, ASSET_SYMBOLS
-from features import FeatureEngineer
 from analyzer import PlanAnalyzer
+from collector import ASSET_SYMBOLS, PlanDataCollector
+from features import FeatureEngineer
+
 
 def run_pdca_plan_workflow(lookback_days: int = 90, output_path: str = None):
     collector = PlanDataCollector()
@@ -19,13 +18,16 @@ def run_pdca_plan_workflow(lookback_days: int = 90, output_path: str = None):
     # 保存先が指定されていればサマリーをJSONで保存
     if output_path:
         import json
+
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "summary": llm_summary,
-                "features": features,
-                "labels": labels
-            }, f, ensure_ascii=False, indent=2)
+            json.dump(
+                {"summary": llm_summary, "features": features, "labels": labels},
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
     return llm_summary
+
 
 if __name__ == "__main__":
     run_pdca_plan_workflow(lookback_days=90, output_path="data/pdca_plan_summary.json")

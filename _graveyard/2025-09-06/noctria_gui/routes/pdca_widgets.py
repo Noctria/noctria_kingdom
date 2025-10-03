@@ -174,7 +174,9 @@ def _collect(pattern: Optional[str], limit: int) -> List[Dict[str, Any]]:
         # GitHelper 実装がある場合はそちらを優先
         try:
             gh = GitHelper()
-            tags = gh.list_tags(pattern=patt, limit=limit)  # 期待: [{name,date,sha,subject?,annotated?}, ...]
+            tags = gh.list_tags(
+                pattern=patt, limit=limit
+            )  # 期待: [{name,date,sha,subject?,annotated?}, ...]
         except Exception:
             tags = []
     else:

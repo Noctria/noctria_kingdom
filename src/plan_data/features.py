@@ -1,7 +1,7 @@
 # src/plan_data/features.py
 
 import time
-from typing import Optional, Dict, Iterable
+from typing import Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -128,18 +128,23 @@ class FeatureEngineer:
                 # 収益率とボラ
                 newdf[f"{base}_return"] = _safe_pct_change(newdf[c]).astype("float64")
                 newdf[f"{base}_volatility_{self.ret_vol_win_short}d"] = (
-                    newdf[f"{base}_return"].rolling(
-                        window=self.ret_vol_win_short, min_periods=self.ret_vol_win_short
-                    ).std()
+                    newdf[f"{base}_return"]
+                    .rolling(
+                        window=self.ret_vol_win_short,
+                        min_periods=self.ret_vol_win_short,
+                    )
+                    .std()
                 )
                 newdf[f"{base}_volatility_{self.ret_vol_win_long}d"] = (
-                    newdf[f"{base}_return"].rolling(
-                        window=self.ret_vol_win_long, min_periods=self.ret_vol_win_long
-                    ).std()
+                    newdf[f"{base}_return"]
+                    .rolling(window=self.ret_vol_win_long, min_periods=self.ret_vol_win_long)
+                    .std()
                 )
 
                 # RSI
-                newdf[f"{base}_rsi_{self.rsi_window}d"] = self.calc_rsi(newdf[c], window=self.rsi_window)
+                newdf[f"{base}_rsi_{self.rsi_window}d"] = self.calc_rsi(
+                    newdf[c], window=self.rsi_window
+                )
 
                 # 移動平均と GC / 並行トレンド
                 ma_fast = newdf[c].rolling(window=self.ma_fast, min_periods=self.ma_fast).mean()
@@ -173,9 +178,14 @@ class FeatureEngineer:
             newdf["news_count"] = pd.to_numeric(newdf["news_count"], errors="coerce")
             # 先頭 NaN が邪魔なら 0 埋め（用途次第）。今回は 0 埋めに寄せる。
             newdf["news_count_change"] = newdf["news_count"].diff().fillna(0.0)
-            base_mean = newdf["news_count"].rolling(
-                window=self.news_base_win, min_periods=max(10, self.news_base_win // 2)
-            ).mean()
+            base_mean = (
+                newdf["news_count"]
+                .rolling(
+                    window=self.news_base_win,
+                    min_periods=max(10, self.news_base_win // 2),
+                )
+                .mean()
+            )
             newdf["news_spike_flag"] = (
                 (newdf["news_count"] > base_mean * 2).fillna(False).astype(int)
             )
@@ -198,9 +208,12 @@ class FeatureEngineer:
                 newdf[macro] = pd.to_numeric(newdf[macro], errors="coerce")
                 diff = newdf[macro].diff()
                 newdf[f"{macro}_diff"] = diff
-                thr = diff.rolling(
-                    window=self.macro_spike_win, min_periods=self.macro_spike_minp
-                ).std() * 2
+                thr = (
+                    diff.rolling(
+                        window=self.macro_spike_win, min_periods=self.macro_spike_minp
+                    ).std()
+                    * 2
+                )
                 newdf[f"{macro}_spike_flag"] = (np.abs(diff) > thr).fillna(False).astype(int)
 
         # 4) 経済イベント（fomc, cpi, nfp, ...）: 0/1 を Int64 で保持、today_flag も付与
@@ -216,7 +229,9 @@ class FeatureEngineer:
 
         # 最後に date 昇順＆重複除去（保険）
         if "date" in newdf.columns:
-            newdf = newdf.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+            newdf = (
+                newdf.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+            )
 
         # 観測ログ（失敗しても継続）
         try:

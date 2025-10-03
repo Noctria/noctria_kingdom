@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import psycopg2
+
 """
 Royal Scribe（史官）
 - 王国の建国記録/議事録/AI会話/PDCA進捗を DB へ保存（Postgres）
@@ -17,20 +24,12 @@ Royal Scribe（史官）
 - log_lint_results(ruff_meta: dict, trace_id: str | None = None, topic="PDCA agents", tags=None) -> None
 """
 
-import os
-import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-import psycopg2
 
 # ----------------------------------------
 # DSN 解決
 # ----------------------------------------
 DSN: Optional[str] = (
-    os.getenv("NOCTRIA_DB_DSN")
-    or os.getenv("NOCTRIA_OBS_PG_DSN")
-    or os.getenv("DATABASE_URL")
+    os.getenv("NOCTRIA_DB_DSN") or os.getenv("NOCTRIA_OBS_PG_DSN") or os.getenv("DATABASE_URL")
 )
 
 # ルート推定（このファイルの2階層上＝リポジトリ直下）
@@ -250,12 +249,7 @@ def log_test_results(
     """
     pytest 実行結果（run_pdca_agents.py からの呼び出し想定）
     """
-    refs = {
-        "junit_xml": str(
-            pytest_summary.get("xml_path")
-            or "src/codex_reports/pytest_last.xml"
-        )
-    }
+    refs = {"junit_xml": str(pytest_summary.get("xml_path") or "src/codex_reports/pytest_last.xml")}
     chronicle_save(
         {
             "stage": "pytest",

@@ -23,7 +23,7 @@ from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
 from noctria_gui.services import tag_summary_service
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
 
 # ✅ 修正: ルーターのprefixを/statisticsに統一
 router = APIRouter(prefix="/statistics", tags=["tag-summary"])
@@ -50,24 +50,23 @@ def get_tag_summary_data() -> List[Dict[str, Any]]:
 
 # --- ルート定義 ---
 
+
 @router.get("/tag-summary", response_class=HTMLResponse)
 async def show_tag_summary(
-    request: Request,
-    summary_data: List[Dict[str, Any]] = Depends(get_tag_summary_data)
+    request: Request, summary_data: List[Dict[str, Any]] = Depends(get_tag_summary_data)
 ):
     """
     📊 タグ別戦略統計ページ
     - タグごとに分類された戦略群を統計集計し表示
     """
-    return templates.TemplateResponse("tag_summary.html", {
-        "request": request,
-        "summary_data": summary_data
-    })
+    return templates.TemplateResponse(
+        "tag_summary.html", {"request": request, "summary_data": summary_data}
+    )
 
 
 @router.get("/tag-summary/export", response_class=StreamingResponse)
 async def export_tag_summary_csv(
-    summary_data: List[Dict[str, Any]] = Depends(get_tag_summary_data)
+    summary_data: List[Dict[str, Any]] = Depends(get_tag_summary_data),
 ):
     """
     📤 タグ統計のCSVエクスポート
@@ -80,25 +79,27 @@ async def export_tag_summary_csv(
         fieldnames = ["タグ", "戦略数", "平均勝率", "平均取引数", "平均最大DD", "戦略例"]
         writer = csv.writer(output)
         writer.writerow(fieldnames)
-        
+
         for item in summary_data:
-            writer.writerow([
-                item.get("tag", "N/A"),
-                item.get("strategy_count", 0),
-                item.get("average_win_rate", "-"),
-                item.get("average_trade_count", "-"),
-                item.get("average_max_drawdown", "-"),
-                ", ".join(item.get("sample_strategies", []))
-            ])
+            writer.writerow(
+                [
+                    item.get("tag", "N/A"),
+                    item.get("strategy_count", 0),
+                    item.get("average_win_rate", "-"),
+                    item.get("average_trade_count", "-"),
+                    item.get("average_max_drawdown", "-"),
+                    ", ".join(item.get("sample_strategies", [])),
+                ]
+            )
     except Exception as e:
         logging.error(f"CSVの生成中にエラーが発生しました: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"CSV生成に失敗しました: {e}")
 
     output.seek(0)
     filename = f"tag_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    
+
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

@@ -6,7 +6,7 @@ url = "http://host.docker.internal:11434/api/generate"
 payload = {
     "model": "openhermes",
     "prompt": "あなたはFX戦略の専門家AIです。USDJPYの戦略案を3つ、簡潔に日本語で出力してください。",
-    "stream": False
+    "stream": False,
 }
 
 response = requests.post(url, json=payload)

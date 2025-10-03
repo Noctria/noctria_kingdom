@@ -27,7 +27,9 @@ from fastapi.templating import Jinja2Templates
 
 logger = logging.getLogger("noctria_gui.strategy_detail")
 if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
 
 # ------------------------------------------------------------
 # パス設定（path_config がなくても動く）
@@ -44,6 +46,7 @@ except Exception:  # pragma: no cover
 STATS_DIR = DATA_DIR / "stats"
 router = APIRouter(prefix="/strategies", tags=["strategy-detail"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
 
 # ------------------------------------------------------------
 # 依存サービス（無ければフォールバック）
@@ -76,8 +79,10 @@ def _load_all_statistics_fallback() -> List[Dict[str, Any]]:
             continue
     return out
 
+
 try:
     from noctria_gui.services import statistics_service  # type: ignore
+
     def load_all_statistics() -> List[Dict[str, Any]]:
         try:
             logs = statistics_service.load_all_statistics()
@@ -85,21 +90,27 @@ try:
                 return [asdict(x) for x in logs]
             return logs
         except Exception:
-            logger.warning("statistics_service.load_all_statistics() 失敗。フォールバックに切替。", exc_info=True)
+            logger.warning(
+                "statistics_service.load_all_statistics() 失敗。フォールバックに切替。",
+                exc_info=True,
+            )
             return _load_all_statistics_fallback()
 except Exception:  # pragma: no cover
+
     def load_all_statistics() -> List[Dict[str, Any]]:
         return _load_all_statistics_fallback()
+
 
 # ------------------------------------------------------------
 # 表示メトリクス
 # ------------------------------------------------------------
 DASHBOARD_METRICS: List[Dict[str, Any]] = [
-    {"key": "win_rate",      "label": "勝率",    "unit": "%", "dec": 2},
-    {"key": "max_drawdown",  "label": "最大DD",  "unit": "%", "dec": 2},
-    {"key": "trade_count",   "label": "取引数",  "unit": "回", "dec": 0},
-    {"key": "profit_factor", "label": "PF",      "unit": "",  "dec": 2},
+    {"key": "win_rate", "label": "勝率", "unit": "%", "dec": 2},
+    {"key": "max_drawdown", "label": "最大DD", "unit": "%", "dec": 2},
+    {"key": "trade_count", "label": "取引数", "unit": "回", "dec": 0},
+    {"key": "profit_factor", "label": "PF", "unit": "", "dec": 2},
 ]
+
 
 # ------------------------------------------------------------
 # ユーティリティ（%変換・集計）
@@ -113,12 +124,16 @@ def _to_pct_if_ratio(k: str, v: Any) -> Any:
         return fv * 100.0
     return fv
 
-def _agg(vals: List[Optional[float]], dec: int) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+
+def _agg(
+    vals: List[Optional[float]], dec: int
+) -> Tuple[Optional[float], Optional[float], Optional[float]]:
     xs = [v for v in vals if isinstance(v, (int, float))]
     if not xs:
         return None, None, None
     avg = round(sum(xs) / len(xs), dec)
     return avg, round(max(xs), dec), round(min(xs), dec)
+
 
 # ------------------------------------------------------------
 # ログ→履歴/トレンド/分布 生成
@@ -156,8 +171,16 @@ def _build_history_trend_dist(strategy_name: str, logs: List[Dict[str, Any]]):
         seq = [v for v in vals if v is not None]
         if len(seq) >= 2:
             diff = round(seq[-1] - seq[-2], m["dec"])
-        trend_dict[k] = {"labels": dates, "values": vals, "avg": avg, "max": vmax, "min": vmin, "diff": diff}
+        trend_dict[k] = {
+            "labels": dates,
+            "values": vals,
+            "avg": avg,
+            "max": vmax,
+            "min": vmin,
+            "diff": diff,
+        }
     return hist, trend_dict, dist
+
 
 # ------------------------------------------------------------
 # モジュール / ファイル フォールバック
@@ -165,12 +188,16 @@ def _build_history_trend_dist(strategy_name: str, logs: List[Dict[str, Any]]):
 def _strategy_candidates(name: str) -> List[Path]:
     vg = STRATEGIES_DIR / "veritas_generated"
     return [
-        vg / f"{name}.py", vg / f"{name}.json",
-        STRATEGIES_DIR / f"{name}.py", STRATEGIES_DIR / f"{name}.json",
+        vg / f"{name}.py",
+        vg / f"{name}.json",
+        STRATEGIES_DIR / f"{name}.py",
+        STRATEGIES_DIR / f"{name}.json",
     ]
+
 
 def _strategy_exists(name: str) -> bool:
     return any(p.exists() for p in _strategy_candidates(name))
+
 
 def _import_strategy_module(name: str):
     for mn in (f"strategies.veritas_generated.{name}", f"strategies.{name}"):
@@ -180,17 +207,23 @@ def _import_strategy_module(name: str):
             continue
     return None
 
+
 def _compute_kpis_from_module(mod) -> Dict[str, Any]:
     # Strategy クラス優先
-    for attr in ("Strategy", "strategy",):
+    for attr in (
+        "Strategy",
+        "strategy",
+    ):
         S = getattr(mod, attr, None)
         if S:
             try:
                 obj = S() if callable(S) else S
                 if hasattr(obj, "compute_kpis"):
                     k = obj.compute_kpis()
-                    if is_dataclass(k): k = asdict(k)
-                    if not isinstance(k, dict): k = dict(k)
+                    if is_dataclass(k):
+                        k = asdict(k)
+                    if not isinstance(k, dict):
+                        k = dict(k)
                     return k
             except Exception:
                 pass
@@ -200,8 +233,10 @@ def _compute_kpis_from_module(mod) -> Dict[str, Any]:
         if callable(fn):
             try:
                 k = fn()
-                if is_dataclass(k): k = asdict(k)
-                if not isinstance(k, dict): k = dict(k)
+                if is_dataclass(k):
+                    k = asdict(k)
+                if not isinstance(k, dict):
+                    k = dict(k)
                 return k
             except Exception:
                 pass
@@ -212,16 +247,27 @@ def _compute_kpis_from_module(mod) -> Dict[str, Any]:
             ret = rb()
             if isinstance(ret, tuple) and len(ret) >= 1:
                 k = ret[0]
-                if is_dataclass(k): k = asdict(k)
-                if not isinstance(k, dict): k = dict(k)
+                if is_dataclass(k):
+                    k = asdict(k)
+                if not isinstance(k, dict):
+                    k = dict(k)
                 return k
         except Exception:
             pass
     # 何もなければ placeholder
-    return {"trades": 0, "win_rate": None, "avg_return_pct": None, "pnl_sum_pct": None, "max_drawdown_pct": None, "_note": "module: KPIs unavailable"}
+    return {
+        "trades": 0,
+        "win_rate": None,
+        "avg_return_pct": None,
+        "pnl_sum_pct": None,
+        "max_drawdown_pct": None,
+        "_note": "module: KPIs unavailable",
+    }
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
 
 # ------------------------------------------------------------
 # Route
@@ -252,7 +298,9 @@ async def show_strategy_detail(
     if not matched_strategy:
         if not _strategy_exists(strategy_name):
             # 本当に何も無ければ 404
-            raise HTTPException(status_code=404, detail=f"戦略『{strategy_name}』は見つかりません。")
+            raise HTTPException(
+                status_code=404, detail=f"戦略『{strategy_name}』は見つかりません。"
+            )
         # KPI だけでも出す
         mod = _import_strategy_module(strategy_name)
         kpis = {}
@@ -276,7 +324,9 @@ async def show_strategy_detail(
         fallback_used = True
 
     # 3) 関連戦略（タグ一致）
-    def _find_related_by_tags(all_logs: List[Dict[str, Any]], current_tags: List[str]) -> List[Dict[str, Any]]:
+    def _find_related_by_tags(
+        all_logs: List[Dict[str, Any]], current_tags: List[str]
+    ) -> List[Dict[str, Any]]:
         if not all_logs or not current_tags:
             return []
         rel, seen = [], set()
@@ -286,7 +336,8 @@ async def show_strategy_detail(
                 continue
             tags = s.get("tags") or []
             if any(t in (tags or []) for t in current_tags):
-                rel.append(s); seen.add(name)
+                rel.append(s)
+                seen.add(name)
             if len(rel) >= 4:
                 break
         return rel
@@ -319,7 +370,11 @@ async def show_strategy_detail(
     tpl_primary = NOCTRIA_GUI_TEMPLATES_DIR / "strategies" / "detail.html"
     tpl_legacy = NOCTRIA_GUI_TEMPLATES_DIR / "strategy_detail.html"
     context = {"request": request, **base_payload}
-    tpl_name = "strategies/detail.html" if tpl_primary.exists() else ("strategy_detail.html" if tpl_legacy.exists() else None)
+    tpl_name = (
+        "strategies/detail.html"
+        if tpl_primary.exists()
+        else ("strategy_detail.html" if tpl_legacy.exists() else None)
+    )
 
     if tpl_name:
         if safe == 1:

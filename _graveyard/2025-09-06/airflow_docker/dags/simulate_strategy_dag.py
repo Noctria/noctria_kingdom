@@ -18,8 +18,11 @@ try:
 except ImportError:
     # ローカルでのテストなど、インポートに失敗した場合のダミー関数
     def run_official_simulation():
-        print("警告: `simulate_official_strategy.main`が見つかりませんでした。ダミー処理を実行します。")
+        print(
+            "警告: `simulate_official_strategy.main`が見つかりませんでした。ダミー処理を実行します。"
+        )
         pass
+
 
 # ================================================
 # 🏰 王国記録係（DAGロガー）の召喚
@@ -43,6 +46,7 @@ def simulation_task_wrapper():
         logger.error(f"❌ シミュレーション失敗: {e}", exc_info=True)
         raise
 
+
 # ================================================
 # 📜 DAG設定
 # ================================================
@@ -64,7 +68,6 @@ with DAG(
     catchup=False,
     tags=["metaai", "simulation", "noctria"],
 ) as dag:
-
     run_task = PythonOperator(
         task_id="simulate_official_strategy",
         python_callable=simulation_task_wrapper,

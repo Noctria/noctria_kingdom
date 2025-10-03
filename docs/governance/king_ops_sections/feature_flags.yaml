@@ -1,0 +1,98 @@
+# =======================================================
+# Feature Flags（Control Plane 対応版）
+# =======================================================
+feature_flags:
+  # --- 個別フラグ定義 -------------------------------------------------
+  predict_v2:
+    status: "off"            # off | dev-only | stg-only | canary | on
+    guard: "contracts.api.predict を満たすこと"
+    rollout_policy: "stg→canary(10%)→on"
+    owner: "veritas"
+    notes: "モデル切替は Decision Log と連動"
+    health_check:
+      metric: "predict_latency_ms_p95"
+      threshold: 300
+      window_minutes: 15
+      rollback_on_violation: true
+
+  gui_async_stream:
+    status: "stg-only"
+    guard: "E2Eスモーク通過"
+    rollout_policy: "stg固定（prodはOpt-in）"
+    owner: "king"
+    notes: "UX影響大。段階展開"
+
+  bt_parallel_runner:
+    status: "off"
+    guard: "testing.sla.ci_time_minutes_max を超えない"
+    rollout_policy: "dev→stg→stg(canary)→on"
+    owner: "prometheus"
+    notes: "CI短縮目的。失敗時即rollback"
+
+  # --- ガバナンス（Airflow/GUI/API連携の共通約束） --------------------
+  governance:
+    default_status: "off"
+    lifecycle:
+      allowed_status: ["off","dev-only","stg-only","canary","on"]
+      change_process:
+        - "必ず Decision Log に記録（level=NONEでも）"
+        - "CRITICAL 警報時は自動で 'off' に戻す（auto_rollback=true 時）"
+    rbac:
+      can_toggle:
+        - "king"
+        - "human_pm"
+      can_canary_promote:
+        - "king"
+        - "prometheus"
+      read_only:
+        - "veritas"
+        - "aurus"
+        - "noctus"
+    storage:
+      backend: "file+git"                 # file+git | redis | db
+      path: "docs/governance/flags/flags.yaml"
+      require_signed_commit: true
+    audit:
+      location: "docs/audit/feature_flags/{YYYYMMDD}.log"
+      fields: ["utc_time","actor","flag","from","to","reason","decision_id","git_sha"]
+    api:
+      base: "/admin/flags"
+      endpoints:
+        - { method: "GET",  path: "/list" }
+        - { method: "GET",  path: "/{flag}" }
+        - { method: "POST", path: "/{flag}/set" }      # body: {status, reason, decision_id}
+        - { method: "POST", path: "/{flag}/promote" }  # canary→on など
+      auth: "ops_jwt(scope=flags:write) / read-onlyは flags:read"
+      rate_limit_rpm: 30
+    airflow:
+      dag_id: "flags_guardrail"
+      schedule: "*/10 * * * *"
+      tasks:
+        - "load_current_flags"
+        - "validate_guards"          # contracts/testingを軽く当てる
+        - "watch_health_and_rollback"
+        - "sync_to_git_and_audit"
+      auto_rollback:
+        enabled: true
+        rules:
+          - if: "observability.metrics.api.predict_latency_ms_p95 > 300 for 2 consecutive windows"
+            then: "set flag to previous status; emit decision_log(level=WARN)"
+          - if: "predict_5xx_total spike (z>3) within 30m after promote"
+            then: "rollback + create change_draft template"
+    gui:
+      panel:
+        path: "/admin/feature-flags"
+        show:
+          - flag
+          - status
+          - owner
+          - rollout_policy
+          - last_changed_at
+          - health(last 15m)
+        actions:
+          - "toggle(off/on/dev-only/stg-only/canary)"
+          - "promote(canary→on)"
+          - "rollback(to previous)"
+        safeguards:
+          - "changes require reason + decision_id"
+          - "prod 反映は二段承認（king + human_pm）"

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import shlex
 import subprocess
 import sys
@@ -40,8 +39,10 @@ def ensure_module_importable(module: str) -> None:
     try:
         __import__(module)
     except Exception:
-        print(f"[hint] Python module '{module}' not importable. If this is a package, "
-              f"ensure your runner environment installs it (e.g., pip install -e .).")
+        print(
+            f"[hint] Python module '{module}' not importable. If this is a package, "
+            f"ensure your runner environment installs it (e.g., pip install -e .)."
+        )
 
 
 def resolve_paths(paths: Iterable[str], globs: Iterable[str]) -> List[Path]:
@@ -68,13 +69,19 @@ def run_ruff_check(targets: List[Path]) -> int:
     return rc
 
 
-def run_auto_fix_agent(targets: List[Path], use_gpt: bool, fix_rounds: int, ruff_extra: str | None) -> int:
+def run_auto_fix_agent(
+    targets: List[Path], use_gpt: bool, fix_rounds: int, ruff_extra: str | None
+) -> int:
     """Call our auto_fix_agent which can do rule-based + GPT escalations."""
     ensure_module_importable("src.codex.tools.auto_fix_agent")
     cmd = [
-        sys.executable, "-m", "src.codex.tools.auto_fix_agent",
-        "--paths", *[str(p) for p in targets],
-        "--fix-rounds", str(fix_rounds),
+        sys.executable,
+        "-m",
+        "src.codex.tools.auto_fix_agent",
+        "--paths",
+        *[str(p) for p in targets],
+        "--fix-rounds",
+        str(fix_rounds),
     ]
     if use_gpt:
         cmd.append("--use-gpt")
@@ -180,21 +187,72 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Autofix loop: Ruff -> auto_fix_agent (rule/GPT) -> Ruff -> pytest -> optional git commit/push."
     )
-    parser.add_argument("--paths", nargs="*", default=[], help="Explicit target paths (files/dirs).")
-    parser.add_argument("--globs", nargs="*", default=[], help="Glob patterns to expand into files (e.g., 'tests/**/*.py').")
+    parser.add_argument(
+        "--paths", nargs="*", default=[], help="Explicit target paths (files/dirs)."
+    )
+    parser.add_argument(
+        "--globs",
+        nargs="*",
+        default=[],
+        help="Glob patterns to expand into files (e.g., 'tests/**/*.py').",
+    )
     parser.add_argument("--max-rounds", type=int, default=3, help="Max iterations of the loop.")
-    parser.add_argument("--use-gpt", action="store_true", help="Escalate unresolved Ruff diagnostics to GPT in auto_fix_agent.")
-    parser.add_argument("--fix-rounds", type=int, default=2, help="Internal fix rounds to pass to auto_fix_agent.")
-    parser.add_argument("--ruff-extra", type=str, default=None, help="Extra args to pass to ruff (e.g., '--ignore E501').")
+    parser.add_argument(
+        "--use-gpt",
+        action="store_true",
+        help="Escalate unresolved Ruff diagnostics to GPT in auto_fix_agent.",
+    )
+    parser.add_argument(
+        "--fix-rounds",
+        type=int,
+        default=2,
+        help="Internal fix rounds to pass to auto_fix_agent.",
+    )
+    parser.add_argument(
+        "--ruff-extra",
+        type=str,
+        default=None,
+        help="Extra args to pass to ruff (e.g., '--ignore E501').",
+    )
 
-    parser.add_argument("--pytest", dest="use_pytest", action="store_true", help="Run pytest in the loop.")
-    parser.add_argument("--pytest-args", nargs=argparse.REMAINDER, help="Args passed to pytest after '--'.")
+    parser.add_argument(
+        "--pytest",
+        dest="use_pytest",
+        action="store_true",
+        help="Run pytest in the loop.",
+    )
+    parser.add_argument(
+        "--pytest-args",
+        nargs=argparse.REMAINDER,
+        help="Args passed to pytest after '--'.",
+    )
 
-    parser.add_argument("--git-commit", action="store_true", help="Commit fixed files at the end if Ruff & (optionally) pytest pass.")
-    parser.add_argument("--git-push", action="store_true", help="Push the commit to origin/<branch>.")
-    parser.add_argument("--git-branch", type=str, default="adopt/autofix-bot", help="Branch to commit to (will be created/switch if needed).")
-    parser.add_argument("--allow-commit-globs", nargs="*", default=["tests/**/*.py", "src/**/*.py"], help="Only commit files matching these globs.")
-    parser.add_argument("--report-json", type=str, default="src/codex_reports/autofix/last_run.json", help="Where to save a small run report.")
+    parser.add_argument(
+        "--git-commit",
+        action="store_true",
+        help="Commit fixed files at the end if Ruff & (optionally) pytest pass.",
+    )
+    parser.add_argument(
+        "--git-push", action="store_true", help="Push the commit to origin/<branch>."
+    )
+    parser.add_argument(
+        "--git-branch",
+        type=str,
+        default="adopt/autofix-bot",
+        help="Branch to commit to (will be created/switch if needed).",
+    )
+    parser.add_argument(
+        "--allow-commit-globs",
+        nargs="*",
+        default=["tests/**/*.py", "src/**/*.py"],
+        help="Only commit files matching these globs.",
+    )
+    parser.add_argument(
+        "--report-json",
+        type=str,
+        default="src/codex_reports/autofix/last_run.json",
+        help="Where to save a small run report.",
+    )
     args = parser.parse_args()
 
     # Resolve targets
@@ -223,7 +281,10 @@ def main() -> int:
     if args.use_pytest:
         rc, _, _ = run(["pytest", "--version"])
         if rc != 0:
-            print("[error] pytest not found. Install with: pip install pytest", file=sys.stderr)
+            print(
+                "[error] pytest not found. Install with: pip install pytest",
+                file=sys.stderr,
+            )
             return 2
 
     # Try import auto_fix_agent so users get a helpful hint if missing
@@ -233,7 +294,12 @@ def main() -> int:
         print(f"\n--- Round {i}/{rounds} ---")
 
         # 1) Try rule-based + GPT-escalation fixes
-        _ = run_auto_fix_agent(targets, use_gpt=args.use_gpt, fix_rounds=args.fix_rounds, ruff_extra=args.ruff_extra)
+        _ = run_auto_fix_agent(
+            targets,
+            use_gpt=args.use_gpt,
+            fix_rounds=args.fix_rounds,
+            ruff_extra=args.ruff_extra,
+        )
 
         # 2) Ruff check
         final_ruff_rc = run_ruff_check(targets)

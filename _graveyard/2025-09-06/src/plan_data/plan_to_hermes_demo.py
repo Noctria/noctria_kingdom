@@ -9,6 +9,7 @@ from src.plan_data.features import FeatureEngineer
 from src.plan_data.analyzer import PlanAnalyzer
 from src.strategies.hermes_cognitor import HermesCognitorStrategy
 
+
 def main():
     # 1. 特徴量・要因ラベルをPlan層から生成
     collector = PlanDataCollector()
@@ -25,13 +26,9 @@ def main():
     reason = "未来予測計画の要約デモ"
     decision_id = "DEMO-HERMES-001"
     proposal = hermes.propose(
-        {
-            "features": features,
-            "labels": labels,
-            "reason": reason
-        },
+        {"features": features, "labels": labels, "reason": reason},
         decision_id=decision_id,
-        caller="plan_to_hermes_demo"
+        caller="plan_to_hermes_demo",
     )
 
     # 3. 結果表示＆保存
@@ -41,6 +38,7 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(proposal, f, ensure_ascii=False, indent=2)
     print(f"説明要約結果を保存: {out_path}")
+
 
 if __name__ == "__main__":
     main()

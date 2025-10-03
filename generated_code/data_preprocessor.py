@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 class DataPreprocessor:
     def preprocess(self, data: pd.DataFrame) -> pd.DataFrame:
         try:

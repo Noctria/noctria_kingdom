@@ -31,7 +31,7 @@ import logging
 import random
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 # --------------------------------------------------------------------------------------
 # ルート・パス設定（path_config が無くても動くようにフォールバック）
@@ -42,9 +42,11 @@ SRC_DIR = PROJECT_ROOT / "src"
 try:
     # 絶対インポート前提（src/core/path_config.py）
     from src.core.path_config import (  # type: ignore
-        STRATEGIES_DIR,                         # 例: <repo>/src/strategies
-        STRATEGIES_VERITAS_GENERATED_DIR,       # 例: <repo>/src/strategies/veritas_generated
-        ACT_LOG_DIR,                            # 例: <repo>/data/act_logs
+        ACT_LOG_DIR,  # 例: <repo>/data/act_logs
+        STRATEGIES_DIR,  # 例: <repo>/src/strategies
+        STRATEGIES_VERITAS_GENERATED_DIR,  # 例: <repo>/src/strategies/veritas_generated
+    )
+    from src.core.path_config import (
         PDCA_LOG_DIR as _PDCA_LOG_DIR_SETTING,  # あれば使う
     )
 except Exception:
@@ -55,8 +57,10 @@ except Exception:
     _PDCA_LOG_DIR_SETTING = None  # 後でデフォルトに差し替え
 
 # PDCA サマリが読む既定のログ置き場
-PDCA_LOG_DIR = Path(_PDCA_LOG_DIR_SETTING) if _PDCA_LOG_DIR_SETTING else (
-    PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders"
+PDCA_LOG_DIR = (
+    Path(_PDCA_LOG_DIR_SETTING)
+    if _PDCA_LOG_DIR_SETTING
+    else (PROJECT_ROOT / "data" / "pdca_logs" / "veritas_orders")
 )
 PDCA_LOG_DIR.mkdir(parents=True, exist_ok=True)
 ACT_LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,7 +71,9 @@ ACT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 _POLICY_AVAILABLE = False
 try:
     # 任意：存在すればポリシーを使用
-    from src.core.policy_engine import get_snapshot as _policy_snapshot, meets_criteria as _policy_meets
+    from src.core.policy_engine import get_snapshot as _policy_snapshot
+    from src.core.policy_engine import meets_criteria as _policy_meets
+
     _POLICY_AVAILABLE = True
 except Exception:
     _policy_snapshot = None
@@ -82,22 +88,29 @@ logger = logging.getLogger("StrategyEvaluator")
 # --------------------------------------------------------------------------------------
 # 王国の採用基準（policy_engine が無い場合のフォールバック）
 # --------------------------------------------------------------------------------------
-WIN_RATE_THRESHOLD = 60.0       # 最低勝率（%）
-MAX_DRAWDOWN_THRESHOLD = 20.0   # 最大許容ドローダウン（%）
+WIN_RATE_THRESHOLD = 60.0  # 最低勝率（%）
+MAX_DRAWDOWN_THRESHOLD = 20.0  # 最大許容ドローダウン（%）
 
 # --------------------------------------------------------------------------------------
 # ユーティリティ
 # --------------------------------------------------------------------------------------
 _STD_KEYS: List[str] = [
-    "strategy", "evaluated_at",
-    "winrate_old", "winrate_new",
-    "maxdd_old", "maxdd_new",
-    "trades_old", "trades_new",
-    "tag", "notes",
+    "strategy",
+    "evaluated_at",
+    "winrate_old",
+    "winrate_new",
+    "maxdd_old",
+    "maxdd_new",
+    "trades_old",
+    "trades_new",
+    "tag",
+    "notes",
 ]
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 def _coerce_float(v: Any) -> Optional[float]:
     try:
@@ -109,6 +122,7 @@ def _coerce_float(v: Any) -> Optional[float]:
     except Exception:
         return None
 
+
 def _strategy_file_candidates(strategy_name: str) -> List[Path]:
     """
     戦略ファイルの可能性がある場所を列挙（存在チェックは呼び出し側で）。
@@ -119,6 +133,7 @@ def _strategy_file_candidates(strategy_name: str) -> List[Path]:
         STRATEGIES_VERITAS_GENERATED_DIR / f"{strategy_name}.py",
         STRATEGIES_DIR / f"{strategy_name}.py",
     ]
+
 
 def _ensure_standard_result(strategy_name: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -159,6 +174,7 @@ def _ensure_standard_result(strategy_name: str, raw: Dict[str, Any]) -> Dict[str
             res[k] = v
     return res
 
+
 def is_strategy_adopted(evaluation_result: Dict[str, Any]) -> bool:
     """
     採用基準: policy_engine があればそちらを優先。
@@ -174,14 +190,25 @@ def is_strategy_adopted(evaluation_result: Dict[str, Any]) -> bool:
 
     if _POLICY_AVAILABLE and callable(_policy_meets):
         ok = bool(_policy_meets(wr_f, dd_f))
-        logger.info("採用判定(policy): strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)",
-                    evaluation_result.get("strategy"), "PASS" if ok else "FAIL", wr_f, dd_f)
+        logger.info(
+            "採用判定(policy): strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)",
+            evaluation_result.get("strategy"),
+            "PASS" if ok else "FAIL",
+            wr_f,
+            dd_f,
+        )
         return ok
 
     ok = (wr_f >= WIN_RATE_THRESHOLD) and (dd_f <= MAX_DRAWDOWN_THRESHOLD)
-    logger.info("採用判定(threshold): strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)",
-                evaluation_result.get("strategy"), "PASS" if ok else "FAIL", wr_f, dd_f)
+    logger.info(
+        "採用判定(threshold): strategy=%s -> %s (win=%.2f%%, dd=%.2f%%)",
+        evaluation_result.get("strategy"),
+        "PASS" if ok else "FAIL",
+        wr_f,
+        dd_f,
+    )
     return ok
+
 
 # --------------------------------------------------------------------------------------
 # 評価本体
@@ -195,16 +222,18 @@ def evaluate_strategy(strategy_name: str) -> Dict[str, Any]:
     # 戦略ファイル存在チェック（最低限）
     candidates = _strategy_file_candidates(strategy_name)
     if not any(p.exists() for p in candidates):
-        msg = f"Strategy file not found for '{strategy_name}'. Searched: " + ", ".join(str(p) for p in candidates)
+        msg = f"Strategy file not found for '{strategy_name}'. Searched: " + ", ".join(
+            str(p) for p in candidates
+        )
         logger.error(msg)
         raise FileNotFoundError(msg)
 
     # ダミー評価（準再現性）
     seed_value = sum(ord(c) for c in strategy_name)
     random.seed(seed_value)
-    win_rate = round(random.uniform(50.0, 75.0), 2)      # 50〜75%
-    max_dd   = round(random.uniform(5.0, 30.0),  2)      # 5〜30%
-    trades   = int(random.uniform(20, 200))              # 20〜200
+    win_rate = round(random.uniform(50.0, 75.0), 2)  # 50〜75%
+    max_dd = round(random.uniform(5.0, 30.0), 2)  # 5〜30%
+    trades = int(random.uniform(20, 200))  # 20〜200
 
     raw = {
         "strategy": strategy_name,
@@ -232,18 +261,28 @@ def evaluate_strategy(strategy_name: str) -> Dict[str, Any]:
     result["passed"] = is_strategy_adopted(result)
     return result
 
+
 # --------------------------------------------------------------------------------------
 # ロギング
 # --------------------------------------------------------------------------------------
 def _pdca_csv_headers(extra_keys: List[str]) -> List[str]:
     base = [
-        "strategy", "evaluated_at",
-        "winrate_old", "winrate_new",
-        "maxdd_old", "maxdd_new",
-        "trades_old", "trades_new",
-        "tag", "notes",
-        "winrate_diff", "maxdd_diff",
-        "trigger_reason", "decision_id", "caller", "parent_dag",
+        "strategy",
+        "evaluated_at",
+        "winrate_old",
+        "winrate_new",
+        "maxdd_old",
+        "maxdd_new",
+        "trades_old",
+        "trades_new",
+        "tag",
+        "notes",
+        "winrate_diff",
+        "maxdd_diff",
+        "trigger_reason",
+        "decision_id",
+        "caller",
+        "parent_dag",
         "passed",
         "source",
         "policy_snapshot",  # JSON文字列として入る可能性あり（下で整形）
@@ -253,6 +292,7 @@ def _pdca_csv_headers(extra_keys: List[str]) -> List[str]:
         if k not in base:
             base.append(k)
     return base
+
 
 def _jsonify_for_csv(v: Any) -> Any:
     """
@@ -265,6 +305,7 @@ def _jsonify_for_csv(v: Any) -> Any:
             return str(v)
     return v
 
+
 def log_evaluation_result(evaluation_result: Dict[str, Any]) -> None:
     """
     評価結果の保存：
@@ -276,7 +317,9 @@ def log_evaluation_result(evaluation_result: Dict[str, Any]) -> None:
     csv_path = PDCA_LOG_DIR / f"rechecks_{date_part}.csv"
 
     # 動的キー（標準キー以外）
-    dynamic_keys = [k for k in evaluation_result.keys() if k not in _STD_KEYS + ["winrate_diff", "maxdd_diff"]]
+    dynamic_keys = [
+        k for k in evaluation_result.keys() if k not in _STD_KEYS + ["winrate_diff", "maxdd_diff"]
+    ]
     headers = _pdca_csv_headers(sorted(dynamic_keys))
 
     write_header = not csv_path.exists()
@@ -299,6 +342,7 @@ def log_evaluation_result(evaluation_result: Dict[str, Any]) -> None:
         logger.info("Archive JSON saved: %s", json_path)
     except Exception as e:
         logger.warning("Archive JSON save failed: %s", e)
+
 
 # --------------------------------------------------------------------------------------
 # 単体実行

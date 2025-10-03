@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 # ===== Airflow/CLI 両対応の安定 import（src. へ統一） =====
 try:
     # 通常ルート（Airflowコンテナ内想定）
-    from src.core.path_config import DATA_DIR, LOGS_DIR, MARKET_DATA_CSV
     from src.core.logger import setup_logger
     from src.core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
+    from src.core.path_config import DATA_DIR, LOGS_DIR, MARKET_DATA_CSV
 except Exception:
     # 直接実行やカレントズレ時のフォールバック:
     # <repo>/src/scripts/apply_best_params_to_metaai.py から見て repo ルートを sys.path に追加
@@ -22,9 +21,9 @@ except Exception:
     project_root = this_file.parents[2]  # .../src/scripts/ -> .../src -> .../<repo>
     if str(project_root) not in sys.path:
         sys.path.append(str(project_root))
-    from src.core.path_config import DATA_DIR, LOGS_DIR, MARKET_DATA_CSV
     from src.core.logger import setup_logger
     from src.core.meta_ai_env_with_fundamentals import TradingEnvWithFundamentals
+    from src.core.path_config import DATA_DIR, LOGS_DIR, MARKET_DATA_CSV
 
 # ログ出力（pdcaサブディレクトリを確実に用意）
 (LOGS_DIR / "pdca").mkdir(parents=True, exist_ok=True)
@@ -40,6 +39,7 @@ def _safe_symlink(src: Path, dst: Path) -> None:
     except Exception:
         # 権限などで失敗したらコピーで代替
         import shutil
+
         shutil.copy2(src, dst)
 
 
@@ -121,6 +121,10 @@ def apply_best_params_to_metaai(
 
 
 if __name__ == "__main__":
-    mock_best_params = dict(learning_rate=1e-4, n_steps=1024, gamma=0.99, ent_coef=0.01, clip_range=0.2)
-    r = apply_best_params_to_metaai(best_params=mock_best_params, total_timesteps=1_000, n_eval_episodes=2)
+    mock_best_params = dict(
+        learning_rate=1e-4, n_steps=1024, gamma=0.99, ent_coef=0.01, clip_range=0.2
+    )
+    r = apply_best_params_to_metaai(
+        best_params=mock_best_params, total_timesteps=1_000, n_eval_episodes=2
+    )
     print(json.dumps(r, indent=2, ensure_ascii=False))

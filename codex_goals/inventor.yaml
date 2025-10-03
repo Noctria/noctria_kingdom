@@ -1,0 +1,56 @@
+north_star: >
+  自律的に新しい戦略/改善案を継続創出し、採択ペースと品質を高める。
+agent: Inventor
+scope:
+  autonomy:
+    max_candidates_per_cycle: 5
+    max_runtime_minutes: 20
+    max_read_files: 1500
+    max_compute_cost_usd: 1.5
+    allowed_paths:
+      - "docs/specs/"
+      - "tests/generated/"
+      - "src/strategies/"
+  inputs:
+    # 仕様理解の強化に使う（存在すれば吸う）
+    - "docs/specs/*_qna.json"
+    - "docs/specs/*.md"
+    - "codex_reports/tasks_discovered.jsonl"
+    - "historical/metrics/*.json"
+  outputs:
+    - {type: spec,  path: "docs/specs/"}
+    - {type: code,  path: "src/strategies/veritas_generated/"}
+    - {type: tests, path: "tests/generated/"}
+    - {type: report, path: "codex_reports/inventor_suggestions.md"}
+success_metrics:
+  - {name: spec_to_green_rate,      target: ">=0.6"}
+  - {name: time_to_first_green_min, target: "<=30"}
+  - {name: diversity_score,         target: ">=0.7"}
+  - {name: novelty_rate,            target: ">=0.7"}
+  - {name: novelty_pass_rate,       target: ">=0.4"}
+  - {name: spec_qna_accuracy,       target: ">=0.9"}
+  - {name: fintokei_violations,     target: "==0"}
+  - {name: self_fix_success_rate,   target: ">=0.5"}
+  - {name: time_to_self_fix_min,    target: "<=10"}
+  - {name: tool_efficiency,         target: ">=0.3"}
+  - {name: handoff_success_rate,    target: ">=0.7"}
+reward_rules:
+  pass_test_bonus: 1.0
+  unique_feature_bonus: 0.2
+  duplicate_penalty: -0.3
+  lint_fail_penalty: -0.2
+guardrails:
+  - "must pass: tests/* and tests/generated/*"
+  - "respect: allowed_files.txt"
+  - "check: Fintokei rules"
+  - "attach spec_qna.json to each proposal"
+  - "declare feature_vector for novelty scoring"
+  - "log tool_calls for efficiency/latency stats"
+  - "must comply: strategy_protocol@v1"
+handoff:
+  reviewer: Harmonia
+  artifacts:
+    - "docs/specs/*"
+    - "docs/specs/*_qna.json"
+    - "src/strategies/veritas_generated/*"
+    - "tests/generated/*"

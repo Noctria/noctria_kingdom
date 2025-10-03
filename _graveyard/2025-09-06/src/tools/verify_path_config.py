@@ -2,6 +2,7 @@ import argparse
 import json
 from core import path_config
 
+
 def verify_paths(strict=False, show_paths=False, category=None, output_json=False):
     paths = []
     results = []
@@ -10,7 +11,9 @@ def verify_paths(strict=False, show_paths=False, category=None, output_json=Fals
         if category not in path_config.CATEGORY_MAP:
             err_msg = f"❌ カテゴリ '{category}' は存在しません。利用可能カテゴリ一覧は --list-categories で確認できます。"
             if output_json:
-                print(json.dumps({"success": False, "error": err_msg}, indent=2, ensure_ascii=False))
+                print(
+                    json.dumps({"success": False, "error": err_msg}, indent=2, ensure_ascii=False)
+                )
             else:
                 print(err_msg)
             return
@@ -44,13 +47,20 @@ def verify_paths(strict=False, show_paths=False, category=None, output_json=Fals
                 print(f"✅ OK: {p}")
 
     if output_json:
-        print(json.dumps({
-            "success": all_ok,
-            "category": category or "all",
-            "result": results
-        }, indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                {"success": all_ok, "category": category or "all", "result": results},
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
     else:
-        print("🎉 すべてのパスが正常に存在しています。" if all_ok else "🚨 一部のパスに問題があります。")
+        print(
+            "🎉 すべてのパスが正常に存在しています。"
+            if all_ok
+            else "🚨 一部のパスに問題があります。"
+        )
+
 
 def list_categories():
     print("📚 利用可能なカテゴリ一覧:")
@@ -59,10 +69,13 @@ def list_categories():
         for p in paths:
             print(f"     - {p}")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="🔍 Noctria Kingdom パス構成検査ツール")
     parser.add_argument("--strict", action="store_true", help="ディレクトリ種別まで厳密に検査")
-    parser.add_argument("--show-paths", action="store_true", help="全パスを表示（--json 無効時のみ）")
+    parser.add_argument(
+        "--show-paths", action="store_true", help="全パスを表示（--json 無効時のみ）"
+    )
     parser.add_argument("--category", type=str, help="検査対象カテゴリを指定（例: core, ai, gui）")
     parser.add_argument("--list-categories", action="store_true", help="利用可能カテゴリ一覧を表示")
     parser.add_argument("--json", action="store_true", help="結果を JSON 形式で出力")
@@ -76,5 +89,5 @@ if __name__ == "__main__":
             strict=args.strict,
             show_paths=args.show_paths,
             category=args.category,
-            output_json=args.json
+            output_json=args.json,
         )

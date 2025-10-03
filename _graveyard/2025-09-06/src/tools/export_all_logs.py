@@ -60,7 +60,7 @@ def normalize_log(entry: dict) -> dict:
         "status": entry.get("status", ""),
         "pushed": entry.get("pushed", ""),
         "note": entry.get("message", entry.get("note", "")),
-        "source": entry.get("__source__", "")
+        "source": entry.get("__source__", ""),
     }
 
 

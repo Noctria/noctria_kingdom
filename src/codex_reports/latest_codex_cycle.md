@@ -1,15 +1,8 @@
 # Latest PDCA Cycle Summary
 
-        - Trace ID: `pdca_20250920_075341`
-        - Started: 2025-09-20T07:53:41+09:00
-        - Finished: 2025-09-20T07:56:40+09:00
-        - Pytest: total=6, failures=0, errors=0, skipped=0
-        - Ruff: returncode=1 (0 がクリーン)
-        - GREEN: False
-
-        ### LLM/Agents Config
-- LLM Enabled: True  (key=set)
-- GPT Model: gpt-4o-mini
-- API Base: https://api.openai.com/v1
-- Harmonia Mode: online
-- Hermes Enabled: on
+- Trace ID: `pdca_20250922_001324`
+- Started: 2025-09-22T00:13:24+09:00
+- Finished: 2025-09-22T00:14:29+09:00
+- Pytest: total=41, failures=0, errors=0, skipped=1
+- Ruff: returncode=0 (0 がクリーン)
+- GREEN: True

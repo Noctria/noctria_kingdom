@@ -10,8 +10,19 @@ CATEGORY_RULES = {
     "delete": ["__pycache__", ".pytest_cache", ".ipynb_checkpoints", "venv", "testenv"],
     "duplicate": ["core", "scripts", "strategies", "data", "models", "logs", "config", "dags"],
     "git_internal": [".git", ".git/logs", ".git/refs", ".git/objects", ".git/info"],
-    "keep": ["airflow_docker", "veritas", "core", "execution", "experts", "tools", "llm_server", "noctria_gui", "tests"],
+    "keep": [
+        "airflow_docker",
+        "veritas",
+        "core",
+        "execution",
+        "experts",
+        "tools",
+        "llm_server",
+        "noctria_gui",
+        "tests",
+    ],
 }
+
 
 def classify_directory(path: Path) -> str:
     name = path.name.lower()
@@ -22,13 +33,16 @@ def classify_directory(path: Path) -> str:
     if any(name == rule for rule in CATEGORY_RULES["duplicate"]):
         return "duplicate"
 
-    if any(str(path).startswith(str(BASE_DIR / git_dir)) for git_dir in CATEGORY_RULES["git_internal"]):
+    if any(
+        str(path).startswith(str(BASE_DIR / git_dir)) for git_dir in CATEGORY_RULES["git_internal"]
+    ):
         return "git_internal"
 
     if any(name == rule for rule in CATEGORY_RULES["keep"]):
         return "keep"
 
     return "other"
+
 
 def generate_plan():
     plan = {"delete": [], "duplicate": [], "git_internal": [], "other": []}
@@ -47,6 +61,7 @@ def generate_plan():
         json.dump(plan, f, indent=2, ensure_ascii=False)
 
     print(f"✅ リファクタ計画出力: {out_path} に {sum(len(v) for v in plan.values())} 件分類")
+
 
 if __name__ == "__main__":
     generate_plan()

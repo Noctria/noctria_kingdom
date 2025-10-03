@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 # 設定
@@ -15,8 +14,9 @@ TARGET_FILES = [
     "airflow_docker/pvc/airflow-dags-pv.yaml",
     "airflow_docker/pvc/airflow-dags-pvc.yaml",
     "airflow_docker/scripts/download_veritas_model.py",
-    "airflow_docker/scripts/push_generated_strategy.py"
+    "airflow_docker/scripts/push_generated_strategy.py",
 ]
+
 
 def apply_fixes(file_path: Path):
     full_path = ROOT / file_path
@@ -35,6 +35,7 @@ def apply_fixes(file_path: Path):
         print(f"🛠 修正済: {file_path} → バックアップ: {backup_path.name}")
     except Exception as e:
         print(f"⚠️ エラー（{file_path}）: {e}")
+
 
 if __name__ == "__main__":
     print("🚀 パス修正開始\n")

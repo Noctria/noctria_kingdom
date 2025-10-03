@@ -3,6 +3,7 @@
 
 import pandas as pd
 
+
 def main():
     file_path = "data/usdjpy_1h.csv"  # ファイルパス
 
@@ -28,6 +29,7 @@ def main():
     save_path = "data/preprocessed_usdjpy_1h.csv"
     df[["Datetime", "Open", "High", "Low", "Close"]].to_csv(save_path, index=False)
     print(f"✅ 前処理結果を保存しました: {save_path}")
+
 
 if __name__ == "__main__":
     main()

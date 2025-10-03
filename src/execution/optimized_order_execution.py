@@ -6,8 +6,15 @@ Docker/Linux側から Windows上のMT5サーバー (order_api.py) に発注リ�
 
 import requests
 
+
 class OrderExecution:
-    def __init__(self, api_url="http://host.docker.internal:5001/order", account_balance=None, max_risk_percent=1.0, min_risk_percent=0.5):
+    def __init__(
+        self,
+        api_url="http://host.docker.internal:5001/order",
+        account_balance=None,
+        max_risk_percent=1.0,
+        min_risk_percent=0.5,
+    ):
         """
         :param api_url: Windows側のMT5サーバーのエンドポイントURL
         :param account_balance: 現在の口座残高（円・ドル等）。必須
@@ -34,7 +41,16 @@ class OrderExecution:
         lot = max_loss / (abs(stop_loss_pips) * PIPS_VALUE)
         return round(lot, 2)  # 小数点2桁で丸める
 
-    def execute_order(self, symbol, lot, order_type="buy", stop_loss=None, take_profit=None, risk_percent=None, comment=None):
+    def execute_order(
+        self,
+        symbol,
+        lot,
+        order_type="buy",
+        stop_loss=None,
+        take_profit=None,
+        risk_percent=None,
+        comment=None,
+    ):
         """
         安全な注文I/F (SL必須/TP任意/lotはリスク0.5%～1%のみ許可)
         :param symbol: 通貨ペア (例: "USDJPY")
@@ -52,7 +68,10 @@ class OrderExecution:
             return {"status": "error", "message": "ロット数が不正です"}
         risk_percent = risk_percent or self._infer_risk_percent(lot, stop_loss)
         if not (self.min_risk_percent <= risk_percent <= self.max_risk_percent):
-            return {"status": "error", "message": f"許容リスク外: {risk_percent:.2f}%。許可範囲={self.min_risk_percent}～{self.max_risk_percent}%"}
+            return {
+                "status": "error",
+                "message": f"許容リスク外: {risk_percent:.2f}%。許可範囲={self.min_risk_percent}～{self.max_risk_percent}%",
+            }
         if self.account_balance is None:
             return {"status": "error", "message": "口座残高情報が未設定です"}
 
@@ -63,7 +82,7 @@ class OrderExecution:
             "stop_loss": stop_loss,
             "take_profit": take_profit,
             "risk_percent": risk_percent,
-            "comment": comment
+            "comment": comment,
         }
         try:
             response = requests.post(self.api_url, json=payload, timeout=5)
@@ -82,11 +101,14 @@ class OrderExecution:
         risk_amount = lot * abs(stop_loss_pips) * PIPS_VALUE
         return round(100 * risk_amount / self.account_balance, 2)
 
+
 # テスト例（本番運用時は必ず外部でaccount_balance等を取得してセット）
 if __name__ == "__main__":
     # 仮の残高100万円（JPY）
     account_balance = 1_000_000
-    executor = OrderExecution(api_url="http://192.168.11.30:5001/order", account_balance=account_balance)
+    executor = OrderExecution(
+        api_url="http://192.168.11.30:5001/order", account_balance=account_balance
+    )
     symbol = "USDJPY"
     stop_loss_pips = 30  # 30pips
     risk_percent = 1.0
@@ -98,6 +120,6 @@ if __name__ == "__main__":
         stop_loss=stop_loss_pips,
         take_profit=None,
         risk_percent=risk_percent,
-        comment="Noctria/AI test order"
+        comment="Noctria/AI test order",
     )
     print("MT5注文結果:", result)

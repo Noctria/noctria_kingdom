@@ -1,7 +1,7 @@
 # src/plan_data/analyzer.py
 
 import time
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -17,11 +17,11 @@ class PlanAnalyzer:
     """
 
     # ======= 閾値（チューニング用に定数化） =======
-    WIN_RATE_DELTA7_THR = 3.0          # 勝率の7行差分がこのpp超なら急上昇
-    NEWS_DELTA3_THR = 50.0             # ニュース件数の3行差分スパイク閾値
-    ACTIVE_TRADES_THR = 20             # 取引回数がこの値超で「活発」
-    DD_ABS_THR = 10.0                  # max_dd の絶対値がこの%超で「悪化」
-    NEWS_COUNT_HIGH_THR = 200.0        # ニュース件数が多い判定
+    WIN_RATE_DELTA7_THR = 3.0  # 勝率の7行差分がこのpp超なら急上昇
+    NEWS_DELTA3_THR = 50.0  # ニュース件数の3行差分スパイク閾値
+    ACTIVE_TRADES_THR = 20  # 取引回数がこの値超で「活発」
+    DD_ABS_THR = 10.0  # max_dd の絶対値がこの%超で「悪化」
+    NEWS_COUNT_HIGH_THR = 200.0  # ニュース件数が多い判定
 
     def __init__(self, df: pd.DataFrame, *, trace_id: Optional[str] = None):
         """
@@ -94,7 +94,9 @@ class PlanAnalyzer:
             delta7 = self._delta(self.df["win_rate"], 7)
             feats["win_rate"] = last_wr
             feats["win_rate_delta7"] = delta7
-            feats["win_rate_rapid_increase"] = self._gt(delta7, self.WIN_RATE_DELTA7_THR)  # NaNならFalse
+            feats["win_rate_rapid_increase"] = self._gt(
+                delta7, self.WIN_RATE_DELTA7_THR
+            )  # NaNならFalse
 
         # 最大ドローダウン（値は負方向。絶対値で評価する方が可読）
         if "max_dd" in self.df.columns:
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     # 依存の都合で相対/絶対 import の両方に対応
     try:
         from src.plan_data.collector import PlanDataCollector  # type: ignore
-        from src.plan_data.features import FeatureEngineer     # type: ignore
+        from src.plan_data.features import FeatureEngineer  # type: ignore
     except Exception:
         from plan_data.collector import PlanDataCollector
         from plan_data.features import FeatureEngineer

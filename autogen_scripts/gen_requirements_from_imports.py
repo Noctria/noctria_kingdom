@@ -18,9 +18,22 @@ for fname in os.listdir(FOLDER):
 
 # 標準ライブラリ候補を除外（例：os, sys, re などは無視）
 std_libs = {
-    "os", "sys", "re", "math", "datetime", "time", "random", "json",
-    "logging", "itertools", "functools", "collections", "subprocess",
-    "pathlib", "typing", "unittest"
+    "os",
+    "sys",
+    "re",
+    "math",
+    "datetime",
+    "time",
+    "random",
+    "json",
+    "logging",
+    "itertools",
+    "functools",
+    "collections",
+    "subprocess",
+    "pathlib",
+    "typing",
+    "unittest",
 }
 pkgs = {p for p in pkgs if p not in std_libs}
 

@@ -1,12 +1,12 @@
 # src/plan_data/plan_to_noctus_demo.py
 
-import pandas as pd
-from datetime import datetime, timedelta
 
-from plan_data.collector import PlanDataCollector
+import pandas as pd
+
+from plan_data.collector import ASSET_SYMBOLS, PlanDataCollector
 from plan_data.features import FeatureEngineer
 from src.strategies.noctus_sentinella import NoctusSentinella
-from plan_data.collector import ASSET_SYMBOLS
+
 
 def prepare_noctus_input(row, hist_df) -> dict:
     """
@@ -17,9 +17,17 @@ def prepare_noctus_input(row, hist_df) -> dict:
         "volume": row.get("USDJPY_Volume", 0.0),
         "spread": row.get("USDJPY_Spread", 0.015),
         "volatility": row.get("USDJPY_Volatility_5d", 0.0),
-        "historical_data": hist_df[["USDJPY_Close"]].rename(columns={"USDJPY_Close": "Close"}).tail(100).reset_index(drop=True) if "USDJPY_Close" in hist_df else pd.DataFrame(),
-        "symbol": "USDJPY"
+        "historical_data": (
+            hist_df[["USDJPY_Close"]]
+            .rename(columns={"USDJPY_Close": "Close"})
+            .tail(100)
+            .reset_index(drop=True)
+            if "USDJPY_Close" in hist_df
+            else pd.DataFrame()
+        ),
+        "symbol": "USDJPY",
     }
+
 
 def main(lookback_days: int = 10):
     # 1. データ収集＋特徴量
@@ -38,7 +46,7 @@ def main(lookback_days: int = 10):
     results = []
     for idx, row in feat_df.tail(lookback_days).iterrows():
         # 直近100件のUSDJPY_Closeをhistoryとして渡す
-        market_data = prepare_noctus_input(row, feat_df.iloc[:idx+1])
+        market_data = prepare_noctus_input(row, feat_df.iloc[: idx + 1])
         # 仮シグナル：BUY/HOLD/SELLをローテで与える
         if idx % 3 == 0:
             action = "BUY"
@@ -46,19 +54,27 @@ def main(lookback_days: int = 10):
             action = "SELL"
         else:
             action = "HOLD"
-        assessment = noctus.assess(market_data, proposed_action=action, decision_id=f"NOCTUS-{idx}", caller="plan_to_noctus_demo")
-        results.append({
-            "date": row.get("Date"),
-            "action": action,
-            "decision": assessment["decision"],
-            "risk_score": assessment["risk_score"],
-            "reason": assessment["reason"],
-            "decision_id": assessment["decision_id"]
-        })
+        assessment = noctus.assess(
+            market_data,
+            proposed_action=action,
+            decision_id=f"NOCTUS-{idx}",
+            caller="plan_to_noctus_demo",
+        )
+        results.append(
+            {
+                "date": row.get("Date"),
+                "action": action,
+                "decision": assessment["decision"],
+                "risk_score": assessment["risk_score"],
+                "reason": assessment["reason"],
+                "decision_id": assessment["decision_id"],
+            }
+        )
 
     df = pd.DataFrame(results)
     print("==== NoctusSentinella Demo Results ====")
     print(df)
+
 
 if __name__ == "__main__":
     main(lookback_days=7)

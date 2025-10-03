@@ -14,6 +14,7 @@ Lightweight Backtest Runner (no heavy deps)
 - outdir に result.json / result.csv / report.html / summary.txt を出力
 - 追加引数文字列は --extra-args or NOCTRIA_EXTRA_ARGS から受け取って記録だけ行う
 """
+
 from __future__ import annotations
 
 import argparse
@@ -104,7 +105,7 @@ def stable_seed_for(name: str, base_seed: int = 0) -> int:
     """ファイル名から安定seedを得る（base_seed が0以外ならそれも加味）"""
     h = hash(name) & 0xFFFFFFFF
     if base_seed:
-        h ^= (base_seed & 0xFFFFFFFF)
+        h ^= base_seed & 0xFFFFFFFF
     return h & 0xFFFF
 
 
@@ -145,7 +146,9 @@ def main() -> int:
         "started_at": started_at,
         "finished_at": datetime.utcnow().isoformat(),
         "count": len(results),
-        "top3_by_pf": sorted(results, key=lambda r: r["profit_factor"], reverse=True)[:3] if results else [],
+        "top3_by_pf": sorted(results, key=lambda r: r["profit_factor"], reverse=True)[:3]
+        if results
+        else [],
         "results": results,
     }
     with open(os.path.join(outdir, "result.json"), "w", encoding="utf-8") as f:
@@ -156,7 +159,9 @@ def main() -> int:
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         f.write("strategy,win_rate,profit_factor,sharpe,trades\n")
         for r in results:
-            f.write(f"{r['strategy']},{r['win_rate']},{r['profit_factor']},{r['sharpe']},{r['trades']}\n")
+            f.write(
+                f"{r['strategy']},{r['win_rate']},{r['profit_factor']},{r['sharpe']},{r['trades']}\n"
+            )
 
     # HTML（ざっくりテーブル）
     html_rows = "\n".join(

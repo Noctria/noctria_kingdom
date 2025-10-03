@@ -3,6 +3,7 @@ import MetaTrader5 as mt5
 
 app = Flask(__name__)
 
+
 @app.route("/order", methods=["POST"])
 def execute_order():
     data = request.json
@@ -43,6 +44,7 @@ def execute_order():
     # 結果を整形して返す
     result_dict = result._asdict() if hasattr(result, "_asdict") else str(result)
     return jsonify({"status": "ok", "result": result_dict})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)

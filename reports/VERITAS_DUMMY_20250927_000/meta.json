@@ -1,0 +1,18 @@
+{
+  "predicted_prob_logged": true,
+  "y_prob": [
+    0.6,
+    0.8,
+    0.2
+  ],
+  "y_true": [
+    1,
+    1,
+    0
+  ],
+  "adv_results": [
+    1,
+    0,
+    1
+  ]
+}

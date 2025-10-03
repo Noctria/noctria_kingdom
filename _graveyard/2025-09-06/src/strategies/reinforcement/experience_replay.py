@@ -1,6 +1,7 @@
 import random
 import numpy as np
 
+
 class ExperienceReplay:
     def __init__(self, capacity=100000):
         self.capacity = capacity
@@ -16,7 +17,13 @@ class ExperienceReplay:
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
-        return np.array(states), np.array(actions), np.array(rewards), np.array(next_states), np.array(dones)
+        return (
+            np.array(states),
+            np.array(actions),
+            np.array(rewards),
+            np.array(next_states),
+            np.array(dones),
+        )
 
     def size(self):
         return len(self.buffer)

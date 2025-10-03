@@ -23,11 +23,11 @@ DSN:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2
 import psycopg2.extras
@@ -212,14 +212,18 @@ def latency_dashboard(request: Request):
                     "at": ev.get("at"),
                     "name": ev.get("name"),
                     "dur_ms": _safe_int(dur),
-                    "success": bool((det or {}).get("success", False)) if isinstance(det, dict) else None,
+                    "success": bool((det or {}).get("success", False))
+                    if isinstance(det, dict)
+                    else None,
                 }
             if stage == "DECISION" and decision is None:
                 det = ev.get("detail") or {}
                 decision = {
                     "at": ev.get("at"),
                     "strategy_name": ev.get("name"),
-                    "score": _safe_float((det or {}).get("score")) if isinstance(det, dict) else None,
+                    "score": _safe_float((det or {}).get("score"))
+                    if isinstance(det, dict)
+                    else None,
                     "reason": (det or {}).get("reason") if isinstance(det, dict) else None,
                     "action": (det or {}).get("action") if isinstance(det, dict) else None,
                     "params": (det or {}).get("params") if isinstance(det, dict) else None,
@@ -262,7 +266,9 @@ def latency_debug():
         # カウント類
         mv = _one("SELECT COUNT(*) AS c FROM public.obs_latency_daily") or {"c": None}
         tl = _one("SELECT COUNT(*) AS c FROM public.obs_trace_timeline") or {"c": None}
-        latest = _one(f"SELECT MAX({tcol}) AS latest FROM public.obs_trace_timeline") or {"latest": None}
+        latest = _one(f"SELECT MAX({tcol}) AS latest FROM public.obs_trace_timeline") or {
+            "latest": None
+        }
         who = _one("SELECT current_user, current_database() AS db, now() AS now")
 
         # 直近 trace_id 3件
@@ -282,7 +288,9 @@ def latency_debug():
             "now": str((who or {}).get("now")),
             "obs_latency_daily.count": mv.get("c"),
             "obs_trace_timeline.count": tl.get("c"),
-            "obs_trace_timeline.latest_ts": None if latest.get("latest") is None else str(latest.get("latest")),
+            "obs_trace_timeline.latest_ts": None
+            if latest.get("latest") is None
+            else str(latest.get("latest")),
             "timeline_columns": cols,
             "recent_sample": sample,
         }

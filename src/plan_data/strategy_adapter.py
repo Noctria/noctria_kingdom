@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, runtime_checkable, Iterable, Tuple
+from typing import Any, Dict, Iterable, Optional, Protocol, Tuple, runtime_checkable
 
 import pandas as pd
 
@@ -21,6 +21,7 @@ except Exception:
 
 # --- Contracts (超軽量版) ---
 
+
 @dataclass
 class FeatureBundle:
     """
@@ -29,6 +30,7 @@ class FeatureBundle:
     - context: メタ情報（symbol, timeframe, data_lag_min, missing_ratioなど）
     - feature_order: 並び順ヒント（必要な戦略向け）
     """
+
     df: pd.DataFrame
     context: Dict[str, Any]
     feature_order: Optional[list[str]] = None
@@ -41,16 +43,18 @@ class FeatureBundle:
 @dataclass
 class StrategyProposal:
     """戦略の共通出力（最小版）"""
+
     symbol: str
-    direction: str        # "LONG" / "SHORT" / "FLAT"
+    direction: str  # "LONG" / "SHORT" / "FLAT"
     qty: float
-    confidence: float     # 0.0 ~ 1.0
+    confidence: float  # 0.0 ~ 1.0
     reasons: list[str]
     meta: Dict[str, Any]
     schema_version: str = "1.0.0"
 
 
 # --- Strategy 呼出契約（プロトコル） ---
+
 
 @runtime_checkable
 class _ProposeLike(Protocol):
@@ -149,7 +153,9 @@ def _coerce_to_proposal(obj: Any, default_symbol: str) -> StrategyProposal:
         )
 
 
-def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], Optional[list[str]]]:
+def _bundle_to_dict_and_order(
+    features: FeatureBundle,
+) -> Tuple[Dict[str, Any], Optional[list[str]]]:
     """
     Aurus など「dict で .get する」戦略向けに FeatureBundle を辞書へ変換。
     - ベース: 最新行（tail）を dict 化
@@ -177,7 +183,9 @@ def _bundle_to_dict_and_order(features: FeatureBundle) -> Tuple[Dict[str, Any], 
     return base, order
 
 
-def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: FeatureBundle, **kwargs) -> Any:
+def _call_strategy_with_auto_compat(
+    strategy: Any, call_name: str, features: FeatureBundle, **kwargs
+) -> Any:
     """
     互換レイヤ：
       1) まず dict 化して呼ぶ（旧API互換：.get を期待する実装に対応/Aurusなど）
@@ -199,6 +207,7 @@ def _call_strategy_with_auto_compat(strategy: Any, call_name: str, features: Fea
 
 # --- Adapter ---
 
+
 def propose_with_logging(
     strategy: Any,
     features: FeatureBundle,
@@ -218,15 +227,21 @@ def propose_with_logging(
       - timeout_sec は簡易実装（実スレッド停止はしない）：計測超過時は success=False を log
       - 戻り値が dict/NamedTuple でも StrategyProposal に変換
     """
-    model = model_name or getattr(getattr(strategy, "__class__", None), "__name__", str(type(strategy).__name__))
+    model = model_name or getattr(
+        getattr(strategy, "__class__", None), "__name__", str(type(strategy).__name__)
+    )
     ver = model_version or getattr(strategy, "VERSION", "dev")
 
     # trace_id を決定（優先度: 引数 > コンテキスト > 自動生成）
     ctx = getattr(features, "context", None)
     ctx_dict = ctx.dict() if hasattr(ctx, "dict") else dict(ctx or {})
-    trace_id = trace_id or get_trace_id() or new_trace_id(
-        symbol=str(ctx_dict.get("symbol", "MULTI")),
-        timeframe=str(ctx_dict.get("timeframe", "1d")),
+    trace_id = (
+        trace_id
+        or get_trace_id()
+        or new_trace_id(
+            symbol=str(ctx_dict.get("symbol", "MULTI")),
+            timeframe=str(ctx_dict.get("timeframe", "1d")),
+        )
     )
 
     t0 = time.time()

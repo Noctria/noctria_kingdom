@@ -35,7 +35,9 @@ KING_LOG_PATH = LOGS_DIR / "king_log.jsonl"
 logger = logging.getLogger("king_routes")
 
 # ====== Airflow REST API 設定（.env で上書き可） ======
-AIRFLOW_BASE_URL = os.getenv("AIRFLOW_API_BASE", os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"))
+AIRFLOW_BASE_URL = os.getenv(
+    "AIRFLOW_API_BASE", os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080")
+)
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 TRAIN_DAG_ID = "train_prometheus_obs8"
@@ -85,6 +87,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+
 # ----------------------------------------
 # 既存：ログ/王コマンド
 # ----------------------------------------
@@ -98,10 +101,13 @@ def load_logs() -> List[Dict[str, Any]]:
         logger.error(f"🔴 load_logs失敗: {e}")
         return []
 
+
 # ❌ インポート時生成はやめる（モデル未配置でクラッシュするため）
 # king_instance = KingNoctria()
 
 _king_instance: Optional[KingNoctria] = None
+
+
 def get_king_instance() -> KingNoctria:
     """初回アクセス時にだけ KingNoctria を生成（モデル未配置時は 503 を返す）"""
     global _king_instance
@@ -110,11 +116,15 @@ def get_king_instance() -> KingNoctria:
             _king_instance = KingNoctria()
         except FileNotFoundError as e:
             logger.error("King初期化に失敗（モデル未配置）: %s", e)
-            raise HTTPException(status_code=503, detail="Prometheusモデル未配置。学習/デプロイ後に再実行してください。")
+            raise HTTPException(
+                status_code=503,
+                detail="Prometheusモデル未配置。学習/デプロイ後に再実行してください。",
+            )
         except Exception as e:
             logger.exception("King初期化に失敗: %s", e)
             raise HTTPException(status_code=500, detail=f"King初期化失敗: {e}")
     return _king_instance
+
 
 @router.post("/command")
 async def king_command_api(request: Request):
@@ -158,6 +168,7 @@ async def king_command_api(request: Request):
         logger.error(f"King command failed: {e}", exc_info=True)
         return JSONResponse(content={"error": f"King command failed: {str(e)}"}, status_code=500)
 
+
 @router.get("/history", response_class=HTMLResponse)
 async def show_king_history(request: Request):
     """
@@ -169,9 +180,11 @@ async def show_king_history(request: Request):
         return templates.TemplateResponse("king_history.html", {"request": request, "logs": logs})
     except Exception as e:
         logger.error(f"ログ読み込みエラー: {e}", exc_info=True)
-        return templates.TemplateResponse("king_history.html", {
-            "request": request, "logs": [], "error": f"ログ読み込みエラー: {str(e)}"
-        })
+        return templates.TemplateResponse(
+            "king_history.html",
+            {"request": request, "logs": [], "error": f"ログ読み込みエラー: {str(e)}"},
+        )
+
 
 # ----------------------------------------
 # Prometheus: 最新＆履歴（同一テンプレで表示）
@@ -191,6 +204,7 @@ def _resolve_latest_dir(base: Path) -> Optional[Path]:
         return None
     return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)[0]
 
+
 def _load_latest_model_info() -> Tuple[Optional[Path], Dict[str, Any]]:
     latest_dir = _resolve_latest_dir(MODELS_DIR)
     if not latest_dir:
@@ -203,6 +217,7 @@ def _load_latest_model_info() -> Tuple[Optional[Path], Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"metadata.json 読み込み失敗: {e}")
     return latest_dir, meta
+
 
 def _scan_model_history(limit: int = 30) -> List[Dict[str, Any]]:
     base = MODELS_DIR / PROJECT / ALGO / f"obs{OBS_DIM}"
@@ -222,6 +237,7 @@ def _scan_model_history(limit: int = 30) -> List[Dict[str, Any]]:
         rows.append({"dir": str(p), "name": p.name, "mtime": p.stat().st_mtime, "meta": meta})
     rows.sort(key=lambda r: r["mtime"], reverse=True)
     return rows[:limit]
+
 
 def _safe_promote_to_latest(target_dir: Path) -> None:
     base = MODELS_DIR / PROJECT / ALGO / f"obs{OBS_DIM}"
@@ -245,12 +261,14 @@ def _safe_promote_to_latest(target_dir: Path) -> None:
     except Exception:
         shutil.copytree(target_dir, latest)
 
+
 def _to_bool(v: Any, default: bool = True) -> bool:
     if isinstance(v, bool):
         return v
     if isinstance(v, str):
         return v.strip().lower() in ("1", "true", "yes", "y", "on")
     return default
+
 
 def _maybe_cast(v: Optional[str], caster, default=None):
     if v is None or v == "":
@@ -260,28 +278,36 @@ def _maybe_cast(v: Optional[str], caster, default=None):
     except Exception:
         return default
 
+
 def _airflow_trigger_train(conf: Dict[str, Any]) -> Dict[str, Any]:
     url = f"{AIRFLOW_BASE_URL}/api/v1/dags/{TRAIN_DAG_ID}/dagRuns"
-    r = requests.post(url, json={"conf": conf}, auth=HTTPBasicAuth(AIRFLOW_USER, AIRFLOW_PASSWORD), timeout=15)
+    r = requests.post(
+        url, json={"conf": conf}, auth=HTTPBasicAuth(AIRFLOW_USER, AIRFLOW_PASSWORD), timeout=15
+    )
     if r.status_code >= 300:
         raise RuntimeError(f"Airflow API error {r.status_code}: {r.text}")
     return r.json()
+
 
 @router.get("/prometheus", response_class=HTMLResponse)
 async def king_prometheus_dashboard(request: Request):
     latest_dir, meta = _load_latest_model_info()
     history_rows = _scan_model_history(limit=30)
-    return templates.TemplateResponse("king_prometheus.html", {
-        "request": request,
-        "latest_dir": str(latest_dir) if latest_dir else None,
-        "meta": meta,
-        "history_rows": history_rows,
-        "message": None,
-        "error": None,
-        "airflow_base": AIRFLOW_BASE_URL,
-        "train_dag_id": TRAIN_DAG_ID,
-        "presets": PRESETS,
-    })
+    return templates.TemplateResponse(
+        "king_prometheus.html",
+        {
+            "request": request,
+            "latest_dir": str(latest_dir) if latest_dir else None,
+            "meta": meta,
+            "history_rows": history_rows,
+            "message": None,
+            "error": None,
+            "airflow_base": AIRFLOW_BASE_URL,
+            "train_dag_id": TRAIN_DAG_ID,
+            "presets": PRESETS,
+        },
+    )
+
 
 @router.post("/prometheus/train", response_class=HTMLResponse)
 async def king_prometheus_train(
@@ -328,20 +354,34 @@ async def king_prometheus_train(
             logger.warning(f"load meta from {from_dir} failed: {e}")
 
     # 3) 画面入力（最優先）
-    if (v := _maybe_cast(TOTAL_TIMESTEPS, int)) is not None: conf["TOTAL_TIMESTEPS"] = v
-    if (v := _maybe_cast(learning_rate, float)) is not None: conf["learning_rate"] = v
-    if (v := _maybe_cast(n_steps, int)) is not None: conf["n_steps"] = v
-    if (v := _maybe_cast(batch_size, int)) is not None: conf["batch_size"] = v
-    if (v := _maybe_cast(n_epochs, int)) is not None: conf["n_epochs"] = v
-    if (v := _maybe_cast(gamma, float)) is not None: conf["gamma"] = v
-    if (v := _maybe_cast(gae_lambda, float)) is not None: conf["gae_lambda"] = v
-    if (v := _maybe_cast(ent_coef, float)) is not None: conf["ent_coef"] = v
-    if (v := _maybe_cast(vf_coef, float)) is not None: conf["vf_coef"] = v
-    if (v := _maybe_cast(max_grad_norm, float)) is not None: conf["max_grad_norm"] = v
-    if (v := _maybe_cast(clip_range, float)) is not None: conf["clip_range"] = v
-    if (v := _maybe_cast(clip_range_vf, float)) is not None: conf["clip_range_vf"] = v
-    if (v := _maybe_cast(seed, int)) is not None: conf["seed"] = v
-    if (v := _maybe_cast(eval_n_episodes, int)) is not None: conf["eval_n_episodes"] = v
+    if (v := _maybe_cast(TOTAL_TIMESTEPS, int)) is not None:
+        conf["TOTAL_TIMESTEPS"] = v
+    if (v := _maybe_cast(learning_rate, float)) is not None:
+        conf["learning_rate"] = v
+    if (v := _maybe_cast(n_steps, int)) is not None:
+        conf["n_steps"] = v
+    if (v := _maybe_cast(batch_size, int)) is not None:
+        conf["batch_size"] = v
+    if (v := _maybe_cast(n_epochs, int)) is not None:
+        conf["n_epochs"] = v
+    if (v := _maybe_cast(gamma, float)) is not None:
+        conf["gamma"] = v
+    if (v := _maybe_cast(gae_lambda, float)) is not None:
+        conf["gae_lambda"] = v
+    if (v := _maybe_cast(ent_coef, float)) is not None:
+        conf["ent_coef"] = v
+    if (v := _maybe_cast(vf_coef, float)) is not None:
+        conf["vf_coef"] = v
+    if (v := _maybe_cast(max_grad_norm, float)) is not None:
+        conf["max_grad_norm"] = v
+    if (v := _maybe_cast(clip_range, float)) is not None:
+        conf["clip_range"] = v
+    if (v := _maybe_cast(clip_range_vf, float)) is not None:
+        conf["clip_range_vf"] = v
+    if (v := _maybe_cast(seed, int)) is not None:
+        conf["seed"] = v
+    if (v := _maybe_cast(eval_n_episodes, int)) is not None:
+        conf["eval_n_episodes"] = v
     conf["eval_deterministic"] = _to_bool(eval_deterministic, True)
 
     message, error = None, None
@@ -354,17 +394,21 @@ async def king_prometheus_train(
 
     latest_dir, meta = _load_latest_model_info()
     history_rows = _scan_model_history(limit=30)
-    return templates.TemplateResponse("king_prometheus.html", {
-        "request": request,
-        "latest_dir": str(latest_dir) if latest_dir else None,
-        "meta": meta,
-        "history_rows": history_rows,
-        "message": message,
-        "error": error,
-        "airflow_base": AIRFLOW_BASE_URL,
-        "train_dag_id": TRAIN_DAG_ID,
-        "presets": PRESETS,
-    })
+    return templates.TemplateResponse(
+        "king_prometheus.html",
+        {
+            "request": request,
+            "latest_dir": str(latest_dir) if latest_dir else None,
+            "meta": meta,
+            "history_rows": history_rows,
+            "message": message,
+            "error": error,
+            "airflow_base": AIRFLOW_BASE_URL,
+            "train_dag_id": TRAIN_DAG_ID,
+            "presets": PRESETS,
+        },
+    )
+
 
 @router.post("/prometheus/promote", response_class=HTMLResponse)
 async def king_prometheus_promote(request: Request):
@@ -381,14 +425,17 @@ async def king_prometheus_promote(request: Request):
 
     latest_dir, meta = _load_latest_model_info()
     history_rows = _scan_model_history(limit=30)
-    return templates.TemplateResponse("king_prometheus.html", {
-        "request": request,
-        "latest_dir": str(latest_dir) if latest_dir else None,
-        "meta": meta,
-        "history_rows": history_rows,
-        "message": message,
-        "error": error,
-        "airflow_base": AIRFLOW_BASE_URL,
-        "train_dag_id": TRAIN_DAG_ID,
-        "presets": PRESETS,
-    })
+    return templates.TemplateResponse(
+        "king_prometheus.html",
+        {
+            "request": request,
+            "latest_dir": str(latest_dir) if latest_dir else None,
+            "meta": meta,
+            "history_rows": history_rows,
+            "message": message,
+            "error": error,
+            "airflow_base": AIRFLOW_BASE_URL,
+            "train_dag_id": TRAIN_DAG_ID,
+            "presets": PRESETS,
+        },
+    )

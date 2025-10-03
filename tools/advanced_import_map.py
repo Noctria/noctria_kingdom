@@ -28,7 +28,7 @@ def mod_name_from_path(p: str) -> str:
     ファイルパスからモジュール名を生成する。
     例: src/strategies/aurus_singularis.py → strategies.aurus_singularis
     """
-    parts = Path(p).with_suffix('').parts
+    parts = Path(p).with_suffix("").parts
     if parts and parts[0] == "src":
         parts = parts[1:]
     return ".".join(parts)

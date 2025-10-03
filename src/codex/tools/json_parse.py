@@ -1,14 +1,17 @@
 # codex/tools/json_parse.py
 from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 
 def load_json(path: Path) -> Dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
 
 def extract_failures(py_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -32,12 +35,15 @@ def extract_failures(py_json: Dict[str, Any]) -> List[Dict[str, Any]]:
             call = t.get("call") or {}
             if isinstance(call, dict):
                 msg = call.get("crash", call.get("message")) or call.get("outcome")
-            out.append({
-                "nodeid": nodeid,
-                "message": msg or "test failed",
-                "traceback": tb or "",
-            })
+            out.append(
+                {
+                    "nodeid": nodeid,
+                    "message": msg or "test failed",
+                    "traceback": tb or "",
+                }
+            )
     return out
+
 
 def build_pytest_result_for_inventor(py_json: Dict[str, Any]) -> Dict[str, Any]:
     return {"failures": extract_failures(py_json)}

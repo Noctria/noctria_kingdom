@@ -12,12 +12,13 @@ Plan層の特徴量DataFrame→AurusSingularis AI入力→予測シグナル出�
     $ python src/plan_data/plan_to_aurus_demo.py
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
+from src.plan_data.collector import ASSET_SYMBOLS, PlanDataCollector
 from src.plan_data.features import FeatureEngineer
-from src.plan_data.collector import PlanDataCollector, ASSET_SYMBOLS
 from src.strategies.aurus_singularis import AurusSingularis
+
 
 # ---------- 1. Plan層データ生成 ----------
 def generate_plan_features(n_days=15):
@@ -36,6 +37,7 @@ def generate_plan_features(n_days=15):
     feat_df = feat_df.tail(n_days).reset_index(drop=True)
     return feat_df
 
+
 # ---------- 2. DataFrame → AI向けdictへ変換 ----------
 def plan_row_to_aurus_dict(row: pd.Series) -> dict:
     """
@@ -46,9 +48,7 @@ def plan_row_to_aurus_dict(row: pd.Series) -> dict:
         "previous_price": float(row.get("USDJPY_Close", np.nan)),  # ここは連続データでshift可
         "volume": float(row.get("USDJPY_Volume", np.nan)),
         "volatility": float(row.get("USDJPY_Volatility_5d", np.nan)),
-        "sma_5_vs_20_diff": float(
-            row.get("USDJPY_MA5", np.nan) - row.get("USDJPY_MA25", np.nan)
-        ),
+        "sma_5_vs_20_diff": float(row.get("USDJPY_MA5", np.nan) - row.get("USDJPY_MA25", np.nan)),
         "macd_signal_diff": float(row.get("USDJPY_Return", np.nan)),  # 仮置き
         "trend_strength": 0.5,
         "trend_prediction": "neutral",
@@ -63,8 +63,9 @@ def plan_row_to_aurus_dict(row: pd.Series) -> dict:
         "interest_rate_diff": float(row.get("FEDFUNDS_Value", np.nan)),
         "cpi_change_rate": float(row.get("CPIAUCSL_Value", np.nan)),
         "news_sentiment_score": row.get("News_Positive_Ratio", 0.5),
-        "symbol": "USDJPY"
+        "symbol": "USDJPY",
     }
+
 
 # ---------- 3. Aurus AI予測デモ ----------
 def aurus_batch_predict(feat_df: pd.DataFrame, aurus: AurusSingularis):
@@ -74,20 +75,36 @@ def aurus_batch_predict(feat_df: pd.DataFrame, aurus: AurusSingularis):
     results = []
     for i, row in feat_df.iterrows():
         input_dict = plan_row_to_aurus_dict(row)
-        proposal = aurus.propose(input_dict, decision_id=f"DEMO-{i+1}", caller="plan_to_aurus_demo")
-        results.append({
-            "date": row.get("Date"),
-            "signal": proposal["signal"],
-            "confidence": proposal["confidence"]
-        })
+        proposal = aurus.propose(
+            input_dict, decision_id=f"DEMO-{i + 1}", caller="plan_to_aurus_demo"
+        )
+        results.append(
+            {
+                "date": row.get("Date"),
+                "signal": proposal["signal"],
+                "confidence": proposal["confidence"],
+            }
+        )
     return pd.DataFrame(results)
+
 
 # ---------- デモ実行部 ----------
 if __name__ == "__main__":
     print("=== Plan層→AurusSingularis データ受け渡しDEMO ===")
     # 1. 特徴量データ生成
     feat_df = generate_plan_features(n_days=15)
-    print("▶︎ Plan層特徴量サンプル（末尾3件）:\n", feat_df.tail(3)[["Date", "USDJPY_Close", "USDJPY_Volatility_5d", "USDJPY_RSI_14d", "News_Positive_Ratio"]])
+    print(
+        "▶︎ Plan層特徴量サンプル（末尾3件）:\n",
+        feat_df.tail(3)[
+            [
+                "Date",
+                "USDJPY_Close",
+                "USDJPY_Volatility_5d",
+                "USDJPY_RSI_14d",
+                "News_Positive_Ratio",
+            ]
+        ],
+    )
 
     # 2. AurusSingularis AIインスタンス
     aurus_ai = AurusSingularis()

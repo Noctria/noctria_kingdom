@@ -1,6 +1,5 @@
-from fastapi import FastAPI, HTTPException
 import requests
-import os
+from fastapi import FastAPI, HTTPException
 
 app = FastAPI()
 
@@ -8,6 +7,7 @@ app = FastAPI()
 AIRFLOW_USERNAME = "airflow"
 AIRFLOW_PASSWORD = "airflow"
 AIRFLOW_API_URL = "http://172.20.0.4:8080/api/v1/dags"
+
 
 @app.post("/trigger-dag")
 def trigger_dag():
@@ -20,7 +20,7 @@ def trigger_dag():
             trigger_url,
             auth=(AIRFLOW_USERNAME, AIRFLOW_PASSWORD),  # 🔐 認証追加
             json=payload,
-            timeout=5
+            timeout=5,
         )
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.text)

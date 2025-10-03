@@ -5,6 +5,7 @@ MODEL_ID = "NousResearch/Nous-Hermes-2-Mistral-7B-DPO"
 MODEL_DIR = "/noctria_kingdom/airflow_docker/models/nous-hermes-2"
 HF_TOKEN = os.getenv("HF_TOKEN")
 
+
 def download():
     if not HF_TOKEN:
         raise ValueError("❌ HF_TOKEN が未設定です。")
@@ -19,6 +20,7 @@ def download():
     tokenizer.save_pretrained(MODEL_DIR)
 
     print("✅ モデルダウンロード完了")
+
 
 if __name__ == "__main__":
     download()

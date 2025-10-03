@@ -1,0 +1,73 @@
+# ---------------------------------------------------
+# 変更管理テンプレ（Change Management Template）
+# ---------------------------------------------------
+change_management:
+  template:
+    change_id: "<YYYYMMDD>-<short-slug>"
+    title: "<短い要約>"
+    requester: "<human|king|agent-name>"
+    owner: "Noctria王"
+    created_at: "<UTC ISO8601>"
+    rationale:
+      problem: |
+        # 何が問題か（事実）— 例：直近5runでECEが0.35→0.41へ悪化
+      objective: |
+        # 何を達成したいか（定量目標）— 例：ECE<=0.35へ回復
+      scope: |
+        # 変更の範囲— 例：evaluate_veritas.py の温度校正パラメータのみ
+    impact_assessment:
+      metrics_baseline:
+        brier_avg_last5: <float>
+        ece_avg_last5: <float>
+        adv_pass_min_last5: <float>
+      risks:
+        - "過校正による汎化性能低下（ECE短期改善/Brier悪化）"
+        - "サンプル不足時のT推定不安定化"
+      mitigations:
+        - "ガード: guard_nll_deg<=0.05, guard_ece_improve_min>=0.02維持"
+        - "乾式リハーサル: オフラインrunで3回連続基準クリア時のみ適用"
+    rollout_plan:
+      dry_runs:
+        count: 3
+        cmd_examples:
+          - "PYTHONPATH=. python src/veritas/evaluate_veritas.py --calibrate-temperature --calib-objective both --calib-bins 12 --guard-nll-deg 0.05 --guard-ece-improve-min 0.02 --adv-keep 0.90"
+          - "PYTHONPATH=. ./scripts/log_kpi_from_reports.py --limit 1"
+          - "PYTHONPATH=. python scripts/plot_reliability.py --reports reports/veritas --limit 1"
+      acceptance_criteria:
+        - "直近3run平均: Brier <= baseline + 0.005"
+        - "直近3run平均: ECE <= baseline - 0.02"
+        - "Adv.pass 最低値 >= 0.40"
+      production_apply:
+        gated_by: "automation_gates.gate_full_autonomy"
+        toggle: "王の承認 or 人間承認(高リスク時)"
+    rollback_plan:
+      triggers:
+        - "Brier > baseline + 0.01（2run連続）"
+        - "ECE > baseline（2run連続）"
+        - "critical 発火 1回"
+      actions:
+        - "パラメータを直前版へ戻す（prior_T, bins, objective）"
+        - "直近runを除いた指標を再計算し影響範囲確認"
+        - "日次レポートに事後分析を追記"
+    approvals:
+      required: ["王（Noctria）","人間PM（高リスク変更時のみ）"]
+      record:
+        - approver: "<name|Noctria王>"
+          decision: "approved|rejected"
+          at: "<UTC ISO8601>"
+          note: "<補足>"
+    execution_log:
+      steps:
+        - at: "<UTC ISO8601>"
+          actor: "<king|agent|human>"
+          cmd: "<実行したコマンド or アクション>"
+          result: "<ok|warn|fail>"
+          artifacts:
+            - "reports/veritas/run_.../meta.json"
+            - "reports/veritas/run_.../reliability.png"
+      summary: |
+        # 変更前後のKPI差分、気づき、次のアクション
+  usage_notes:
+    - "日次レポート生成後に差分を見て、必要時のみ新規 change を起票"
+    - "乾式run→基準クリア→本番適用の順。gate基準に満たない場合は自動適用しない"
+    - "全ての判断・実行は execution_log に必ず記録する"

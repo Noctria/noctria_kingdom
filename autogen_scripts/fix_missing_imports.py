@@ -5,18 +5,9 @@ FOLDER = "./generated_code"
 
 # 必要なimportパターン
 IMPORT_RULES = [
-    {
-        "pattern": r"\bpd\.(DataFrame|Series)\b",
-        "import": "import pandas as pd"
-    },
-    {
-        "pattern": r"\bTuple\b",
-        "import": "from typing import Tuple"
-    },
-    {
-        "pattern": r"\bSequential\b",
-        "import": "from keras.models import Sequential"
-    },
+    {"pattern": r"\bpd\.(DataFrame|Series)\b", "import": "import pandas as pd"},
+    {"pattern": r"\bTuple\b", "import": "from typing import Tuple"},
+    {"pattern": r"\bSequential\b", "import": "from keras.models import Sequential"},
     # 追加パターンは随時ここに
 ]
 
@@ -27,12 +18,20 @@ for fname in os.listdir(FOLDER):
             code = f.read()
 
         # すでにimportされているものリスト化
-        existing_imports = set(re.findall(r"^import (.+)|^from (.+) import", code, flags=re.MULTILINE))
-        existing_import_lines = [line.strip() for line in code.splitlines() if line.strip().startswith("import") or line.strip().startswith("from")]
-        
+        existing_imports = set(
+            re.findall(r"^import (.+)|^from (.+) import", code, flags=re.MULTILINE)
+        )
+        existing_import_lines = [
+            line.strip()
+            for line in code.splitlines()
+            if line.strip().startswith("import") or line.strip().startswith("from")
+        ]
+
         new_imports = []
         for rule in IMPORT_RULES:
-            if re.search(rule["pattern"], code) and all(rule["import"] not in l for l in existing_import_lines):
+            if re.search(rule["pattern"], code) and all(
+                rule["import"] not in line for line in existing_import_lines
+            ):
                 new_imports.append(rule["import"])
 
         # 追加がある場合のみ書き換え

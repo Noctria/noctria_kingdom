@@ -1,0 +1,27 @@
+automations:
+  triggers:
+  - id: on_docs_changed
+    when: git.diff:docs
+    steps:
+    - run: git.diff_docs
+      with:
+        range: origin/main..HEAD
+    - remember:
+        project_state: docs_changed
+        last_diff_json: docs/_generated/diff_report.json
+    - run: weekly.consolidate
+    - run: git.auto_pr
+    - remember:
+        last_action: weekly_pr
+    - suggest:
+        NEXT_ACTIONS:
+        - PRのレビュー依頼
+        - マージ後のガバナンスYAMLの再読み込みと再起動確認
+  - id: on_precommit_blocked
+    when: precommit.blocked:pytest-heavy
+    steps:
+    - run: pytest.lite
+    - suggest:
+        NEXT_ACTIONS:
+        - heavyテストに @pytest.mark.heavy を付与
+        - pre-commit 除外パターンの見直し

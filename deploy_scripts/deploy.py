@@ -7,6 +7,7 @@ import shutil
 AIRFLOW_DAGS_DIR = "/opt/airflow/dags/generated"
 GENERATED_CODE_DIR = "./generated_code"
 
+
 def copy_generated_code():
     os.makedirs(AIRFLOW_DAGS_DIR, exist_ok=True)
     for filename in os.listdir(GENERATED_CODE_DIR):
@@ -16,6 +17,7 @@ def copy_generated_code():
             shutil.copy2(src, dst)
             print(f"Copied {filename} to Airflow DAGs folder.")
 
+
 def docker_build_and_push(tag):
     try:
         subprocess.run(["docker", "build", "-t", tag, "."], check=True)
@@ -23,6 +25,7 @@ def docker_build_and_push(tag):
         print(f"Docker image {tag} built and pushed successfully.")
     except subprocess.CalledProcessError as e:
         print(f"Error during Docker build/push: {e}")
+
 
 def main():
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -35,6 +38,7 @@ def main():
     docker_build_and_push(tag)
 
     print("Deployment completed.")
+
 
 if __name__ == "__main__":
     main()

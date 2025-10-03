@@ -3,6 +3,7 @@
 import gym
 import numpy as np
 
+
 class MetaAIEnv(gym.Env):
     """
     MetaAI向けの学習環境（OpenAI Gym形式）
@@ -62,7 +63,7 @@ class MetaAIEnv(gym.Env):
 
         return next_state, reward, done, {}
 
-    def render(self, mode='human'):
+    def render(self, mode="human"):
         """
         （オプション）環境の状態を可視化
         """

@@ -18,8 +18,9 @@ from core.path_config import (
     STRATEGY_OFFICIAL_DIR,
     ACT_LOG_DIR,
     PUSH_LOG_DIR,
-    GITHUB_REPO_URL  # "https://github.com/Noctria/noctria_kingdom"
+    GITHUB_REPO_URL,  # "https://github.com/Noctria/noctria_kingdom"
 )
+
 
 def get_latest_commit_hash() -> str:
     try:
@@ -27,9 +28,11 @@ def get_latest_commit_hash() -> str:
     except subprocess.CalledProcessError:
         return "unknown"
 
+
 def get_github_url(strategy_path: Path) -> str:
     rel_path = strategy_path.relative_to(Path.cwd())
     return f"{GITHUB_REPO_URL}/blob/main/{rel_path.as_posix()}"
+
 
 def load_act_logs() -> list:
     logs = []
@@ -42,6 +45,7 @@ def load_act_logs() -> list:
         except:
             continue
     return logs
+
 
 def push_to_github():
     pushed = 0
@@ -76,7 +80,7 @@ def push_to_github():
             "pushed_by": "veritas_auto",
             "commit": commit_hash,
             "github_url": github_url,
-            "pushed": True
+            "pushed": True,
         }
 
         log_file_name = f"{datetime.now().isoformat().replace(':', '-')}_{strategy_name}.json"
@@ -93,6 +97,7 @@ def push_to_github():
 
     if pushed == 0:
         print("🔍 Push対象はありませんでした。")
+
 
 if __name__ == "__main__":
     print("👑 Noctria Kingdom: GitHub Push スクリプト起動")

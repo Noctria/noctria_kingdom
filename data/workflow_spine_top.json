@@ -1,0 +1,125 @@
+{
+  "legend_mt5_order": {
+    "score": 1.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": [
+      "hint:mt5",
+      "hint:order"
+    ]
+  },
+  "legend_backtest": {
+    "score": 0.5,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": [
+      "hint:backtest"
+    ]
+  },
+  "legend_forwardtest": {
+    "score": 0.5,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": [
+      "hint:forward"
+    ]
+  },
+  "legend_pdca": {
+    "score": 0.5,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": [
+      "hint:pdca"
+    ]
+  },
+  "legend_settlement": {
+    "score": 0.5,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": [
+      "hint:settle"
+    ]
+  },
+  "legend_airflow": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_analyze": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_collect": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_docs": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_fintokei_check": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_gui": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_merge_info": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_plan": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_replanning": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_result_analyze": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  },
+  "legend_spine": {
+    "score": 0.0,
+    "fanin": 0,
+    "fanout": 0,
+    "stage_bridges": 0,
+    "flags": []
+  }
+}

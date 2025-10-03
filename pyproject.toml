@@ -1,0 +1,62 @@
+[tool.ruff]
+extend = "ruff-baseline.toml"
+target-version = "py311"
+line-length = 100
+src = ["src", "scripts", "tests", "noctria_gui"]
+
+# まずは壊れがちな領域を広く除外（段階的に戻す前提）
+extend-exclude = [
+  "_graveyard",
+  "generated_code",
+  "actions-runner/_work",
+  "**/.ipynb_checkpoints",
+  "data/models/*.zip",
+  "mt5_test.py",
+
+  # 追加の暫定除外（段階的に戻す）
+  "noctria_gui",
+  "deploy_scripts",
+  "scripts",
+  "data",
+  "tools",
+  "llm_server",
+  "order_api.py",
+  "conversation_history_manager.py",
+  "add_ai_label.py",
+]
+
+[tool.ruff.lint]
+# まずは致命系（E/F）＋ import整形（I）のみに絞る
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# tests は先頭以外の import/E402 などを当面許容
+"tests/*.py" = ["F403", "F405", "E402", "I001"]
+"tests/test_policy_guard.py" = ["F841"]
+"tests/test_noctria.py" = ["I001"]
+"tests/test_noctria_master_ai.py" = ["I001"]
+
+# 構造的に直すまでのピン留め
+"src/codex/prompts/loader.py" = ["E402"]
+"src/codex/run_codex_cycle.py" = ["E402", "F404"]
+"src/plan_data/trace.py" = ["E402"]
+"src/plan_data/quality_gate.py" = ["E402", "F821"]
+"src/codex/mini_loop.py" = ["F841"]
+
+[tool.ruff.format]
+# format 側にも同じ除外
+exclude = [
+  "_graveyard",
+  "generated_code",
+  "actions-runner/_work",
+  "**/.ipynb_checkpoints",
+  "data/models/*.zip",
+  "mt5_test.py",
+  "noctria_gui",
+  "deploy_scripts",
+  "scripts",
+  "data",
+  "tools",
+  "llm_server",
+]

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import shutil
 import tempfile
 from dataclasses import asdict, is_dataclass
@@ -34,6 +33,7 @@ except Exception:  # pragma: no cover
 
 # ========== JSON セーフ化ユーティリティ ==========
 
+
 def _finite_to_string(x: float) -> Union[float, str]:
     """inf/NaN を JSON セーフな文字列に変換（規格準拠）。"""
     if isinstance(x, float):
@@ -53,7 +53,14 @@ def _np_to_base(obj: Any) -> Any:
     if isinstance(obj, np.ndarray):
         # 配列は大きくなる可能性があるため、サイズが大きい場合は要約
         if obj.size <= 64:
-            return [_finite_to_string(float(v)) if isinstance(v, (float, np.floating)) else _np_to_base(v) for v in obj.tolist()]
+            return [
+                (
+                    _finite_to_string(float(v))
+                    if isinstance(v, (float, np.floating))
+                    else _np_to_base(v)
+                )
+                for v in obj.tolist()
+            ]
         # 要約（min/max/shape）
         try:
             _min = float(np.nanmin(obj))
@@ -100,7 +107,10 @@ def _space_to_spec(space: Any) -> Dict[str, Any]:
             nvec = [int(v) for v in nvec.tolist()]
         return {"space": "MultiDiscrete", "nvec": nvec}
     if isinstance(space, gym_spaces.Dict):
-        return {"space": "Dict", "spaces": {k: _space_to_spec(v) for k, v in space.spaces.items()}}
+        return {
+            "space": "Dict",
+            "spaces": {k: _space_to_spec(v) for k, v in space.spaces.items()},
+        }
     if isinstance(space, gym_spaces.Tuple):
         return {"space": "Tuple", "spaces": [_space_to_spec(s) for s in space.spaces]}
     # その他は文字列で
@@ -131,7 +141,7 @@ def _to_jsonsafe(obj: Any) -> Any:
         pass
 
     # Path
-    if isinstance(obj, (Path, )):
+    if isinstance(obj, (Path,)):
         return str(obj)
 
     # datetime
@@ -155,6 +165,7 @@ def _to_jsonsafe(obj: Any) -> Any:
 
 
 # ========== パス構築/観測次元推定 ==========
+
 
 def build_model_path(
     base_dir: Union[str, Path],
@@ -225,6 +236,7 @@ def infer_obs_dim_from_env(env: Any) -> int:
 
 
 # ========== メタデータ書き込み/アトミック保存 ==========
+
 
 def _write_metadata(meta_path: Union[str, Path], payload: Dict[str, Any]) -> None:
     meta_path = Path(meta_path)
@@ -300,11 +312,13 @@ def atomic_save_model(
                 obs_dim = None
                 env_info["obs_dim_error"] = str(e)
 
-            env_info.update({
-                "env_class": f"{env.__class__.__module__}:{env.__class__.__name__}",
-                "observation_space": _to_jsonsafe(getattr(env, "observation_space", None)),
-                "action_space": _to_jsonsafe(getattr(env, "action_space", None)),
-            })
+            env_info.update(
+                {
+                    "env_class": f"{env.__class__.__module__}:{env.__class__.__name__}",
+                    "observation_space": _to_jsonsafe(getattr(env, "observation_space", None)),
+                    "action_space": _to_jsonsafe(getattr(env, "action_space", None)),
+                }
+            )
 
             # 任意で env 側に config があれば拾う
             for k in ("config", "kwargs", "params"):

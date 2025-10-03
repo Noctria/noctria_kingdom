@@ -2,6 +2,7 @@
 
 import numpy as np
 
+
 class LSTMDataProcessor:
     """
     取得した市場データを、LSTM学習・予測用のシーケンスに変換するクラス。
@@ -21,7 +22,7 @@ class LSTMDataProcessor:
         """
         X, y = [], []
         for i in range(len(data) - self.window_size):
-            X.append(data[i:i + self.window_size])
+            X.append(data[i : i + self.window_size])
             y.append(data[i + self.window_size][0])  # 予測対象は最初の特徴量と仮定
         return np.array(X), np.array(y)
 
@@ -33,5 +34,5 @@ class LSTMDataProcessor:
         """
         if len(data) < self.window_size:
             raise ValueError("データ長がwindow_size未満です")
-        sequence = data[-self.window_size:]
+        sequence = data[-self.window_size :]
         return sequence.reshape(1, self.window_size, -1)
