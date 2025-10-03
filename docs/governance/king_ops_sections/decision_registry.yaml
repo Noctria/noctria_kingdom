@@ -1,0 +1,111 @@
+# =======================================================
+# Decision Registry（レポート突合＆自動ルール）
+# =======================================================
+decision_registry:
+  storage: "docs/decisions/index.json"
+  timezone: "UTC"
+
+  schema:
+    # index.json に格納する1レコードの最低スキーマ
+    fields_required:
+      - decision_id          # ex: 20250312-ece-warn-a1
+      - level                # NONE|WARN|CRITICAL
+      - metric               # brier_score|ece_calibration|adversarial_pass_rate|availability|latency|...
+      - time_utc
+      - status               # draft|open|monitoring|closed|rolled_back
+      - owner                # king|noctus|...
+      - links                # {daily, change_draft, files[]}
+    fields_optional:
+      - consecutive
+      - deviation_signed
+      - triage_category
+      - success_criteria_line
+      - next_check_date
+      - notes
+
+  id_rules:
+    pattern: "{YYYYMMDD}-{metric}-{level-lower}-{suffix}"
+    suffix_series: ["a1","a2","a3","b1","b2"]  # 同日・同指標での連番
+    collision: "auto-increment-suffix"
+
+  status_lifecycle:
+    transitions:
+      - from: "draft"      ; to: ["open","closed"]
+      - from: "open"       ; to: ["monitoring","closed","rolled_back"]
+      - from: "monitoring" ; to: ["closed","rolled_back"]
+      - from: "rolled_back"; to: ["closed"]
+    guards:
+      - "closed へ遷移時は success_criteria_line の達成可否を記録"
+      - "rolled_back は対応する change_draft の rollback_plan.trigger を引用"
+
+  validators:
+    - name: "bidirectional_links"
+      rule: "links.change_draft があれば、change_draft 側にも Decision ID があること"
+      on_fail: "weekly 合議で修復PRを自動起票（draft）"
+    - name: "run_refs_exist"
+      rule: "daily/decisionファイルのパスが実在 & Gitに追跡されていること"
+    - name: "metric_enum"
+      rule: "metric は kpi_definitions または contracts/api 由来の拡張集合に含まれること"
+
+  auto_crosscheck:
+    with_daily_report: true
+    schedule_cron: "*/15 * * * *"   # 15分毎に突合
+    grace_minutes: 30               # アラート発報から起票までの許容
+    rule_examples:
+      - "daily.alerts.* → Decision.required if level in [WARN,CRITICAL]"
+      - "slo_burn.*critical → Decision.required"
+      - "api_incident.triggered → Decision.required(level=CRITICAL, metric='availability'|'latency')"
+    actions_on_violation:
+      - "draftとして自動起票（owner=king, status=draft, notes='auto-created by crosscheck'})"
+      - "cadence.daily の次回会で提示（missing list）"
+
+  deduplication:
+    key: ["date","metric","level"]
+    merge_strategy:
+      keep: "earliest"
+      fold_fields: ["notes"]
+      link_union: true
+
+  mappings:
+    latency_hot:
+      action: "bins固定DRY"
+      template_decision: "document_templates.decision_log"
+      success_criteria: "p95 24h移動中央値がSLO以内"
+      default_orders:
+        - "scripts.evaluate_veritas --calib-bins 10 --dry-run"
+        - "observabilityチェック：predict_latency_ms_p95 を注視"
+      cooldown_minutes: 30
+
+    availability_drop:
+      action: "breaker検討"
+      template_decision: "document_templates.decision_log"
+      success_criteria: "可用性の long-window が SLO を 24h 維持"
+      require_human_ack: true
+      link_change_template: "document_templates.change_draft"
+      cooldown_minutes: 15
+
+  bidirectional_linking: "document_templates.change_draft.bidirectional_links_guideline"
+
+  suppression:
+    maintenance_windows:
+      - { cron: "0 9 * * *", duration_minutes: 20 }  # 既存FT締切と整合
+    ignore_if:
+      - "daily_report.front_matter.tags includes 'maintenance'"
+
+  audit:
+    log_path: "docs/audit/{YYYY}/{YYYYMMDD}.log"
+    events:
+      - "utc=<ts> | action=auto_draft | id=<decision_id> | source=crosscheck | result=<ok|skip>"
+      - "utc=<ts> | action=status_change | id=<decision_id> | from=<src> | to=<dst> | by=<actor>"
+
+  metrics:
+    export:
+      - "decision_mtta_minutes"     # アラート→起票まで
+      - "decision_mttr_hours"       # 起票→closedまで
+      - "decision_open_count"
+      - "decision_auto_drafted_count"
+
+  cli:
+    create: "python tools/decision_registry.py create --metric ece_calibration --level WARN --orders '...' --links daily=... "
+    link:   "python tools/decision_registry.py link --id <decision_id> --change <path>"
+    close:  "python tools/decision_registry.py close --id <decision_id> --result pass|fail --note '...'"

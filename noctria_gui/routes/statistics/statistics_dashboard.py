@@ -1,3 +1,4 @@
+# [NOCTRIA_CORE_REQUIRED]
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -7,21 +8,56 @@
 - フィルタ・ソート機能
 - CSVエクスポート機能 (/export)
 - 戦略比較機能 (/strategy_compare)
+- 予測可視化: forecast.json をダッシュボードに同梱（/forecast/raw で生JSONも提供）
 """
 
+import json
 import logging
+import os
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
 
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
 from noctria_gui.services import statistics_service
 
 # プレフィックスは外部で付与される想定
 router = APIRouter(tags=["Statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
+
+# 予測JSONの既定パス（環境変数で上書き可）
+FORECAST_JSON_PATH = Path(
+    os.getenv("NOCTRIA_FORECAST_JSON", "data/oracle/forecast.json")
+).resolve()
+
+
+def _load_forecast_json() -> tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """
+    forecast.json を読み込み、(data, meta) を返す。
+    data は dict または None。meta は path/mtime/warning を含む。
+    """
+    meta: Dict[str, Any] = {"path": str(FORECAST_JSON_PATH), "mtime": None, "warning": None}
+    if not FORECAST_JSON_PATH.exists():
+        meta["warning"] = "forecast.json が見つかりません。PrometheusOracle 実行後に生成されます。"
+        return None, meta
+
+    try:
+        mtime = datetime.fromtimestamp(FORECAST_JSON_PATH.stat().st_mtime)
+        meta["mtime"] = mtime.isoformat(timespec="seconds")
+        with FORECAST_JSON_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        # 最小限の正当性点検（必須ではないが、壊れたJSONの早期検知）
+        if not isinstance(data, dict):
+            meta["warning"] = "forecast.json の形式が想定外です（dict ではありません）。"
+        return data if isinstance(data, dict) else None, meta
+    except Exception as e:
+        logging.warning(f"Failed to load forecast.json: {e}", exc_info=True)
+        meta["warning"] = f"forecast.json の読み込みに失敗: {e}"
+        return None, meta
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -29,6 +65,7 @@ templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 async def show_statistics_dashboard(request: Request):
     """
     📈 HUDスタイル統計ダッシュボードと戦略一覧を表示（フィルタ付き）
+    追加: forecast.json を読み込み、テンプレに 'forecast' / 'forecast_meta' として渡す。
     """
     strategy = request.query_params.get("strategy", "").strip() or None
     symbol = request.query_params.get("symbol", "").strip() or None
@@ -52,6 +89,9 @@ async def show_statistics_dashboard(request: Request):
             logs=filtered_logs, sort_key="win_rate", descending=True
         )
 
+        # 予測の読み込み（無くても落とさない）
+        forecast, forecast_meta = _load_forecast_json()
+
     except Exception as e:
         logging.error(f"Failed to process statistics data: {e}", exc_info=True)
         # エラー発生時も最低限の表示ができるように空のデータを渡す
@@ -64,6 +104,8 @@ async def show_statistics_dashboard(request: Request):
                 "strategies": [],
                 "symbols": [],
                 "filters": {},
+                "forecast": None,
+                "forecast_meta": {"path": str(FORECAST_JSON_PATH), "mtime": None, "warning": str(e)},
                 "error": "統計データの処理中にエラーが発生しました。",
             },
         )
@@ -82,8 +124,23 @@ async def show_statistics_dashboard(request: Request):
                 "start_date": start_date or "",
                 "end_date": end_date or "",
             },
+            # 追加: 予測（テンプレで任意に可視化可能）
+            "forecast": forecast,  # 例: {"horizon":[...], "pred":[...], "conf_int":[...]} 等の想定
+            "forecast_meta": forecast_meta,  # {"path": "...", "mtime": "...", "warning": "..."}
         },
     )
+
+
+@router.get("/forecast/raw", response_class=JSONResponse)
+async def get_forecast_raw():
+    """
+    🌤 予測JSONの生データを返す API（ダッシュボード未対応でも確認できるように）
+    """
+    data, meta = _load_forecast_json()
+    if data is None:
+        # ファイルが無い/壊れている
+        return JSONResponse({"ok": False, "data": None, "meta": meta}, status_code=404)
+    return JSONResponse({"ok": True, "data": data, "meta": meta})
 
 
 @router.get("/export")
@@ -93,6 +150,7 @@ async def export_statistics_csv():
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = TOOLS_DIR / f"strategy_statistics_{timestamp}.csv"
+    output_path.parent.mkdir(parents=True, exist_ok=True)  # 追加: 出力先を自動作成
 
     try:
         logs = statistics_service.load_all_logs()
@@ -117,7 +175,7 @@ async def strategy_compare(request: Request):
     all_logs = statistics_service.load_all_logs()
     available_strategies = statistics_service.get_available_strategies(all_logs)
 
-    context = {
+    context: Dict[str, Any] = {
         "request": request,
         "strategies": available_strategies,
         "strategy_1": strategy_1,

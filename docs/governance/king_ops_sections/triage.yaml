@@ -1,0 +1,65 @@
+# =======================================================
+# 原因トリアージテンプレ（KPI悪化時の原因仮説の定形）
+# =======================================================
+triage:
+  categories:
+    - code: "DATA_MISSING"
+      label: "データ不足"
+      description: "市場データや外部指標の欠落/遅延により評価が不安定。欠損率・遅延・外部API失敗などを点検。"
+      suggested_checks:
+        - "collector の失敗ログとリトライ状況"
+        - "特徴量テーブルの null 率 / 時系列整合"
+        - "休日/メンテによるサンプル不足の影響排除"
+      suggested_actions:
+        - "不足期間の再収集・補間（前方/線形/週次プロファイル）"
+        - "評価runの除外条件強化（min_samples, lookback調整）"
+
+    - code: "OVERFITTING"
+      label: "モデル過校正"
+      description: "過学習や最適化の行き過ぎにより汎化性能低下。検証/本番での乖離を伴う。"
+      suggested_checks:
+        - "学習/検証の分割リーク・特徴量リーク"
+        - "ハイパラの過剰最適化（試行回数・探索範囲の過多）"
+        - "温度スケーリングでECEだけ改善・Brier悪化していないか"
+      suggested_actions:
+        - "正則化強化/特徴量削減/単純モデルでのAB比較"
+        - "早期打切り/探索制限/再現性固定（seed, fold）"
+
+    - code: "SHIFT"
+      label: "分布シフト"
+      description: "市場環境やデータ分布が過去と乖離。レジーム変更やイベント起因の可能性。"
+      suggested_checks:
+        - "入力分布の漂移（PSI/KL），ボラ/相関の変化"
+        - "レジーム検出器の発火状況と期間の整合"
+      suggested_actions:
+        - "特徴量の頑健化・ドメイン適応・レジーム別モデル"
+        - "評価セットの再サンプリング/期間分解での性能確認"
+
+    - code: "BUG"
+      label: "実装バグ"
+      description: "コード欠陥やパイプライン異常による問題。テスト失敗/例外/異常なメトリクス形状を伴う。"
+      suggested_checks:
+        - "CI/pytest の失敗件数・スタックトレース"
+        - "直近コミット差分（ラベル作成・閾値処理・I/O）"
+      suggested_actions:
+        - "再現手順の最小化・回帰テスト追加"
+        - "バグ修正PR → 乾式runで検証 → 本流反映"
+
+    - code: "UNKNOWN"
+      label: "未分類"
+      description: "その他/要追加調査。ログの粒度を上げ、暫定回避策で延命しながら原因探索を続行。"
+      suggested_actions:
+        - "ログ粒度の引き上げ（観測/計測ポイント追加）"
+        - "手動レビュー/メタデータ可視化の追加"
+
+  default: "UNKNOWN"
+
+  rules:
+    - if: "kpi_drop_ratio > 0.10 and missing_ratio > 0.30"
+      then: "DATA_MISSING"
+    - if: "kpi_drop_ratio > 0.20 and past_runs_stable is true"
+      then: "SHIFT"
+    - if: "failed_tests_count > 0 or exceptions_count > 0"
+      then: "BUG"
+    - if: "ece_improves and brier_worsens"
+      then: "OVERFITTING"

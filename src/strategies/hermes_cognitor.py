@@ -1,3 +1,4 @@
+# [NOCTRIA_CORE_REQUIRED]
 # src/strategies/hermes_cognitor.py
 # -*- coding: utf-8 -*-
 """

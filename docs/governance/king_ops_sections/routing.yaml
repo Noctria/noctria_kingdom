@@ -1,0 +1,10 @@
+routing:
+  intents:
+    - match: "依存|インストール|pip"
+      prefer_tools: ["deps.install_gui"]
+    - match: "ランナー|Actions|smoke"
+      prefer_tools: ["gh.runner_smoke"]
+    - match: "差分|docs|レポート"
+      prefer_tools: ["git.diff_docs"]
+  fallbacks:
+    - "pytest.lite"

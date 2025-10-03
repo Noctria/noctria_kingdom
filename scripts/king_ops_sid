@@ -1,0 +1,60 @@
+# 先頭の方に追加
+import os, json, requests
+CLOUD_BASE = os.getenv("OPENAI_BASE_URL_CLOUD", "https://api.openai.com").rstrip("/")
+CLOUD_KEY  = os.getenv("OPENAI_API_KEY_CLOUD", "")
+ROUTE_MODE = os.getenv("ROUTE_MODE", "auto")
+ROUTE_RULES = json.loads(os.getenv("ROUTE_RULES", '{"max_tokens_cloud_threshold":400,"force_cloud_header":"X-Force-GPU","cloud_model_prefixes":["gpt-","o4","gpt-4o","gpt-4.1"]}'))
+MODEL_ALLOWLIST = set(filter(None, os.getenv("MODEL_ALLOWLIST","").split(",")))
+
+def _choose_backend(path:str, body:bytes|None, headers:dict) -> str:
+    # 明示クラウド（モデル名プリフィクス）
+    try:
+        j = json.loads(body.decode("utf-8")) if body else {}
+    except Exception:
+        j = {}
+    model = (j.get("model") or "").strip()
+    max_tokens = int(j.get("max_tokens") or 0)
+    force = headers.get(ROUTE_RULES.get("force_cloud_header","X-Force-GPU"), None) is not None
+    if any(model.startswith(p) for p in ROUTE_RULES.get("cloud_model_prefixes",[])):
+        return "cloud"
+    if force:
+        return "cloud"
+    if ROUTE_MODE == "cloud":
+        return "cloud"
+    if ROUTE_MODE == "auto" and max_tokens > ROUTE_RULES.get("max_tokens_cloud_threshold",400):
+        return "cloud"
+    return "local"
+
+# 既存 passthru を置換
+def passthru(path: str, method: str = "GET", body: any = None, headers: dict | None = None) -> requests.Response:
+    headers = headers or {}
+    # Allowlist（あればチェック）
+    if method == "POST" and body:
+        try:
+            j = json.loads(body if isinstance(body,str) else body.decode("utf-8"))
+            m = j.get("model")
+            if MODEL_ALLOWLIST and m not in MODEL_ALLOWLIST:
+                return requests.Response()  # 後段で400に変換するならここで空返却可
+        except Exception:
+            pass
+
+    backend = _choose_backend(path, body if isinstance(body, (bytes,bytearray)) else (body.encode("utf-8") if isinstance(body,str) else None), headers)
+    if backend == "cloud":
+        base = CLOUD_BASE
+        auth = f"Bearer {CLOUD_KEY}"
+    else:
+        base = DOWNSTREAM
+        auth = os.getenv("OPENAI_API_KEY","ollama-local")
+
+    url = f"{base}{path}"
+    h = dict(headers)
+    h["Authorization"] = auth
+    h["Connection"] = "close"
+    h["Accept-Encoding"] = "identity"
+
+    if method == "GET":
+        return requests.get(url, headers=h, timeout=60)
+    elif method == "POST":
+        return requests.post(url, data=body, headers=h, timeout=600)
+    else:
+        raise ValueError(f"Unsupported method: {method}")

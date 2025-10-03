@@ -1,3 +1,4 @@
+# [NOCTRIA_CORE_REQUIRED]
 # src/plan_data/observability.py
 from __future__ import annotations
 
@@ -8,6 +9,9 @@ import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional, Tuple
+
+# ★ trace_id 自動補完
+from .trace import get_trace_id
 
 # =============================================================================
 # Observability with graceful modes:
@@ -472,6 +476,7 @@ def _log_plan_phase(
     error_rate: float,
     trace_id: Optional[str] = None,
 ) -> Optional[int]:
+    trace_id = trace_id or get_trace_id()
     mode = _effective_mode(conn_str)
     payload = {
         "phase": phase,
@@ -516,13 +521,14 @@ def _log_plan_phase(
 
 def _log_plan_status(
     *,
-    trace_id: str,
+    trace_id: str | None,
     status: str,
     started_at: Optional[datetime] = None,
     finished_at: Optional[datetime] = None,
     meta: Optional[Dict[str, Any]] = None,
     conn_str: Optional[str] = None,
 ) -> Optional[int]:
+    trace_id = trace_id or get_trace_id()
     mode = _effective_mode(conn_str)
     payload = {
         "trace_id": trace_id,
@@ -567,6 +573,10 @@ def _log_plan_status(
 
 
 def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
+    # ★ trace_id を自動補完
+    trace_id = kwargs.get("trace_id") or get_trace_id()
+    kwargs["trace_id"] = trace_id
+
     mode = _effective_mode(conn_str)
 
     # GUI互換（ai_name/params_json/metrics_json系）
@@ -584,23 +594,16 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             _stdout_event("INFER(gui,no-dsn)", payload)
             return None
 
-        trace_id: Optional[str] = kwargs.get("trace_id")
-        ai_name: Optional[str] = kwargs.get("ai_name")
         started_at_raw = kwargs.get("started_at")
         ended_at_raw = kwargs.get("ended_at")
-        status: Optional[str] = kwargs.get("status")
-        note: Optional[str] = kwargs.get("note", "")
-        params_json = kwargs.get("params_json") or {}
-        metrics_json = kwargs.get("metrics_json") or {}
 
-        started_at = started_at_raw
-        ended_at = ended_at_raw
-        duration_ms: Optional[int] = None
         try:
             if started_at_raw and ended_at_raw:
                 s = datetime.fromisoformat(str(started_at_raw).replace("Z", "+00:00"))
                 e = datetime.fromisoformat(str(ended_at_raw).replace("Z", "+00:00"))
                 duration_ms = max(0, int((e - s).total_seconds() * 1000))
+            else:
+                duration_ms = None
         except Exception:
             duration_ms = None
 
@@ -613,16 +616,16 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         )
         params = (
             trace_id,
-            ai_name,
-            started_at,
-            ended_at,
-            status,
-            note,
-            _json(params_json),
-            _json(metrics_json),
+            kwargs.get("ai_name"),
+            started_at_raw,
+            ended_at_raw,
+            kwargs.get("status"),
+            kwargs.get("note", ""),
+            _json(kwargs.get("params_json") or {}),
+            _json(kwargs.get("metrics_json") or {}),
             duration_ms,
             duration_ms,
-            started_at or _utcnow(),
+            started_at_raw or _utcnow(),
         )
         try:
             row = _fetchone(dsn, sql, params)
@@ -631,7 +634,7 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             logger.warning(
                 "log_infer_call(gui-compat) failed: %s (ai_name=%s, trace_id=%s)",
                 e,
-                ai_name,
+                kwargs.get("ai_name"),
                 trace_id,
             )
             return None
@@ -662,7 +665,6 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             _stdout_event("INFER(new,no-dsn)", payload)
             return None
 
-        trace_id: Optional[str] = kwargs.get("trace_id")
         model_name: Optional[str] = kwargs.get("model_name") or kwargs.get("model")
         model: Optional[str] = kwargs.get("model") or kwargs.get("model_name")
         ver: Optional[str] = kwargs.get("ver") or kwargs.get("model_version")
@@ -682,9 +684,6 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
         except Exception:
             staleness = 0
 
-        inputs = kwargs.get("inputs")
-        outputs = kwargs.get("outputs")
-
         sql = (
             "INSERT INTO obs_infer_calls "
             "(trace_id, model_name, model, ver, call_at, duration_ms, dur_ms, success, feature_staleness_min, "
@@ -702,8 +701,8 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
             ms_val,
             bool(success),
             staleness,
-            _json(inputs or {}),
-            _json(outputs or {}),
+            _json(kwargs.get("inputs") or {}),
+            _json(kwargs.get("outputs") or {}),
         )
         try:
             row = _fetchone(dsn, sql, params)
@@ -749,7 +748,6 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
     except Exception:
         feature_staleness_min = 0
 
-    trace_id: Optional[str] = kwargs.get("trace_id")
     sql = (
         "INSERT INTO obs_infer_calls (ts, model, ver, dur_ms, success, feature_staleness_min, trace_id, duration_ms) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
@@ -774,7 +772,7 @@ def log_infer_call(conn_str: Optional[str] = None, **kwargs) -> Optional[int]:
 
 def log_decision(
     *,
-    trace_id: str,
+    trace_id: str | None = None,
     engine_version: str,
     strategy_name: str,
     score: float,
@@ -784,6 +782,7 @@ def log_decision(
     made_at: Optional[datetime] = None,
     conn_str: Optional[str] = None,
 ) -> Optional[int]:
+    trace_id = trace_id or get_trace_id()
     mode = _effective_mode(conn_str)
     payload = {
         "trace_id": trace_id,
@@ -835,7 +834,7 @@ def log_decision(
 
 def log_exec_event(
     *,
-    trace_id: str,
+    trace_id: str | None = None,
     symbol: str,
     side: str,
     size: float,
@@ -846,6 +845,7 @@ def log_exec_event(
     sent_at: Optional[datetime] = None,
     conn_str: Optional[str] = None,
 ) -> Optional[int]:
+    trace_id = trace_id or get_trace_id()
     mode = _effective_mode(conn_str)
     payload = {
         "trace_id": trace_id,
@@ -908,6 +908,7 @@ def log_alert(
     created_at: Optional[datetime] = None,
     conn_str: Optional[str] = None,
 ) -> Optional[int]:
+    trace_id = trace_id or get_trace_id()
     mode = _effective_mode(conn_str)
     payload = {
         "created_at": (created_at or _utcnow()).isoformat(),
@@ -962,6 +963,7 @@ def emit_alert(
     推奨API：policy_name= "PLAN.<subsystem>.<kind>" などの規約名で呼ぶ。
     例) emit_alert(kind="STATS.MISSING_CLOSE", reason="no *_close columns", severity="HIGH", trace_id=...)
     """
+    trace_id = trace_id or get_trace_id()
     policy_name = (
         f"PLAN.{kind}" if not kind.startswith(("PLAN.", "DECISION.", "EXEC.", "AI.")) else kind
     )
@@ -975,7 +977,6 @@ def emit_alert(
     )
 
 
-# --- ping & exports -----------------------------------------------------------
 def ping(conn_str: Optional[str] = None) -> bool:
     mode = _effective_mode(conn_str)
     if mode == "off":

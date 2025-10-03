@@ -37,6 +37,6 @@ def test_path_exists(name):
     """各パスがPathオブジェクトであることを検証"""
     value = getattr(path_config, name, None)
     assert value is not None, f"{name} is not defined"
-    assert (
-        value.__class__.__name__ == "PosixPath" or value.__class__.__name__ == "WindowsPath"
-    ), f"{name} is not a Path object"
+    assert value.__class__.__name__ == "PosixPath" or value.__class__.__name__ == "WindowsPath", (
+        f"{name} is not a Path object"
+    )

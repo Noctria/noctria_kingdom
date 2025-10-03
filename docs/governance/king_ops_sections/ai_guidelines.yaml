@@ -1,0 +1,44 @@
+# =======================================================
+# LLM/MLの活用方針（共通ガイド）
+# =======================================================
+ai_guidelines:
+  prompts_basic:
+    style: "目的→制約→入出力フォーマット→評価基準→例→データ"
+    must_include: ["目的/背景の1行要約","評価指標(KPI)","境界条件/禁止事項","期待する出力スキーマ"]
+    review_check: "draft結果を自動lint（schema/禁止語）後に利用"   # 追加: 自動チェック
+
+  cost_controls:
+    strategies:
+      - "入力を要約して長文投入を避ける（コンテキスト節約）"
+      - "routing: 重要度に応じて小型/大型モデルを使い分け"
+      - "キャッシュ/再利用（不変プロンプトの結果を保存）"
+      - "温度とサンプリングをタスクに最適化（deterministic優先）"
+    budget_policy:
+      max_monthly_usd: 500                                   # 追加: 上限設定
+      alert_threshold_pct: 80                                # 追加: 予算警告
+      tracking: "logs/ai_usage/{YYYY-MM}.jsonl"              # 追加: 使用ログパス
+
+  static_analysis:
+    python: "ruff を採用（lint/format/簡易バグ検出）。PR前フックで実行"
+    ml: "モデル差分は pytest + golden_dataset で回帰確認"        # 追加: ML向け静的チェック
+
+  orchestration:
+    container: "Docker で統一（再現性・依存の固定）"
+    scheduler: "Airflow でパイプライン編成（BT/FT/日次レポート）"
+    trace_id_policy: "全推論に trace_id を付与し、observability に送信"   # 追加: トレーサビリティ
+
+  golden_dataset:
+    purpose: "回帰検出の下限。BT/FT前に必ず smoke:golden を実行し、許容範囲外はゲートで停止"
+    location: "data/golden/*"
+    acceptance:
+      rules:
+        - "Brier/ECE/Adv の各指標が過去ベスト±許容内"
+        - "diffが閾値超過なら change_draft 起票"
+    update_policy:
+      cadence: "quarterly"                                   # 追加: 更新周期
+      approval: "human_pm"                                   # 追加: ゴールデン改訂は人間承認必須
+
+  safety_and_bias:
+    pii_policy: "個人情報（PII）は入力禁止。検出時は mask → error"
+    fairness_checks: ["ジェンダー/国籍/職業 に依存しない回答を確認"]  # 追加
+    jailbreak_guard: "危険promptは安全モードにフォールバック"         # 追加

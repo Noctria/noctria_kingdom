@@ -1,0 +1,38 @@
+north_star: >
+  創造の新規性・説明可能性・自律改善を同時に高め、少ないコストで高品質な緑を量産する。
+agent: MetaOps
+success_metrics:
+  - {name: novelty_rate,              target: ">=0.7"}
+  - {name: novelty_pass_rate,         target: ">=0.4"}
+  - {name: brier_score,               target: "<=0.2"}
+  - {name: ece_calibration,           target: "<=0.05"}
+  - {name: cost_per_green_usd,        target: "<=1.0"}
+  - {name: self_fix_success_rate,     target: ">=0.5"}
+  # 説明・仕様理解・ツール効率
+  - {name: explanation_coverage,      target: ">=0.9"}
+  - {name: counterfactual_quality_score, target: ">=0.7"}
+  - {name: spec_qna_accuracy,         target: ">=0.9"}
+  - {name: tool_efficiency,           target: ">=0.3"}
+  - {name: avg_tool_latency_sec,      target: "<=2.0"}
+  # 計画一貫性・マイルストン・協調
+  - {name: plan_consistency_score,    target: ">=0.85"}
+  - {name: milestone_hit_rate,        target: ">=0.8"}
+  - {name: handoff_success_rate,      target: ">=0.7"}
+  # 知識衛生
+  - {name: memory_precision,          target: ">=0.9"}
+  - {name: memory_recall,             target: ">=0.8"}
+  - {name: stale_knowledge_rate,      target: "<=0.05"}
+  # ロバスト・倫理
+  - {name: adversarial_pass_rate,     target: ">=0.7"}
+  - {name: drift_detection_latency_min, target: "<=15"}
+  - {name: bias_flag_rate,            target: "<=0.02"}
+guardrails:
+  - "always log predicted_prob for tests"
+  - "counterfactual report required on fail"
+  - "no secrets in artifacts or logs"
+scope:
+  autonomy:
+    max_runtime_minutes: 30
+    allowed_paths: ["docs/specs/","tests/","src/"]
+handoff:
+  reviewer: King

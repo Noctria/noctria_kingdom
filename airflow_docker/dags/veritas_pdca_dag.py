@@ -45,7 +45,7 @@ def send_failure_email(context):
     ログURL: {task_instance.log_url}
 
     エラー詳細:
-    {context.get('exception')}
+    {context.get("exception")}
     """
     # メール送信 (Airflow設定でSMTPが必要)
     send_email(to=["your_email@example.com"], subject=subject, html_content=body)

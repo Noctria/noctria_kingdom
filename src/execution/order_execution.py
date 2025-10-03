@@ -1,355 +1,327 @@
-# =========================
-# File: src/execution/order_execution.py
-# =========================
+# [NOCTRIA_CORE_REQUIRED]
+#!/usr/bin/env python3
+# coding: utf-8
 """
-💼 OrderExecution（Fintokei対応／リスク計算見直し版）
+💂 OrderExecution (v2.1)
+- King/Plan 層の公式発注クライアント。
+- HTTP ブローカー API に対して安全に注文を送る。
+- 監査ログは core.utils.log_execution_event に記録（DB未設定時はNO-OP）。
 
-目的
-- MT5/ブリッジ(API)への注文リクエスト送信（requests）
-- 取引リスクは「口座残高に対する 0.5%〜1%」を厳守
-- 損切(SL)は **必須**（TPは任意）
-- ロットは **口座通貨ベース**のリスク額に合わせて自動計算
-- バリデーション違反時は注文不可＆理由返却
-
-主な修正点
-- ❗通貨換算の不整合修正：USDJPYなどのJPY建てペアで、口座通貨（想定: USD）に換算して
-  リスク％を評価（以前は JPY のまま割っていたため誤差が大きい）
-- リスク％判定は「(ロス額[口座通貨] / 残高)」で厳密化
-- BUY/SELL の SL 方向チェック（SLがエントリの逆側にあるか）
-- pip サイズ自動判定（例: *JPY は 0.01、それ以外は 0.0001）
-- 失敗時のレスポンス整備・タイムアウト付
+依存:
+  - requests
+  - src.core.utils (log_execution_event)
+  - src.core.path_config (ensure_import_path は任意)
 """
 
 from __future__ import annotations
 
-import math
-import os
+import json
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import requests
 
+# パス関連（必要なら呼び出し側で ensure_import_path() を先に行う）
+from src.core.utils import log_execution_event, setup_logger
 
-# ------------------------------------------------------------
-# ユーティリティ
-# ------------------------------------------------------------
-def _infer_pip_size(symbol: str) -> float:
-    """通貨ペアから pip サイズを推定。例: USDJPY -> 0.01 / EURUSD -> 0.0001"""
-    s = symbol.upper()
-    return 0.01 if s.endswith("JPY") else 0.0001
+logger = setup_logger("noctria.execution.order_execution")
 
 
-def _quote_ccy(symbol: str) -> str:
-    """クォート通貨（右側3文字）"""
-    return symbol.upper()[-3:]
-
-
-def _base_ccy(symbol: str) -> str:
-    """ベース通貨（左側3文字）"""
-    return symbol.upper()[:3]
-
-
-def _pip_value_per_lot_in_account_ccy(
-    *,
-    symbol: str,
-    price: float,
-    contract_size: int = 100_000,
-    account_ccy: str = "USD",
-) -> float:
-    """
-    1pip あたりの損益（口座通貨建て, 1ロット）の近似値を返す。
-
-    想定：
-      - 口座通貨は USD（Fintokei/一般的海外口座の想定）
-      - 主要2パターンは正確に扱う：
-         1) クォート通貨が USD（EURUSD/GBPUSD 等）:  pip_value = contract_size * pip_size [USD]
-         2) クォート通貨が JPY（USDJPY 等）:          pip_value = (contract_size * pip_size [JPY]) / price
-      - それ以外（例：EURGBP）は近似対応が困難なため簡易計算にフォールバック（必要なら拡張）
-    """
-    pip = _infer_pip_size(symbol)
-    q = _quote_ccy(symbol)
-
-    if account_ccy.upper() != "USD":
-        # 必要なら将来拡張（今は USD 口座のみ正式対応）
-        raise NotImplementedError(
-            "Only USD account is officially supported in this implementation."
-        )
-
-    if q == "USD":
-        # 例: EURUSD -> 1 pip = 100000 * 0.0001 = 10 USD / lot
-        return contract_size * pip
-    elif q == "JPY":
-        # 例: USDJPY -> 1 pip = 100000 * 0.01 = 1000 JPY / lot => USD換算 = 1000 / price
-        return (contract_size * pip) / price
-    else:
-        # 簡易フォールバック（精度は悪い）:
-        # 「クォートがUSDでない」場合、本来は別レートでの換算が必要。
-        # ここでは安全側に倒すため、pip価値をやや大きめに見積もり、Lotを小さめに計算。
-        # ※実運用する場合は必ず通貨換算レートを注入してください。
-        return (contract_size * pip) * 0.7  # 保守的に7割評価（＝リスクを厳しめにする）
-
-
-# ------------------------------------------------------------
-# 実装
-# ------------------------------------------------------------
 @dataclass
-class OrderExecution:
-    api_url: str = "http://host.docker.internal:5001/order"
-    max_risk_per_trade: float = 0.01  # 最大1%（1トレードあたり）
-    min_risk_per_trade: float = 0.005  # 最小0.5%
-    get_balance_api_url: Optional[str] = None
-    contract_size: int = 100_000  # 1Lotの通貨数量（FX一般）
-    account_ccy: str = "USD"
-    timeout_sec: float = 6.0
+class OrderResult:
+    ok: bool
+    status: str
+    reason: Optional[str] = None
+    broker_order_id: Optional[str] = None
+    response: Optional[Dict[str, Any]] = None
 
-    # --------------------------------------------------------
-    # 口座残高
-    # --------------------------------------------------------
-    def get_account_balance(self) -> Optional[float]:
-        """
-        口座残高を取得（API or ダミー）
-        - GET {get_balance_api_url} -> {"balance": <float>}
-        - ENV BALANCE_OVERRIDE があればそれを優先（デモ用）
-        """
-        override = os.getenv("BALANCE_OVERRIDE")
-        if override:
-            try:
-                return float(override)
-            except Exception:
-                pass
-
-        if self.get_balance_api_url:
-            try:
-                r = requests.get(self.get_balance_api_url, timeout=self.timeout_sec)
-                r.raise_for_status()
-                return float(r.json().get("balance", 0))
-            except Exception:
-                return None
-
-        # ダミー
-        return 10_000.0
-
-    # --------------------------------------------------------
-    # ロット計算（口座通貨ベースで厳密化）
-    # --------------------------------------------------------
-    def calc_lot_size(
-        self,
-        *,
-        balance: float,
-        symbol: str,
-        entry_price: float,
-        stop_loss_price: float,
-        risk_percent: Optional[float] = None,
-    ) -> (float, Optional[str], Dict[str, Any]):
-        """
-        口座通貨ベースで最大許容ロス額を算出し、Lotを計算。
-        戻り値: (lot, error_message, debug_info)
-        """
-        pip_size = _infer_pip_size(symbol)
-        if abs(entry_price - stop_loss_price) < pip_size:
-            return 0.0, "エントリーとSLの幅が狭すぎます", {}
-
-        rp = float(risk_percent or self.max_risk_per_trade)
-        rp = max(min(rp, self.max_risk_per_trade), self.min_risk_per_trade)
-        risk_amount = balance * rp  # 口座通貨ベース
-
-        pip_value = _pip_value_per_lot_in_account_ccy(
-            symbol=symbol,
-            price=entry_price,
-            contract_size=self.contract_size,
-            account_ccy=self.account_ccy,
-        )
-        pip_diff = abs(entry_price - stop_loss_price) / pip_size
-        # 1ロット当たりの損失（口座通貨）
-        loss_per_lot = pip_value * pip_diff
-        if loss_per_lot <= 0:
-            return 0.0, "SL値幅が不正です", {}
-
-        lot = risk_amount / loss_per_lot
-
-        # ロット刻みは 0.01 を想定（必要なら外出し設定）
-        min_lot = 0.01
-        lot = max(min_lot, math.floor(lot * 100) / 100)
-
-        debug = {
-            "pip_size": pip_size,
-            "pip_value_per_lot": pip_value,
-            "pip_diff": pip_diff,
-            "loss_per_lot": loss_per_lot,
-            "risk_amount": risk_amount,
-            "risk_percent": rp,
-            "lot_raw": risk_amount / loss_per_lot,
-            "lot_rounded": lot,
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "status": self.status,
+            "reason": self.reason,
+            "broker_order_id": self.broker_order_id,
+            "response": self.response or {},
         }
-        return lot, None, debug
 
-    # --------------------------------------------------------
-    # 事前バリデーション
-    # --------------------------------------------------------
-    def validate_order(
+
+class OrderExecution:
+    """
+    MT5/ブローカー連携APIの薄いクライアント。
+    例:
+        exec = OrderExecution(api_url="http://host.docker.internal:5001/order")
+        res = exec.execute_order("USDJPY", 0.12, "buy", 157.20, stop_loss=156.70)
+    """
+
+    def __init__(
         self,
+        api_url: str,
         *,
-        symbol: str,
-        side: str,  # "buy" | "sell"
-        entry_price: float,
-        stop_loss_price: Optional[float],
-        balance: float,
-        lot: float,
-        risk_percent: float,
-    ) -> (bool, Optional[str], Dict[str, Any]):
-        """
-        - SL 必須
-        - SL が正しい方向（buy: SL < entry, sell: SL > entry）
-        - lot 範囲（0.01〜100を仮定）
-        - 実効リスク％が min〜max の範囲か
-        """
-        if not stop_loss_price:
-            return False, "損切(SL)は必須です", {}
+        timeout: float = 8.0,
+        retries: int = 2,
+        backoff_base_sec: float = 0.8,
+        default_sl_required: bool = True,
+        dry_run: bool = False,
+    ):
+        self.api_url = api_url.rstrip("/")
+        self.timeout = timeout
+        self.retries = max(0, retries)
+        self.backoff_base_sec = max(0.1, backoff_base_sec)
+        self.default_sl_required = default_sl_required
+        self.dry_run = dry_run
 
-        # 方向（BUY: SL < entry / SELL: SL > entry）
-        if side.lower() == "buy" and not (stop_loss_price < entry_price):
-            return False, "BUYでは SL はエントリーより下に設定してください", {}
-        if side.lower() == "sell" and not (stop_loss_price > entry_price):
-            return False, "SELLでは SL はエントリーより上に設定してください", {}
-
-        if not (0.01 <= lot <= 100.0):
-            return False, f"ロット数が異常です: {lot:.2f}", {}
-
-        # 実効リスク率を逆算チェック
-        pip_size = _infer_pip_size(symbol)
-        pip_value = _pip_value_per_lot_in_account_ccy(
-            symbol=symbol,
-            price=entry_price,
-            contract_size=self.contract_size,
-            account_ccy=self.account_ccy,
-        )
-        pip_diff = abs(entry_price - stop_loss_price) / pip_size
-        risk_amount = pip_value * pip_diff * lot
-        eff_percent = risk_amount / balance if balance > 0 else 1.0
-
-        ok_max = eff_percent <= (self.max_risk_per_trade * 1.02)  # 若干の丸め許容
-        ok_min = eff_percent >= (self.min_risk_per_trade * 0.98)
-
-        if not ok_max:
-            return (
-                False,
-                f"リスクが上限({self.max_risk_per_trade * 100:.2f}%)を超えます: {eff_percent * 100:.2f}%",
-                {"eff_percent": eff_percent, "risk_amount": risk_amount},
-            )
-        if not ok_min:
-            return (
-                False,
-                f"リスクが下限({self.min_risk_per_trade * 100:.2f}%)未満です: {eff_percent * 100:.2f}%",
-                {"eff_percent": eff_percent, "risk_amount": risk_amount},
-            )
-
-        return True, None, {"eff_percent": eff_percent, "risk_amount": risk_amount}
-
-    # --------------------------------------------------------
-    # 実注文（API POST）
-    # --------------------------------------------------------
+    # ---------------------------
+    # Public API
+    # ---------------------------
     def execute_order(
         self,
         *,
         symbol: str,
-        side: str,  # "buy" | "sell"
-        entry_price: float,
-        stop_loss_price: float,  # 必須（価格）
-        take_profit_price: Optional[float] = None,
-        risk_percent: Optional[float] = None,
-        magic_number: Optional[int] = None,
-        comment: Optional[str] = None,
-        extra_fields: Optional[Dict[str, Any]] = None,
+        lot: float,
+        order_type: str,
+        entry_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        decision_id: Optional[str] = None,
+        caller: Optional[str] = None,
+        reason: Optional[str] = None,
+        run_id: Optional[str] = None,
+        dag_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        extras: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        ✅ リスクとSLに基づくロット自動計算 → バリデーション → API送信
-        返却: {"status": "ok"|"error", "message": str, "payload": {...}, "debug": {...}}
+        安全な公式発注メソッド。
+        - stop_loss は原則必須（default_sl_required=Trueの場合）
+        - order_type は buy/sell に正規化
+        - API へ JSON POST
+        - 監査ログ (execution_events) へ書き込み
+
+        戻り値: dict(OrderResult.to_dict() + 追加メタ)
         """
-        # 1) 残高
-        balance = self.get_account_balance()
-        if balance is None or balance <= 0:
-            return {"status": "error", "message": "口座残高取得エラー", "debug": {}}
+        norm_side = normalize_side(order_type)
+        if norm_side is None:
+            return self._log_and_return(
+                ok=False,
+                status="rejected",
+                reason=f"invalid order_type: {order_type}",
+                symbol=symbol,
+                action=order_type,
+                qty=lot,
+                price=entry_price or 0.0,
+                dag_id=dag_id,
+                task_id=task_id,
+                run_id=run_id,
+                extras=extras,
+                decision_id=decision_id,
+            )
 
-        # 2) ロット計算
-        lot, err, dbg1 = self.calc_lot_size(
-            balance=balance,
-            symbol=symbol,
-            entry_price=entry_price,
-            stop_loss_price=stop_loss_price,
-            risk_percent=risk_percent,
-        )
-        if err:
-            return {"status": "error", "message": err, "debug": dbg1}
+        # SLガード
+        if self.default_sl_required and (stop_loss is None):
+            return self._log_and_return(
+                ok=False,
+                status="rejected",
+                reason="stop_loss is required",
+                symbol=symbol,
+                action=norm_side,
+                qty=lot,
+                price=entry_price or 0.0,
+                dag_id=dag_id,
+                task_id=task_id,
+                run_id=run_id,
+                extras=extras,
+                decision_id=decision_id,
+            )
 
-        # 3) バリデーション
-        rp = float(risk_percent or self.max_risk_per_trade)
-        ok, msg, dbg2 = self.validate_order(
-            symbol=symbol,
-            side=side,
-            entry_price=entry_price,
-            stop_loss_price=stop_loss_price,
-            balance=balance,
-            lot=lot,
-            risk_percent=rp,
-        )
-        if not ok:
-            return {"status": "error", "message": msg, "debug": {**dbg1, **dbg2}}
-
-        # 4) API送信
         payload = {
             "symbol": symbol,
-            "type": side.lower(),  # "buy" | "sell"
-            "lot": float(f"{lot:.2f}"),  # 刻み 0.01
+            "side": norm_side,  # buy / sell
+            "lot": round(float(lot), 2),
             "entry_price": entry_price,
-            "stop_loss": stop_loss_price,
-            "take_profit": take_profit_price,
-            "magic_number": magic_number,
-            "comment": comment,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "meta": {
+                "decision_id": decision_id,
+                "caller": caller,
+                "reason": reason,
+            },
         }
-        if extra_fields:
-            payload.update(extra_fields)
 
+        if self.dry_run:
+            logger.info("[dry_run] order payload: %s", safe_json(payload))
+            return self._log_and_return(
+                ok=True,
+                status="simulated",
+                reason="dry_run",
+                symbol=symbol,
+                action=norm_side,
+                qty=lot,
+                price=entry_price or 0.0,
+                broker_order_id=None,
+                extras={"dry_run": True, **(extras or {})},
+                decision_id=decision_id,
+                response={"payload": payload},
+                dag_id=dag_id,
+                task_id=task_id,
+                run_id=run_id,
+            )
+
+        # 実送信（リトライ）
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.retries + 1):
+            try:
+                resp = requests.post(self.api_url, json=payload, timeout=self.timeout)
+                if resp.status_code >= 500:
+                    raise RuntimeError(f"broker 5xx: {resp.status_code} {resp.text[:200]}")
+                data = try_parse_json(resp)
+                ok, status, boid, reason_text = interpret_response(resp.status_code, data)
+                return self._log_and_return(
+                    ok=ok,
+                    status=status,
+                    reason=reason_text,
+                    symbol=symbol,
+                    action=norm_side,
+                    qty=lot,
+                    price=entry_price or 0.0,
+                    broker_order_id=boid,
+                    response=data,
+                    dag_id=dag_id,
+                    task_id=task_id,
+                    run_id=run_id,
+                    extras=extras,
+                    decision_id=decision_id,
+                )
+            except Exception as e:
+                last_exc = e
+                if attempt < self.retries:
+                    wait = self.backoff_base_sec * (2**attempt)
+                    logger.warning(
+                        "order attempt %d failed: %s (backoff %.2fs)", attempt + 1, e, wait
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error("order failed (no more retries): %s", e)
+
+        # ここに来たら失敗確定
+        return self._log_and_return(
+            ok=False,
+            status="error",
+            reason=str(last_exc) if last_exc else "unknown error",
+            symbol=symbol,
+            action=norm_side,
+            qty=lot,
+            price=entry_price or 0.0,
+            dag_id=dag_id,
+            task_id=task_id,
+            run_id=run_id,
+            extras=extras,
+            decision_id=decision_id,
+            response={"payload": payload},
+        )
+
+    # ---------------------------
+    # Internals
+    # ---------------------------
+    def _log_and_return(
+        self,
+        *,
+        ok: bool,
+        status: str,
+        reason: Optional[str],
+        symbol: str,
+        action: str,
+        qty: float,
+        price: float,
+        broker_order_id: Optional[str] = None,
+        response: Optional[Dict[str, Any]] = None,
+        dag_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        extras: Optional[Dict[str, Any]] = None,
+        decision_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        # DBが未設定でもNO-OPで安全
         try:
-            r = requests.post(self.api_url, json=payload, timeout=self.timeout_sec)
-            r.raise_for_status()
-            resp = r.json()
-            return {
-                "status": "ok",
-                "message": "sent",
-                "payload": payload,
-                "response": resp,
-                "debug": {**dbg1, **dbg2},
-            }
-        except requests.RequestException as e:
-            return {
-                "status": "error",
-                "message": f"発注APIエラー: {e}",
-                "payload": payload,
-                "debug": {**dbg1, **dbg2},
-            }
+            log_execution_event(
+                dag_id=dag_id or "manual",
+                task_id=task_id or "order_execution",
+                run_id=run_id or "manual",
+                symbol=symbol,
+                action=action,
+                qty=float(qty),
+                price=float(price),
+                status=status,
+                broker_order_id=broker_order_id,
+                latency_ms=None,
+                error=None if ok else (reason or "error"),
+                extras={
+                    **(extras or {}),
+                    "decision_id": decision_id,
+                    "raw_response": response or {},
+                },
+                trace_id=decision_id,
+            )
+        except Exception as e:
+            logger.debug("log_execution_event failed (ignored): %s", e)
+
+        result = OrderResult(
+            ok=ok, status=status, reason=reason, broker_order_id=broker_order_id, response=response
+        ).to_dict()
+        # 互換メタを少し足して返す
+        result.update({"symbol": symbol, "action": action, "qty": qty, "price": price})
+        return result
 
 
-# ==========================
-# テスト／サンプル実行
-# ==========================
-if __name__ == "__main__":
+# ---------------------------
+# helpers
+# ---------------------------
+def normalize_side(side: str) -> Optional[str]:
+    if not side:
+        return None
+    s = side.strip().lower()
+    if s in {"buy", "long", "b"}:
+        return "buy"
+    if s in {"sell", "short", "s"}:
+        return "sell"
+    return None
+
+
+def try_parse_json(resp: requests.Response) -> Dict[str, Any]:
+    try:
+        return resp.json()  # type: ignore[no-any-return]
+    except Exception:
+        text = (resp.text or "").strip()
+        return {"status_code": resp.status_code, "text": text[:400]}
+
+
+def interpret_response(
+    status_code: int, data: Dict[str, Any]
+) -> tuple[bool, str, Optional[str], Optional[str]]:
     """
-    例:
-      口座 USD 1万、USDJPY 155.00 でエントリー、SL 154.50（= 50pips）
-      リスク1%だと、許容ロス = 100 USD 以内に収まる Lot を自動で算出・送信
+    ブローカーAPIの返却を解釈。
+    期待形:
+      { "status": "ok"|"rejected"|"error", "order_id": "...", "message": "..." }
+    不在時はHTTPコードで推定。
     """
-    exe = OrderExecution(
-        api_url=os.getenv("ORDER_API_URL", "http://host.docker.internal:5001/order"),
-        get_balance_api_url=os.getenv("BALANCE_API_URL", None),
-        max_risk_per_trade=0.01,
-        min_risk_per_trade=0.005,
-    )
-    result = exe.execute_order(
-        symbol="USDJPY",
-        side="buy",
-        entry_price=155.00,
-        stop_loss_price=154.50,
-        take_profit_price=155.80,
-        comment="Fintokeiテスト（SL必須/リスク管理）",
-    )
-    print(result)
+    status = str(data.get("status") or "").lower()
+    message = (data.get("message") or data.get("reason") or "") or None
+    order_id = data.get("order_id") or data.get("broker_order_id")
+
+    if status in {"ok", "success", "executed"} and status_code in (200, 201):
+        return True, "executed", str(order_id) if order_id else None, message
+    if status in {"rejected", "denied"} or status_code in (400, 422):
+        return False, "rejected", None, message or f"HTTP {status_code}"
+    if status_code >= 500:
+        return False, "error", None, message or f"HTTP {status_code}"
+
+    # 曖昧ケース
+    ok = status_code in (200, 201)
+    return ok, ("executed" if ok else "error"), str(order_id) if ok and order_id else None, message
+
+
+def safe_json(obj: Any) -> str:
+    try:
+        return json.dumps(obj, ensure_ascii=False)
+    except Exception:
+        return str(obj)

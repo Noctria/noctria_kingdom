@@ -1,0 +1,21 @@
+# ---------------------------------------------------
+# 臣下スクリプト一覧（役職表）
+# ---------------------------------------------------
+scripts:
+  evaluate_veritas: "Veritas戦略の評価 → reports/veritas/run_* を生成"
+  log_kpi_from_reports: "KPI記録 → DB obs_codex_kpi に保存"
+  plot_reliability: "信頼度曲線 reliability.png を生成"
+  generate_daily_report: "docs/reports/daily/YYYY-MM-DD.md にまとめる"
+  run_veritas_pipeline: "上記一連を自動実行（評価→KPI→図→レポート）"
+  kpi_quickpeek: "obs_codex_kpi DB の最新KPIをSQLビューで簡易確認"
+  start_fastapi: "FastAPI サービス起動（uvicorn）— noctria_kingdom/api/main.py を既定とする"
+  api_contract_test: "FastAPI のOpenAPI/主要エンドポイントの死活・契約テストを実施"
+  run_backtest: "戦略バックテスト一括実行（期間指定/パラメタ指定）— 成果物: reports/backtest/*"
+  run_forwardtest: "フォワードテスト（紙上/ペーパートレード相当, Pythonシミュレーション）— 成果物: reports/forwardtest/*"
+  summarize_bt_ft: "BT/FTのKPIを集計し、obs_codex_btft_kpi に保存、比較表を生成"
+  build_gui: "GUI（noctria_kingdom/noctria_gui）をビルド/静的配信用に束ねる"
+  e2e_user_journey: "GUI→FastAPI→評価パイプラインまでのE2Eスモークを1本通す"
+  publish_artifacts: "BT/FTレポート、API契約レポート、GUIビルド物を artifacts/ に集約"
+  governance_review_daily: "king_ops_prompt の差分検出→小掃除案の生成（承認制）"
+  governance_review_weekly: "日次候補を統合し、重複排除と順序最適化の提案（承認制）"
+  governance_review_monthly: "非推奨項目の棚卸しと章立て再編の提案（2段階承認）"

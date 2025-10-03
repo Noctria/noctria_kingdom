@@ -1,0 +1,49 @@
+# ---------------------------------------------------
+# バックログ & ロードマップ
+# ---------------------------------------------------
+backlog:
+  categories:
+    calibration: "校正・閾値関連（ECE改善、温度スケーリング、Brier調整など）"
+    robustness: "頑健性・逆境テスト（ノイズ、シナリオ強度、分布シフト対応）"
+    automation: "自動化レベル移行・臣下エージェント強化"
+    reporting: "可視化・レポート・ドキュメント改善"
+
+  next_7_days:
+    - id: "BL-001"
+      category: "calibration"
+      title: "温度スケーリングのサンプル依存レンジ自動化"
+      owner: "王（委任先: Prometheus）"
+      priority: "P1"
+      accept_criteria:
+        - "samples>200で bins=12、>400で15 を自動選択"
+        - "ECE 前週平均比 -0.02 以上改善（2/3 run）"
+    - id: "BL-002"
+      category: "calibration"
+      title: "最適閾値探索のA/B（オフライン）"
+      owner: "王（委任先: Veritas）"
+      priority: "P2"
+      accept_criteria:
+        - "Brier -0.005 以上改善（検証セット）"
+        - "adversarial_pass_rate 低下なし"
+
+  horizon_30_days:
+    - id: "BL-010"
+      category: "robustness"
+      title: "頑健性テスト拡張（シナリオ強度の段階化）"
+      priority: "P1"
+      accept_criteria:
+        - "通過率 >= 0.45 を1回以上達成"
+        - "悪化トレンドが2run以内に解消"
+    - id: "BL-011"
+      category: "automation"
+      title: "partial→full 自動化への移行検証"
+      priority: "P2"
+      accept_criteria:
+        - "gate_full_autonomy の基準を2週連続クリア"
+        - "人間承認なしで日次レポート生成→handoverまで成功"
+    - id: "BL-012"
+      category: "reporting"
+      title: "週次スライドの自動生成（markdown→pdf/pptx）"
+      priority: "P3"
+      accept_criteria:
+        - "weekly_slide_deck が自動生成され、レビュー1分以内で説明可能"

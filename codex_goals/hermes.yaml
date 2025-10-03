@@ -1,0 +1,39 @@
+north_star: >
+  意思決定の説明・可視化を行い、理解時間を短縮する。
+agent: Hermes
+scope:
+  autonomy:
+    max_reports_per_cycle: 5
+    max_runtime_minutes: 20
+    max_read_files: 800
+    max_compute_cost_usd: 1.0
+    allowed_paths:
+      - "reports/"
+      - "noctria_gui/"
+      - "docs/specs/"
+success_metrics:
+  - {name: explanation_coverage, target: ">=0.9"}
+  - {name: read_time_min,        target: "<=3"}
+  - {name: ui_issue_count,       target: "==0"}
+  # 追加: 説明の質と再現性・体験指標
+  - {name: counterfactual_quality_score, target: ">=0.7"}
+  - {name: reproducibility_score,        target: ">=0.95"}   # グラフ/数表の再生成一致率
+  - {name: accessibility_score,          target: ">=0.9"}    # a11y(alt/contrast/tab)簡易採点
+  - {name: plan_consistency_score,       target: ">=0.85"}
+  - {name: handoff_success_rate,         target: ">=0.7"}
+outputs:
+  - {type: report, path: "reports/explanations/"}
+  - {type: ui,     path: "noctria_gui/"}
+guardrails:
+  - "every fail must include counterfactual: {minimal_change, expected_delta}"
+  - "plots must include data_source and params in metadata"
+  - "ui must pass: contrast>=AA, tab-order logical, aria-labels for controls"
+  - "no secrets in screenshots/logs"
+  - "embed small tables as CSV attachments when feasible"
+  - "plan doc must include {north_star, milestones, tasks} with explicit links"
+handoff:
+  reviewer: King
+handoff_artifacts:
+  - "reports/explanations/*.md"
+  - "reports/explanations/*.csv"
+  - "noctria_gui/**/*"

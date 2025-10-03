@@ -315,6 +315,8 @@ _safe_include("noctria_gui.routes.pdca_routes")
 _safe_include("noctria_gui.routes.pdca_summary")
 _safe_include("noctria_gui.routes.pdca_recent")
 _safe_include("noctria_gui.routes.pdca_widgets")
+# 🆕 三行要約カード / 直近一覧
+_safe_include("noctria_gui.routes.summary_card")
 # API（←これが /pdca/api/* の実体）
 _safe_include("noctria_gui.routes.pdca_api")
 
@@ -486,3 +488,14 @@ def _log_llm_usage(resp):
             logging.info("LLM usage unavailable (provider?)")
     except Exception as _e:
         logging.exception("LLM usage logging failed: %s", _e)
+
+
+# ---------------------------------------------------------------------------
+# Testing/External runners helper
+# ---------------------------------------------------------------------------
+def create_app():
+    """
+    Return the initialized FastAPI app.
+    This lets tests and external launchers obtain a fully wired instance.
+    """
+    return app

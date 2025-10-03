@@ -1,0 +1,20 @@
+version: 1
+naming:
+  prefix: "VERITAS_"
+  pattern: "VERITAS_<theme>_<yyyymmdd>_<rev>"
+design_spec:
+  required_fields: [objective, universe, timeframe, features, signals, risk, execution]
+  feature_vector: {type: "onehot+numeric", must_attach: true}   # novelty計測用
+risk_rules:
+  tp_sl_required: true
+  per_trade_risk_pct_max: 0.2
+  lot_step_increase_max: 1.5
+  forbid: [martingale, one_shot, signal_chasing]
+files:
+  code_dir: "src/strategies/veritas_generated/"
+  tests_dir: "tests/generated/"
+  report_dir: "codex_reports/"
+artifacts:
+  require: [README.md, design.md, backtest_config.yaml]
+versioning:
+  bump_on: [feature_change, risk_change, params_change]

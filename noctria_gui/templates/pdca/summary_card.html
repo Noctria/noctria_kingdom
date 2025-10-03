@@ -1,0 +1,36 @@
+{% extends "base_hud.html" %}
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-semibold mb-4">📋 {{ title }}</h1>
+
+  {% if item %}
+  <div class="bg-gray-800/60 rounded-2xl shadow-lg p-5 border border-gray-700">
+    <div class="flex justify-between items-center mb-3">
+      <div>
+        <div class="text-sm text-gray-400">trace_id</div>
+        <div class="font-mono text-sm break-all">{{ item.trace_id }}</div>
+      </div>
+      <div class="text-right">
+        <div class="text-sm text-gray-400">created_at (SQLite)</div>
+        <div class="font-mono text-sm">{{ item.created_at }}</div>
+      </div>
+    </div>
+
+    <div class="grid gap-2">
+      <div class="bg-black/30 rounded-xl p-3"><span class="text-gray-400 mr-2">①</span>{{ item.lines[0] }}</div>
+      <div class="bg-black/30 rounded-xl p-3"><span class="text-gray-400 mr-2">②</span>{{ item.lines[1] }}</div>
+      <div class="bg-black/30 rounded-xl p-3"><span class="text-gray-400 mr-2">③</span>{{ item.lines[2] }}</div>
+    </div>
+
+    <div class="mt-4 text-sm text-gray-400 flex flex-wrap gap-4">
+      <div>model: <span class="font-mono">{{ item.model_used or "-" }}</span></div>
+      <div>source: <span class="font-mono break-all">{{ item.source_path or "-" }}</span></div>
+      <div>ID: <span class="font-mono">{{ item.id }}</span></div>
+      <div><a class="underline" href="/pdca/summary_recent?limit=10">直近一覧へ</a></div>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-gray-400">データが見つかりませんでした。</div>
+  {% endif %}
+</div>
+{% endblock %}

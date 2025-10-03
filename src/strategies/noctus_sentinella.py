@@ -1,3 +1,4 @@
+# [NOCTRIA_CORE_REQUIRED]
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -5,6 +6,8 @@
 🛡️ Noctus Sentinella (リスク＋ロット計算I/F付)
 - calculate_lot_and_risk: Fintokei/一般口座のリスクに基づきロットサイズ判定＆注文判定
 """
+
+from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional
@@ -55,10 +58,31 @@ class NoctusSentinella:
         max_risk: float = 0.01,
     ) -> Dict[str, Any]:
         """
-        [NEW] 王やPlan層の公式リスク＆ロット計算API
+        王やPlan層の公式リスク＆ロット計算API
         - ストップロス・エントリー距離とリスク許容割合からロット計算
         - Fintokei基準: リスク0.5%～1.0%のみ許可
         """
+        # --- 基本検証 ---
+        try:
+            entry_price = float(entry_price)
+            stop_loss_price = float(stop_loss_price)
+            capital = float(capital)
+            risk_percent = float(risk_percent)
+        except Exception:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text="数値パラメータが不正（float化に失敗）",
+                lot=0,
+                risk_amount=0,
+                risk_percent=risk_percent,
+                entry_price=entry_price,
+                stop_loss_price=stop_loss_price,
+                capital=capital,
+                decision_id=decision_id,
+                caller=caller,
+                reason=reason,
+            )
+
         sl_distance = abs(entry_price - stop_loss_price)
         if sl_distance <= 0:
             return self._create_calc_result(
@@ -75,11 +99,10 @@ class NoctusSentinella:
                 reason=reason,
             )
 
-        # 許容リスク額
+        # 許容リスク額（0.5%～1.0%の範囲チェック）
         risk_amount = capital * risk_percent
-        # ガード: 0.5～1.0%以外NG
-        min_risk_amount = capital * min_risk
-        max_risk_amount = capital * max_risk
+        min_risk_amount = capital * float(min_risk)
+        max_risk_amount = capital * float(max_risk)
         if not (min_risk_amount <= risk_amount <= max_risk_amount):
             return self._create_calc_result(
                 decision="VETO",
@@ -94,31 +117,27 @@ class NoctusSentinella:
                 caller=caller,
                 reason=reason,
             )
-        # ロット計算: 1pip単位・最小ロット0.01想定
+
+        # ロット計算（最小0.01ロット、pip換算は単純化）
         lot = risk_amount / sl_distance
         lot = max(round(lot, 2), 0.01)
 
-        # 他のPlan特徴量でリスク/流動性チェック
-        try:
-            liquidity = feature_dict.get(self.col_map["liquidity"], None)
-            spread = feature_dict.get(self.col_map["spread"], None)
-            volatility = feature_dict.get(self.col_map["volatility"], None)
-            price = feature_dict.get(self.col_map["price"], None)
-            historical_data = feature_dict.get(self.col_map["historical_data"], None)
-            if None in (
-                liquidity,
-                spread,
-                volatility,
-                price,
-                historical_data,
-            ) or getattr(historical_data, "empty", True):
-                raise ValueError("リスク評価に必要な特徴量が不足または不正。")
-            self.risk_manager = RiskManager(historical_data=historical_data)
-            risk_score = self.risk_manager.calculate_var_ratio(price)
-        except Exception as e:
+        # --- 特徴量取り出し（DataFrameの真偽値曖昧エラーを回避） ---
+        liquidity = feature_dict.get(self.col_map["liquidity"], None)
+        spread = feature_dict.get(self.col_map["spread"], None)
+        volatility = feature_dict.get(self.col_map["volatility"], None)
+        price = feature_dict.get(self.col_map["price"], None)
+        historical_data = feature_dict.get(self.col_map["historical_data"], None)
+
+        # DataFrame を None と比較しない（== は使わない）
+        missing_basic = any(v is None for v in (liquidity, spread, volatility, price))
+        hist_missing = (historical_data is None) or (
+            hasattr(historical_data, "empty") and bool(getattr(historical_data, "empty"))
+        )
+        if missing_basic or hist_missing:
             return self._create_calc_result(
                 decision="VETO",
-                reason_text=f"特徴量不足/異常: {e}",
+                reason_text="リスク評価に必要な特徴量が不足または不正。",
                 lot=0,
                 risk_amount=risk_amount,
                 risk_percent=risk_percent,
@@ -130,6 +149,26 @@ class NoctusSentinella:
                 reason=reason,
             )
 
+        # --- リスクスコア計算 ---
+        try:
+            self.risk_manager = RiskManager(historical_data=historical_data)
+            risk_score = self.risk_manager.calculate_var_ratio(price)
+        except Exception as e:
+            return self._create_calc_result(
+                decision="VETO",
+                reason_text=f"リスクスコア計算失敗: {e}",
+                lot=0,
+                risk_amount=risk_amount,
+                risk_percent=risk_percent,
+                entry_price=entry_price,
+                stop_loss_price=stop_loss_price,
+                capital=capital,
+                decision_id=decision_id,
+                caller=caller,
+                reason=reason,
+            )
+
+        # --- ガード群 ---
         if liquidity < self.min_liquidity:
             return self._create_calc_result(
                 decision="VETO",
@@ -187,6 +226,7 @@ class NoctusSentinella:
                 reason=reason,
             )
 
+        # --- 承認 ---
         return self._create_calc_result(
             decision="APPROVE",
             reason_text="全監視項目正常/許可",
@@ -220,25 +260,22 @@ class NoctusSentinella:
             "type": "risk_calc",
             "decision": decision,
             "reason": reason_text,
-            "lot": round(lot, 3),
-            "risk_amount": round(risk_amount, 2),
-            "risk_percent": risk_percent,
-            "entry_price": entry_price,
-            "stop_loss": stop_loss_price,
-            "capital": capital,
+            "lot": round(float(lot), 3),
+            "risk_amount": round(float(risk_amount), 2),
+            "risk_percent": float(risk_percent),
+            "entry_price": float(entry_price),
+            "stop_loss": float(stop_loss_price),
+            "capital": float(capital),
             "decision_id": decision_id,
             "caller": caller,
             "action_reason": reason,
         }
 
-    # 既存のassess()等は省略
 
-
-# === テスト例 ===
 if __name__ == "__main__":
     logging.info("--- Noctus: ロット/リスク計算テスト ---")
     dummy_hist_data = pd.DataFrame({"Close": np.random.normal(loc=150, scale=2, size=100)})
-    dummy_hist_data["returns"] = dummy_hist_data["Close"].pct_change().dropna()
+    # returns は RiskManager 側で計算する想定なら不要
     feature_dict = {
         "price": 152.5,
         "volume": 150,
@@ -259,5 +296,6 @@ if __name__ == "__main__":
         reason="unit_test",
     )
     print(
-        f"🛡️ Noctusロット/リスク判定: {res['decision']} ({res['reason']}) Lot: {res['lot']}, Risk額: {res['risk_amount']}"
+        f"🛡️ Noctusロット/リスク判定: {res['decision']} ({res['reason']}) "
+        f"Lot: {res['lot']}, Risk額: {res['risk_amount']}"
     )

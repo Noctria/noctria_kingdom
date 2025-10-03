@@ -1,0 +1,107 @@
+# =======================================================
+# ランブック（インシデント/回復）
+# =======================================================
+runbooks:
+  common:
+    severities:
+      - { level: "SEV1", desc: "顧客影響大/予測不可/長時間停止", target_ack_min: 10, target_mitigate_hours: 2 }
+      - { level: "SEV2", desc: "部分劣化/回避策あり",           target_ack_min: 15, target_mitigate_hours: 4 }
+      - { level: "SEV3", desc: "軽微/監視強化",                   target_ack_min: 30, target_mitigate_hours: 24 }
+    comms:
+      channels: ["#noctria-incident","statuspage(optional)","oncall-pager"]
+      templates:
+        start:  "[{sev}] {title} — 影響: {impact} / 回避策: {workaround|none} / 次更新: +{next_update_min}m"
+        update: "[{sev}] 進捗: {progress} / 指標: p95={p95}ms 5xx={err_rate}% / 次更新: +{next_update_min}m"
+        resolve:"[{sev}] 収束: 原因: {root_cause_short} / 再発防止: {action_items_count}件"
+    artifacts_to_collect:
+      - "grafana: API RED（RPS/p95/5xx）スクリーンショット"
+      - "trace: 代表リクエストのspan dump（5xx or p95>300ms）"
+      - "logs: 直近15分のapi/* ERROR行"
+      - "config: git_sha, model_ver, calib_T, bins"
+    rollback_policy:
+      safe_commands:
+        - "scripts/apply_calibration.sh --use-prior --dry-run"
+        - "make -C noctria_kingdom/noctria_gui rollback"
+      guards: ["NLL劣化<=0.05 を超える変更は不可","automation_gates未達は適用禁止"]
+
+  api_incident:
+    trigger: "contracts.api.error_budget 超過 または 5xx 急増（5分移動平均>1%）"
+    owner: "king"
+    backup: "noctus"
+    sla: { ack_min: 15, mitigate_hours: 4 }
+    decision_tree:
+      - when: "5xx_rate>=5% OR p95_ms>1000 for 5m"
+        then: ["break_glass検討（safety_and_access.break_glass）","トラフィック50%へ段階的縮小 or read-onlyモード"]
+      - when: "単一リリース起因の疑い（直近deploy<30m）"
+        then: ["即時ロールバック","canary比率を5%に戻して再観測"]
+    steps:
+      - "0) 宣言: インシデント開始、{common.comms.channels}へテンプレstart投下（次更新+15m）"
+      - "1) 健全性: GET /health, /openapi.json → 200 & スキーマ整合を確認"
+      - "2) 計測: predict の p95/5xx（直近15分）と rate_limit をダッシュボードで確認"
+      - "3) 範囲特定: 特定pair/モデル/バージョンに偏っていないか（labels: pair, model_ver, git_sha）"
+      - "4) 回避: stgで再現 → 再現すればロールバック、不可なら breaker 有効化（prodのみ）"
+      - "5) 収束判定: p95<=300ms & 5xx<=1% を10分継続で一旦収束"
+      - "6) 記録: decision_log 起票（level=CRITICAL相当なら change_draft 同日）"
+      - "7) レポート: daily『🔔 警報』に事象/対処/次アクションを追記、テンプレupdate/resolve送信"
+    verification_after_fix:
+      checklist:
+        - "OpenAPI契約テスト pass（/health, /openapi.json, /predict 200/422）"
+        - "負荷スモーク L01/L02 パス"
+        - "エラーバジェットの燃焼率が通常域へ低下"
+
+  btft_regression:
+    trigger: "BT/FT KPI が kpi_alerts の WARN/CRITICAL 判定に該当"
+    owner: "prometheus"
+    backup: "veritas"
+    severity_mapping:
+      warn_to_sev: "SEV3"
+      critical_to_sev: "SEV2"
+    steps:
+      - "1) 影響範囲: 対象期間/戦略/設定差分（reports/*/meta.json）を列挙"
+      - "2) トリアージ順: データ不足 → 分布シフト → 実装バグ（triage.rules を参照）"
+      - "3) 校正DRY: bins/T/prior_T を3本、guard: NLL≤+0.05 & ECE改善≥0.02（R01）"
+      - "4) 回帰比較: summarize_bt_ft で before/after 比較表を生成 → obs_codex_btft_kpi へ記録"
+      - "5) 判断: 受け入れ基準を満たせば apply候補、未満なら rollback & backlog追加"
+      - "6) 記録: decision_log / change_draft を更新（双方向リンク遵守）"
+    verification_after_fix:
+      checklist:
+        - "直近3run平均: Brier ≤ baseline+0.005 / ECE ≤ baseline-0.02 / Adv.pass ≥ 0.40"
+        - "reliability.png の視覚チェック（過校正の兆候なし）"
+        - "ガードレール（decision_rules.kpi_targets）との整合"
+
+  data_quality_incident:
+    trigger: "data_missing_rate>0.10（2連続） or feature_null_rate>0.05（2連続） or label_lag_skew>|1.0|"
+    owner: "aurus"
+    backup: "prometheus"
+    steps:
+      - "1) 収集系確認: collector 失敗ログ/リトライ/外部APIのSLAを点検"
+      - "2) 欠損範囲: 影響期間・通貨ペア・特徴量をSQLで抽出（欠損ヒートマップ）"
+      - "3) 補正策: 再収集/補間（前方/線形/週次プロファイル）と評価runの除外条件強化"
+      - "4) 再評価: evaluate_veritas を再実行しKPI再計算"
+      - "5) 記録: decision_log=WARN/CRITICAL相当で起票、日次に記載"
+    verification_after_fix:
+      checklist:
+        - "data_missing_rate ≤ 0.05 / feature_null_rate ≤ 0.02"
+        - "影響runのラベル生成境界（翌足）にズレ無し"
+
+  postmortem:
+    required_for: ["SEV1","SEV2"]
+    template:
+      - "タイトル / 期間（UTC/JST） / 影響（ユーザ・期間・件数）"
+      - "タイムライン（検知→宣言→回避→恒久対策）"
+      - "根本原因（5 Whys / 因果図）"
+      - "検出ギャップ（なぜ早く気付けなかったか）"
+      - "再発防止（具体アクション / オーナ / 期限）"
+      - "指標の変化（p95/5xx/KPI）とエラーバジェットへの影響"
+    storage: "docs/postmortems/{YYYY}/{YYYYMMDD}_{slug}.md"
+    follow_up_tracking: "weekly_ops にて未完アクションを追跡（最大3週）"
+
+  drills:
+    schedule: "月1回（第1月曜 JST 10:00）"
+    scenarios:
+      - "API p95急騰（依存タイムアウト）"
+      - "データ欠損（外部API障害）"
+      - "過校正に伴うECE悪化"
+    success_criteria:
+      - "MTTA/MTTR 目標内"
+      - "手順逸脱ゼロ（チェックリストすべて通過）"

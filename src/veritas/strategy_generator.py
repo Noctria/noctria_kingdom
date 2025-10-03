@@ -1,141 +1,241 @@
-import os
-import sys
-from datetime import datetime
-from pathlib import Path
-
-import psycopg2
-import torch
-
-from core.logger import setup_logger
-from core.path_config import LOGS_DIR, STRATEGIES_DIR, VERITAS_MODELS_DIR
-from veritas.models.ml_model.simple_model import SimpleModel
-
 # src/veritas/strategy_generator.py
+# [NOCTRIA_CORE_REQUIRED]
+#!/usr/bin/env python3
+# coding: utf-8
+
+"""
+🛡️ Veritas Machina — ML 戦略コード生成（KEEP-safeラッパ）
+
+- 既存API互換: build_prompt(prompt), generate_strategy_code(prompt) -> str,
+              save_to_db(prompt, response) -> None, save_to_file(code, tag) -> str
+- 中身は veritas_machina.generate_strategy(...) に委譲。
+- 失敗時はフォールバックコードを返し、保存は原子的 (tmp -> os.replace)。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+# ------- 遅延import/パス/ロガー/obs --------------------------------------------
 
 
-# --- ここで src ディレクトリの絶対パスを sys.path に追加 ---
-src_path = Path(__file__).resolve().parents[1]  # src/veritas/ の一つ上 = src/
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+def _lazy_import(name: str):
+    try:
+        __import__(name)
+        return sys.modules[name]
+    except Exception:
+        return None
 
 
-logger = setup_logger("VeritasGenerator", LOGS_DIR / "veritas" / "generator.log")
+def _paths() -> Dict[str, Path]:
+    mod = _lazy_import("src.core.path_config") or _lazy_import("core.path_config")
+    root = Path(__file__).resolve().parents[2]
+    if mod:
+        return {
+            "ROOT": getattr(mod, "ROOT", root),
+            "LOGS_DIR": getattr(mod, "LOGS_DIR", root / "logs"),
+            "STRATEGIES_DIR": getattr(mod, "STRATEGIES_DIR", root / "src" / "strategies"),
+            "VERITAS_MODELS_DIR": getattr(mod, "VERITAS_MODELS_DIR", root / "models" / "veritas"),
+        }
+    return {
+        "ROOT": root,
+        "LOGS_DIR": root / "logs",
+        "STRATEGIES_DIR": root / "src" / "strategies",
+        "VERITAS_MODELS_DIR": root / "models" / "veritas",
+    }
 
-# --- 環境変数（必要に応じてcore.settingsへ集約してもOK） ---
+
+def _logger():
+    mod = _lazy_import("src.core.logger") or _lazy_import("core.logger")
+    p = _paths()
+    log_path = Path(p["LOGS_DIR"]) / "veritas" / "generator.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if mod and hasattr(mod, "setup_logger"):
+        return mod.setup_logger("VeritasGenerator", log_path)  # type: ignore[attr-defined]
+    import logging
+
+    lg = logging.getLogger("VeritasGenerator")
+    if not lg.handlers:
+        lg.setLevel(logging.INFO)
+        fh = logging.FileHandler(str(log_path), encoding="utf-8")
+        sh = logging.StreamHandler(sys.stdout)
+        fmt = logging.Formatter("%(asctime)s - [%(levelname)s] - %(message)s")
+        fh.setFormatter(fmt)
+        sh.setFormatter(fmt)
+        lg.addHandler(fh)
+        lg.addHandler(sh)
+    return lg
+
+
+def _obs():
+    mod = _lazy_import("src.plan_data.observability") or _lazy_import("plan_data.observability")
+    import datetime as dt
+
+    def mk_trace_id():
+        return dt.datetime.utcnow().strftime("trace_%Y%m%dT%H%M%S_%f")
+
+    def obs_event(
+        event: str,
+        *,
+        severity: str = "LOW",
+        trace_id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ):
+        msg = {
+            "event": event,
+            "severity": severity,
+            "trace_id": trace_id,
+            "meta": meta or {},
+            "ts": dt.datetime.utcnow().isoformat(),
+        }
+        print("[OBS]", json.dumps(msg, ensure_ascii=False))
+
+    if mod:
+        return getattr(mod, "mk_trace_id", mk_trace_id), getattr(mod, "obs_event", obs_event)
+    return mk_trace_id, obs_event
+
+
+PATHS = _paths()
+logger = _logger()
+mk_trace_id, obs_event = _obs()
+
+# ------- 環境変数 --------------------------------------------------------------
+
 DB_NAME = os.getenv("POSTGRES_DB", "airflow")
 DB_USER = os.getenv("POSTGRES_USER", "airflow")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "airflow")
 DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+VERITAS_MODEL_DIR = Path(
+    os.getenv("VERITAS_MODEL_DIR", str(PATHS["VERITAS_MODELS_DIR"] / "ml_model"))
+)
 
-MODEL_PATH: Path = Path(os.getenv("VERITAS_MODEL_DIR", str(VERITAS_MODELS_DIR / "ml_model")))
+# ------- 原子的保存 ------------------------------------------------------------
 
 
-def load_ml_model() -> SimpleModel:
-    """
-    PyTorchモデル（SimpleModel構造）をロードする
-    """
-    if not MODEL_PATH.exists():
-        logger.error(f"❌ MLモデルディレクトリが存在しません: {MODEL_PATH}")
-        raise FileNotFoundError(f"ML model directory not found: {MODEL_PATH}")
-    model_file = MODEL_PATH / "model.pt"
-    if not model_file.is_file():
-        logger.error(f"❌ モデルファイルが見つかりません: {model_file}")
-        raise FileNotFoundError(f"Model file not found: {model_file}")
-    model = SimpleModel()
-    try:
-        state_dict = torch.load(str(model_file), map_location=torch.device("cpu"))
-        model.load_state_dict(state_dict)
-        model.eval()
-        logger.info("✅ MLモデルのロード完了")
-        return model
-    except Exception as e:
-        logger.error(f"モデルロード失敗: {e}", exc_info=True)
-        raise
+def _atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", delete=False, dir=str(path.parent), encoding=encoding
+    ) as tmp:
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+    os.replace(tmp_path, path)
+
+
+# ------- 既存I/F: プロンプト生成 ----------------------------------------------
 
 
 def build_prompt(symbol: str, tag: str, target_metric: str) -> str:
-    """
-    戦略生成用プロンプトまたはパラメータ説明
-    """
     prompt = f"通貨ペア'{symbol}', 特性'{tag}', 目標指標'{target_metric}'に基づく取引戦略生成用パラメータ"
     logger.info(f"📝 生成されたパラメータ説明: {prompt}")
     return prompt
 
 
-def generate_strategy_code(prompt: str) -> str:
-    """
-    MLモデルを使った戦略コード生成
-    （本番用は推論結果→Python戦略コードへ動的変換が必要）
-    """
-    try:
-        _model = load_ml_model()
-        # TODO: 入力ベクトル・推論ロジックを本番仕様で置き換え
-        import random
+# ------- プロンプト解析（既存build_promptに整合） ------------------------------
 
-        random.seed(len(prompt))
-        dummy_code = f"# Generated strategy code for prompt: {prompt}\n"
-        dummy_code += f"def simulate():\n    return {random.uniform(0, 1):.4f}  # 戦略のスコア例\n"
-        logger.info("🤖 MLモデルによる戦略コードの生成完了（ダミー）")
-        return dummy_code
+_PROMPT_RE = re.compile(
+    r"通貨ペア'(?P<symbol>[^']+)'.*?特性'(?P<tag>[^']+)'.*?目標指標'(?P<metric>[^']+)'", re.DOTALL
+)
+
+
+def _parse_prompt(prompt: str) -> Dict[str, str]:
+    m = _PROMPT_RE.search(prompt)
+    if not m:
+        return {"symbol": "USDJPY", "tag": "default", "metric": "sharpe_ratio"}
+    return {"symbol": m.group("symbol"), "tag": m.group("tag"), "metric": m.group("metric")}
+
+
+# ------- 既存I/F: 戦略生成（machina に委譲） -----------------------------------
+
+FALLBACK_CODE = """# Veritas fallback strategy code
+def simulate(prices, params=None):
+    if not prices:
+        return {"action": "HOLD", "reason": "no-data", "meta": {}}
+    ma = sum(prices[-5:]) / max(1, min(5, len(prices)))
+    action = "BUY" if prices[-1] > ma else "SELL"
+    return {"action": action, "reason": "fallback-ma", "meta": {"ma": ma, "last": prices[-1]}}
+"""
+
+
+def generate_strategy_code(prompt: str) -> str:
+    trace_id = mk_trace_id()
+    obs_event("veritas.wrapper.start", trace_id=trace_id, meta={"prompt_head": prompt[:80]})
+    try:
+        vm = _lazy_import("src.veritas.veritas_machina") or _lazy_import("veritas.veritas_machina")
+        if not vm or not hasattr(vm, "generate_strategy"):
+            raise RuntimeError("veritas_machina.generate_strategy not available")
+
+        parsed = _parse_prompt(prompt)
+        inputs = {
+            "pair": parsed["symbol"],
+            "tag": parsed["tag"],
+            "profile": None,
+            "model_dir": str(VERITAS_MODEL_DIR),
+            "safe_mode": False,
+            "seed": None,
+        }
+        res: Dict[str, Any] = vm.generate_strategy(inputs)  # type: ignore
+        code = str(res.get("code") or "")
+        if not code.strip():
+            raise RuntimeError("empty code from machina")
+        obs_event("veritas.wrapper.done", trace_id=trace_id, meta={"via": "machina"})
+        logger.info("🤖 VeritasMachina 経由の戦略コード生成完了")
+        return code
     except Exception as e:
-        logger.error(f"戦略コード生成失敗: {e}", exc_info=True)
-        raise
+        logger.error(f"[{trace_id}] Veritas wrapper 失敗、フォールバック適用: {e}", exc_info=True)
+        obs_event(
+            "veritas.wrapper.fallback", trace_id=trace_id, severity="MEDIUM", meta={"exc": repr(e)}
+        )
+        return FALLBACK_CODE
+
+
+# ------- 既存I/F: DB 保存（ベストエフォート） ----------------------------------
 
 
 def save_to_db(prompt: str, response: str) -> None:
-    """
-    生成結果をPostgreSQL DBへ保存
-    """
+    pg = _lazy_import("psycopg2")
+    if not pg:
+        logger.warning("psycopg2 が無いため DB保存をスキップ")
+        return
     conn = None
     try:
-        conn = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT,
+        conn = pg.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
         )
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO veritas_outputs (prompt, response, created_at) VALUES (%s, %s, %s)",
-                (prompt, response, datetime.now()),
+                (prompt, response, datetime.now(timezone.utc)),
             )
             conn.commit()
         logger.info("✅ 生成結果をDBに保存しました。")
     except Exception as e:
-        logger.error(f"🚨 DB保存に失敗: {e}", exc_info=True)
-        # 必要に応じてファイル等へバックアップ実装可
+        logger.error(f"🚨 DB保存に失敗（継続）: {e}", exc_info=True)
     finally:
         if conn:
             conn.close()
 
 
+# ------- 既存I/F: ファイル保存（原子的） ---------------------------------------
+
+
 def save_to_file(code: str, tag: str) -> str:
-    """
-    生成コードをファイル保存し、保存パスを返却
-    """
-    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    now = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"veritas_{tag}_{now}.py"
-    save_dir = STRATEGIES_DIR / "veritas_generated"
-    save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = save_dir / filename
+    save_dir = PATHS["STRATEGIES_DIR"] / "veritas_generated"
+    dest = save_dir / filename
     try:
-        with open(save_path, "w", encoding="utf-8") as f:
-            f.write(code)
-        logger.info(f"💾 戦略をファイルに保存しました: {save_path}")
+        _atomic_write_text(dest, code)
+        logger.info(f"💾 戦略をファイルに保存しました: {dest}")
+        return str(dest)
     except Exception as e:
         logger.error(f"戦略ファイル保存失敗: {e}", exc_info=True)
-        raise
-    return str(save_path)
-
-
-# ✅ テストブロック（本番DAG等からは直接呼ばれない）
-if __name__ == "__main__":
-    # テスト用プロンプトでのダミー生成例
-    test_prompt = build_prompt("USDJPY", "hybrid", "sharpe_ratio")
-    code = generate_strategy_code(test_prompt)
-    save_path = save_to_file(code, "hybrid")
-    print(f"戦略コードの保存先: {save_path}")
-    save_to_db(test_prompt, code)
-    print("DB保存まで完了")
+        return ""

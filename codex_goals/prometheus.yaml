@@ -1,0 +1,35 @@
+north_star: >
+  実装案の検証精度を高め、偽陽性を最小化し、説明可能な評価を提供する。
+agent: Prometheus
+scope:
+  autonomy:
+    max_eval_minutes: 30
+    max_read_files: 1500
+    max_compute_cost_usd: 1.5
+    allowed_paths:
+      - "data/"
+      - "reports/"
+      - "tests/"
+success_metrics:
+  - {name: false_positive_rate, target: "<=0.1"}
+  - {name: eval_runtime_min,    target: "<=20"}
+  - {name: explainability_cov,  target: ">=0.9"}
+  # 追加: 不確実性の自己校正
+  - {name: brier_score,         target: "<=0.2"}
+  - {name: ece_calibration,     target: "<=0.05"}
+  # 追加: 健全性・網羅
+  - {name: test_coverage_rate,  target: ">=0.85"}
+  - {name: data_leak_checks,    target: "==0"}     # 0=問題なし
+  - {name: adversarial_pass_rate, target: ">=0.7"}  # 逆境耐性
+  - {name: avg_tool_latency_sec,  target: "<=2.0"}  # ツール遅延の上限
+guardrails:
+  - "deterministic seeds for backtests"
+  - "store artifacts under reports/"
+  - "return predicted_prob per test case"
+  - "log dataset_hash and seed per run"
+  - "detect data leakage (train/test overlap, target leakage)"
+  - "snapshot eval data (path or hash) for reproducibility"
+  - "adversarial tests must be included in eval suite"
+  - "must comply: eval_protocol@v1"
+handoff:
+  reviewer: Harmonia

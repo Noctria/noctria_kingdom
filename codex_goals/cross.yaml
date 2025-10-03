@@ -1,0 +1,53 @@
+north_star: >-
+  安全・効率・説明責任を満たしつつ、創造サイクルのスループットを最大化する横断規範。
+agent: CrossCutting
+guardrails:
+  - "no secrets in specs/tests/code"
+  - "use allow_paths only; deny: node_modules, venv_*, _graveyard, models/*, data/raw/*"
+  - "fintokei: MAX_RISK_PCT<=2.0; SUDDEN_LOT_JUMP<=3.0; MAX_TP_SHARE_PCT<=50"
+  - "external_api: rpm<=12 for GNews; timeout<=45s"
+  # --- Fintokei compliance (program-agnostic safe defaults) ---
+  - "daily_dd_pct < 5"               # 日次ドローダウン上限（％, 含み損/スワップ込）
+  - "total_dd_pct < 10"              # 最大ドローダウン上限（％, 含み損/スワップ込）
+  - "open_positions_risk_pct <= 3"   # 同時保有ポジション合計の想定損失（％ of capital）
+  - "min_trading_days >= 3"          # 各ステップの最低取引日数
+  - "inactivity_close_days <= 30"    # 30日無取引で閉鎖に準拠
+  # --- trading discipline (strict) ---
+  - "per_trade_risk_pct <= 0.2"       # 1トレードの許容リスク上限（% of capital）
+  - "tp_sl_required == true"          # すべてのエントリに TP/SL 必須
+  - "no_martingale == true"           # ナンピン/マーチン禁止
+  - "no_revenge_trade == true"        # 連敗直後の感情トレード禁止
+  - "no_one_shot == true"             # 一発逆転狙い禁止
+  - "no_strategy_hopping == true"     # 手法の頻繁な乗り換え禁止
+  - "no_signal_chasing == true"       # 他人シグナルへの追随禁止
+  - "lot_step_increase_max <= 1.5x"   # 連続エントリでのロット増加は段階的（上限倍率）
+scope:
+  autonomy:
+    max_runtime_minutes: 60
+    max_read_files: 3000
+    allowed_paths:
+      - "docs/specs/"
+      - "tests/"
+      - "src/"
+    deny_paths:
+      - "node_modules/"
+      - "venv_"
+      - "_graveyard/"
+      - "models/"
+      - "data/raw/"
+success_metrics:
+  - {name: cycle_throughput_per_day, target: ">=2"}
+  - {name: violation_count, target: "==0"}
+  - {name: rule_adherence_rate, target: ">=0.98"}
+  - {name: tp_sl_coverage_rate, target: "==1.0"}
+  - {name: lot_jump_violations, target: "==0"}
+  - {name: cost_share_pct,      target: "<=0.25"}
+  - {name: daily_dd_breach_count, target: "==0"}
+  - {name: total_dd_breach_count, target: "==0"}
+  - {name: open_pos_risk_breach_count, target: "==0"}
+  - {name: active_days_in_step, target: ">=3"}
+  - {name: memory_precision, target: ">=0.9"}
+  - {name: memory_recall,    target: ">=0.8"}
+  - {name: stale_knowledge_rate, target: "<=0.05"}
+  - {name: bias_flag_rate,       target: "<=0.02"}
+  - {name: drift_detection_latency_min, target: "<=15"}

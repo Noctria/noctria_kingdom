@@ -1,0 +1,70 @@
+# docs/governance/king_ops_prompt.yaml
+# Noctria 王の憲章 & 業務テンプレート（統合マージ版）
+# -------------------------------------
+
+# ── 基本憲章 / 原則 / 判断 ─────────────────────────────────
+!include king_ops_sections/charter.yaml
+!include king_ops_sections/triage.yaml
+!include king_ops_sections/decision_rules.yaml
+!include king_ops_sections/automation_gates.yaml
+
+# ── 変更管理 / バックログ / KPI アラート / スクリプト ────────
+!include king_ops_sections/change_management.yaml
+!include king_ops_sections/backlog.yaml
+!include king_ops_sections/kpi_alerts.yaml
+!include king_ops_sections/scripts.yaml
+
+# ── 日次/週次/月次運用 / ハンドオーバー / 役割とRACI / アラートSOP ─
+!include king_ops_sections/ops.yaml
+!include king_ops_sections/handover.yaml
+!include king_ops_sections/roles_raci.yaml
+!include king_ops_sections/alert_sop.yaml
+
+# ── 決定記録 / KPI定義 / 会議体 ───────────────────────────
+!include king_ops_sections/decision_log.yaml
+!include king_ops_sections/kpi_definitions.yaml
+!include king_ops_sections/cadence.yaml
+
+# ── ドキュメント運用（再現フッター） ───────────────────────
+# ※ doc_ops.yaml は同ディレクトリ配下（docs/governance/）に配置
+!include doc_ops.yaml
+
+# ── 付録（Handover用 警報追記テンプレ） / レポート雛形 ───────
+!include king_ops_sections/handover_alert_appendix.yaml
+!include king_ops_sections/report_templates.yaml
+!include king_ops_sections/document_templates.yaml
+!include king_ops_sections/alert_to_decision_workflow.yaml
+!include king_ops_sections/weekly_slide_deck.yaml
+
+# ── セーフティ/アクセス/監査 ──────────────────────────────
+!include king_ops_sections/safety_access_audit.yaml
+
+# ── テスト / SLO / 環境 / API契約 / 可観測性 / ランブック ──────
+!include king_ops_sections/testing.yaml
+!include king_ops_sections/slo.yaml
+!include king_ops_sections/environments.yaml
+!include king_ops_sections/contracts.yaml
+!include king_ops_sections/observability.yaml
+!include king_ops_sections/runbooks.yaml
+
+# ── セキュリティ / フィーチャーフラグ ──────────────────────
+!include king_ops_sections/security.yaml
+!include king_ops_sections/feature_flags.yaml
+
+# ── Whale Watch / SLOバーン連携 / Decision Registry / 変更レジストリ ─
+!include king_ops_sections/whale_watch.yaml
+!include king_ops_sections/slo_burn_monitor.yaml
+!include king_ops_sections/decision_registry.yaml
+!include king_ops_sections/file_change_registry.yaml
+
+# ── 提案・ガバナンスレビュー / AI活用方針 ───────────────────
+!include king_ops_sections/suggestion_registry.yaml
+!include king_ops_sections/governance_reviews.yaml
+!include king_ops_sections/ai_guidelines.yaml
+
+# ── エージェント拡張 / ツール / 自動化 / ルーティング / メモリ ─
+!include king_ops_sections/agent.yaml
+!include king_ops_sections/tools.yaml
+!include king_ops_sections/automations.yaml
+!include king_ops_sections/routing.yaml
+!include king_ops_sections/memory.yaml

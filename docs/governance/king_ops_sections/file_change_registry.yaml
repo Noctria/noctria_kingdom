@@ -1,0 +1,115 @@
+# =======================================================
+# ファイル変更レジストリ（新規/改変の必須ログ）
+# =======================================================
+file_change_registry:
+  enabled: true
+  schema_version: "1.1"
+  path: "docs/audit/file_changes/{YYYY-MM}.jsonl"
+
+  required_on_create: true
+  required_on_modify: true
+  required_on_move: true           # 追加: リネーム/移動も必須
+  required_on_delete: true         # 追加: 削除も必須
+  allow_batch_event: true          # 追加: 1イベントで複数ファイルを記録可（correlation_idで束ねる）
+
+  fields:                          # 収集スキーマ強化
+    - "time_utc"
+    - "actor"
+    - "repo"
+    - "branch"
+    - "git_sha_before?"
+    - "git_sha_after?"
+    - "correlation_id?"            # CI-run/PRと紐づけるID
+    - "path"
+    - "previous_path?"             # move/rename時
+    - "action"                     # create|modify|move|delete
+    - "semantic_type?"             # code|config|doc|data|model|infra
+    - "risk_level?"                # low|medium|high
+    - "breaking_change?"           # true/false
+    - "reason"
+    - "imports"                    # 自動抽出or申告
+    - "diffstat?"                  # {lines_added, lines_removed}
+    - "content_hash_before?"       # sha256
+    - "content_hash_after?"        # sha256
+    - "size_bytes_after?"
+    - "mime_type_after?"
+    - "linked_decision_id?"
+    - "linked_change_id?"
+    - "pr_number?"
+    - "reviewed_by?"
+    - "tests_referenced?"          # 例: ["T01","R01"]
+    - "artifacts?"                 # 生成物への相対パス配列
+    - "verification_status?"       # pending|passed|failed
+    - "notes?"
+
+  review:
+    daily_rollup: "docs/audit/file_changes/daily/{YYYY-MM-DD}.md"
+    weekly_summary: "docs/audit/file_changes/weekly/{YYYY-WW}.md"
+    sampling:
+      focus: ["config","infra","model"]   # 重点レビュー種別
+      min_high_risk_sample_pct: 100       # highは全件レビュー
+
+  policy:
+    block_merge_if_missing_log: true
+    block_merge_if_high_risk_unreviewed: true   # highはreviewed_by必須
+    require_tests_for: ["code","model"]         # 変更にテスト参照必須
+    exempt_paths:
+      - "README.md"
+      - ".gitignore"
+      - "docs/reports/**"                       # 自動生成物は監査対象外にできる
+    emergency_override:
+      allowed_via: "safety_and_access.break_glass"
+      require_human_pm_approval: true
+      auto_create_decision_log: true
+
+  integrity:                          # 改ざん検知/保存
+    sign_manifest: true               # 月次manifestにsha256合算・署名
+    manifest_path: "docs/audit/file_changes/{YYYY-MM}.manifest.json"
+    tamper_evident_hash_chain: true   # JSONLをハッシュチェーンで接続（prev_hash, curr_hash）
+
+  retention:
+    months: 18
+    rotate:
+      period: "monthly"
+      compression: "gz"
+
+  tooling:
+    cli:
+      log:   "python tools/fc_registry.py log --action modify --path <p> --reason '<r>' --risk high ..."
+      rollup:"python tools/fc_registry.py rollup --date {YYYY-MM-DD}"
+      verify:"python tools/fc_registry.py verify --month {YYYY-MM}"
+    precommit_hook:
+      enabled: true
+      rule: "対象変更に対し log エントリが同一コミットに存在するか確認"
+    ci_checks:
+      - "fc_registry.verify(manifest, hash_chain)"
+      - "policy(block_merge_if_missing_log, high_risk_reviewed)"
+
+  ux:
+    auto_extract:
+      imports_from: ["*.py","*.ipynb","*.yaml","*.yml"]
+      detect_move_with_git: true
+    prompts:
+      reason_hint: "『何を』『なぜ』『どのリスクを下げたか』を1行で"
+      link_hint:   "関連 Decision/Change があればIDを必ず紐づける"
+
+  metrics:
+    export:
+      - "fc_events_total"
+      - "fc_events_high_risk_total"
+      - "fc_events_without_review_total"
+      - "fc_missing_log_blocks"      # CIでblockした件数
+      - "fc_time_to_review_minutes"  # highの平均レビュー所要
+
+  examples:
+    jsonl_record: |
+      {"time_utc":"2025-03-05T09:21:33Z","actor":"king","repo":"noctria","branch":"main",
+       "git_sha_before":"abc123","git_sha_after":"def456","correlation_id":"pr-482",
+       "path":"docs/governance/king_ops_sections/kpi_alerts.yaml","previous_path":null,
+       "action":"modify","semantic_type":"config","risk_level":"medium","breaking_change":false,
+       "reason":"ECE warnに伴いbins調整のguard追記","imports":["kpi_alerts","decision_rules"],
+       "diffstat":{"lines_added":6,"lines_removed":1},
+       "content_hash_before":"...","content_hash_after":"...",
+       "linked_decision_id":"20250305-ece-warn-a1","linked_change_id":null,
+       "pr_number":482,"reviewed_by":"prometheus","tests_referenced":["R01"],
+       "artifacts":["docs/reports/daily/2025-03-05.md"],"verification_status":"passed"}

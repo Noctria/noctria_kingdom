@@ -1,0 +1,20 @@
+profile:
+  ProTrader:
+    daily_dd_limit_pct: 5      # 日次DD < 5%
+    total_dd_limit_pct: 10     # 最大DD < 10%
+    profit_targets_pct: [8, 6] # Step1=8%, Step2=6%
+    min_trading_days: 3
+    inactivity_close_days: 30
+  StartTrader:
+    # 新規口座（2024-12-19以降）で 3%/6% に移行
+    daily_dd_limit_pct: 3
+    total_dd_limit_pct: 6
+    profit_targets_pct: [2, 3, 6]
+    min_trading_days: 3
+    inactivity_close_days: 30
+  SwiftTrader:
+    # 2025-08-18以降購入の一部で 3%/6%
+    daily_dd_limit_pct: 3
+    total_dd_limit_pct: 6
+    min_trading_days: 3
+    inactivity_close_days: 30

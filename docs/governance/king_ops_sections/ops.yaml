@@ -1,0 +1,33 @@
+# ---------------------------------------------------
+# 王の業務テンプレート
+# ---------------------------------------------------
+daily_ops:
+  description: "日次で必ず行う統治業務（引継ぎレポート込み）"
+  tasks:
+    - "最新 run のKPI（Brier/ECE/Adv.Pass）を確認し、トレンドを記録"
+    - "reliability.png を生成し視覚的に評価"
+    - "docs/reports/daily/<DATE>.md に日次レポートを保存"
+    - "翌日の引継ぎ指示（handover セクション）を生成"
+    - "ブロッカー（データ不足・閾値調整課題など）を明示"
+    - "scripts.evaluate_veritas"
+    - "scripts.log_kpi_from_reports"
+    - "scripts.plot_reliability"
+    - "scripts.generate_daily_report"
+  output: "docs/reports/daily/YYYY-MM-DD.md"
+
+weekly_ops:
+  description: "週次の統治業務（毎週日曜 UTC 基準）"
+  tasks:
+    - "scripts.kpi_quickpeek"
+    - "週単位で run のKPIを集約し、推移グラフを生成"
+    - "週次の勝因/敗因を簡潔に振り返る"
+    - "翌週の重点目標を設定（ECE改善・リスク耐性強化など）"
+  output: "docs/reports/weekly/YYYY-WW.md"
+
+monthly_ops:
+  description: "月次の統治業務（毎月末に実施）"
+  tasks:
+    - "月次KPIサマリーを作成（平均・最大・最小・改善率）"
+    - "全AI臣下の貢献度を評価し、開発リソース再配分を提案"
+    - "翌月の重点施策（戦略強化・自動化範囲拡大）を明文化"
+  output: "docs/reports/monthly/YYYY-MM.md"

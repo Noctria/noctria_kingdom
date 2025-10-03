@@ -1,0 +1,60 @@
+stages_order: [collect, analyze, plan, backtest, forwardtest, fintokei_check, mt5_order, settlement, result_analyze, merge_info, replanning]
+stage_titles:
+  collect: "Collect"
+  analyze: "Analyze"
+  plan: "Plan"
+  backtest: "Backtest"
+  forwardtest: "ForwardTest"
+  fintokei_check: "Fintokei Check"
+  mt5_order: "MT5 Order"
+  settlement: "Settlement"
+  result_analyze: "Result Analyze"
+  merge_info: "Merge Info"
+  replanning: "Replanning"
+
+styles:
+  collect: "fill:#0369a1,stroke:#0ea5e9,color:#fff"
+  analyze: "fill:#1d4ed8,stroke:#60a5fa,color:#fff"
+  plan: "fill:#065f46,stroke:#34d399,color:#fff"
+  backtest: "fill:#7c2d12,stroke:#f97316,color:#fff"
+  forwardtest: "fill:#7e22ce,stroke:#c084fc,color:#fff"
+  fintokei_check: "fill:#991b1b,stroke:#f87171,color:#fff"
+  mt5_order: "fill:#0f172a,stroke:#f43f5e,color:#fff"
+  settlement: "fill:#4b5563,stroke:#9ca3af,color:#fff"
+  result_analyze: "fill:#334155,stroke:#94a3b8,color:#fff"
+  merge_info: "fill:#14532d,stroke:#4ade80,color:#fff"
+  replanning: "fill:#164e63,stroke:#22d3ee,color:#fff"
+
+roles:
+  - class_name: collect
+    patterns: ["*collector.py","*data_loader.py","*raw_data_loader.py","*market_data*.py","*fetch_*.py","*integrate_fundamental*.py","*observation*.py","*observation_adapter.py"]
+
+  - class_name: analyze
+    patterns: ["*analy*.py","*statistics*.py","*summary*.py","*market_regime*.py","*explain*.py","*pdca_log_parser.py","*decision_registry*.py","*trade_analysis.py","*plot*.py"]
+
+  - class_name: plan
+    patterns: ["*inventor*.py","*strategy_generator.py","*strategy_adapter.py","*plan*.py","*llm_plan*.py","*feature_spec.py","*quality_gate.py","*noctus_gate.py","*_dag.py"]
+
+  - class_name: backtest
+    patterns: ["*backtest*.py","*simulate*.py","*eval*.py","*trade_simulator.py","*evaluate_generated_strategies.py","*evaluate_single_strategy.py","veritas_eval_dag.py","veritas_eval_single_dag.py"]
+
+  - class_name: forwardtest
+    patterns: ["*forwardtest*.py","*forward*.py"]
+
+  - class_name: fintokei_check
+    patterns: ["*fintokei*.py","*risk_gate.py","*risk_policy.py","*quality_gate.py","*policy_guard.py","structure_check_dag.py","verify_path_config_dag.py"]
+
+  - class_name: mt5_order
+    patterns: ["*mt5*.py","*order_execution.py","*generate_order*.py","*veritas_to_order_dag.py","*veritas_airflow_executor.py","order_api.py","*executor*.py"]
+
+  - class_name: settlement
+    patterns: ["*settlement*.py","*record*.py","veritas_act_record_dag.py"]
+
+  - class_name: result_analyze
+    patterns: ["*dashboard*.py","*statistics_dashboard.py","*pdca_summary.py","*pdca_plan_summary_dag.py"]
+
+  - class_name: merge_info
+    patterns: ["*merge*.py","*integrate*.py","*adapter_to_decision.py"]
+
+  - class_name: replanning
+    patterns: ["*optimize*.py","*strategy_optimizer*.py","*recheck*.py","*update*.py","run_pdca_plan_workflow.py"]

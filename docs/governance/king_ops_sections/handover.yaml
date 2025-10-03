@@ -1,0 +1,31 @@
+# ---------------------------------------------------
+# ハンドオーバーテンプレート
+# ---------------------------------------------------
+handover_template:
+  date: "<YYYY-MM-DD>"
+  priorities:
+    - name: "ECE改善 >=0.30 維持/向上"
+      actions: ["温度スケーリング調整", "最適閾値探索の検証"]
+    - name: "Adversarial耐性 >=0.40 維持/向上"
+      actions: ["ノイズ注入/時系列シフト/レジームドリフト対策強化"]
+  checkpoints:
+    - "obs_codex_kpi_latest ビュー確認"
+    - "Prometheus エージェント設定(T, bins, objective)を記録"
+  blockers:
+    - "サンプル不足による温度推定の不安定化"
+  tomorrow_tasks:
+    - "09:30 UTC: evaluate_veritas.py 実行"
+    - "09:35 UTC: log_kpi_from_reports.py 実行"
+    - "09:40 UTC: plot_reliability.py 実行"
+
+  # --- 任意拡張（運用を回しやすくする軽いメタ情報）---
+  meta:
+    owner: "王（Noctria）"         # 当番/責任者
+    timezone: "UTC"               # 表示時刻のTZ（例: Asia/Tokyo）
+    links:                        # 参照の標準スロット
+      kpi_view: "obs_codex_kpi_latest"
+      latest_daily: "docs/reports/daily/{YYYY-MM-DD}.md"
+  acceptance_checklist:
+    - "優先事項（priorities）が2～3点で収まっている"
+    - "チェックポイントが実測/画面で確認可能"
+    - "明日タスクに時刻が付与されている（UTC/TZ明記）"

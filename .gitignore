@@ -61,3 +61,26 @@ logs/
 *.jsonl
 !codex_reports/decision_registry.jsonl
 *.bak
+
+# allow bot-generated weekly artifacts
+!docs/_generated/
+!docs/_generated/**
+# secrets / local artifacts
+.env
+.env.*
+pdca_log.db
+src/codex_reports/pdca_log.db
+runs/
+artifacts/
+codex_reports/
+__pycache__/
+*.pyc
+*.ipynb_checkpoints
+venv_noctria/
+.venv/
+bins/
+*.patch
+
+# ignore notebooks
+*.ipynb
+.ipynb_checkpoints/

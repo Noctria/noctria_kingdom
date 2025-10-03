@@ -1,0 +1,26 @@
+# =======================================================
+# SLO（APIとBT/FTの鮮度）
+# =======================================================
+slo:
+  api:
+    predict:
+      p95_latency_ms: 300
+      availability_pct_month: 99.0
+      error_rate_pct_month_max: 1.0
+      alert_policy:              # 改善: SLA違反時の扱い
+        on_violation: "WARN if単発 / CRITICAL if連続3回"
+        escalation: "王 + human_pm に即時通知"
+      measurement:
+        window: "rolling_30d"   # 改善: 測定ウィンドウ明示
+        source: "obs_api_metrics"
+
+  btft:
+    bt_batch_recency_days_max: 1
+    ft_daily_ready_by_utc: "09:20"
+    summary_publish_by_utc: "09:40"
+    alert_policy:              # 改善: 締切未達の扱い
+      on_violation: "WARN if遅延1回 / CRITICAL if2回連続"
+      fallback: "break_glass:翌営業日までに手動集計公開"
+    measurement:
+      source: "obs_btft_metrics"
+      timezone: "UTC"          # 改善: SLA基準時刻を明記

@@ -1,0 +1,127 @@
+# =======================================================
+# 週次3枚スライド骨子テンプレ
+# =======================================================
+weekly_slide_deck:
+  purpose: "外部共有・経営レビュー向けに、週次の要点を3枚で即時説明できる骨子"
+  export:
+    file_naming:
+      pattern: "docs/reports/weekly/slides/{YYYY}-W{WW}.md"
+      alt_formats: ["pdf","pptx"]
+    presenter: "Noctria 王（PM）"
+    duration_minutes: 7
+    # 改善: 生成コマンドと再現フラグを追加
+    generate_cmd: "PYTHONPATH=. python scripts/generate_weekly_slides.py --week {YYYY}-W{WW} --out docs/reports/weekly/slides"
+    reproducibility_footer: true
+
+  design_guidelines:
+    layout: "各スライドは見出し→数表/箇条書き→結論（1行）"
+    bullets_max_per_slide: 5
+    numbers_first: true
+    font_scale_hint: "見出し: 24–28 / 本文: 14–16 / 注釈: 12"
+    emoji_policy:
+      allow: true
+      guide:
+        - "成果: ✅"
+        - "課題/警報: 🔔"
+        - "次アクション: 🚀"
+    # 改善: 機微情報ガード
+    redaction:
+      pii: true
+      trading_secrets: true
+      rule: "機密は {REDACTED} に置換、詳細は別ドキュメント参照"
+
+  variables:
+    kpi_keys: ["brier_score","ece_calibration","adversarial_pass_rate"]
+    baseline_label_format: "{win}r {stat}"
+    date_range_label: "{from_date}〜{to_date}（JST）"
+    # 改善: SLO/Burnの要約を載せる変数
+    slo_brief_vars:
+      api_p95_burn_mid: "{burn_mid:.2f}"
+      api_err_burn_mid: "{err_mid:.2f}"
+      btft_fresh_burn_long: "{fresh_long:.2f}"
+
+  # 改善: スライド本体定義（3枚）
+  slides:
+    - id: "s1_kpi_overview"
+      title: "Slide 1 — KPI Overview（{year}-W{week} / {date_range_label}）"
+      body: |
+        **結論（1行）**: {exec_kpi_conclusion_one_line}
+
+        | metric | latest | baseline({baseline_label}) | Δ vs baseline | trend |
+        |---|---:|---:|---:|:--:|
+        | Brier | {brier_latest:.4f} | {brier_base_txt} | {brier_dev_signed} | {brier_trend_arrow} |
+        | ECE   | {ece_latest:.4f}   | {ece_base_txt}   | {ece_dev_signed}   | {ece_trend_arrow}   |
+        | Adv   | {adv_latest:.4f}   | {adv_base_txt}   | {adv_dev_signed}   | {adv_trend_arrow}   |
+
+        - 🔔 警報まとめ: {alerts_week_brief}
+        - SLO/Burn: p95(mid) {burn_mid:.2f} / err(mid) {err_mid:.2f} / fresh(long) {fresh_long:.2f}
+        - 注目イベント: {events_one_line}
+        - 所感: {kpi_comment_short}
+      presenter_notes:
+        - "トレンド矢印は連続性を強調（⬆/⬇/→）。Δは符号付きで説明。"
+        - "SLO/Burnは一言で方針（様子見/是正）を添える。"
+
+    - id: "s2_decisions_and_changes"
+      title: "Slide 2 — Decisions & Changes"
+      body: |
+        **結論（1行）**: {exec_ops_conclusion_one_line}
+
+        **Decisions（主要3件）**
+        1) {decision_1_id}: {decision_1_brief}（根拠: {decision_1_reason_short}）→ 状態: {decision_1_status}
+        2) {decision_2_id}: {decision_2_brief}（根拠: {decision_2_reason_short}）→ 状態: {decision_2_status}
+        3) {decision_3_id}: {decision_3_brief}（根拠: {decision_3_reason_short}）→ 状態: {decision_3_status}
+
+        **Change Drafts（今週の起票/更新）**
+        - 新規: {changes_open_count} / 完了: {changes_closed_count} / 保留: {changes_onhold_count}
+        - ハイライト: {highlight_change_id_or_dash} — {highlight_change_one_line}
+
+        **リスク & エスカレーション**
+        - 重大リスク: {top_risk_one_line}
+        - エスカレーション: {escalation_actions_brief}
+      presenter_notes:
+        - "Ordersと成功条件を口頭で即答できる粒度に。"
+        - "CRITICALは“何を/いつまでに/誰が”を明言。"
+
+    - id: "s3_next_week_focus"
+      title: "Slide 3 — Next Week Focus & Commitments"
+      body: |
+        **結論（1行）**: {exec_nextweek_conclusion_one_line}
+
+        **Focus（最大3点 / SMART）**
+        1) {focus1} — 期日: {focus1_due} / 担当: {focus1_owner} / 成功条件: {focus1_criteria}
+        2) {focus2} — 期日: {focus2_due} / 担当: {focus2_owner} / 成功条件: {focus2_criteria}
+        3) {focus3} — 期日: {focus3_due} / 担当: {focus3_owner} / 成功条件: {focus3_criteria}
+
+        **コミットメント**
+        - 🚀 実行: {commit_do_line}
+        - 🧪 検証: {commit_test_line}
+        - 🔁 ロールバック条件: {commit_rollback_trigger_line}
+
+        **参考リンク**
+        - Weekly Report: {weekly_report_path}
+        - Decisions: {decisions_dir_path}
+        - Changes: {changes_dir_path}
+      presenter_notes:
+        - "“次の一手”は3つに絞る。期日/担当/達成基準を明記。"
+        - "ロールバック条件は事前合意を強調。"
+
+  # 改善: Lint/受入チェック
+  acceptance_checklist:
+    - "各スライドに『結論（1行）』がある"
+    - "KPI表: latest / baseline / Δ / trend を1枚で説明できる"
+    - "Decisionは最大3件、Changeはハイライト1件で要点が伝わる"
+    - "Next Week: 3点・期日・担当・成功条件がSMARTで記載"
+    - "再現フッター（git_sha/data_snapshot_id など）が入る（export.reproducibility_footer=true）"
+    - "機微情報の自動マスキング（redaction.rule）を通過"
+
+  # 改善: 自動化フック（作成→レビュー→公開）
+  automation_hooks:
+    pre_generate:
+      - "scripts.kpi_quickpeek"
+    post_generate:
+      - "scripts.validate_weekly_slides --lint --redact"
+      - "scripts.publish_artifacts --path docs/reports/weekly/slides/{YYYY}-W{WW}.*"
+    failure_handling:
+      retry: { max: 2, backoff_minutes: [2,5] }
+      escalate_to: ["human_pm","king"]
+      annotate_weekly_report: true

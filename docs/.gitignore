@@ -6,3 +6,7 @@
 # Generated
 _generated/
 _partials/
+
+# allow bot-generated weekly artifacts
+!_generated/
+!_generated/**

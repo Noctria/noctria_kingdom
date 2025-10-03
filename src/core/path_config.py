@@ -1,23 +1,37 @@
+# [NOCTRIA_CORE_REQUIRED]
 #!/usr/bin/env python3
 # coding: utf-8
 """
-📌 Noctria Kingdom Path Config (v5.1)
+📌 Noctria Kingdom Path Config (v6.0)
 
-- 王国全体のパス構造を一元管理
-- Docker/WSL/ローカル差異を吸収し、ENVで上書き可能
+- 王国全体のパス構造を一元管理（ENVで上書き可能 / Docker・WSL・ローカル差異を吸収）
 - 実行層リネーム（execution -> do）に互換レイヤで対応
 - ✅ ensure_import_path(): エントリポイント側で呼べば import 経路を安定化
 - ✅ NOCTRIA_AUTOPATH=1 で import 時に自動で sys.path を整備（任意）
-- ✅ NEW: ensure_strategy_packages(): strategies 配下に __init__.py を自動整備
+- ✅ ensure_strategy_packages(): strategies 配下に __init__.py を自動整備
 - ✅ NOCTRIA_AUTOINIT=1 で __init__.py を自動生成（任意）
+- ✅ ensure_runtime_dirs(): ランタイムで必要となる主要ディレクトリを生成（存在時はNO-OP）
+- ✅ NOCTRIA_AUTODIRS=1 で起動時に ensure_runtime_dirs を自動実行（任意）
+- ✅ path_summary(): 主要パスを辞書で可視化（デバッグ/GUI用）
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+
+# ---------------------------------------------------------
+# logger (軽量なINFOログを出す。二重ハンドラは避ける)
+# ---------------------------------------------------------
+_logger = logging.getLogger("noctria.path_config")
+if not _logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    _logger.addHandler(_handler)
+_logger.setLevel(logging.INFO)
 
 # =========================================================
 # 🏰 基本ディレクトリ判定（Docker or ローカル）＋ENV上書き
@@ -112,9 +126,12 @@ NOCTRIA_GUI_SERVICES_DIR = NOCTRIA_GUI_DIR / "services"
 LLM_SERVER_DIR = PROJECT_ROOT / "llm_server"
 DOCS_DIR = PROJECT_ROOT / "docs"
 TESTS_DIR = PROJECT_ROOT / "tests"
+GOALS_DIR = PROJECT_ROOT / "codex_goals"  # ← 公式: Codex Goal Charter置き場
+REPORTS_DIR = PROJECT_ROOT / "reports"  # ← 公式: レポート/可視化の出力先（Hermes等）
+
 
 # --- 互換性のためのエイリアス ---
-GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # <--- 修正: エイリアスを追加
+GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # 既存参照の後方互換
 
 # =========================================================
 # 📄 主要ファイルパス（王国の記録物）
@@ -122,18 +139,21 @@ GUI_TEMPLATES_DIR = NOCTRIA_GUI_TEMPLATES_DIR  # <--- 修正: エイリアスを
 VERITAS_EVAL_LOG = LOGS_DIR / "veritas_eval_result.json"
 MARKET_DATA_CSV = DATA_DIR / "preprocessed_usdjpy_with_fundamental.csv"
 
-# Windows MT5ユーザパス（WSL/Windows混在対策）
-MT5_USER_PATH = Path(
-    os.getenv(
-        "MT5_USER_PATH",
-        "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files",
-    )
+# Windows MT5ユーザパス（WSL/Windows混在対策） + 環境変数の ~ 展開に対応
+_mt5_env = os.getenv(
+    "MT5_USER_PATH",
+    "/mnt/c/Users/masay/AppData/Roaming/MetaQuotes/Terminal/"
+    "D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files",
 )
+if _mt5_env:
+    _mt5_env = os.path.expanduser(_mt5_env)
+MT5_USER_PATH = Path(_mt5_env)
+
 if MT5_USER_PATH.exists():
     VERITAS_ORDER_JSON = MT5_USER_PATH / "veritas_signal.json"
 else:
     TEMP_DIR = PROJECT_ROOT / "tmp"
-    TEMP_DIR.mkdir(exist_ok=True)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
     VERITAS_ORDER_JSON = TEMP_DIR / "veritas_signal.json"
 
 # =========================================================
@@ -227,7 +247,6 @@ def with_import_path(**kwargs):
         sys.path[:] = before
 
 
-# --- NEW: strategies パッケージの __init__.py を自動整備（任意） ---
 def ensure_strategy_packages() -> None:
     """
     strategies 配下を import できるように __init__.py を自動整備する。
@@ -246,12 +265,69 @@ def ensure_strategy_packages() -> None:
                 pass
 
 
-# ENV で自動適用したい場合（明示 opt-in）
+def ensure_runtime_dirs() -> None:
+    """初回起動で必要になりがちなディレクトリを生成しておく（存在すれば何もしない）"""
+    for d in [
+        DATA_DIR,
+        RAW_DATA_DIR,
+        PROCESSED_DATA_DIR,
+        STATS_DIR,
+        PDCA_LOG_DIR,
+        ACT_LOG_DIR,
+        PUSH_LOG_DIR,
+        AIRFLOW_DOCKER_DIR,
+        DAGS_DIR,
+        LOGS_DIR,
+        NOCTRIA_GUI_DIR,
+        NOCTRIA_GUI_TEMPLATES_DIR,
+        NOCTRIA_GUI_STATIC_DIR,
+    ]:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            # 生成に失敗しても致命ではない（権限等は個別に対処）
+            pass
+
+
+def path_summary() -> dict:
+    """主要パスの文字列ダンプ（ログ/GUIで可視化しやすい）"""
+    keys = [
+        "PROJECT_ROOT",
+        "SRC_DIR",
+        "DAGS_DIR",
+        "LOGS_DIR",
+        "STRATEGIES_DIR",
+        "DO_DIR",
+        "NOCTRIA_GUI_DIR",
+        "LLM_SERVER_DIR",
+        "DATA_DIR",
+        "VERITAS_DIR",
+        "HERMES_DIR",
+    ]
+    out: dict[str, str] = {}
+    for k in keys:
+        v = globals().get(k)
+        try:
+            out[k] = str(v.resolve()) if isinstance(v, Path) else str(v)
+        except Exception:
+            out[k] = str(v)
+    return out
+
+
+# =========================================================
+# ENVでの自動適用（明示 opt-in）
+# =========================================================
 if os.getenv("NOCTRIA_AUTOPATH", "").lower() in {"1", "true", "yes"}:
     ensure_import_path()
+    _logger.info("NOCTRIA_AUTOPATH enabled: sys.path prepared")
 
 if os.getenv("NOCTRIA_AUTOINIT", "").lower() in {"1", "true", "yes"}:
     ensure_strategy_packages()
+    _logger.info("NOCTRIA_AUTOINIT enabled: strategies __init__.py ensured")
+
+if os.getenv("NOCTRIA_AUTODIRS", "").lower() in {"1", "true", "yes"}:
+    ensure_runtime_dirs()
+    _logger.info("NOCTRIA_AUTODIRS enabled: runtime directories ensured")
 
 # =========================================================
 # 🌐 公開定数（王の地図として他モジュールに輸出）
@@ -301,10 +377,12 @@ __all__ = [
     "NOCTRIA_GUI_STATIC_DIR",
     "NOCTRIA_GUI_ROUTES_DIR",
     "NOCTRIA_GUI_SERVICES_DIR",
-    "GUI_TEMPLATES_DIR",  # <--- 修正: エイリアスを公開リストに追加
+    "GUI_TEMPLATES_DIR",
     "LLM_SERVER_DIR",
     "DOCS_DIR",
     "TESTS_DIR",
+    "GOALS_DIR",
+    "REPORTS_DIR",
     # 主要ファイル
     "VERITAS_EVAL_LOG",
     "MARKET_DATA_CSV",
@@ -321,6 +399,10 @@ __all__ = [
     "ensure_import_path",
     "with_import_path",
     "ensure_strategy_packages",
+    "ensure_runtime_dirs",
+    "path_summary",
+    # テスト互換用
+    "AIRFLOW_DIR",
 ]
 
 # tests/test_path_config.py が参照する AIRFLOW_DIR を必ず用意する

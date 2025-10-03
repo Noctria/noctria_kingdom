@@ -1,0 +1,71 @@
+# =======================================================
+# 運用ロール & RACI（分割版）
+# =======================================================
+ops_roles:
+  king:
+    name: "Noctria 王"
+    role: "統治/最終意思決定"
+    focus: ["KPIガバナンス", "優先度裁定", "承認と訓示"]
+  prometheus:
+    role: "予測/校正管掌"
+    focus: ["温度スケーリング方針", "ECE/NLL監督"]
+  veritas:
+    role: "戦略生成管掌"
+    focus: ["特徴量/窓/ラベル定義", "戦略探索要件"]
+  noctus:
+    role: "リスク/ゲート管掌"
+    focus: ["Lot/Drawdown制御", "セーフモード判断"]
+  aurus:
+    role: "実行/高速化管掌"
+    focus: ["実装の健全性", "パイプライン安定化"]
+  human_pm:
+    role: "人間PM(任意)"
+    focus: ["高リスク変更の最終承認", "対外連絡"]
+
+raci_matrix:
+  - task: "日次レポートの確認/訓示"
+    R: ["king"]
+    A: ["king"]
+    C: ["prometheus", "veritas", "noctus", "aurus"]
+    I: ["human_pm"]
+
+  - task: "KPI警報の一次判定（WARN/CRITICAL）"
+    R: ["king"]
+    A: ["king"]
+    C: ["prometheus", "noctus"]
+    I: ["veritas", "aurus", "human_pm"]
+
+  - task: "原因トリアージ（仮説の一次整理）"
+    R: ["king", "prometheus"]
+    A: ["king"]
+    C: ["veritas", "noctus", "aurus"]
+    I: ["human_pm"]
+
+  - task: "変更管理ドラフト起票"
+    R: ["king"]
+    A: ["king"]
+    C: ["prometheus", "noctus"]
+    I: ["veritas", "aurus", "human_pm"]
+
+  - task: "セーフモード宣言/解除（実運用時）"
+    R: ["noctus"]
+    A: ["king"]
+    C: ["human_pm"]
+    I: ["veritas", "prometheus", "aurus"]
+
+# --- オプション: 検証/拡張メタ（非必須、CIでのlintに便利）---
+meta:
+  constraints:
+    # A(最終責任)は各taskで必ず1名、R(実行責任)は1名以上、RとAは重複可否=許容（現行仕様）
+    require_exactly_one_A: true
+    require_at_least_one_R: true
+    forbid_unknown_roles: true
+    allowed_letters: ["R","A","C","I"]
+  contacts:               # 将来の通知連携用に空スロット
+    slack: "#noctria-ops"
+    email: "ops@noctria.example"
+  acceptance_checklist:
+    - "全taskにAが1名存在する"
+    - "全taskにRが1名以上存在する"
+    - "roleキーがops_rolesに存在する"
+    - "task名がユニークで重複しない"

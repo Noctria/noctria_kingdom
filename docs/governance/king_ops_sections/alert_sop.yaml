@@ -1,0 +1,54 @@
+# =======================================================
+# アラート対応SOP（分割版）
+# =======================================================
+alert_sop:
+  overview: |
+    KPI警報は “王の判断イベント”。以下の手順で必ずドキュメント化し、
+    決定は訓示・handover・change_management に反映する。
+
+  steps:
+    - step: "1) 受付"
+      do:
+        - "日次レポートの『警報』欄を確認し、該当KPI/値/ベースライン/連続回数を把握"
+        - "triage.categories と rules を参照し、暫定カテゴリを選定"
+      outputs:
+        - "decision_log エントリ（下記スキーマ）"
+
+    - step: "2) 影響評価"
+      do:
+        - "直近5 run のスパークライン（数値推移）を王が読み、悪化の持続性を判定"
+        - "データ品質メモ（欠損/遅延/休日等）の確認"
+      guardrails:
+        - "critical の場合、Noctus にセーフモード準備を助言"
+
+    - step: "3) 対応方針の裁定"
+      branch:
+        - when: "WARN"
+          actions:
+            - "handover に軽微悪化の原因仮説＋明日やる1点を明記（ex. bins見直しの準備）"
+            - "翌日まで監視継続、再警報時は変更管理の必要性を再評価"
+        - when: "CRITICAL"
+          actions:
+            - "change_management ドラフトを作成（テンプレに沿って要件を埋める）"
+            - "Noctus と協議し、セーフモード（該当時のみ）の是非を即決"
+            - "翌日の handover に『是正アクション』を明文化（Dry-run 3本など）"
+
+    - step: "4) 記録と通達"
+      do:
+        - "decision_log に決定・根拠・エスカレーションを追記"
+        - "人間PMがいる場合、CRITICAL の要点を通知テンプレで共有"
+
+  timing_sla:
+    warn: { respond_within_minutes: 60, close_within_hours: 24 }
+    critical: { respond_within_minutes: 15, close_within_hours: 24 }
+
+  # --- 任意の検証メタ（lint/CIフック用） ---
+  meta:
+    require_decision_log_on_any_alert: true
+    require_change_draft_on_critical: true
+    allowed_levels: ["WARN", "CRITICAL"]
+    acceptance_checklist:
+      - "警報のlevel/metric/value/baseline/deviation/consecutiveが記録されている"
+      - "triageカテゴリと根拠が1行で言語化されている"
+      - "Orders（最大3つ）と成功条件が定義されている"
+      - "CRITICALは同日中にChange Draftが作成されている"

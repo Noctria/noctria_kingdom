@@ -1,472 +1,335 @@
 # src/veritas/veritas_machina.py
+# [NOCTRIA_CORE_REQUIRED]
 #!/usr/bin/env python3
 # coding: utf-8
 
 """
-🧠 Veritas Machina（MLベースの戦略生成・評価・ランキング）
-- MLスクリプトで戦略を「生成→評価」し、ランキングを返す
-- 返却に decision_id / caller / ai_source / trace_id を含める
-- 生成・評価のサブプロセス出力をログファイルへ保存
-- すべての結果（成功/警告/失敗）を agent_logs（SQLite）へ保存（全エージェント共通の運用）
-- LLMは使わない（ML中心）。共通SPの統治方針は実装・返却ポリシーで遵守
+🧪 Veritas Machina — 生成ロジック本体（KEEP-safe）
+
+役割
+- Veritas の戦略生成エンジン本体。caller（strategy_generator.py）から委譲される。
+- 依存はすべて遅延import。失敗しても HOLD（テンプレ/ヒューリスティックにフォールバック）。
+- 生成コードは `simulate(prices, params=None)` を含む。
+
+I/F
+- generate_strategy(inputs: dict) -> {"code": str, "meta": dict}
+  inputs 期待キー:
+    - pair: str                # "USD/JPY" 等
+    - tag: str                 # "momentum_core" 等
+    - profile: Optional[str]   # "default", "conservative" 等
+    - model_dir: Optional[str] # LLM ディレクトリ（任意）
+    - safe_mode: bool          # True なら即テンプレ
+    - seed: Optional[int]      # 決定性制御（任意）
 """
 
 from __future__ import annotations
 
 import json
-import logging
-import os
-import sqlite3
-import subprocess
-import traceback
-from datetime import datetime, timedelta, timezone
+import random
+import re
+import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from src.core.path_config import (
-    LOGS_DIR,
-    VERITAS_EVAL_LOG,
-    VERITAS_EVALUATE_SCRIPT,
-    VERITAS_GENERATE_SCRIPT,
-)
+# --- src を sys.path に追加 ----------------------------------------------------
+_SRC = Path(__file__).resolve().parents[1]  # src/
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")
-LOG = logging.getLogger("VeritasMachina")
+# ===== ユーティリティ（遅延import / ロガー / パス / 観測ログ） =================
 
 
-# =============================================================================
-# DB（agent_logs）— run_pdca_agents.py のテーブル互換
-# =============================================================================
-def _db_path() -> Path:
-    # 既定: src/codex_reports/pdca_log.db
-    root = Path(__file__).resolve().parents[2]
-    return Path(os.getenv("NOCTRIA_PDCA_DB", str(root / "src" / "codex_reports" / "pdca_log.db")))
-
-
-def _db_connect() -> Optional[sqlite3.Connection]:
+def _lazy_import(name: str):
     try:
-        dbp = _db_path()
-        dbp.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(dbp)
-        # 必要なら最小スキーマを作成（存在すれば no-op）
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS agent_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                trace_id TEXT,
-                role TEXT,
-                title TEXT,
-                content TEXT,
-                created_at TEXT
-            );
-            """
-        )
-        return conn
-    except Exception as e:
-        LOG.warning("agent_logs DB接続に失敗: %s", e)
+        __import__(name)
+        return sys.modules[name]
+    except Exception:
         return None
 
 
-def _db_log_agent(role: str, title: str, content: str, trace_id: Optional[str]) -> None:
-    conn = _db_connect()
-    if not conn:
-        return
-    try:
-        jst = timezone(timedelta(hours=9))
-        ts = datetime.now(tz=jst).isoformat(timespec="seconds")
-        conn.execute(
-            "INSERT INTO agent_logs (trace_id, role, title, content, created_at) VALUES (?, ?, ?, ?, ?)",
-            (trace_id or "", role, title, content, ts),
-        )
-        conn.commit()
-    except Exception as e:
-        LOG.warning("agent_logs への書き込みに失敗: %s", e)
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+def _paths():
+    mod = _lazy_import("core.path_config") or _lazy_import("src.core.path_config")
+    root = Path(__file__).resolve().parents[2]
+    if mod:
+        return {
+            "ROOT": getattr(mod, "ROOT", root),
+            "LOGS_DIR": getattr(mod, "LOGS_DIR", root / "logs"),
+            "STRATEGIES_DIR": getattr(mod, "STRATEGIES_DIR", root / "src" / "strategies"),
+            "VERITAS_MODELS_DIR": getattr(mod, "VERITAS_MODELS_DIR", root / "models" / "veritas"),
+        }
+    return {
+        "ROOT": root,
+        "LOGS_DIR": root / "logs",
+        "STRATEGIES_DIR": root / "src" / "strategies",
+        "VERITAS_MODELS_DIR": root / "models" / "veritas",
+    }
 
 
-# =============================================================================
-# 本体
-# =============================================================================
-class VeritasMachina:
-    def __init__(self):
-        try:
-            LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            LOG.error("ログディレクトリ作成失敗: %s", e)
-        self.generate_log_path = LOGS_DIR / "veritas_generate.log"
-        self.evaluate_log_path = LOGS_DIR / "veritas_evaluate.log"
+def _logger():
+    mod = _lazy_import("core.logger") or _lazy_import("src.core.logger")
+    paths = _paths()
+    log_path = Path(paths["LOGS_DIR"]) / "veritas" / "machina.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if mod and hasattr(mod, "setup_logger"):
+        return mod.setup_logger("VeritasMachina", log_path)  # type: ignore[attr-defined]
+    import logging
 
-    # --- 共通: サブプロセス出力をファイルへ保存 ---
-    def _save_subprocess_output(self, proc: Any, log_path: Path, desc: str = ""):
-        try:
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(f"\n--- {desc} [{datetime.now()}] ---\n")
-                f.write("STDOUT:\n")
-                out = getattr(proc, "stdout", "") or ""
-                err = getattr(proc, "stderr", "") or ""
-                if isinstance(out, bytes):
-                    out = out.decode("utf-8", errors="ignore")
-                if isinstance(err, bytes):
-                    err = err.decode("utf-8", errors="ignore")
-                f.write(out)
-                f.write("\nSTDERR:\n")
-                f.write(err)
-                f.write("\n")
-        except Exception as e:
-            LOG.error("%s ログ保存時にエラー: %s", desc, e)
+    lg = logging.getLogger("VeritasMachina")
+    if not lg.handlers:
+        lg.setLevel(logging.INFO)
+        fh = logging.FileHandler(str(log_path), encoding="utf-8")
+        sh = logging.StreamHandler(sys.stdout)
+        fmt = logging.Formatter("%(asctime)s - [%(levelname)s] - %(message)s")
+        fh.setFormatter(fmt)
+        sh.setFormatter(fmt)
+        lg.addHandler(fh)
+        lg.addHandler(sh)
+    return lg
 
-    # --- 共通: パラメータ辞書 → CLI引数 ---
-    def _build_cli_args(self, param_dict: Dict[str, Any]) -> List[str]:
-        args: List[str] = []
-        try:
-            for k, v in (param_dict or {}).items():
-                args.append(f"--{k}")
-                if isinstance(v, bool):
-                    v = str(v).lower()
-                args.append(str(v))
-        except Exception as e:
-            LOG.error("CLI引数組立て失敗: %s", e)
-        return args
 
-    # --- 共通: 説明文（軽量ヒューリスティック） ---
-    def _make_explanation(self, best: dict, rankings: List[dict]) -> str:
-        try:
-            avg_win = sum(r.get("win_rate", 0) for r in rankings) / len(rankings) if rankings else 0
-            avg_dd = (
-                sum(r.get("max_drawdown", 0) for r in rankings) / len(rankings) if rankings else 0
-            )
-            best_wr = best.get("win_rate")
-            best_dd = best.get("max_drawdown")
-            best_sharpe = best.get("sharpe_ratio")
-            lines: List[str] = []
-            if isinstance(best_wr, (int, float)):
-                lines.append(f"勝率: {best_wr:.2f}%（合格平均: {avg_win:.2f}%）")
-            if isinstance(best_dd, (int, float)):
-                lines.append(f"最大DD: {best_dd:.2f}（合格平均: {avg_dd:.2f}）")
-            if isinstance(best_sharpe, (int, float)):
-                lines.append(f"シャープ: {best_sharpe:.3f}")
-            lines.append("final_capital と安定性指標の総合で最良と判断")
-            return " / ".join(lines)
-        except Exception as e:
-            return f"自動説明生成エラー: {e}"
+def _obs():
+    mod = _lazy_import("plan_data.observability") or _lazy_import("src.plan_data.observability")
+    import datetime as dt
 
-    # --- 共通: 最終結果をログして返す ---
-    def _finalize(self, result: Dict[str, Any], trace_id: Optional[str]) -> Dict[str, Any]:
-        # trace_id を明示反映してから agent_logs へ保存
-        if trace_id:
-            result.setdefault("trace_id", trace_id)
-        try:
-            _db_log_agent(
-                role="veritas",
-                title=f"Veritas {result.get('status', 'RESULT')}",
-                content=json.dumps(result, ensure_ascii=False),
-                trace_id=trace_id,
-            )
-        except Exception:
-            pass
-        return result
+    def mk_trace_id():
+        return dt.datetime.utcnow().strftime("trace_%Y%m%dT%H%M%S_%f")
 
-    # -------------------------------------------------------------------------
-    # Public API
-    # -------------------------------------------------------------------------
-    def propose(
-        self,
-        top_n: int = 5,
-        decision_id: Optional[str] = None,
-        caller: Optional[str] = "king_noctria",
+    def obs_event(
+        event: str,
+        *,
+        severity: str = "LOW",
         trace_id: Optional[str] = None,
-        **params,
-    ) -> Dict[str, Any]:
-        """
-        MLベースの戦略を生成→評価し、上位候補を返す。
-        - すべてのフェーズで例外時もエラー結果を返し agent_logs に記録
-        - params はそのまま生成/評価スクリプトへ --key value でパス
-        """
-        try:
-            # --- 生成スクリプト存在チェック ---
-            if not Path(VERITAS_GENERATE_SCRIPT).exists():
-                msg = f"戦略生成スクリプトが見つかりません: {VERITAS_GENERATE_SCRIPT}"
-                LOG.error(msg)
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": msg,
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
+        meta: Optional[Dict[str, Any]] = None,
+    ):
+        msg = {
+            "event": event,
+            "severity": severity,
+            "trace_id": trace_id,
+            "meta": meta or {},
+            "ts": dt.datetime.utcnow().isoformat(),
+        }
+        print("[OBS]", json.dumps(msg, ensure_ascii=False))
 
-            # --- 戦略生成 ---
-            try:
-                LOG.info("戦略生成プロセス開始（params=%s）", params)
-                cli_args = self._build_cli_args(params)
-                res = subprocess.run(
-                    ["python", str(VERITAS_GENERATE_SCRIPT)] + cli_args,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                self._save_subprocess_output(res, self.generate_log_path, "VERITAS GENERATE")
-                LOG.info("戦略生成プロセス完了")
-            except subprocess.CalledProcessError as e:
-                self._save_subprocess_output(e, self.generate_log_path, "VERITAS GENERATE (FAILED)")
-                error_message = f"戦略生成失敗: {e.stderr or e}"
-                LOG.error(error_message)
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": error_message,
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-            except Exception as e:
-                LOG.error("戦略生成時エラー: %s", traceback.format_exc())
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": f"戦略生成時エラー: {e}",
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-
-            # --- 評価スクリプト存在チェック ---
-            if not Path(VERITAS_EVALUATE_SCRIPT).exists():
-                msg = f"戦略評価スクリプトが見つかりません: {VERITAS_EVALUATE_SCRIPT}"
-                LOG.error(msg)
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": msg,
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-
-            # --- 戦略評価 ---
-            try:
-                LOG.info("戦略評価プロセス開始")
-                cli_args = self._build_cli_args(params)
-                res = subprocess.run(
-                    ["python", str(VERITAS_EVALUATE_SCRIPT)] + cli_args,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                self._save_subprocess_output(res, self.evaluate_log_path, "VERITAS EVALUATE")
-                LOG.info("戦略評価プロセス完了")
-            except subprocess.CalledProcessError as e:
-                self._save_subprocess_output(e, self.evaluate_log_path, "VERITAS EVALUATE (FAILED)")
-                error_message = f"戦略評価失敗: {e.stderr or e}"
-                LOG.error(error_message)
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": error_message,
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-            except Exception as e:
-                LOG.error("戦略評価時エラー: %s", traceback.format_exc())
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": f"戦略評価時エラー: {e}",
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-
-            # --- 評価ログからランキング抽出 ---
-            if not Path(VERITAS_EVAL_LOG).exists():
-                msg = f"評価ログが見つかりません: {VERITAS_EVAL_LOG}"
-                LOG.error(msg)
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": msg,
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-
-            try:
-                LOG.info("評価結果からランキング選定…")
-                with open(VERITAS_EVAL_LOG, "r", encoding="utf-8") as f:
-                    results = json.load(f)
-
-                passed = [r for r in results if r.get("passed")]
-                if not passed:
-                    msg = "全ての戦略が評価基準を満たしませんでした。"
-                    LOG.warning(msg)
-                    return self._finalize(
-                        {
-                            "name": "VeritasMachina",
-                            "ai_source": "veritas",
-                            "decision_id": decision_id,
-                            "caller": caller,
-                            "type": "strategy_proposal",
-                            "status": "REJECTED",
-                            "detail": msg,
-                            "strategy_rankings": [],
-                            "explanation": "",
-                            "params": params,
-                        },
-                        trace_id,
-                    )
-
-                rankings: List[dict] = sorted(
-                    passed, key=lambda r: r.get("final_capital", 0), reverse=True
-                )[: top_n if isinstance(top_n, int) and top_n > 0 else 5]
-
-                best = rankings[0]
-                explanation = self._make_explanation(best, rankings)
-                LOG.info("最良戦略『%s』選定: %s", best.get("strategy"), explanation)
-
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "PROPOSED",
-                        "strategy_details": best,
-                        "strategy_rankings": rankings,
-                        "explanation": explanation,
-                        "params": params,
-                    },
-                    trace_id,
-                )
-
-            except (json.JSONDecodeError, KeyError) as e:
-                msg = f"評価ログ破損/形式不正: {e}"
-                LOG.error(msg)
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": msg,
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-            except Exception as e:
-                LOG.error("最良戦略抽出時エラー: %s", traceback.format_exc())
-                return self._finalize(
-                    {
-                        "name": "VeritasMachina",
-                        "ai_source": "veritas",
-                        "decision_id": decision_id,
-                        "caller": caller,
-                        "type": "strategy_proposal",
-                        "status": "ERROR",
-                        "detail": f"最良戦略抽出時エラー: {e}",
-                        "strategy_rankings": [],
-                        "explanation": "",
-                        "params": params,
-                    },
-                    trace_id,
-                )
-
-        except Exception as e:
-            LOG.error("致命的な例外: %s", traceback.format_exc())
-            return self._finalize(
-                {
-                    "name": "VeritasMachina",
-                    "ai_source": "veritas",
-                    "decision_id": decision_id,
-                    "caller": caller,
-                    "type": "strategy_proposal",
-                    "status": "ERROR",
-                    "detail": f"致命的な例外: {e}",
-                    "strategy_rankings": [],
-                    "explanation": "",
-                    "params": params,
-                },
-                trace_id,
-            )
+    if mod:
+        mk_trace_id = getattr(mod, "mk_trace_id", mk_trace_id)  # type: ignore
+        obs_event = getattr(mod, "obs_event", obs_event)  # type: ignore
+    return mk_trace_id, obs_event
 
 
-# ========================================
-# ✅ 単体テスト（直接起動時）
-# ========================================
-if __name__ == "__main__":
+LOGGER = _logger()
+PATHS = _paths()
+mk_trace_id, obs_event = _obs()
+
+# ===== シード制御 =============================================================
+
+
+def _set_seed(seed: Optional[int]) -> None:
     try:
-        LOG.info("--- Veritas Machina: self-test ---")
-        strategist = VeritasMachina()
-        proposal = strategist.propose(
-            top_n=5,
-            decision_id="KC-TEST",
-            caller="king_noctria",
-            trace_id="trace_test_001",
-            risk=0.01,
-            symbol="USDJPY",
-            lookback=180,
-        )
-        print("\n👑 王への進言（Veritas Machina）:")
-        print(json.dumps(proposal, indent=4, ensure_ascii=False))
-        LOG.info("--- Veritas Machina: self-test done ---")
+        import numpy as _np  # type: ignore
+
+        _np.random.seed(seed if seed is not None else 42)
     except Exception:
-        LOG.error("メインブロック例外: %s", traceback.format_exc())
+        pass
+    try:
+        torch = _lazy_import("torch")
+        if torch is not None:
+            s = 42 if seed is None else seed
+            torch.manual_seed(s)  # type: ignore[attr-defined]
+            if getattr(torch, "cuda", None) and torch.cuda.is_available():  # type: ignore[attr-defined]
+                torch.cuda.manual_seed_all(s)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    random.seed(seed if seed is not None else 42)
+
+
+# ===== テンプレ & 簡易ジェネレーター ===========================================
+
+
+def _load_template_text() -> str:
+    candidates = [
+        PATHS["ROOT"] / "src" / "veritas" / "generate" / "templates" / "strategy_template.py",
+        PATHS["ROOT"] / "src" / "strategies" / "official" / "sample_strategy.py",
+    ]
+    for p in candidates:
+        try:
+            if Path(p).is_file():
+                return Path(p).read_text(encoding="utf-8")
+        except Exception:
+            continue
+    # 最小テンプレ
+    return """# Generated Fallback Strategy
+def simulate(prices, params=None):
+    if not prices:
+        return {}
+    ma = sum(prices[-5:]) / max(1, min(5, len(prices)))
+    signal = "BUY" if prices[-1] > ma else "SELL"
+    return {"action": signal, "reason": "fallback-ma", "meta": {"ma": ma, "last": prices[-1]}}
+"""
+
+
+def _render_header(pair: str, tag: str, profile: Optional[str]) -> str:
+    return f"# VeritasMachina strategy — pair={pair}, tag={tag}, profile={profile or 'default'}\n"
+
+
+def _heuristic_strategy(pair: str, tag: str, profile: Optional[str]) -> str:
+    """
+    依存ゼロの決定論的ジェネレーター（SMA/EMA/RSI 風のシンプル合成）
+    """
+    header = _render_header(pair, tag, profile)
+    body = r"""
+from statistics import mean
+
+def _sma(xs, n):
+    n = max(1, min(n, len(xs)))
+    return mean(xs[-n:]) if xs else 0.0
+
+def _ema(xs, n):
+    n = max(1, min(n, len(xs)))
+    if not xs:
+        return 0.0
+    alpha = 2/(n+1)
+    ema = xs[0]
+    for x in xs[1:]:
+        ema = alpha*x + (1-alpha)*ema
+    return ema
+
+def _rsi(xs, n=14):
+    n = max(1, min(n, len(xs)))
+    if len(xs) < 2:
+        return 50.0
+    gains, losses = [], []
+    for i in range(1, n):
+        diff = xs[-i] - xs[-i-1]
+        (gains if diff > 0 else losses).append(abs(diff))
+    avg_gain = (sum(gains)/len(gains)) if gains else 0.0
+    avg_loss = (sum(losses)/len(losses)) if losses else 0.0
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain/avg_loss
+    return 100 - (100/(1+rs))
+
+def simulate(prices, params=None):
+    params = params or {}
+    fast = int(params.get("fast", 5))
+    slow = int(params.get("slow", 20))
+    rsi_n = int(params.get("rsi_n", 14))
+
+    if not prices or len(prices) < max(2, slow):
+        return {"action": "HOLD", "reason": "insufficient-data", "meta": {}}
+
+    sma_fast = _sma(prices, fast)
+    sma_slow = _sma(prices, slow)
+    ema_slow = _ema(prices, slow)
+    rsi = _rsi(prices, rsi_n)
+    last = prices[-1]
+
+    # 合成シグナル（単純な重み付け）
+    score = 0.0
+    score += 1.0 if sma_fast > sma_slow else -1.0
+    score += 0.5 if last > ema_slow else -0.5
+    score += (rsi - 50.0)/50.0 * 0.5  # [-0.5, +0.5] スケール
+
+    action = "BUY" if score > 0.2 else ("SELL" if score < -0.2 else "HOLD")
+    return {
+        "action": action,
+        "reason": "heuristic-composite",
+        "meta": {
+            "sma_fast": sma_fast, "sma_slow": sma_slow, "ema_slow": ema_slow,
+            "rsi": rsi, "last": last, "score": score
+        },
+    }
+"""
+    return header + body.lstrip()
+
+
+# ===== LLM 統合（任意） =======================================================
+
+
+def _try_llm(prompt: str, *, model_dir: Optional[str]) -> Optional[str]:
+    """
+    transformers/torch があり、model_dir が存在すれば LLM 生成を試みる。
+    """
+    if not model_dir:
+        return None
+    try:
+        trf = _lazy_import("transformers")
+        torch = _lazy_import("torch")
+        if trf is None or torch is None:
+            return None
+        from pathlib import Path as _P
+
+        if not _P(model_dir).exists():
+            return None
+        AutoModelForCausalLM = getattr(trf, "AutoModelForCausalLM")
+        AutoTokenizer = getattr(trf, "AutoTokenizer")
+        model = AutoModelForCausalLM.from_pretrained(model_dir, local_files_only=True)
+        tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+        inputs = tokenizer(prompt, return_tensors="pt")
+        with torch.no_grad():  # type: ignore[attr-defined]
+            tokens = model.generate(
+                inputs["input_ids"],
+                max_new_tokens=1024,
+                pad_token_id=getattr(tokenizer, "eos_token_id", None),
+            )
+        text = tokenizer.decode(tokens[0], skip_special_tokens=True)
+        m = re.search(r"(def\s+simulate\(.*)", text, re.DOTALL)
+        return m.group(1).strip() if m else text.strip()
+    except Exception as e:
+        LOGGER.error(f"LLM生成に失敗: {e}", exc_info=True)
+        return None
+
+
+# ===== Public API =============================================================
+
+
+def generate_strategy(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Public: strategy_generator から呼ばれる唯一の関数。
+    戻り値: {"code": str, "meta": {...}}
+    """
+    pair: str = str(inputs.get("pair") or inputs.get("symbol") or "USD/JPY")
+    tag: str = str(inputs.get("tag") or "momentum_core")
+    profile: Optional[str] = inputs.get("profile")
+    model_dir: Optional[str] = inputs.get("model_dir")
+    safe_mode: bool = bool(inputs.get("safe_mode") or False)
+    seed: Optional[int] = inputs.get("seed")
+
+    _set_seed(seed)
+
+    trace_id = mk_trace_id()
+    obs_event(
+        "veritas.machina.start",
+        severity="LOW",
+        trace_id=trace_id,
+        meta={"pair": pair, "tag": tag, "profile": profile, "safe_mode": safe_mode},
+    )
+
+    meta: Dict[str, Any] = {
+        "pair": pair,
+        "tag": tag,
+        "profile": profile,
+        "via": None,
+        "trace_id": trace_id,
+    }
+
+    # 1) safe-mode → テンプレ
+    if safe_mode:
+        base = _load_template_text()
+        code = _render_header(pair, tag, profile) + base
+        meta["via"] = "template_safe_mode"
+        obs_event("veritas.machina.done", severity="LOW", trace_id=trace_id, meta=meta)
+        return {"code": code, "meta": meta}
+
+    # 2) LLM（任意）
+    prompt = f"Create a robust FX strategy for {pair} with tag '{tag}', profile '{profile or 'default'}'. Include simulate(prices, params=None). Prefer readable Python."
+    llm_code = _try_llm(prompt, model_dir=model_dir)
+    if llm_code:
+        meta["via"] = "llm"
+        obs_event("veritas.machina.done", severity="LOW", trace_id=trace_id, meta=meta)
+        return {"code": llm_code, "meta": meta}
+
+    # 3) 依存ゼロのヒューリスティック
+    code = _heuristic_strategy(pair, tag, profile)
+    meta["via"] = "heuristic"
+    obs_event("veritas.machina.done", severity="LOW", trace_id=trace_id, meta=meta)
+    return {"code": code, "meta": meta}

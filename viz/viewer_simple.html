@@ -1,0 +1,134 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Noctria Graph Viewer (simple, wheel/pan disabled)</title>
+<style>
+  html,body { margin:0; padding:0; height:100%; }
+  #app { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  #toolbar {
+    display:flex; gap:.5rem; align-items:center;
+    padding:.5rem .75rem; background:#f6f7fb; border-bottom:1px solid #e5e7eb;
+    font:13px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  }
+  #toolbar label { opacity:.7; }
+  #cy { width:100%; height:100%; }
+  button, input[type="file"], input[type="text"] {
+    font:inherit; padding:.35rem .5rem; border:1px solid #d1d5db; border-radius:6px; background:white;
+  }
+  button { cursor:pointer; }
+  button:active { transform: translateY(1px); }
+  .sep { width:1px; height:22px; background:#e5e7eb; margin:0 .5rem; }
+  #meta { margin-left:.5rem; opacity:.7; }
+</style>
+
+<div id="app">
+  <div id="toolbar">
+    <label>Choose JSON</label><input id="file" type="file" accept=".json">
+    <span class="sep"></span>
+    <button id="fit">FIT</button>
+    <button id="zin">＋</button>
+    <button id="zout">－</button>
+    <span class="sep"></span>
+    <input id="q" type="text" placeholder="search id/label…">
+    <button id="find">FIND</button>
+    <button id="clear">CLEAR</button>
+    <span class="sep"></span>
+    <label>focus neighbors</label><input id="focus" type="checkbox">
+    <span id="meta"></span>
+  </div>
+  <div id="cy"></div>
+</div>
+
+<script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
+<script>
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  style: [
+    { selector:'node', style:{
+        'label':'data(label)', 'font-size':'6px',
+        'width':6, 'height':6, 'background-color':'#8a8a8a', 'color':'#111'
+    }},
+    { selector:'node[id $= "_cluster"]', style:{
+        'background-color':'#1f2937','color':'#fff','width':16,'height':16,'font-size':'8px','label':'data(id)'
+    }},
+    { selector:'node.hit', style:{ 'background-color':'#2563eb','width':8,'height':8 }},
+    { selector:'node.hidden', style:{ 'display':'none' }},
+    { selector:'edge', style:{ 'width':1, 'curve-style':'bezier', 'target-arrow-shape':'triangle' }},
+  ],
+  userZoomingEnabled: false,
+  userPanningEnabled: false,
+  autoungrabify: true,
+  boxSelectionEnabled: false,
+  pixelRatio: 1
+});
+
+let lastClickedId = null;
+let lastLayout = 'concentric';
+
+function runLayout(name='concentric', fit=true) {
+  lastLayout = name;
+  cy.layout({ name, animate:false, fit:!!fit, padding:20 }).run();
+}
+
+function fitAll(){ runLayout(lastLayout, true); }
+
+function zoomBy(f){
+  const z = cy.zoom();
+  cy.zoom({ level: Math.max(0.1, Math.min(2.0, z * f)), renderedPosition: {x: cy.width()/2, y: cy.height()/2} });
+}
+
+function unhideAll(){ cy.nodes('.hidden').removeClass('hidden'); }
+
+function focusNeighbors(centerId){
+  unhideAll();
+  if (!document.getElementById('focus').checked || !centerId) { fitAll(); return; }
+  const c = cy.getElementById(centerId);
+  if (!c.nonempty()) { fitAll(); return; }
+  const keep = c.closedNeighborhood();
+  cy.nodes().difference(keep.nodes()).addClass('hidden');
+  fitAll();
+}
+
+function loadJSON(obj){
+  cy.elements().remove();
+  cy.add(obj.elements);
+  runLayout('concentric', true);
+  document.getElementById('meta').textContent =
+    `  nodes=${obj.meta?.out_nodes ?? cy.nodes().length} edges=${obj.meta?.out_edges ?? cy.edges().length}`;
+}
+
+cy.on('tap', 'node', evt=>{
+  lastClickedId = evt.target.id();
+  focusNeighbors(lastClickedId);
+  console.log('[node]', evt.target.data());
+});
+
+document.getElementById('file').onchange = (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=> loadJSON(JSON.parse(r.result));
+  r.readAsText(f);
+};
+
+document.getElementById('fit').onclick  = ()=> fitAll();
+document.getElementById('zin').onclick  = ()=> zoomBy(1.2);
+document.getElementById('zout').onclick = ()=> zoomBy(1/1.2);
+
+document.getElementById('find').onclick = ()=>{
+  const q = (document.getElementById('q').value || '').toLowerCase().trim();
+  cy.nodes().removeClass('hit hidden');
+  if(!q) { fitAll(); return; }
+  const hits = cy.nodes().filter(n=>{
+    const d = n.data(); return (''+(d.id||'')).toLowerCase().includes(q) || (''+(d.label||'')).toLowerCase().includes(q);
+  }).addClass('hit');
+  if(hits.nonempty()){ cy.nodes().difference(hits).addClass('hidden'); }
+  fitAll();
+};
+
+document.getElementById('clear').onclick = ()=>{
+  document.getElementById('q').value = '';
+  cy.nodes().removeClass('hit hidden');
+  fitAll();
+};
+
+document.getElementById('focus').onchange = ()=>{ focusNeighbors(lastClickedId); };
+</script>

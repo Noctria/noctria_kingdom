@@ -1,0 +1,102 @@
+# =======================================================
+# SLO バーンレート監視（自動アクション連携）
+# =======================================================
+slo_burn_monitor:
+  owners: ["king","noctus"]   # 運用責任とゲート管掌
+  timezone: "UTC"
+
+  windows:
+    short: "5m"     # 素早い検知
+    long: "30m"     # 誤検知抑制（意思決定は原則こちらで判定）
+    quorum: "long"  # 判定は long 窓を優先
+
+  compute:
+    - key: "api_p95"
+      unit: "ms"
+      value_metric: "observability.metrics.api.predict_latency_ms_p95"
+      slo_ref: "slo.api.predict.p95_latency_ms"
+      burn_formula: "burn = value / slo"              # >1 でSLO超過
+      aggregate: "max(short), avg(long)"
+
+    - key: "api_availability"
+      unit: "pct"
+      # 可用性は「エラーバジェット燃焼率」で計算
+      value_formula: "error_rate = predict_5xx_total / max(predict_requests_total,1)"
+      slo_ref: "slo.api.predict.availability_pct_month"
+      burn_formula: "burn = (error_rate) / (1 - slo/100.0)"   # 例: SLO=99% → 1% が予算
+      aggregate: "avg(long)"
+
+    - key: "ft_deadline"
+      unit: "minutes_late"
+      value_formula: "late_minutes = max(0, now_utc - slo.btft.ft_daily_ready_by_utc)"
+      allow_minutes: 20     # 許容遅延の上限（運用ポリシー）
+      burn_formula: "burn = min(late_minutes / allow_minutes, 10.0)"  # 上限10でクリップ
+      aggregate: "max(long)"
+
+  thresholds:
+    warn: 1.0
+    critical: 2.0
+
+  hysteresis:
+    enter_warn: 1.0
+    exit_warn: 0.8
+    enter_critical: 2.0
+    exit_critical: 1.6
+
+  suppression:
+    maintenance_windows:
+      - { cron: "0 9 * * *", duration_minutes: 20 }   # 既存のFT締切周辺メンテと整合
+    ignore_if:
+      - "observability.metrics.api.predict_requests_total < 20 over short"
+
+  auto_rules:
+    - id: "AR_LATENCY_DRY"
+      when: "burn(api_p95) >= critical for long"
+      cooldown_minutes: 30
+      then:
+        - "decision_registry.map('latency_hot','bins_fixed_dry')"
+        - "scripts.evaluate_veritas --calib-bins 10 --dry-run"
+        - "log 'auto_action:AR_LATENCY_DRY initiated'"
+      safety:
+        guardrails:
+          - "testing.sla.ci_time_minutes_max >= observed_ci_time"   # CI超過を禁止
+          - "contracts.api.error_budget.p95_latency_ms not violated in stg"
+        require_human_ack: false
+
+    - id: "AR_FT_EXPIDITE"
+      when: "burn(ft_deadline) >= warn for long"
+      cooldown_minutes: 60
+      then:
+        - "scripts.summarize_bt_ft --priority now"
+        - "append_to_handover 'FT遅延是正: summarize_bt_ft を前倒し実行'"
+      safety:
+        require_human_ack: false
+
+    - id: "AR_AVAIL_BREAKER_HINT"
+      when: "burn(api_availability) >= critical for long"
+      cooldown_minutes: 15
+      then:
+        - "notify 'noctus' '可用性急落。breaker候補と直近デプロイ差分確認'"
+        - "open_decision level=CRITICAL metric='availability' action='breaker_consideration'"
+      safety:
+        require_human_ack: true   # ブレーカは人間承認必須（safety_and_access に準拠）
+
+  escalation_bridge:
+    warn_to: "alert_sop (step 1→2)"
+    critical_to: "alert_sop (即 step 3), decision_log + change_draft 起票"
+
+  audit:
+    log_path: "docs/audit/{YYYY}/{YYYYMMDD}.log"
+    events:
+      - "utc=<ts> | key=<slo_key> | burn=<val> | level=<warn|critical> | action=<id|none> | result=<ok|skipped|cooldown>"
+
+  observability:
+    export_metrics:
+      - "slo_burn_api_p95"
+      - "slo_burn_api_availability"
+      - "slo_burn_ft_deadline"
+    dashboard_hint: "SLO Burn board: short/long窓とhysteresis境界を重ね描画"
+
+  sim_mode:
+    enabled: false
+    note: "true にすると全自動アクションは実行せず、decision_log への草案のみ作成"

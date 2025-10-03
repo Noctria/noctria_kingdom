@@ -3,7 +3,6 @@ import os
 
 import pandas as pd
 import torch
-
 from core.NoctriaMasterAI import NoctriaMasterAI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

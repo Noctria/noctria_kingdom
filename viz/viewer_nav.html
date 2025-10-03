@@ -1,0 +1,324 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Noctria Graph Viewer (nav + metrics + violations + export)</title>
+<style>
+  html,body{margin:0;padding:0;height:100%}
+  #app{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr}
+  #toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.5rem .75rem;background:#f6f7fb;border-bottom:1px solid #e5e7eb;font:13px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .sep{width:1px;height:22px;background:#e5e7eb;margin:0 .5rem}
+  #cy{width:100%;height:100%}
+  button,input[type="file"],input[type="text"],select{font:inherit;padding:.35rem .5rem;border:1px solid #d1d5db;border-radius:6px;background:#fff}
+  button{cursor:pointer}
+  #meta{margin-left:.5rem;opacity:.7}
+  #url{width:18rem}
+  .padbtns{display:inline-grid;grid-template-columns:repeat(3,2rem);grid-template-rows:repeat(3,2rem);gap:.25rem;align-items:center;justify-items:center}
+  .padbtns button{width:2rem;height:2rem;padding:0}
+  .small{font-size:12px;opacity:.8}
+</style>
+
+<div id="app">
+  <div id="toolbar">
+    <label>Choose JSON</label><input id="file" type="file" accept=".json">
+    <span class="sep"></span>
+    <label>URL</label><input id="url" type="text" placeholder="graph_overview_with_imports.json">
+    <button id="loadurl">LOAD URL</button>
+    <span class="sep"></span>
+    <button id="fit">FIT</button>
+    <button id="zin">＋</button><button id="zout">－</button>
+    <label style="margin-left:.5rem">Pan</label><input id="panmode" type="checkbox">
+    <label>Wheel</label><input id="wheel" type="checkbox">
+    <div class="padbtns" title="パン（←→↑↓ / WASD）">
+      <span></span><button id="panU">↑</button><span></span>
+      <button id="panL">←</button><span></span><button id="panR">→</button>
+      <span></span><button id="panD">↓</button><span></span>
+    </div>
+    <span class="sep"></span>
+    <input id="q" type="text" placeholder="search id/label…"><button id="find">FIND</button><button id="clear">CLEAR</button>
+    <label>focus neighbors</label><input id="focus" type="checkbox" title="クリックノードの近傍だけ表示">
+    <span class="sep"></span>
+    <label>k-hop</label>
+    <select id="khop"><option>1</option><option selected>2</option><option>3</option></select>
+    <button id="applyHop">APPLY</button>
+    <span class="sep"></span>
+    <label>layout</label>
+    <select id="layout">
+      <option value="concentric" selected>concentric</option>
+      <option value="breadthfirst">breadthfirst</option>
+      <option value="grid">grid</option>
+      <option value="circle">circle</option>
+    </select>
+    <button id="relayout">RUN</button>
+    <span class="sep"></span>
+    <button id="metrics">Compute metrics</button>
+    <label>violations</label><input id="viol" type="checkbox" title="ステージ順に反するエッジを赤表示">
+    <input id="order" type="text" class="small" style="width:24rem"
+           value="collect,analyze,plan,backtest,forwardtest,fintokei_check,mt5_order,settlement,result_analyze,merge_info,replanning"
+           title="ステージ順（カンマ区切り）">
+    <span class="sep"></span>
+    <button id="png">Save PNG</button>
+    <span class="sep"></span>
+    <label>Path A→B</label><input id="pathA" class="small" placeholder="id or label" style="width:10rem">
+    <input id="pathB" class="small" placeholder="id or label" style="width:10rem">
+    <button id="spath">Shortest Path</button>
+    <span id="meta"></span>
+  </div>
+  <div id="cy"></div>
+</div>
+
+<script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
+<script>
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  style: [
+    { selector:'node', style:{
+      'label':'data(label)','font-size':'6px','width':6,'height':6,
+      'background-color':'#8a8a8a','color':'#111'
+    }},
+    { selector:'node[id $= "_cluster"]', style:{
+      'background-color':'#1f2937','color':'#fff','width':16,'height':16,'font-size':'8px','label':'data(id)'
+    }},
+    { selector:'node.hit', style:{ 'background-color':'#2563eb','width':8,'height':8 }},
+    { selector:'node.hidden', style:{ 'display':'none' }},
+    { selector:'edge', style:{ 'width':1,'curve-style':'bezier','target-arrow-shape':'triangle' }},
+    { selector:'edge.reverse', style:{ 'line-color':'#ef4444','target-arrow-color':'#ef4444','width':2 }}
+  ],
+  userZoomingEnabled:false,
+  userPanningEnabled:false,
+  autoungrabify:true,
+  boxSelectionEnabled:false,
+  pixelRatio:1
+});
+
+let lastClickedId=null, lastLayout='concentric';
+function runLayout(name='concentric',fit=true){
+  lastLayout=name;
+  cy.layout({name,animate:false,fit:!!fit,padding:20}).run();
+}
+function fitAll(){ runLayout(lastLayout,true); }
+function zoomBy(f){ const z=cy.zoom(); cy.zoom({level:Math.max(0.05,Math.min(3.0,z*f)), renderedPosition:{x:cy.width()/2,y:cy.height()/2}}); }
+function unhideAll(){ cy.nodes('.hidden').removeClass('hidden'); }
+function focusNeighbors(centerId){
+  unhideAll();
+  if(!document.getElementById('focus').checked || !centerId){ fitAll(); return; }
+  const c=cy.getElementById(centerId); if(!c.nonempty()){ fitAll(); return; }
+  const keep=c.closedNeighborhood(); cy.nodes().difference(keep.nodes()).addClass('hidden'); fitAll();
+}
+function loadJSON(obj){
+  const norm = normalizeToCytoscapeElements(obj);
+  cy.elements().remove(); cy.add(norm.elements);
+  runLayout('concentric',true);
+  document.getElementById('meta').textContent = `  nodes=${norm.elements.nodes.length} edges=${norm.elements.edges.length}`;
+}
+
+/* -------- robust loader -------- */
+function normalizeToCytoscapeElements(obj){
+  let elements = obj.elements;
+  if(!elements){
+    if(obj.nodes || obj.edges){ elements={nodes:obj.nodes||[], edges:obj.edges||[]}; }
+    else if(Array.isArray(obj)){
+      elements = { nodes: obj.filter(x=>!x.data?.source && !x.source),
+                   edges: obj.filter(x=> x.data?.source || x.source) };
+    }else{
+      elements = {nodes:[],edges:[]};
+    }
+  }
+  const normNodes = (elements.nodes||[]).map(n=>{
+    const d = n.data ? {...n.data} : {...n};
+    if(d.id===undefined && n.id!==undefined) d.id = n.id;
+    if(d.label===undefined && n.label!==undefined) d.label = n.label;
+    if(d.stage===undefined && n.stage!==undefined) d.stage = n.stage;
+    if(d.id!==undefined) d.id = String(d.id);
+    if(d.label!==undefined) d.label = String(d.label);
+    return { data: d };
+  });
+  let ecount=0;
+  const normEdges = (elements.edges||[]).map(e=>{
+    const d = e.data ? {...e.data} : {...e};
+    if(d.source===undefined && e.source!==undefined) d.source = e.source;
+    if(d.target===undefined && e.target!==undefined) d.target = e.target;
+    if(!d.id) d.id = `e${ecount++}`;
+    if(d.source!==undefined) d.source = String(d.source);
+    if(d.target!==undefined) d.target = String(d.target);
+    return { data: d };
+  });
+  return {elements:{nodes:normNodes, edges:normEdges}, meta: obj.meta||{}};
+}
+
+/* -------- metrics -------- */
+function computeDegrees(){
+  // reset
+  cy.nodes().forEach(n=>{ n.data('deg_in',0); n.data('deg_out',0); n.data('deg',0); });
+  cy.edges().forEach(e=>{
+    const s=e.data('source'), t=e.data('target');
+    const ns=cy.getElementById(s), nt=cy.getElementById(t);
+    if(ns.nonempty()) ns.data('deg_out', (ns.data('deg_out')||0)+1);
+    if(nt.nonempty()) nt.data('deg_in',  (nt.data('deg_in')||0)+1);
+  });
+  cy.nodes().forEach(n=>{ n.data('deg', (n.data('deg_in')||0)+(n.data('deg_out')||0)); });
+  // 色とサイズを mapData で
+  const maxDeg = Math.max(1, ...cy.nodes().map(n=>n.data('deg')||0));
+  cy.style()
+    .selector('node')
+      .style({
+        'background-color': `mapData(deg, 0, ${maxDeg}, #9ca3af, #ef4444)`,
+        'width': `mapData(deg, 0, ${maxDeg}, 6, 16)`,
+        'height': `mapData(deg, 0, ${maxDeg}, 6, 16)`
+      })
+    .update();
+}
+
+/* -------- violations (reverse edges) -------- */
+function markViolations(){
+  const orderStr = (document.getElementById('order').value||'').trim();
+  const stages = orderStr.split(',').map(s=>s.trim()).filter(Boolean);
+  const rank = {}; stages.forEach((s,i)=> rank[s]=i);
+  cy.edges().removeClass('reverse');
+  cy.edges().forEach(e=>{
+    const s = cy.getElementById(e.data('source'));
+    const t = cy.getElementById(e.data('target'));
+    const ss = s.nonempty()? (s.data('stage')||'') : '';
+    const tt = t.nonempty()? (t.data('stage')||'') : '';
+    if(ss in rank && tt in rank && rank[ss] > rank[tt]){
+      e.addClass('reverse');
+    }
+  });
+}
+
+/* -------- shortest path (simple BFS, directed) -------- */
+function findNodeByQuery(q){
+  q=q.toLowerCase();
+  let n = cy.$id(q);
+  if(n.nonempty()) return n;
+  const hits = cy.nodes().filter(x=>{
+    const d=x.data(); return (''+(d.id||'')).toLowerCase()===q || (''+(d.label||'')).toLowerCase()===q;
+  });
+  return hits[0];
+}
+function shortestPath(aId,bId){
+  // build adjacency (directed)
+  const adj = new Map();
+  cy.nodes().forEach(n=>adj.set(n.id(),[]));
+  cy.edges().forEach(e=>{
+    const s=e.data('source'), t=e.data('target');
+    if(adj.has(s)) adj.get(s).push(t);
+  });
+  const q=[aId], prev=new Map([[aId,null]]); let i=0;
+  while(i<q.length){
+    const u=q[i++]; if(u===bId) break;
+    const nbrs=adj.get(u)||[];
+    for(const v of nbrs){ if(!prev.has(v)){ prev.set(v,u); q.push(v); } }
+  }
+  if(!prev.has(bId)) return [];
+  const path=[]; let cur=bId;
+  while(cur!=null){ path.push(cur); cur=prev.get(cur); }
+  path.reverse(); return path;
+}
+function highlightPath(ids){
+  if(!ids.length){ alert('path not found'); return; }
+  cy.nodes().removeClass('hidden hit');
+  const keepNodes = ids.map(id=>cy.getElementById(id)).filter(n=>n.nonempty());
+  const keepSet = cy.collection(keepNodes);
+  const keepEdges = cy.edges().filter(e=> ids.indexOf(e.data('source'))>=0 && ids.indexOf(e.data('target'))>=0 );
+  cy.elements().difference( keepSet.union(keepEdges) ).addClass('hidden');
+  keepSet.addClass('hit');
+  fitAll();
+}
+
+/* -------- k-hop from lastClicked -------- */
+function applyKhop(){
+  const k = parseInt(document.getElementById('khop').value||'2');
+  if(!lastClickedId){ alert('click a node first'); return; }
+  // BFS undirected k steps on topology
+  const adj = new Map();
+  cy.nodes().forEach(n=>adj.set(n.id(), new Set()));
+  cy.edges().forEach(e=>{
+    const s=e.data('source'), t=e.data('target');
+    if(adj.has(s)) adj.get(s).add(t);
+    if(adj.has(t)) adj.get(t).add(s);
+  });
+  const seen=new Set([lastClickedId]); const q=[[lastClickedId,0]];
+  while(q.length){
+    const [u,d]=q.shift();
+    if(d===k) continue;
+    for(const v of adj.get(u)||[]){
+      if(!seen.has(v)){ seen.add(v); q.push([v,d+1]); }
+    }
+  }
+  cy.nodes().removeClass('hidden');
+  cy.nodes().filter(n=>!seen.has(n.id())).addClass('hidden');
+  fitAll();
+}
+
+/* -------- events & UI wiring -------- */
+cy.on('tap','node',evt=>{ lastClickedId=evt.target.id(); if(document.getElementById('focus').checked){ focusNeighbors(lastClickedId); } });
+
+document.getElementById('file').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>loadJSON(JSON.parse(r.result)); r.readAsText(f); };
+document.getElementById('loadurl').onclick=()=>{ const u=(document.getElementById('url').value||'').trim(); if(!u){ alert('URL を入力'); return; } fetch(u).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json();}).then(loadJSON).catch(e=>alert(e)); };
+
+document.getElementById('fit').onclick=()=>fitAll();
+document.getElementById('zin').onclick=()=>zoomBy(1.2);
+document.getElementById('zout').onclick=()=>zoomBy(1/1.2);
+
+const panToggle=document.getElementById('panmode');
+panToggle.onchange=()=>{ cy.userPanningEnabled( panToggle.checked ); };
+const wheelToggle=document.getElementById('wheel');
+wheelToggle.onchange=()=>{ cy.userZoomingEnabled( wheelToggle.checked ); };
+
+function panBy(dx,dy){ cy.panBy({x:dx,y:dy}); }
+document.getElementById('panL').onclick=()=>panBy(-120,0);
+document.getElementById('panR').onclick=()=>panBy(120,0);
+document.getElementById('panU').onclick=()=>panBy(0,-120);
+document.getElementById('panD').onclick=()=>panBy(0,120);
+
+window.addEventListener('keydown',(e)=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a'){ panBy(-120,0); }
+  if(k==='arrowright'||k==='d'){ panBy(120,0); }
+  if(k==='arrowup'||k==='w'){ panBy(0,-120); }
+  if(k==='arrowdown'||k==='s'){ panBy(0,120); }
+  if(k==='f'){ fitAll(); }
+  if(k==='+'){ zoomBy(1.2); }
+  if(k==='-'){ zoomBy(1/1.2); }
+});
+
+document.getElementById('find').onclick=()=>{
+  const q=(document.getElementById('q').value||'').toLowerCase().trim();
+  cy.nodes().removeClass('hit hidden');
+  if(!q){ fitAll(); return; }
+  const hits=cy.nodes().filter(n=>{ const d=n.data(); return (''+(d.id||'')).toLowerCase().includes(q)||( ''+(d.label||'')).toLowerCase().includes(q);}).addClass('hit');
+  if(hits.nonempty()){ cy.nodes().difference(hits).addClass('hidden'); } fitAll();
+};
+document.getElementById('clear').onclick=()=>{ document.getElementById('q').value=''; cy.nodes().removeClass('hit hidden'); fitAll(); };
+
+document.getElementById('layout').onchange=()=>{};
+document.getElementById('relayout').onclick=()=> runLayout(document.getElementById('layout').value, true);
+
+document.getElementById('metrics').onclick=()=> computeDegrees();
+document.getElementById('viol').onchange=()=> markViolations();
+
+document.getElementById('png').onclick=()=>{
+  const png = cy.png({full:true, scale:1});
+  const a = document.createElement('a');
+  a.href = png; a.download = 'graph.png'; a.click();
+};
+
+document.getElementById('spath').onclick=()=>{
+  const aQ=(document.getElementById('pathA').value||'').trim();
+  const bQ=(document.getElementById('pathB').value||'').trim();
+  if(!aQ||!bQ){ alert('Path A/B を入力'); return; }
+  const A=findNodeByQuery(aQ), B=findNodeByQuery(bQ);
+  if(!A||!A.nonempty()||!B||!B.nonempty()){ alert('AまたはBが見つかりません'); return; }
+  const ids = shortestPath(A.id(), B.id());
+  highlightPath(ids);
+};
+
+document.getElementById('applyHop').onclick=()=> applyKhop();
+
+/* -------- auto load via ?url=... -------- */
+(function(){
+  const u = new URL(window.location.href);
+  const p = u.searchParams.get('url');
+  if(p){ document.getElementById('url').value=p; fetch(p).then(r=>r.json()).then(loadJSON).catch(()=>{}); }
+})();
+</script>

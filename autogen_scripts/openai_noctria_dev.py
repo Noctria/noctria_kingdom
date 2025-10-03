@@ -256,8 +256,8 @@ async def call_openai(client, messages, retry=3, delay=2):
             )
             return response.choices[0].message.content
         except Exception as e:
-            log_message(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}")
-            print(f"API呼び出しエラー(試行 {attempt+1}/{retry}): {e}", file=sys.stderr)
+            log_message(f"API呼び出しエラー(試行 {attempt + 1}/{retry}): {e}")
+            print(f"API呼び出しエラー(試行 {attempt + 1}/{retry}): {e}", file=sys.stderr)
             if attempt + 1 == retry:
                 log_message("最終試行でAPI呼び出しに失敗しました。処理を中断します。")
                 raise RuntimeError("OpenAI API呼び出しが最終試行で失敗しました。") from e
@@ -310,7 +310,7 @@ async def auto_fix_missing_symbols(client, max_attempts=5):
             break
         with open(UNDEF_FILE, "r", encoding="utf-8") as f:
             content = f.read().strip()
-        print(f"[auto_fix] undefined_symbols.txt内容 (試行{attempts+1}回目):\n{content}")
+        print(f"[auto_fix] undefined_symbols.txt内容 (試行{attempts + 1}回目):\n{content}")
         if not content or content.lower().startswith("=== 0 missing"):
             print("[auto_fix] 未定義なしと判断、ループ終了")
             break
@@ -340,7 +340,7 @@ def save_and_commit_ai_files(ai_response):
 async def multi_agent_loop(client, max_turns=10):
     consecutive_fails = 0
     for turn in range(max_turns):
-        print(f"\n=== Turn {turn+1} ===")
+        print(f"\n=== Turn {turn + 1} ===")
 
         # 1. 未定義シンボル自動補完（全消えるまで）
         await auto_fix_missing_symbols(client, max_attempts=5)
@@ -377,7 +377,7 @@ async def multi_agent_loop(client, max_turns=10):
             if role in ("implement", "test", "doc"):
                 files = split_files_from_response(response)
                 if not files:
-                    filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn+1}.py")
+                    filename = os.path.join(OUTPUT_DIR, f"{role}_turn{turn + 1}.py")
                     save_ai_generated_file(filename, response)
                     print(f"{role} AIのコード保存: {filename}")
                     log_message(f"{role} AIのコード保存: {filename}")
@@ -389,7 +389,7 @@ async def multi_agent_loop(client, max_turns=10):
                         print(f"{role} AIのコード保存: {file_path}")
                         log_message(f"{role} AIのコード保存: {file_path}")
 
-                commit_message = f"{role} AI generated files - turn {turn+1}"
+                commit_message = f"{role} AI generated files - turn {turn + 1}"
                 if not git_commit_and_push(OUTPUT_DIR, commit_message):
                     print("警告: Git連携に失敗しました。手動でコミットを確認してください。")
 
@@ -446,9 +446,9 @@ async def multi_agent_loop(client, max_turns=10):
                 extra_info=extra_info,
                 finished_at=finished_at,
             )
-            print(f"[DB記録] ターン{turn+1} の実績をDB保存しました")
+            print(f"[DB記録] ターン{turn + 1} の実績をDB保存しました")
         except Exception as e:
-            print(f"[DB記録エラー] ターン{turn+1}: {e}")
+            print(f"[DB記録エラー] ターン{turn + 1}: {e}")
 
         if error_in_turn:
             consecutive_fails += 1

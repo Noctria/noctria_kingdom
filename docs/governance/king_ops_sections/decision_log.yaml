@@ -1,0 +1,43 @@
+# =======================================================
+# 決定記録（Decision Log）
+# =======================================================
+decision_log:
+  storage:
+    path: "docs/decisions/{YYYY}/{YYYYMMDD}_{slug}.md"
+
+  fields:
+    - { key: "decision_id", required: true }
+    - { key: "time_utc", required: true }
+    - { key: "level", enum: ["INFO", "WARN", "CRITICAL"] }
+    - { key: "metric" }
+    - { key: "latest_value" }
+    - { key: "baseline_value" }
+    - { key: "deviation_signed" }
+    - { key: "triage_category" }
+    - { key: "evidence" }
+    - { key: "orders" }
+    - { key: "owner", default: "Noctria 王" }
+    - { key: "status", enum: ["open", "in_progress", "closed"] }
+
+  comms_templates:
+    warn_short: |
+      【WARN】{metric} 悪化。
+      最新 {latest:.4f} / 基準 {base:.4f}（偏差 {dev:+.4f}）。
+      仮説:{triage}。明日:{next_step}。
+
+    critical_short: |
+      【CRITICAL】{metric} 重大悪化（{consec}連続）。
+      仮説:{triage}。
+      是正: change起票＋Dry-run 3本＋必要ならセーフモード審議。
+
+  # --- 改善ポイント（lint/自動生成に便利） ---
+  meta:
+    require_fields: ["decision_id", "time_utc", "level", "metric"]
+    enforce_level_enum: true
+    enforce_status_enum: true
+    auto_slug_rule: "{YYYYMMDD}-{metric}-{level}"
+    acceptance_checklist:
+      - "decision_id と time_utc が必ず埋まっている"
+      - "level が INFO/WARN/CRITICAL のいずれか"
+      - "critical の場合、orders と evidence が必須"
+      - "closed の場合、status=closed が一致している"

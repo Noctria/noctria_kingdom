@@ -1,0 +1,106 @@
+# ---------------------------------------------------
+# KPI 警報ルール & 通知テンプレ（Alerting Rules & Templates）
+# ---------------------------------------------------
+kpi_alerts:
+  metrics:
+    - key: "brier_score"
+      good_is: "low"
+      warn_when: { change_vs_baseline: "+> 0.005", lookback_runs: 3, min_samples: 5 }
+      critical_when: { change_vs_baseline: "+> 0.010", lookback_runs: 3, consecutive: 2 }
+
+    - key: "ece_calibration"
+      good_is: "low"
+      warn_when: { change_vs_baseline: "+> 0.02", lookback_runs: 3, min_samples: 5 }
+      critical_when: { change_vs_baseline: "+> 0.04", lookback_runs: 3, consecutive: 2 }
+
+    - key: "adversarial_pass_rate"
+      good_is: "high"
+      warn_when: { absolute_below: 0.35, lookback_runs: 3 }
+      critical_when: { absolute_below: 0.30, lookback_runs: 3, consecutive: 2 }
+
+    # データ品質KPI
+    - key: "data_missing_rate"
+      good_is: "low"
+      warn_when: { absolute_above: 0.05, lookback_runs: 3 }
+      critical_when: { absolute_above: 0.10, consecutive: 2 }
+
+    - key: "feature_null_rate"
+      good_is: "low"
+      warn_when: { absolute_above: 0.02, lookback_runs: 3 }
+      critical_when: { absolute_above: 0.05, consecutive: 2 }
+
+    - key: "label_lag_skew"
+      good_is: "low"
+      note: "ラベル生成の時間ずれ歪度（|skew|が大きいとずれ疑い）"
+      warn_when: { absolute_above: 0.5, lookback_runs: 3 }
+      critical_when: { absolute_above: 1.0, consecutive: 2 }
+
+  baseline:
+    source: "obs_codex_kpi_latest"
+    mode: "moving_window"
+    window_runs: 5
+    robust_stat: "median"
+
+  debounce:
+    min_gap_minutes: 30
+    allowlist_runs: 1
+    missing_ok: true
+
+  recipients:
+    primary: [{ type: "log" }, { type: "file" }]
+    escalate: [{ type: "human_pm" }, { type: "issue" }]
+
+  templates:
+    warn:
+      title: "[WARN] KPI deviation detected — {metric}"
+      body: |
+        run_id: {run_id}
+        metric: {metric}
+        value: {value:.4f}
+        baseline({baseline_window}r {baseline_stat}): {baseline:.4f}
+        deviation: {deviation:+.4f}
+        lookback: {lookback_runs} runs
+        guidance: >
+          軽微な悪化を検知。日次レポートの「翌日の引継ぎ指示」に
+          根因仮説と簡易アクションを追加せよ。
+        next_step: "監視継続（変更管理はまだ不要）"
+
+    critical:
+      title: "[CRITICAL] KPI regression — {metric}"
+      body: |
+        run_id: {run_id}
+        metric: {metric}
+        value: {value:.4f}
+        baseline({baseline_window}r {baseline_stat}): {baseline:.4f}
+        deviation: {deviation:+.4f} over {consecutive} consecutive runs
+        required_action:
+          - "change_management を起票（change_id 提案: {suggested_change_id})"
+          - "rollout_plan.dry_runs を即日実施（count={dry_runs})"
+          - "acceptance_criteria を満たせない場合は rollback_plan を準備"
+        gate: "automation_gates.gate_full_autonomy を満たすまで本番適用禁止"
+        note: >
+          日次レポートに「警報」セクションを作成し、原因・対策・実行予定を明記。
+
+  escalation_policy:
+    escalate_on:
+      - { type: "critical" }
+      - { type: "warn_chain", count: 3 }
+    actions:
+      - "recipients.escalate.human_pm へ通知"
+      - "change_management 起票ドラフトを自動生成（テンプレ埋め）"
+      - "日次レポート『ブロッカー』に追加"
+
+  suppression:
+    maintenance_windows:
+      - { cron: "0 9 * * *", duration_minutes: 20 }
+    ignore_when:
+      - "baseline.window_runs < 3"
+
+  decision_flow:
+    - "最新 run を obs_codex_kpi_latest で取得"
+    - "metrics ごとに baseline（window_runs, robust_stat）を算出"
+    - "warn_when / critical_when を判定（good_is に応じて符号反転に注意）"
+    - "debounce / suppression を適用"
+    - "テンプレ埋め込み → recipients.primary へ通知"
+    - "critical なら escalation_policy を即時発火"
+    - "必要に応じて change_management を起票 → rollout_plan 実施"

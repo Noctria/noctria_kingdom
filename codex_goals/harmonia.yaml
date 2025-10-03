@@ -1,0 +1,31 @@
+north_star: >
+  品質・安全・規約順守を担保し、採択判断の信頼性を高める。
+agent: Harmonia
+scope:
+  autonomy:
+    max_reviews_per_cycle: 10
+    # 追加: レビューの時間/対象制限（任意調整）
+    max_runtime_minutes: 20
+success_metrics:
+  - {name: rework_rate,        target: "<=0.2"}
+  - {name: guideline_coverage, target: ">=0.95"}
+  - {name: security_incidents, target: "==0"}
+  # 追加: ルール検知KPI（Harmoniaの仕事ぶりを定量化）
+  - {name: rule_violation_catch_rate, target: ">=0.95"}
+  - {name: dd_violation_catch_rate,   target: ">=0.95"}
+  - {name: tp_sl_coverage_rate,       target: "==1.0"}
+guardrails:
+  - "static checks required"
+  - "Fintokei absolute constraints"
+  # --- enforce: Fintokei program thresholds (プロファイル注入を想定) ---
+  - "enforce: daily_dd_pct < fintokei.daily_dd_limit_pct"
+  - "enforce: total_dd_pct < fintokei.total_dd_limit_pct"
+  - "enforce: open_positions_risk_pct <= 3"
+  - "enforce: min_trading_days >= 3"
+  # --- enforce: trading discipline (Cross に揃える) ---
+  - "enforce: tp_sl_required"
+  - "enforce: per_trade_risk_pct <= 0.2"
+  - "enforce: lot_step_increase_max <= 1.5x"
+  - "enforce: no_martingale & no_one_shot & no_signal_chasing"
+handoff:
+  reviewer: King

@@ -1,3 +1,4 @@
+# [NOCTRIA_CORE_REQUIRED]
 # noctria_gui/routes/observability.py
 from __future__ import annotations
 
@@ -81,6 +82,22 @@ def _fetchall(sql: str, params: Iterable[Any] = ()) -> List[Tuple]:
                 return cur.fetchall()
 
 
+def _safe_fetchall(sql: str, params: Iterable[Any] = ()) -> Tuple[List[Tuple], Optional[str]]:
+    """
+    DB未設定 / ビュー未作成 / 権限無し 等でも例外で落とさず、
+    空リストと warning メッセージを返す。
+    """
+    try:
+        rows = _fetchall(sql, params)
+        return rows, None
+    except Exception as e:
+        # 代表的なケース:
+        # - NOCTRIA_OBS_PG_DSN 未設定
+        # - relation "obs_trace_timeline" does not exist
+        # - permission denied for relation ...
+        return [], str(e)
+
+
 # --------------------------------------------------------------------
 # Router
 # --------------------------------------------------------------------
@@ -101,15 +118,11 @@ def pdca_timeline(
     limit: int = Query(default=300, ge=1, le=2000),
     days: int = Query(default=3, ge=1, le=90, description="期間未指定時に遡る日数（既定3日）"),
 ):
+    # 期間パース（失敗時はフィルタ無しにフォールバック）
     try:
-        f_dt: Optional[datetime] = None
-        t_dt: Optional[datetime] = None
-        if from_date:
-            f_dt = datetime.fromisoformat(from_date)
-        if to_date:
-            t_dt = datetime.fromisoformat(to_date)
+        f_dt: Optional[datetime] = datetime.fromisoformat(from_date) if from_date else None
+        t_dt: Optional[datetime] = datetime.fromisoformat(to_date) if to_date else None
     except ValueError:
-        # フォーマット不正時は期間フィルタ無しで続行
         f_dt = t_dt = None
 
     # --- 最近のトレース一覧（ドロップダウン用）
@@ -133,13 +146,15 @@ def pdca_timeline(
          ORDER BY last_ts DESC
          LIMIT 50;
     """
-    recent_rows = _fetchall(sql_recent, tuple(params_recent))
+    recent_rows, warn_recent = _safe_fetchall(sql_recent, tuple(params_recent))
     recent_traces = [{"trace_id": r[0], "last_ts": r[1], "events": r[2]} for r in recent_rows]
 
     # --- イベント本体
     events: List[Dict[str, Any]] = []
+    warn_events: Optional[str] = None
+
     if trace_id:
-        rows = _fetchall(
+        rows, warn_events = _safe_fetchall(
             """
             SELECT ts, kind, action, payload::text
               FROM obs_trace_timeline
@@ -163,7 +178,7 @@ def pdca_timeline(
         if not where_ev:
             where_ev.append("ts >= now() - %s")
             params_ev.append(timedelta(days=days))
-        rows = _fetchall(
+        rows, warn_events = _safe_fetchall(
             f"""
             SELECT trace_id, ts, kind, action
               FROM obs_trace_timeline
@@ -178,6 +193,8 @@ def pdca_timeline(
             for r in rows
         ]
 
+    warning_msg = warn_recent or warn_events  # どちらかにエラーがあればテンプレに表示
+
     # テンプレへ（前に共有したテンプレと互換のキー名）
     return templates.TemplateResponse(
         "pdca_timeline.html",
@@ -189,6 +206,7 @@ def pdca_timeline(
             "filter": {"from": from_date, "to": to_date},
             "limit": limit,
             "days": days,
+            "warning": warning_msg,  # ★ 404/未作成/未接続などの状況を表示
         },
     )
 
@@ -205,6 +223,7 @@ def pdca_latency_daily(
     to_date: Optional[str] = Query(default=None),
     days: int = Query(default=30, ge=1, le=365),
 ):
+    # 期間パース（失敗時は既定にフォールバック）
     try:
         today = datetime.utcnow().date()
         f_day = today - timedelta(days=days - 1)
@@ -214,12 +233,11 @@ def pdca_latency_daily(
         if to_date:
             t_day = datetime.fromisoformat(to_date).date()
     except ValueError:
-        # フォーマット不正時はデフォルト期間
         today = datetime.utcnow().date()
         f_day = today - timedelta(days=days - 1)
         t_day = today
 
-    rows = _fetchall(
+    rows, warn = _safe_fetchall(
         """
         SELECT day, p50_ms, p90_ms, p95_ms, max_ms, traces
           FROM obs_latency_daily
@@ -259,6 +277,7 @@ def pdca_latency_daily(
             "traces": n,
             "items": items,  # 互換用
             "filter": {"from": f_day.isoformat(), "to": t_day.isoformat()},
+            "warning": warn,  # ★ MV未作成/未接続などをテンプレ側で通知
         },
     )
 

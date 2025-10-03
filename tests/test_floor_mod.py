@@ -1,3 +1,15 @@
+import pytest
+
+pytest.importorskip(
+    "tensorflow", reason="tensorflow not installed; skipping floor_mod tests", minversion=None
+)
+
+import pytest
+
+pytest.importorskip(
+    "tensorflow", reason="tensorflow not installed; skipping floor_mod tests", minversion=None
+)
+
 import tensorflow as tf
 
 

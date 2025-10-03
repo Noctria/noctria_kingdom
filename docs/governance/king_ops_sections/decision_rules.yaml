@@ -1,0 +1,120 @@
+# ---------------------------------------------------
+# 戦略判断ルール（KPI閾値・優先度・判断フロー）
+# ---------------------------------------------------
+decision_rules:
+  objectives:
+    - name: "資本保全 > 安定性 > 収益最大化"
+      detail: "まず極端なリスクを回避し、次に予測の整合性（ECE/Brier/頑健性）を優先。収益はこれらが整ってから拡大。"
+    - name: "説明可能性・再現性の維持"
+      detail: "温度スケーリング・閾値決定はrun/設定を記録し、王国史料として追跡可能に保つ。"
+
+  kpi_targets:
+    brier_score: { goal: 0.18, warn: 0.20, critical: 0.23 }
+    ece_calibration: { goal: 0.35, warn: 0.38, critical: 0.42 }
+    adversarial_pass_rate: { goal: 0.40, warn: 0.30, critical: 0.20 }
+
+  evaluation_window:
+    recent_runs: 5
+    trend_runs: 3
+    min_samples_for_calib: 20
+    bins_default: 10
+
+  calibration_policy:
+    objective_selection:
+      rule: "both"
+      guard_ece_improve_min: 0.02
+      guard_nll_degradation_max: 0.05
+    binning:
+      base_bins: 10
+      adjust: { if_samples_gt_200: 12, if_samples_gt_400: 15 }
+    temperature_range:
+      default_min: 0.05
+      default_max: 6.0
+      widen_if_instability: true
+    prior_T_usage:
+      use_prior_when_not_worse: true
+      comment: "直近runのTでNLL/ECEが悪化しない場合はprior_Tを優先。"
+
+  action_map:
+    - when: { metric: "ece_calibration", condition: "value > targets.warn AND trend_worse_for >= 3" }
+      then:
+        orders:
+          - "evaluate_veritas.py を --calibrate-temperature --calib-objective both で実行"
+          - "bins を samples に応じて 12 or 15 に引き上げる"
+          - "閾値0.5固定の見直し：最適閾値探索のA/B（ただし取引実行には未反映、オフライン検証）"
+          - "generate_daily_report.py で理由と対策をhandoverに明記"
+        priority: 1
+        success_criteria:
+          - "次runで ECE <= targets.goal または 前run比 -0.02 以上の改善"
+
+    - when: { metric: "brier_score", condition: "value > targets.warn AND trend_worse_for >= 3" }
+      then:
+        orders:
+          - "確率生成ロジックの検証：スコア→ロジット→温度の一貫性を監査"
+          - "Veritas生成戦略のうち、情報寄与の低い特徴量を棚卸し（情報量・相互情報量で順位付け）"
+          - "データリーク/ラベルずれ検査（価格の翌足ラベル生成の境界をチェック）"
+        priority: 1
+        success_criteria:
+          - "次runで Brier <= targets.goal または 前run比 -0.01 以上の改善"
+
+    - when: { metric: "adversarial_pass_rate", condition: "value < targets.warn OR trend_worse_for >= 2" }
+      then:
+        orders:
+          - "ノイズ注入/時系列シフト/レジームドリフトの強度レンジを段階的に引上げて再評価"
+          - "耐性の低い戦略にペナルティ付与（採用判断での重み低下）"
+          - "ポートフォリオ最適化時に頑健性重視の制約（最小通過率）を追加（オフライン検証）"
+        priority: 2
+        success_criteria:
+          - "通過率 >= targets.goal の回復、もしくは悪化停止（±0.00〜+）"
+
+    - when: { metric: "any", condition: "brier > targets.critical OR ece > targets.critical OR adv_pass < targets.critical" }
+      then:
+        orders:
+          - "即時セーフモード：取引レバレッジ/サイズを段階的に縮小（実稼働系がある場合のみ）"
+          - "評価データの健全性監査（欠損・時系列整合・リーク）を最優先"
+          - "過去runで良好だった設定（T/bins）にロールバックし比較runを作成"
+        priority: 0
+        success_criteria:
+          - "24時間以内に警告域以下へ復帰"
+
+  resource_allocation:
+    rule: |
+      直近5runの加重スコア S = w1*(ECE改善率) + w2*(Brier改善率) + w3*(頑健性達成度)
+      推奨: w1=0.5, w2=0.3, w3=0.2
+      S が高い領域（例：校正改善が効いている）へ次サイクルの探索計算資源を重点配分。
+    examples:
+      - "ECEが改善する一方でBrierが停滞 → しきい値/ロス関数側の検討に人手/計算を振る"
+      - "頑健性が目標未達 → 生成戦略の複雑さ抑制、単純指標（RSI/価格差）の再評価へ一時回帰"
+
+  escalation:
+    T0:
+      trigger: "critical域検出"
+      actions:
+        - "セーフモード宣言（実運用がある場合のみ）"
+        - "データ監査＆直近runロールバック検証を即日実施"
+    T1_24h:
+      actions:
+        - "校正再最適化（both, bins調整, priorT比較）"
+        - "頑健性テスト強化runを追加"
+    T2_72h:
+      actions:
+        - "戦略生成（Veritas）への要件見直し指示（特徴量/窓/ラベル定義の見直し）"
+        - "王の訓示で中期KPI再設定を通達"
+
+  autonomy:
+    level: "partial"
+    allowed_without_human:
+      - "校正パラメータの再最適化（T/bins, prior_T選択）"
+      - "reliability.png等の可視化更新"
+      - "日次レポート生成とhandoverの草案作成"
+    require_human_ack:
+      - "セーフモード宣言/解除"
+      - "戦略採用基準の変更（WIN_RATE_THRESHOLD等）"
+      - "Live取引パラメータの変更"
+
+  reporting_guidance:
+    include:
+      - "KPIの現状値と前日差（矢印＋差分）"
+      - "発火した意思決定ルールと、その根拠（条件・数値）"
+      - "明日の作戦（handover）と成功条件"
+      - "ブロッカーとエスカレーション計画"

@@ -1,0 +1,46 @@
+# ---------------------------------------------------
+# 自動化レベル移行ゲート（partial -> full）
+# ---------------------------------------------------
+automation_gates:
+  gate_full_autonomy:
+    entry_criteria:
+      - "直近5runの brier_score 平均 <= 0.18"
+      - "直近5runの ece_calibration 平均 <= 0.35"
+      - "adversarial_pass_rate >= 0.40（3run連続）"
+      - "直近30日で critical 発火ゼロ"
+    scope_allowed:
+      - "校正パラメータ変更と適用"
+      - "戦略評価パイプラインの再実行"
+      - "日次レポートとhandoverの完全自動化"
+    exclusions:
+      - "ライブ取引パラメータ変更（人間承認必須）"
+    rollback_triggers:
+      - "任意KPIがwarn超過を3run連続"
+      - "critical発火を1回検知"
+
+  ci_wiring:
+    description: "ゲート条件をCIとスケジューラに直結し、未達時は自動適用をブロック"
+    jobs:
+      evaluate: "PYTHONPATH=. python src/veritas/evaluate_veritas.py ..."
+      log_kpi: "PYTHONPATH=. ./scripts/log_kpi_from_reports.py --limit 1"
+      plot_reliability: "PYTHONPATH=. python scripts/plot_reliability.py --reports reports/veritas --limit 1"
+      generate_daily: "PYTHONPATH=. ./scripts/generate_daily_report.py --runs 3"
+      apply_changes: "scripts/apply_calibration.sh  # gate未達時はskip"
+      api_contract: "PYTHONPATH=. pytest tests/api --maxfail=1 -q"
+      backtest_batch: "PYTHONPATH=. python scripts/run_backtest.py --from 2022-01-01 --to 2024-12-31 --report-dir reports/backtest"
+      forwardtest_daily: "PYTHONPATH=. python scripts/run_forwardtest.py --from {Y-m-d-1} --to {Y-m-d} --report-dir reports/forwardtest"
+      btft_summary: "PYTHONPATH=. python scripts/summarize_bt_ft.py --out reports/btft_summary"
+      gui_build: "make -C noctria_kingdom/noctria_gui build"
+      e2e_smoke: "PYTHONPATH=. pytest tests/e2e/test_gui_api_pipeline.py::test_smoke"
+      api_latency_smoke: "PYTHONPATH=. python tests/api/smoke_latency.py --p95-max 300 --n 20"
+      btft_freshness_check: "PYTHONPATH=. python scripts/check_btft_freshness.py --bt-max-days 1 --ft-deadline 09:20"
+    policy:
+      apply_when: "gate_full_autonomy.entry_criteria をすべて満たす場合のみ"
+      skip_reason_log: "docs/reports/daily/{YYYY-MM-DD}.md に gate未達理由を自動追記"
+      dry_run_required: 3
+
+  apply_policies:
+    guardrails:
+      - "NLL劣化 > 0.05 の構成は適用禁止"
+      - "Adv.pass < 0.35 の構成は適用禁止"
+      - "最終適用者とgit_shaを監査ログに記録"

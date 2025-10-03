@@ -1,3 +1,4 @@
+# [NOCTRIA_CORE_REQUIRED]
 from __future__ import annotations
 
 import json
