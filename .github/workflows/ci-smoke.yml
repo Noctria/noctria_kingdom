@@ -1,0 +1,27 @@
+name: smoke
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  lint-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff (minimal)
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Ruff (lint) — non blocking
+        run: ruff check . --output-format=github
+        continue-on-error: true
