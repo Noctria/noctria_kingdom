@@ -23,3 +23,16 @@ repos:
     exclude: ^(.github/workflows/|\.devcontainer/|scripts/|.*\.md$)
     entry: bash -c "pytest -q -k 'not e2e and not heavy' -m 'not heavy' --maxfail=1
       --disable-warnings"
+
+# --- added: global excludes for noisy/large artifacts ---
+exclude: |
+  (?x)(
+    ^Untitled\.ipynb$
+    | ^codex_reports/.*\.ipynb$
+    | \.ipynb_checkpoints/
+    | ^actions-runner/
+    | ^runs/
+    | ^artifacts/
+    | ^codex_reports/
+    | ^viz/.*\.(json|mmd)$
+  )
