@@ -84,3 +84,8 @@ bins/
 # ignore notebooks
 *.ipynb
 .ipynb_checkpoints/
+
+
+# Ignore large visualization artifacts
+viz/*.json
+viz/*.mmd
