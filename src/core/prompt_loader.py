@@ -1,220 +1,248 @@
-# [NOCTRIA_CORE_REQUIRED]
 # src/core/prompt_loader.py
 from __future__ import annotations
 
-import glob
-import io
-import re
+"""
+Prompt loader/builder for Noctria.
+
+- SSOT: docs/governance/king_ops_prompt.yaml
+- Optional: Merge additional fragments under docs/governance/king_ops_sections/*.yaml
+- Output: Markdown-like, model-friendly system prompt text usable by both Ollama and GPT API.
+
+Usage:
+    from src.core.prompt_loader import load_prompt_text
+    system_prompt = load_prompt_text()  # default SSOT
+"""
+
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Mapping, Sequence, Iterable, Optional, Dict, List
 
 import yaml
 
-# プロジェクトルート -> docs/governance を指す（このファイルは src/core/ 配下）
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-GOV_DIR = PROJECT_ROOT / "docs" / "governance"
+# ====== Defaults ======
+DEFAULT_SSOT = "docs/governance/king_ops_prompt.yaml"
+DEFAULT_SECTIONS_DIR = "docs/governance/king_ops_sections"
+
+# セクションの推奨順（存在しないキーは無視、余ったキーは末尾に自然順で付与）
+RECOMMENDED_SECTION_ORDER: List[str] = [
+    "charter",
+    "roles_raci",
+    "agent",
+    "ai_guidelines",
+    "governance_reviews",
+    "contracts",
+    "rules",
+    "routing",
+    "automation_gates",
+    "tools",
+    "testing",
+    "observability",
+    "security",
+    "slo",
+    "cadence",
+    "runbooks",
+    "handover",
+    "decision_rules",
+    "decision_registry",
+    "kpi_definitions",
+    "kpi_alerts",
+]
 
 
-# ------------------------------------------------------------
-# 小物: ディープマージ / 配列化 / YAMLローダ
-# ------------------------------------------------------------
-def _deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-    """dict を深くマージ（b が a を上書き）。"""
-    for k, v in (b or {}).items():
-        if k in a and isinstance(a[k], dict) and isinstance(v, dict):
-            a[k] = _deep_merge(a[k], v)
-        else:
-            a[k] = v
-    return a
-
-
-def _as_list(x: Any) -> List[str]:
-    if x is None:
-        return []
-    if isinstance(x, (list, tuple)):
-        return [str(i) for i in x]
-    return [str(x)]
-
-
-def _load_yaml(path: Path) -> Dict[str, Any]:
-    with path.open("r", encoding="utf-8") as f:
-        loader = yaml.SafeLoader(f)
-        loader.name = str(path)  # !include の相対解決に使う
-        data = loader.get_single_data() or {}
-    return data
-
-
-# ------------------------------------------------------------
-# !include タグ & パターン解決
-# ------------------------------------------------------------
-def _merge_from_patterns(pattern: str, base_file: Path) -> Dict[str, Any]:
-    """パターン（相対/絶対・glob可）から候補を探し、読み込んでディープマージして返す。"""
-    if not Path(pattern).is_absolute():
-        # 1) include元ファイルの親 2) governance 直下
-        candidates = glob.glob(str((base_file.parent / pattern).resolve()))
-        candidates += glob.glob(str((GOV_DIR / pattern).resolve()))
-        # 3) 見つからない場合は governance 配下を再帰探索（例: "doc_ops.yaml" 単体名）
-        if not candidates and "/" not in pattern and "\\" not in pattern:
-            candidates = [str(p) for p in GOV_DIR.rglob(pattern)]
-    else:
-        candidates = glob.glob(pattern)
-
-    merged: Dict[str, Any] = {}
-    seen: set[str] = set()
-    for c in candidates:
-        p = Path(c)
-        if not p.exists():
-            continue
-        key = str(p.resolve())
-        if key in seen:
-            continue
-        seen.add(key)
-        d = _load_with_includes(p)  # 再帰読み込み（!include / includes 両対応）
-        merged = _deep_merge(merged, d)
-    return merged
-
-
-def _include_constructor(loader: yaml.SafeLoader, node: yaml.Node):
-    value = loader.construct_scalar(node)
-    base_file = Path(getattr(loader, "name", GOV_DIR))
-    return _merge_from_patterns(value, base_file)
-
-
-# YAML ローダへ !include を登録
-yaml.SafeLoader.add_constructor("!include", _include_constructor)
-
-
-# ------------------------------------------------------------
-# includes/include キー対応（配列・文字列・glob 可）
-# ------------------------------------------------------------
-def _resolve_key_includes(data: Dict[str, Any], base_file: Path) -> Dict[str, Any]:
-    if not isinstance(data, dict):
-        return data
-
-    inc_list: List[str] = []
-    for k in ("includes", "include"):
-        v = data.get(k)
-        if v is not None:
-            inc_list.extend(_as_list(v))
-
-    # キー自体はマージ前に取り除く（最終出力に残さない）
-    data = dict(data)
-    data.pop("includes", None)
-    data.pop("include", None)
-
-    merged = dict(data)
-    for pat in inc_list:
-        inc_dict = _merge_from_patterns(pat, base_file)
-        merged = _deep_merge(merged, inc_dict)
-    return merged
-
-
-# ------------------------------------------------------------
-# 中核: ファイル読み込み（フォールバックで裸の !include 群も解釈）
-# ------------------------------------------------------------
-def _load_with_includes(path: Path) -> Dict[str, Any]:
+# ====== Public API ======
+def load_prompt_text(
+    ssot_path: str = DEFAULT_SSOT,
+    sections_dir: Optional[str] = DEFAULT_SECTIONS_DIR,
+    strict: bool = False,
+    prefer_sections: bool = True,
+    order: Optional[Iterable[str]] = None,
+    json_contract: Optional[Dict[str, Any]] = None,
+) -> str:
     """
-    1) 通常: YAML としてロード（!include タグ/ includes キーを解決）
-    2) 失敗時: 裸の `!include foo.yaml` を行ごとにパースして順次マージ
-    """
-    text = path.read_text(encoding="utf-8")
+    Build a model-ready system prompt string.
 
-    # まず通常の YAML として解釈
+    Args:
+        ssot_path: Path to the main YAML (SSOT).
+        sections_dir: If provided, merge *.yaml in this directory (top-level dicts only).
+        strict: If True, raise on missing files/invalid YAML. If False, continue best-effort.
+        prefer_sections: When True and a key exists in both SSOT and section files, sections override.
+        order: Custom section order (list of keys). Non-listed keys are appended in natural order.
+        json_contract: Optional JSON schema-ish dict to append as “Output format” hard rule.
+
+    Returns:
+        Markdown-like text suitable for system prompt.
+    """
+    base_map = _read_yaml_map(ssot_path, strict=strict)
+
+    merged = dict(base_map)
+    if sections_dir:
+        frags = _read_sections_dir(sections_dir, strict=strict)
+        merged = _merge_maps(base_map, frags, prefer_sections=prefer_sections)
+
+    # シリアライズ（YAML→Markdown風整形）
+    ordered_keys = _order_keys(merged.keys(), order or RECOMMENDED_SECTION_ORDER)
+    parts = []
+    for k in ordered_keys:
+        parts.append(_flatten_section(k, merged[k]))
+
+    # 追加で JSON 出力契約を付けたい場合
+    if json_contract:
+        parts.append("## Output Format (HARD REQUIREMENT)")
+        parts.append(
+            "- Return ONLY a single JSON object matching the schema below. "
+            "No explanations or prose outside JSON."
+        )
+        # スキーマは可読性のため整形して提示（モデルはテキストとして読む）
+        schema_str = json.dumps(json_contract, ensure_ascii=False, indent=2)
+        parts.append("```json\n" + schema_str + "\n```")
+        parts.append("")
+
+    return "\n".join(parts).strip() + "\n"
+
+
+# ====== Helpers ======
+def _read_yaml_map(path: str | Path, strict: bool = False) -> Dict[str, Any]:
+    p = Path(path)
+    if not p.exists():
+        if strict:
+            raise FileNotFoundError(f"SSOT not found: {p}")
+        return {}
     try:
-        with path.open("r", encoding="utf-8") as f:
-            loader = yaml.SafeLoader(f)
-            loader.name = str(path)
-            data = loader.get_single_data() or {}
-        # さらに includes/include キーを解決（再帰）
-        return _resolve_key_includes(data, path)
-    except yaml.YAMLError:
-        pass  # フォールバックへ
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        if strict:
+            raise ValueError(f"Invalid YAML at {p}: {e}") from e
+        return {}
+    if data is None:
+        return {}
+    if not isinstance(data, Mapping):
+        if strict:
+            raise ValueError(f"Top-level must be a mapping in {p}")
+        return {}
+    return dict(data)
 
-    # フォールバック: 行単位で `!include` を拾ってマージ
-    merged: Dict[str, Any] = {}
-    base_file = path
-    for line in text.splitlines():
-        m = re.match(r"^\s*!include\s+(.+?)\s*$", line)
-        if not m:
+
+def _read_sections_dir(dir_path: str | Path, strict: bool = False) -> Dict[str, Any]:
+    d = Path(dir_path)
+    if not d.exists():
+        if strict:
+            raise FileNotFoundError(f"Sections dir not found: {d}")
+        return {}
+
+    agg: Dict[str, Any] = {}
+    for fp in sorted(d.glob("*.yaml")):
+        try:
+            data = yaml.safe_load(fp.read_text(encoding="utf-8"))
+        except Exception as e:
+            if strict:
+                raise ValueError(f"Invalid YAML at {fp}: {e}") from e
+            else:
+                continue
+        if data is None:
             continue
-        pattern = m.group(1).strip()
-        inc = _merge_from_patterns(pattern, base_file)
-        merged = _deep_merge(merged, inc)
+        if not isinstance(data, Mapping):
+            if strict:
+                raise ValueError(f"Top-level must be a mapping in {fp}")
+            else:
+                continue
+        # ファイル名（拡張子なし）をキーの候補として使う or 中身のキーをマージ
+        # ここでは「中身の top-level キー」をすべてマージ（同名キーがあれば後勝ち）
+        for k, v in data.items():
+            agg[k] = v
+    return agg
 
-    return merged
 
-
-# ------------------------------------------------------------
-# 公開 API
-# ------------------------------------------------------------
-def load_governance(root_file: Optional[Path] = None) -> Dict[str, Any]:
+def _merge_maps(
+    base: Dict[str, Any],
+    overlay: Dict[str, Any],
+    prefer_sections: bool = True,
+) -> Dict[str, Any]:
     """
-    docs/governance/king_ops_prompt.yaml を起点に、!include / includes を
-    再帰解決して統合辞書を返す。
+    Shallow merge. When keys collide:
+        - prefer_sections=True  -> overlay wins
+        - prefer_sections=False -> base wins
     """
-    if root_file is None:
-        root_file = GOV_DIR / "king_ops_prompt.yaml"
-    return _load_with_includes(root_file)
+    if prefer_sections:
+        merged = dict(base)
+        merged.update(overlay)
+        return merged
+    else:
+        merged = dict(overlay)
+        merged.update(base)
+        return merged
 
 
-def render_system_prompt(gov: Dict[str, Any]) -> str:
-    """
-    統合済みガバナンス辞書から、王の System Prompt を合成する。
-    - Charter / Principles は先頭に
-    - Policies / Resource Policy / Operating / Guardrails があれば続ける
-    - 最後に出力フォーマット規定
-    """
-    buf = io.StringIO()
+def _order_keys(keys: Iterable[str], preferred: Iterable[str]) -> List[str]:
+    ks = list(keys)
+    preferred = [k for k in preferred if k in ks]
+    rest = sorted([k for k in ks if k not in preferred])
+    return preferred + rest
 
-    charter = gov.get("charter", {}) or {}
-    name = charter.get("name", "Noctria 王")
-    role = charter.get("role", "")
-    mission = charter.get("mission", "")
 
-    principles = gov.get("principles", []) or charter.get("principles", [])
-    policies = gov.get("policies", {}) or gov.get("policy", {})
-    resource_policy = gov.get("resource_policy", {})
-    operating = gov.get("operating", {})
-    guardrails = gov.get("guardrails", {})
+def _flatten_section(title: str, content: Any) -> str:
+    lines = [f"## {title}"]
+    _append_lines(lines, content, level=0)
+    lines.append("")
+    return "\n".join(lines)
 
-    buf.write(f"You are {name}.\n")
-    if role:
-        buf.write(f"ROLE: {role}\n")
-    if mission:
-        buf.write(f"MISSION: {mission}\n")
 
-    if principles:
-        buf.write("PRINCIPLES:\n")
-        for p in principles:
-            buf.write(f"- {p}\n")
+def _append_lines(lines: List[str], content: Any, level: int) -> None:
+    bullet = "-"  # 単純な箇条書き
+    indent = "  " * level
 
-    if policies:
-        buf.write("POLICIES:\n")
-        for k, v in policies.items():
-            buf.write(f"- {k}: {v}\n")
+    if isinstance(content, Mapping):
+        for k, v in content.items():
+            if isinstance(v, (Mapping, list, tuple)):
+                lines.append(f"{indent}{bullet} **{k}**:")
+                _append_lines(lines, v, level + 1)
+            else:
+                lines.append(f"{indent}{bullet} **{k}**: {v}")
+    elif isinstance(content, (list, tuple)):
+        for it in content:
+            if isinstance(it, (Mapping, list, tuple)):
+                lines.append(f"{indent}{bullet}")
+                _append_lines(lines, it, level + 1)
+            else:
+                lines.append(f"{indent}{bullet} {it}")
+    else:
+        lines.append(f"{indent}{bullet} {content}")
 
-    if resource_policy:
-        buf.write("RESOURCE_POLICY:\n")
-        for k, v in resource_policy.items():
-            buf.write(f"- {k}: {v}\n")
 
-    if operating:
-        buf.write("OPERATING_PROCEDURES:\n")
-        for k, v in operating.items():
-            buf.write(f"- {k}: {v}\n")
+# ====== Optional: quick CLI for debugging ======
+if __name__ == "__main__":
+    import argparse
 
-    if guardrails:
-        buf.write("GUARDRAILS:\n")
-        for k, v in guardrails.items():
-            buf.write(f"- {k}: {v}\n")
-
-    # 出力フォーマット規定（王の応答の一貫性確保）
-    buf.write(
-        "\nOUTPUT_FORMAT:\n"
-        "- Always respond in Japanese.\n"
-        "- Return a concise PLAN with numbered steps, plus RISKS and NEXT_ACTIONS.\n"
-        "- When proposing code changes, output minimal, testable diffs or shell commands.\n"
-        "- Prefer terse, actionable items over long prose.\n"
+    parser = argparse.ArgumentParser(description="Build system prompt from YAML.")
+    parser.add_argument("--ssot", default=DEFAULT_SSOT, help="Path to SSOT YAML")
+    parser.add_argument(
+        "--sections",
+        default=DEFAULT_SECTIONS_DIR,
+        help="Dir with additional *.yaml fragments (set '' to disable)",
     )
+    parser.add_argument("--strict", action="store_true", help="Strict mode")
+    parser.add_argument(
+        "--no-prefer-sections",
+        action="store_true",
+        help="Base SSOT should override sections on conflict",
+    )
+    parser.add_argument(
+        "--with-json-contract",
+        default="",
+        help="Path to a JSON file with output schema to append (optional)",
+    )
+    args = parser.parse_args()
 
-    return buf.getvalue()
+    contract = None
+    if args.with_json_contract:
+        p = Path(args.with_json_contract)
+        if p.exists():
+            contract = json.loads(p.read_text(encoding="utf-8"))
+
+    text = load_prompt_text(
+        ssot_path=args.ssot,
+        sections_dir=(args.sections or None),
+        strict=args.strict,
+        prefer_sections=not args.no_prefer_sections,
+        json_contract=contract,
+    )
+    print(text)
