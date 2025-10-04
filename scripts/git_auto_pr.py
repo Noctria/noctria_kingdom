@@ -50,9 +50,13 @@ def main() -> int:
     ap.add_argument("--files", nargs="+", required=True, help="files to add/commit (space separated)")
     ap.add_argument("--branch-prefix", default="chore/weekly-report-", help="branch name prefix")
     ap.add_argument("--title", default="chore: weekly report update", help="PR title")
+    ap.add_argument("--title-prefix", default="", help="prefix to prepend to PR title (e.g. 'docs:' or 'ci:')")
     ap.add_argument("--body-path", default="docs/_generated/weekly_insert.md", help="PR body path (used if gh is available)")
     ap.add_argument("--remote", default="origin", help="git remote (default: origin)")
     ap.add_argument("--base", default="main", help="base branch to target PR against")
+    ap.add_argument("--label", action="append", help="labels to add to PR (can be repeated)", default=[])
+    ap.add_argument("--reviewer", action="append", help="reviewers to request on PR (can be repeated)", default=[])
+    ap.add_argument("--assignee", action="append", help="assignees for the PR (can be repeated)", default=[])
     args = ap.parse_args()
 
     # 0) 対象ファイルの存在チェック（1つも無ければ終了）
@@ -75,22 +79,17 @@ def main() -> int:
 
     # 3) ブランチ作成
     branch = next_branch_name(args.branch_prefix)
-    # ベースブランチへ（失敗しても続けるが、基本は成功する想定）
     sh(["git", "checkout", args.base], check=False)
-    # 新規ブランチ
     sh(["git", "checkout", "-b", branch], check=True)
 
     # 4) add & commit
     sh(["git", "add"] + to_add, check=True)
-    msg = f"{args.title}"
-    # ここでさらに「インデックスに差分がなければスキップ」（保険）
+    msg = f"{args.title_prefix}{args.title}" if args.title_prefix else args.title
     rc = subprocess.run(["git", "diff", "--cached", "--quiet", "--"] + to_add).returncode
     if rc == 0:
         print("ℹ️ No staged changes → skipping commit & PR")
         print({"skipped": True, "reason": "no_staged_changes"})
-        # 元ブランチを残したくないならここで `git checkout -` + `git branch -D` しても良い
         return 0
-
     sh(["git", "commit", "-m", msg], check=True)
 
     # 5) push
@@ -101,14 +100,19 @@ def main() -> int:
     if have_gh():
         gh_cmd = [
             "gh", "pr", "create",
-            "--title", args.title,
+            "--title", msg,
             "--base", args.base,
             "--head", branch,
             "--fill",
         ]
-        # PR本文ファイルがあれば -F で渡す
         if Path(args.body_path).exists():
             gh_cmd += ["-F", args.body_path]
+        for lbl in args.label:
+            gh_cmd += ["--label", lbl]
+        for rv in args.reviewer:
+            gh_cmd += ["--reviewer", rv]
+        for asg in args.assignee:
+            gh_cmd += ["--assignee", asg]
 
         r = sh(gh_cmd, check=False)
         out = (r.stdout or "") + (r.stderr or "")
@@ -118,8 +122,15 @@ def main() -> int:
                 pr_url = s
                 break
 
-    # 7) 成果をJSONで返す（agent_runnerがパースしやすいように）
-    print({"branch": branch, "pushed": True, "pr_url": pr_url or ""})
+    # 7) 成果をJSONで返す
+    print({
+        "branch": branch,
+        "pushed": True,
+        "pr_url": pr_url or "",
+        "labels": args.label,
+        "reviewers": args.reviewer,
+        "assignees": args.assignee,
+    })
     return 0
 
 
