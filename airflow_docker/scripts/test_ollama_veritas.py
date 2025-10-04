@@ -1,5 +1,4 @@
 import requests
-import json
 
 url = "http://host.docker.internal:11434/api/generate"
 

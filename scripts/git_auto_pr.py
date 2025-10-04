@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
-import os
 import shutil
 import subprocess
 import sys
@@ -10,7 +9,9 @@ from pathlib import Path
 from typing import List
 
 
-def sh(args: List[str], cwd: str = ".", check: bool = True, text: bool = True) -> subprocess.CompletedProcess:
+def sh(
+    args: List[str], cwd: str = ".", check: bool = True, text: bool = True
+) -> subprocess.CompletedProcess:
     return subprocess.run(args, cwd=cwd, text=text, capture_output=True, check=check)
 
 
@@ -61,16 +62,36 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Create a branch, commit generated files, push, and (optionally) open a PR via gh CLI."
     )
-    ap.add_argument("--files", nargs="+", required=True, help="files to add/commit (space separated)")
+    ap.add_argument(
+        "--files", nargs="+", required=True, help="files to add/commit (space separated)"
+    )
     ap.add_argument("--branch-prefix", default="chore/weekly-report-", help="branch name prefix")
     ap.add_argument("--title", default="chore: weekly report update", help="PR title")
-    ap.add_argument("--title-prefix", default="", help="Prefix to prepend to PR title (e.g. 'docs: ')")
-    ap.add_argument("--body-path", default="docs/_generated/weekly_insert.md", help="PR body path (used if gh is available)")
+    ap.add_argument(
+        "--title-prefix", default="", help="Prefix to prepend to PR title (e.g. 'docs: ')"
+    )
+    ap.add_argument(
+        "--body-path",
+        default="docs/_generated/weekly_insert.md",
+        help="PR body path (used if gh is available)",
+    )
     ap.add_argument("--remote", default="origin", help="git remote (default: origin)")
     ap.add_argument("--base", default="main", help="base branch to target PR against")
-    ap.add_argument("--label", action="append", default=[], help="Labels to add to the PR (can specify multiple)")
-    ap.add_argument("--reviewer", action="append", default=[], help="Reviewers to request (can specify multiple)")
-    ap.add_argument("--assignee", action="append", default=[], help="Assignees to add (can specify multiple)")
+    ap.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        help="Labels to add to the PR (can specify multiple)",
+    )
+    ap.add_argument(
+        "--reviewer",
+        action="append",
+        default=[],
+        help="Reviewers to request (can specify multiple)",
+    )
+    ap.add_argument(
+        "--assignee", action="append", default=[], help="Assignees to add (can specify multiple)"
+    )
     args = ap.parse_args()
 
     # 0) 対象ファイルの存在チェック（1つも無ければ終了）
@@ -126,10 +147,15 @@ def main() -> int:
     if have_gh():
         final_title = f"{args.title_prefix}{args.title}".strip()
         gh_cmd = [
-            "gh", "pr", "create",
-            "--title", final_title,
-            "--base", args.base,
-            "--head", branch,
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            final_title,
+            "--base",
+            args.base,
+            "--head",
+            branch,
             "--fill",
         ]
         if Path(args.body_path).exists():

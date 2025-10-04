@@ -20,10 +20,13 @@ CSV 形式:
   --stage-from-path "key:stage" ...         : 追加ノードの stage をパス断片から推定（最初にマッチしたものを採用）
                                               例: "airflow_docker:dags" "src:plan" "tests:analyze"
 """
+
 from __future__ import annotations
-import csv, json, sys
+import csv
+import json
 from pathlib import Path
-from typing import Dict, Tuple, List, Any
+from typing import Dict, List, Any
+
 
 # ---------- 基本入出力 ----------
 def load_cyto(path: Path):
@@ -39,6 +42,7 @@ def load_cyto(path: Path):
         obj["elements"] = elements
     return obj, elements, nodes, edges
 
+
 def build_index(nodes) -> tuple[Dict[str, Any], Dict[str, List[Any]]]:
     by_id: Dict[str, Any] = {}
     by_label: Dict[str, List[Any]] = {}
@@ -51,6 +55,7 @@ def build_index(nodes) -> tuple[Dict[str, Any], Dict[str, List[Any]]]:
         if lab:
             by_label.setdefault(lab, []).append(n)
     return by_id, by_label
+
 
 # ---------- ID 解決 ----------
 def norm_id_from_path(p: str, strip_prefix: str | None = None) -> str:
@@ -68,10 +73,11 @@ def norm_id_from_path(p: str, strip_prefix: str | None = None) -> str:
         if not sp.endswith("/"):
             sp += "/"
         if s.startswith(sp):
-            s = s[len(sp):]
+            s = s[len(sp) :]
     s = s.lstrip("/")
     s = s.replace(".", "_").replace("/", "_")
     return s
+
 
 def resolve_node(csv_path: str, by_id, by_label, strip_prefix: str | None) -> str | None:
     nid = norm_id_from_path(csv_path, strip_prefix)
@@ -91,6 +97,7 @@ def resolve_node(csv_path: str, by_id, by_label, strip_prefix: str | None) -> st
         return cands[0]
     return None
 
+
 # ---------- 追加ノード stage 推定 ----------
 def parse_stage_rules(pairs: List[str]) -> List[tuple[str, str]]:
     rules: List[tuple[str, str]] = []
@@ -100,6 +107,7 @@ def parse_stage_rules(pairs: List[str]) -> List[tuple[str, str]]:
             rules.append((key.strip(), st.strip()))
     return rules
 
+
 def guess_stage(path: str, rules: List[tuple[str, str]]) -> str:
     low = path.lower()
     for key, st in rules:
@@ -107,16 +115,27 @@ def guess_stage(path: str, rules: List[tuple[str, str]]) -> str:
             return st
     return "unknown"
 
+
 # ---------- メイン ----------
 def main():
     import argparse
+
     ap = argparse.ArgumentParser()
     ap.add_argument("nodes_json")
     ap.add_argument("edges_csv")
     ap.add_argument("out_json")
-    ap.add_argument("--strip-prefix", default="", help="CSV 絶対パスの先頭を剥がす（例: /mnt/d/noctria_kingdom/）")
+    ap.add_argument(
+        "--strip-prefix",
+        default="",
+        help="CSV 絶対パスの先頭を剥がす（例: /mnt/d/noctria_kingdom/）",
+    )
     ap.add_argument("--autocreate", action="store_true", help="未解決ノードを自動作成する")
-    ap.add_argument("--stage-from-path", nargs="*", default=[], help='例: "airflow_docker:dags" "src:plan" "tests:analyze"')
+    ap.add_argument(
+        "--stage-from-path",
+        nargs="*",
+        default=[],
+        help='例: "airflow_docker:dags" "src:plan" "tests:analyze"',
+    )
     args = ap.parse_args()
 
     strip = args.strip_prefix or ""
@@ -181,29 +200,35 @@ def main():
             if pair in seen_pairs:
                 continue
             seen_pairs.add(pair)
-            elements["edges"].append({"data": {"id": f"e_merge_{len(seen_pairs)}",
-                                               "source": s_id, "target": t_id}})
+            elements["edges"].append(
+                {"data": {"id": f"e_merge_{len(seen_pairs)}", "source": s_id, "target": t_id}}
+            )
             added_edges += 1
 
     # 出力
     obj["elements"] = elements
     meta = obj.get("meta", {})
-    meta.update({
-        "merged_edges_added": added_edges,
-        "merged_nodes_autocreated": added_nodes,
-        "merge_skipped_unresolved": skipped_unresolved,
-        "total_edges": len(elements["edges"]),
-        "total_nodes": len(elements["nodes"]),
-        "source_nodes_json": str(nj),
-        "source_edges_csv": str(ecsv),
-        "strip_prefix": strip,
-        "stage_rules": rules,
-    })
+    meta.update(
+        {
+            "merged_edges_added": added_edges,
+            "merged_nodes_autocreated": added_nodes,
+            "merge_skipped_unresolved": skipped_unresolved,
+            "total_edges": len(elements["edges"]),
+            "total_nodes": len(elements["nodes"]),
+            "source_nodes_json": str(nj),
+            "source_edges_csv": str(ecsv),
+            "strip_prefix": strip,
+            "stage_rules": rules,
+        }
+    )
     obj["meta"] = meta
 
     out.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
-    print(f"[ok] wrote {out}  +edges={added_edges}  +nodes={added_nodes}  "
-          f"skipped={skipped_unresolved}  totals: nodes={len(elements['nodes'])} edges={len(elements['edges'])}")
+    print(
+        f"[ok] wrote {out}  +edges={added_edges}  +nodes={added_nodes}  "
+        f"skipped={skipped_unresolved}  totals: nodes={len(elements['nodes'])} edges={len(elements['edges'])}"
+    )
+
 
 if __name__ == "__main__":
     main()

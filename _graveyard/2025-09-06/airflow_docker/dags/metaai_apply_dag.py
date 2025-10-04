@@ -3,7 +3,6 @@
 from datetime import datetime
 from typing import Dict, Any
 from airflow.decorators import dag, task
-from airflow.operators.python import get_current_context
 
 
 from core.path_config import LOGS_DIR

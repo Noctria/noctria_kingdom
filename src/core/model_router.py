@@ -14,12 +14,13 @@ Ollama ↔ GPT の自動ルーティング層。
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+
 import os
-import time
 import re
+import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 try:
     import yaml  # type: ignore

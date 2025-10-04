@@ -10,7 +10,7 @@ from flask import Blueprint, current_app, jsonify, make_response, render_templat
 try:
     import psycopg2  # type: ignore
     import psycopg2.extras  # type: ignore
-except Exception as e:  # pragma: no cover
+except Exception:  # pragma: no cover
     psycopg2 = None  # type: ignore
 
 bp_obs_latency = Blueprint("obs_latency", __name__)

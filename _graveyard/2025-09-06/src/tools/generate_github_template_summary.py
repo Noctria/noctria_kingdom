@@ -43,7 +43,7 @@ def fetch_file_content(user, repo, path, token):
 
 # === 📝 Markdownテンプレート生成 ===
 def generate_summary():
-    md = f"# 📘 Noctria Kingdom GitHub構成テンプレート（API自動生成）\n"
+    md = "# 📘 Noctria Kingdom GitHub構成テンプレート（API自動生成）\n"
     md += f"対象リポジトリ: `{GITHUB_USER}/{REPO_NAME}` @ `{BRANCH}`\n\n"
 
     tree = fetch_tree(GITHUB_USER, REPO_NAME, BRANCH, GITHUB_TOKEN)

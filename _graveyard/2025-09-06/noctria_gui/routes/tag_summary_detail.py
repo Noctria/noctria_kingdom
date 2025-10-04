@@ -11,7 +11,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
-from pathlib import Path
 import csv
 
 from noctria_gui.services import tag_summary_service

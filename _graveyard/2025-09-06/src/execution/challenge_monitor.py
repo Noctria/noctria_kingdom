@@ -1,9 +1,6 @@
 # challenge_monitor.py
-import time
 
 # ※実際の環境では smtplib などを利用してメールを送るなどのアラート機能を実装できます
-from email.mime.text import MIMEText
-import smtplib
 
 
 class ChallengeMonitor:
@@ -51,7 +48,6 @@ class ChallengeMonitor:
 # テスト運用用
 if __name__ == "__main__":
     from risk_control import RiskControl
-    import numpy as np
 
     # 初期資本金 100万円の RiskControl インスタンスを生成
     risk_control = RiskControl(initial_capital=1000000)

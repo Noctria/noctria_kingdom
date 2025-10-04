@@ -6,23 +6,28 @@ scan_py_import_graph.py
 - 出力は CSV: source_path,target_path
 - 相対/絶対importをできる範囲で解決（best-effort）
 """
+
 from __future__ import annotations
-import ast, sys, os
+import ast
+import sys
 from pathlib import Path
 from typing import Dict, Set, Tuple, List, Optional
 
 EXCLUDE_DIRS = {".git", ".venv", "venv", "__pycache__", ".ipynb_checkpoints"}
 
+
 def walk_py_files(roots: List[Path]) -> List[Path]:
     files = []
     for root in roots:
         root = root.resolve()
-        if not root.exists(): continue
+        if not root.exists():
+            continue
         for p in root.rglob("*.py"):
             if any(part in EXCLUDE_DIRS for part in p.parts):
                 continue
             files.append(p)
     return files
+
 
 def module_name_for(path: Path, roots: List[Path]) -> Optional[str]:
     # roots のいずれか配下なら module パスを推定
@@ -37,7 +42,10 @@ def module_name_for(path: Path, roots: List[Path]) -> Optional[str]:
         pass
     return None
 
-def resolve_import(cur_mod: str, imp_mod: Optional[str], level: int, roots: List[Path]) -> Optional[str]:
+
+def resolve_import(
+    cur_mod: str, imp_mod: Optional[str], level: int, roots: List[Path]
+) -> Optional[str]:
     """
     from .foo import bar のような相対importをモジュール名に解決。
     cur_mod: 現在ファイルの module 名（a.b.c）
@@ -49,12 +57,13 @@ def resolve_import(cur_mod: str, imp_mod: Optional[str], level: int, roots: List
     # 相対
     base_parts = cur_mod.split(".") if cur_mod else []
     if level <= len(base_parts):
-        parent = base_parts[:len(base_parts)-level]
+        parent = base_parts[: len(base_parts) - level]
         if imp_mod:
             return ".".join(parent + imp_mod.split("."))
         else:
             return ".".join(parent)
     return imp_mod
+
 
 def module_to_path(mod: str, roots: List[Path]) -> Optional[Path]:
     """
@@ -63,17 +72,21 @@ def module_to_path(mod: str, roots: List[Path]) -> Optional[Path]:
     parts = mod.split(".")
     for r in roots:
         cand = r.joinpath(*parts).with_suffix(".py")
-        if cand.exists(): return cand
+        if cand.exists():
+            return cand
         cand2 = r.joinpath(*parts, "__init__.py")
-        if cand2.exists(): return cand2
+        if cand2.exists():
+            return cand2
     return None
+
 
 def extract_edges(roots: List[Path]) -> Set[Tuple[str, str]]:
     files = walk_py_files(roots)
     mod_map: Dict[str, Path] = {}
     for f in files:
         m = module_name_for(f, roots)
-        if m: mod_map[m] = f
+        if m:
+            mod_map[m] = f
 
     edges: Set[Tuple[str, str]] = set()
     for f in files:
@@ -100,6 +113,7 @@ def extract_edges(roots: List[Path]) -> Set[Tuple[str, str]]:
                         edges.add((str(f.resolve()), str(tgt.resolve())))
     return edges
 
+
 def main():
     if len(sys.argv) < 3:
         print("Usage: scan_py_import_graph.py <out_csv> <root1> [<root2> ...]", file=sys.stderr)
@@ -107,8 +121,9 @@ def main():
     out = Path(sys.argv[1])
     roots = [Path(p) for p in sys.argv[2:]]
     edges = extract_edges(roots)
-    out.write_text("\n".join(f"{s},{t}" for s,t in sorted(edges)), encoding="utf-8")
+    out.write_text("\n".join(f"{s},{t}" for s, t in sorted(edges)), encoding="utf-8")
     print(f"[ok] wrote {out}  edges={len(edges)}")
+
 
 if __name__ == "__main__":
     main()

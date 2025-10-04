@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
 import os
-import logging
 
 from core.logger import setup_logger
 from core.path_config import LOGS_DIR

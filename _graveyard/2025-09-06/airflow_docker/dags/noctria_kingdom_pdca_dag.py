@@ -12,7 +12,6 @@
 # ⑩ royal_decision_task を拡張：昇格済みモデルパスをXCom/メタから解決し、NOCTRIA_MODEL_PATH として渡す
 
 from datetime import datetime, timedelta
-import logging
 import os
 import json
 from pathlib import Path

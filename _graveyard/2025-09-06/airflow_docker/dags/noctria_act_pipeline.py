@@ -4,17 +4,9 @@ from datetime import datetime, timedelta
 from airflow.models import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-import os
 import json
 from glob import glob
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-import os
-import json
-import time
-from typing import Dict, Any
-from datetime import datetime
-from typing import Any, Dict
+from typing import Dict, Any, List
 
 # =========================
 # Noctria Act 層 自動化 一式

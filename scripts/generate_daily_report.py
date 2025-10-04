@@ -19,7 +19,10 @@ Noctria 王国・日次業務レポート自動生成（ノーコード強化版
 """
 
 from __future__ import annotations
-import os, sys, argparse, datetime as dt
+import os
+import sys
+import argparse
+import datetime as dt
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import psycopg2
@@ -86,7 +89,9 @@ def fmt_dt(x: Any) -> str:
         return str(x)
 
 
-def arrow_and_delta(curr: Optional[float], prev: Optional[float], lower_is_better: bool) -> Tuple[str, str]:
+def arrow_and_delta(
+    curr: Optional[float], prev: Optional[float], lower_is_better: bool
+) -> Tuple[str, str]:
     """
     直近との差分を矢印と差分文字列で返す。
     lower_is_better: True のとき値が下がれば「↑（良化）」ではなく「↓（良化）」にしたい…が
@@ -101,7 +106,7 @@ def arrow_and_delta(curr: Optional[float], prev: Optional[float], lower_is_bette
     elif delta < 0:
         return "↓", f"({delta:.4f})"
     else:
-        return "→", f"(+0.0000)"
+        return "→", "(+0.0000)"
 
 
 def reliability_path(run_id: str) -> Path:
@@ -123,9 +128,15 @@ def to_md_table_row_latest(latest: Dict[str, Any], prev: Optional[Dict[str, Any]
     bins = latest.get("bins") or "—"
 
     # 前 run と比較して矢印・差分
-    br_arrow, br_delta = arrow_and_delta(brier, prev.get("brier") if prev else None, lower_is_better=True)
-    ece_arrow, ece_delta = arrow_and_delta(ece, prev.get("ece") if prev else None, lower_is_better=True)
-    adv_arrow, adv_delta = arrow_and_delta(adv, prev.get("adv_pass") if prev else None, lower_is_better=False)
+    br_arrow, br_delta = arrow_and_delta(
+        brier, prev.get("brier") if prev else None, lower_is_better=True
+    )
+    ece_arrow, ece_delta = arrow_and_delta(
+        ece, prev.get("ece") if prev else None, lower_is_better=True
+    )
+    adv_arrow, adv_delta = arrow_and_delta(
+        adv, prev.get("adv_pass") if prev else None, lower_is_better=False
+    )
 
     return (
         f"| `{latest['run_id']}` | "
@@ -136,21 +147,31 @@ def to_md_table_row_latest(latest: Dict[str, Any], prev: Optional[Dict[str, Any]
     )
 
 
-def kpi_judgement_line(brier: Optional[float], ece: Optional[float], adv: Optional[float],
-                       tgt_brier_max: float, tgt_ece_max: float, tgt_adv_min: float) -> str:
+def kpi_judgement_line(
+    brier: Optional[float],
+    ece: Optional[float],
+    adv: Optional[float],
+    tgt_brier_max: float,
+    tgt_ece_max: float,
+    tgt_adv_min: float,
+) -> str:
     def mark(val: Optional[float], ok: bool, label: str) -> str:
         if val is None:
             return f"{label}=— → ❔"
-        return f"{label}={val:.4f}" if label != "Adv.Pass" else f"{label}={val:.3f}" + (" → ✅" if ok else " → ❌")
+        return (
+            f"{label}={val:.4f}"
+            if label != "Adv.Pass"
+            else f"{label}={val:.3f}" + (" → ✅" if ok else " → ❌")
+        )
 
     ok_brier = (brier is not None) and (brier <= tgt_brier_max)
-    ok_ece   = (ece   is not None) and (ece   <= tgt_ece_max)
-    ok_adv   = (adv   is not None) and (adv   >= tgt_adv_min)
+    ok_ece = (ece is not None) and (ece <= tgt_ece_max)
+    ok_adv = (adv is not None) and (adv >= tgt_adv_min)
 
     parts = [
         mark(brier, ok_brier, "Brier"),
-        mark(ece,   ok_ece,   "ECE"),
-        mark(adv,   ok_adv,   "Adv.Pass"),
+        mark(ece, ok_ece, "ECE"),
+        mark(adv, ok_adv, "Adv.Pass"),
     ]
     return "本日の判定: " + " / ".join(parts)
 
@@ -168,8 +189,9 @@ def fetch_runs(limit: int) -> List[Dict[str, Any]]:
     return runs
 
 
-def build_yaml_frontmatter(date_str: str, latest: Optional[Dict[str, Any]],
-                           targets: Dict[str, float]) -> str:
+def build_yaml_frontmatter(
+    date_str: str, latest: Optional[Dict[str, Any]], targets: Dict[str, float]
+) -> str:
     run_id = latest["run_id"] if latest else ""
     rel = reliability_path(run_id) if run_id else None
     rel_str = str(rel).replace("\\", "/") if (rel and file_exists(rel)) else ""
@@ -192,11 +214,9 @@ def build_yaml_frontmatter(date_str: str, latest: Optional[Dict[str, Any]],
     return "\n".join(fm)
 
 
-def build_markdown(date_str: str,
-                   runs: List[Dict[str, Any]],
-                   targets: Dict[str, float]) -> str:
+def build_markdown(date_str: str, runs: List[Dict[str, Any]], targets: Dict[str, float]) -> str:
     latest = runs[0] if runs else None
-    prev   = runs[1] if len(runs) >= 2 else None
+    prev = runs[1] if len(runs) >= 2 else None
 
     # 1) YAML front matter
     parts = [build_yaml_frontmatter(date_str, latest, targets), ""]
@@ -207,27 +227,39 @@ def build_markdown(date_str: str,
 
     # 3) 本日のKPIレビュー
     parts.append("## 1) 本日のKPIレビュー（最新 run）\n")
-    parts.append("| run_id | Brier | trend | ECE | trend | Adv.Pass | trend | objective | T | bins | updated_at |")
+    parts.append(
+        "| run_id | Brier | trend | ECE | trend | Adv.Pass | trend | objective | T | bins | updated_at |"
+    )
     parts.append("|---|---:|:---:|---:|:---:|---:|:---:|:--|--:|--:|:--|")
     if latest:
         parts.append(to_md_table_row_latest(latest, prev))
         # 判定ライン
         parts.append("")
-        parts.append(kpi_judgement_line(
-            latest.get("brier"), latest.get("ece"), latest.get("adv_pass"),
-            targets["brier_max"], targets["ece_max"], targets["adv_min"]
-        ))
+        parts.append(
+            kpi_judgement_line(
+                latest.get("brier"),
+                latest.get("ece"),
+                latest.get("adv_pass"),
+                targets["brier_max"],
+                targets["ece_max"],
+                targets["adv_min"],
+            )
+        )
         parts.append("")
         # reliability plot があれば表示
         img_path = reliability_path(latest["run_id"])
         if file_exists(img_path):
             parts.append(f"![Reliability Curve](/{img_path.as_posix()})\n")
         else:
-            parts.append("> 注記: reliability.png が見つかりません。`plot_reliability.py` の実行を確認してください。\n")
+            parts.append(
+                "> 注記: reliability.png が見つかりません。`plot_reliability.py` の実行を確認してください。\n"
+            )
     else:
         parts.append("| — | — | → | — | → | — | → | — | — | — | — |")
         parts.append("")
-        parts.append("> 注記: KPI データが取得できませんでした。データ連携/DSN/テーブルを確認してください。\n")
+        parts.append(
+            "> 注記: KPI データが取得できませんでした。データ連携/DSN/テーブルを確認してください。\n"
+        )
 
     # 4) 直近ラン一覧
     parts.append("## 2) 直近ラン一覧\n")
@@ -247,8 +279,12 @@ def build_markdown(date_str: str,
     parts.append("## 3) 今週の暫定トレンド（直近3点）\n")
     last3 = runs[:3]
     if last3:
-        brier_seq = " → ".join(f"{x['brier']:.4f}" if x['brier'] is not None else "—" for x in last3[::-1])
-        ece_seq   = " → ".join(f"{x['ece']:.4f}"   if x['ece']   is not None else "—" for x in last3[::-1])
+        brier_seq = " → ".join(
+            f"{x['brier']:.4f}" if x["brier"] is not None else "—" for x in last3[::-1]
+        )
+        ece_seq = " → ".join(
+            f"{x['ece']:.4f}" if x["ece"] is not None else "—" for x in last3[::-1]
+        )
         parts.append(f"- Brier: {brier_seq}")
         parts.append(f"- ECE:   {ece_seq}\n")
     else:
@@ -258,42 +294,46 @@ def build_markdown(date_str: str,
     parts.append("## 4) 翌日の引継ぎ指示（王の作戦）\n")
     latest_run_id = latest["run_id"] if latest else ""
     parts.append("```yaml")
-    parts.append(f"handover:")
+    parts.append("handover:")
     parts.append(f"  date: {date_str}")
     parts.append(f"  latest_run: {latest_run_id}")
     parts.append("  priorities:")
     parts.append("    - id: CAL-01")
-    parts.append("      name: \"信頼度曲線（ECE）を目標内に再収束\"")
-    parts.append("      why: \"過学習抑制とポジションサイズ最適化の精度向上\"")
+    parts.append('      name: "信頼度曲線（ECE）を目標内に再収束"')
+    parts.append('      why: "過学習抑制とポジションサイズ最適化の精度向上"')
     parts.append("      actions:")
-    parts.append("        - \"温度スケーリングのTレンジをサンプル数に応じて自動調整\"")
-    parts.append("        - \"bin=12,15 の比較検証（安定性 vs 粒度）\"")
-    parts.append(f"      success_criteria:")
+    parts.append('        - "温度スケーリングのTレンジをサンプル数に応じて自動調整"')
+    parts.append('        - "bin=12,15 の比較検証（安定性 vs 粒度）"')
+    parts.append("      success_criteria:")
     parts.append(f"        - \"ECE <= {targets['ece_max']:.2f}\"")
     parts.append("    - id: ROBUST-01")
-    parts.append("      name: \"逆境耐性維持・改善\"")
+    parts.append('      name: "逆境耐性維持・改善"')
     parts.append("      actions:")
-    parts.append("        - \"ノイズ注入/時系列シフト/レジームドリフトに対する頑強性テストの強化\"")
-    parts.append(f"      success_criteria:")
+    parts.append('        - "ノイズ注入/時系列シフト/レジームドリフトに対する頑強性テストの強化"')
+    parts.append("      success_criteria:")
     parts.append(f"        - \"adversarial_pass_rate >= {targets['adv_min']:.2f}\"")
     parts.append("  checkpoints:")
-    parts.append("    - \"obs_codex_kpi_latest ビューで run ごとのKPIを再確認\"")
-    parts.append("    - \"Prometheus エージェントの設定（T, bins, objective）を記録\"")
+    parts.append('    - "obs_codex_kpi_latest ビューで run ごとのKPIを再確認"')
+    parts.append('    - "Prometheus エージェントの設定（T, bins, objective）を記録"')
     parts.append("  blockers:")
-    parts.append("    - \"サンプル不足による温度推定の不安定化\"")
+    parts.append('    - "サンプル不足による温度推定の不安定化"')
     parts.append("  tomorrow_tasks:")
-    parts.append("    - \"09:30 UTC: evaluate_veritas.py を --calibrate-temperature で実行\"")
-    parts.append("    - \"09:35 UTC: log_kpi_from_reports.py でKPI記録（--limit 1）\"")
-    parts.append("    - \"09:40 UTC: plot_reliability.py で reliability.png を更新\"")
+    parts.append('    - "09:30 UTC: evaluate_veritas.py を --calibrate-temperature で実行"')
+    parts.append('    - "09:35 UTC: log_kpi_from_reports.py でKPI記録（--limit 1）"')
+    parts.append('    - "09:40 UTC: plot_reliability.py で reliability.png を更新"')
     parts.append("```")
     parts.append("")
 
     # 7) 明日の実行コマンド例
     parts.append("## 5) 明日の実行コマンド例\n")
     parts.append("```bash")
-    parts.append("PYTHONPATH=. python src/veritas/evaluate_veritas.py --calibrate-temperature --calib-objective both --calib-bins 12")
+    parts.append(
+        "PYTHONPATH=. python src/veritas/evaluate_veritas.py --calibrate-temperature --calib-objective both --calib-bins 12"
+    )
     parts.append("PYTHONPATH=. ./scripts/log_kpi_from_reports.py --limit 1")
-    parts.append("PYTHONPATH=. python scripts/plot_reliability.py --reports reports/veritas --limit 1")
+    parts.append(
+        "PYTHONPATH=. python scripts/plot_reliability.py --reports reports/veritas --limit 1"
+    )
     parts.append("```")
     parts.append("")
 
@@ -302,7 +342,9 @@ def build_markdown(date_str: str,
     if latest:
         img_path = reliability_path(latest["run_id"])
         if not file_exists(img_path):
-            parts.append("- アーティファクト未生成: reliability.png が存在しません（プロットスクリプトの実行を確認）")
+            parts.append(
+                "- アーティファクト未生成: reliability.png が存在しません（プロットスクリプトの実行を確認）"
+            )
     else:
         parts.append("- KPI 取得に失敗: DSN/テーブル/ビューの整合を確認")
     parts.append("")
@@ -325,11 +367,13 @@ def resolve_report_path(date_arg: Optional[str]) -> Tuple[str, Path]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=5, help="直近何 run を列挙するか（デフォルト: 5）")
-    ap.add_argument("--date", type=str, default=None, help="レポートの日付（YYYY-MM-DD, 省略時はUTC今日）")
+    ap.add_argument(
+        "--date", type=str, default=None, help="レポートの日付（YYYY-MM-DD, 省略時はUTC今日）"
+    )
     ap.add_argument("--dry-run", action="store_true", help="ファイルに保存せず標準出力に表示")
     ap.add_argument("--target-brier-max", type=float, default=0.18)
-    ap.add_argument("--target-ece-max",   type=float, default=0.35)
-    ap.add_argument("--target-adv-min",   type=float, default=0.40)
+    ap.add_argument("--target-ece-max", type=float, default=0.35)
+    ap.add_argument("--target-adv-min", type=float, default=0.40)
     args = ap.parse_args()
 
     # 取得
@@ -341,8 +385,8 @@ def main():
 
     targets = {
         "brier_max": float(args.target_brier_max),
-        "ece_max":   float(args.target_ece_max),
-        "adv_min":   float(args.target_adv_min),
+        "ece_max": float(args.target_ece_max),
+        "adv_min": float(args.target_adv_min),
     }
 
     date_str, out_path = resolve_report_path(args.date)

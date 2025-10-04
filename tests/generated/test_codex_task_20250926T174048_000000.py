@@ -21,6 +21,6 @@ def test_health_endpoint_exists():
         path = getattr(r, "path", "")
         if isinstance(path, str):
             paths.add(path)
-    assert ("/healthz" in paths) or ("/" in paths), (
-        f"ヘルスチェックまたは / がありません: {sorted(paths)}"
-    )
+    assert ("/healthz" in paths) or (
+        "/" in paths
+    ), f"ヘルスチェックまたは / がありません: {sorted(paths)}"

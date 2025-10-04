@@ -7,10 +7,13 @@
 - { "nodes":[...], "edges":[...] }
 - [ {...}, {...}, ... ]  # data付きノード配列 or group指定配列 など
 """
+
 from __future__ import annotations
-import json, sys
+import json
+import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
+
 
 def to_cyto_elements(obj: Any) -> Dict[str, Any]:
     # 1) elements 抽出
@@ -24,7 +27,9 @@ def to_cyto_elements(obj: Any) -> Dict[str, Any]:
         nodes = []
         edges = []
         for x in obj:
-            if isinstance(x, dict) and ("source" in x or (isinstance(x.get("data"), dict) and "source" in x["data"])):
+            if isinstance(x, dict) and (
+                "source" in x or (isinstance(x.get("data"), dict) and "source" in x["data"])
+            ):
                 edges.append(x)
             else:
                 nodes.append(x)
@@ -36,31 +41,44 @@ def to_cyto_elements(obj: Any) -> Dict[str, Any]:
         d = dict(n.get("data", {})) if isinstance(n, dict) else {}
         # トップに id/label がある場合は拾う
         if isinstance(n, dict):
-            if "id" in n and "id" not in d: d["id"] = n["id"]
-            if "label" in n and "label" not in d: d["label"] = n["label"]
-            if "stage" in n and "stage" not in d: d["stage"] = n["stage"]
-        if "id" in d: d["id"] = str(d["id"])
-        if "label" in d: d["label"] = str(d["label"])
+            if "id" in n and "id" not in d:
+                d["id"] = n["id"]
+            if "label" in n and "label" not in d:
+                d["label"] = n["label"]
+            if "stage" in n and "stage" not in d:
+                d["stage"] = n["stage"]
+        if "id" in d:
+            d["id"] = str(d["id"])
+        if "label" in d:
+            d["label"] = str(d["label"])
         return {"data": d}
 
     eid = 0
+
     def norm_edge(e: Any) -> Dict[str, Any]:
         nonlocal eid
         d = dict(e.get("data", {})) if isinstance(e, dict) else {}
         if isinstance(e, dict):
-            if "source" in e and "source" not in d: d["source"] = e["source"]
-            if "target" in e and "target" not in d: d["target"] = e["target"]
-            if "id" in e and "id" not in d: d["id"] = e["id"]
+            if "source" in e and "source" not in d:
+                d["source"] = e["source"]
+            if "target" in e and "target" not in d:
+                d["target"] = e["target"]
+            if "id" in e and "id" not in d:
+                d["id"] = e["id"]
         if "id" not in d:
-            d["id"] = f"e{eid}"; eid += 1
-        if "source" in d: d["source"] = str(d["source"])
-        if "target" in d: d["target"] = str(d["target"])
+            d["id"] = f"e{eid}"
+            eid += 1
+        if "source" in d:
+            d["source"] = str(d["source"])
+        if "target" in d:
+            d["target"] = str(d["target"])
         return {"data": d}
 
     nodes = [norm_node(n) for n in elements.get("nodes", [])]
     edges = [norm_edge(e) for e in elements.get("edges", [])]
 
     return {"elements": {"nodes": nodes, "edges": edges}}
+
 
 def main():
     if len(sys.argv) < 3:
@@ -72,7 +90,10 @@ def main():
     meta = obj.get("meta", {}) if isinstance(obj, dict) else {}
     out = {**norm, "meta": meta}
     dst.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    print(f"[ok] wrote {dst}  nodes={len(norm['elements']['nodes'])}  edges={len(norm['elements']['edges'])}")
+    print(
+        f"[ok] wrote {dst}  nodes={len(norm['elements']['nodes'])}  edges={len(norm['elements']['edges'])}"
+    )
+
 
 if __name__ == "__main__":
     main()

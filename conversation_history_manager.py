@@ -1,10 +1,10 @@
-import json
-from typing import List, Dict, Optional
-from fastapi import Depends
-from openai import OpenAI
 import asyncio
+import json
 import threading
-from fastapi import Request
+from typing import Dict, List, Optional
+
+from fastapi import Depends, Request
+from openai import OpenAI
 
 # src/noctria_gui/services/conversation_history_manager.py
 

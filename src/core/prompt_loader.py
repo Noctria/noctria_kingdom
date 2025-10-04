@@ -11,7 +11,7 @@ Prompt loader/builder for Noctria.
 
 import json
 from pathlib import Path
-from typing import Any, Mapping, Iterable, Optional, Dict, List
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 import yaml
 
