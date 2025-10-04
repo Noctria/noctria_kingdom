@@ -1,6 +1,7 @@
 target-version = "py310"
 line-length = 100
 
+# 既存の除外 + 安全用に src 下の非 core を追加
 extend-exclude = [
   "autogen_scripts",
   "mt5_test.py",
@@ -14,13 +15,18 @@ extend-exclude = [
   "scripts",
   "tests",
   "Untitled.ipynb",
+
+  # --- safety: non-core paths (lint は src/core 限定運用) ---
+  "src/codex",
+  "src/execution",
+  "src/plan_data",
+  "src/strategies",
 ]
 
 [lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]  # 当面は行長を無視
-
-# ファイル単位の例外
+# ファイル単位の例外（既存を維持）
 per-file-ignores = { "src/core/prompt_loader.py" = ["E402"] }
 
 [format]
