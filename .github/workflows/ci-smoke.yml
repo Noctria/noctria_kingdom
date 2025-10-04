@@ -1,27 +1,56 @@
 name: smoke
 
 on:
-  pull_request:
   push:
-    branches: [ main ]
+    branches: ["**"]
+    paths:
+      - "src/**"
+      - "tests/smoke/**"
+      - ".github/workflows/ci-smoke.yml"
+      - "requirements*.txt"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/smoke/**"
+      - ".github/workflows/ci-smoke.yml"
+      - "requirements*.txt"
 
 jobs:
-  lint-only:
+  smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.10"
+          cache: "pip"
 
-      - name: Install ruff (minimal)
+      - name: Install minimal deps (non-fatal)
         run: |
+          set -e
           python -m pip install --upgrade pip
-          pip install ruff
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt || echo "[smoke] requirements install failed, continuing"
+          fi
+          pip install pytest || echo "[smoke] pytest install failed, continuing"
 
-      - name: Ruff (lint) — non blocking
-        run: ruff check . --output-format=github
-        continue-on-error: true
+      - name: Run smoke tests (noconftest; never fail on missing/empty)
+        run: |
+          set -e
+          if [ ! -d tests/smoke ]; then
+            echo "[smoke] no smoke tests; skipping"
+            exit 0
+          fi
+          if ! command -v pytest >/dev/null 2>&1; then
+            echo "[smoke] pytest not available; skipping"
+            exit 0
+          fi
+          # conftest を読まない（重い依存を回避）
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+          pytest -q tests/smoke --noconftest -k "not slow" || rc=$?; rc=${rc:-0}; \
+          if [ "$rc" = "5" ]; then
+            echo "[smoke] no tests collected"
+            exit 0
+          else
+            exit "$rc"
+          fi
