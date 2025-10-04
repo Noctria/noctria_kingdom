@@ -1,4 +1,3 @@
-# .github/workflows/lint.yml
 name: lint
 
 on:
@@ -18,23 +17,29 @@ on:
 
 jobs:
   ruff:
-    # Branch protection 上では「lint / ruff」と表示される
+    # ← Branch protection では「lint / ruff」と表示される
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
+      - uses: actions/setup-python@v5
         with:
-          # ローカル(pre-commit)と揃えるためにバージョン固定
-          version: "0.6.8"
-          # PR にアノテーションを出すため --output-format=github を追加
-          args: check --force-exclude src/core --output-format=github
+          python-version: "3.10"
+          cache: "pip"
+      - name: Install ruff
+        run: pip install "ruff==0.6.8"
+      - name: Lint (ruff check)
+        run: ruff check --force-exclude src/core
 
   ruff-format:
-    # Branch protection 上では「lint / ruff-format」と表示される
+    # ← Branch protection では「lint / ruff-format」と表示される
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
+      - uses: actions/setup-python@v5
         with:
-          version: "0.6.8"
-          args: format --check --force-exclude src/core
+          python-version: "3.10"
+          cache: "pip"
+      - name: Install ruff
+        run: pip install "ruff==0.6.8"
+      - name: Format check (ruff format --check)
+        run: ruff format --check --force-exclude src/core
