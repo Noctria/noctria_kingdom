@@ -11,7 +11,7 @@ Prompt loader/builder for Noctria.
 
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence, Iterable, Optional, Dict, List
+from typing import Any, Mapping, Iterable, Optional, Dict, List
 
 import yaml
 
@@ -45,10 +45,11 @@ RECOMMENDED_SECTION_ORDER: List[str] = [
 ]
 
 
-# ====== Core API ======
+# ====== Core API (legacy) ======
 def load_governance(path: str | Path = DEFAULT_SSOT) -> Dict[str, Any]:
     """
-    Load governance YAML (SSOT) and return as dict.
+    Legacy: Load ONLY the SSOT YAML file and return as dict (no sections merge).
+    新コードでは load_governance_dict() の使用を推奨。
     """
     p = Path(path)
     if not p.exists():
@@ -81,6 +82,7 @@ def load_prompt_text(
 ) -> str:
     """
     Convenience wrapper: YAML -> dict -> Markdown text
+    - SSOT と sections をマージしてから Markdown 風テキストを組み立てる
     """
     base_map = _read_yaml_map(ssot_path, strict=strict)
 
@@ -105,6 +107,26 @@ def load_prompt_text(
         parts.append("")
 
     return "\n".join(parts).strip() + "\n"
+
+
+# === New: dictを返す高機能ローダ（sections込み） ===
+def load_governance_dict(
+    ssot_path: str = DEFAULT_SSOT,
+    sections_dir: Optional[str] = DEFAULT_SECTIONS_DIR,
+    *,
+    strict: bool = False,
+    prefer_sections: bool = True,
+) -> Dict[str, Any]:
+    """
+    SSOT + sections/*.yaml をマージした dict を返す。
+    - text が欲しい場合は load_prompt_text()
+    - dict が欲しい場合は本関数を使う（king_noctria/agent_runner 等）
+    """
+    base_map = _read_yaml_map(ssot_path, strict=strict)
+    if sections_dir:
+        frags = _read_sections_dir(sections_dir, strict=strict)
+        return _merge_maps(base_map, frags, prefer_sections=prefer_sections)
+    return base_map
 
 
 # ====== Helpers ======
@@ -246,10 +268,3 @@ if __name__ == "__main__":
         json_contract=contract,
     )
     print(text)
-
-def load_governance_dict(path: str = DEFAULT_SSOT) -> Dict[str, Any]:
-    """
-    SSOT YAMLを dict として読み込む（system prompt 文字列ではなく生のdictが欲しい時用）。
-    agent_runner や king_noctria で使う。
-    """
-    return _read_yaml_map(path, strict=False)
