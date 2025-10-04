@@ -3,6 +3,8 @@ line-length = 100
 
 # トップレベルで追加除外
 extend-exclude = [
+  "autogen_scripts",
+  "mt5_test.py",
   "_graveyard",
   "generated_code",
   "data",
