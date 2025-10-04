@@ -1,3 +1,4 @@
+# .github/workflows/lint.yml
 name: lint
 
 on:
@@ -17,19 +18,23 @@ on:
 
 jobs:
   ruff:
-    # ← Branch protection では「lint / ruff」と表示される
+    # Branch protection 上では「lint / ruff」と表示される
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
         with:
-          args: check --force-exclude src/core
+          # ローカル(pre-commit)と揃えるためにバージョン固定
+          version: "0.6.8"
+          # PR にアノテーションを出すため --output-format=github を追加
+          args: check --force-exclude src/core --output-format=github
 
   ruff-format:
-    # ← Branch protection では「lint / ruff-format」と表示される
+    # Branch protection 上では「lint / ruff-format」と表示される
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
         with:
+          version: "0.6.8"
           args: format --check --force-exclude src/core
