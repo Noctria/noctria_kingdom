@@ -1,8 +1,7 @@
 target-version = "py310"
 line-length = 100
 
-# ← セクション外（トップレベル）に置く
-# 既存の除外に“追加”したい場合は extend-exclude を使ってOK
+# トップレベルで追加除外
 extend-exclude = [
   "_graveyard",
   "generated_code",
@@ -17,8 +16,14 @@ extend-exclude = [
 ]
 
 [lint]
-select = ["E", "F", "I", "W"]
+select = ["E", "F", "W", "I"]
 ignore = []
 
 [format]
-line-length = 100
+# ※ ここには line-length を置かない
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 100
