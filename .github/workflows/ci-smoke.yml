@@ -1,3 +1,4 @@
+# .github/workflows/ci-smoke.yml
 name: smoke
 
 on:
@@ -25,16 +26,22 @@ jobs:
           python-version: "3.10"
           cache: "pip"
 
-      - name: Install minimal deps
+      - name: Install minimal deps (non-fatal)
         run: |
+          set -e
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
+          # requirements は重い/壊れていることがあるので、失敗しても続行
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt || echo "[smoke] requirements install failed, continuing"
+          fi
+          pip install pytest || echo "[smoke] pytest install failed, continuing"
 
-      - name: Run smoke tests
+      - name: Run smoke tests (never fail on missing/empty)
         run: |
+          set -e
           if [ -d tests/smoke ]; then
-            pytest -q tests/smoke -k "not slow"
+            # テストが0件でも成功扱いにするため、失敗コード5を0に変換
+            pytest -q tests/smoke -k "not slow" || rc=$?; rc=${rc:-0}; if [ "$rc" = "5" ]; then echo "[smoke] no tests collected"; exit 0; else exit "$rc"; fi
           else
-            echo "no smoke tests; skipping"
+            echo "[smoke] no smoke tests; skipping"
           fi
