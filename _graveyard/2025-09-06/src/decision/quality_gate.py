@@ -14,7 +14,7 @@ Decision 層からの DataQualityGate 利用を、Plan 層実装へ一本化す�
 try:
     # 公式実装（単一の正典）へ委譲
     from plan_data.quality_gate import DataQualityGate, QualityAssessment  # type: ignore
-except Exception as e:  # pragma: no cover
+except Exception:  # pragma: no cover
     # もし import に失敗したら、そのまま例外を投げて気づけるようにする
     # （ここでサイレントフォールバックはしない）
     raise

@@ -7,7 +7,6 @@
 - .envからGitHub設定を読み取り
 """
 
-import os
 import subprocess
 from pathlib import Path
 from typing import List

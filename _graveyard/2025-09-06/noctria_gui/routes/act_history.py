@@ -56,7 +56,7 @@ def get_filtered_logs(
         # 🔒 normalize_score() 内で score_mean を常に保証しておくこと
         return [act_log_service.normalize_score(log) for log in filtered]
 
-    except Exception as e:
+    except Exception:
         logging.error("ログのフィルタリング中にエラーが発生しました", exc_info=True)
         return []
 

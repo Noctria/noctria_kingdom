@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # 仮データの生成（30日分の1時間足、720行）
 rows = 24 * 30

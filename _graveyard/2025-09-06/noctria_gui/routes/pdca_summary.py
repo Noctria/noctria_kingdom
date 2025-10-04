@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import csv
 import logging
-import os
 import sys
 from datetime import datetime, timedelta, timezone
 from io import StringIO

@@ -1,5 +1,6 @@
 from __future__ import annotations
-import yaml, os
+import yaml
+import os
 from typing import Dict, Any, Optional
 
 

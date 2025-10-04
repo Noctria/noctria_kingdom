@@ -2,10 +2,7 @@ from core.path_config import *
 #!/usr/bin/env python3
 # coding: utf-8
 
-import sys
 
-import gym
-import numpy as np
 from stable_baselines3 import PPO
 from core.meta_ai import MetaAI  # core モジュール
 

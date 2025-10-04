@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal, Tuple
+from typing import List, Optional, Literal
 from datetime import date
 
 router = APIRouter()

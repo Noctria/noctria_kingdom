@@ -8,12 +8,7 @@
 
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse, RedirectResponse
-from core.veritas_trigger_api import (
-    trigger_generate_dag,
-    trigger_recheck_dag,
-)  # AirflowトリガーAPI関数
 from src.core.path_config import STRATEGIES_DIR
-from pathlib import Path
 import urllib.parse
 
 router = APIRouter()

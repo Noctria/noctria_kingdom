@@ -44,12 +44,30 @@ def git_diff_unified(commit_range: str, file_path: str, find_renames: bool) -> s
 
 def main():
     ap = argparse.ArgumentParser(description="Generate Markdown/JSON diff report for docs/")
-    ap.add_argument("--range", default="HEAD~1..HEAD", help="git commit range, e.g. A..B (default: HEAD~1..HEAD)")
+    ap.add_argument(
+        "--range",
+        default="HEAD~1..HEAD",
+        help="git commit range, e.g. A..B (default: HEAD~1..HEAD)",
+    )
     ap.add_argument("--path", default="docs/", help="limit path (default: docs/)")
-    ap.add_argument("--output", default="docs/_generated/diff_report.md", help="markdown report path")
-    ap.add_argument("--json-sidecar", dest="json_sidecar", default=None, help="write JSON sidecar to this path")
-    ap.add_argument("--summary-only", dest="summary_only", action="store_true", help="write only summary (no per-file diffs)")
-    ap.add_argument("--find-renames", dest="find_renames", action="store_true", help="enable rename detection (-M)")
+    ap.add_argument(
+        "--output", default="docs/_generated/diff_report.md", help="markdown report path"
+    )
+    ap.add_argument(
+        "--json-sidecar", dest="json_sidecar", default=None, help="write JSON sidecar to this path"
+    )
+    ap.add_argument(
+        "--summary-only",
+        dest="summary_only",
+        action="store_true",
+        help="write only summary (no per-file diffs)",
+    )
+    ap.add_argument(
+        "--find-renames",
+        dest="find_renames",
+        action="store_true",
+        help="enable rename detection (-M)",
+    )
     args = ap.parse_args()
 
     # 出力ディレクトリ
@@ -64,7 +82,9 @@ def main():
 
     # Markdown 出力
     with out_md.open("w", encoding="utf-8") as f:
-        f.write(f"# Docs Diff Report\n\n- range: `{args.range}`\n- path: `{args.path}`\n- generated_at: {ts}\n\n")
+        f.write(
+            f"# Docs Diff Report\n\n- range: `{args.range}`\n- path: `{args.path}`\n- generated_at: {ts}\n\n"
+        )
         if not changed:
             f.write("_No changes in range._\n")
         else:
@@ -100,7 +120,9 @@ def main():
             for p in changed:
                 diff = git_diff_unified(args.range, p, args.find_renames)
                 data["files"].append({"path": p, "diff": diff})
-        Path(args.json_sidecar).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        Path(args.json_sidecar).write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(f"✅ Wrote {args.json_sidecar}")
 
 

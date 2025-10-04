@@ -6,7 +6,8 @@ and run a minimal adversarial suite. Idempotent (safe to run multiple times).
 """
 
 from __future__ import annotations
-import re, sys
+import re
+import sys
 from pathlib import Path
 
 TARGET = Path("src/veritas/evaluate_veritas.py")
@@ -132,6 +133,7 @@ FINAL_META = """\
         logging.warning(f"meta.json 生成に失敗: {e}")
 """
 
+
 def insert_once(buf: str, marker_regex: str, insert_after: str) -> str:
     if re.search(re.escape(insert_after.strip()), buf):
         return buf  # already inserted
@@ -140,6 +142,7 @@ def insert_once(buf: str, marker_regex: str, insert_after: str) -> str:
         return buf
     idx = m.end()
     return buf[:idx] + "\n" + insert_after + "\n" + buf[idx:]
+
 
 def main() -> int:
     if not TARGET.exists():
@@ -151,20 +154,25 @@ def main() -> int:
     # 1) imports
     if "import numpy as np" not in text:
         # after existing import block
-        text = re.sub(r"(^from pathlib import Path.*?\n)(from typing.*?\n)",
-                      r"\1\2" + IMPORTS, text, flags=re.S|re.M)
+        text = re.sub(
+            r"(^from pathlib import Path.*?\n)(from typing.*?\n)",
+            r"\1\2" + IMPORTS,
+            text,
+            flags=re.S | re.M,
+        )
         if "import numpy as np" not in text:
             # fallback: just prepend near the top
             text = text.replace("import pandas as pd\n", "import pandas as pd\n" + IMPORTS)
 
     # 2) helpers after TEST_DATA_PATH line
-    if "REPORTS_BASE = Path(\"reports\") / \"veritas\"" not in text:
+    if 'REPORTS_BASE = Path("reports") / "veritas"' not in text:
         text = insert_once(text, r"TEST_DATA_PATH\s*=\s*.*?\n", HELPERS)
 
     # 3) agg init inside main() after results declaration
     if "agg_y_true" not in text:
-        text = re.sub(r"(results:\s*List\[Dict\[str,\s*Any\]\]\s*=\s*\[\]\s*\n)",
-                      r"\1" + AGG_INIT, text)
+        text = re.sub(
+            r"(results:\s*List\[Dict\[str,\s*Any\]\]\s*=\s*\[\]\s*\n)", r"\1" + AGG_INIT, text
+        )
 
     # 4) collect block after results.append(result) in the for loop
     if "optional フィールドを回収" not in text:
@@ -174,12 +182,13 @@ def main() -> int:
     if "meta.json 生成に失敗" not in text:
         text = text.replace(
             'logging.info("📜 訓示:『数の知恵を集めよ、勝利の礎となすべし』")\n',
-            'logging.info("📜 訓示:『数の知恵を集めよ、勝利の礎となすべし』")\n\n' + FINAL_META
+            'logging.info("📜 訓示:『数の知恵を集めよ、勝利の礎となすべし』")\n\n' + FINAL_META,
         )
 
     TARGET.write_text(text, encoding="utf-8")
     print("[patch] applied (idempotent).")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

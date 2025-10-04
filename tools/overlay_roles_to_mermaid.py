@@ -7,14 +7,19 @@ overlay_roles_to_mermaid.py (v4: label-first matching, legend fix)
 - さらにフォールバックとして ID を“擬似パス復元”して緩く照合（__ → /, _ → [-_])
 - 既存の manifest/spine もそのまま利用可
 """
+
 from __future__ import annotations
-import argparse, fnmatch, json, re
+import argparse
+import fnmatch
+import json
+import re
 from pathlib import Path
 from typing import Dict, List, Set
 
 import yaml  # pip install PyYAML
 
-NODE_RE = re.compile(r'^\s*([A-Za-z0-9_./:\-]+)\s*\[(.*?)\]\s*(?::[:A-Za-z0-9 _-]+)?$')
+NODE_RE = re.compile(r"^\s*([A-Za-z0-9_./:\-]+)\s*\[(.*?)\]\s*(?::[:A-Za-z0-9 _-]+)?$")
+
 
 def parse_nodes(lines: List[str]) -> Dict[str, str]:
     """nodeId[Label] を dict へ"""
@@ -25,15 +30,19 @@ def parse_nodes(lines: List[str]) -> Dict[str, str]:
             nid = m.group(1).strip()
             label = m.group(2).strip()
             # ラベルが ["file.py"] のように引用符付きなら外す
-            if (label.startswith('"') and label.endswith('"')) or (label.startswith("'") and label.endswith("'")):
+            if (label.startswith('"') and label.endswith('"')) or (
+                label.startswith("'") and label.endswith("'")
+            ):
                 label = label[1:-1]
             nodes[nid] = label
     return nodes
+
 
 def _basename(glob: str) -> str:
     if "/" in glob:
         return glob.split("/")[-1]
     return glob
+
 
 def _label_globs_from_pattern(pat: str) -> List[str]:
     base = _basename(pat)
@@ -44,9 +53,11 @@ def _label_globs_from_pattern(pat: str) -> List[str]:
         outs.append(base)
     return outs
 
+
 def _pseudo_path_from_id(nid: str) -> str:
     s = nid.replace("__", "/")
     return s
+
 
 def _id_regex_from_pattern(pat: str) -> re.Pattern:
     p = pat.replace("/", "__")
@@ -54,6 +65,7 @@ def _id_regex_from_pattern(pat: str) -> re.Pattern:
     esc = esc.replace(r"\*", ".*").replace(r"\?", ".")
     esc = esc.replace(r"\-", "[-_]").replace(r"\_", "[-_]")
     return re.compile(esc, re.IGNORECASE)
+
 
 def match_roles(node_id: str, label: str, role_patterns: List[str]) -> bool:
     lab = label.lower()
@@ -72,7 +84,8 @@ def match_roles(node_id: str, label: str, role_patterns: List[str]) -> bool:
             return True
     return False
 
-def ensure_styles(styles: Dict[str,str]) -> List[str]:
+
+def ensure_styles(styles: Dict[str, str]) -> List[str]:
     out = ["", "%% ---- Auto-generated role styles ----"]
     styles = dict(styles or {})
     styles.setdefault("spine", "fill:#111827,stroke:#ef4444,stroke-width:3px,color:#ffffff")
@@ -82,15 +95,17 @@ def ensure_styles(styles: Dict[str,str]) -> List[str]:
     out.append("")
     return out
 
-def build_stage_subgraphs(stage_order: List[str],
-                          stage_titles: Dict[str,str],
-                          node_classes: Dict[str,Set[str]]) -> List[str]:
+
+def build_stage_subgraphs(
+    stage_order: List[str], stage_titles: Dict[str, str], node_classes: Dict[str, Set[str]]
+) -> List[str]:
     out: List[str] = ["", "%% ---- Stage subgraphs ----"]
     for st in stage_order or []:
         members = [nid for nid, cls in node_classes.items() if st in cls]
-        if not members: continue
+        if not members:
+            continue
         title = stage_titles.get(st, st)
-        out.append(f"subgraph {st}_cluster[\"{title}\"]")
+        out.append(f'subgraph {st}_cluster["{title}"]')
         out.append("direction TB")
         for nid in sorted(members):
             out.append(f"{nid}")
@@ -99,29 +114,33 @@ def build_stage_subgraphs(stage_order: List[str],
     out.append("")
     return out
 
+
 def build_loop_arrows(stage_order: List[str]) -> List[str]:
-    if not stage_order or len(stage_order) < 2: return []
+    if not stage_order or len(stage_order) < 2:
+        return []
     out = ["", "%% ---- Loop arrows ----"]
     pairs = list(zip(stage_order, stage_order[1:] + stage_order[:1]))
-    for a,b in pairs:
+    for a, b in pairs:
         out.append(f"{a}_cluster --> {b}_cluster")
     out.append("%% ----------------------")
     out.append("")
     return out
 
-def build_legend(styles: Dict[str,str], titles: Dict[str,str]) -> List[str]:
+
+def build_legend(styles: Dict[str, str], titles: Dict[str, str]) -> List[str]:
     out = ["", "%% ---- Legend (stage → color) ----", "subgraph legend[Legend]", "direction TB"]
     keys = list((styles or {}).keys()) + ["spine"]
     for st in sorted(set(keys)):
         title = titles.get(st, st) if titles else st
-        nid   = f"legend_{st}"
+        nid = f"legend_{st}"
         label = f"[{title}]"
-        out.append(f"{nid}{label}")          # ノード定義
-        out.append(f"class {nid} {st};")     # class 適用
+        out.append(f"{nid}{label}")  # ノード定義
+        out.append(f"class {nid} {st};")  # class 適用
     out.append("end")
     out.append("%% ---------------------------------")
     out.append("")
     return out
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -137,9 +156,9 @@ def main():
 
     roles_cfg = yaml.safe_load(Path(args.roles).read_text(encoding="utf-8")) or {}
     roles: List[dict] = roles_cfg.get("roles", [])
-    styles: Dict[str,str] = roles_cfg.get("styles", {}) or {}
+    styles: Dict[str, str] = roles_cfg.get("styles", {}) or {}
     stage_order: List[str] = roles_cfg.get("stages_order", []) or []
-    stage_titles: Dict[str,str] = roles_cfg.get("stage_titles", {}) or {}
+    stage_titles: Dict[str, str] = roles_cfg.get("stage_titles", {}) or {}
 
     manifest = {}
     if args.manifest and Path(args.manifest).exists():
@@ -160,7 +179,7 @@ def main():
             want_low = want.lower()
             for nid, label in nodes.items():
                 lab = label.lower()
-                if lab == want_low or lab.endswith("/"+want_low) or lab.endswith(want_low):
+                if lab == want_low or lab.endswith("/" + want_low) or lab.endswith(want_low):
                     node_classes.setdefault(nid, set()).add(stage)
                     continue
             rx = _id_regex_from_pattern(want_low)
@@ -186,6 +205,7 @@ def main():
 
     Path(args.output).write_text("\n".join(out_lines) + "\n", encoding="utf-8")
     print(f"wrote: {args.output}")
+
 
 if __name__ == "__main__":
     main()

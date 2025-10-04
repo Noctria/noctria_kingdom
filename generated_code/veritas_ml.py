@@ -1,5 +1,4 @@
 import pandas as pd
-from keras.models import Sequential
 import tensorflow as tf
 from path_config import PathConfig
 

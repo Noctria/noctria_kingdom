@@ -24,7 +24,7 @@ def fetch_fred_data(api_key, series_id):
     pd.DataFrame
         日付と値のDataFrame
     """
-    url = f"https://api.stlouisfed.org/fred/series/observations"
+    url = "https://api.stlouisfed.org/fred/series/observations"
     params = {"series_id": series_id, "api_key": api_key, "file_type": "json"}
     response = requests.get(url, params=params)
     data = response.json()["observations"]

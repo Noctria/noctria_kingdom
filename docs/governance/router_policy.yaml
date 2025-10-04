@@ -1,0 +1,12 @@
+# docs/governance/router_policy.yaml
+# ルーティング層の外部化ポリシー（envで上書き可）
+max_local_tokens: 1200
+prefer_cloud_for:
+  - governance
+  - ml_training
+  - web_search
+  - long_doc
+hard_cloud_if_internet: true
+latency_budget_ms: 2000
+cost_sensitivity: 0.5
+safety_bias: 0.4

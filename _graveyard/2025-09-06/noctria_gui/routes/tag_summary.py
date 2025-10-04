@@ -14,12 +14,12 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 # --- 王国の基盤モジュールをインポート ---
 # ✅ 修正: path_config.pyのリファクタリングに合わせて、正しい変数名をインポート
-from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, TOOLS_DIR
+from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR
 from noctria_gui.services import tag_summary_service
 
 # ロガーの設定

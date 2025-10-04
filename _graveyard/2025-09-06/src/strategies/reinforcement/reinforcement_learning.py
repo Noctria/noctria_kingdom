@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from core.NoctriaEnv import NoctriaEnv
 from strategies.reinforcement.dqn_agent import DQNAgent
