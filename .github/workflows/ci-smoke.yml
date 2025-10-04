@@ -16,6 +16,14 @@ on:
       - "requirements*.txt"
 
 jobs:
+
+  lint-and-smoke:
+    name: lint / lint-and-smoke (alias)
+    runs-on: ubuntu-latest
+    needs: smoke
+    steps:
+      - run: echo "alias context to satisfy required check"
+
   smoke:
     name: lint / lint-and-smoke
     runs-on: ubuntu-latest
