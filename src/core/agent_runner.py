@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.core.prompt_loader import load_governance
+from src.core.prompt_loader import load_governance_dict
 
 MEM_PATH_DEFAULT = Path("data/agent_memory.jsonl")
 
@@ -146,7 +146,7 @@ def run_automations(event: Optional[str] = None) -> Dict[str, Any]:
     """
     automations.triggers を走査し、条件成立したものの steps を順に実行。
     """
-    gov = load_governance()
+    gov = load_governance_dict()
     triggers = (gov.get("automations", {}) or {}).get("triggers", []) or []
 
     fired: List[str] = []
