@@ -1,0 +1,3 @@
+# CODEOWNERS
+# core 配下の変更は @Noctria を必須レビュワーに
+/src/core/**  @Noctria
