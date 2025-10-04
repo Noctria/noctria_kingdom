@@ -1,0 +1,60 @@
+name: pr-policy (soft block)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  require-green-lint:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+      checks: read
+    steps:
+      - name: Evaluate CI statuses
+        id: eval
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const sha = pr.head.sha;
+
+            const checks = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
+            const runs = checks.data.check_runs || [];
+
+            const statuses = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha });
+            const contexts = (statuses.data.statuses || []).map(s => ({ context: s.context, state: s.state }));
+
+            const required = ["ruff","ruff-format"];
+
+            function isGreen(name) {
+              const okRun = runs.some(r => (r.name === name || r.name?.includes?.(name)) && r.conclusion === "success");
+              const okCtx = contexts.some(c => c.context === name && c.state === "success");
+              return okRun || okCtx;
+            }
+
+            const failed = required.filter(n => !isGreen(n));
+            core.setOutput("failed", failed.join(","));
+
+      - name: Soft-block if not green
+        if: steps.eval.outputs.failed != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failed = "${{ steps.eval.outputs.failed }}";
+            const pr = context.payload.pull_request;
+            const body = [
+              "❌ Soft block: 必須チェック未通過のため PR を自動クローズします。",
+              "",
+              "**未通過チェック**: " + failed,
+              "",
+              "通過後に **Reopen** してください。（Branch Protection 非対応の暫定運用）"
+            ].join("\n");
+            await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: pr.number, body });
+            await github.rest.pulls.update({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number, state: "closed" });
+
+      - name: All good (post info)
+        if: steps.eval.outputs.failed == ''
+        run: echo "All required checks passed (ruff, ruff-format)"
