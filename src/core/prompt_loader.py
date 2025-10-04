@@ -251,3 +251,17 @@ if __name__ == "__main__":
         json_contract=contract,
     )
     print(text)
+
+# === New: convenience wrapper ===
+def load_prompt_text(ssot_path: Optional[str] = None) -> str:
+    """
+    YAML (SSOT) -> dict(load_governance) -> Markdown-like system prompt(render_system_prompt)
+    をひとまとめにした便宜関数。
+    Ollama / GPT API の両方に渡せるテキストを返す。
+    """
+    root = Path(ssot_path) if ssot_path else None
+    gov = load_governance(root)
+    return render_system_prompt(gov)
+
+# 互換エイリアス
+build_system_prompt = load_prompt_text
