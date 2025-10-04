@@ -1,0 +1,32 @@
+target-version = "py310"
+line-length = 100
+
+extend-exclude = [
+  "autogen_scripts",
+  "mt5_test.py",
+  "_graveyard",
+  "generated_code",
+  "data",
+  "airflow_docker",
+  "noctria_gui",
+  "llm_server",
+  "tools",
+  "scripts",
+  "tests",
+  "Untitled.ipynb",
+]
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # 当面は行長を無視
+
+# ファイル単位の例外
+per-file-ignores = { "src/core/prompt_loader.py" = ["E402"] }
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 100

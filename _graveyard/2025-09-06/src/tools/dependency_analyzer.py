@@ -1,6 +1,5 @@
 # tools/dependency_analyzer.py
 
-import os
 import re
 from collections import defaultdict
 from pathlib import Path

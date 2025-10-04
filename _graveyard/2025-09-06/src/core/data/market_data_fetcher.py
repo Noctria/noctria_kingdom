@@ -6,7 +6,7 @@
 from __future__ import annotations
 import time
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, Tuple
+from typing import Optional, Tuple
 
 import pandas as pd
 import yfinance as yf

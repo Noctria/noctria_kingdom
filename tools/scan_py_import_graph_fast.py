@@ -9,7 +9,10 @@ scan_py_import_graph_fast.py
 """
 
 from __future__ import annotations
-import ast, sys, os, warnings
+import ast
+import sys
+import os
+import warnings
 from pathlib import Path
 from typing import Dict, Set, Tuple, List, Optional
 
@@ -18,14 +21,28 @@ warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 # デフォルト除外
 DEFAULT_EXCLUDE_DIRS = {
-    ".git", ".hg", ".svn",
-    ".venv", "venv", "venv_codex", "autogen_venv",
-    "__pycache__", ".mypy_cache", ".pytest_cache", ".cache",
-    "node_modules", "dist", "build",
-    "data", "viz", "htmlcov", "site-packages",
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "venv_codex",
+    "autogen_venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".cache",
+    "node_modules",
+    "dist",
+    "build",
+    "data",
+    "viz",
+    "htmlcov",
+    "site-packages",
 }
 
 EXCLUDE_DIRS: Set[str] = set(DEFAULT_EXCLUDE_DIRS)
+
 
 def walk_py_files(roots: List[Path]) -> List[Path]:
     files: List[Path] = []
@@ -43,6 +60,7 @@ def walk_py_files(roots: List[Path]) -> List[Path]:
                 files.append(p)
     return files
 
+
 def module_name_for(path: Path, roots: List[Path]) -> Optional[str]:
     """roots のどれかに対する相対パスからモジュール名を推定"""
     p = path.absolute()
@@ -58,6 +76,7 @@ def module_name_for(path: Path, roots: List[Path]) -> Optional[str]:
         return ".".join(parts)
     return None
 
+
 def module_to_path(mod: str, roots: List[Path]) -> Optional[Path]:
     """a.b.c -> a/b/c.py または a/b/c/__init__.py"""
     parts = mod.split(".")
@@ -71,6 +90,7 @@ def module_to_path(mod: str, roots: List[Path]) -> Optional[Path]:
             return initp
     return None
 
+
 def resolve_relative(cur_mod: str, imp_mod: Optional[str], level: int) -> Optional[str]:
     """from ..x import y の相対 import をモジュール名に"""
     if level == 0:
@@ -83,6 +103,7 @@ def resolve_relative(cur_mod: str, imp_mod: Optional[str], level: int) -> Option
         else:
             return ".".join(parent) if parent else None
     return imp_mod
+
 
 def extract_edges(roots: List[Path]) -> Set[Tuple[str, str]]:
     roots = [r.absolute() for r in roots]
@@ -121,9 +142,13 @@ def extract_edges(roots: List[Path]) -> Set[Tuple[str, str]]:
                     edges.add((str(f), str(tgt)))
     return edges
 
+
 def main():
     if len(sys.argv) < 3:
-        print("Usage: scan_py_import_graph_fast.py <out_csv> <root1> [<root2> ...] [--exclude DIR ...]", file=sys.stderr)
+        print(
+            "Usage: scan_py_import_graph_fast.py <out_csv> <root1> [<root2> ...] [--exclude DIR ...]",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     out = Path(sys.argv[1])
@@ -136,7 +161,7 @@ def main():
     while i < len(args):
         if args[i] == "--exclude":
             if i + 1 < len(args):
-                extra_excludes.append(args[i+1])
+                extra_excludes.append(args[i + 1])
                 i += 2
             else:
                 print("Error: --exclude requires DIR", file=sys.stderr)
@@ -153,6 +178,7 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(f"{s},{t}" for s, t in sorted(edges)), encoding="utf-8")
     print(f"[ok] wrote {out}  edges={len(edges)}  excludes={len(EXCLUDE_DIRS)}")
+
 
 if __name__ == "__main__":
     main()

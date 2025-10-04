@@ -15,7 +15,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
-from typing import Dict
 
 # --- 王国の基盤モジュールをインポート ---
 # このファイルの相対パスからllm_prompt_builderをインポート

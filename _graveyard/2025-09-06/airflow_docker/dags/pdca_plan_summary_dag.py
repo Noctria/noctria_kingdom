@@ -3,7 +3,6 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.utils.dates import days_ago
-from datetime import datetime
 
 default_args = {
     "owner": "noctria",

@@ -6,14 +6,19 @@ overlay_roles_to_mermaid.py (v3)
 - workflow_manifest.yml（明示割当）
 - 追加: --spine-json（幹ランキング）を渡すと、上位を class spine で強調
 """
+
 from __future__ import annotations
-import argparse, fnmatch, re, json
+import argparse
+import fnmatch
+import re
+import json
 from pathlib import Path
 from typing import Dict, List, Set
 
 import yaml  # 推奨（簡易パーサは省略）
 
-NODE_RE = re.compile(r'^\s*([A-Za-z0-9_./:\-]+)\s*\[(.*?)\]\s*$')
+NODE_RE = re.compile(r"^\s*([A-Za-z0-9_./:\-]+)\s*\[(.*?)\]\s*$")
+
 
 def parse_nodes(lines: List[str]) -> Dict[str, str]:
     nodes: Dict[str, str] = {}
@@ -23,16 +28,19 @@ def parse_nodes(lines: List[str]) -> Dict[str, str]:
             nodes[m.group(1)] = m.group(2)
     return nodes
 
+
 def match_roles(node_id: str, label: str, roles: List[dict]) -> Set[str]:
     got: Set[str] = set()
     for r in roles:
         cls = r.get("class_name")
         for pat in r.get("patterns", []):
             if fnmatch.fnmatch(node_id, pat) or fnmatch.fnmatch(label, pat):
-                got.add(cls); break
+                got.add(cls)
+                break
     return got
 
-def ensure_styles(styles: Dict[str,str]) -> List[str]:
+
+def ensure_styles(styles: Dict[str, str]) -> List[str]:
     out = ["", "%% ---- Auto-generated role styles ----"]
     # spine スタイルが無ければデフォルト付与（太枠＋濃色）
     styles = dict(styles)
@@ -43,15 +51,17 @@ def ensure_styles(styles: Dict[str,str]) -> List[str]:
     out.append("")
     return out
 
-def build_stage_subgraphs(stage_order: List[str],
-                          stage_titles: Dict[str,str],
-                          node_classes: Dict[str,Set[str]]) -> List[str]:
+
+def build_stage_subgraphs(
+    stage_order: List[str], stage_titles: Dict[str, str], node_classes: Dict[str, Set[str]]
+) -> List[str]:
     out: List[str] = ["", "%% ---- Stage subgraphs ----"]
     for st in stage_order:
         members = [nid for nid, cls in node_classes.items() if st in cls]
-        if not members: continue
+        if not members:
+            continue
         title = stage_titles.get(st, st)
-        out.append(f"subgraph {st}_cluster[\"{title}\"]")
+        out.append(f'subgraph {st}_cluster["{title}"]')
         out.append("direction TB")
         for nid in sorted(members):
             out.append(f"{nid}")
@@ -60,17 +70,20 @@ def build_stage_subgraphs(stage_order: List[str],
     out.append("")
     return out
 
+
 def build_loop_arrows(stage_order: List[str]) -> List[str]:
-    if len(stage_order) < 2: return []
+    if len(stage_order) < 2:
+        return []
     out = ["", "%% ---- Loop arrows ----"]
     pairs = list(zip(stage_order, stage_order[1:] + stage_order[:1]))
-    for a,b in pairs:
+    for a, b in pairs:
         out.append(f"{a}_cluster --> {b}_cluster")
     out.append("%% ----------------------")
     out.append("")
     return out
 
-def build_legend(styles: Dict[str,str], titles: Dict[str,str]) -> List[str]:
+
+def build_legend(styles: Dict[str, str], titles: Dict[str, str]) -> List[str]:
     out = ["", "%% ---- Legend (stage → color) ----", "subgraph legend[Legend]", "direction TB"]
     keys = list(styles.keys())
     for st in sorted(keys):
@@ -83,12 +96,13 @@ def build_legend(styles: Dict[str,str], titles: Dict[str,str]) -> List[str]:
     out.append("")
     return out
 
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
     ap.add_argument("--roles", required=True)
     ap.add_argument("--manifest", default=None)
-    ap.add_argument("--spine-json", default=None)   # ★ 追加
+    ap.add_argument("--spine-json", default=None)  # ★ 追加
     ap.add_argument("--output", required=True)
     args = ap.parse_args()
 
@@ -97,9 +111,9 @@ def main():
 
     roles_cfg = yaml.safe_load(Path(args.roles).read_text(encoding="utf-8")) or {}
     roles: List[dict] = roles_cfg.get("roles", [])
-    styles: Dict[str,str] = roles_cfg.get("styles", {})
+    styles: Dict[str, str] = roles_cfg.get("styles", {})
     stage_order: List[str] = roles_cfg.get("stages_order", [])
-    stage_titles: Dict[str,str] = roles_cfg.get("stage_titles", {})
+    stage_titles: Dict[str, str] = roles_cfg.get("stage_titles", {})
 
     manifest = {}
     if args.manifest and Path(args.manifest).exists():
@@ -134,9 +148,11 @@ def main():
     if stage_order:
         out_lines += build_stage_subgraphs(stage_order, stage_titles, node_classes)
         out_lines += build_loop_arrows(stage_order)
-    out_lines += build_legend({**styles, "spine": styles.get("spine","")}, stage_titles)
+    out_lines += build_legend({**styles, "spine": styles.get("spine", "")}, stage_titles)
 
     Path(args.output).write_text("\n".join(out_lines) + "\n", encoding="utf-8")
     print(f"wrote: {args.output}")
+
+
 if __name__ == "__main__":
     main()

@@ -53,8 +53,7 @@ ensure_strategy_packages()
 
 # --- ガバナンスYAML → System Prompt 合成 / 外部依存 ---
 import requests  # noqa: E402
-
-from src.core.prompt_loader import load_governance_dict, load_prompt_text  # noqa: E402
+from src.core.prompt_loader import load_prompt_text, load_governance_dict  # noqa: E402
 
 # --- ルーティング層（Ollama↔GPT） ---
 try:
@@ -312,25 +311,17 @@ class KingNoctria:
             )
         messages.append({"role": "user", "content": user_prompt})
 
-        # ★ hard_model_hint を最優先で採用（未インストールモデルによる 404 を防止）
-        selected_model = hard_model_hint or decision["model"]
-        if hard_model_hint and hard_model_hint != decision["model"]:
-            try:
-                logger.info(f"hard_model_hint override: {decision['model']} -> {hard_model_hint}")
-            except Exception:
-                pass
-
         if decision["provider"] == "ollama":
             out = self._call_ollama(
                 base_url=decision["base_url"],
-                model=selected_model,
+                model=decision["model"],
                 messages=messages,
                 timeout_s=decision["timeout_s"],
             )
         else:
             out = self._call_gpt(
                 base_url=decision["base_url"],
-                model=selected_model,
+                model=decision["model"],
                 api_key=decision.get("api_key") or "",
                 messages=messages,
                 timeout_s=decision["timeout_s"],
@@ -340,7 +331,7 @@ class KingNoctria:
         try:
             self._log_router_decision(
                 side=decision["selected_side"],
-                model=selected_model,
+                model=decision["model"],
                 reason=decision["reason"],
                 est_tokens=decision["estimated_tokens"],
                 prompt_sample=user_prompt[:160],

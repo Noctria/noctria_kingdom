@@ -9,7 +9,6 @@
 - get_current_context は使わず、kwargs の context を参照
 """
 
-import os
 import json
 import logging
 from datetime import datetime, timedelta

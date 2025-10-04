@@ -15,12 +15,14 @@ graph_prune_apply.py
     --dry-run \
     --bash-out viz/prune_apply.sh
 """
+
 from __future__ import annotations
 import argparse
 import os
 import re
 from pathlib import Path
 from typing import Dict, List
+
 
 def guess_paths_from_ids(ids: List[str], project_root: str) -> Dict[str, str]:
     # 簡易逆引き: "src_a_b_py" → src/a/b.py や src/a/b/__init__.py を試す
@@ -37,12 +39,13 @@ def guess_paths_from_ids(ids: List[str], project_root: str) -> Dict[str, str]:
         # 探索
         found = ""
         for c in candidates:
-            p = Path(project_root)/c
+            p = Path(project_root) / c
             if p.exists():
                 found = str(p)
                 break
         out[nid] = found  # 空なら未解決
     return out
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -53,8 +56,12 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    remove_ids = [s.strip() for s in args.remove_list.read_text(encoding="utf-8").splitlines() if s.strip()]
-    merge_files = [s.strip() for s in args.merge_list.read_text(encoding="utf-8").splitlines() if s.strip()]
+    remove_ids = [
+        s.strip() for s in args.remove_list.read_text(encoding="utf-8").splitlines() if s.strip()
+    ]
+    merge_files = [
+        s.strip() for s in args.merge_list.read_text(encoding="utf-8").splitlines() if s.strip()
+    ]
 
     id2path = guess_paths_from_ids(remove_ids, args.project_root)
 
@@ -91,6 +98,7 @@ def main():
         os.chmod(args.bash_out, 0o755)
     except Exception:
         pass
+
 
 if __name__ == "__main__":
     main()

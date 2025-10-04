@@ -27,6 +27,7 @@ ID突合ルール:
     --merge-out viz/merge_candidates.txt \
     --subgraph-out viz/graph_core_only.json
 """
+
 from __future__ import annotations
 import argparse
 import json
@@ -36,13 +37,15 @@ from pathlib import Path
 from collections import deque, defaultdict
 from typing import Dict, Set, List, Tuple
 
+
 def norm_id_from_path(p: str, project_root: str) -> str:
     # パスからCytoscapeノードIDへの正規化（あなたのviewer側ルールに寄せる）
     p = os.path.abspath(p)
     if project_root and p.startswith(os.path.abspath(project_root) + os.sep):
-        p = p[len(os.path.abspath(project_root))+1:]
+        p = p[len(os.path.abspath(project_root)) + 1 :]
     # 例: noctria_gui/main.py → noctria_gui_main_py
     return re.sub(r"[^a-zA-Z0-9]+", "_", p).strip("_").lower()
+
 
 def load_graph(graph_path: Path):
     data = json.loads(graph_path.read_text(encoding="utf-8"))
@@ -64,6 +67,7 @@ def load_graph(graph_path: Path):
             adj_out[s].add(t)
             adj_in[t].add(s)
     return node_map, adj_out, adj_in
+
 
 def load_seed_ids(seed_file: Path, node_map: Dict[str, dict], project_root: str) -> Set[str]:
     seeds: Set[str] = set()
@@ -91,6 +95,7 @@ def load_seed_ids(seed_file: Path, node_map: Dict[str, dict], project_root: str)
             pass
     return seeds
 
+
 def bfs_reachable(starts: Set[str], adj_out: Dict[str, Set[str]]) -> Set[str]:
     seen: Set[str] = set()
     dq = deque(starts)
@@ -104,13 +109,17 @@ def bfs_reachable(starts: Set[str], adj_out: Dict[str, Set[str]]) -> Set[str]:
                 dq.append(v)
     return seen
 
-def degree_info(node_map: Dict[str, dict], adj_out: Dict[str, Set[str]], adj_in: Dict[str, Set[str]]) -> Dict[str, Tuple[int, int, int]]:
+
+def degree_info(
+    node_map: Dict[str, dict], adj_out: Dict[str, Set[str]], adj_in: Dict[str, Set[str]]
+) -> Dict[str, Tuple[int, int, int]]:
     info = {}
     for nid in node_map:
         outd = len(adj_out.get(nid, ()))
-        ind  = len(adj_in.get(nid, ()))
-        info[nid] = (ind, outd, ind+outd)
+        ind = len(adj_in.get(nid, ()))
+        info[nid] = (ind, outd, ind + outd)
     return info
+
 
 def guess_file_path(nid: str, project_root: str, node_map: Dict[str, dict]) -> str:
     # ノードの label がファイル名なら、それを手掛かりに推定（簡易）
@@ -120,20 +129,45 @@ def guess_file_path(nid: str, project_root: str, node_map: Dict[str, dict]) -> s
     candidates = []
     if label:
         candidates.append(label)
-        if not label.endswith((".py",".html",".js",".css",".json",".md",".sql",".yaml",".yml",".toml",".ini",".sh",".bat",".ps1",".ts",".tsx",".vue",".jinja",".j2")):
+        if not label.endswith(
+            (
+                ".py",
+                ".html",
+                ".js",
+                ".css",
+                ".json",
+                ".md",
+                ".sql",
+                ".yaml",
+                ".yml",
+                ".toml",
+                ".ini",
+                ".sh",
+                ".bat",
+                ".ps1",
+                ".ts",
+                ".tsx",
+                ".vue",
+                ".jinja",
+                ".j2",
+            )
+        ):
             candidates.append(label + ".py")
     for c in candidates:
-        p = Path(project_root)/c
+        p = Path(project_root) / c
         if p.exists():
             return str(p)
     # ダメなら stage フォルダで探索（簡易）
     if stage and label:
-        candidate = Path(project_root)/stage/label
+        candidate = Path(project_root) / stage / label
         if candidate.exists():
             return str(candidate)
     return ""  # 不明
 
-def pick_merge_candidates(node_map, deg, project_root, size_kb_threshold=5, deg_sum_threshold=1) -> List[str]:
+
+def pick_merge_candidates(
+    node_map, deg, project_root, size_kb_threshold=5, deg_sum_threshold=1
+) -> List[str]:
     # とても小さくて次数も小さい＝“合併（集約）候補”
     out = []
     for nid, (_, _, tot) in deg.items():
@@ -141,12 +175,13 @@ def pick_merge_candidates(node_map, deg, project_root, size_kb_threshold=5, deg_
         if not f or not os.path.isfile(f):
             continue
         try:
-            size_kb = max(1, os.path.getsize(f)//1024)
+            size_kb = max(1, os.path.getsize(f) // 1024)
         except Exception:
             continue
         if size_kb <= size_kb_threshold and tot <= deg_sum_threshold:
             out.append(f)
     return sorted(set(out))
+
 
 def write_subgraph(node_map, adj_out, keep: Set[str], out_path: Path):
     # KEEPだけの部分グラフJSONを書き出す
@@ -158,6 +193,7 @@ def write_subgraph(node_map, adj_out, keep: Set[str], out_path: Path):
                 edges.append({"data": {"id": f"{u}->{v}", "source": u, "target": v}})
     data = {"elements": {"nodes": nodes, "edges": edges}}
     out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -196,7 +232,9 @@ def main():
     lines.append("# Prune Plan (Graph-based)")
     lines.append("")
     lines.append(f"- Graph: `{args.graph}`")
-    lines.append(f"- Seeds: `{args.seeds}`  → KEEP={len(keep_ids)} / REMOVE候補={len(remove_candidates)}")
+    lines.append(
+        f"- Seeds: `{args.seeds}`  → KEEP={len(keep_ids)} / REMOVE候補={len(remove_candidates)}"
+    )
     lines.append("")
     lines.append("## KEEP (IDs, reachability)")
     lines += [f"- {nid}" for nid in keep_ids[:200]]
@@ -217,6 +255,7 @@ def main():
     lines.append("- Review KEEP/REMOVE lists; edit seeds if needed.")
     lines.append("- Apply with tools/graph_prune_apply.py (generates commented bash).")
     args.report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
 
 if __name__ == "__main__":
     main()

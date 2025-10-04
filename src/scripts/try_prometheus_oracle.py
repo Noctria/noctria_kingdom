@@ -34,6 +34,7 @@ from src.core.path_config import (
     ORACLE_FORECAST_JSON,
     DATA_DIR,
 )
+
 ensure_import_path()
 
 from src.strategies.prometheus_oracle import PrometheusOracle
@@ -74,7 +75,6 @@ def _ensure_dummy_keras_model(output_path: Path, input_dim: int) -> Optional[Pat
     """
     try:
         os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-        import tensorflow as tf  # type: ignore
         from tensorflow import keras  # type: ignore
         from tensorflow.keras import layers  # type: ignore
 
@@ -107,16 +107,30 @@ def main():
     ap.add_argument("--rows", type=int, default=120, help="Feature rows to synthesize")
     ap.add_argument("--n-days", type=int, default=14, help="Days to forecast for predict_future")
     ap.add_argument("--deterministic", action="store_true", help="SB3 deterministic prediction")
-    ap.add_argument("--write-json", action="store_true", help=f"Write forecast JSON to {ORACLE_FORECAST_JSON}")
+    ap.add_argument(
+        "--write-json", action="store_true", help=f"Write forecast JSON to {ORACLE_FORECAST_JSON}"
+    )
     ap.add_argument(
         "--backend",
         choices=["auto", "keras", "sb3"],
         default="auto",
         help="Force backend. 'auto' keeps PrometheusOracle auto-detection.",
     )
-    ap.add_argument("--model-path", type=str, default="", help="Path to model (.keras/.h5/dir for Keras, .zip for SB3)")
-    ap.add_argument("--make-dummy-keras", action="store_true", help="Create a tiny Keras model if none given")
-    ap.add_argument("--input-dim", type=int, default=0, help="Override input dim for dummy Keras (0=auto based on STANDARD_FEATURE_ORDER)")
+    ap.add_argument(
+        "--model-path",
+        type=str,
+        default="",
+        help="Path to model (.keras/.h5/dir for Keras, .zip for SB3)",
+    )
+    ap.add_argument(
+        "--make-dummy-keras", action="store_true", help="Create a tiny Keras model if none given"
+    )
+    ap.add_argument(
+        "--input-dim",
+        type=int,
+        default=0,
+        help="Override input dim for dummy Keras (0=auto based on STANDARD_FEATURE_ORDER)",
+    )
     args = ap.parse_args()
 
     # Prepare dummy features
@@ -129,7 +143,7 @@ def main():
 
     # If user forced keras but didn't provide a model, optionally make a dummy one
     if args.backend == "keras" and model_path is None and args.make_dummy_keras:
-        input_dim = args.input-dim if args.input_dim > 0 else auto_input_dim
+        input_dim = args.input - dim if args.input_dim > 0 else auto_input_dim
         default_dummy = Path(DATA_DIR) / "models" / "prometheus_oracle_dummy.keras"
         model_path = _ensure_dummy_keras_model(default_dummy, input_dim=input_dim)
 
@@ -137,7 +151,9 @@ def main():
     if args.backend == "auto":
         oracle = PrometheusOracle(lazy=True, deterministic=args.deterministic, model_path=None)
     else:
-        oracle = PrometheusOracle(lazy=True, deterministic=args.deterministic, model_path=model_path or "")
+        oracle = PrometheusOracle(
+            lazy=True, deterministic=args.deterministic, model_path=model_path or ""
+        )
 
     log.info("=== PrometheusOracle status (before) ===")
     log.info(oracle.status())
@@ -157,7 +173,9 @@ def main():
         if args.write_json:
             try:
                 ORACLE_FORECAST_JSON.parent.mkdir(parents=True, exist_ok=True)
-                forecast_df.to_json(ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=2)
+                forecast_df.to_json(
+                    ORACLE_FORECAST_JSON, orient="records", force_ascii=False, indent=2
+                )
                 log.info("wrote forecast JSON -> %s", ORACLE_FORECAST_JSON)
             except Exception as e:
                 log.warning("failed to write forecast JSON: %s", e)

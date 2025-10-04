@@ -15,16 +15,35 @@ seeds_from_marker.py
 """
 
 from __future__ import annotations
-import argparse, json, os, re
+import argparse
+import json
+import os
+import re
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import List, Set
 
 MARK = "# [NOCTRIA_CORE_REQUIRED]"
 EXCLUDE_DIRS = {
-    ".git",".hg",".svn",".venv","venv","venv_codex","autogen_venv",
-    "__pycache__", ".mypy_cache", ".pytest_cache", ".cache",
-    "node_modules","dist","build","viz","htmlcov","site-packages","data",
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "venv_codex",
+    "autogen_venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".cache",
+    "node_modules",
+    "dist",
+    "build",
+    "viz",
+    "htmlcov",
+    "site-packages",
+    "data",
 }
+
 
 def norm_id_from_relpath(rel: Path) -> str:
     s = rel.as_posix().lower()
@@ -34,12 +53,13 @@ def norm_id_from_relpath(rel: Path) -> str:
     t = re.sub(r"_+", "_", t)
     return t
 
+
 def collect_marked_files(project_root: Path) -> List[Path]:
     found: List[Path] = []
     for dirpath, dirnames, filenames in os.walk(project_root, followlinks=False):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
         for fn in filenames:
-            if not fn.endswith(".py"): 
+            if not fn.endswith(".py"):
                 continue
             p = Path(dirpath) / fn
             try:
@@ -50,6 +70,7 @@ def collect_marked_files(project_root: Path) -> List[Path]:
                 found.append(p)
     return found
 
+
 def graph_ids(graph_json: Path) -> Set[str]:
     ids: Set[str] = set()
     if not graph_json or not graph_json.exists():
@@ -57,7 +78,7 @@ def graph_ids(graph_json: Path) -> Set[str]:
     try:
         obj = json.loads(graph_json.read_text(encoding="utf-8"))
         els = obj.get("elements") or {}
-        for n in (els.get("nodes") or []):
+        for n in els.get("nodes") or []:
             d = (n or {}).get("data") or {}
             nid = d.get("id")
             if isinstance(nid, str):
@@ -65,6 +86,7 @@ def graph_ids(graph_json: Path) -> Set[str]:
     except Exception:
         pass
     return ids
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -76,8 +98,16 @@ def main():
     args = ap.parse_args()
 
     project_root = Path(args.project_root).resolve()
-    seeds_out = (project_root / args.seeds_out) if not Path(args.seeds_out).is_absolute() else Path(args.seeds_out)
-    keep_out  = (project_root / args.keep_out)  if not Path(args.keep_out).is_absolute()  else Path(args.keep_out)
+    seeds_out = (
+        (project_root / args.seeds_out)
+        if not Path(args.seeds_out).is_absolute()
+        else Path(args.seeds_out)
+    )
+    keep_out = (
+        (project_root / args.keep_out)
+        if not Path(args.keep_out).is_absolute()
+        else Path(args.keep_out)
+    )
     graph_path = Path(args.graph_json) if args.graph_json else None
     if graph_path and not graph_path.is_absolute():
         graph_path = project_root / graph_path
@@ -122,8 +152,11 @@ def main():
         for sp in file_paths:
             f.write(sp + "\n")
 
-    print(f"[ok] seeds -> {seeds_out}  count={len(node_ids)} (in_graph={sum(1 for i in node_ids if i in graph_id_set)})")
+    print(
+        f"[ok] seeds -> {seeds_out}  count={len(node_ids)} (in_graph={sum(1 for i in node_ids if i in graph_id_set)})"
+    )
     print(f"[ok] keep  -> {keep_out}   count={len(file_paths)}")
+
 
 if __name__ == "__main__":
     main()

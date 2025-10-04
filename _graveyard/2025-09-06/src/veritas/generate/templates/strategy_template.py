@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 
 def simulate(data: pd.DataFrame) -> dict:

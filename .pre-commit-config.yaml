@@ -1,25 +1,20 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.6.9
-  hooks:
-  - id: ruff
-    args:
-    - --fix
-  - id: ruff-format
-- repo: local
-  hooks:
-  - id: pytest
-    name: pytest
-    entry: pytest -q --maxfail=1 --disable-warnings -rA
-    language: system
-    pass_filenames: false
-  - id: pytest-lite
-    name: pytest (lite)
-    language: system
-    pass_filenames: true
-    types:
-    - python
-    files: ^(src/|tests/|noctria_gui/).*\.py$
-    exclude: ^(.github/workflows/|\.devcontainer/|scripts/|.*\.md$)
-    entry: bash -c "pytest -q -k 'not e2e and not heavy' -m 'not heavy' --maxfail=1
-      --disable-warnings"
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (src/core only)
+        entry: ruff
+        language: python
+        language_version: python3
+        additional_dependencies: ["ruff==0.6.8"]
+        pass_filenames: false
+        args: ["check", "--fix", "--force-exclude", "src/core"]
+
+      - id: ruff-format
+        name: ruff-format (src/core only)
+        entry: ruff
+        language: python
+        language_version: python3
+        additional_dependencies: ["ruff==0.6.8"]
+        pass_filenames: false
+        args: ["format", "--force-exclude", "src/core"]

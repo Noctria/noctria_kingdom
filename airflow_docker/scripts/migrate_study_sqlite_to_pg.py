@@ -22,7 +22,7 @@ except optuna.exceptions.DuplicatedStudyError:
     print(f"⚠️ PostgreSQLに既にStudyが存在: {study_name}")
 
 # === 全Trialを移行（enqueue） ===
-print(f"🚚 TrialをPostgreSQLに移行中...")
+print("🚚 TrialをPostgreSQLに移行中...")
 for trial in study.trials:
     if trial.state.is_finished():
         new_study = optuna.load_study(study_name=study_name, storage=pg_storage)

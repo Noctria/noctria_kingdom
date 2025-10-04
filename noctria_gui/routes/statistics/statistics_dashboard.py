@@ -30,9 +30,7 @@ router = APIRouter(tags=["Statistics"])
 templates = Jinja2Templates(directory=str(NOCTRIA_GUI_TEMPLATES_DIR))
 
 # 予測JSONの既定パス（環境変数で上書き可）
-FORECAST_JSON_PATH = Path(
-    os.getenv("NOCTRIA_FORECAST_JSON", "data/oracle/forecast.json")
-).resolve()
+FORECAST_JSON_PATH = Path(os.getenv("NOCTRIA_FORECAST_JSON", "data/oracle/forecast.json")).resolve()
 
 
 def _load_forecast_json() -> tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
@@ -105,7 +103,11 @@ async def show_statistics_dashboard(request: Request):
                 "symbols": [],
                 "filters": {},
                 "forecast": None,
-                "forecast_meta": {"path": str(FORECAST_JSON_PATH), "mtime": None, "warning": str(e)},
+                "forecast_meta": {
+                    "path": str(FORECAST_JSON_PATH),
+                    "mtime": None,
+                    "warning": str(e),
+                },
                 "error": "統計データの処理中にエラーが発生しました。",
             },
         )

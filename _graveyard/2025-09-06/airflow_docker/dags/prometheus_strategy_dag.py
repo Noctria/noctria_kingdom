@@ -47,7 +47,6 @@ def prometheus_forecast_task(**kwargs):
     reason = conf.get("reason", "理由未指定")
     try:
         from strategies.prometheus_oracle import PrometheusOracle
-        import pandas as pd
 
         logger = logging.getLogger("PrometheusForecast")
         logger.info(f"【未来予測発令理由】{reason}")

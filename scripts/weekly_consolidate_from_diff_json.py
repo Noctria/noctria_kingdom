@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import argparse, json, sys
+import argparse
+import json
+import sys
 from pathlib import Path
+
 
 def load_json(path: Path):
     data = json.loads(path.read_text(encoding="utf-8"))
     return data
+
 
 def normalize_changed_files(data: dict):
     """
@@ -29,6 +33,7 @@ def normalize_changed_files(data: dict):
     # どちらも無い場合は空集合で返す（エラーにしない）
     return [], []
 
+
 def main():
     ap = argparse.ArgumentParser(description="Weekly paste snippet generator")
     ap.add_argument("--json", required=True, help="diff_report.json path")
@@ -49,7 +54,7 @@ def main():
 
     # メタ情報
     rng = data.get("range", "")
-    ts  = data.get("generated_at", "")
+    ts = data.get("generated_at", "")
     summary_only = bool(data.get("summary_only", False))
 
     # 簡易スニペット
@@ -57,8 +62,10 @@ def main():
     lines.append(f"# {args.title}")
     lines.append("")
     meta = []
-    if rng: meta.append(f"range: `{rng}`")
-    if ts:  meta.append(f"generated_at: {ts}")
+    if rng:
+        meta.append(f"range: `{rng}`")
+    if ts:
+        meta.append(f"generated_at: {ts}")
     if meta:
         lines.append("- " + "\n- ".join(meta))
         lines.append("")
@@ -73,8 +80,8 @@ def main():
     if not summary_only and details:
         lines.append("---")
         for it in details:
-            p = it.get("path","(unknown)")
-            diff = it.get("diff","")
+            p = it.get("path", "(unknown)")
+            diff = it.get("diff", "")
             lines.append(f"### `{p}`")
             lines.append("")
             if diff.strip():
@@ -87,6 +94,7 @@ def main():
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"✅ Wrote {out_path}")
+
 
 if __name__ == "__main__":
     main()

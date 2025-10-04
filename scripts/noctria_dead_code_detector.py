@@ -34,7 +34,7 @@ import subprocess
 import time
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "codex_reports" / "dead_code"

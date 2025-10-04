@@ -1,5 +1,5 @@
-import os
 import json
+import os
 
 STATS_DIR = "data/stats"
 AI_RULES = [

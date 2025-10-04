@@ -1,7 +1,7 @@
 # noctria_gui/routes/chat_history_db_api.py
 
 import asyncpg
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List
 import os
