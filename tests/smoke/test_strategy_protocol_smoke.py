@@ -1,8 +1,8 @@
+import pytest
+yaml = pytest.importorskip('yaml', reason='smoke: optional dep (pyyaml) not installed')
+
 # [NOCTRIA_CORE_REQUIRED]
 from __future__ import annotations
-import pytest
-yaml = pytest.importorskip('yaml', reason='smoke: optional dep (pyyaml) not installed', allow_module_level=True)
-
 import json
 from pathlib import Path
 import os
