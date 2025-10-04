@@ -246,3 +246,10 @@ if __name__ == "__main__":
         json_contract=contract,
     )
     print(text)
+
+def load_governance_dict(path: str = DEFAULT_SSOT) -> Dict[str, Any]:
+    """
+    SSOT YAMLを dict として読み込む（system prompt 文字列ではなく生のdictが欲しい時用）。
+    agent_runner や king_noctria で使う。
+    """
+    return _read_yaml_map(path, strict=False)
