@@ -17,29 +17,107 @@ on:
 
 jobs:
   ruff:
-    # ← Branch protection では「lint / ruff」と表示される
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 差分判定のため履歴を取得
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: "pip"
+
+      # 変更内容に応じて実行可否を決める（src/core 配下の .py/.pyi 変更 or 設定ファイル変更なら実行）
+      - name: Guard: decide whether to run
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          head="${{ github.sha }}"
+          if [ -z "${base}" ]; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          changed="$(git diff --name-only "${base}" "${head}" || true)"
+          echo "Changed files:"
+          echo "${changed}"
+
+          # 実行対象：
+          # 1) src/core 配下の .py / .pyi
+          # 2) 設定ファイル変更（.ruff.toml / .pre-commit-config.yaml / lint.yml）
+          if echo "${changed}" | grep -E -q '^src/core/.*\.(py|pyi)$'; then
+            should_run=true
+          elif echo "${changed}" | grep -E -q '^(\.ruff\.toml|\.pre-commit-config\.yaml|\.github/workflows/lint\.yml)$'; then
+            should_run=true
+          else
+            should_run=false
+          fi
+
+          echo "should_run=${should_run}" | tee -a "$GITHUB_OUTPUT"
+
       - name: Install ruff
-        run: pip install "ruff==0.6.8"
+        if: steps.guard.outputs.should_run == 'true'
+        run: python -m pip install --upgrade pip && pip install "ruff==0.6.8"
+
       - name: Lint (ruff check)
-        run: ruff check --force-exclude src/core
+        if: steps.guard.outputs.should_run == 'true'
+        run: |
+          ruff check \
+            --force-exclude \
+            --output-format=github \
+            src/core
+
+      - name: Skip note
+        if: steps.guard.outputs.should_run != 'true'
+        run: echo "No src/core Python or lint-config changes; skipping ruff."
 
   ruff-format:
-    # ← Branch protection では「lint / ruff-format」と表示される
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: "pip"
+
+      - name: Guard: decide whether to run
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          head="${{ github.sha }}"
+          if [ -z "${base}" ]; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          changed="$(git diff --name-only "${base}" "${head}" || true)"
+          echo "Changed files:"
+          echo "${changed}"
+
+          if echo "${changed}" | grep -E -q '^src/core/.*\.(py|pyi)$'; then
+            should_run=true
+          elif echo "${changed}" | grep -E -q '^(\.ruff\.toml|\.pre-commit-config\.yaml|\.github/workflows/lint\.yml)$'; then
+            should_run=true
+          else
+            should_run=false
+          fi
+
+          echo "should_run=${should_run}" | tee -a "$GITHUB_OUTPUT"
+
       - name: Install ruff
-        run: pip install "ruff==0.6.8"
+        if: steps.guard.outputs.should_run == 'true'
+        run: python -m pip install --upgrade pip && pip install "ruff==0.6.8"
+
       - name: Format check (ruff format --check)
-        run: ruff format --check --force-exclude src/core
+        if: steps.guard.outputs.should_run == 'true'
+        run: |
+          ruff format \
+            --check \
+            --force-exclude \
+            src/core
+
+      - name: Skip note
+        if: steps.guard.outputs.should_run != 'true'
+        run: echo "No src/core Python or lint-config changes; skipping ruff-format."

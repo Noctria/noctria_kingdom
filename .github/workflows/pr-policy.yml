@@ -12,8 +12,38 @@ jobs:
       contents: read
       checks: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 変更ファイルを見て、src/core or Lint設定に関係ある変更のみ"対象"にする
+      - name: Guard: consider only src/core or lint-config changes
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed="$(git diff --name-only "${base}" "${head}" || true)"
+          echo "Changed files:"
+          echo "${changed}"
+
+          should_run=false
+          if echo "${changed}" | grep -E -q '^src/core/.*\.(py|pyi)$'; then
+            should_run=true
+          elif echo "${changed}" | grep -E -q '^(\.ruff\.toml|\.pre-commit-config\.yaml|\.github/workflows/lint\.yml)$'; then
+            should_run=true
+          fi
+
+          echo "should_run=${should_run}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip (not a lint-governed PR)
+        if: steps.guard.outputs.should_run != 'true'
+        run: echo "No src/core or lint-config change — skipping soft block."
+
       - name: Evaluate CI statuses
         id: eval
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -21,16 +51,19 @@ jobs:
             const pr = context.payload.pull_request;
             const sha = pr.head.sha;
 
+            // Checks (GitHub Actions)
             const checks = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
             const runs = checks.data.check_runs || [];
 
+            // Statuses (legacy)
             const statuses = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha });
             const contexts = (statuses.data.statuses || []).map(s => ({ context: s.context, state: s.state }));
 
+            // 必須チェック（必要なら "smoke" を追加可）
             const required = ["ruff","ruff-format"];
 
             function isGreen(name) {
-              const okRun = runs.some(r => (r.name === name || r.name?.includes?.(name)) && r.conclusion === "success");
+              const okRun = runs.some(r => (r.name === name || (r.name||"").includes(name)) && r.conclusion === "success");
               const okCtx = contexts.some(c => c.context === name && c.state === "success");
               return okRun || okCtx;
             }
@@ -39,7 +72,7 @@ jobs:
             core.setOutput("failed", failed.join(","));
 
       - name: Soft-block if not green
-        if: steps.eval.outputs.failed != ''
+        if: steps.guard.outputs.should_run == 'true' && steps.eval.outputs.failed != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -56,5 +89,5 @@ jobs:
             await github.rest.pulls.update({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number, state: "closed" });
 
       - name: All good (post info)
-        if: steps.eval.outputs.failed == ''
+        if: steps.guard.outputs.should_run == 'true' && steps.eval.outputs.failed == ''
         run: echo "All required checks passed (ruff, ruff-format)"
