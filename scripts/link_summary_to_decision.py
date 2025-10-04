@@ -43,7 +43,7 @@ import sqlite3
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Tuple, List
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SQLITE = ROOT / "pdca_log.db"
@@ -82,13 +82,14 @@ def _fetch_summary_from_sqlite(sqlite_path: Path, trace_id: str) -> Tuple[List[s
 
     # JSONは ["…","…","…"] フォーマットのはず
     import json
+
     arr = json.loads(summary_json)
     if not (isinstance(arr, list) and len(arr) == 3 and all(isinstance(x, str) for x in arr)):
         raise ValueError(f"invalid summary_json for trace_id={trace_id}: expect list[str]*3")
 
     # created_at は SQLite のローカル時刻 (UTCでない可能性がある) なので、ここでは UTC 現在時刻を記録
     # 必要なら pdca_summaries の created_at をそのまま使うように調整してもよい
-    summary_at = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00","Z")
+    summary_at = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     return arr + [model_used, summary_at], model_used  # 返り値は整形済み配列＋モデル名
 
@@ -175,11 +176,23 @@ def _csv_update_registry(registry_csv: Path, trace_id: str, fields: Dict[str, st
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Link PDCA three-line summary to Decision Registry by trace_id.")
-    ap.add_argument("--trace-id", required=True, help="Trace ID to link (must exist in pdca_summaries)")
-    ap.add_argument("--sqlite", default=str(DEFAULT_SQLITE), help="Path to pdca_log.db (default: ./pdca_log.db)")
-    ap.add_argument("--registry-csv", default="", help="Path to Decision Registry CSV (if not using module API)")
-    ap.add_argument("--use-module", action="store_true", help="Use src.core.decision_registry if upsert API exists")
+    ap = argparse.ArgumentParser(
+        description="Link PDCA three-line summary to Decision Registry by trace_id."
+    )
+    ap.add_argument(
+        "--trace-id", required=True, help="Trace ID to link (must exist in pdca_summaries)"
+    )
+    ap.add_argument(
+        "--sqlite", default=str(DEFAULT_SQLITE), help="Path to pdca_log.db (default: ./pdca_log.db)"
+    )
+    ap.add_argument(
+        "--registry-csv", default="", help="Path to Decision Registry CSV (if not using module API)"
+    )
+    ap.add_argument(
+        "--use-module",
+        action="store_true",
+        help="Use src.core.decision_registry if upsert API exists",
+    )
     args = ap.parse_args()
 
     sqlite_path = Path(args.sqlite).resolve()

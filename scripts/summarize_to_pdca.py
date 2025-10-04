@@ -51,6 +51,7 @@ SUMMARIZER = ROOT / "scripts" / "summarize3.sh"
 _RE_HANGUL = re.compile(r"[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]")
 # _RE_LATIN  = re.compile(r"[A-Za-z]")  # 英字も禁止する場合は有効化
 
+
 def _lang_is_japanese(arr: List[str]) -> bool:
     if any(_RE_HANGUL.search(s) for s in arr):
         return False
@@ -264,7 +265,9 @@ def _insert_sqlite(
 def main():
     p = argparse.ArgumentParser(description="Summarize text into PDCA SQLite and metrics CSV.")
     p.add_argument("input", nargs="?", default="-", help="Input file path or '-' for stdin")
-    p.add_argument("--sqlite", default=str(DEFAULT_SQLITE), help="Path to SQLite DB (default: pdca_log.db)")
+    p.add_argument(
+        "--sqlite", default=str(DEFAULT_SQLITE), help="Path to SQLite DB (default: pdca_log.db)"
+    )
     p.add_argument("--trace-id", default=None, help="Optional trace_id to record")
     p.add_argument("--model", default=None, help="Model name tag to record (for metrics/log)")
     p.add_argument("--summarizer", default=str(SUMMARIZER), help="Path to scripts/summarize3.sh")

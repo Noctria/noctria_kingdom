@@ -31,6 +31,7 @@ run_king_ops.py — KingOps(王)を1回起動して「開発プロマネ計画�
   runs/king_ops/king_ops_<timestamp>.md
   （三行要約は pdca_log.db に保存、Decision Registry に summary_* がupsert）
 """
+
 from __future__ import annotations
 
 import argparse
@@ -91,13 +92,17 @@ def _upsert_registry(trace_id: str, summary_lines: list[str], model_tag: str) ->
     """
     try:
         from src.core import decision_registry as dr  # type: ignore
+
         if hasattr(dr, "upsert_fields") and callable(dr.upsert_fields):
-            dr.upsert_fields(trace_id, {
-                "summary_line1": summary_lines[0],
-                "summary_line2": summary_lines[1],
-                "summary_line3": summary_lines[2],
-                "summary_model": model_tag,
-            })
+            dr.upsert_fields(
+                trace_id,
+                {
+                    "summary_line1": summary_lines[0],
+                    "summary_line2": summary_lines[1],
+                    "summary_line3": summary_lines[2],
+                    "summary_model": model_tag,
+                },
+            )
             print("[OK] Decision Registry upsert via module API")
             return
     except Exception as e:
@@ -108,9 +113,12 @@ def _upsert_registry(trace_id: str, summary_lines: list[str], model_tag: str) ->
     linker = ROOT / "scripts" / "link_summary_to_decision.py"
     if _which(linker):
         cmd = [
-            sys.executable, str(linker),
-            "--trace-id", trace_id,
-            "--registry-csv", str(Path(csv_path))
+            sys.executable,
+            str(linker),
+            "--trace-id",
+            trace_id,
+            "--registry-csv",
+            str(Path(csv_path)),
         ]
         print("[RUN]", " ".join(cmd))
         subprocess.run(cmd, check=False)
@@ -149,10 +157,14 @@ def _summarize_and_store(trace_id: str, md_path: Path, model_tag: str) -> list[s
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Run KingOps once to generate PM plan and persist artifacts.")
+    ap = argparse.ArgumentParser(
+        description="Run KingOps once to generate PM plan and persist artifacts."
+    )
     ap.add_argument("context", nargs="?", default="-", help="Context path or '-' for stdin")
     ap.add_argument("--trace-id", default=None, help="指定が無ければ自動生成")
-    ap.add_argument("--model", default=os.getenv("NOCTRIA_GPT_MODEL", ""), help="LLM model tag (optional)")
+    ap.add_argument(
+        "--model", default=os.getenv("NOCTRIA_GPT_MODEL", ""), help="LLM model tag (optional)"
+    )
     args = ap.parse_args()
 
     # 1) 入力コンテキスト
@@ -168,7 +180,9 @@ def main():
     md_path = _save_outputs(trace_id, plan_json, md_text)
 
     # 4) 三行要約 → SQLite保存
-    summary3 = _summarize_and_store(trace_id, md_path, model_tag=args.model or plan_json.get("model", ""))
+    summary3 = _summarize_and_store(
+        trace_id, md_path, model_tag=args.model or plan_json.get("model", "")
+    )
 
     # 5) 台帳 upsert（summary_* も反映）
     if summary3:

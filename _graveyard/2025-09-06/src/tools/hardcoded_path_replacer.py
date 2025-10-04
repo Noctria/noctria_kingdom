@@ -12,7 +12,6 @@ from core.path_config import (
     TOOLS_DIR,
     VERITAS_DIR,
 )
-import os
 import re
 import difflib
 import argparse

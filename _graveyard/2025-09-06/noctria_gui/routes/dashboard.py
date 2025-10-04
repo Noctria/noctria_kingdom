@@ -12,7 +12,6 @@ from fastapi.templating import Jinja2Templates
 
 # パス設定が正しいか確認
 from src.core.path_config import NOCTRIA_GUI_TEMPLATES_DIR, STATS_DIR
-from strategies.prometheus_oracle import PrometheusOracle
 
 # ロギング設定
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(message)s")

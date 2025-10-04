@@ -20,12 +20,14 @@ logger = logging.getLogger("noctria.hermes")
 
 # ========= 軽量ユーティリティ（DAG/GUIパース時は安全） ===========================
 
+
 def _lazy_import(name: str):
     try:
         __import__(name)
         return sys.modules[name]
     except Exception:
         return None
+
 
 def _paths() -> Dict[str, Path]:
     mod = _lazy_import("src.core.path_config") or _lazy_import("core.path_config")
@@ -42,36 +44,58 @@ def _paths() -> Dict[str, Path]:
         "STRATEGIES_DIR": root / "src" / "strategies",
     }
 
+
 def _obs():
     mod = _lazy_import("src.plan_data.observability") or _lazy_import("plan_data.observability")
     import datetime as dt
+
     def mk_trace_id():
         return dt.datetime.utcnow().strftime("trace_%Y%m%dT%H%M%S_%f")
-    def obs_event(event: str, *, severity: str = "LOW", trace_id: Optional[str] = None, meta: Optional[Dict[str, Any]] = None):
-        msg = {"event": event, "severity": severity, "trace_id": trace_id, "meta": meta or {}, "ts": dt.datetime.utcnow().isoformat()}
+
+    def obs_event(
+        event: str,
+        *,
+        severity: str = "LOW",
+        trace_id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ):
+        msg = {
+            "event": event,
+            "severity": severity,
+            "trace_id": trace_id,
+            "meta": meta or {},
+            "ts": dt.datetime.utcnow().isoformat(),
+        }
         # GUI実行でも標準出力に落としておく（収集しやすい）
         print("[OBS]", json.dumps(msg, ensure_ascii=False))
+
     if mod:
         mk_trace_id = getattr(mod, "mk_trace_id", mk_trace_id)  # type: ignore
-        obs_event = getattr(mod, "obs_event", obs_event)        # type: ignore
+        obs_event = getattr(mod, "obs_event", obs_event)  # type: ignore
     return mk_trace_id, obs_event
+
 
 def _atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent), encoding=encoding) as tmp:
+    with tempfile.NamedTemporaryFile(
+        "w", delete=False, dir=str(path.parent), encoding=encoding
+    ) as tmp:
         tmp.write(content)
         tmp_path = Path(tmp.name)
     os.replace(tmp_path, path)
+
 
 PATHS = _paths()
 mk_trace_id, obs_event = _obs()
 
 # ========= Pydantic I/O =======================================================
 
+
 class HermesStrategyRequest(BaseModel):
     symbol: str
     tag: str
     target_metric: str
+
 
 class HermesStrategyResponse(BaseModel):
     status: str
@@ -79,6 +103,7 @@ class HermesStrategyResponse(BaseModel):
     explanation: Optional[str] = None
     prompt: str
     saved_path: Optional[str] = None
+
 
 # ========= フォールバック用テンプレ ============================================
 
@@ -92,6 +117,7 @@ def simulate(prices, params=None):
     return {"action": action, "reason": "fallback-ma", "meta": {"ma": ma, "last": prices[-1]}}
 """
 
+
 def _fallback_build_prompt(symbol: str, tag: str, target_metric: str) -> str:
     return (
         f"あなたはプロの金融エンジニアです。通貨ペア'{symbol}'を対象に、"
@@ -99,14 +125,18 @@ def _fallback_build_prompt(symbol: str, tag: str, target_metric: str) -> str:
         "Pythonで simulate(prices, params=None) を含む関数を提示してください。"
     )
 
+
 async def _safe_save_file(code: str, tag: str) -> str:
     from datetime import datetime, timezone
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     dest = PATHS["STRATEGIES_DIR"] / "hermes_generated" / f"hermes_{tag}_{ts}.py"
     _atomic_write_text(dest, code)
     return str(dest)
 
+
 # ========= コア処理（遅延 import + HOLD フォールバック） ========================
+
 
 async def _run_hermes_generation(symbol: str, tag: str, target_metric: str) -> Dict[str, Any]:
     """
@@ -114,10 +144,16 @@ async def _run_hermes_generation(symbol: str, tag: str, target_metric: str) -> D
     使えない・失敗時はフォールバック（テンプレ）で **HOLD** 維持。
     """
     trace_id = mk_trace_id()
-    obs_event("gui.hermes.start", trace_id=trace_id, meta={"symbol": symbol, "tag": tag, "target_metric": target_metric})
+    obs_event(
+        "gui.hermes.start",
+        trace_id=trace_id,
+        meta={"symbol": symbol, "tag": tag, "target_metric": target_metric},
+    )
 
     # 遅延 import（重依存回避）
-    hermes = _lazy_import("src.hermes.strategy_generator") or _lazy_import("hermes.strategy_generator")
+    hermes = _lazy_import("src.hermes.strategy_generator") or _lazy_import(
+        "hermes.strategy_generator"
+    )
 
     prompt = None
     code = None
@@ -125,7 +161,10 @@ async def _run_hermes_generation(symbol: str, tag: str, target_metric: str) -> D
     via = "fallback"
 
     try:
-        if hermes and all(hasattr(hermes, k) for k in ("build_prompt", "generate_strategy_code", "save_to_file", "save_to_db")):
+        if hermes and all(
+            hasattr(hermes, k)
+            for k in ("build_prompt", "generate_strategy_code", "save_to_file", "save_to_db")
+        ):
             # 既存の I/F をそのまま使用（互換）
             prompt = await asyncio.to_thread(hermes.build_prompt, symbol, tag, target_metric)
             code = await asyncio.to_thread(hermes.generate_strategy_code, prompt)
@@ -143,7 +182,13 @@ async def _run_hermes_generation(symbol: str, tag: str, target_metric: str) -> D
             saved_path = await _safe_save_file(code, tag)
 
         obs_event("gui.hermes.done", trace_id=trace_id, meta={"via": via, "path": saved_path})
-        return {"prompt": prompt, "code": code, "path": saved_path, "via": via, "trace_id": trace_id}
+        return {
+            "prompt": prompt,
+            "code": code,
+            "path": saved_path,
+            "via": via,
+            "trace_id": trace_id,
+        }
 
     except Exception as e:
         logger.error(f"[{trace_id}] Hermes生成処理で例外: {e}", exc_info=True)
@@ -153,12 +198,22 @@ async def _run_hermes_generation(symbol: str, tag: str, target_metric: str) -> D
             prompt = prompt or _fallback_build_prompt(symbol, tag, target_metric)
             code = code or FALLBACK_CODE
             saved_path = saved_path or await _safe_save_file(code, tag)
-            return {"prompt": prompt, "code": code, "path": saved_path, "via": "fallback-error", "trace_id": trace_id}
+            return {
+                "prompt": prompt,
+                "code": code,
+                "path": saved_path,
+                "via": "fallback-error",
+                "trace_id": trace_id,
+            }
         except Exception as e2:
             logger.critical(f"[{trace_id}] フォールバック保存まで失敗: {e2}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Hermes生成に失敗しました（trace_id={trace_id}）")
+            raise HTTPException(
+                status_code=500, detail=f"Hermes生成に失敗しました（trace_id={trace_id}）"
+            )
+
 
 # ========= FastAPI ルート ======================================================
+
 
 @router.post("/hermes/generate_strategy", response_model=HermesStrategyResponse)
 async def generate_strategy(req: HermesStrategyRequest):
@@ -172,7 +227,9 @@ async def generate_strategy(req: HermesStrategyRequest):
     if not result or not result.get("code"):
         raise HTTPException(status_code=500, detail="Hermes生成失敗（空の結果）")
 
-    explanation = f"Hermes生成戦略：{req.symbol} / {req.tag} / {req.target_metric}（via={result.get('via')}）"
+    explanation = (
+        f"Hermes生成戦略：{req.symbol} / {req.tag} / {req.target_metric}（via={result.get('via')}）"
+    )
     return HermesStrategyResponse(
         status="SUCCESS",
         strategy_code=result["code"],

@@ -58,7 +58,9 @@ def _fetch_by_trace_id(trace_id: str) -> Dict[str, Any]:
         cur = con.cursor()
         row = cur.execute(q, (trace_id,)).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail=f"summary not found for trace_id={trace_id}")
+            raise HTTPException(
+                status_code=404, detail=f"summary not found for trace_id={trace_id}"
+            )
         return _row_to_item(row)
     finally:
         con.close()
@@ -110,7 +112,9 @@ def _fetch_recent(limit: int = 10) -> List[Dict[str, Any]]:
 
 
 @router.get("/pdca/summary_card", response_class=HTMLResponse)
-def summary_card(request: Request, trace_id: Optional[str] = Query(None, description="PDCA trace_id (省略可)")):
+def summary_card(
+    request: Request, trace_id: Optional[str] = Query(None, description="PDCA trace_id (省略可)")
+):
     # trace_id が無ければ最新1件を採用
     data = _fetch_by_trace_id(trace_id) if trace_id else _fetch_latest_one()
     return templates.TemplateResponse(

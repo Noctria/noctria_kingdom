@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import json, sys
+import json
+import sys
 from pathlib import Path
+
 
 def main(in_json, out_json, stage):
     data = json.loads(Path(in_json).read_text(encoding="utf-8"))
@@ -23,7 +25,8 @@ def main(in_json, out_json, stage):
     for e in edges:
         try:
             i = int(str(e["data"]["id"]).lstrip("e"))
-            if i > max_i: max_i = i
+            if i > max_i:
+                max_i = i
         except Exception:
             pass
     i = max_i + 1
@@ -44,6 +47,7 @@ def main(in_json, out_json, stage):
 
     Path(out_json).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     print(f"[ok] wrote {out_json} (added {added} hub edges to {hub_id})")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:

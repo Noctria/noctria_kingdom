@@ -19,7 +19,7 @@ if not api_key or api_key in ("REPLACE_ME", "sk-xxxx"):
 # OpenAI v1 クライアント
 try:
     from openai import OpenAI
-except Exception as e:
+except Exception:
     print("openai パッケージが見当たりません。`pip install openai` を実行してください。")
     raise
 

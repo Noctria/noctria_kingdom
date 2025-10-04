@@ -32,7 +32,7 @@ def normalize_path(path: str, project_root: str = "") -> str:
 
     # プロジェクトルートを除去
     if project_root and s.startswith(project_root):
-        s = s[len(project_root):].lstrip("/")
+        s = s[len(project_root) :].lstrip("/")
 
     # 区切り "/" や "\" を "_" に置換
     s = s.replace("/", "_").replace("\\", "_")
@@ -70,7 +70,11 @@ def main():
         add_seeds.parent.mkdir(parents=True, exist_ok=True)
         existing: set[str] = set()
         if add_seeds.exists():
-            existing = {line.strip() for line in add_seeds.read_text(encoding="utf-8").splitlines() if line.strip()}
+            existing = {
+                line.strip()
+                for line in add_seeds.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            }
 
         new_entries = [nid for nid in results if nid not in existing]
 

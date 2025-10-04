@@ -4,8 +4,11 @@
 cyto_build_overview.py
 複数の *_hub.json（Cytoscape.js形式）をマージし、ステージ間の cluster→cluster エッジを付加して俯瞰ビュー JSON を出力。
 """
+
 from __future__ import annotations
-import argparse, json, glob
+import argparse
+import json
+import glob
 from pathlib import Path
 from typing import Dict, List, Tuple, Set
 
@@ -23,19 +26,31 @@ DEFAULT_CHAIN = [
     "replanning",
 ]
 
+
 def load_cyto_json(p: Path) -> Dict:
     return json.loads(p.read_text(encoding="utf-8"))
+
 
 def ensure_cluster_node(stage: str) -> Dict:
     cid = f"{stage}_cluster"
     return {"data": {"id": cid, "label": cid, "stage": stage}}
 
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--inputs", "-i", nargs="+", help="入力 JSON（*_hub.json）を複数指定。glob可。例: viz/graph_*_100_hub.json")
+    ap.add_argument(
+        "--inputs",
+        "-i",
+        nargs="+",
+        help="入力 JSON（*_hub.json）を複数指定。glob可。例: viz/graph_*_100_hub.json",
+    )
     ap.add_argument("--output", "-o", required=True, help="出力 JSON パス")
-    ap.add_argument("--chain", "-c", default=",".join(DEFAULT_CHAIN),
-                    help="cluster間エッジを張るステージ順（カンマ区切り）。未指定は既定の11ステージ。")
+    ap.add_argument(
+        "--chain",
+        "-c",
+        default=",".join(DEFAULT_CHAIN),
+        help="cluster間エッジを張るステージ順（カンマ区切り）。未指定は既定の11ステージ。",
+    )
     ap.add_argument("--dedup", action="store_true", help="ノード/エッジの厳密重複を削除（推奨）")
     args = ap.parse_args()
 
@@ -68,7 +83,8 @@ def main():
         # ノードは id キーでマージ
         for n in nodes:
             nid = n.get("data", {}).get("id")
-            if not nid: continue
+            if not nid:
+                continue
             if nid not in nodes_by_id:
                 nodes_by_id[nid] = {"data": dict(n.get("data", {}))}
             else:
@@ -81,7 +97,8 @@ def main():
         for e in edges:
             d = e.get("data", {})
             s, t = d.get("source"), d.get("target")
-            if not s or not t: continue
+            if not s or not t:
+                continue
             pair = (s, t)
             if (not args.dedup) or (pair not in edge_pairs):
                 edge_pairs.add(pair)
@@ -97,7 +114,8 @@ def main():
 
     # チェーンに沿って有向エッジ
     for a, b in zip(chain, chain[1:]):
-        sa = f"{a}_cluster"; tb = f"{b}_cluster"
+        sa = f"{a}_cluster"
+        tb = f"{b}_cluster"
         pair = (sa, tb)
         if (not args.dedup) or (pair not in edge_pairs):
             edge_pairs.add(pair)
@@ -117,6 +135,7 @@ def main():
 
     Path(args.output).write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     print(f"[ok] wrote {args.output} (nodes={len(out_nodes)}, edges={len(edges_out)})")
+
 
 if __name__ == "__main__":
     main()

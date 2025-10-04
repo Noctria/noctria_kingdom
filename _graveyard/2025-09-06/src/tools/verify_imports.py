@@ -1,6 +1,4 @@
 import os
-import sys
-import re
 from pathlib import Path
 
 PROJECT_ROOT = Path("/opt/airflow")

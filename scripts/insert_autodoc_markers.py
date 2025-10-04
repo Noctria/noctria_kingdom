@@ -43,7 +43,6 @@ from __future__ import annotations
 
 import argparse
 import glob
-import os
 import re
 from pathlib import Path
 from typing import List, Tuple

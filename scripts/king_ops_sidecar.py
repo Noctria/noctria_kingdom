@@ -2,7 +2,10 @@
 # v1.7.3-ssefix3 — SSE安定化: CRLF終端/ヘッダ明示/非SSE行ラップ修正/圧縮無効化
 #                   + [DONE]重複送出ガード + 接続失敗もSSEで返却
 from __future__ import annotations
-import os, json, time, uuid
+import os
+import json
+import time
+import uuid
 from typing import AsyncIterator, Dict, Any, Optional, List
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -16,7 +19,9 @@ CRLF2 = b"\r\n\r\n"
 
 # ===== 環境設定 =====
 CLOUD_ENABLED = os.getenv("CLOUD_ENABLED", "false").lower() == "true"
-CLOUD_BASE_URL = os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+CLOUD_BASE_URL = os.getenv("OPENAI_API_BASE") or os.getenv(
+    "OPENAI_BASE_URL", "https://api.openai.com/v1"
+)
 CLOUD_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # ※ デフォはそのまま。Ollama互換を使うなら環境変数で 11434/v1 を指定:
 #    export LOCAL_OPENAI_BASE="http://127.0.0.1:11434/v1"
@@ -25,7 +30,9 @@ LOCAL_TIMEOUT = float(os.getenv("LOCAL_HTTP_TIMEOUT", "300"))
 CLOUD_TIMEOUT = float(os.getenv("CLOUD_HTTP_TIMEOUT", "300"))
 
 MODEL_ALLOWLIST: List[str] = [
-    m.strip() for m in os.getenv("MODEL_ALLOWLIST", "qwen2.5:3b-instruct-q4_K_M,gpt-4o-mini").split(",") if m.strip()
+    m.strip()
+    for m in os.getenv("MODEL_ALLOWLIST", "qwen2.5:3b-instruct-q4_K_M,gpt-4o-mini").split(",")
+    if m.strip()
 ]
 MAX_TOKENS_CAP = int(os.getenv("MAX_TOKENS_CAP", "4096"))
 DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "512"))
@@ -127,7 +134,9 @@ async def _sse_proxy(
         "Accept-Encoding": "identity",
     }
     try:
-        async with client.stream(method, url, json=json_body, headers=hdrs, timeout=client.timeout) as r:
+        async with client.stream(
+            method, url, json=json_body, headers=hdrs, timeout=client.timeout
+        ) as r:
             r.raise_for_status()
             is_event_stream = r.headers.get("content-type", "").startswith("text/event-stream")
             if is_event_stream:
@@ -165,7 +174,13 @@ async def _sse_proxy(
         yield b"data: [DONE]" + CRLF2
     finally:
         try:
-            _write_audit({**audit_base, "latency_ms": int((time.time() - start) * 1000), "phase": "sse_proxy_done"})
+            _write_audit(
+                {
+                    **audit_base,
+                    "latency_ms": int((time.time() - start) * 1000),
+                    "phase": "sse_proxy_done",
+                }
+            )
         finally:
             # ここで client を確実にクローズ（重要）
             await client.aclose()
@@ -191,7 +206,9 @@ async def chat_completions(
         with open(KING_OPS_PATH, "r", encoding="utf-8") as f:
             sys_body = f.read()
         # 言語指示を常に先頭へ
-        lang_text = _build_system_from_lang(x_reply_lang) if x_reply_lang else _build_system_from_lang("en")
+        lang_text = (
+            _build_system_from_lang(x_reply_lang) if x_reply_lang else _build_system_from_lang("en")
+        )
         sys_text = f"{lang_text}\n\n【KING OPS 指示書】\n{sys_body}"
         payload["messages"] = _inject_system(messages, sys_text)
     else:
@@ -240,11 +257,19 @@ async def chat_completions(
                 r = await client.post(target_url, json=payload, headers=headers)
                 r.raise_for_status()
                 data = r.json()
-                _write_audit({**audit_base, "latency_ms": int((time.time() - start) * 1000), "phase": "nonstream_done"})
+                _write_audit(
+                    {
+                        **audit_base,
+                        "latency_ms": int((time.time() - start) * 1000),
+                        "phase": "nonstream_done",
+                    }
+                )
                 return JSONResponse(data)
             except httpx.HTTPStatusError as e:
                 _write_audit({**audit_base, "phase": "error", "status": e.response.status_code})
-                return JSONResponse({"error": {"message": e.response.text}}, status_code=e.response.status_code)
+                return JSONResponse(
+                    {"error": {"message": e.response.text}}, status_code=e.response.status_code
+                )
 
 
 @app.get("/v1/models")

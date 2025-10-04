@@ -1,5 +1,7 @@
 from openai import OpenAI
-import os, sys
+import os
+import sys
+
 BASE = os.getenv("OPENAI_BASE_URL", "http://127.0.0.1:8012/v1")
 MODEL = os.getenv("OPENAI_MODEL", "noctria-king:latest")
 RAW = " ".join(sys.argv[1:]) or "今日の優先タスクを3つ、規定フォーマットで。"
@@ -29,7 +31,7 @@ USER = f"""{RULES}
 client = OpenAI(base_url=BASE, api_key="dummy")
 resp = client.chat.completions.create(
     model=MODEL,
-    messages=[{"role":"user","content": USER}],
+    messages=[{"role": "user", "content": USER}],
     temperature=0.2,
     max_tokens=1200,
 )

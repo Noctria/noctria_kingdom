@@ -3,7 +3,6 @@ from core.path_config import *
 # coding: utf-8
 
 import os
-import sys
 
 from stable_baselines3 import PPO
 from core.meta_ai import MetaAI  # カスタム環境

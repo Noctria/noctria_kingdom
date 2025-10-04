@@ -1,6 +1,7 @@
 # src/scripts/try_hermes_cognitor.py
 from src.strategies.hermes_cognitor import HermesCognitorStrategy
 
+
 def main():
     hermes = HermesCognitorStrategy()
 
@@ -14,6 +15,7 @@ def main():
     print("=== Hermes result ===")
     for k, v in res.items():
         print(k, ":", v)
+
 
 if __name__ == "__main__":
     main()

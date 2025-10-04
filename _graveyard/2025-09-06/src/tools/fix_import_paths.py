@@ -1,6 +1,5 @@
 # /mnt/d/noctria_kingdom/tools/fix_import_paths.py
 
-import os
 from pathlib import Path
 
 BASE_DIR = Path("/opt/airflow")

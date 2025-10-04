@@ -1,0 +1,45 @@
+name: lint
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "src/core/**"
+      - ".ruff.toml"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/lint.yml"
+  pull_request:
+    paths:
+      - "src/core/**"
+      - ".ruff.toml"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/lint.yml"
+
+jobs:
+  ruff:
+    # ← Branch protection では「lint / ruff」と表示される
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - name: Install ruff
+        run: pip install "ruff==0.6.8"
+      - name: Lint (ruff check)
+        run: ruff check --force-exclude src/core
+
+  ruff-format:
+    # ← Branch protection では「lint / ruff-format」と表示される
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - name: Install ruff
+        run: pip install "ruff==0.6.8"
+      - name: Format check (ruff format --check)
+        run: ruff format --check --force-exclude src/core
