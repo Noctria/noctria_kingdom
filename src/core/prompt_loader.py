@@ -260,8 +260,5 @@ def load_prompt_text(ssot_path: Optional[str] = None) -> str:
     Ollama / GPT API の両方に渡せるテキストを返す。
     """
     root = Path(ssot_path) if ssot_path else None
-    gov = load_governance(root)
-    return render_system_prompt(gov)
-
-# 互換エイリアス
-build_system_prompt = load_prompt_text
+    gov = load_governance(root)           # dictに変換
+    return render_system_prompt(gov)      # Markdownテキストに変換
