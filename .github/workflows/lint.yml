@@ -17,6 +17,7 @@ on:
 
 jobs:
   ruff:
+    name: lint / lint-only
     # ← Branch protection では「lint / ruff」と表示される
     runs-on: ubuntu-latest
     steps:

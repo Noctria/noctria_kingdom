@@ -1,5 +1,8 @@
 # [NOCTRIA_CORE_REQUIRED]
 from __future__ import annotations
+import pytest
+yaml = pytest.importorskip('yaml', reason='smoke: optional dep (pyyaml) not installed')
+
 from pathlib import Path
 import json
 import yaml
