@@ -1,9 +1,8 @@
 target-version = "py310"
+line-length = 100
 
-[lint]
-select = ["E", "F", "I", "W"]
-ignore = []
-
+# ← セクション外（トップレベル）に置く
+# 既存の除外に“追加”したい場合は extend-exclude を使ってOK
 extend-exclude = [
   "_graveyard",
   "generated_code",
@@ -16,6 +15,10 @@ extend-exclude = [
   "tests",
   "Untitled.ipynb",
 ]
+
+[lint]
+select = ["E", "F", "I", "W"]
+ignore = []
 
 [format]
 line-length = 100
