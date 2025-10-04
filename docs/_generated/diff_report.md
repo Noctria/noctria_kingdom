@@ -2,6 +2,11 @@
 
 - range: `origin/main..HEAD`
 - path: `docs/`
-- generated_at: 2025-10-04T11:11:30
+- generated_at: 2025-10-04T11:13:46
 
-_No changes in range._
+## Changed files
+- `docs/_generated/diff_report.json`
+- `docs/_generated/diff_report.md`
+- `docs/_generated/weekly_insert.md`
+
+---

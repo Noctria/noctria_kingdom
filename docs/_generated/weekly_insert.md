@@ -1,8 +1,10 @@
 # Weekly Paste Snippet
 
 - range: `origin/main..HEAD`
-- generated_at: 2025-10-04T11:11:30
+- generated_at: 2025-10-04T11:13:46
 
-## Changed files (0)
-_No changes detected._
+## Changed files (3)
+- `docs/_generated/diff_report.json`
+- `docs/_generated/diff_report.md`
+- `docs/_generated/weekly_insert.md`
 
