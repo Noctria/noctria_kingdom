@@ -1,0 +1,21 @@
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "I", "W"]
+ignore = []
+
+extend-exclude = [
+  "_graveyard",
+  "generated_code",
+  "data",
+  "airflow_docker",
+  "noctria_gui",
+  "llm_server",
+  "tools",
+  "scripts",
+  "tests",
+  "Untitled.ipynb",
+]
+
+[format]
+line-length = 100
