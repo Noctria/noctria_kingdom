@@ -7,14 +7,6 @@ Prompt loader/builder for Noctria.
 - SSOT: docs/governance/king_ops_prompt.yaml
 - Optional: Merge additional fragments under docs/governance/king_ops_sections/*.yaml
 - Output: Markdown-like, model-friendly system prompt text usable by both Ollama and GPT API.
-
-Usage:
-    from src.core.prompt_loader import load_prompt_text
-    system_prompt = load_prompt_text()  # default SSOT
-
-    # For legacy code:
-    from src.core.prompt_loader import load_governance
-    system_prompt = load_governance()
 """
 
 import json
@@ -27,7 +19,7 @@ import yaml
 DEFAULT_SSOT = "docs/governance/king_ops_prompt.yaml"
 DEFAULT_SECTIONS_DIR = "docs/governance/king_ops_sections"
 
-# セクションの推奨順（存在しないキーは無視、余ったキーは末尾に自然順で付与）
+# セクションの推奨順
 RECOMMENDED_SECTION_ORDER: List[str] = [
     "charter",
     "roles_raci",
@@ -53,7 +45,32 @@ RECOMMENDED_SECTION_ORDER: List[str] = [
 ]
 
 
-# ====== Public API ======
+# ====== Core API ======
+def load_governance(path: str | Path = DEFAULT_SSOT) -> Dict[str, Any]:
+    """
+    Load governance YAML (SSOT) and return as dict.
+    """
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data or {}
+
+
+def render_system_prompt(governance: Dict[str, Any]) -> str:
+    """
+    Render governance dict into Markdown-like system prompt text.
+    """
+    parts: List[str] = []
+    ordered_keys = _order_keys(governance.keys(), RECOMMENDED_SECTION_ORDER)
+    for k in ordered_keys:
+        parts.append(_flatten_section(k, governance[k]))
+    return "\n".join(parts).strip() + "\n"
+
+
 def load_prompt_text(
     ssot_path: str = DEFAULT_SSOT,
     sections_dir: Optional[str] = DEFAULT_SECTIONS_DIR,
@@ -63,18 +80,7 @@ def load_prompt_text(
     json_contract: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
-    Build a model-ready system prompt string.
-
-    Args:
-        ssot_path: Path to the main YAML (SSOT).
-        sections_dir: If provided, merge *.yaml in this directory (top-level dicts only).
-        strict: If True, raise on missing files/invalid YAML. If False, continue best-effort.
-        prefer_sections: When True and a key exists in both SSOT and section files, sections override.
-        order: Custom section order (list of keys). Non-listed keys are appended in natural order.
-        json_contract: Optional JSON schema-ish dict to append as “Output format” hard rule.
-
-    Returns:
-        Markdown-like text suitable for system prompt.
+    Convenience wrapper: YAML -> dict -> Markdown text
     """
     base_map = _read_yaml_map(ssot_path, strict=strict)
 
@@ -83,13 +89,11 @@ def load_prompt_text(
         frags = _read_sections_dir(sections_dir, strict=strict)
         merged = _merge_maps(base_map, frags, prefer_sections=prefer_sections)
 
-    # シリアライズ（YAML→Markdown風整形）
     ordered_keys = _order_keys(merged.keys(), order or RECOMMENDED_SECTION_ORDER)
     parts = []
     for k in ordered_keys:
         parts.append(_flatten_section(k, merged[k]))
 
-    # 追加で JSON 出力契約を付けたい場合
     if json_contract:
         parts.append("## Output Format (HARD REQUIREMENT)")
         parts.append(
@@ -204,15 +208,6 @@ def _append_lines(lines: List[str], content: Any, level: int) -> None:
         lines.append(f"{indent}{bullet} {content}")
 
 
-# ====== Backward compatibility alias ======
-def load_governance(path: str = DEFAULT_SSOT) -> str:
-    """
-    Alias for backward compatibility.
-    Old code may import `load_governance`, which maps to `load_prompt_text`.
-    """
-    return load_prompt_text(ssot_path=path)
-
-
 # ====== Optional: quick CLI for debugging ======
 if __name__ == "__main__":
     import argparse
@@ -251,14 +246,3 @@ if __name__ == "__main__":
         json_contract=contract,
     )
     print(text)
-
-# === New: convenience wrapper ===
-def load_prompt_text(ssot_path: Optional[str] = None) -> str:
-    """
-    YAML (SSOT) -> dict(load_governance) -> Markdown-like system prompt(render_system_prompt)
-    をひとまとめにした便宜関数。
-    Ollama / GPT API の両方に渡せるテキストを返す。
-    """
-    root = Path(ssot_path) if ssot_path else None
-    gov = load_governance(root)           # dictに変換
-    return render_system_prompt(gov)      # Markdownテキストに変換
