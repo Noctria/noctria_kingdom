@@ -43,6 +43,20 @@ def has_changes_against(base_ref: str, paths: List[str]) -> bool:
         return True
 
 
+def changed_files_against(base_ref: str) -> list[str]:
+    """base_ref と比較した変更ファイル一覧を返す"""
+    try:
+        r = subprocess.run(
+            ["git", "diff", "--name-only", base_ref, "--"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return [p.strip() for p in r.stdout.splitlines() if p.strip()]
+    except Exception:
+        return []
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Create a branch, commit generated files, push, and (optionally) open a PR via gh CLI."
@@ -77,6 +91,17 @@ def main() -> int:
         print({"skipped": True, "reason": "no_changes_against_base", "base": base_ref})
         return 0
 
+    # --- 変更検知で自動ラベル/レビュアー付与（戦略コードが含まれる場合） ---
+    changed = changed_files_against(base_ref)
+    if any(p.startswith("src/strategies/") for p in changed):
+        if "strategies" not in args.label:
+            args.label.append("strategies")
+        if not args.reviewer:
+            args.reviewer.extend(["alice", "bob"])
+        print(
+            "ℹ️  Detected changes under src/strategies/ → add label:[strategies], reviewers:[alice,bob]"
+        )
+
     # 3) ブランチ作成
     branch = next_branch_name(args.branch_prefix)
     sh(["git", "checkout", args.base], check=False)
@@ -109,12 +134,12 @@ def main() -> int:
         ]
         if Path(args.body_path).exists():
             gh_cmd += ["-F", args.body_path]
-        for label in args.label:
-            gh_cmd += ["--label", label]
-        for reviewer in args.reviewer:
-            gh_cmd += ["--reviewer", reviewer]
-        for assignee in args.assignee:
-            gh_cmd += ["--assignee", assignee]
+        for lbl in args.label:
+            gh_cmd += ["--label", lbl]
+        for rev in args.reviewer:
+            gh_cmd += ["--reviewer", rev]
+        for asg in args.assignee:
+            gh_cmd += ["--assignee", asg]
 
         r = sh(gh_cmd, check=False)
         out = (r.stdout or "") + (r.stderr or "")
