@@ -45,18 +45,18 @@ def has_changes_against(base_ref: str, paths: List[str]) -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Create a branch, commit generated weekly, push, and (optionally) open a PR via gh CLI."
+        description="Create a branch, commit generated files, push, and (optionally) open a PR via gh CLI."
     )
     ap.add_argument("--files", nargs="+", required=True, help="files to add/commit (space separated)")
     ap.add_argument("--branch-prefix", default="chore/weekly-report-", help="branch name prefix")
     ap.add_argument("--title", default="chore: weekly report update", help="PR title")
-    ap.add_argument("--title-prefix", default="", help="prefix to prepend to PR title (e.g. 'docs:' or 'ci:')")
+    ap.add_argument("--title-prefix", default="", help="Prefix to prepend to PR title (e.g. 'docs: ')")
     ap.add_argument("--body-path", default="docs/_generated/weekly_insert.md", help="PR body path (used if gh is available)")
     ap.add_argument("--remote", default="origin", help="git remote (default: origin)")
     ap.add_argument("--base", default="main", help="base branch to target PR against")
-    ap.add_argument("--label", action="append", help="labels to add to PR (can be repeated)", default=[])
-    ap.add_argument("--reviewer", action="append", help="reviewers to request on PR (can be repeated)", default=[])
-    ap.add_argument("--assignee", action="append", help="assignees for the PR (can be repeated)", default=[])
+    ap.add_argument("--label", action="append", default=[], help="Labels to add to the PR (can specify multiple)")
+    ap.add_argument("--reviewer", action="append", default=[], help="Reviewers to request (can specify multiple)")
+    ap.add_argument("--assignee", action="append", default=[], help="Assignees to add (can specify multiple)")
     args = ap.parse_args()
 
     # 0) 対象ファイルの存在チェック（1つも無ければ終了）
@@ -84,12 +84,13 @@ def main() -> int:
 
     # 4) add & commit
     sh(["git", "add"] + to_add, check=True)
-    msg = f"{args.title_prefix}{args.title}" if args.title_prefix else args.title
+    msg = f"{args.title}"
     rc = subprocess.run(["git", "diff", "--cached", "--quiet", "--"] + to_add).returncode
     if rc == 0:
         print("ℹ️ No staged changes → skipping commit & PR")
         print({"skipped": True, "reason": "no_staged_changes"})
         return 0
+
     sh(["git", "commit", "-m", msg], check=True)
 
     # 5) push
@@ -98,21 +99,22 @@ def main() -> int:
     # 6) PR（gh があれば）
     pr_url = None
     if have_gh():
+        final_title = f"{args.title_prefix}{args.title}".strip()
         gh_cmd = [
             "gh", "pr", "create",
-            "--title", msg,
+            "--title", final_title,
             "--base", args.base,
             "--head", branch,
             "--fill",
         ]
         if Path(args.body_path).exists():
             gh_cmd += ["-F", args.body_path]
-        for lbl in args.label:
-            gh_cmd += ["--label", lbl]
-        for rv in args.reviewer:
-            gh_cmd += ["--reviewer", rv]
-        for asg in args.assignee:
-            gh_cmd += ["--assignee", asg]
+        for label in args.label:
+            gh_cmd += ["--label", label]
+        for reviewer in args.reviewer:
+            gh_cmd += ["--reviewer", reviewer]
+        for assignee in args.assignee:
+            gh_cmd += ["--assignee", assignee]
 
         r = sh(gh_cmd, check=False)
         out = (r.stdout or "") + (r.stderr or "")
@@ -123,14 +125,7 @@ def main() -> int:
                 break
 
     # 7) 成果をJSONで返す
-    print({
-        "branch": branch,
-        "pushed": True,
-        "pr_url": pr_url or "",
-        "labels": args.label,
-        "reviewers": args.reviewer,
-        "assignees": args.assignee,
-    })
+    print({"branch": branch, "pushed": True, "pr_url": pr_url or ""})
     return 0
 
 
