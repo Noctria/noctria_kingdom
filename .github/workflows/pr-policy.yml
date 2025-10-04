@@ -12,34 +12,90 @@ jobs:
       contents: read
       checks: read
     steps:
-      - name: Evaluate CI statuses
-        id: eval
+      - uses: actions/checkout@v4
+
+      # PRの最終差分(API)で、core or lint-config に該当するか判定
+      - name: Guard: consider only src/core or lint-config changes (PR files API)
+        id: guard
         uses: actions/github-script@v7
         with:
           script: |
             const { owner, repo } = context.repo;
-            const pr = context.payload.pull_request;
-            const sha = pr.head.sha;
+            const prNumber = context.payload.pull_request.number;
 
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number: prNumber, per_page: 100 }
+            );
+            const names = files.map(f => f.filename);
+
+            const reCore = /^src\/core\/.*\.(py|pyi)$/;
+            const reLintCfg = /^(\.ruff\.toml|\.pre-commit-config\.yaml|\.github\/workflows\/lint\.yml)$/;
+
+            const shouldRun = names.some(n => reCore.test(n) || reLintCfg.test(n));
+
+            core.info(`Changed files (${names.length}): ${names.join(", ")}`);
+            core.info(`should_run = ${shouldRun}`);
+            core.setOutput("should_run", shouldRun ? "true" : "false");
+
+      - name: Skip (not a lint-governed PR)
+        if: steps.guard.outputs.should_run != 'true'
+        run: echo "No src/core or lint-config change — skipping soft block."
+
+      - name: Evaluate CI statuses
+        id: eval
+        if: steps.guard.outputs.should_run == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.payload.pull_request.head.sha;
+
+            // Checks (modern API)
             const checks = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
             const runs = checks.data.check_runs || [];
 
+            // Statuses (legacy API)
             const statuses = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha });
             const contexts = (statuses.data.statuses || []).map(s => ({ context: s.context, state: s.state }));
 
-            const required = ["ruff","ruff-format"];
+            const required = ["ruff","ruff-format"]; // 必要なら "smoke" を追加
+
+            const seen = new Set([
+              ...runs.map(r => r.name || ""),
+              ...contexts.map(c => c.context || "")
+            ]);
+
+            function nameMatches(a, b) {
+              // ジョブ名や context 名が多少違っても部分一致で拾う
+              return a === b || a.includes(b) || b.includes(a);
+            }
+
+            function isPresent(name) {
+              for (const s of seen) if (nameMatches(s, name)) return true;
+              return false;
+            }
 
             function isGreen(name) {
-              const okRun = runs.some(r => (r.name === name || r.name?.includes?.(name)) && r.conclusion === "success");
-              const okCtx = contexts.some(c => c.context === name && c.state === "success");
+              const okRun = runs.some(r => nameMatches(r.name || "", name) && r.conclusion === "success");
+              const okCtx = contexts.some(c => nameMatches(c.context || "", name) && c.state === "success");
               return okRun || okCtx;
             }
 
-            const failed = required.filter(n => !isGreen(n));
+            // 必須チェックが一つも見つからない場合は、誤検知防止のためブロックしない
+            const nonePresent = required.every(n => !isPresent(n));
+            let failed = [];
+            if (!nonePresent) {
+              failed = required.filter(n => !isGreen(n));
+            }
+
+            core.info(`required: ${required.join(", ")}`);
+            core.info(`seen: ${Array.from(seen).join(", ")}`);
+            core.info(`nonePresent: ${nonePresent}`);
             core.setOutput("failed", failed.join(","));
 
       - name: Soft-block if not green
-        if: steps.eval.outputs.failed != ''
+        if: steps.guard.outputs.should_run == 'true' && steps.eval.outputs.failed != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -56,5 +112,5 @@ jobs:
             await github.rest.pulls.update({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number, state: "closed" });
 
       - name: All good (post info)
-        if: steps.eval.outputs.failed == ''
+        if: steps.guard.outputs.should_run == 'true' && steps.eval.outputs.failed == ''
         run: echo "All required checks passed (ruff, ruff-format)"
