@@ -18,8 +18,18 @@ def ensure_clean_index():
 def next_branch_name(prefix: str):
     ts = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     base = f"{prefix}{ts}"
-    # 衝突回避（基本は時刻で十分ユニーク）
-    return base
+    return base  # 衝突回避（時刻ベースで十分ユニーク）
+
+def has_changes(paths: list[str]) -> bool:
+    """対象パスに差分があるかを確認"""
+    try:
+        r = subprocess.run(
+            ["git", "diff", "--quiet", "--"] + paths,
+            text=True,
+        )
+        return r.returncode != 0  # 0=差分なし, 1=差分あり
+    except Exception:
+        return True  # チェック不能時は強制Trueで処理続行
 
 def main():
     ap = argparse.ArgumentParser(description="Create a branch, commit generated weekly, push, and (optionally) open a PR via gh CLI.")
@@ -31,13 +41,15 @@ def main():
     ap.add_argument("--base", default="main", help="base branch to target PR against")
     args = ap.parse_args()
 
+    # --- 差分チェック（追加） ---
+    if not has_changes(args.files):
+        print("ℹ️ No changes detected in target files → skipping PR")
+        return 0
+
     # 1) ブランチ作成
     branch = next_branch_name(args.branch_prefix)
-    # 追従元のフェッチ（失敗しても続ける）
     sh(["git", "fetch", args.remote, args.base], check=False)
-    # ベースブランチへ
     sh(["git", "checkout", args.base], check=False)
-    # 新規ブランチ
     sh(["git", "checkout", "-b", branch], check=True)
 
     # 2) ファイル存在チェック＆ add
@@ -63,9 +75,11 @@ def main():
         body_arg = []
         if Path(args.body_path).exists():
             body_arg = ["-F", args.body_path]
-        # 既に同じタイトルPRがあれば gh 側でエラー→stdoutをそのまま返す
-        r = sh(["gh","pr","create","--fill","--title", args.title, "--base", args.base, "--head", branch] + (["-F", args.body_path] if body_arg else []), check=False)
-        # gh はURLを出力することが多い
+        r = sh(
+            ["gh","pr","create","--fill","--title", args.title, "--base", args.base, "--head", branch] 
+            + (body_arg if body_arg else []),
+            check=False
+        )
         out = (r.stdout or "") + (r.stderr or "")
         for line in out.splitlines():
             if line.strip().startswith("https://github.com/"):
