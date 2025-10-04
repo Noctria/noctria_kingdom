@@ -29,28 +29,25 @@ jobs:
         run: |
           set -e
           python -m pip install --upgrade pip
-          # requirements は重い/壊れていても続行
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt || echo "[smoke] requirements install failed, continuing"
           fi
-          # pytest の導入に失敗しても続行（後段で存在チェックしてスキップ）
           pip install pytest || echo "[smoke] pytest install failed, continuing"
 
-      - name: Run smoke tests (never fail on missing/empty)
+      - name: Run smoke tests (noconftest; never fail on missing/empty)
         run: |
           set -e
-          # テストディレクトリが無ければ成功で終了
           if [ ! -d tests/smoke ]; then
             echo "[smoke] no smoke tests; skipping"
             exit 0
           fi
-          # pytest コマンドが無ければ成功で終了
           if ! command -v pytest >/dev/null 2>&1; then
             echo "[smoke] pytest not available; skipping"
             exit 0
           fi
-          # 収集 0 件(終了コード 5)は成功扱い
-          pytest -q tests/smoke -k "not slow" || rc=$?; rc=${rc:-0}; \
+          # conftest を読まない（重い依存を回避）
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+          pytest -q tests/smoke --noconftest -k "not slow" || rc=$?; rc=${rc:-0}; \
           if [ "$rc" = "5" ]; then
             echo "[smoke] no tests collected"
             exit 0
