@@ -11,6 +11,10 @@ Prompt loader/builder for Noctria.
 Usage:
     from src.core.prompt_loader import load_prompt_text
     system_prompt = load_prompt_text()  # default SSOT
+
+    # For legacy code:
+    from src.core.prompt_loader import load_governance
+    system_prompt = load_governance()
 """
 
 import json
@@ -92,7 +96,6 @@ def load_prompt_text(
             "- Return ONLY a single JSON object matching the schema below. "
             "No explanations or prose outside JSON."
         )
-        # スキーマは可読性のため整形して提示（モデルはテキストとして読む）
         schema_str = json.dumps(json_contract, ensure_ascii=False, indent=2)
         parts.append("```json\n" + schema_str + "\n```")
         parts.append("")
@@ -145,8 +148,6 @@ def _read_sections_dir(dir_path: str | Path, strict: bool = False) -> Dict[str, 
                 raise ValueError(f"Top-level must be a mapping in {fp}")
             else:
                 continue
-        # ファイル名（拡張子なし）をキーの候補として使う or 中身のキーをマージ
-        # ここでは「中身の top-level キー」をすべてマージ（同名キーがあれば後勝ち）
         for k, v in data.items():
             agg[k] = v
     return agg
@@ -157,11 +158,6 @@ def _merge_maps(
     overlay: Dict[str, Any],
     prefer_sections: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Shallow merge. When keys collide:
-        - prefer_sections=True  -> overlay wins
-        - prefer_sections=False -> base wins
-    """
     if prefer_sections:
         merged = dict(base)
         merged.update(overlay)
@@ -187,7 +183,7 @@ def _flatten_section(title: str, content: Any) -> str:
 
 
 def _append_lines(lines: List[str], content: Any, level: int) -> None:
-    bullet = "-"  # 単純な箇条書き
+    bullet = "-"
     indent = "  " * level
 
     if isinstance(content, Mapping):
@@ -206,6 +202,15 @@ def _append_lines(lines: List[str], content: Any, level: int) -> None:
                 lines.append(f"{indent}{bullet} {it}")
     else:
         lines.append(f"{indent}{bullet} {content}")
+
+
+# ====== Backward compatibility alias ======
+def load_governance(path: str = DEFAULT_SSOT) -> str:
+    """
+    Alias for backward compatibility.
+    Old code may import `load_governance`, which maps to `load_prompt_text`.
+    """
+    return load_prompt_text(ssot_path=path)
 
 
 # ====== Optional: quick CLI for debugging ======
