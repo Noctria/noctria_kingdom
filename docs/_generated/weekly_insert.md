@@ -8,3 +8,4 @@
 - `docs/_generated/diff_report.md`
 - `docs/_generated/weekly_insert.md`
 
+- trigger: 2025-10-04T17:14:58+09:00
