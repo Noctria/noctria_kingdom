@@ -12,6 +12,7 @@ jobs:
       contents: read
       checks: read
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -44,6 +45,10 @@ jobs:
       - name: Evaluate CI statuses
         id: eval
         if: steps.guard.outputs.should_run == 'true'
+=======
+      - name: Evaluate CI statuses
+        id: eval
+>>>>>>> origin/main
         uses: actions/github-script@v7
         with:
           script: |
@@ -51,6 +56,7 @@ jobs:
             const pr = context.payload.pull_request;
             const sha = pr.head.sha;
 
+<<<<<<< HEAD
             // Checks (GitHub Actions)
             const checks = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
             const runs = checks.data.check_runs || [];
@@ -64,6 +70,18 @@ jobs:
 
             function isGreen(name) {
               const okRun = runs.some(r => (r.name === name || (r.name||"").includes(name)) && r.conclusion === "success");
+=======
+            const checks = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
+            const runs = checks.data.check_runs || [];
+
+            const statuses = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha });
+            const contexts = (statuses.data.statuses || []).map(s => ({ context: s.context, state: s.state }));
+
+            const required = ["ruff","ruff-format"];
+
+            function isGreen(name) {
+              const okRun = runs.some(r => (r.name === name || r.name?.includes?.(name)) && r.conclusion === "success");
+>>>>>>> origin/main
               const okCtx = contexts.some(c => c.context === name && c.state === "success");
               return okRun || okCtx;
             }
@@ -72,7 +90,11 @@ jobs:
             core.setOutput("failed", failed.join(","));
 
       - name: Soft-block if not green
+<<<<<<< HEAD
         if: steps.guard.outputs.should_run == 'true' && steps.eval.outputs.failed != ''
+=======
+        if: steps.eval.outputs.failed != ''
+>>>>>>> origin/main
         uses: actions/github-script@v7
         with:
           script: |
@@ -89,5 +111,9 @@ jobs:
             await github.rest.pulls.update({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number, state: "closed" });
 
       - name: All good (post info)
+<<<<<<< HEAD
         if: steps.guard.outputs.should_run == 'true' && steps.eval.outputs.failed == ''
+=======
+        if: steps.eval.outputs.failed == ''
+>>>>>>> origin/main
         run: echo "All required checks passed (ruff, ruff-format)"
